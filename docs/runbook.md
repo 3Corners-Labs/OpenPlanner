@@ -592,7 +592,9 @@ proxy-check`, CI step *proxy check*) runs against the bundled proxy in every cer
 
 With a reverse proxy of your own (`--no-tls`) the script does not run against it; ask its
 operator for the same: TLS 1.2 and 1.3 only, HSTS (the app already sends it, do not strip it),
-`X-Forwarded-*` set and not passed through from the client, and run `address-check`.
+`X-Forwarded-*` set and not passed through from the client, the browser's `Sec-Fetch-*` and
+`Sec-Purpose` headers passed on unchanged (without them the audited downloads of the admin
+portal lose their cross-site guard, see `docs/threat-model.md`), and run `address-check`.
 
 ### Go-live check of the public address (ADR 0086)
 

@@ -8,11 +8,14 @@
  * 2. every term of `do_not_name`, also inside compounds, and a whole row (a dt with its dd), table
  *    column or form field whose label holds such a term;
  * 3. versions: release numbers, the label dev, commit ids, digests, and the values of the version
- *    fields named in `versionFields`. Dates and times stay.
+ *    fields named in `versionFields`;
+ * 4. the year: each number of `years` that stands on its own, in a date, a heading or a field, so
+ *    a screenshot does not show when it was taken. Day, month and time stay, and no other year
+ *    is ever shown in its place.
  */
 
 /** Return the boxes to cover: {kind, label, context, x, y, w, h} in CSS pixels of the viewport. */
-export function detect({ product, terms, versionFields, versionTexts }) {
+export function detect({ product, terms, versionFields, versionTexts, years }) {
   const esc = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const NAME = product ? new RegExp(esc(product), 'gi') : null;
   const TERMS = terms.length
@@ -25,7 +28,9 @@ export function detect({ product, terms, versionFields, versionTexts }) {
     '(?<![\\w-])dev(?![\\w-])',
   ].join('|'), 'g');
   const NO_VERSION = versionTexts.length ? new RegExp(versionTexts.map(esc).join('|'), 'gi') : null;
-  const patterns = [[NAME, 'product'], [TERMS, 'term'], [VERSION, 'version'], [NO_VERSION, 'version']].filter(([re]) => re);
+  const YEAR = years.length ? new RegExp(`(?<![\\p{L}\\p{N}])(?:${years.join('|')})(?![\\p{L}\\p{N}])`, 'gu') : null;
+  const patterns = [[NAME, 'product'], [TERMS, 'term'], [VERSION, 'version'], [NO_VERSION, 'version'], [YEAR, 'year']]
+    .filter(([re]) => re);
   const hits = (re, text) => { re.lastIndex = 0; return re.test(text || ''); };
   const named = (text) => Boolean(TERMS) && hits(TERMS, text);
   const clean = (text) => (text || '').replace(/\s+/g, ' ').trim();
@@ -61,7 +66,9 @@ export function detect({ product, terms, versionFields, versionTexts }) {
     while ((m = re.exec(text))) {
       if (!m[0]) { re.lastIndex++; continue; }
       const x = left + measure(el, text.slice(0, m.index));
-      const atEnd = m.index + m[0].length >= text.trimEnd().length;
+      // A match at the end runs to the edge, where scrolled text ends; a date field's year is
+      // followed by its picker, so its box stays the year's width.
+      const atEnd = el.type !== 'date' && m.index + m[0].length >= text.trimEnd().length;
       const w = atEnd ? right - x : Math.min(measure(el, m[0]) * 1.08 + 4, right - x);
       if (w > 1) push(kind, m[0], snippet(text), { left: x, top: r.top, width: w, height: r.height });
     }
@@ -104,9 +111,15 @@ export function detect({ product, terms, versionFields, versionTexts }) {
     }
   }
 
+  // A date field holds 2026-11-09 but shows the browser's own format (09-11-2026 in nl-NL), so a
+  // match is measured in what it shows. No page has a datetime-local, month or week field; one
+  // would be measured on its ISO value, so it needs its shown format here first.
+  const DAY = new Intl.DateTimeFormat(navigator.language, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
+  const shownValue = (el) => (el.type === 'date' && el.valueAsDate
+    ? DAY.format(el.valueAsDate) : el.value || el.getAttribute('placeholder') || '');
   for (const el of document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea')) {
     if (!shown(el)) continue;
-    const value = el.value || el.getAttribute('placeholder') || '';
+    const value = shownValue(el);
     for (const [re, kind] of patterns) {
       if (!hits(re, value)) continue;
       if (el.tagName === 'TEXTAREA') push(kind, 'tekstvak', snippet(value), el.getBoundingClientRect());

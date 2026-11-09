@@ -73,7 +73,7 @@
     <button type="submit" class="button button--secondary">{{ _("admin.audit.apply") }}</button>
     {% if filters.active %}<a href="/admin/audit">{{ _("admin.audit.clear") }}</a>{% endif %}
   </div>
-  {% if can("audit.export") %}<p><a href="/admin/audit/export.csv{% if filters.query %}?{{ filters.query }}{% endif %}" download>{{ _("admin.audit.export") }}</a></p>{% endif %}
+  {% if can("audit.export") %}<p><a href="/admin/audit/export.csv{% if filters.query %}?{{ filters.query }}{% endif %}">{{ _("admin.audit.export") }}</a></p>{% endif %}
 </form>
 {{ error_message(export_error) }}
 <p role="status">{% if events | length >= limit %}{{ _("admin.audit.count_newest", count=events | length) }}{% else %}{{ _("admin.audit.count", count=events | length) }}{% endif %}</p>

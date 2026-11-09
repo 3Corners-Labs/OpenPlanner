@@ -260,8 +260,9 @@ wat een nieuwe versie raakt. Eén opdracht doet het hele rondje:
 
 1. **Opnemen.** De nieuwe versie wordt lokaal gebouwd en gevuld met voorbeeldgegevens: verzonnen
    deelnemers boeken, verplaatsen en annuleren via de echte schermen, rond de opnamedatum. Per
-   schermafdruk loopt een script daarna het echte gebruikerspad door. Versienummers worden in beeld
-   afgedekt; de echte versie staat op de titelpagina. De vorige opname blijft ernaast bewaard.
+   schermafdruk loopt een script daarna het echte gebruikerspad door. Versienummers en het jaartal
+   worden in beeld afgedekt; de echte versie en datum staan op de titelpagina. De vorige opname
+   blijft ernaast bewaard.
 2. **Controleren.** Een controlescript vergelijkt de handleidingen met de software (zie de tabel).
 3. **Herstellen.** Een knop of schermtekst die alleen een andere naam kreeg, vervangt het script
    zelf in de bron. Al het andere komt als bevinding in het controlerapport.

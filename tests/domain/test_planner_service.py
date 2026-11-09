@@ -1,3 +1,4 @@
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from datetime import timedelta
 
@@ -19,7 +20,8 @@ from app.domain.services import BookingService
 from app.domain.usage import ActorClass, FactKind, UsageFact
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
-from tests.support.admin import AUDITOR, GROUP_ADMIN, OTHER_TEAM
+from tests.support.admin import AUDITOR, GROUP_ADMIN, OTHER_TEAM, SUPER
+from tests.support.cross_group import booking_id_methods, refused_as_unknown
 from tests.support.domain import (
     ADA,
     MONDAY,
@@ -98,17 +100,6 @@ async def test_a_move_that_causes_a_shortfall_needs_confirmation(
     moved = await planner.move(GROUP_ADMIN, "demo", first, SLOT_0930, accept_shortfall=True)
 
     assert moved.start == SLOT_0930
-
-
-async def test_a_booking_of_another_group_cannot_be_reached_through_this_group(
-    planner: PlannerService, bookings: BookingService
-) -> None:
-    other = await _book(bookings, slug="andere-team")
-
-    with pytest.raises(DomainError, match="booking_not_found"):
-        await planner.move(GROUP_ADMIN, "demo", other, SLOT_0930)
-    with pytest.raises(DomainError, match="booking_not_found"):
-        await planner.cancel(GROUP_ADMIN, "demo", other, ChangeReason.STAFFING)
 
 
 async def test_a_full_slot_stays_full(planner: PlannerService, bookings: BookingService) -> None:
@@ -376,20 +367,16 @@ async def test_a_planner_confirms_for_the_participant_who_gets_the_full_confirma
     )
 
 
-async def test_only_a_pending_booking_of_the_own_group_can_be_confirmed(
+async def test_only_a_pending_booking_can_be_confirmed(
     planner: PlannerService, bookings: BookingService
 ) -> None:
     confirmed = await _book(bookings)
-    other = await _book(bookings, slug="andere-team")
     with pytest.raises(DomainError) as not_pending:
         await planner.confirm(GROUP_ADMIN, "demo", confirmed)
-    with pytest.raises(DomainError) as elsewhere:
-        await planner.confirm(GROUP_ADMIN, "demo", other)
     with pytest.raises(DomainError) as refused:
         await planner.confirm(AUDITOR, "demo", confirmed)
 
     assert not_pending.value.code.value == "booking_not_pending"
-    assert elsewhere.value.code.value == "booking_not_found"
     assert refused.value.code.value == "not_permitted"
 
 
@@ -489,25 +476,64 @@ async def test_a_pending_booking_can_be_cancelled_but_not_asked_to_rebook(
     assert uow.state.bookings[second.booking.id or 0].status is BookingStatus.PENDING_CONFIRMATION
 
 
-async def test_a_pending_booking_of_another_group_is_not_found_through_this_group(
-    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+STAFFING = ChangeReason.STAFFING
+NEXT_0900 = SLOT_0900 + timedelta(days=7)
+ON_ONE_BOOKING: dict[str, Callable[[PlannerService, int], Awaitable[object]]] = {
+    "booking": lambda s, b: s.booking(GROUP_ADMIN, "demo", b),
+    "move": lambda s, b: s.move(GROUP_ADMIN, "demo", b, SLOT_0930),
+    "confirm": lambda s, b: s.confirm(GROUP_ADMIN, "demo", b),
+    "cancel": lambda s, b: s.cancel(GROUP_ADMIN, "demo", b, STAFFING),
+    "request_rebook": lambda s, b: s.request_rebook(GROUP_ADMIN, "demo", b, STAFFING),
+    "booking_proposal": lambda s, b: s.booking_proposal(GROUP_ADMIN, "demo", b),
+    "propose": lambda s, b: s.propose(GROUP_ADMIN, "demo", b, SLOT_0930, STAFFING),
+    "withdraw": lambda s, b: s.withdraw(GROUP_ADMIN, "demo", b),
+    "confirm_proposal": lambda s, b: s.confirm_proposal(GROUP_ADMIN, "demo", b),
+}
+"""Every use case on one booking, by the group admin of ``demo`` through their own group."""
+
+
+async def _booking_in(
+    group: str, state: str, planner: PlannerService, bookings: BookingService
+) -> int:
+    """Book in ``group``: pending, confirmed, with an open proposal, or cancelled."""
+    if state == "pending":
+        receipt = await book_pending(bookings, slug=group, contact=another_participant())
+    else:
+        receipt = await book_another(bookings, slug=group)
+    booking_id = receipt.booking.id or 0
+    if state == "proposed":
+        await planner.propose(SUPER, group, booking_id, NEXT_0900, STAFFING)
+    if state == "cancelled":
+        await bookings.cancel(receipt.management_token)
+    return booking_id
+
+
+def test_every_use_case_on_one_booking_is_tried_through_another_group() -> None:
+    assert set(ON_ONE_BOOKING) == booking_id_methods(PlannerService)
+
+
+@pytest.mark.parametrize("state", ["pending", "confirmed", "proposed", "cancelled"])
+@pytest.mark.parametrize("group", ["andere-team", "demo-twee"])
+@pytest.mark.parametrize("action", list(ON_ONE_BOOKING))
+async def test_another_groups_booking_is_not_found_through_this_group(
+    action: str,
+    group: str,
+    state: str,
+    planner: PlannerService,
+    bookings: BookingService,
+    uow: InMemoryUnitOfWork,
 ) -> None:
-    """The group check comes before the pending booking's own rules: no hint that it exists."""
-    receipt = await book_pending(bookings, slug="andere-team", contact=another_participant())
-    other = receipt.booking.id or 0
-    reason = ChangeReason.STAFFING
-    attempts = (
-        lambda: planner.move(GROUP_ADMIN, "demo", other, SLOT_0930),
-        lambda: planner.cancel(GROUP_ADMIN, "demo", other, reason),
-        # Its own rule would answer booking_not_active: the group check comes first.
-        lambda: planner.request_rebook(GROUP_ADMIN, "demo", other, reason),
-    )
+    """The group check comes first: no hint that the booking exists, nothing changed.
 
-    for attempt in attempts:
-        with pytest.raises(DomainError, match="booking_not_found"):
-            await attempt()
+    The booking is in another organisation's group or in a sibling group of ``demo``. Each use
+    case acts on it in one of the first three states (``confirm`` on a pending one,
+    ``withdraw`` and ``confirm_proposal`` on a proposed one, the others on a confirmed one), so
+    a missing group check fails. A cancelled one is refused by each use case's own rule with
+    another code, so a group check made after that rule fails too.
+    """
+    other = await _booking_in(group, state, planner, bookings)
 
-    assert uow.state.bookings[other].status is BookingStatus.PENDING_CONFIRMATION
+    await refused_as_unknown(uow, other, ON_ONE_BOOKING[action](planner, other))
 
 
 async def test_a_pending_booking_is_told_by_email_only_and_the_team_gets_no_withdrawal(

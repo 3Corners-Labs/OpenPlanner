@@ -24,7 +24,7 @@ from app.domain.scheduling import ScheduleRule, TimeWindow
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
-from tests.support.admin import AUDITOR, GROUP_ADMIN, SUPER
+from tests.support.admin import AUDITOR, GROUP_ADMIN
 from tests.support.domain import (
     NOW,
     SLOT_0900,
@@ -469,21 +469,6 @@ async def test_the_planner_withdraws_or_confirms_a_proposal(
     assert caught.value.code is ErrorCode.PROPOSAL_NOT_OPEN
     details = {e.detail for e in uow.state.audit}
     assert {"planner.withdraw", "planner.confirm_proposal"} <= details
-
-
-async def test_another_groups_booking_cannot_be_reached_through_this_group(
-    planner: PlannerService, bookings: BookingService
-) -> None:
-    booking_id, _ = await _book(bookings)
-    await planner.propose(GROUP_ADMIN, "demo", booking_id, NEXT_0900, ChangeReason.STAFFING)
-
-    with pytest.raises(DomainError) as withdrawn:
-        await planner.withdraw(SUPER, "demo-twee", booking_id)
-    with pytest.raises(DomainError) as confirmed:
-        await planner.confirm_proposal(SUPER, "demo-twee", booking_id)
-
-    assert withdrawn.value.code is ErrorCode.BOOKING_NOT_FOUND
-    assert confirmed.value.code is ErrorCode.BOOKING_NOT_FOUND
 
 
 async def test_a_slot_without_a_free_agent_is_not_proposed(

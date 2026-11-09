@@ -2,7 +2,9 @@
 
 A ``content-disposition`` filename is lower-case letters, digits, dots and hyphens only: no
 quote, path separator, control character or non-ASCII letter can end up in a header. The five
-places that set the header are pinned, so a new download has to be added here.
+places that set the header are pinned, so a new download has to be added here. The header names
+the file, so no link carries the HTML ``download`` attribute: with it the browser saves whatever
+comes back as that file, a login page after the session ended or a refusal included.
 """
 
 import re
@@ -35,6 +37,16 @@ def test_only_the_known_modules_set_a_content_disposition() -> None:
     }
 
     assert found == DOWNLOAD_MODULES  # a new download: add its test below, then this set
+
+
+def test_no_link_carries_the_download_attribute() -> None:
+    marked = [
+        str(path.relative_to(APP))
+        for path in APP.rglob("*.html")
+        if re.search(r"<a\b[^>]*\sdownload\b", path.read_text(encoding="utf-8"))
+    ]
+
+    assert marked == []  # ``content-disposition`` names the file; see the module docstring
 
 
 @pytest.mark.parametrize(

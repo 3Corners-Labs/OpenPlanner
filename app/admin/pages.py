@@ -266,10 +266,10 @@ ALERT_POPUP_LABELS = {
 def back_href(request: Request) -> str:
     """Return the current page as the "return to" target of the profile menu's forms.
 
-    The path is ``page_path`` (a GET returns to itself, a page rendered by a POST to the page
-    that sent the form) and the query is filtered like a link's (``kept_query``), so typed
-    input is never echoed into the form; ``preference_routes`` still checks the value with
-    ``safe_next``.
+    The path is ``page_path`` (a GET returns to itself, a page rendered by a POST or by a
+    download to the page that asked for it) and the query is filtered like a link's
+    (``kept_query``), so typed input is never echoed into the form; ``preference_routes``
+    still checks the value with ``safe_next``.
     """
     query = urlencode(kept_query(request))
     path = page_path(request)

@@ -153,7 +153,8 @@ FLOWS: dict[str, Flow] = {
     "## Flow: TLS termination (ADR 0030)": Flow((CHANGE, JOB)),
     "## Flow: public address and round trip (ADR 0086)": Flow((PUBLIC, ADDRESS)),
     "## Flow: public pages and language choice": Flow((PUBLIC,)),
-    "### `GET` routes with an effect (V3.5.3)": Flow((PUBLIC,)),
+    # The login callback is one of these routes; a forged one leaves an ``admin.login`` refusal.
+    "### `GET` routes with an effect (V3.5.3)": Flow((PUBLIC, LOGIN)),
     "### Redirects (V3.7.2)": Flow(
         no_event="an unsafe target is replaced by the safe default; nothing is refused, so "
         "there is no caller to attribute"
