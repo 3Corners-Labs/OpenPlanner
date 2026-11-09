@@ -12,7 +12,8 @@ name: backport
 # and which the repository allows for the decision gate only. The merge queue pushes one squash
 # commit `Title (#N)` per pull request. `find`, which holds no secret, runs
 # `release_line.py backports`: it walks the push with the decision gate's own `queue_commits`
-# (a commit that names no pull request fails the run), reads each pull request once, refuses
+# (a commit that names no pull request, or two that name the same one, fail the run), reads
+# each pull request once, refuses
 # one whose merge commit is not the commit that named it, and keeps one entry per line its
 # `backport:X.Y` labels name. A label set after the merge: run the workflow by hand,
 # `gh workflow run backport.yml -f pull_request=N` (digits only).
@@ -72,8 +73,8 @@ jobs:
           else
             listed=(--base "$BEFORE" --head "$GITHUB_SHA")
           fi
-          # A failed read, a commit that names no pull request or a refused pull request fails
-          # the run (it can be re-run); a backport is never skipped quietly.
+          # A failed read, a commit that names no pull request, a pull request named twice or
+          # a refused pull request fails the run (it can be re-run); never a quiet skip.
           found="$(python3 -m scripts.release_line backports \
             --repository "$GITHUB_REPOSITORY" "${listed[@]}")"
           echo "backports=$found" >> "$GITHUB_OUTPUT"

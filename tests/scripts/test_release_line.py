@@ -301,14 +301,21 @@ def test_a_pushed_commit_that_names_no_pull_request_stops_the_run(
     assert "names no pull request: chore: pushed by hand" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize("its_own_first", [False, True])
 def test_a_pull_request_named_by_two_pushed_commits_stops_the_run(
-    git: Git, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    git: Git, tmp_path: Path, capsys: pytest.CaptureFixture[str], its_own_first: bool
 ) -> None:
-    """``Merge pull request #5 ... (#6)`` and then #5 itself: #6 is never skipped quietly."""
-    pushed(git, tmp_path, "Merge pull request #5 from a fork (#6)", "fix: one (#5)")
+    """``Merge pull request #5 ... (#6)`` and #5 itself: #6 is never skipped quietly.
+
+    #5's merge commit is its own commit, so only the repeated number can stop the run.
+    """
+    own, other = "fix: one (#5)", "Merge pull request #5 from a fork (#6)"
+    subjects = [own, other] if its_own_first else [other, own]
+    commits = pushed(git, tmp_path, *subjects)
+    five = {**PULLS[5], "merge_commit_sha": commits[subjects.index(own)]}
 
     push = ["backports", "--repository", "o/r", "--base", "main", "--head", "pushed"]
-    assert release_line.main(push, FakeGh(pulls=PULLS)) == 1
+    assert release_line.main(push, FakeGh(pulls={**PULLS, 5: five})) == 1
     assert "#5 is named by two pushed commits" in capsys.readouterr().err
 
 

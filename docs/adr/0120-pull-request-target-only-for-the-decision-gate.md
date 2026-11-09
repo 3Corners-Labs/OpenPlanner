@@ -97,7 +97,8 @@ Options weighed:
    `push` to `main` that a merge makes, and from `workflow_dispatch` with a pull request's
    number (digits only, passed on as one argument). A first job without secrets runs
    `scripts/release_line.py backports`: it walks the push with the decision gate's own
-   `queue_commits` (a commit that names no pull request fails the run, as in the gate), reads
+   `queue_commits` (a commit that names no pull request fails the run, as in the gate, and so
+   do two commits that name the same one), reads
    each pull request once and lists one cherry-pick per line its labels name (`backport:X.Y`,
    the rule of ADR 0116). A pull request that is not merged into `main` (yet), or whose merge
    commit is not the pushed commit that named it (a subject such as
@@ -231,7 +232,8 @@ merges on green after review, not after `po:approved`.
   pull_request=N`; before the merge it works as before. The workflow that holds the release
   app's key starts only from a merge to `main` or from a dispatch by someone with write
   access, and backports only pull requests merged into `main`. A push whose commit names no
-  pull request fails the run instead of skipping a backport quietly.
+  pull request, or two commits that name the same one, fails the run instead of skipping a
+  backport quietly.
 - A brownout or a missing policy cannot be fixed by re-running: the run has no job. A new
   event on the pull request starts a new run (runbook).
 - Not known from GitHub's documentation: whether a policy without an actor rule changes who
