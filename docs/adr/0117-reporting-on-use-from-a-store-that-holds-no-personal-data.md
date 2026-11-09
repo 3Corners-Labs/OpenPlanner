@@ -453,7 +453,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 6b | Bring *Volume* and *Capacity* to the mockup ([`docs/reporting-mockups.md`](../reporting-mockups.md)): figure tiles, day bars, stacked outcome bar, *split by*, per-table suppression note | | planned |
 | 7 | *Team* screen and `usage_staff_hour` (setting off by default, folding on removal) | | planned |
 | 8 | CSV export of the screen and the tidy `openplanner.usage/1` file, limits, audit event | #652 | merged |
-| 9 | Machine API `/api/v1/reports/usage`, API client scope, `docs/reporting-api.md`, schemathesis | | planned |
+| 9 | Machine API `/api/v1/reports/usage`, API client scope, `docs/reporting-api.md`, schemathesis | #678 | merged |
 | 10 | Digest: subscriptions (*Digest* sub-tab), `reports.digest` job, templates `nl`/`en`, run records | | planned |
 | 11 | Facts to log destinations (`usage.fact`, non-staff, hour and bucket only) | | planned |
 | 12 | `report-charts.js`: tooltips, focus, series toggles, SVG/PNG download, drill-down links; script CSP on report pages; JS-off and axe runs | | planned |
