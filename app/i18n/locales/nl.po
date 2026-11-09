@@ -11581,6 +11581,8 @@ msgstr "geen adres bekend: krijgt de mail niet"
 
 msgid "reports.digest.no_address_count"
 msgstr "{count} heeft geen bekend adres en wordt overgeslagen"
+msgid "settings.field.reporting_usage_events_to_log.label"
+msgstr "Gebruiksfeiten ook naar de logdoelen sturen"
 msgid "admin.agenda.propose"
 msgstr "Nieuwe tijd voorstellen"
 

@@ -11568,6 +11568,8 @@ msgstr "no address known: will not get the mail"
 
 msgid "reports.digest.no_address_count"
 msgstr "{count} has no known address and is skipped"
+msgid "settings.field.reporting_usage_events_to_log.label"
+msgstr "Also send usage facts to the log destinations"
 msgid "admin.agenda.propose"
 msgstr "Propose a new time"
 

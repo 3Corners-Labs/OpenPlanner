@@ -455,7 +455,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 8 | CSV export of the screen and the tidy `openplanner.usage/1` file, limits, audit event | #652 | merged |
 | 9 | Machine API `/api/v1/reports/usage`, API client scope, `docs/reporting-api.md`, schemathesis | | planned |
 | 10 | Digest: subscriptions (*Digest* sub-tab), `reports.digest` job, templates `nl`/`en`, run records | #679 | merged |
-| 11 | Facts to log destinations (`usage.fact`, non-staff, hour and bucket only) | | planned |
+| 11 | Facts to log destinations (`usage.fact`, non-staff, hour and bucket only) | #675 | merged |
 | 12 | `report-charts.js`: tooltips, focus, series toggles, SVG/PNG download, drill-down links; script CSP on report pages; JS-off and axe runs | | planned |
 | 13 | Wallboard: `view=wallboard`, kiosk layout, live tiles on the shared fragment poll, stale state, wait alert, `reports.wallboard.view` | | planned |
 | 14 | Display links: creation, hash, expiry, revocation, kiosk session, audit, manual and threat model | | planned |
@@ -635,6 +635,17 @@ per step:
 - **Steps 12–14:** endpoint or job (Q1): `view=wallboard`, display-link routes and the kiosk session (`require_permission` or the kiosk cookie on one route); PII risk (Q3): a chart label or tooltip, a token in a URL or log; failing test (Q4): JS-off page test, label-as-text test, revoked-link and redirect tests, stale-board test.
 - **Steps 11:** endpoint or job (Q1): no route; PII risk (Q3): the `usage.fact` log event; failing test (Q4): masked-stream test.
 
+**Step 11 notes (no change of a decision):** the line `usage.fact` is written after the commit of the transaction that
+wrote the fact, as an ordinary structured log line (`app/domain/usage_log.py`: `fact_fields`), so it travels the same
+stdout line, level filter, masking processor and destination tap as every other line, and a rolled-back change leaves no
+line. `SqlTransaction` collects the committed non-team facts (`written_usage`) and `SqlUnitOfWork._emit` writes them when
+`reporting_usage_events_to_log` is on (class C, off by default, read live in the web and the worker). A failing write is
+the logged `usage.emit_failed` and never fails the request. A line holds the allow-listed fields of the fact, the UTC hour
+and the duration *bucket* (signed for Q3) instead of the seconds; the organisation and group are ids, because the fact holds
+no slug. Category is *operations* at level info, so a destination receives it at `min_level` info or lower; the
+destination's own category filter does not apply to it. Team facts are never written. `tests/adapters/db/test_usage_to_log.py`
+asserts on a captured stream that the line is there only when asked, only after commit, never for a team fact, and that the
+masking has nothing to mask.
 **Step 8 notes (no change of a decision):** the CSV writer of the audit export moved unchanged to
 `app/domain/csv_export.py` (`ExportLimits`, `export_window`, `safe_cell`, `to_csv`, plus `checksum`); the audit
 export keeps its event name and its columns and writes through it (`audit_export.audit_csv`), so there is one
