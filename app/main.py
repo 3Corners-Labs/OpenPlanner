@@ -153,6 +153,7 @@ from app.domain.trial_call_service import TrialCallService
 from app.domain.usage_api_service import UsageApiLimits, UsageApiService
 from app.domain.usage_export_service import UsageExportService
 from app.domain.usage_report_service import UsageReportService
+from app.domain.wallboard_service import WallboardService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
 from app.keys import (
@@ -486,6 +487,14 @@ def create_app(
             lambda: live().reporting_min_cell_size,
             lambda organisation: per_organisation(organisation).reporting_org_min_cell_size,
             lambda organisation: per_organisation(organisation).reporting_staff_view_enabled,
+        )
+        app.state.wallboard_service = WallboardService(
+            uow,
+            app.state.usage_report_service,
+            clock,
+            lambda organisation: (
+                per_organisation(organisation).reporting_wallboard_wait_alert_minutes
+            ),
         )
         app.state.digest_admin = DigestAdmin(
             uow,

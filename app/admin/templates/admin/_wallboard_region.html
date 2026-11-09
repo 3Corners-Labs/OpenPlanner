@@ -1,0 +1,15 @@
+{#- The wallboard (ADR 0117 point 20): a live region around the fragment, with the title, the date and the controls that stay when the fragment is swapped. Without the script it is the board as loaded and a Refresh link; static/live-region.js reveals the pause button and keeps the fragment current. -#}
+<div class="wb" data-live data-stale-after="{{ stale_after }}">
+  <div class="wb__top">
+    {% if kiosk_layout %}<h1 class="wb__title">{{ organisation_name }}{% if board_groups|length == 1 %} · {{ board_name }}{% endif %}</h1>{% else %}<h2 class="wb__title" id="wb-title">{{ board_name }}</h2>{% endif %}
+    <span class="wb__date">{{ day_text }}</span>
+    <span class="wb__controls">
+      <button type="button" class="button button--secondary button--small wb__pause" data-live-pause aria-pressed="false" hidden>
+        <span class="wb__pause-off">{{ _("reports.wallboard.pause") }}</span><span class="wb__pause-on">{{ _("reports.wallboard.resume") }}</span>
+      </button>
+      <a class="button button--secondary button--small" href="{{ here }}">{{ _("reports.wallboard.refresh_now") }}</a>
+    </span>
+  </div>
+  <p class="visually-hidden" role="status" aria-live="polite" data-live-announce></p>
+  {% include "admin/_wallboard.html" %}
+</div>

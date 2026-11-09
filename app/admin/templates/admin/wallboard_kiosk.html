@@ -1,0 +1,11 @@
+{#- The wallboard full screen (ADR 0117 point 20): no menu and no report links, only the board and the way back. It is the same board, the same permission and the same session as the framed one. -#}
+{% extends "admin/_shell.html" %}
+{% block title %}{{ _("reports.view.wallboard") }} · {{ board_name }}{% endblock %}
+{% block body_attributes %} class="admin admin--kiosk" data-theme="dark"{% endblock %}
+{% block page %}
+<main id="content" class="wb-screen" tabindex="-1">
+  {% include "admin/_wallboard_region.html" %}
+  <p class="wb-screen__exit"><a href="{{ exit }}">{{ _("reports.wallboard.exit") }}</a></p>
+</main>
+{% endblock %}
+{% block scripts %}<script src="{{ static_url('live-region.js') }}" defer></script>{% endblock %}

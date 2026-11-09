@@ -1137,6 +1137,27 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "written while it is off (ADR 0117 point 9).",
     ),
     S(
+        "reporting_wallboard_refresh_seconds",
+        K.INT,
+        10,
+        _C,
+        T.RETENTION,
+        "How often the wallboard asks for fresh figures, in seconds (ADR 0117 point 20).",
+        minimum=5,
+        maximum=120,
+    ),
+    S(
+        "reporting_wallboard_wait_alert_minutes",
+        K.INT,
+        5,
+        _D,
+        T.RETENTION,
+        "A wait of the own queue beyond this many minutes shows on the wallboard with the words "
+        "long wait (ADR 0117 point 20).",
+        minimum=1,
+        maximum=60,
+    ),
+    S(
         "reporting_usage_events_to_log",
         K.BOOL,
         False,

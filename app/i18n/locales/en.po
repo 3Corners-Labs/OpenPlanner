@@ -10481,6 +10481,12 @@ msgstr "Smallest count in the organisation's reports"
 msgid "settings.field.reporting_staff_view_enabled.label"
 msgstr "Show the load of each team member in the reports"
 
+msgid "settings.field.reporting_wallboard_refresh_seconds.label"
+msgstr "Seconds between two updates of the wallboard"
+
+msgid "settings.field.reporting_wallboard_wait_alert_minutes.label"
+msgstr "Minutes of waiting after which the wallboard says long wait"
+
 msgid "settings.field.reporting_export_max_rows.label"
 msgstr "Most rows in a CSV export of a usage report"
 
@@ -10855,6 +10861,111 @@ msgstr "Capacity"
 
 msgid "reports.view.channels"
 msgstr "Channels"
+
+msgid "reports.view.wallboard"
+msgstr "Wallboard"
+
+msgid "reports.wallboard.lead"
+msgstr "A live display of today for a screen in the team's room. Counts only: no names, references or links."
+
+msgid "reports.wallboard.open_kiosk"
+msgstr "Open full screen"
+
+msgid "reports.wallboard.groups"
+msgstr "Groups on this board"
+
+msgid "reports.wallboard.pause"
+msgstr "Pause updates"
+
+msgid "reports.wallboard.resume"
+msgstr "Resume updates"
+
+msgid "reports.wallboard.refresh_now"
+msgstr "Refresh now"
+
+msgid "reports.wallboard.exit"
+msgstr "Back to the report"
+
+msgid "reports.wallboard.paused"
+msgstr "Updates are paused. The figures are as of {time}, not current."
+
+msgid "reports.wallboard.stale"
+msgstr "The data is old since {time}. The figures below are not current."
+
+msgid "reports.wallboard.stale.announce"
+msgstr "The wallboard could not be refreshed. Its figures are old since {time}."
+
+msgid "reports.wallboard.long_wait"
+msgstr "long wait"
+
+msgid "reports.wallboard.long_wait.announce"
+msgstr "Long wait: someone has waited longer than the limit of the organisation."
+
+msgid "reports.wallboard.long_wait.beyond"
+msgstr "longer than the limit of the organisation"
+
+msgid "reports.wallboard.wait.unit"
+msgstr "minutes and seconds, the first in the queue"
+
+msgid "reports.wallboard.refresh"
+msgstr "updates every {n} seconds"
+
+msgid "reports.wallboard.live.none"
+msgstr "Live figures are shown for groups with an own queue, to readers who may work the queue."
+
+msgid "reports.wallboard.as_of"
+msgstr "as of {time}"
+
+msgid "reports.wallboard.tile.waiting"
+msgstr "Waiting now"
+
+msgid "reports.wallboard.tile.longest"
+msgstr "Longest wait"
+
+msgid "reports.wallboard.tile.connected"
+msgstr "In a call"
+
+msgid "reports.wallboard.tile.connected.groups"
+msgstr "{n} of {m} groups have an own queue"
+
+msgid "reports.wallboard.tile.connected.detail"
+msgstr "participants in a call now"
+
+msgid "reports.wallboard.tile.today"
+msgstr "Appointments today"
+
+msgid "reports.wallboard.tile.today.noshows"
+msgstr "no-shows so far"
+
+msgid "reports.wallboard.tile.block"
+msgstr "Fill of the current block"
+
+msgid "reports.wallboard.tile.block.next"
+msgstr "Next block: {percent}%"
+
+msgid "reports.wallboard.tile.failed"
+msgstr "Failed hand-overs, this hour and the one before"
+
+msgid "reports.wallboard.tile.failed.detail"
+msgstr "task or meeting not created at the provider"
+
+msgid "reports.wallboard.bars.title"
+msgstr "Appointments per hour today"
+
+msgid "reports.wallboard.bars.hour"
+msgstr "Hour"
+
+msgid "reports.wallboard.bars.state"
+msgstr "State"
+
+msgid "reports.wallboard.bars.now"
+msgstr "the running hour"
+
+msgid "reports.wallboard.bars.planned"
+msgstr "planned, still to come"
+
+msgid "reports.wallboard.bars.note"
+msgstr "Lightly shaded bars are appointments still to come. Counts only, no names."
 
 msgid "reports.views.label"
 msgstr "Report"
@@ -11481,6 +11592,9 @@ msgid "settings.field.reporting_api_rate_per_minute.label"
 msgstr "Calls per minute per API client to the usage API"
 msgid "authz.permission.reports_staff_view"
 msgstr "See the load per team member in the reports"
+
+msgid "authz.permission.reports_wallboard_view"
+msgstr "Show the live wallboard of the groups"
 
 msgid "authz.permission.reports_digest_manage"
 msgstr "Manage the digest of the reports"

@@ -126,6 +126,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `REPORTING_RETENTION_MONTHS` | int | `25` | 13–60 | `settings.platform.manage` | Months the hourly usage rollup is kept; 25 gives two full years and the running one (ADR 0117). |
 | `REPORTING_ROLLUP_INTERVAL_MINUTES` | int | `15` | 5–240 | `settings.platform.manage` | Minutes between two rollups of usage facts into the hourly table; System status warns when the rollup is four times this behind (ADR 0117). |
 | `REPORTING_MIN_CELL_SIZE` | int | `5` | 3–20 | `settings.platform.manage` | The smallest count a usage report shows; a smaller cell reads < n and its sum and mean are hidden. Never below 3 (ADR 0117 point 8). |
+| `REPORTING_WALLBOARD_REFRESH_SECONDS` | int | `10` | 5–120 | `settings.platform.manage` | How often the wallboard asks for fresh figures, in seconds (ADR 0117 point 20). |
 | `REPORTING_USAGE_EVENTS_TO_LOG` | bool | `false` | — | `settings.platform.manage` | Also write every usage fact as the log line usage.fact for the log destinations: counts and codes only, no personal data (ADR 0117 point 15). |
 | `REPORTING_EXPORT_MAX_ROWS` | int | `100000` | 1000–1000000 | `settings.platform.manage` | Most rows one CSV export of a usage report may hold; more is refused (ADR 0117 point 12). |
 | `REPORTING_EXPORT_MAX_DAYS` | int | `400` | 31–1100 | `settings.platform.manage` | Most days one CSV export of a usage report may cover (ADR 0117 point 12). |
@@ -212,6 +213,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 |---|---|---|---|---|---|
 | `REPORTING_ORG_MIN_CELL_SIZE` | int | `3` | 3–50 | `settings.organisation.manage` | The smallest count the organisation's own usage reports show. It can only raise the platform value; the larger of the two applies (ADR 0117 point 8). |
 | `REPORTING_STAFF_VIEW_ENABLED` | bool | `false` | — | `settings.organisation.manage` | Whether the load of each team member (calls handled, call minutes, claims, on-time share) is written and shown on the Team report. Off by default: no team fact is written while it is off (ADR 0117 point 9). |
+| `REPORTING_WALLBOARD_WAIT_ALERT_MINUTES` | int | `5` | 1–60 | `settings.organisation.manage` | A wait of the own queue beyond this many minutes shows on the wallboard with the words long wait (ADR 0117 point 20). |
 | `REPORTING_DIGEST_SEND_HOUR` | int | `7` | 0–23 | `settings.organisation.manage` | The local hour (in the organisation's time zone) the digest of the reports is sent (ADR 0117 point 16). |
 | `REPORTING_DIGEST_INCLUDE_NUMBERS` | bool | `true` | — | `settings.organisation.manage` | Whether the digest mail holds the figures; off, it holds only the link to the report (ADR 0117 point 16). |
 | `AGENT_CHANGE_REQUESTS_ENABLED` | bool | `false` | — | `settings.organisation.manage` | Whether a bot may ask to cancel or move this organisation's bookings by phone number and appointment code, and whether pages and messages show that code (ADR 0023 step 2). |

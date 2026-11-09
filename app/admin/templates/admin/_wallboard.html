@@ -1,0 +1,67 @@
+{#- The wallboard's live fragment (ADR 0117 point 20): rendered inside the page and on its own for static/live-region.js, which swaps it in every ``poll_seconds``. Counts only. Every tile says what it is made from and as of when; the old-data banner and the paused sentence are in the markup and shown by the region's data-stale and data-paused. -#}
+{% from "admin/_usage_tables.html" import cell with context %}
+<div class="wb__fragment" data-live-fragment data-poll="{{ poll }}" data-poll-seconds="{{ poll_seconds }}">
+  <span data-live-status hidden>{% if board.long_wait %}{{ _("reports.wallboard.long_wait.announce") }}{% endif %}</span>
+  <span data-live-stale-status hidden>{{ _("reports.wallboard.stale.announce", time=as_of_clock) }}</span>
+  <p class="wb__banner wb__banner--stale" id="wb-stale">{{ _("reports.wallboard.stale", time=as_of_clock) }}</p>
+  <p class="wb__banner wb__banner--paused">{{ _("reports.wallboard.paused", time=as_of_clock) }}</p>
+  <ul class="wb__tiles" role="list">
+    <li class="wb__tile">
+      <span class="wb__label">{{ _("reports.wallboard.tile.waiting") }}</span>
+      <span class="wb__n">{% if board.live %}{{ board.live.waiting }}{% else %}–{% endif %}</span>
+      <span class="wb__s">{% if board.live %}{{ _("reports.wallboard.refresh", n=poll_seconds) }}{% else %}{{ _("reports.wallboard.live.none") }}{% endif %}</span>
+      <span class="wb__asof">{{ _("reports.wallboard.as_of", time=as_of_clock) }}</span>
+    </li>
+    <li class="wb__tile{% if board.long_wait %} wb__tile--alert{% endif %}">
+      <span class="wb__label">{{ _("reports.wallboard.tile.longest") }}</span>
+      <span class="wb__n">{% if board.live %}{{ wait }}{% else %}–{% endif %}</span>
+      <span class="wb__s">{% if board.long_wait %}<strong class="wb__tag">{{ _("reports.wallboard.long_wait") }}</strong> {{ _("reports.wallboard.long_wait.beyond") }}{% elif board.live %}{{ _("reports.wallboard.wait.unit") }}{% else %}{{ _("reports.wallboard.live.none") }}{% endif %}</span>
+      <span class="wb__asof">{{ _("reports.wallboard.as_of", time=as_of_clock) }}</span>
+    </li>
+    <li class="wb__tile">
+      <span class="wb__label">{{ _("reports.wallboard.tile.connected") }}</span>
+      <span class="wb__n">{% if board.live %}{{ board.live.connected }}{% else %}–{% endif %}</span>
+      <span class="wb__s">{% if board.live and board.live.groups != board.live.of_groups %}{{ _("reports.wallboard.tile.connected.groups", n=board.live.groups, m=board.live.of_groups) }}{% elif board.live %}{{ _("reports.wallboard.tile.connected.detail") }}{% else %}{{ _("reports.wallboard.live.none") }}{% endif %}</span>
+      <span class="wb__asof">{{ _("reports.wallboard.as_of", time=as_of_clock) }}</span>
+    </li>
+    <li class="wb__tile">
+      <span class="wb__label">{{ _("reports.wallboard.tile.today") }}</span>
+      <span class="wb__n">{{ cell(board.appointments, board.threshold) }}</span>
+      <span class="wb__s">{{ _("reports.wallboard.tile.today.noshows") }}: {{ cell(board.no_shows, board.threshold) }}</span>
+      <span class="wb__asof">{% if rolled_clock %}{{ _("reports.wallboard.as_of", time=rolled_clock) }}{% else %}{{ _("reports.usage.not_yet") }}{% endif %}</span>
+    </li>
+    <li class="wb__tile">
+      <span class="wb__label">{{ _("reports.wallboard.tile.block") }}</span>
+      <span class="wb__n">{% if board.block_now_percent is none %}–{% else %}{{ board.block_now_percent }}%{% endif %}</span>
+      <span class="wb__s">{% if board.block_now_percent is none %}{{ _("reports.unavailable") }}{% endif %}{% if board.block_next_percent is not none %}{% if board.block_now_percent is none %} · {% endif %}{{ _("reports.wallboard.tile.block.next", percent=board.block_next_percent) }}{% endif %}</span>
+      <span class="wb__asof">{{ _("reports.wallboard.as_of", time=as_of_clock) }}</span>
+    </li>
+    <li class="wb__tile">
+      <span class="wb__label">{{ _("reports.wallboard.tile.failed") }}</span>
+      <span class="wb__n">{{ cell(board.failed, board.threshold) }}</span>
+      <span class="wb__s">{{ _("reports.wallboard.tile.failed.detail") }}</span>
+      <span class="wb__asof">{% if rolled_clock %}{{ _("reports.wallboard.as_of", time=rolled_clock) }}{% else %}{{ _("reports.usage.not_yet") }}{% endif %}</span>
+    </li>
+  </ul>
+  <figure class="wb__strip">
+    <figcaption>{{ _("reports.wallboard.bars.title") }}</figcaption>
+    <svg class="wb__bars" viewBox="0 0 {{ bar_view_width }} {{ bar_height + 34 }}" aria-hidden="true" focusable="false">
+      <line class="wb__grid" x1="4" x2="{{ bar_view_width - 4 }}" y1="{{ bar_height + 14 }}" y2="{{ bar_height + 14 }}"/>
+      {% for bar in bars %}
+      {% if bar.height %}<rect class="wb__bar{% if bar.planned %} wb__bar--planned{% endif %}{% if bar.current %} wb__bar--now{% endif %}" x="{{ bar.x }}" y="{{ bar.y }}" width="{{ bar_width }}" height="{{ bar.height }}"/>{% endif %}
+      <text class="wb__hour" x="{{ bar.x + bar_width // 2 }}" y="{{ bar_height + 30 }}" text-anchor="middle">{{ bar.hour }}</text>
+      <text class="wb__val" x="{{ bar.x + bar_width // 2 }}" y="{{ bar.y - 3 }}" text-anchor="middle">{% if bar.count is none %}&lt;{{ board.threshold }}{% else %}{{ bar.count }}{% endif %}</text>
+      {% endfor %}
+    </svg>
+    <table class="visually-hidden">
+      <caption>{{ _("reports.wallboard.bars.title") }}</caption>
+      <thead><tr><th scope="col">{{ _("reports.wallboard.bars.hour") }}</th><th scope="col">{{ _("reports.count") }}</th><th scope="col">{{ _("reports.wallboard.bars.state") }}</th></tr></thead>
+      <tbody>
+        {% for bar in bars %}
+        <tr><th scope="row">{{ bar.hour }}</th><td>{{ cell(bar.count, board.threshold) }}</td><td>{% if bar.current %}{{ _("reports.wallboard.bars.now") }}{% elif bar.planned %}{{ _("reports.wallboard.bars.planned") }}{% endif %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="wb__note">{{ _("reports.wallboard.bars.note") }}</p>
+  </figure>
+</div>

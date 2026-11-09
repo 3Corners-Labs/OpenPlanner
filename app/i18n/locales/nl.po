@@ -10494,6 +10494,12 @@ msgstr "Kleinste aantal in de rapporten van de organisatie"
 msgid "settings.field.reporting_staff_view_enabled.label"
 msgstr "Toon de werklast per teamlid in de rapporten"
 
+msgid "settings.field.reporting_wallboard_refresh_seconds.label"
+msgstr "Seconden tussen twee verversingen van het wallboard"
+
+msgid "settings.field.reporting_wallboard_wait_alert_minutes.label"
+msgstr "Minuten wachten waarna het wallboard lange wachttijd meldt"
+
 msgid "settings.field.reporting_export_max_rows.label"
 msgstr "Meeste rijen in een CSV-export van een gebruiksrapport"
 
@@ -10868,6 +10874,111 @@ msgstr "Capaciteit"
 
 msgid "reports.view.channels"
 msgstr "Kanalen"
+
+msgid "reports.view.wallboard"
+msgstr "Wallboard"
+
+msgid "reports.wallboard.lead"
+msgstr "Een live weergave van vandaag voor een scherm in de teamruimte. Alleen aantallen: geen namen, referenties of links."
+
+msgid "reports.wallboard.open_kiosk"
+msgstr "Open schermvullend"
+
+msgid "reports.wallboard.groups"
+msgstr "Groepen op dit bord"
+
+msgid "reports.wallboard.pause"
+msgstr "Pauzeer verversen"
+
+msgid "reports.wallboard.resume"
+msgstr "Ga door met verversen"
+
+msgid "reports.wallboard.refresh_now"
+msgstr "Nu verversen"
+
+msgid "reports.wallboard.exit"
+msgstr "Terug naar het rapport"
+
+msgid "reports.wallboard.paused"
+msgstr "Verversen staat gepauzeerd. De getallen zijn van {time}, niet actueel."
+
+msgid "reports.wallboard.stale"
+msgstr "Gegevens zijn oud sinds {time}. De getallen hieronder zijn niet actueel."
+
+msgid "reports.wallboard.stale.announce"
+msgstr "Het wallboard kon niet worden ververst. De getallen zijn oud sinds {time}."
+
+msgid "reports.wallboard.long_wait"
+msgstr "lange wachttijd"
+
+msgid "reports.wallboard.long_wait.announce"
+msgstr "Lange wachttijd: iemand wacht langer dan de grens van de organisatie."
+
+msgid "reports.wallboard.long_wait.beyond"
+msgstr "langer dan de grens van de organisatie"
+
+msgid "reports.wallboard.wait.unit"
+msgstr "minuten en seconden, de eerste in de wachtrij"
+
+msgid "reports.wallboard.refresh"
+msgstr "ververst elke {n} seconden"
+
+msgid "reports.wallboard.live.none"
+msgstr "Live getallen zie je voor groepen met een eigen wachtrij, als je de wachtrij mag werken."
+
+msgid "reports.wallboard.as_of"
+msgstr "per {time}"
+
+msgid "reports.wallboard.tile.waiting"
+msgstr "Wachtend nu"
+
+msgid "reports.wallboard.tile.longest"
+msgstr "Langste wachttijd"
+
+msgid "reports.wallboard.tile.connected"
+msgstr "In gesprek"
+
+msgid "reports.wallboard.tile.connected.groups"
+msgstr "{n} van {m} groepen hebben een eigen wachtrij"
+
+msgid "reports.wallboard.tile.connected.detail"
+msgstr "deelnemers nu in gesprek"
+
+msgid "reports.wallboard.tile.today"
+msgstr "Afspraken vandaag"
+
+msgid "reports.wallboard.tile.today.noshows"
+msgstr "no-shows tot nu toe"
+
+msgid "reports.wallboard.tile.block"
+msgstr "Bezetting huidig blok"
+
+msgid "reports.wallboard.tile.block.next"
+msgstr "Volgend blok: {percent}%"
+
+msgid "reports.wallboard.tile.failed"
+msgstr "Mislukte doorzettingen, dit uur en het uur ervoor"
+
+msgid "reports.wallboard.tile.failed.detail"
+msgstr "taak of vergadering niet aangemaakt bij de aanbieder"
+
+msgid "reports.wallboard.bars.title"
+msgstr "Afspraken per uur vandaag"
+
+msgid "reports.wallboard.bars.hour"
+msgstr "Uur"
+
+msgid "reports.wallboard.bars.state"
+msgstr "Toestand"
+
+msgid "reports.wallboard.bars.now"
+msgstr "het lopende uur"
+
+msgid "reports.wallboard.bars.planned"
+msgstr "gepland, nog te komen"
+
+msgid "reports.wallboard.bars.note"
+msgstr "Vaag gearceerde staven zijn afspraken die nog komen. Alleen aantallen, geen namen."
 
 msgid "reports.views.label"
 msgstr "Rapport"
@@ -11494,6 +11605,9 @@ msgid "settings.field.reporting_api_rate_per_minute.label"
 msgstr "Aanroepen per minuut per API-client naar de gebruiks-API"
 msgid "authz.permission.reports_staff_view"
 msgstr "De werklast per teamlid in de rapporten bekijken"
+
+msgid "authz.permission.reports_wallboard_view"
+msgstr "Het live wallboard van de groepen tonen"
 
 msgid "authz.permission.reports_digest_manage"
 msgstr "Samenvattingen van de rapporten beheren"

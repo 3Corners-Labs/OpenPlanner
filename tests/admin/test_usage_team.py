@@ -72,7 +72,7 @@ async def test_switched_on_the_organisation_admin_sees_the_team_by_name(site: Si
     page = (await site.client.get(f"{ORG_USAGE}?view=team&{RANGE}")).text
 
     nav = page.split('class="report-views"', 1)[1].split("</nav>", 1)[0]
-    assert nav.count("<a ") == 5
+    assert nav.count("<a ") == 6
     assert nav.count('aria-current="page"') == 1
     assert ORG_ADMIN.display_name in page
     assert "Voormalige teamleden" in page

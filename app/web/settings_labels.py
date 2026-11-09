@@ -57,6 +57,8 @@ SETTING_LABELS: dict[str, str] = {
     "reporting_min_cell_size": "settings.field.reporting_min_cell_size.label",
     "reporting_org_min_cell_size": "settings.field.reporting_org_min_cell_size.label",
     "reporting_staff_view_enabled": "settings.field.reporting_staff_view_enabled.label",
+    "reporting_wallboard_refresh_seconds": "settings.field.reporting_wallboard_refresh_seconds.label",  # noqa: E501
+    "reporting_wallboard_wait_alert_minutes": "settings.field.reporting_wallboard_wait_alert_minutes.label",  # noqa: E501
     "reporting_usage_events_to_log": "settings.field.reporting_usage_events_to_log.label",
     "reporting_export_max_rows": "settings.field.reporting_export_max_rows.label",
     "reporting_export_max_days": "settings.field.reporting_export_max_days.label",
