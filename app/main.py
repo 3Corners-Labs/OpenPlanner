@@ -89,6 +89,7 @@ from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.confirmation import ConfirmPolicy
 from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.contact_service import ContactService
+from app.domain.csv_export import ExportLimits
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.embedding_service import EmbeddingService
 from app.domain.entitlements import ClaimMode
@@ -144,6 +145,7 @@ from app.domain.tls import public_address
 from app.domain.tls_check import CertificateStatus, TlsWatch
 from app.domain.tls_source import CertificateSourceService
 from app.domain.trial_call_service import TrialCallService
+from app.domain.usage_export_service import UsageExportService
 from app.domain.usage_report_service import UsageReportService
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
@@ -449,6 +451,13 @@ def create_app(
             clock,
             lambda: live().reporting_min_cell_size,
             lambda organisation: per_organisation(organisation).reporting_org_min_cell_size,
+        )
+        app.state.usage_export_service = UsageExportService(
+            app.state.usage_report_service,
+            app.state.admin_service,
+            lambda: ExportLimits(
+                live().reporting_export_max_rows, live().reporting_export_max_days
+            ),
         )
         app.state.log_destination_service = LogDestinationService(
             uow,
