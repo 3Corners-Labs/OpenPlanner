@@ -454,7 +454,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 7 | *Team* screen and `usage_staff_hour` (setting off by default, folding on removal) | | planned |
 | 8 | CSV export of the screen and the tidy `openplanner.usage/1` file, limits, audit event | #652 | merged |
 | 9 | Machine API `/api/v1/reports/usage`, API client scope, `docs/reporting-api.md`, schemathesis | | planned |
-| 10 | Digest: subscriptions (*Digest* sub-tab), `reports.digest` job, templates `nl`/`en`, run records | | planned |
+| 10 | Digest: subscriptions (*Digest* sub-tab), `reports.digest` job, templates `nl`/`en`, run records | #679 | merged |
 | 11 | Facts to log destinations (`usage.fact`, non-staff, hour and bucket only) | #675 | merged |
 | 12 | `report-charts.js`: tooltips, focus, series toggles, SVG/PNG download, drill-down links; script CSP on report pages; JS-off and axe runs | | planned |
 | 13 | Wallboard: `view=wallboard`, kiosk layout, live tiles on the shared fragment poll, stale state, wait alert, `reports.wallboard.view` | | planned |
@@ -665,6 +665,38 @@ threshold are the screens' own. `reporting_export_max_days` is also capped by th
 loader until the API (step 9) reads wider ranges. The audit event `reports.export` holds `view`, the range, the
 row and hidden counts and the SHA-256, never a figure; a refusal (`too_many_rows`, `too_many_days`) is audited and
 shown on the report page (422).
+
+
+**Step 10 notes (no change of a decision, one assumption):** migration 0103 adds `report_subscriptions` (recipients as a
+comma-separated list of staff row ids; the check constraints keep `period`, weekday 0–6 and day of the month 1–28 honest) and
+`report_digest_runs` (unique on subscription and due date). A due digest is the latest date on or before now that the
+period selects, from the send hour in the group's zone (the organisation's first group's zone for an organisation-wide
+subscription); it covers the days since the last mail up to yesterday (daily: yesterday; weekly: the seven days before;
+monthly: back to the same day of the month before). The worker's `DigestRunner` claims the run record in a transaction
+before the mails go out, so a retry or a second worker sends nothing twice; a digest later than
+`reporting_digest_late_hours` is recorded as skipped; an organisation without an email channel is held back and tried
+again on the next poll. **Assumption (the staff table holds no address):** the address is read at send time from the
+bundled identity provider's directory (`StaffAddresses`, `DirectoryAddresses`, ADR 0095 and 0106), matched on the staff
+subject; a person the directory does not hold (an enterprise provider without a directory) is skipped and counted.
+Eligibility (`may_read`) evaluates the staff record's memberships, custom roles included, through `scope_for`, so the
+digest follows the matrix; superusers have no membership and are never recipients. The mail is a fixed layout with
+`reports.digest.*` text blocks (organisation override through the translator), a plain and a semantic HTML part, no logo
+and no attachment; the language is the organisation's default. Permission `reports.digest.manage` (level organisation,
+organisation admin only, requires `reports.view`) is a **decision change** to `authorization.py`. The subscriptions are a
+section of the organisation's Usage page with forms that work without JavaScript. The log lines are
+`reports.digest_run`, `reports.digest_failed`, `reports.digest_run_failed` and `reports.digest_no_mail_channel` (counts and
+error types only).
+
+
+**Open point (step 10):** staff of an organisation with its own identity provider (ADR 0083), or of a deployment without the
+bundled provider's directory, have no address the portal can read, so they get no digest. The picker and the list say so ("no
+address known"), and the run counts them as skipped. A later step could store the `email` claim at login (a new personal-data
+field on the staff record, retention of ADR 0046 applying); that is a product decision and is not built here.
+
+
+**Delivery is at most once (step 10):** the run record is claimed before the mails go out, so a crash after the claim, or a
+sender that refuses every address, loses that digest instead of sending it twice; the failures are counted in the log line
+`reports.digest_run` (`failed`). The next due date sends as usual. Retrying a failed send is a later refinement.
 
 
 ## Consequences

@@ -1661,3 +1661,51 @@ class RescheduleProposalRow(Base):
         Index("ix_reschedule_proposals_booking_id", "booking_id"),
         Index("ix_reschedule_proposals_slot_id", "slot_id"),
     )
+
+
+class ReportSubscriptionRow(Base):
+    """A digest subscription of the usage reports (ADR 0117 point 16).
+
+    ``recipients`` holds staff row ids, comma-separated; never an address. The address is read
+    from the identity provider's directory when the mail goes out.
+    """
+
+    __tablename__ = "report_subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id", ondelete="CASCADE"))
+    group_id: Mapped[int | None] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
+    period: Mapped[str] = mapped_column(String(8))
+    weekday: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    month_day: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+    recipients: Mapped[str] = mapped_column(String(1000), server_default=text("''"))
+    created_by: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        CheckConstraint("period IN ('daily', 'weekly', 'monthly')", name="period"),
+        CheckConstraint("weekday BETWEEN 0 AND 6", name="weekday"),
+        CheckConstraint("month_day BETWEEN 1 AND 28", name="month_day"),
+        Index("ix_report_subscriptions_organisation_id", "organisation_id"),
+    )
+
+
+class ReportDigestRunRow(Base):
+    """One due digest and what came of it; unique per subscription and due date."""
+
+    __tablename__ = "report_digest_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    subscription_id: Mapped[int] = mapped_column(
+        ForeignKey("report_subscriptions.id", ondelete="CASCADE")
+    )
+    due_date: Mapped[date] = mapped_column(Date())
+    status: Mapped[str] = mapped_column(String(16))
+    sent: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    skipped: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    ran_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        CheckConstraint("status IN ('sent', 'skipped_late', 'no_recipient')", name="status"),
+        UniqueConstraint("subscription_id", "due_date"),
+    )

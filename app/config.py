@@ -261,6 +261,13 @@ class Settings(BaseSettings):
     # is refused with a code, never cut short.
     reporting_export_max_rows: int = Field(default=100_000, ge=1_000, le=1_000_000)
     reporting_export_max_days: int = Field(default=400, ge=31, le=1100)
+    # ADR 0117 point 16: the digest mail. Send hour and whether the mail holds figures are the
+    # organisation's (class D); how late a missed digest is still sent and how many subscriptions an
+    # organisation may have are the platform's (class C).
+    reporting_digest_send_hour: int = Field(default=7, ge=0, le=23)
+    reporting_digest_include_numbers: bool = True
+    reporting_digest_late_hours: int = Field(default=24, ge=1, le=72)
+    reporting_digest_max_subscriptions: int = Field(default=20, ge=1, le=200)
     security_event_retention_days: int = Field(default=365, ge=30, le=3650)
     diagnostic_event_retention_days: int = Field(default=7, ge=1, le=90)
     diagnostic_mode_hours: int = Field(default=24, ge=1, le=72)

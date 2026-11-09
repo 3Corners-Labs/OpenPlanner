@@ -195,6 +195,8 @@ async def test_the_organisation_states_show_the_source() -> None:
         "queue_wait_warning_minutes",
         "queue_wait_target_minutes",
         "reporting_org_min_cell_size",
+        "reporting_digest_send_hour",
+        "reporting_digest_include_numbers",
     }
     assert (states["time_format"].source, states["time_format"].shown) == ("organisation", "12h")
     assert states["admin_timezone"].source == "default"

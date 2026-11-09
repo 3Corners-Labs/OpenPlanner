@@ -357,6 +357,44 @@ _OPERATIONS = (
         _CHECK_HOST,
     ),
     _e(
+        "reports.digest_run",
+        _OPS,
+        "info",
+        "digests sent skipped late failed",
+        "Digest run: {digests} due, {sent} mails sent, {skipped} recipients skipped, "
+        "{late} late, {failed} failed.",
+        "The worker sent the due digests of the usage reports (ADR 0117 point 16): counts only.",
+    ),
+    _e(
+        "reports.digest_failed",
+        _OPS,
+        "warning",
+        "error",
+        "A digest subscription could not be run: {error}.",
+        "One subscription stopped with an error; the others went on. Counts and the error "
+        "type only, never an address.",
+        _CHECK_HOST,
+    ),
+    _e(
+        "reports.digest_run_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The digest run failed: {error}.",
+        "The whole pass failed, for example before the schema was migrated; the worker goes on.",
+        _CHECK_HOST,
+    ),
+    _e(
+        "reports.digest_no_mail_channel",
+        _OPS,
+        "warning",
+        "digests",
+        "{digests} digests are held back: the organisation has no email channel.",
+        "A digest is due but its organisation has no way to send email; it is tried again "
+        "until it is too late.",
+        "Set up the organisation's email channel or the platform's fallback.",
+    ),
+    _e(
         "usage.fact",
         _OPS,
         "info",

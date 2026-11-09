@@ -103,6 +103,7 @@ from app.adapters.db.record_names import (
     channel_secret_name,
     organisation_records,
 )
+from app.adapters.db.report_digest import ReportDigestQueries
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
 from app.adapters.db.rollup import RollupQueries
@@ -493,6 +494,7 @@ class SqlTransaction(
     UsageRollupQueries,
     UsageSlotQueries,
     UsageReportQueries,
+    ReportDigestQueries,
     StaffQueries,
     MaintenanceQueries,
     RoleQueries,

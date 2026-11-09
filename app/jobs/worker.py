@@ -38,6 +38,7 @@ from app.adapters.integrations import (
     secret_box,
     webex_fingerprint,
 )
+from app.adapters.keycloak_directory import DirectoryAddresses, directory_from_settings
 from app.adapters.live_settings import LiveSettings
 from app.adapters.log_senders import build_sender
 from app.adapters.log_shipping import LogShipper, ship_settings
@@ -68,6 +69,7 @@ from app.domain.participant_link_service import ParticipantLinkService
 from app.domain.platform_settings import PlatformSettingsStore
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.queue_wait import NotPickedUpWatch, QueueWaitWatch
+from app.domain.report_digest_service import DigestRunner
 from app.domain.request_log import RequestEvents
 from app.domain.retention_sweep import RetentionSweep
 from app.domain.security_log import SecurityLog
@@ -77,6 +79,7 @@ from app.domain.system_log import SystemLog
 from app.domain.tls_check import TlsWatch
 from app.domain.update_service import UpdateService
 from app.domain.usage_backfill_service import UsageBackfill
+from app.domain.usage_report_service import UsageReportService
 from app.domain.usage_rollup_service import UsageRollup
 from app.domain.worker_check import WorkerHeartbeat, heartbeat_due
 from app.i18n import Translator, load_catalogues
@@ -88,6 +91,7 @@ from app.jobs.usage import backfill_usage, close_slots, roll_up_usage
 from app.keys import management_token_key, management_token_key_previous
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
 from app.web.alert_text import alert_composer
+from app.web.digest_text import compose_digest
 from app.web.fallback_text import SpaceTexts
 
 log = structlog.get_logger()
@@ -368,6 +372,27 @@ async def run_worker(
         ),
         lambda: timedelta(hours=live.settings.alert_repeat_hours),
     )
+    # ADR 0117 point 16: the digest mails of the usage reports, to staff who hold reports.view.
+    digest_texts = Translator(load_catalogues(), CachedTextOverrides(uow))
+    digest = DigestRunner(
+        uow,
+        clock,
+        UsageReportService(
+            uow,
+            AdminService(uow, clock),
+            clock,
+            lambda: live.settings.reporting_min_cell_size,
+            lambda organisation: live.for_organisation(organisation).reporting_org_min_cell_size,
+        ),
+        ConfiguredSenders(uow, http, lambda: fallback_mail(live.settings)),
+        DirectoryAddresses(directory_from_settings(settings)),
+        lambda content, locale: compose_digest(content, digest_texts.gettext, locale),
+        settings.public_base_url,
+        lambda organisation: live.for_organisation(organisation).reporting_digest_send_hour,
+        lambda organisation: live.for_organisation(organisation).reporting_digest_include_numbers,
+        lambda: live.settings.reporting_digest_late_hours,
+        settings.admin_timezone,
+    )
     # ADR 0083 point 12: the TXT records of the routing login domains.
     domains = DomainWatch(
         uow,
@@ -416,6 +441,7 @@ async def run_worker(
                     await _check_integrations(watch)
                     await _watch_health(health_watch)
                     await _notify(notifier)
+                    await _digest(digest, digest_texts)
                     await _watch_waits(waits)
                     await _watch_unpicked(unpicked)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
@@ -495,6 +521,29 @@ async def _notify(notifier: AlertNotifier) -> None:
         await notifier.run()
     except Exception as exc:  # e.g. schema not migrated yet
         log.warning("alert.notify_failed", error=type(exc).__name__)
+
+
+async def _digest(runner: DigestRunner, texts: Translator) -> None:
+    """Send the digests that are due; a failure is logged and never stops the loop (ADR 0117)."""
+    try:
+        await texts.refresh()
+        run = await runner.run()
+    except Exception as exc:  # e.g. schema not migrated yet
+        log.warning("reports.digest_run_failed", error=type(exc).__name__)
+        return
+    for error in run.errors:
+        log.warning("reports.digest_failed", error=error)
+    if run.no_channel:
+        log.warning("reports.digest_no_mail_channel", digests=run.no_channel)
+    if run.digests:
+        log.info(
+            "reports.digest_run",
+            digests=run.digests,
+            sent=run.sent,
+            skipped=run.skipped,
+            late=run.late,
+            failed=run.failed,
+        )
 
 
 async def _watch_health(watch: IntegrationHealthWatch) -> None:
