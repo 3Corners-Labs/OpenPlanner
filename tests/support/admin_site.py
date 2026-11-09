@@ -34,6 +34,10 @@ async def audit_log(site: Site) -> list[AuditEvent]:
     return [e.event for e in reversed(events)]
 
 
-async def audit_events(site: Site) -> list[tuple[str, str, Outcome, str]]:
+AuditRow = tuple[str, str, Outcome, str]
+"""An audit event as the tests compare it: actor, action, outcome and reason."""
+
+
+async def audit_events(site: Site) -> list[AuditRow]:
     """Return actor, action, outcome and reason of the newest 50 audit events, oldest first."""
     return [(e.actor, e.action, e.outcome, e.reason) for e in await audit_log(site)]

@@ -53,4 +53,5 @@ aan het IdP-team; op de pagina van de medewerker (**Medewerkers**) staat hetzelf
 
 **Downloaden als tekst** geeft dezelfde lijst als tekstbestand, één waarde per regel, met een
 regel commentaar per organisatie en groep, voor het IdP-team. Elke download staat in de
-auditlog.
+auditlog. Net als bij de export van het auditlog geeft een link ernaar op een andere website
+in een actuele browser een foutmelding.

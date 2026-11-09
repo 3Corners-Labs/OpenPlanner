@@ -5,6 +5,7 @@ module, or copy a script into a throw-away repository (the ``git`` fixture) and 
 """
 
 import importlib.util
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -15,6 +16,13 @@ from tests.support.git_repository import Git, commit_all
 SKILLS = Path(__file__).resolve().parents[2] / ".claude" / "skills"
 BASH = shutil.which("bash") or "/bin/bash"
 STACK = "verify-openplanner/scripts/stack.sh"
+
+
+def manuals_workspace(root: Path, variables: dict[str, object]) -> Path:
+    """Lay out a role-manuals workspace at ``root``: ``variables.json`` and ``evidence/``."""
+    (root / "evidence").mkdir(parents=True, exist_ok=True)
+    (root / "variables.json").write_text(json.dumps(variables))
+    return root
 
 
 def load_skill_script(relative: str) -> ModuleType:

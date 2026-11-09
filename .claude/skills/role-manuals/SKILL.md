@@ -231,14 +231,14 @@ The manuals double as evidence that the software exists, so:
   never printed.
 - Allowed edits: cropping, and grey boxes drawn on the page just before the capture, on the box
   the page reports, over what `redact.js` lists: the product name when hidden, the terms of
-  `do_not_name`, version numbers. Switch off what a real setting can switch off first (the footer
+  `do_not_name`, version numbers, the year. Switch off what a real setting can switch off first (the footer
   line on participant pages). Never replace a name with another, never a mock-up. Every capture
   and every box is in `evidence/log.md` (commit, time, role, address).
 - Observations about one installation (a display fault, a failing probe) go into
   `evidence/notes.json` of the workspace (`{"<id>": ["…"]}`), not into the code; the log adds
   them to their capture.
 - Dates are the real ones. Never put an earlier date on a manual, a screenshot or a log than the
-  day it was made.
+  day it was made, and never another year into a screenshot: its year is covered, not changed.
 - **Sample data** fills agendas, the week, reports and the audit log: fictional participants book
   from the third working day after today on, confirm, move and cancel through the same real
   paths, and the planner moves and cancels a few; the worker rolls them up into the reports every
@@ -246,8 +246,9 @@ The manuals double as evidence that the software exists, so:
   stay as the story needs them. Never dates before the software's first version and never a shifted clock: a
   screenshot shows what happened that day. A history over months needs a seed command in the
   product, which is a build step of its own.
-- **Version numbers and commit ids** are covered on every screenshot, so screenshots do not age;
-  the real software version and date stay on the title page and in the evidence log.
+- **Version numbers, commit ids and the year** (the capture's year, the one before and the five
+  after it) are covered on every screenshot, so screenshots do not age; day, month and time
+  stay, and the real software version and date stay on the title page and in the evidence log.
 
 The shot list is generated from the register; a new screen gets a `screen(...)` entry (or a
 `step(...)` when it needs actions first) in the `steps-*.mjs` file of its phase, with its id, its

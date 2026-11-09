@@ -44,7 +44,7 @@ from app.domain.authorization import (
     scope_for,
 )
 from app.domain.closure_retention import ClosureRetentionOf, default_closure_retention
-from app.domain.csv_export import ExportLimits, ExportRefused, export_window
+from app.domain.csv_export import ExportLimits, ExportRefusal, ExportRefused, export_window
 from app.domain.entitlements import Refusal
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.event_schema import Envelope, to_record
@@ -462,7 +462,7 @@ class AdminService:
                     scope, limits.max_rows + 1, replace(narrow, since=since, until=until)
                 )
             if len(entries) > limits.max_rows:
-                raise ExportRefused("too_many_rows")
+                raise ExportRefused(ExportRefusal.TOO_MANY_ROWS)
         except ExportRefused as refused:
             await self._record_export(principal, scope, narrow, Outcome.FAILURE, refused.code)
             raise

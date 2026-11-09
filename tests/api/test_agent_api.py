@@ -13,6 +13,7 @@ from app.config import Settings
 from app.domain.api_clients import IssuedSecret
 from app.domain.audit import Outcome
 from app.domain.services import BookingService
+from app.web.route_dependencies import guards
 from tests.support.agent_api import BASE, FORM, OPEN_ROUTES, SUPER, TRANSFER, Agent, agent_api
 from tests.support.configuration_package import PASSPHRASE
 from tests.support.legacy_package import package_of
@@ -284,7 +285,7 @@ def test_every_route_declares_one_scope_except_token_and_docs(agent: Agent) -> N
     routes = all_routes(mounted.app.routes)  # type: ignore[attr-defined]
 
     for route in routes:
-        found = [d.call for d in route.dependant.dependencies if isinstance(d.call, RequireScope)]
+        found = guards(route, RequireScope)
         expected = 0 if route.path in OPEN_ROUTES else 1
         assert len(found) == expected, route.path
     assert OPEN_ROUTES <= {r.path for r in routes}

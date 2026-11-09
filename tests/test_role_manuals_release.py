@@ -15,7 +15,12 @@ from pathlib import Path
 import pytest
 
 from tests.support.git_repository import Git, commit_all
-from tests.support.skill_scripts import fingerprint, image_checkout, load_skill_script
+from tests.support.skill_scripts import (
+    fingerprint,
+    image_checkout,
+    load_skill_script,
+    manuals_workspace,
+)
 
 release = load_skill_script("role-manuals/scripts/release.py")
 NAME = "2026-11-08_software-1.0.0_handleiding-2.0"
@@ -58,10 +63,9 @@ def checkout(git: Git, tmp_path: Path) -> Path:
 @pytest.fixture
 def workspace(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """A workspace whose baseline is the commit of an earlier version."""
-    root = tmp_path_factory.mktemp("workspace")
-    (root / "evidence").mkdir()
-    (root / "variables.json").write_text(json.dumps({"product": "de dienst", "commit": "d36485a6"}))
-    return root
+    return manuals_workspace(
+        tmp_path_factory.mktemp("workspace"), {"product": "de dienst", "commit": "d36485a6"}
+    )
 
 
 def _head(git: Git) -> str:

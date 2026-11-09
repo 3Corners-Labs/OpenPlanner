@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.support.skill_scripts import load_skill_script
+from tests.support.skill_scripts import load_skill_script, manuals_workspace
 
 check = load_skill_script("role-manuals/scripts/check.py")
 
@@ -152,9 +152,9 @@ def _built_workspace(
     bold: list[dict] | None = None,
 ) -> Path:
     """Write a workspace and a build/manuals.json current for it, as build.mjs writes one."""
-    for folder in ("sources", "evidence", "build"):
+    manuals_workspace(root, variables)
+    for folder in ("sources", "build"):
         (root / folder).mkdir(exist_ok=True)
-    (root / "variables.json").write_text(json.dumps(variables))
     (root / "evidence" / "shots.json").write_text("[]")
     for stem, text in (sources or {}).items():
         (root / "sources" / f"{stem}.md").write_text(text)
