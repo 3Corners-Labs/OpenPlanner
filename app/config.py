@@ -282,6 +282,9 @@ class Settings(BaseSettings):
     # ADR 0044: changes by one planner per hour above which a system event warns (never
     # blocks). Class C platform (ADR 0042, settings registry).
     planner_changes_alert_per_hour: int = Field(default=50, ge=5, le=1000)
+    # ADR 0044 §2: requests for participants' contact details by one person per hour above
+    # which a system event warns (never blocks). Class C platform.
+    contact_reveals_alert_per_hour: int = Field(default=20, ge=5, le=500)
     # ADR 0072 (announced in ADR 0043): how often the own queue, a claimed booking and the
     # participant's waiting page ask the server for a change. Class C platform.
     queue_refresh_seconds: int = Field(default=10, ge=5, le=60)

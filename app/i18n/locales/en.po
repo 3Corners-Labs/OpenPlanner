@@ -2620,6 +2620,9 @@ msgstr "appointment on hold moved"
 msgid "audit.event.planner_changes_alert"
 msgstr "Many changes by one planner"
 
+msgid "audit.event.contact_reveals_alert"
+msgstr "Many requests for contact details by one person"
+
 msgid "admin.audit.detail.planner_move"
 msgstr "booking moved by a planner"
 
@@ -2637,6 +2640,9 @@ msgstr "shortfall accepted"
 
 msgid "admin.audit.detail.changes"
 msgstr "changes in the past hour: {count}"
+
+msgid "admin.audit.detail.reveals"
+msgstr "requests for contact details in the past hour: {count}"
 
 msgid "admin.audit.detail.reason"
 msgstr "reason: {value}"
@@ -6349,6 +6355,9 @@ msgstr "Shortfall look-ahead (days)"
 
 msgid "settings.field.planner_changes_alert_per_hour.label"
 msgstr "Alert above changes per planner per hour"
+
+msgid "settings.field.contact_reveals_alert_per_hour.label"
+msgstr "Alert above requests for contact details per person per hour"
 
 msgid "admin.settings.problem.dev_placeholder"
 msgstr "holds a development placeholder; production refuses it."

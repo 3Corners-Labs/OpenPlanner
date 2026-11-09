@@ -1643,10 +1643,11 @@ class Transaction(Protocol):
         """Store a planner's acceptance; it replaces an earlier one for the same slot."""
         ...
 
-    async def count_audit_events(
-        self, actor: str, actions: Collection[str], since: datetime
-    ) -> int:
-        """Return how many of ``actor``'s events with one of ``actions`` happened since then."""
+    async def count_audit_successes(self, actor: str, action: str, since: datetime) -> int:
+        """Return how many successful events with ``action`` ``actor`` has had since then.
+
+        A refusal or a failure never counts (``app.domain.activity_alert``).
+        """
         ...
 
     async def get_closures(self, group_id: int, now: datetime) -> list[Closure]:

@@ -86,6 +86,11 @@ het nummer of het adres belt of mailt u vanuit uw eigen programma.
   zoeken, ziet ze niet.
 - Elke keer dat u ze toont, legt het auditlog vast wie dat deed, bij welk team en bij welke
   afspraak (*Contactgegevens van de deelnemer getoond*). De gegevens zelf staan er niet in.
+- Toont één persoon de contactgegevens binnen een uur vaker dan de grens van het platform
+  (standaard 20 keer), dan komt er één waarschuwing in het auditlog: *Veel verzoeken om
+  contactgegevens door één persoon*, met wie het was en hoe vaak. Ook dezelfde afspraak opnieuw
+  telt mee. Het tonen gaat gewoon door; de superuser stelt de grens in (zie
+  [Geavanceerde instellingen](advanced-settings.md)).
 - Met **Contactgegevens verbergen** haalt u ze weer van het scherm, bijvoorbeeld voordat u een
   schermafdruk maakt voor Webex-support.
 - Alleen de knop op de pagina zelf toont ze. Opent u de pagina via een gedeelde link (in een

@@ -83,6 +83,11 @@ number or the address calls or mails from your own program.
   does not see them.
 - Each time you show them, the audit log records who did, for which group and which booking
   (*Participant's contact details shown*). The details themselves are not in it.
+- When one person shows contact details more often within an hour than the platform's limit
+  (20 times by default), one warning goes into the audit log: *Many requests for contact
+  details by one person*, naming who it was and how often. The same booking again counts too.
+  The details still show; the superuser sets the limit (see
+  [Advanced settings](advanced-settings.md)).
 - **Hide contact details** takes them off the screen again, for example before you take a
   screenshot for Webex support.
 - Only the button on the page itself shows them. When you open the page through a shared link

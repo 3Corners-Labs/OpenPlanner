@@ -13,10 +13,17 @@ the web edge's call: only the button on the booking page itself
 (``app.web.protection.from_this_page``), never a shared or bookmarked address or a link on
 another page. It is a protection, so there is no setting to switch it off (ADR 0042).
 
+When one person makes more than ``contact_reveals_alert_per_hour`` requests (class C) within an
+hour, a system event warns once (abuse case: a stolen session or an insider walking many booking
+ids; ``app.domain.activity_alert``). Every request counts, also one for the same booking again,
+as in the audit log; a refused request does not. It never refuses a request: the product owner
+chose an alert on 2026-11-08, so that a planner calling many participants on a bad day is not
+stopped.
+
     reveal  bookings.view  group level  the contact details of one booking of the group
 """
 
-from app.domain.admin import AdminService, record_change, require
+from app.domain.admin import AdminService, require
 from app.domain.authorization import Permission, Principal
 from app.domain.booking import Contact
 from app.domain.lookups import group_booking
@@ -32,7 +39,8 @@ class ParticipantContactService:
     Args:
         uow: Opens database transactions.
         clock: Current time, for the audit event.
-        admin: Authorises every request and audits refusals.
+        admin: Authorises every request, audits refusals, and records each request with its
+            hourly alert (``contact_reveals_alert_per_hour``).
     """
 
     def __init__(self, uow: UnitOfWork, clock: Clock, admin: AdminService) -> None:
@@ -45,7 +53,8 @@ class ParticipantContactService:
         """Return the contact details of one booking of the group, and audit the request.
 
         The audit event is written in the same transaction that reads the booking, so the
-        details are only returned once the request is on record.
+        details are only returned once the request is on record; so is the warning when this
+        request takes the person above the hourly threshold.
 
         Returns:
             The participant's contact, or ``None`` when their personal data have been deleted
@@ -63,7 +72,7 @@ class ParticipantContactService:
             booking, _ = await group_booking(tx, slug, booking_id)
             if booking.contact is None:
                 return None
-            await record_change(
+            await self._admin.record_change(
                 tx,
                 self._clock.now(),
                 principal,

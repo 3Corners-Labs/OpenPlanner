@@ -5,6 +5,7 @@ from datetime import timedelta
 
 import pytest
 
+from app.domain.activity_alert import CHANGES_ALERT
 from app.domain.admin import AdminService
 from app.domain.alerts import FALLBACK_EVENT
 from app.domain.audit import Outcome
@@ -24,7 +25,7 @@ from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
 from tests.fakes.integrations import webex_cc
 from tests.fakes.jobs import FakeQueue, job
-from tests.support.admin import GROUP_ADMIN, OUTSIDER
+from tests.support.admin import GROUP_ADMIN, ORG_ADMIN, OUTSIDER
 from tests.support.call_jobs import WIRED, Setup, group_uow
 from tests.support.domain import NOW, TEST_TOKEN_KEY
 
@@ -63,11 +64,14 @@ def wired(**fields: object) -> Setup:
     return setup
 
 
-def service(setup: Setup, poster: Poster | None = None) -> FallbackService:
+def service(
+    setup: Setup, poster: Poster | None = None, alert_per_hour: int = 50
+) -> FallbackService:
+    thresholds = {CHANGES_ALERT: alert_per_hour}
     return FallbackService(
         setup.uow,
         setup.clock,
-        AdminService(setup.uow, setup.clock),
+        AdminService(setup.uow, setup.clock, alert_thresholds=thresholds),
         setup.integration,
         poster or Poster(),
         Texts(),
@@ -158,6 +162,17 @@ async def test_ending_by_hand_needs_bookings_manage_and_is_audited() -> None:
     assert not await fallback.end(planner, "aangifte")
     assert any(e.detail == "fallback.off" and e.actor == "o-1" for e in setup.uow.state.audit)
     _ = (GROUP_ADMIN, ORG_ADMIN)
+
+
+async def test_ending_by_hand_counts_toward_the_alert_on_many_changes_by_one_person() -> None:
+    setup = wired()
+    fallback = service(setup, alert_per_hour=0)
+    await fallback.sweep(health(HealthState.DOWN))
+
+    assert await fallback.end(ORG_ADMIN, setup.uow.state.groups[1].slug)
+
+    alerts = [e for e in setup.uow.state.audit if e.action == CHANGES_ALERT.action]
+    assert [e.detail for e in alerts] == ["actor:o-1,changes:1"]
 
 
 def runner(setup: Setup, queue: FakeQueue, fallback: FallbackService) -> JobRunner:
