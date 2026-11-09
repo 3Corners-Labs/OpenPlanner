@@ -188,11 +188,21 @@ def inside(inner: Sequence[str], outer: Sequence[str]) -> bool:
     )
 
 
+def _address(text: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    """Return ``text`` as an address, an IPv4-mapped IPv6 one (``::ffff:10.0.0.1``) as IPv4."""
+    try:
+        found = ipaddress.ip_address(text)
+    except ValueError:
+        return None
+    if isinstance(found, ipaddress.IPv6Address) and found.ipv4_mapped is not None:
+        return found.ipv4_mapped
+    return found
+
+
 def pinned_range(address: str) -> str | None:
     """Return the range an address pins to: its ``/32`` (IPv4) or ``/64`` (IPv6), else ``None``."""
-    try:
-        found = ipaddress.ip_address(address)
-    except ValueError:
+    found = _address(address)
+    if found is None:
         return None
     prefix = 32 if found.version == 4 else 64
     return str(ipaddress.ip_network(f"{found}/{prefix}", strict=False))
@@ -202,9 +212,8 @@ def allowed_from(address: str, networks: Sequence[str]) -> bool:
     """Return whether ``address`` lies in one of ``networks`` (an empty list allows any)."""
     if not networks:
         return True
-    try:
-        found = ipaddress.ip_address(address)
-    except ValueError:
+    found = _address(address)
+    if found is None:
         return False
     return any(
         found.version == net.version and found in net
@@ -222,3 +231,20 @@ def refusal_for(link: WallboardLink, address: str) -> Refusal | None:
     if link.pinned_network is not None and not allowed_from(address, (link.pinned_network,)):
         return Refusal.PIN
     return None
+
+
+def decide(
+    link: WallboardLink, now: datetime, enabled: bool, address: str, *, first_use: bool
+) -> Refusal | None:
+    """Return why a request with ``link`` is refused at ``now``, or ``None`` when it may go on.
+
+    The one rule for both kinds of request: the first use needs a link not opened yet, every
+    later one an active link; the organisation's switch must still be on; then the ACL and the
+    pin. A state that does not fit is ``Refusal.LINK`` whichever it was, so a guess learns nothing.
+    """
+    wanted = LinkStatus.NOT_OPENED if first_use else LinkStatus.ACTIVE
+    if status_of(link, now) is not wanted:
+        return Refusal.LINK
+    if not enabled:
+        return Refusal.OFF
+    return refusal_for(link, address)

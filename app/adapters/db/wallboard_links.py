@@ -172,12 +172,6 @@ class WallboardLinkQueries:
         )
         return bool(result.rowcount)  # type: ignore[attr-defined]
 
-    async def organisation_id_of_slug(self, slug: str) -> int | None:
-        """Return the id of an organisation, or ``None``."""
-        return await self._session.scalar(
-            select(OrganisationRow.id).where(OrganisationRow.slug == slug)
-        )
-
     async def group_id_in_organisation(self, organisation_id: int, slug: str) -> int | None:
         """Return the id of a group of the organisation, or ``None``."""
         return await self._session.scalar(

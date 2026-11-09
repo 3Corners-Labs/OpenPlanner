@@ -121,3 +121,9 @@ def test_the_acl_and_the_pin_both_apply_and_the_acl_is_asked_first() -> None:
     assert refusal_for(link, "10.20.4.32") is Refusal.PIN  # inside the ACL, not the pin
     assert refusal_for(link, "192.0.2.1") is Refusal.NETWORK
     assert refusal_for(_link(), "192.0.2.1") is None  # no ACL, no pin: any address
+
+
+def test_an_ipv4_mapped_ipv6_address_is_the_ipv4_address() -> None:
+    assert pinned_range("::ffff:10.20.4.31") == "10.20.4.31/32"  # not the whole ::/64
+    assert allowed_from("::ffff:10.20.4.31", ("10.20.0.0/16",))
+    assert not allowed_from("::ffff:10.21.4.31", ("10.20.0.0/16",))

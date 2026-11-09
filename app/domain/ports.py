@@ -2408,10 +2408,6 @@ class WallboardLinkStore(Protocol):
         """Record a refusal unless one was recorded after ``older_than``; ``True`` when written."""
         ...
 
-    async def organisation_id_of_slug(self, slug: str) -> int | None:
-        """Return the id of an organisation, or ``None``."""
-        ...
-
     async def group_id_in_organisation(self, organisation_id: int, slug: str) -> int | None:
         """Return the id of a group of the organisation, or ``None``."""
         ...

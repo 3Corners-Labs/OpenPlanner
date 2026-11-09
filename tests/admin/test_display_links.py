@@ -404,3 +404,29 @@ async def test_the_token_is_in_no_log_line(site: Site, capsys: pytest.CaptureFix
     assert token not in seen.out + seen.err
     assert cookie is not None
     assert cookie not in seen.out + seen.err
+
+
+async def test_a_days_value_that_is_no_ascii_number_is_refused_not_a_crash(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    await _switch_on(site)
+
+    response = await site.client.post(
+        CREATE, data={"name": "TV", "days": "\u00b2"}, headers=SAME_ORIGIN
+    )
+
+    assert response.status_code == 303
+    assert "refused=days" in response.headers["location"]
+
+
+async def test_a_post_from_another_site_is_refused(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    await _switch_on(site)
+
+    response = await site.client.post(
+        CREATE,
+        data={"name": "TV", "days": "7"},
+        headers={"origin": "https://evil.example", "sec-fetch-site": "cross-site"},
+    )
+
+    assert response.status_code == 403
+    assert TOKEN.search(response.text) is None

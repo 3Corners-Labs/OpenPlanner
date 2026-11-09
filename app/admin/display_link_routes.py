@@ -14,13 +14,18 @@ A refused form goes back to the board's page with a code (``?refused=``) like ev
 
 from dataclasses import dataclass
 from typing import Annotated
-from urllib.parse import parse_qs
 
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission, admin_service, can_function
-from app.admin.forms import raise_refusal, redirect_done, redirect_refused, refused_message
+from app.admin.forms import (
+    raise_refusal,
+    read_form,
+    redirect_done,
+    redirect_refused,
+    refused_message,
+)
 from app.admin.pages import Locale, SameOrigin, admin_moment, organisation_header, page
 from app.domain.authorization import Permission, Principal
 from app.domain.errors import DomainError, ErrorCode
@@ -146,29 +151,23 @@ async def links_context(
     }
 
 
-def _form(raw: bytes) -> dict[str, str]:
-    """Return the first value of each field of a urlencoded body."""
-    parsed = parse_qs(raw.decode("utf-8", errors="replace"), keep_blank_values=True)
-    return {k: v[0] for k, v in parsed.items() if v}
-
-
 @router.post("/organisations/{org}/usage/wallboard/links", response_model=None)
 async def link_create(
     request: Request, locale: Locale, org: str, _: SameOrigin, context: ManageLinks
 ) -> Response:
     """Make a display link and show it, once, on the page that answers this request."""
-    first = _form(await request.body())
-    days = first.get("days", "")
+    first = await read_form(request, locale)
+    days = first.values.get("days", "")
     back = f"/admin/organisations/{org}/usage?view=wallboard"
     try:
         created = await link_service(request).create(
             context.principal,
             org,
-            group_slug=first.get("group") or None,
-            name=first.get("name", ""),
-            days=int(days) if days.isdigit() and len(days) <= 3 else 0,
-            networks=first.get("networks", "")[:2000],
-            pin=first.get("pin") == "on",
+            group_slug=first.values.get("group") or None,
+            name=first.values.get("name", ""),
+            days=int(days) if days.isascii() and days.isdigit() and len(days) <= 3 else 0,
+            networks=first.values.get("networks", "")[:2000],
+            pin=first.values.get("pin") == "on",
         )
     except DomainError as error:
         raise_refusal(error)

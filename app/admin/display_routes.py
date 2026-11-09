@@ -16,11 +16,11 @@ route template (``/display/start/{token}``) is what the logs carry, never the ra
 from fastapi import APIRouter, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
+from app.admin.display_link_routes import link_service
 from app.admin.pages import Locale, templates
 from app.admin.wallboard_routes import board_context, wallboard_service
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.wallboard_link import Refusal, WallboardLink
-from app.domain.wallboard_link_service import WallboardLinkService
 from app.web.cookies import CookieSpec, cookie_for, set_cookie
 from app.web.protection import limiter, unknown_link_limit
 from app.web.templates import render
@@ -42,12 +42,6 @@ MESSAGES: dict[str, str] = {
 }
 """The words for each refusal; a pin and an ACL read the same, so the page says no more."""
 _NO_STORE = {"cache-control": "no-store", "referrer-policy": "no-referrer"}
-
-
-def link_service(request: Request) -> WallboardLinkService:
-    """Return the application's display link service."""
-    service: WallboardLinkService = request.app.state.wallboard_link_service
-    return service
 
 
 def display_cookie(request: Request) -> CookieSpec:
@@ -105,20 +99,13 @@ async def start(request: Request, locale: Locale, token: str) -> Response:
     return response
 
 
-@router.get("", response_class=HTMLResponse, response_model=None)
-async def board(request: Request, locale: Locale) -> Response:
-    """Show the wallboard of the link's group or organisation, full screen."""
-    try:
-        link = await _session(request)
-    except DomainError as error:
-        if error.code is not ErrorCode.NOT_PERMITTED:
-            raise
-        return _refused(request, locale, error)
+async def _context(request: Request, locale: Locale, link: WallboardLink) -> dict[str, object]:
+    """Return the board of the link's scope, ready for the kiosk templates (page and fragment)."""
     shown, covered = await wallboard_service(request).read_scope(
         link.scope(), link.organisation_slug, link.group_slug
     )
     refresh = request.app.state.live_settings.for_organisation(link.organisation_id)
-    context = board_context(
+    return board_context(
         request,
         locale,
         shown,
@@ -129,12 +116,23 @@ async def board(request: Request, locale: Locale) -> Response:
         here=BOARD,
         seconds=refresh.reporting_wallboard_refresh_seconds,
     )
+
+
+@router.get("", response_class=HTMLResponse, response_model=None)
+async def board(request: Request, locale: Locale) -> Response:
+    """Show the wallboard of the link's group or organisation, full screen."""
+    try:
+        link = await _session(request)
+    except DomainError as error:
+        if error.code is not ErrorCode.NOT_PERMITTED:
+            raise
+        return _refused(request, locale, error)
     response = render(
         templates,
         request,
         "admin/wallboard_kiosk.html",
         locale,
-        {**context, "exit": None},
+        {**await _context(request, locale, link), "exit": None},
         scripts=True,
     )
     response.headers["referrer-policy"] = "no-referrer"
@@ -150,19 +148,6 @@ async def live(request: Request, locale: Locale) -> Response:
         if error.code is not ErrorCode.NOT_PERMITTED:
             raise
         return Response(status_code=403, headers=_NO_STORE)
-    shown, covered = await wallboard_service(request).read_scope(
-        link.scope(), link.organisation_slug, link.group_slug
+    return render(
+        templates, request, "admin/_wallboard.html", locale, await _context(request, locale, link)
     )
-    refresh = request.app.state.live_settings.for_organisation(link.organisation_id)
-    context = board_context(
-        request,
-        locale,
-        shown,
-        covered,
-        BOARD,
-        kiosk=True,
-        poll=POLL,
-        here=BOARD,
-        seconds=refresh.reporting_wallboard_refresh_seconds,
-    )
-    return render(templates, request, "admin/_wallboard.html", locale, context)

@@ -24,7 +24,7 @@ from app.domain.admin import AdminService
 from app.domain.audit import Outcome
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.ports import Clock, WallboardLinkUnitOfWork
+from app.domain.ports import Clock, WallboardLinkStore, WallboardLinkUnitOfWork
 from app.domain.wallboard_link import (
     DAYS_FIELD,
     ENABLED_FIELD,
@@ -33,17 +33,15 @@ from app.domain.wallboard_link import (
     NETWORKS_FIELD,
     REFUSAL_EVERY,
     TOUCH_EVERY,
-    LinkStatus,
     Refusal,
     WallboardLink,
+    decide,
     hash_token,
     inside,
     new_token,
     parse_networks,
     pinned_range,
-    refusal_for,
     same_hash,
-    status_of,
 )
 
 STARTED = "wallboard.session_started"
@@ -206,29 +204,26 @@ class WallboardLinkService:
                 audited once per link and period.
         """
         now = self._clock.now()
-        refusal: Refusal | None = None
+        refusal = Refusal.LINK
         record: WallboardLink | None = None
         opened: Opened | None = None
         async with self._uow.locked() as tx:
             link = await tx.get_wallboard_link_by_token(hash_token(token))
-            if link is None or not same_hash(link.token_hash, token):
-                refusal = Refusal.LINK
-            elif status_of(link, now) is not LinkStatus.NOT_OPENED:
-                refusal = Refusal.LINK
-            elif not self._enabled(link.organisation_id):
-                refusal = Refusal.OFF
-            else:
-                refusal = refusal_for(link, address)
+            if link is not None and same_hash(link.token_hash, token):
+                found = decide(
+                    link, now, self._enabled(link.organisation_id), address, first_use=True
+                )
                 pin = pinned_range(address) if link.pin else None
-                if refusal is None and link.pin and pin is None:
-                    refusal = Refusal.NETWORK
-                if refusal is None:
+                if found is None and link.pin and pin is None:
+                    found = Refusal.NETWORK  # a pin needs an address to pin
+                if found is None:
                     secret = new_token()
                     if await tx.consume_wallboard_link(link.id or 0, now, hash_token(secret), pin):
                         opened = Opened(secret, link)
                     else:
-                        refusal = Refusal.LINK  # another request used it first
-                elif link is not None:
+                        found = Refusal.LINK  # another request used it first
+                if found is not None:
+                    refusal = found
                     record = await self._note_refusal(tx, link, now)
         if opened is not None:
             await self._admin.record(
@@ -242,7 +237,7 @@ class WallboardLinkService:
             )
             return opened
         await self._audit_refusal(record, refusal)
-        raise DomainError(ErrorCode.NOT_PERMITTED, (refusal or Refusal.LINK).value)
+        raise DomainError(ErrorCode.NOT_PERMITTED, refusal.value)
 
     async def session(self, secret: str, address: str) -> WallboardLink:
         """Return the link behind a screen's session secret, or refuse the request.
@@ -259,15 +254,13 @@ class WallboardLinkService:
             link = await tx.get_wallboard_link_by_session(hash_token(secret))
         if link is None or not same_hash(link.session_hash, secret):
             raise DomainError(ErrorCode.NOT_PERMITTED, Refusal.LINK.value)
-        if status_of(link, now) is not LinkStatus.ACTIVE:
-            raise DomainError(ErrorCode.NOT_PERMITTED, Refusal.LINK.value)
-        if not self._enabled(link.organisation_id):
-            raise DomainError(ErrorCode.NOT_PERMITTED, Refusal.OFF.value)
-        refusal = refusal_for(link, address)
+        refusal = decide(link, now, self._enabled(link.organisation_id), address, first_use=False)
         if refusal is not None:
-            async with self._uow.locked() as tx:
-                record = await self._note_refusal(tx, link, now)
-            await self._audit_refusal(record, refusal)
+            due = link.last_refused_at is None or now - link.last_refused_at >= REFUSAL_EVERY
+            if refusal in (Refusal.NETWORK, Refusal.PIN) and due:  # no write lock while it is not
+                async with self._uow.locked() as tx:
+                    record = await self._note_refusal(tx, link, now)
+                await self._audit_refusal(record, refusal)
             raise DomainError(ErrorCode.NOT_PERMITTED, refusal.value)
         if link.last_used_at is None or now - link.last_used_at >= TOUCH_EVERY:
             async with self._uow.locked() as tx:
@@ -275,13 +268,10 @@ class WallboardLinkService:
         return link
 
     async def _note_refusal(
-        self, tx_store: object, link: WallboardLink, now: datetime
+        self, store: WallboardLinkStore, link: WallboardLink, now: datetime
     ) -> WallboardLink | None:
         """Mark the refusal on the link; return the link when an event is due, else ``None``."""
-        store = tx_store
-        wrote = await store.mark_wallboard_link_refused(  # type: ignore[attr-defined]
-            link.id or 0, now, now - REFUSAL_EVERY
-        )
+        wrote = await store.mark_wallboard_link_refused(link.id or 0, now, now - REFUSAL_EVERY)
         return link if wrote else None
 
     async def _audit_refusal(self, link: WallboardLink | None, refusal: Refusal | None) -> None:
