@@ -16,7 +16,14 @@ def test_rendering_a_page_leaves_its_template_name_and_duration(tmp_path: Path) 
     translator = Translator(load_catalogues())
     locale = RequestLocale(translator.bind("nl"), remember=False, translator=translator)
     request = Request(
-        {"type": "http", "app": FastAPI(), "headers": [], "query_string": b"", "path": "/x"}
+        {
+            "type": "http",
+            "method": "GET",
+            "app": FastAPI(),
+            "headers": [],
+            "query_string": b"",
+            "path": "/x",
+        }
     )
 
     with captured_trace() as lines:
