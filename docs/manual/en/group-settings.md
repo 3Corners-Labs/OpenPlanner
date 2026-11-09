@@ -70,6 +70,29 @@ a double click. The page shows a refused participant the same "check your email"
 anyone else; only the email to that address explains why the appointment could not be made.
 A refused attempt does not appear in the agenda.
 
+<!-- field: reschedule_auto_send -->
+### Send proposals automatically
+
+Off by default. When there are too few agents for the bookings of a slot, the assistant can
+propose new times to the most recently made appointments by itself, without a planner reviewing
+them first. Switch it on only for a team that agrees to that. The participant always confirms,
+chooses another time or cancels: nothing moves without them. Every automatic proposal is in the
+audit log with the system as actor.
+
+<!-- field: reschedule_auto_delay_minutes -->
+### Wait before automatic proposals
+
+How long a shortfall must stay exactly the same before the proposals go out, from 5 to 120
+minutes. Default 15. This gives you time to correct a typing error in the staffing: when the
+shortfall changes or disappears, the waiting starts again.
+
+<!-- field: reschedule_auto_max_bookings -->
+### Most appointments for automatic sending
+
+From 1 to 100, default 10. When more appointments are affected, the assistant sends nothing and
+asks a planner to review the proposals on the agenda; the planners are told once. This keeps a
+mistake in the staffing from moving a whole day.
+
 <!-- field: dispatch_kind -->
 ### How appointments reach staff
 

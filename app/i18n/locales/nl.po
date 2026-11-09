@@ -1135,6 +1135,24 @@ msgstr "Afspraken per e-mailadres"
 msgid "admin.field.max_bookings_per_email_hint"
 msgstr "Hoeveel toekomstige afspraken één e-mailadres tegelijk bij dit team mag hebben. Hoger dan 1 zodat mensen ook voor een ander kunnen boeken. Hetzelfde adres twee keer op hetzelfde moment kan nooit. 1 tot 10."
 
+msgid "admin.field.reschedule_auto_send"
+msgstr "Voorstellen automatisch versturen"
+
+msgid "admin.field.reschedule_auto_send_hint"
+msgstr "Bij een tekort aan medewerkers stelt de assistent nieuwe tijden voor aan de laatst gemaakte afspraken, zonder dat een planner dat eerst bekijkt. Uit: de planner bekijkt elk voorstel zelf. De deelnemer bevestigt altijd zelf."
+
+msgid "admin.field.reschedule_auto_delay_minutes"
+msgstr "Wachttijd voor automatische voorstellen (minuten)"
+
+msgid "admin.field.reschedule_auto_delay_minutes_hint"
+msgstr "Zo lang moet een tekort hetzelfde blijven voordat de voorstellen worden verstuurd, zodat een typefout in de bezetting eerst hersteld kan worden. 5 tot 120."
+
+msgid "admin.field.reschedule_auto_max_bookings"
+msgstr "Hoogste aantal afspraken voor automatisch versturen"
+
+msgid "admin.field.reschedule_auto_max_bookings_hint"
+msgstr "Zijn er meer afspraken betrokken, dan verstuurt de assistent niets en vraagt hij een planner de voorstellen te bekijken. 1 tot 100."
+
 msgid "admin.field.calendar_invite_address"
 msgstr "Agenda-uitnodiging naar (eigen wachtrij)"
 
@@ -1302,6 +1320,12 @@ msgstr "In dit tijdslot zijn dan meer afspraken dan {agents}. Bevestig dat u het
 
 msgid "admin.form.error.max_bookings_per_email"
 msgstr "Vul een aantal in van 1 tot 10."
+
+msgid "admin.form.error.reschedule_auto_delay_minutes"
+msgstr "Vul een aantal minuten in van 5 tot 120."
+
+msgid "admin.form.error.reschedule_auto_max_bookings"
+msgstr "Vul een aantal in van 1 tot 100."
 
 msgid "admin.form.error.calendar_invite_address"
 msgstr "Vul een geldig e-mailadres in, of laat het veld leeg."
@@ -2619,6 +2643,12 @@ msgstr "opgeschorte afspraak verzet"
 
 msgid "audit.event.planner_changes_alert"
 msgstr "Veel wijzigingen door één planner"
+
+msgid "audit.event.planner_auto_review_waiting"
+msgstr "Automatische voorstellen wachten op een planner"
+
+msgid "audit.event.planner_auto_proposal"
+msgstr "Automatisch voorstel voor een nieuwe tijd"
 
 msgid "audit.event.contact_reveals_alert"
 msgstr "Veel verzoeken om contactgegevens door één persoon"

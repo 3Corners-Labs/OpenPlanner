@@ -71,6 +71,11 @@ SESSIONS_EVERY = timedelta(hours=1)
 REQUESTS_EVERY = timedelta(hours=1)
 """How often the bots' expired change requests are deleted; the retention is a setting."""
 
+AUTO_EVERY = timedelta(minutes=5)
+"""How often the automatic proposals of the rebooking assistant look at the short slots
+(ADR 0057 point 6): as often as the shortest delay a group may set, so a due shortfall waits
+at most this long past its delay."""
+
 STAFF_EVERY = timedelta(days=1)
 """How often staff records past their retention are erased; the period is a setting."""
 
@@ -100,6 +105,8 @@ class Housekeeping:
         prune_requests: Deletes the bots' change requests past
             ``agent_change_request_retention_days`` and returns the count (ADR 0023 step 2b);
             called once per ``REQUESTS_EVERY``.
+        auto_proposals: Sends the rebooking assistant's proposals for the groups that let it and
+            returns how many went (ADR 0057 point 6); called once per ``AUTO_EVERY``.
         backups: The directory of the update back-ups (``data/backups``), or ``None`` to leave
             them to the updater; pruned once per ``BACKUPS_EVERY``.
         rollup: Merges old booking rows into daily counts and deletes them (ADR 0102 step 4);
@@ -121,8 +128,11 @@ class Housekeeping:
         backups: Path | None = None,
         rollup: Callable[[], Awaitable[RollupResult]] | None = None,
         prune_requests: Callable[[], Awaitable[int]] | None = None,
+        auto_proposals: Callable[[], Awaitable[int]] | None = None,
     ) -> None:
         """Store the collaborators; nothing has been logged, reclaimed or erased yet."""
+        self._auto_proposals = auto_proposals
+        self._auto_proposed_at: datetime | None = None
         self._prune_requests = prune_requests
         self._requests_pruned_at: datetime | None = None
         self._rollup = rollup
@@ -161,6 +171,7 @@ class Housekeeping:
         erase_staff: Callable[[], Awaitable[int]] | None = None,
         rollup: Callable[[], Awaitable[RollupResult]] | None = None,
         prune_requests: Callable[[], Awaitable[int]] | None = None,
+        auto_proposals: Callable[[], Awaitable[int]] | None = None,
     ) -> "Housekeeping":
         """Return housekeeping that measures the SQLite file of ``database_url``."""
         return cls(
@@ -177,6 +188,7 @@ class Housekeeping:
             _backup_directory(database_url),
             rollup,
             prune_requests,
+            auto_proposals,
         )
 
     async def run(self) -> None:
@@ -189,6 +201,7 @@ class Housekeeping:
         await self._clean_admin_sessions(now)
         await self._erase_staff_records(now)
         await self._prune_change_requests(now)
+        await self._send_auto_proposals(now)
         self._prune_backups(now)
         await self._roll_up_bookings(now)
 
@@ -237,6 +250,22 @@ class Housekeeping:
         else:
             if deleted:
                 log.info("change_requests.pruned", requests=deleted)
+
+    async def _send_auto_proposals(self, now: datetime) -> None:
+        """Let the rebooking assistant propose by itself, once per ``AUTO_EVERY`` (ADR 0057)."""
+        if self._auto_proposals is None:
+            return
+        due = self._auto_proposed_at is None or now - self._auto_proposed_at >= AUTO_EVERY
+        if not due:
+            return
+        self._auto_proposed_at = now
+        try:
+            sent = await self._auto_proposals()
+        except Exception as exc:  # never stop the loop over housekeeping
+            log.warning("reschedule.auto_failed", error=type(exc).__name__)
+        else:
+            if sent:
+                log.info("reschedule.auto_sent", bookings=sent)
 
     async def _roll_up_bookings(self, now: datetime) -> None:
         """Merge old purged booking rows into daily counts, at most once per ``ROLLUP_EVERY``."""

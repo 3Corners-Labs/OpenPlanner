@@ -16,6 +16,7 @@ from app.domain.alert_model import AlertTarget, DeliveryState
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category, Outcome
 from app.domain.authorization import CustomRole, RoleCatalogue, Scope
+from app.domain.auto_rebooking import ShortfallWatch
 from app.domain.booking import (
     APPOINTMENTS,
     IN_AGENDA,
@@ -144,6 +145,7 @@ class State:
     group_holidays: dict[int, holiday_model.GroupHolidays] = field(default_factory=dict)
     closures: dict[int, Closure] = field(default_factory=dict)
     acceptances: dict[tuple[int, datetime], ShortfallAcceptance] = field(default_factory=dict)
+    watches: dict[tuple[int, datetime], ShortfallWatch] = field(default_factory=dict)
     closure_images: dict[int, ImageFile] = field(default_factory=dict)
     scenarios: dict[int, ClosureScenario] = field(default_factory=dict)
     scenario_images: dict[int, ImageFile] = field(default_factory=dict)
@@ -1356,6 +1358,17 @@ class InMemoryTransaction:
 
     async def save_shortfall_acceptance(self, acceptance: ShortfallAcceptance) -> None:
         self.state.acceptances[(acceptance.group_id, acceptance.start)] = acceptance
+
+    async def get_shortfall_watches(self, group_id: int) -> list[ShortfallWatch]:
+        return [w for (gid, _), w in sorted(self.state.watches.items()) if gid == group_id]
+
+    async def save_shortfall_watches(self, watches: Sequence[ShortfallWatch]) -> None:
+        for w in watches:
+            self.state.watches[(w.group_id, w.slot_start)] = w
+
+    async def delete_shortfall_watches(self, group_id: int, starts: Sequence[datetime]) -> None:
+        for start in starts:
+            self.state.watches.pop((group_id, start), None)
 
     async def count_audit_successes(self, actor: str, action: str, since: datetime) -> int:
         return sum(

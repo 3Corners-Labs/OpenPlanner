@@ -88,6 +88,7 @@ from app.domain.authorization import (
     Target,
     decide,
 )
+from app.domain.auto_rebooking import AUTO_PROPOSAL_EVENT, REVIEW_WAITING_EVENT
 from app.domain.booking import ChangeReason
 from app.domain.csv_export import ExportLimits, ExportRefusal, ExportRefused
 from app.domain.diagnostics import BRAKE_EVENT, DiagnosticsService
@@ -164,6 +165,8 @@ EVENT_LABELS: dict[str, str] = {
     # ADR 0044: one planner made many changes, or one person asked for many participants'
     # contact details (§2), within an hour.
     CHANGES_ALERT.action: "audit.event.planner_changes_alert",
+    REVIEW_WAITING_EVENT: "audit.event.planner_auto_review_waiting",
+    AUTO_PROPOSAL_EVENT: "audit.event.planner_auto_proposal",
     REVEALS_ALERT.action: "audit.event.contact_reveals_alert",
     # ADR 0049: entitlements and IdP values.
     ENTITLEMENT_REFUSED_EVENT: "audit.event.entitlement_refused",
@@ -241,6 +244,9 @@ DETAIL_LABELS: dict[str, str] = {
     "queue_visible_from_minutes": "admin.field.queue_visible_from_minutes",
     "queue_free_pick_allowed": "admin.field.queue_free_pick_allowed",
     "max_bookings_per_email": "admin.field.max_bookings_per_email",
+    "reschedule_auto_send": "admin.field.reschedule_auto_send",
+    "reschedule_auto_delay_minutes": "admin.field.reschedule_auto_delay_minutes",
+    "reschedule_auto_max_bookings": "admin.field.reschedule_auto_max_bookings",
     "calendar_invite_address": "admin.field.calendar_invite_address",
     "video_host_email": "admin.field.video_host_email",
     # ADR 0032: the routing is one setting; changes audited before it name the three fields.

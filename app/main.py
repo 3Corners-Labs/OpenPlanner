@@ -89,7 +89,6 @@ from app.domain.channel_service import ChannelSettingsService
 from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.closure_service import ClosureService
 from app.domain.configuration_service import ConfigurationPackageService
-from app.domain.confirmation import ConfirmPolicy
 from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.contact_service import ContactService
 from app.domain.csv_export import ExportLimits
@@ -131,10 +130,8 @@ from app.domain.ports import (
 from app.domain.proxy_watch import ProxyHeaderWatch
 from app.domain.queue_service import QueueService
 from app.domain.readiness import ReadinessService
-from app.domain.rebooking import Reach
 from app.domain.report_digest_service import DigestAdmin
 from app.domain.request_log import RequestEvents
-from app.domain.reschedule_proposal import ProposalHours
 from app.domain.roles import RoleService
 from app.domain.routing_service import RoutingService
 from app.domain.scenario_service import ScenarioService
@@ -164,6 +161,7 @@ from app.keys import (
     session_secret,
 )
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
+from app.policies import confirm_policy, proposal_hours, reach
 from app.web.alert_text import alert_composer
 from app.web.authz_labels import ROLE_LABELS
 from app.web.call_labels import agent_start_label
@@ -214,21 +212,6 @@ def oidc_provider(
     return OidcIdentityProvider(config, http)
 
 
-def _confirm_policy(settings: Settings) -> ConfirmPolicy:
-    """Return the rules for confirming a booking from one organisation's settings (ADR 0056)."""
-    return ConfirmPolicy.from_settings(
-        window_hours=settings.booking_confirm_window_hours,
-        cutoff_hours=settings.booking_confirm_cutoff_hours,
-        reminders=settings.booking_confirm_reminders,
-        min_minutes=settings.booking_confirm_min_minutes,
-    )
-
-
-def _reach(settings: Settings) -> Reach:
-    """Return how far proposed and suggested times may lie, from one organisation's settings."""
-    return Reach(settings.reschedule_search_days, settings.reschedule_time_tolerance_minutes)
-
-
 def _change_policy(settings: Settings) -> ChangePolicy:
     """Return one organisation's settings for a bot's change requests (ADR 0023 step 2).
 
@@ -238,13 +221,6 @@ def _change_policy(settings: Settings) -> ChangePolicy:
         settings.takes_change_requests,
         settings.agent_change_request_minutes,
         settings.agent_change_request_cooldown_minutes,
-    )
-
-
-def _proposal_hours(settings: Settings) -> ProposalHours:
-    """Return how long a proposal is held and when it is recalled (ADR 0057)."""
-    return ProposalHours(
-        settings.reschedule_proposal_confirm_hours, settings.reschedule_proposal_reminder_hours
     )
 
 
@@ -452,10 +428,10 @@ def create_app(
             clock,
             token_key,
             phone_region=lambda org: per_organisation(org).phone_default_region,
-            confirm_policy=lambda org: _confirm_policy(per_organisation(org)),
+            confirm_policy=lambda org: confirm_policy(per_organisation(org)),
             previous_token_key=management_token_key_previous(settings),
             closure_retention=app.state.live_settings.closure_retention,
-            reach=lambda org: _reach(per_organisation(org)),
+            reach=lambda org: reach(per_organisation(org)),
         )
         # ADR 0023 step 2: a bot's change request, confirmed by the participant.
         previous_key = management_token_key_previous(settings)
@@ -824,8 +800,8 @@ def create_app(
             app.state.booking_service,
             rebook_days=lambda org: per_organisation(org).planner_rebook_days,
             reminder_days=lambda org: per_organisation(org).planner_rebook_reminder_days,
-            proposal_hours=lambda org: _proposal_hours(per_organisation(org)),
-            reach=lambda org: _reach(per_organisation(org)),
+            proposal_hours=lambda org: proposal_hours(per_organisation(org)),
+            reach=lambda org: reach(per_organisation(org)),
         )
         app.state.role_service = RoleService(
             uow,

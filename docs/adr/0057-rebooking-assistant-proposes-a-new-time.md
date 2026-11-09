@@ -2,7 +2,7 @@
 
 Status: accepted (2026-10-30), requested by the product owner, with the choices recorded under *Choices
 made on acceptance*. Extends ADR 0044 (planner agenda, shortfalls, actions on bookings) and
-reuses the pending-confirmation mechanism of ADR 0056. Partly built, checked on 2026-10-30 (status was *proposed*): see `docs/adr-status.md` for what is built.
+reuses the pending-confirmation mechanism of ADR 0056. Built: steps 1–3 in #129, #644 and #673, step 4 in #PRNUM; see *Build status*.
 Note (2026-11-01 review): §8 sends SMS "when the participant consented", but there is no SMS
 consent: SMS goes when a phone number is known (ADR 0009, `app/domain/channels.py`).
 
@@ -62,6 +62,22 @@ after that it is released. Holding several alternative slots per booking is out 
    `reschedule_auto_max_bookings` bookings would be affected, it sends nothing and instead
    notifies the planners that a review is waiting (system event plus the agenda's summary).
    The actor in the audit is the system, with the staffing change that caused it as context.
+
+   *As built (product owner, 2026-11-09):* no group-level job and no staffing version. Staffing
+   has many sources (blocks, exceptions, holidays, closures, staff), and a version number would
+   have to be raised by every one of them. Instead a housekeeping task (`AUTO_EVERY`, five
+   minutes, the shortest delay a group may set) scans the groups that switched it on. It
+   remembers per short slot the *fingerprint* of its shortfall (agents and places taken) and
+   since when it has been the same (table `shortfall_watches`, counts and times only,
+   migration 0107). A shortfall that stayed the same for `reschedule_auto_delay_minutes` is
+   due; one that changed or disappeared starts waiting again, so a typo undone in time never
+   sends anything. Due bookings are the same ones a review would take (point 2), proposed by
+   the same assistant (point 4) with the reason `staffing`; a time that no longer fits becomes
+   "ask to rebook". Each one is an audit event `planner.auto_proposal` with the system as
+   actor (not a `bookings.manage` change, so it never counts towards the planner's hourly
+   alert). Above `reschedule_auto_max_bookings` nothing is sent and the system event
+   `planner.auto_review_waiting` tells the planners once per shortfall; the shortfall stays in
+   the agenda as always. The three settings are group columns, like `max_bookings_per_email`.
 
 7. **Holding the proposed slot.** In one transaction:
    - the original booking frees its place and gets status `awaiting_rebook` (ADR 0044), so the
@@ -148,14 +164,17 @@ The product owner chose on 2026-10-30, out of the options put to them:
 | 1 | Ranking and assignment of new times (`domain/rebooking.py`) | #129 | merged |
 | 2 | Held proposal: table `reschedule_proposals` (migration 0102) counted with the bookings that hold a place; hold, confirm, choose another time, cancel and expiry (`EXPIRE_PROPOSAL`); the proposal, reminder and release messages (nl/en, email and SMS); the participant's confirm page and suggested times; `PlannerService.propose`; the four organisation settings `reschedule_proposal_confirm_hours`, `reschedule_proposal_reminder_hours`, `reschedule_search_days`, `reschedule_time_tolerance_minutes` | #644 | merged |
 | 3 | Planner review page in the agenda (single and bulk), bulk send with fresh login, overview in *Awaiting a new time* with withdraw and confirm on behalf; the agenda counts held proposals | #673 | merged |
-| 4 | Automatic mode per group: `reschedule_auto_send`, `reschedule_auto_delay_minutes`, `reschedule_auto_max_bookings`, the `reschedule_proposals` job with the staffing-version pin |  | planned |
+| 4 | Automatic mode per group: `reschedule_auto_send`, `reschedule_auto_delay_minutes`, `reschedule_auto_max_bookings` (migration 0107), the scan with a fingerprint per short slot (`auto_rebooking.py`, `PlannerService.run_automatic`) instead of a job with a staffing version, the housekeeping task and the two audit events | #PRNUM | merged |
 
-(State as checked against the code on 2026-10-30; the overview of every ADR is `docs/adr-status.md`.)
+(State as checked against the code on 2026-11-09; the overview of every ADR is `docs/adr-status.md`.)
 
 ## Consequences
 
 - New i18n keys (nl and en) for the review page, the proposal message, its reminder and its
   expiry message; manual topics under `docs/manual/{nl,en}/` for the assistant.
+- Step 4 adds table `shortfall_watches` (migration 0107, reversible): per group and slot a fingerprint
+  and times; no personal data. The scan reads the agenda over the group's booking horizon every
+  five minutes for each group that switched it on.
 - Threat model: mass proposals by a compromised planner account (fresh login, alert per
   hour); automatic mode triggered by a malicious staffing change (delay, ceiling, audit);
   proposals into another group's slot (refused, tested); token reuse after a proposal was

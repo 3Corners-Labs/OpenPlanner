@@ -28,11 +28,12 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from app.domain import booking_changes, rebooking
+from app.domain import auto_rebooking, booking_changes, rebooking
 from app.domain.admin import AdminService, Authorization, require
 from app.domain.agenda import AgendaSlot, ShortfallAcceptance
 from app.domain.agenda_service import agenda_days
-from app.domain.authorization import Permission, Principal, scope_for
+from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
+from app.domain.authorization import Permission, Principal, Scope, scope_for
 from app.domain.booking import Booking, BookingStatus, ChangeReason, stored_id
 from app.domain.booking_changes import PlannerRule, ProposalTiming
 from app.domain.errors import DomainError, ErrorCode
@@ -45,7 +46,7 @@ from app.domain.reschedule_proposal import (
     ProposalHours,
     ProposalOutcome,
 )
-from app.domain.scheduling import Group
+from app.domain.scheduling import Group, GroupSummary
 from app.domain.services import BookingService
 from app.domain.slot_close import shortfall_resolved
 from app.domain.tunable import value_for
@@ -537,6 +538,124 @@ class PlannerService:
                     resolved = shortfall_resolved(group, slot.start, after.agents, after.booked)
                     await tx.record_usage(resolved)
         return len(choices)
+
+    async def run_automatic(self) -> int:
+        """Send the assistant's proposals for every group that lets it; return how many went.
+
+        ADR 0057 point 6, run by the worker as a housekeeping task. Per group a scan compares
+        the short slots with what earlier scans saw (``auto_rebooking.scan``): a shortfall that
+        stayed the same for ``reschedule_auto_delay_minutes`` is due, so a typo in the staffing
+        can be undone first. The due bookings get the assistant's proposal in one transaction,
+        the system as the actor and ``staffing`` as the reason. When more than
+        ``reschedule_auto_max_bookings`` are affected nothing is sent and the planners are told
+        once that a review waits.
+        """
+        async with self._uow.read() as tx:
+            groups = [
+                summary
+                for summary in await tx.list_groups(Scope(everything=True))
+                if summary.group.reschedule_auto_send
+            ]
+        sent = 0
+        for summary in groups:
+            async with self._uow.locked() as tx:
+                sent += await self._automatic(tx, summary)
+        return sent
+
+    async def _automatic(self, tx: Transaction, summary: GroupSummary) -> int:
+        """Scan one group, and send what is due and within the ceiling (``run_automatic``)."""
+        group, now = summary.group, self._clock.now()
+        agenda = await agenda_days(
+            tx, group, now.astimezone(group.tz).date(), group.horizon_days, now
+        )
+        short = [s for day in agenda for s in day.slots if s.open_shortfall and s.start >= now]
+        known = {w.slot_start: w for w in await tx.get_shortfall_watches(group.id)}
+        scan = auto_rebooking.scan(
+            group.id,
+            [
+                auto_rebooking.Seen(s.start, auto_rebooking.fingerprint_of(s.agents, s.booked))
+                for s in short
+            ],
+            known,
+            now,
+            timedelta(minutes=group.reschedule_auto_delay_minutes),
+        )
+        await tx.save_shortfall_watches(scan.store)
+        await tx.delete_shortfall_watches(group.id, scan.gone)
+        due = {w.slot_start for w in scan.due}
+        slots = [s for s in short if s.start in due]
+        movers = await self._movers(tx, group, ReviewScope(), slots) if slots else []
+        if auto_rebooking.needs_review(len(movers), group.reschedule_auto_max_bookings):
+            await self._announce_review(tx, summary, scan.due, len(movers))
+            return 0
+        rows = await self._assist(tx, group, movers) if movers else []
+        for row in rows:
+            await self._send_automatic(tx, summary, row)
+        for slot in slots:
+            after = await self._slot(tx, group, slot.start)
+            if rows and after is not None and not after.shortfall:  # ADR 0117 metric C5
+                await tx.record_usage(
+                    shortfall_resolved(group, slot.start, after.agents, after.booked)
+                )
+        return len(rows)
+
+    async def _send_automatic(
+        self, tx: Transaction, summary: GroupSummary, row: ProposalRow
+    ) -> None:
+        """Propose ``row``'s time, or ask to rebook when none fits; audited as the system."""
+        group, booking = summary.group, row.booking
+        reason = ChangeReason.STAFFING
+        proposed = row.proposed
+        if proposed is not None:
+            try:
+                await self._propose(tx, group, booking, proposed, reason)
+            except DomainError:  # the time no longer fits: the participant chooses themselves
+                proposed = None
+        if proposed is None:
+            await self._request(tx, group, booking, reason)
+        kind = "propose" if proposed is not None else "rebook"
+        await tx.add_audit_event(
+            AuditEvent(
+                self._clock.now(),
+                SYSTEM_ACTOR,
+                auto_rebooking.AUTO_PROPOSAL_EVENT,
+                Outcome.SUCCESS,
+                "",
+                summary.organisation_slug,
+                group.slug,
+                f"planner.{kind},reason:{reason.value}",
+                source=Source.SYSTEM,
+                booking_id=stored_id(booking),
+            )
+        )
+
+    async def _announce_review(
+        self,
+        tx: Transaction,
+        summary: GroupSummary,
+        due: tuple[auto_rebooking.ShortfallWatch, ...],
+        bookings: int,
+    ) -> None:
+        """Tell the planners once per shortfall that too many bookings wait for a review."""
+        fresh = [w for w in due if w.notified_at is None]
+        if not fresh:
+            return
+        now = self._clock.now()
+        await tx.save_shortfall_watches([w.notify(now) for w in fresh])
+        group = summary.group
+        await tx.add_audit_event(
+            AuditEvent(
+                now,
+                SYSTEM_ACTOR,
+                auto_rebooking.REVIEW_WAITING_EVENT,
+                Outcome.FAILURE,
+                "too_many_bookings",
+                summary.organisation_slug,
+                group.slug,
+                f"bookings:{bookings},max:{group.reschedule_auto_max_bookings}",
+                source=Source.SYSTEM,
+            )
+        )
 
     async def withdraw(self, principal: Principal, slug: str, booking_id: int) -> None:
         """Take back a booking's open proposal; it keeps awaiting a new time (point 10).

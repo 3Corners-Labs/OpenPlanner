@@ -79,6 +79,9 @@ class GroupSettings:
     queue_visible_from_minutes: int
     queue_free_pick_allowed: bool
     max_bookings_per_email: int
+    reschedule_auto_send: bool
+    reschedule_auto_delay_minutes: int
+    reschedule_auto_max_bookings: int
     calendar_invite_address: str | None
     dispatch_fallback: DispatchFallback
     fallback_space_room_id: str | None

@@ -300,6 +300,25 @@ _OPERATIONS = (
         "Housekeeping deleted change requests past `agent_change_request_retention_days`.",
     ),
     _e(
+        "reschedule.auto_sent",
+        _OPS,
+        "info",
+        "bookings",
+        "The assistant proposed new times for {bookings} bookings.",
+        "Housekeeping let the rebooking assistant send proposals for groups that switched on "
+        "automatic sending (ADR 0057 point 6).",
+    ),
+    _e(
+        "reschedule.auto_failed",
+        _OPS,
+        "warning",
+        "error",
+        "Automatic proposals could not be sent: {error}.",
+        "Housekeeping could not run the rebooking assistant's automatic proposals (ADR 0057 "
+        "point 6).",
+        "The next run, five minutes later, tries again; check the database if it keeps failing.",
+    ),
+    _e(
         "backups.pruned",
         _OPS,
         "info",
@@ -1807,6 +1826,31 @@ _AUDIT = (
         "fallbacks ended by hand. The detail names the actor and the count; nothing was refused.",
         "Ask the person whether the changes were theirs; if not, use *End all sessions* on their "
         "page under Staff, which also lists what they did.",
+    ),
+    _e(
+        "planner.auto_proposal",
+        _SYS,
+        "outcome",
+        "",
+        "The assistant moved a booking by itself.",
+        "A group lets the rebooking assistant send proposals by itself (ADR 0057 point 6): this "
+        "booking was proposed a new time, or asked to choose one, after its shortfall stayed "
+        "the same for `reschedule_auto_delay_minutes`. The system is the actor; the detail "
+        "names the action and the reason.",
+        "Nothing is needed; the participant confirms, chooses another time or cancels.",
+    ),
+    _e(
+        "planner.auto_review_waiting",
+        _SYS,
+        "outcome",
+        "",
+        "Automatic proposals wait for a planner.",
+        "A group lets the rebooking assistant send proposals by itself (ADR 0057 point 6), but a "
+        "shortfall affects more bookings than `reschedule_auto_max_bookings`, so nothing was "
+        "sent. The detail names the number of bookings and the ceiling. It is told once per "
+        "shortfall; the shortfall stays visible in the agenda.",
+        "A planner reviews the proposals on the group's agenda, or raises the ceiling on the "
+        "group's settings if sending this many by itself is acceptable.",
     ),
     _e(
         "public_address",
