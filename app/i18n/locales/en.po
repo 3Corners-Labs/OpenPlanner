@@ -710,7 +710,7 @@ msgid "admin.group.settings"
 msgstr "Settings"
 
 msgid "admin.group.slot_minutes"
-msgstr "Length of an appointment"
+msgstr "Length of a call"
 
 msgid "admin.group.minutes"
 msgstr "{minutes} minutes"
@@ -4922,7 +4922,8 @@ msgstr "No webhook secret is configured (WEBEX_WEBHOOK_SECRET or WXCC_WEBHOOK_SE
 msgid "admin.done.simulator_refused"
 msgstr "The webhook endpoint refused the event. Check the web container's log."
 
-#. Environment bar in the admin portal (dev/test only).
+#. Environment names in the admin portal: the bar (dev/test only), System status and the
+#. overview's status widget.
 
 msgid "admin.environment.label"
 msgstr "Environment"
@@ -4932,6 +4933,9 @@ msgstr "Development environment"
 
 msgid "admin.environment.test"
 msgstr "Test environment"
+
+msgid "admin.environment.prod"
+msgstr "Production environment"
 
 msgid "admin.environment.text"
 msgstr "Not for real appointments of participants."
@@ -7936,7 +7940,7 @@ msgid "admin.rights.refused_intro"
 msgstr "The identity provider sent these values at your last login, but this installation does not recognise them. Pass them on to the IdP team."
 
 msgid "admin.roles.entitlement_notice"
-msgstr "When the installation uses an entitlement claim (ADR 0049), the identity provider sends one value per organisation or group with this role's key, for example openplanner:custom.3:org-a. The key and the exact values are on the Identity provider mapping page."
+msgstr "When the installation uses an entitlement claim, the identity provider sends one value per organisation or group with this role's key, for example openplanner:custom.3:org-a. The key and the exact values are on the Identity provider mapping page."
 
 msgid "admin.form.error.idp_key"
 msgstr "Use only lower-case letters, digits and hyphens (at most 63 characters), starting with a letter or digit."

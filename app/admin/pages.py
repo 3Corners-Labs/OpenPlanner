@@ -398,11 +398,15 @@ def page(
     context: dict[str, object],
     *,
     scripts: bool = False,
+    help_link: bool = True,
 ) -> HTMLResponse:
     """Render an admin page with navigation and ``can()`` from the matrix.
 
+    The menu, the top bar and the profile menu reach the template as ``render``'s ``frame``, so
+    a page value under one of their names is refused instead of silently replaced.
     ``scripts=True`` allows the page's own scripts (``SCRIPT_CSP``); only pages that enhance
-    themselves under an ADR do (the updates page, ADR 0048).
+    themselves under an ADR do (the updates page, ADR 0048). ``help_link=False`` leaves out
+    the top bar's link to the manual (a message page: refusal, not found).
     """
     can = can_function(principal)
     home = current_home(request)
@@ -416,8 +420,7 @@ def page(
     ]
     nav = [section for section in sections if section.entries]
     on_overview = {item.key for item in overview_widgets(principal, can, overview_layout(request))}
-    topic: object = context["help_topic"] if "help_topic" in context else page_topic(request)
-    help_topic = topic if isinstance(topic, HelpTopic) else None
+    help_topic = page_topic(request) if help_link else None
     bar, more = bottom_bar(nav)
     theme = session_theme(request)
     maintenance = getattr(request.state, "maintenance_notice", None)
@@ -426,8 +429,8 @@ def page(
         request,
         name,
         locale,
-        {
-            **context,
+        context,
+        frame={
             "principal": principal,
             # The page width from the register (ADR 0080); ``admin.css`` keys on it.
             "content_width": (home.width if home else Width.STANDARD).value,
@@ -444,13 +447,12 @@ def page(
             # The menu width the admin chose from the top bar's menu button, if any.
             "nav_choice": session_nav(request),
             "alert_prefs": session_alert_prefs(request),
-            # Where the preference forms of the profile menu return to (``preference_routes``).
-            "back": back_href(request),
+            # Where the forms of the profile menu and the alert banner return to
+            # (``preference_routes``); a page's own link back (to the agenda) is its ``back``.
+            "return_to": back_href(request),
             "alert_popup_options": [
                 (key, locale.gettext(label)) for key, label in ALERT_POPUP_LABELS.items()
             ],
-            # A message page (refusal, not found) keeps ``help_topic`` None: no help link.
-            "help_topic": help_topic,
             # ADR 0060 §7: which sign-in the top-bar mark settles for once (brand-motion.js).
             "brand_signed_in": _signed_in_key(request),
             # Set by ``update_routes.load_update_notice`` for every admin route (ADR 0029).
@@ -492,13 +494,12 @@ def message(
         "title": locale.gettext(title_key),
         "message": locale.gettext(message_key),
         "back_link": back_link,
-        "help_topic": None,
-        "theme": session_theme(request),
     }
     principal = session_principal(request)
     if principal is not None:
-        response = page(request, locale, "admin/message.html", principal, context)
+        response = page(request, locale, "admin/message.html", principal, context, help_link=False)
     else:
+        context["theme"] = session_theme(request)  # the shell's theme, without the shell
         response = render(templates, request, "admin/public_message.html", locale, context)
     response.status_code = status
     return response

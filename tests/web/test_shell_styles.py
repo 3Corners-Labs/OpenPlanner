@@ -47,11 +47,13 @@ def _styled() -> set[str]:
 
 
 def _rule(selector: str) -> str:
-    """Return the declarations of the first rule of ``admin.css`` that is exactly ``selector``."""
-    sheet = CSS_COMMENT.sub("", (STATIC / "admin.css").read_text())
-    found = re.search(rf"(?:^|\n){re.escape(selector)}\s*\{{([^}}]*)\}}", sheet)
+    """Return the declarations of the first rule of ``admin.css`` whose selector is ``selector``.
+
+    A selector list spread over lines is matched with single spaces: ``"a, b"``.
+    """
+    found = [body for sel, body in _rules() if sel == selector]
     assert found, f"no rule for {selector}"
-    return found.group(1)
+    return found[0]
 
 
 @pytest.mark.parametrize("path", SHELL_TEMPLATES, ids=str)
@@ -223,3 +225,30 @@ def test_the_menu_button_and_the_mark_form_one_cluster_on_the_left() -> None:
     assert "margin: 0 0 0 calc(-1 * var(--adm-topbar-pad))" in toggle
     assert "justify-content: center" in toggle
     assert _token("--adm-rail-width") == "3.75rem"
+
+
+# --- Display faults at 1280 px, found while capturing the manual's screenshots ----------------
+# The fit itself (facts, tables, the option list) is checked in the browser: e2e/layout.mjs on
+# every admin page of e2e/pages.json at 1280 px (tests/admin-shell.spec.ts). Two things stay here.
+
+
+def test_the_participant_option_row_is_not_the_admin_option_list() -> None:
+    """Admin pages load site.css too: its ``.choice`` (a flex row) made the admin's
+    ``fieldset.choice`` of a new role one row of every permission, 7,000 px wide."""
+    site = CSS_COMMENT.sub("", (STATIC / "site.css").read_text())
+
+    assert not re.search(r"\.choice(?![\w-])", site)
+
+
+def test_a_long_system_status_state_takes_the_line_under_its_label() -> None:
+    """A proxy finding ran 600 px off the overview's card and squeezed "Proxy" to a letter.
+
+    The e2e stack runs no worker, so it never shows a long state; this checks the means.
+    """
+    item = _rule(".widget-list--status .widget-list__item")
+    template = (ADMIN_TEMPLATES / "widgets" / "status.html").read_text()
+
+    assert "flex-wrap: wrap" in item
+    assert "white-space: normal" in _rule(".chip--wrap")
+    assert "widget-list--status" in template
+    assert "chip--wrap" in template

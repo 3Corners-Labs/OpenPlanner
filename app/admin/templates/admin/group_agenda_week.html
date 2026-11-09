@@ -16,7 +16,7 @@
   <p class="card__lead">{% if week_shortfalls %}{{ icon("alert") }}{{ _("admin.agenda.week_shortfalls", count=week_shortfalls) }}{% if week_review %} <a href="{{ week_review }}">{{ _("admin.agenda.week_propose") }}</a>{% endif %}{% else %}{{ _("admin.agenda.week_no_shortfalls") }}{% endif %}</p>
   {% if rows %}
   <div class="table-scroll" role="region" aria-labelledby="week-heading" tabindex="0">
-  <table class="data-table agenda-week">
+  <table class="data-table data-table--grid agenda-week">
     <caption class="visually-hidden">{{ _("admin.agenda.week_caption", week=week_label) }}</caption>
     <thead>
       <tr>

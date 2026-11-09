@@ -120,6 +120,7 @@ from app.web.settings_labels import (
     TLS_FINDING_LABELS,
     TOPIC_LABELS,
 )
+from app.web.templates import ENVIRONMENT_LABELS
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -652,7 +653,7 @@ async def render_tab(
     }
     if tab is Tab.STATUS:
         values |= {
-            "environment": current.environment,
+            "environment_label": _(ENVIRONMENT_LABELS[current.environment]),
             "address": await address_view(request, locale, current),
             "backups": backup_view(request, locale, current),
             "usage": await usage_view(request, locale, current),

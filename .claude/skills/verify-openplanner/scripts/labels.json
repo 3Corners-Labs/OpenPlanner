@@ -33,7 +33,11 @@
     "contactShow": { "key": "admin.booking.contact_show", "text": "Contactgegevens tonen" },
     "contactHide": { "key": "admin.booking.contact_hide", "text": "Contactgegevens verbergen" },
     "contactNoPhone": { "key": "admin.booking.contact_no_phone", "text": "Niet opgegeven" },
-    "auditContactViewed": { "key": "admin.audit.detail.booking_contact_viewed", "text": "Contactgegevens van de deelnemer getoond" }
+    "auditContactViewed": { "key": "admin.audit.detail.booking_contact_viewed", "text": "Contactgegevens van de deelnemer getoond" },
+    "environmentFact": { "key": "admin.settings.status.environment", "text": "Omgeving" },
+    "environmentDev": { "key": "admin.environment.dev", "text": "Ontwikkelomgeving" },
+    "slotFact": { "key": "admin.group.slot_minutes", "text": "Duur van een gesprek" },
+    "noticeFact": { "key": "admin.group.notice", "text": "Minimale aanlooptijd" }
   },
   "subject": {
     "confirmRequest": { "key": "message.confirm_request.subject", "pattern": "^Bevestig uw afspraak met " },
