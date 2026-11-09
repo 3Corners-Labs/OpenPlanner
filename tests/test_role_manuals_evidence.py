@@ -11,6 +11,7 @@ checkout.
 import json
 import shutil
 import subprocess
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -119,9 +120,14 @@ def test_a_run_stops_on_a_recorded_start_without_a_year_before_it_needs_a_stack(
 
 
 def test_a_log_rewrite_names_the_start_and_its_years(workspace: Path) -> None:
-    """A valid start gives the log its moment and the window of that start, not of today."""
-    done = capture(workspace, "2030-03-04 10:00:00 CET", "--log-only")
+    """A valid start gives the log its moment and the window of that start, never today's.
+
+    The start lies ten years after today, so its window never overlaps the clock's.
+    """
+    year = date.today().year + 10
+    started = f"{year}-03-04 10:00:00 CET"
+    done = capture(workspace, started, "--log-only")
     assert done.returncode == 0, done.stderr
     log = (workspace / "evidence" / "log.md").read_text()
-    assert "Opname gestart 2030-03-04 10:00:00 CET" in log
-    assert "het jaartal (2029 tot en met 2035)" in log
+    assert f"Opname gestart {started}" in log
+    assert f"het jaartal ({year - 1} tot en met {year + 5})" in log
