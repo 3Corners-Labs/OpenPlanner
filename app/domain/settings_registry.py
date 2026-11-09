@@ -1419,6 +1419,36 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=600,
     ),
     S(
+        "agent_change_requests_per_hour",
+        K.INT,
+        20,
+        _C,
+        T.RATE_LIMITS,
+        "Change requests per API client per hour, next to the machine API's call limit "
+        "(ADR 0023 step 2); the off switch stays RATE_LIMIT_ENABLED.",
+        minimum=1,
+        maximum=120,
+    ),
+    S(
+        "agent_change_requests_enabled",
+        K.BOOL,
+        False,
+        _D,
+        T.PLANNER,
+        "Whether a bot may ask to cancel or move this organisation's bookings by phone number "
+        "and appointment code, and whether pages and messages show that code (ADR 0023 step 2).",
+    ),
+    S(
+        "agent_change_request_minutes",
+        K.INT,
+        60,
+        _D,
+        T.PLANNER,
+        "Minutes the participant has to confirm a bot's change request (ADR 0023 step 2).",
+        minimum=10,
+        maximum=1440,
+    ),
+    S(
         "admin_session_hours",
         K.INT,
         8,

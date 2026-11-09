@@ -34,6 +34,7 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 
 from app.domain.booking import Booking, Contact
+from app.domain.change_requests import ChangeRequest
 from app.domain.channels import ChannelKind, ReminderRule, reachable
 from app.domain.confirmation import ConfirmWindow
 from app.domain.reschedule_proposal import HeldProposal
@@ -95,6 +96,7 @@ class JobType(StrEnum):
     SEND_PROPOSAL_REMINDER = "send_proposal_reminder"
     EXPIRE_PROPOSAL = "expire_proposal"
     SEND_PROPOSAL_RELEASED = "send_proposal_released"
+    SEND_CHANGE_REQUEST = "send_change_request"
 
     @classmethod
     def _missing_(cls, value: object) -> "JobType | None":
@@ -128,6 +130,10 @@ released while the participant can still choose (ADR 0057 point 9); sent only wh
 PROPOSAL_NOTICES = frozenset({JobType.SEND_RESCHEDULE_PROPOSAL, JobType.SEND_PROPOSAL_REMINDER})
 """A proposed new time and its reminder (ADR 0057 point 8), pinned to the proposed start: sent
 only while the booking awaits a new time and that proposal still holds its place."""
+
+CHANGE_REQUEST_NOTICES = frozenset({JobType.SEND_CHANGE_REQUEST})
+"""A bot's change request to confirm (ADR 0023 step 2), pinned to the booking's start: sent only
+while the booking is confirmed at that start and the request is still open."""
 
 CONFIRM_NOTICES = frozenset({JobType.SEND_CONFIRM_REQUEST, JobType.SEND_CONFIRM_REMINDER})
 """Requests to confirm a booking by email link (ADR 0056); sent only while it is pending."""
@@ -239,6 +245,7 @@ def is_stale(
     job_type: JobType | None = None,
     *,
     proposal: HeldProposal | None = None,
+    change: ChangeRequest | None = None,
     now: datetime | None = None,
 ) -> bool:
     """Return whether a job pinned to ``pinned_start`` must do nothing for ``booking``.
@@ -247,7 +254,8 @@ def is_stale(
     data still exists (CLAUDE.md). Closure notices only act on a booking that is still
     suspended; requests to rebook only while the booking still awaits a new time; requests to
     confirm only while it still awaits confirmation; a proposed new time and its reminder only
-    while that ``proposal`` is open, in time and the one the job was pinned to (ADR 0057).
+    while that ``proposal`` is open, in time and the one the job was pinned to (ADR 0057); a
+    bot's change request only while that ``change`` is open for the booking (ADR 0023).
     Other unpinned jobs (cancellation mail, lapse, purge) always run.
     """
     if job_type in CLOSURE_NOTICES:
@@ -261,6 +269,15 @@ def is_stale(
         return not booking.awaits_rebook or booking.contact is None
     if job_type in CONFIRM_NOTICES:
         return not booking.awaits_confirmation or booking.contact is None
+    if job_type in CHANGE_REQUEST_NOTICES:
+        open_ = (
+            change is not None
+            and now is not None
+            and change.booking_id == booking.id
+            and change.is_open_for(booking.start, now)
+        )
+        moved = booking.start != pinned_start
+        return not booking.is_active or booking.contact is None or moved or not open_
     if pinned_start is None:
         return False
     return not booking.is_active or booking.start != pinned_start or booking.contact is None
@@ -459,3 +476,13 @@ def plan_purge(purge_at: datetime) -> list[PlannedJob]:
 def plan_closure_update(*, now: datetime) -> list[PlannedJob]:
     """Return the job that mails a suspended booking the closure's updated notice."""
     return [PlannedJob(JobType.SEND_CLOSURE_UPDATE, now, None, ChannelKind.EMAIL)]
+
+
+def plan_for_change_request(*, now: datetime, start: datetime, sms: bool) -> list[PlannedJob]:
+    """Return the message asking the participant to confirm a bot's change (ADR 0023 step 2).
+
+    Pinned to the booking's ``start``; added next to the booking's jobs, which stay until the
+    participant confirms. ``sms`` adds the SMS form where the participant agreed to it.
+    """
+    channels = [ChannelKind.EMAIL, ChannelKind.SMS] if sms else [ChannelKind.EMAIL]
+    return [PlannedJob(JobType.SEND_CHANGE_REQUEST, now, start, c) for c in channels]

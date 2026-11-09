@@ -91,10 +91,12 @@ Every refusal is `{"error": "<code>"}`; it never repeats input.
 | 401 | `invalid_client` | Wrong, expired or disabled credentials, or a network that is not allowed |
 | 401 | `invalid_token` | Token missing, expired or revoked: get a new one |
 | 403 | `insufficient_scope` | The client may not do this, or not for this team |
-| 404 | `group_not_found`, `not_found` | Unknown team or path |
+| 404 | `group_not_found`, `not_found`, `change_request_not_found` | Unknown team or path, or not a change request of this client |
+| 409 | `slot_unavailable` | The requested new time is not free |
 | 409 | `configuration_plan_stale`, `configuration_package_version` | The plan is not the one named by `X-Plan-Hash`, or a plan that deletes came without it; a SQLite package is of another schema revision |
 | 413 | `configuration_package_too_large` | Above the platform setting *Largest configuration package* |
 | 422 | `invalid_request`, `invalid_range` | Bad dates or language |
+| 422 | `invalid_contact`, `invalid_appointment_code`, `change_requests_disabled` | A change request with no valid phone number or code, or for an organisation that has not switched change requests on |
 | 422 | `configuration_passphrase_short`, `configuration_passphrase_wrong`, `configuration_package_invalid`, `invalid_configuration`, `configuration_out_of_scope`, `configuration_too_many_changes` | The passphrase is under 16 characters or wrong; the body is not a package or a valid document, or names another scope; the plan holds too many changes |
 | 429 | `rate_limited` | Too many requests (token endpoint: per IP; calls: per client) |
 | 503 | `temporarily_unavailable` | The API is switched off (emergency stop) |
@@ -178,12 +180,46 @@ maintenance mode is on (ADR 0038); only the export (`GET`) still answers. The ho
 export|plan|apply`, and `scripts/install.sh --configuration` applies a document to a new
 installation.
 
-## 7. What comes next
+## 7. Cancel or move an appointment: change requests
 
-Changing and cancelling (ADR 0023, next step): the bot sends the caller's phone number and
-the wanted change; OpenPlanner sends the participant an email or SMS to confirm, and only that
-confirmation changes the booking. The bot gets the same answer whether or not the number has
-a booking, so the API cannot reveal who has an appointment.
+A bot can ask to cancel or move an appointment for a caller (ADR 0023 step 2). It needs the
+scope `bookings:request_change`, and the organisation must have switched on *Change requests by
+a bot* (`agent_change_requests_enabled`, organisation settings). The caller names the
+appointment by their **phone number and appointment code together**: the code is eight digits,
+shown on the participant's booking page and in their confirmation, change and reminder
+messages once the organisation switched change requests on.
+
+```http
+POST /api/agent/v1/groups/helpdesk/change-requests
+Authorization: Bearer opa_…
+Content-Type: application/json
+
+{"action": "reschedule", "phone": "06 1234 5678", "code": "1234 5678",
+ "start": "2026-01-05T08:30:00Z"}
+```
+
+```json
+{"id": "chr_…", "action": "reschedule", "start": "2026-01-05T08:30:00Z",
+ "status": "pending", "expires_at": "2026-01-01T09:00:00Z"}
+```
+
+- `action` is `cancel` (no `start`) or `reschedule` (a `start` from the availability call).
+- The answer is always `202 pending`, whether or not the number and code match an appointment
+  that can still be changed: say to the caller "if the details match, you will get a message to
+  confirm the change". The API never tells whether a number or a code exists.
+- On a match the participant gets an email (and an SMS where they agreed to SMS) with a link to
+  confirm; nothing changes until they do. A newer request for the same appointment replaces
+  the open one. Cancelling is possible until the start, moving until the change deadline.
+- `GET /api/agent/v1/change-requests/{id}` answers `pending`, `confirmed` or `expired`, only to
+  the client that asked. A request that matched nothing stays `pending` until `expires_at`
+  (*Time to confirm a change request*, default 60 minutes).
+- Refused before anything is matched, so they say nothing about an appointment: a malformed
+  phone number (`422 invalid_contact`) or code (`422 invalid_appointment_code`), a time that
+  is not free (`409 slot_unavailable`), an organisation without change requests
+  (`422 change_requests_disabled`).
+- Each client may send *Change requests per API client* per hour (default 20), next to the
+  general call limit. Every request is in the audit log with the client id and whether it
+  matched; the phone number and code are never stored, logged or audited.
 
 ## 8. Operating it
 

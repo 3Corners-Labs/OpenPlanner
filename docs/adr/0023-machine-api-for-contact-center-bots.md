@@ -1,6 +1,6 @@
 # 0023. Machine API for contact-center bots (WxCC AI Agent)
 
-Status: accepted (2026-10-25). First step of open point O11. Partly built, checked on 2026-10-30; see `docs/adr-status.md` for what is built.
+Status: accepted (2026-10-25); step 2 (change requests) decided by the product owner on 2026-11-09. First step of open point O11. Built: see *Build status* and `docs/adr-status.md`.
 
 ## Context
 
@@ -59,12 +59,83 @@ must be visible to the superuser.
 | this ADR | `POST /oauth/token` | – |
 | this ADR | `GET /me` (who am I, which scopes and groups) | any valid token |
 | this ADR | `GET /groups`, `GET /groups/{slug}/availability` | `availability:read` |
-| next | `POST /change-requests` (phone number + reschedule/cancel) | `bookings:request_change` |
-| next | `GET /change-requests/{id}` (pending, confirmed, expired) | `bookings:request_change` |
+| step 2 | `POST /groups/{slug}/change-requests` (phone number + appointment code + reschedule/cancel) | `bookings:request_change` |
+| step 2 | `GET /change-requests/{id}` (pending, confirmed, expired) | `bookings:request_change` |
 
 The change-request flow (next step) answers the same way whether or not the phone number
 matches a booking, so the API cannot be used to find out who has an appointment. It depends
 on SMS (WP4) for callers without email access; until then confirmation goes by email.
+
+## Step 2: change requests (product owner, 2026-11-09)
+
+The product owner decided how a caller is identified: "denk dat nog een id moet zijn met een
+afspraaknummer/code om dit te borgen. Dit zal de rest van de vragen ook oplossen." A change
+request names the booking by its phone number **and** its appointment code together, never by
+the phone number alone. The notes below follow from that.
+
+1. **The appointment code.** Every booking has an eight-digit code, derived as the management
+   token is (ADR 0011): HMAC-SHA256 under `MANAGEMENT_TOKEN_KEY` of the booking's salt with its
+   own purpose, reduced to eight digits. Nothing new is stored; a reschedule makes a new
+   booking with a new salt and so a new code, and the purge, which replaces the salt, kills it.
+   During a key rotation (ADR 0094) the code under the previous key is accepted as well.
+   Digits, so a voice bot and a keypad can take it; shown as `1234 5678`.
+2. **Where the participant sees it.** Only in organisations that switched change requests on
+   (`agent_change_requests_enabled`): on the management page and in the confirmation, change
+   and reminder messages ("Uw afspraakcode"). Elsewhere nothing changes.
+3. **The request.** `POST /groups/{slug}/change-requests` with `phone`, `code`, `action`
+   (`cancel` or `reschedule`) and, for a reschedule, `start` (a free time from the
+   availability call). The answer is always `202` with a request id, `status: pending` and
+   `expires_at`, whether or not the pair matches a booking that can still be changed. A wrong
+   pair, an unknown number, a booking past its deadline and a match all get the same answer, so
+   the API never tells whether a number or a code exists. Only what any caller can see anyway
+   is refused before the match: a malformed phone number or code (`invalid_request`), a time
+   that is not free (`slot_unavailable`), an organisation that has not switched the feature on
+   (`feature_disabled`).
+4. **Which booking.** The pair picks one booking: a number with several bookings is no longer
+   ambiguous. The booking must be confirmed (not pending, suspended or awaiting a new time),
+   in the URL's group, and still changeable as the participant's own link would allow (ADR
+   0069: cancel until the start, move until the change deadline).
+5. **Confirmation by the participant.** On a match the participant gets a message (email, and
+   an SMS where they agreed to SMS) that names the requested change and links to
+   `/b/m/{ref}/change`: the change and one button. A GET changes nothing (mail scanners); the
+   POST applies it through the same paths as the participant's own cancel and reschedule. A
+   newer request for the same booking replaces the open one. Nothing is held: a time taken in
+   the meantime sends the participant back to the booking page, which says so.
+6. **Expiry.** A request is open for `agent_change_request_minutes` after it was made (the
+   same for a match and a non-match, so `expires_at` reveals nothing), and only while the
+   booking's start is unchanged. After that the status is `expired` and the link shows the
+   booking.
+7. **Status.** `GET /change-requests/{id}` answers `pending`, `confirmed` or `expired`, only to
+   the client that made the request (another client gets `not_found`). An unmatched request
+   stays `pending` until it expires.
+8. **Scope.** `bookings:request_change`, group level (ADR 0014 `API_SCOPES`); the client's
+   group narrowing applies.
+9. **Limits and audit.** `POST /change-requests` has its own per-client limit
+   (`agent_change_requests_per_hour`) next to the general one. Every request is an audit event
+   with the client id, the action and whether it matched (for the superuser, never in the
+   answer); a confirmation is an event at the booking. No phone number, code or name is
+   stored with the request, logged or audited.
+10. **Data.** A table `change_requests` holds the public id, client, group, action, requested
+    start, the matched booking id (or none), the booking's start when asked, the times made,
+    expiring and confirmed. No personal data; it goes with the booking's other rows.
+
+## Settings
+
+| Key | Class | Default | Bounds | Permission | Note |
+|---|---|---|---|---|---|
+| `agent_change_requests_enabled` | D organisation | off | on/off | organisation settings | Change requests for the organisation's groups, and the appointment code in its messages and pages. Switching it off is no loss of protection: the API refuses requests. |
+| `agent_change_request_minutes` | D organisation | 60 | 10–1440 | organisation settings | How long the participant has to confirm a change request. |
+| `agent_change_requests_per_hour` | C platform | 20 | 1–120 | `settings.platform.manage` | Change requests per API client per hour, next to `rate_limit_agent_calls`. |
+
+**Fixed on purpose:** the code has eight digits (a crypto parameter: 10^8 codes per phone
+number, behind the per-client limit and the audit trail).
+
+## Build status
+
+| Step | What | PR | State |
+|---|---|---|---|
+| 1 | Clients, tokens, `/me`, groups and availability; the superuser's switch, client admin and audit | #18, #67, #97 | merged |
+| 2 | Change requests by phone number and appointment code: scope `bookings:request_change`, `POST /groups/{slug}/change-requests`, `GET /change-requests/{id}`, table `change_requests` (migration 0105), the code on pages and messages, the participant's confirm page `/b/m/{ref}/change`, three settings | #PRNUM | merged |
 
 ## Consequences
 

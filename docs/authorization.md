@@ -112,3 +112,4 @@ the scopes below. There is no superuser equivalent for machines.
 | Read free times (`availability:read`) | Group |
 | Read the hourly usage figures (`reports:read`) | Group |
 | Export and import the configuration package (whole installation) (`configuration:transfer`) | Portal |
+| Ask to cancel or move (with phone number and appointment code; the participant confirms) (`bookings:request_change`) | Group |

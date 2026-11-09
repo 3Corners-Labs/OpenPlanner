@@ -148,6 +148,12 @@ class ErrorCode(StrEnum):
     """ADR 0099 point 7: a booking, a slot or an active closure still refers to the object."""
     CONFIGURATION_CAPACITY_BELOW_BOOKED = "configuration_capacity_below_booked"
     """ADR 0099 point 7: a capacity lower than the places already booked in that window."""
+    CHANGE_REQUESTS_DISABLED = "change_requests_disabled"
+    """ADR 0023 step 2: the organisation has not switched on change requests by a bot."""
+    INVALID_APPOINTMENT_CODE = "invalid_appointment_code"
+    """ADR 0023 step 2: the appointment code is not eight digits."""
+    CHANGE_REQUEST_NOT_FOUND = "change_request_not_found"
+    """ADR 0023 step 2: no such request of this client, or nothing open to confirm."""
 
 
 class DomainError(Exception):

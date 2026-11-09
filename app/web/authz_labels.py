@@ -77,6 +77,7 @@ API_SCOPE_LABELS: dict[ApiScope, str] = {
     ApiScope.AVAILABILITY_READ: "authz.api_scope.availability_read",
     ApiScope.REPORTS_READ: "authz.api_scope.reports_read",
     ApiScope.CONFIGURATION_TRANSFER: "authz.api_scope.configuration_transfer",
+    ApiScope.BOOKINGS_REQUEST_CHANGE: "authz.api_scope.bookings_request_change",
 }
 
 PARTICIPANT_LABELS: dict[str, str] = {

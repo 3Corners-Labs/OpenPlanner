@@ -14,6 +14,10 @@
       <dd>{{ when }}</dd>
       <dt>{{ team_label }}</dt>
       <dd>{{ group_name }}</dd>
+      {% if code %}
+      <dt>{{ code_label }}</dt>
+      <dd>{{ code }}</dd>
+      {% endif %}
     </dl>
     {% if notice %}
     <h2>{{ notice_label }}</h2>

@@ -39,6 +39,11 @@ SCOPE_DESCRIPTIONS: dict[ApiScope, str] = {
         "client is not bound by per-object rights: it can change anything a superuser can "
         "configure, so grant it to a provisioning pipeline only."
     ),
+    ApiScope.BOOKINGS_REQUEST_CHANGE: (
+        "Ask to cancel or move an appointment named by phone number and appointment code; the "
+        "participant confirms it through their own message. Reads no personal data and never "
+        "says whether the pair matched (ADR 0023 step 2)."
+    ),
 }
 """Shown in the OpenAPI spec; the admin portal has its own translated labels."""
 

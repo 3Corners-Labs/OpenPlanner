@@ -571,12 +571,16 @@ class ApiScope(StrEnum):
     # ADR 0089 point 7, ADR 0099 step 4: export, plan and apply the configuration of the whole
     # installation. The client is not bound by the matrix, which makes the scope a superuser's.
     CONFIGURATION_TRANSFER = "configuration:transfer"
+    # ADR 0023 step 2: ask to cancel or move a booking named by phone number and appointment
+    # code; the participant confirms it through their own message. Reads no personal data.
+    BOOKINGS_REQUEST_CHANGE = "bookings:request_change"
 
 
 API_SCOPES: dict[ApiScope, Level] = {
     ApiScope.AVAILABILITY_READ: Level.GROUP,
     ApiScope.REPORTS_READ: Level.GROUP,
     ApiScope.CONFIGURATION_TRANSFER: Level.GLOBAL,
+    ApiScope.BOOKINGS_REQUEST_CHANGE: Level.GROUP,
 }
 """Every API scope with the level it applies to; documented next to the admin matrix.
 

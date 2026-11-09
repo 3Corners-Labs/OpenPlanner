@@ -11664,3 +11664,75 @@ msgstr "Propose new times for this day"
 
 msgid "admin.agenda.week_propose"
 msgstr "Propose new times for this week"
+
+msgid "settings.field.agent_change_requests_per_hour.label"
+msgstr "Change requests per API client (per hour)"
+
+msgid "settings.field.agent_change_requests_enabled.label"
+msgstr "Change requests by a bot (with appointment code)"
+
+msgid "settings.field.agent_change_request_minutes.label"
+msgstr "Time to confirm a change request (minutes)"
+
+msgid "authz.api_scope.bookings_request_change"
+msgstr "Ask to cancel or move (with phone number and appointment code; the participant confirms)"
+
+msgid "audit.job.send_change_request"
+msgstr "Send a change request to confirm"
+
+msgid "message.change_request.subject"
+msgstr "Confirm the change to your video call"
+
+msgid "message.change_request.intro_cancel"
+msgstr "You asked to cancel your video call with {group_name} on {date} at {time}. Please confirm this by {deadline}. Nothing changes without your confirmation. Did you not ask for this? Then you need not do anything."
+
+msgid "message.change_request.intro_reschedule"
+msgstr "You asked to move your video call with {group_name} on {date} at {time} to {new_date} at {new_time}. Please confirm this by {deadline}. Nothing changes without your confirmation. Did you not ask for this? Then you need not do anything."
+
+msgid "message.change_request.sms_cancel"
+msgstr "Dear {first_name}, you asked to cancel your video call with {group_name} on {date} at {time}. Confirm by {deadline}: {manage_url}"
+
+msgid "message.change_request.sms_reschedule"
+msgstr "Dear {first_name}, you asked to move your video call with {group_name} on {date} at {time} to {new_date} at {new_time}. Confirm by {deadline}: {manage_url}"
+
+msgid "message.manage_change_request"
+msgstr "Confirm the change by {deadline}:"
+
+msgid "message.change_request_link"
+msgstr "View the change"
+
+msgid "message.appointment_code"
+msgstr "Appointment code"
+
+msgid "manage.appointment_code"
+msgstr "Appointment code"
+
+msgid "manage.notice.change_gone"
+msgstr "This change can no longer be confirmed. Your appointment has not changed."
+
+msgid "change_request.title"
+msgstr "Confirm the change"
+
+msgid "change_request.text_cancel"
+msgstr "You asked to cancel this appointment. Please confirm by {deadline}; after that the request lapses."
+
+msgid "change_request.text_reschedule"
+msgstr "You asked to move this appointment. If you confirm, you get a confirmation with a calendar invitation. The request lapses after {deadline}."
+
+msgid "change_request.submit_cancel"
+msgstr "Yes, cancel my appointment"
+
+msgid "change_request.submit_reschedule"
+msgstr "Yes, move my appointment"
+
+msgid "change_request.ignore"
+msgstr "Change nothing"
+
+msgid "error.change_requests_disabled"
+msgstr "Change requests are not switched on for this organisation."
+
+msgid "error.invalid_appointment_code"
+msgstr "The appointment code has eight digits."
+
+msgid "error.change_request_not_found"
+msgstr "This change request does not exist or is no longer open."

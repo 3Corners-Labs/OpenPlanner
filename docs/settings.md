@@ -152,6 +152,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `RATE_LIMIT_UNKNOWN_LINKS` | rate | `20/hour` | 5–100 per hour | `settings.platform.manage` | Unknown management links per IP address. |
 | `RATE_LIMIT_AGENT_TOKENS` | rate | `10/minute` | 1–30 per minute | `settings.platform.manage` | Machine API token requests per client. |
 | `RATE_LIMIT_AGENT_CALLS` | rate | `120/minute` | 10–600 per minute | `settings.platform.manage` | Machine API calls per client. |
+| `AGENT_CHANGE_REQUESTS_PER_HOUR` | int | `20` | 1–120 | `settings.platform.manage` | Change requests per API client per hour, next to the machine API's call limit (ADR 0023 step 2); the off switch stays RATE_LIMIT_ENABLED. |
 | `ADMIN_SESSION_HOURS` | int | `8` | 1–8 | `settings.platform.manage` | Lifetime of an admin session. |
 | `ADMIN_REAUTH_MINUTES` | int | `60` | 5–60 | `settings.platform.manage` | Maximum login age for a change (ADR 0015). |
 | `ADMIN_IDLE_MINUTES` | int | `60` | 15–120 | `settings.platform.manage` | Idle time after which an admin session ends (ADR 0098). |
@@ -210,6 +211,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `REPORTING_ORG_MIN_CELL_SIZE` | int | `3` | 3–50 | `settings.organisation.manage` | The smallest count the organisation's own usage reports show. It can only raise the platform value; the larger of the two applies (ADR 0117 point 8). |
 | `REPORTING_DIGEST_SEND_HOUR` | int | `7` | 0–23 | `settings.organisation.manage` | The local hour (in the organisation's time zone) the digest of the reports is sent (ADR 0117 point 16). |
 | `REPORTING_DIGEST_INCLUDE_NUMBERS` | bool | `true` | — | `settings.organisation.manage` | Whether the digest mail holds the figures; off, it holds only the link to the report (ADR 0117 point 16). |
+| `AGENT_CHANGE_REQUESTS_ENABLED` | bool | `false` | — | `settings.organisation.manage` | Whether a bot may ask to cancel or move this organisation's bookings by phone number and appointment code, and whether pages and messages show that code (ADR 0023 step 2). |
+| `AGENT_CHANGE_REQUEST_MINUTES` | int | `60` | 10–1440 | `settings.organisation.manage` | Minutes the participant has to confirm a bot's change request (ADR 0023 step 2). |
 | `TIME_FORMAT` | enum | `24h` | 24h, 12h, locale | `settings.organisation.manage` | How clock times are written. |
 | `ADMIN_TIMEZONE` | string | `Europe/Amsterdam` | — | `settings.organisation.manage` | IANA time zone of the admin portal. |
 | `PRODUCT_FOOTER` | bool | `true` | — | `settings.organisation.manage` | "Appointments via OpenPlanner" with the product mark at the foot of the booking pages and in the HTML part of emails (ADR 0060 §6). |

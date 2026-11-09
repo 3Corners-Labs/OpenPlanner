@@ -11677,3 +11677,75 @@ msgstr "Nieuwe tijden voorstellen voor deze dag"
 
 msgid "admin.agenda.week_propose"
 msgstr "Nieuwe tijden voorstellen voor deze week"
+
+msgid "settings.field.agent_change_requests_per_hour.label"
+msgstr "Wijzigingsverzoeken per API-client (per uur)"
+
+msgid "settings.field.agent_change_requests_enabled.label"
+msgstr "Wijzigingsverzoeken door een bot (met afspraakcode)"
+
+msgid "settings.field.agent_change_request_minutes.label"
+msgstr "Tijd om een wijzigingsverzoek te bevestigen (minuten)"
+
+msgid "authz.api_scope.bookings_request_change"
+msgstr "Annuleren of verplaatsen vragen (met telefoonnummer en afspraakcode; de deelnemer bevestigt)"
+
+msgid "audit.job.send_change_request"
+msgstr "Wijzigingsverzoek ter bevestiging sturen"
+
+msgid "message.change_request.subject"
+msgstr "Bevestig de wijziging van uw videogesprek"
+
+msgid "message.change_request.intro_cancel"
+msgstr "U heeft gevraagd uw videogesprek met {group_name} op {date} om {time} te annuleren. Bevestig dit voor {deadline}. Zonder uw bevestiging verandert er niets. Heeft u dit niet gevraagd? Dan hoeft u niets te doen."
+
+msgid "message.change_request.intro_reschedule"
+msgstr "U heeft gevraagd uw videogesprek met {group_name} op {date} om {time} te verplaatsen naar {new_date} om {new_time}. Bevestig dit voor {deadline}. Zonder uw bevestiging verandert er niets. Heeft u dit niet gevraagd? Dan hoeft u niets te doen."
+
+msgid "message.change_request.sms_cancel"
+msgstr "Beste {first_name}, u vroeg uw videogesprek met {group_name} op {date} om {time} te annuleren. Bevestig voor {deadline}: {manage_url}"
+
+msgid "message.change_request.sms_reschedule"
+msgstr "Beste {first_name}, u vroeg uw videogesprek met {group_name} op {date} om {time} te verplaatsen naar {new_date} om {new_time}. Bevestig voor {deadline}: {manage_url}"
+
+msgid "message.manage_change_request"
+msgstr "Bevestig de wijziging, uiterlijk {deadline}:"
+
+msgid "message.change_request_link"
+msgstr "Wijziging bekijken"
+
+msgid "message.appointment_code"
+msgstr "Afspraakcode"
+
+msgid "manage.appointment_code"
+msgstr "Afspraakcode"
+
+msgid "manage.notice.change_gone"
+msgstr "Deze wijziging kan niet meer worden bevestigd. Uw afspraak is niet veranderd."
+
+msgid "change_request.title"
+msgstr "Wijziging bevestigen"
+
+msgid "change_request.text_cancel"
+msgstr "U heeft gevraagd deze afspraak te annuleren. Bevestig dit uiterlijk {deadline}; daarna vervalt het verzoek."
+
+msgid "change_request.text_reschedule"
+msgstr "U heeft gevraagd deze afspraak te verplaatsen. Bevestigt u dit, dan krijgt u een bevestiging met een agenda-uitnodiging. Het verzoek vervalt na {deadline}."
+
+msgid "change_request.submit_cancel"
+msgstr "Ja, annuleer mijn afspraak"
+
+msgid "change_request.submit_reschedule"
+msgstr "Ja, verplaats mijn afspraak"
+
+msgid "change_request.ignore"
+msgstr "Niets veranderen"
+
+msgid "error.change_requests_disabled"
+msgstr "Wijzigingsverzoeken zijn voor deze organisatie niet ingeschakeld."
+
+msgid "error.invalid_appointment_code"
+msgstr "De afspraakcode bestaat uit acht cijfers."
+
+msgid "error.change_request_not_found"
+msgstr "Dit wijzigingsverzoek bestaat niet of is niet meer open."

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ _("change_request.title") }} – {{ group.name }}{% endblock %}
+{% block content %}
+<p class="eyebrow">{{ group.name }}</p>
+<h1>{{ _("change_request.title") }}</h1>
+<dl class="details">
+  {% if change_label %}
+  <dt>{{ _("proposal.new") }}</dt><dd>{{ change_label }}</dd>
+  <dt>{{ _("proposal.old") }}</dt><dd>{{ slot_label }}</dd>
+  {% else %}
+  <dt>{{ _("manage.when") }}</dt><dd>{{ slot_label }}</dd>
+  {% endif %}
+  <dt>{{ _("manage.team") }}</dt><dd>{{ group.name }}</dd>
+</dl>
+<form method="post" action="/b/m/{{ ref }}/change">
+  {% if change_label %}
+  <p>{{ _("change_request.text_reschedule", deadline=change_by) }}</p>
+  <button type="submit" class="button button--large">{{ _("change_request.submit_reschedule") }}</button>
+  {% else %}
+  <p>{{ _("change_request.text_cancel", deadline=change_by) }}</p>
+  <button type="submit" class="button button--large">{{ _("change_request.submit_cancel") }}</button>
+  {% endif %}
+</form>
+<ul class="actions">
+  <li><a href="/b/m/{{ ref }}">{{ _("change_request.ignore") }}</a></li>
+</ul>
+{% endblock %}

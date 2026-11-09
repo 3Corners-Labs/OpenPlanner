@@ -5,6 +5,7 @@ and time next to them so a bot can speak them without converting time zones.
 """
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -157,3 +158,39 @@ class UsagePageResponse(BaseModel):
     rows: list[UsageRow]
 
     model_config = {"populate_by_name": True}
+
+
+class ChangeRequestBody(BaseModel):
+    """A caller's request to cancel or move their appointment (ADR 0023 step 2)."""
+
+    action: Literal["cancel", "reschedule"] = Field(description="What the caller asks for.")
+    phone: str = Field(
+        min_length=6,
+        max_length=32,
+        description="The caller's phone number as they gave it; the group's country is assumed "
+        "without a `+` prefix. Never stored or returned.",
+    )
+    code: str = Field(
+        min_length=8,
+        max_length=16,
+        description="The appointment code from the participant's messages: eight digits, spaces "
+        "and dashes allowed. Never stored or returned.",
+    )
+    start: datetime | None = Field(
+        None,
+        description="For `reschedule`: the new start, a `start` from the availability call. "
+        "Leave it out for `cancel`.",
+    )
+
+
+class ChangeRequestInfo(BaseModel):
+    """A change request: what was asked and where it stands; never which appointment."""
+
+    id: str = Field(description="Ask the status with it.")
+    action: str = Field(description="`cancel` or `reschedule`.")
+    start: datetime | None = Field(description="The requested new start (UTC), or `null`.")
+    status: str = Field(
+        description="`pending` (waiting for the participant, also when nothing matched), "
+        "`confirmed` or `expired`."
+    )
+    expires_at: datetime = Field(description="Until when the participant can confirm it.")

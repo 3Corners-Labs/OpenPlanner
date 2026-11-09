@@ -42,7 +42,7 @@ from the rows below.
 | 0020 | Participant calendar, branding through tokens | BUILT | #11, #49; `calendar.js`, `slot_picker.py`, `SCRIPT_CSP`, `/o/{slug}/theme.css`, `domain/branding.py` | – |
 | 0021 | Ending the work item of a cancelled booking | BUILT | #12; `CallService.end_task`, `WxccDispatcher`, job `END_WXCC_TASK`, `diagnostics.py` | – |
 | 0022 | Channels per organisation, SMS, editable texts | BUILT | #19, #29, #168; migration 0013; `admin/channel_routes.py`, `message_routes.py`, `adapters/senders.py`; the organisation-wide editor: ADR 0074 | – |
-| 0023 | Machine API for contact-center bots | PARTIAL | #18, #67, #97; migration 0014; `api/agent/`, `domain/api_clients.py`, `docs/agent-api.md` | `POST` and `GET /change-requests` and scope `bookings:request_change` ("next step" in the ADR) |
+| 0023 | Machine API for contact-center bots | BUILT | #18, #67, #97, #PRNUM; migrations 0014, 0105; `api/agent/`, `domain/api_clients.py`, `domain/change_requests.py`, `domain/change_request_service.py`, `docs/agent-api.md` | – |
 | 0024 | Emergency closure | BUILT | #21, #73; migration 0015; CLI `closure` | – |
 | 0025 | Holiday calendars | BUILT | #20; migration 0016 | Holiday names on the participant calendar ("later" in the ADR) |
 | 0026 | Direct-call cap, queue feedback | BUILT | #24; migration 0017 | WxCC live statistics (deferred by the ADR) |

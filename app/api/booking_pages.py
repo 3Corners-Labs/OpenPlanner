@@ -27,6 +27,8 @@ Server-rendered and usable without JavaScript. Every response goes through
                                    (awaiting a new time: up to three suggested times, ADR 0057)
     GET  /b/m/{ref}/proposal       the proposed new time, one button ─► POST
                                    ─► 303 /b/m/{new ref}?status=rescheduled (ADR 0057 point 8)
+    GET  /b/m/{ref}/change         a bot's change request (ADR 0023 step 2), one button ─► POST
+                                   ─► 303 ?status=cancelled, or /b/m/{new ref}?status=rescheduled
 The cookie rule is in ``app.api.link_session``; the join, trial and waiting pages are in
 ``join_pages``, ``trial_pages`` and ``direct_pages``.
 """
@@ -54,6 +56,7 @@ from app.api.slot_picker import parse_filter, picker, slot_value
 from app.api.trace import bind_group_from_path
 from app.domain.availability import AvailableSlot
 from app.domain.booking import BookingStatus
+from app.domain.change_request_service import ChangeRequestService
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock
 from app.domain.scheduling import Group
@@ -85,6 +88,7 @@ STATUS_NOTICES: dict[str, str] = {
     "lapsed": "manage.notice.lapsed",
     "details": "manage.notice.details",
     "proposal_gone": "manage.notice.proposal_gone",
+    "change_gone": "manage.notice.change_gone",
 }
 
 STATUS_LABELS: dict[BookingStatus, str] = {
@@ -376,6 +380,7 @@ LEGACY_SUBPATHS = (
     "/reschedule",
     "/details",
     "/proposal",
+    "/change",
     "/wait",
     "/wait/status",
     "/wait/leave",
@@ -436,7 +441,21 @@ async def manage_page(
     """Show a booking: movable until its change deadline, cancellable until its start (ADR 0069)."""
     details = await _details(request, public_ref)
     context = _page_context(details, locale, public_ref, status, _clock(request).now())
+    context["appointment_code"] = _appointment_code(request, details)
     return await participant_page(request, locale, "manage.html", details.group, context)
+
+
+def _appointment_code(request: Request, details: BookingDetails) -> str | None:
+    """Return the code a bot asks for, where the organisation takes change requests (ADR 0023).
+
+    Only for a confirmed booking: that is the only kind a change request can name.
+    """
+    current = getattr(request.state, "organisation_settings", None)
+    if not details.booking.is_active or not getattr(
+        current, "agent_change_requests_enabled", False
+    ):
+        return None
+    return _change_service(request).code(details.booking)
 
 
 @router.get("/b/m/{public_ref}/cancel", response_class=HTMLResponse)
@@ -502,6 +521,57 @@ async def confirm_proposal(
         return RedirectResponse(_manage_url(public_ref, "proposal_gone"), status_code=303)
     new = receipt.booking
     return await start(request, new.id or 0, _manage_url(new.public_ref, "rescheduled"))
+
+
+def _change_service(request: Request) -> ChangeRequestService:
+    """Return the application's change request service."""
+    service: ChangeRequestService = request.app.state.change_request_service
+    return service
+
+
+@router.get("/b/m/{public_ref}/change", response_class=HTMLResponse)
+@limiter.limit(read_limit)
+async def change_page(request: Request, public_ref: str, locale: Locale) -> Response:
+    """Show a bot's change request with one button; a GET never changes (ADR 0023 step 2)."""
+    ref = await authorise(request, public_ref)
+    found = await _change_service(request).open_request(ref)
+    if found is None:
+        return RedirectResponse(_manage_url(public_ref, "change_gone"), status_code=303)
+    details, change = found.details, found.request
+    follow(request, details.group.organisation_id)
+    group, booking = details.group, details.booking
+    target = change.target_start
+    context = {
+        **_page_context(details, locale, public_ref, None, _clock(request).now()),
+        "change_label": slot_label(target, target + (booking.end - booking.start), group, locale)
+        if target
+        else None,
+        "change_by": _moment(change.expires_at, group, locale),
+    }
+    return await participant_page(request, locale, "change_request.html", group, context)
+
+
+@router.post("/b/m/{public_ref}/change", response_class=HTMLResponse)
+@limiter.limit(booking_limit)
+async def confirm_change(
+    request: Request, public_ref: str, locale: Locale, _: SameOrigin
+) -> Response:
+    """Apply the bot's change request as the participant's own cancel or move.
+
+    A request no longer open, or a change the booking no longer allows (the time was taken,
+    the deadline passed), sends the browser back to the booking page, which says so.
+    """
+    ref = await authorise(request, public_ref)
+    try:
+        done = await _change_service(request).confirm(ref)
+    except DomainError as error:
+        if error.code is ErrorCode.DATABASE_BUSY:  # a retry may still work: not "gone"
+            raise
+        return RedirectResponse(_manage_url(public_ref, "change_gone"), status_code=303)
+    if done.moved is not None:
+        new = done.moved.booking
+        return await start(request, new.id or 0, _manage_url(new.public_ref, "rescheduled"))
+    return RedirectResponse(_manage_url(public_ref, "cancelled"), status_code=303)
 
 
 @router.post("/b/m/{public_ref}/cancel", response_class=HTMLResponse)
