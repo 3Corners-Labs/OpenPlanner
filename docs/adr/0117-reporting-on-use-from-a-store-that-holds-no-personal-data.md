@@ -459,7 +459,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 11 | Facts to log destinations (`usage.fact`, non-staff, hour and bucket only) | #675 | merged |
 | 12 | `report-charts.js`: tooltips, focus, series toggles, SVG/PNG download, drill-down links; script CSP on report pages; JS-off and axe runs | #689 | merged |
 | 13 | Wallboard: `view=wallboard`, kiosk layout, live tiles on the shared fragment poll, stale state, wait alert, `reports.wallboard.view` | #703 | merged |
-| 14 | Display links: creation, hash, expiry, revocation, kiosk session, audit, manual and threat model | | planned |
+| 14 | Display links: creation, hash, expiry, revocation, kiosk session, audit, manual and threat model | #711 | merged |
 
 **Build order (agreed with the product owner, 2026-11-08):** 1, 2, 4, 5, then 3, then 6 to 14. The
 *Volume* screen of step 5 needs only the booking facts of step 2, so the first visible screen comes
