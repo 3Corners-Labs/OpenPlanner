@@ -576,6 +576,8 @@ OBJECTS = (
                     f"{_GROUP}/agenda/bookings/{{booking_id}}/rebook",
                     f"{_GROUP}/agenda/slot-rebook",
                     f"{_GROUP}/agenda/waiting",
+                    f"{_GROUP}/agenda/bookings/{{booking_id}}/propose",
+                    f"{_GROUP}/agenda/slot-propose",
                 ),
                 width=Width.WIDE,
                 wide_subpages=(f"{_GROUP}/agenda/week",),
