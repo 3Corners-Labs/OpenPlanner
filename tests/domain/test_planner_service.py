@@ -102,17 +102,6 @@ async def test_a_move_that_causes_a_shortfall_needs_confirmation(
     assert moved.start == SLOT_0930
 
 
-async def test_a_booking_of_another_group_cannot_be_reached_through_this_group(
-    planner: PlannerService, bookings: BookingService
-) -> None:
-    other = await _book(bookings, slug="andere-team")
-
-    with pytest.raises(DomainError, match="booking_not_found"):
-        await planner.move(GROUP_ADMIN, "demo", other, SLOT_0930)
-    with pytest.raises(DomainError, match="booking_not_found"):
-        await planner.cancel(GROUP_ADMIN, "demo", other, ChangeReason.STAFFING)
-
-
 async def test_a_full_slot_stays_full(planner: PlannerService, bookings: BookingService) -> None:
     first = await _book(bookings, SLOT_0900)
     await _book(bookings, SLOT_0930)
@@ -502,27 +491,45 @@ ON_ONE_BOOKING: dict[str, Callable[[PlannerService, int], Awaitable[object]]] = 
 """Every use case on one booking, by the group admin of ``demo`` through their own group."""
 
 
+async def _other_groups_booking(bookings: BookingService, state: str) -> int:
+    """Book in ``andere-team``: ``pending``, ``confirmed``, or ``cancelled`` by the participant."""
+    if state == "pending":
+        receipt = await book_pending(bookings, slug="andere-team", contact=another_participant())
+    else:
+        receipt = await book_another(bookings, slug="andere-team")
+    if state == "cancelled":
+        await bookings.cancel(receipt.management_token)
+    return receipt.booking.id or 0
+
+
 def test_every_use_case_on_one_booking_is_tried_through_another_group() -> None:
     assert set(ON_ONE_BOOKING) == booking_id_methods(PlannerService)
 
 
+@pytest.mark.parametrize("state", ["pending", "confirmed", "cancelled"])
 @pytest.mark.parametrize("action", list(ON_ONE_BOOKING))
-async def test_a_pending_booking_of_another_group_is_not_found_through_this_group(
-    action: str, planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+async def test_another_groups_booking_is_not_found_through_this_group(
+    action: str,
+    state: str,
+    planner: PlannerService,
+    bookings: BookingService,
+    uow: InMemoryUnitOfWork,
 ) -> None:
     """The group check comes first: no hint that the booking exists, nothing changed or audited.
 
-    The booking's own rules would read or change it, confirm it, or answer
-    ``booking_not_active`` or ``proposal_not_open``.
+    A pending or confirmed booking is one a use case would read or change, so a missing group
+    check fails. A cancelled one is refused by each use case's own rule with another code
+    (``booking_not_active``, ``booking_not_pending``, ``proposal_not_open``), so a group check
+    made after that rule fails too.
     """
-    receipt = await book_pending(bookings, slug="andere-team", contact=another_participant())
-    other = receipt.booking.id or 0
+    other = await _other_groups_booking(bookings, state)
+    before = uow.state.bookings[other]
     audited = len(uow.state.audit)
 
     with pytest.raises(DomainError, match="booking_not_found"):
         await ON_ONE_BOOKING[action](planner, other)
 
-    assert uow.state.bookings[other].status is BookingStatus.PENDING_CONFIRMATION
+    assert uow.state.bookings[other] == before
     assert len(uow.state.audit) == audited
 
 

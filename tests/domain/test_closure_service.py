@@ -214,9 +214,6 @@ async def test_other_groups_admin_cannot_close_or_touch_bookings(
         await closures.close_group(OTHER_TEAM, "demo", UNTIL_TUESDAY)
     with pytest.raises(DomainError, match="not_permitted"):
         await closures.cancel(OTHER_TEAM, "demo", booking_id)
-    # Through their own group a booking of another group is "not found", never touched.
-    with pytest.raises(DomainError, match="booking_not_found"):
-        await closures.cancel(OTHER_TEAM, "andere-team", booking_id)
     assert _status(uow, booking_id) is BookingStatus.SUSPENDED
     denied = [e for e in uow.state.audit if e.outcome is Outcome.DENIED]
     assert len(denied) == 2
@@ -235,22 +232,31 @@ def test_every_use_case_on_one_booking_is_tried_through_another_group() -> None:
     assert set(ON_ONE_BOOKING) == booking_id_methods(ClosureService)
 
 
+@pytest.mark.parametrize("state", ["on_hold", "not_on_hold"])
 @pytest.mark.parametrize("action", list(ON_ONE_BOOKING))
 async def test_another_groups_booking_is_not_found_through_this_group(
-    action: str, closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork
+    action: str,
+    state: str,
+    closures: ClosureService,
+    bookings: BookingService,
+    uow: InMemoryUnitOfWork,
 ) -> None:
-    """The group check comes before the rule that only a booking on hold is handled.
+    """The group check comes first, before the rule that only a booking on hold is handled.
 
-    The booking is not on hold, so a missing group check and one made after that rule both
-    answer ``booking_not_active``, which would give away that the booking exists.
+    On hold, a use case would show, reinstate, cancel or move the booking, so a missing group
+    check fails. Not on hold, that rule answers ``booking_not_active``, so a group check made
+    after it fails too.
     """
     booking_id = await _book(bookings)
+    if state == "on_hold":
+        await closures.close_group(GROUP_ADMIN, "demo", UNTIL_TUESDAY)
+    before = uow.state.bookings[booking_id]
     audited = len(uow.state.audit)
 
     with pytest.raises(DomainError, match="booking_not_found"):
         await ON_ONE_BOOKING[action](closures, booking_id)
 
-    assert _status(uow, booking_id) is BookingStatus.CONFIRMED
+    assert uow.state.bookings[booking_id] == before
     assert len(uow.state.audit) == audited
 
 
