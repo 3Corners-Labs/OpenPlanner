@@ -72,5 +72,7 @@ async def test_the_webhook_secret_is_only_for_the_connected_kind_and_organisatio
         == secrets.values["contact-center:1"]["webhook_secret"]
     )
     assert await connections.webhook_secret(2, WXCC) is None
+    secrets.values["contact-center-tokens:1"] = {"access_token": "issued"}
     await connections.delete(1)
     assert await connections.webhook_secret(1, WXCC) is None
+    assert secrets.values == {}  # its access tokens go with it

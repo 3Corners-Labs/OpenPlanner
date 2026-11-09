@@ -57,6 +57,7 @@ from app.domain.ports import (
     Clock,
     ContactCenterDispatchers,
     IntegrationError,
+    OrganisationDispatchers,
     SenderDirectory,
     Transaction,
     UnitOfWork,
@@ -133,7 +134,9 @@ class JobRunner:
         senders: Finds the sender per organisation and channel; ``None`` claims no messages.
         composer: Builds messages.
         video: Webex meetings, or ``None`` when not configured.
-        dispatchers: The dispatcher per contact-center platform; empty when none is configured.
+        dispatchers: The installation's dispatcher per contact-center platform; empty when none
+            is configured.
+        organisations: Each organisation's own dispatcher (ADR 0032 point 9), or ``None``.
         integration: Records call events; required when ``video`` is set.
         retention: How long each category of event is kept (ADR 0040, part 4).
         clock_style: The time format of an organisation by id (ADR 0042 step 5); messages
@@ -165,6 +168,7 @@ class JobRunner:
         change_requests: Callable[[int], bool] | None = None,
         after_purge: Callable[[], Awaitable[None]] | None = None,
         fallback: FallbackService | None = None,
+        organisations: OrganisationDispatchers | None = None,
     ) -> None:
         """Store the collaborators and decide which job types this worker can handle."""
         self._queue = queue
@@ -187,7 +191,13 @@ class JobRunner:
             CallJobs(
                 uow,
                 CallService(
-                    uow, integration, video, dispatchers or {}, agent_start_label, fallback
+                    uow,
+                    integration,
+                    video,
+                    dispatchers or {},
+                    agent_start_label,
+                    fallback,
+                    organisations,
                 ),
             )
             if integration is not None

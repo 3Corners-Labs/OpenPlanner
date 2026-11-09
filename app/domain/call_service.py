@@ -19,12 +19,14 @@ from datetime import datetime
 from app.domain.booking import Booking
 from app.domain.calls import EventKind, TaskState, contact_center_task, meeting_request
 from app.domain.contact_center import ContactCenterTaskRef
+from app.domain.contact_center_dispatch import DispatcherChoice
 from app.domain.fallback import FallbackService
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType
 from app.domain.ports import (
     ContactCenterDispatchers,
     IntegrationError,
+    OrganisationDispatchers,
     UnitOfWork,
     VideoProvider,
 )
@@ -52,12 +54,17 @@ class CallService:
         dispatchers: ContactCenterDispatchers,
         start_label: StartLabel,
         fallback: FallbackService | None = None,
+        organisations: OrganisationDispatchers | None = None,
     ) -> None:
-        """Store the collaborators; ``fallback`` diverts dispatches to the own queue (ADR 0082)."""
+        """Store the collaborators; ``fallback`` diverts dispatches to the own queue (ADR 0082).
+
+        ``organisations`` gives each organisation's own dispatcher (ADR 0032 point 9); the
+        installation's ``dispatchers`` serve the organisations without one.
+        """
         self._uow = uow
         self._integration = integration
         self._video = video
-        self._dispatchers = dispatchers
+        self._dispatchers = DispatcherChoice(dispatchers, organisations)
         self._start_label = start_label
         self._fallback = fallback
 
@@ -69,7 +76,7 @@ class CallService:
     @property
     def dispatch_available(self) -> bool:
         """Whether tasks can be created (needs video for the meeting link)."""
-        return self._video is not None and bool(self._dispatchers)
+        return self._video is not None and self._dispatchers.configured
 
     async def ensure_meeting(self, booking: Booking, group: Group) -> Booking:
         """Create the booking's meeting if the group has video and it has none yet."""
@@ -94,7 +101,7 @@ class CallService:
         routing = group.contact_center
         if routing is None or not group.dispatch_enabled or booking.contact_center_task:
             return booking
-        dispatcher = self._dispatchers.get(routing.kind)
+        dispatcher = await self._dispatchers.for_organisation(group.organisation_id, routing.kind)
         if dispatcher is None:
             return booking
         if await self.diverts(booking, group):
@@ -171,9 +178,9 @@ class CallService:
     @property
     def end_available(self) -> bool:
         """Whether tasks can be ended (needs only a contact center)."""
-        return bool(self._dispatchers)
+        return self._dispatchers.configured
 
-    async def end_task(self, booking: Booking) -> None:
+    async def end_task(self, booking: Booking, group: Group) -> None:
         """Mark a cancelled booking's task cancelled, then try to end it.
 
         Nothing happens without a task, without a dispatcher for the platform that holds it, or
@@ -184,8 +191,10 @@ class CallService:
             IntegrationError: Retryable failures, so the job tries again.
         """
         task = booking.contact_center_task
-        dispatcher = self._dispatchers.get(task.kind) if task else None
-        if task is None or dispatcher is None:
+        if task is None:
+            return
+        dispatcher = await self._dispatchers.for_organisation(group.organisation_id, task.kind)
+        if dispatcher is None:
             return
         task_id, booking_id = task.id, _id(booking)
         status = await self._integration.status(booking_id)

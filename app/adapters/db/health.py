@@ -196,6 +196,7 @@ class HealthQueries:
                 CallStatusRow.task,
                 OrganisationRow.slug,
                 GroupRow.slug,
+                OrganisationRow.id,
             )
             .join(CallStatusRow, CallStatusRow.booking_id == BookingRow.id)
             .join(SlotRow, SlotRow.id == BookingRow.slot_id)
@@ -217,6 +218,7 @@ class HealthQueries:
                 TaskState(task),
                 organisation,
                 group,
+                organisation_id,
             )
-            for booking_id, task_id, kind, task, organisation, group in rows
+            for booking_id, task_id, kind, task, organisation, group, organisation_id in rows
         ]

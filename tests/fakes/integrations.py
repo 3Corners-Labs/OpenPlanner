@@ -21,7 +21,12 @@ from app.domain.calls import (
 )
 from app.domain.checks import Finding
 from app.domain.contact_center import ConnectionChange, ContactCenterKind, OrganisationConnection
-from app.domain.ports import ContactCenterDispatcher, IntegrationError, RequestRecord
+from app.domain.ports import (
+    ContactCenterDispatcher,
+    IntegrationError,
+    OwnConnection,
+    RequestRecord,
+)
 from app.domain.scheduling import Group
 
 
@@ -242,3 +247,15 @@ class FakeContactCenterConnections:
 
     async def delete(self, organisation_id: int) -> None:
         self.connections.pop(organisation_id, None)
+
+
+class FakeOrganisationDispatchers:
+    """``OrganisationDispatchers`` in memory: per organisation id its dispatcher, or ``None``."""
+
+    def __init__(self, own: dict[int, ContactCenterDispatcher | None] | None = None) -> None:
+        self.connections = own or {}
+
+    async def own(self, organisation_id: int, kind: ContactCenterKind) -> OwnConnection | None:
+        if organisation_id not in self.connections:
+            return None
+        return OwnConnection(self.connections[organisation_id])

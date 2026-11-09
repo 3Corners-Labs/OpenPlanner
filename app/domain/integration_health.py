@@ -27,9 +27,16 @@ from app.domain.connection_health import (
     evaluate,
     health_event,
 )
+from app.domain.contact_center_dispatch import DispatcherChoice
 from app.domain.event_context import bind_booking, bind_level, trace_scope
 from app.domain.integration import IntegrationService
-from app.domain.ports import Clock, ContactCenterDispatchers, IntegrationError, UnitOfWork
+from app.domain.ports import (
+    Clock,
+    ContactCenterDispatchers,
+    IntegrationError,
+    OrganisationDispatchers,
+    UnitOfWork,
+)
 from app.domain.tunable import value_of
 
 NOTE_EVERY = timedelta(seconds=10)
@@ -121,11 +128,16 @@ class TaskReconciler:
         dispatchers: ContactCenterDispatchers,
         integration: IntegrationService,
         after: timedelta | Callable[[], timedelta],
+        organisations: OrganisationDispatchers | None = None,
     ) -> None:
-        """Store the collaborators; nothing has been read yet."""
+        """Store the collaborators; nothing has been read yet.
+
+        A task of an organisation with its own connection is read through that connection
+        (ADR 0032 point 9); the others through the installation's ``dispatchers``.
+        """
         self._uow = uow
         self._clock = clock
-        self._dispatchers = dispatchers
+        self._dispatchers = DispatcherChoice(dispatchers, organisations)
         self._integration = integration
         self._after = after
         self._read_at: dict[int, datetime] = {}
@@ -138,7 +150,7 @@ class TaskReconciler:
         failure with the count; one with an open failure whose run found none gets the success
         that closes the alert.
         """
-        if not self._dispatchers:
+        if not self._dispatchers.configured:
             return 0
         now = self._clock.now()
         after = value_of(self._after)
@@ -160,7 +172,14 @@ class TaskReconciler:
 
     async def _read(self, task: StaleTask) -> EventKind | None:
         """Return the event that brings the booking to the task's state, if it differs."""
-        dispatcher = self._dispatchers.get(task.task.kind)
+        if task.organisation_id is None:
+            return None
+        try:
+            dispatcher = await self._dispatchers.for_organisation(
+                task.organisation_id, task.task.kind
+            )
+        except IntegrationError:  # an incomplete own connection: read it once it is complete
+            return None
         if dispatcher is None:
             return None
         with trace_scope():

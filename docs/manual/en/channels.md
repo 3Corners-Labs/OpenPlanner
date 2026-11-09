@@ -90,9 +90,12 @@ it leaked; the old one stops working at once. **Remove the own connection** eras
 and its secrets.
 
 As long as an organisation has no connection of its own, it uses the installation's. That
-fallback goes away in a later version. Sending tasks through the own connection comes in the next
-step; until then this card records the connection and the webhook address. The webhook address
-only works once OpenPlanner registers it with the contact center in that step.
+fallback goes away in a later version. With an own connection this organisation's tasks go only
+through it; while the client secret or the refresh token is missing, they wait until the
+connection is complete. An API address on this server or in an internal network is refused. The
+webhook address works once OpenPlanner registers it with the contact center in a later step.
+Connect or disconnect an organisation when none of its tasks is open: a task made through the
+previous connection is not ended through the new one.
 
 ## What is recorded
 

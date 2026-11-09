@@ -450,6 +450,29 @@ ContactCenterDispatchers = Mapping[ContactCenterKind, ContactCenterDispatcher]
 """The configured dispatcher per platform (ADR 0032 point 5); empty without a contact center."""
 
 
+@dataclass(frozen=True)
+class OwnConnection:
+    """An organisation's own connection as the dispatch sees it (ADR 0032 point 13).
+
+    Attributes:
+        dispatcher: Its dispatcher; ``None`` while the connection cannot dispatch.
+    """
+
+    dispatcher: ContactCenterDispatcher | None
+
+
+class OrganisationDispatchers(Protocol):
+    """Each organisation's own dispatcher, built from its connection (ADR 0032 point 9)."""
+
+    async def own(self, organisation_id: int, kind: ContactCenterKind) -> OwnConnection | None:
+        """Return the organisation's own connection for ``kind``; ``None`` when it has none.
+
+        ``OwnConnection.dispatcher`` is ``None`` when the connection cannot dispatch yet (another
+        kind, or a secret missing): the organisation's tasks then wait (point 13).
+        """
+        ...
+
+
 class ContactCenterConnections(Protocol):
     """The organisations' contact-center connections, sealed and write-only (ADR 0032 point 9).
 
