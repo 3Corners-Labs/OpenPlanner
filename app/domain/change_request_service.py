@@ -245,7 +245,9 @@ class ChangeRequestService:
         A message of the replaced request that has not gone out yet is dropped, so the
         participant gets one message per request.
         """
-        booking_id = booking.id or 0
+        booking_id = booking.id
+        if booking_id is None:  # pragma: no cover - a matched booking is stored
+            raise ValueError("booking has not been stored")
         previous = await tx.get_latest_change_request(booking_id)
         if previous is not None and previous.is_current(booking.start, now):
             await tx.save_change_request(previous.supersede(now))

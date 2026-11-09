@@ -306,9 +306,14 @@ class JobRunner:
                 if booking and booking.id is not None and job.type in PROPOSAL_NOTICES
                 else None
             )
+            # Switched off since the request: no request, so ``is_stale`` stops it (ADR 0023).
             change = (
                 await tx.get_latest_change_request(booking.id)
-                if booking and booking.id is not None and job.type in CHANGE_REQUEST_NOTICES
+                if booking
+                and booking.id is not None
+                and group
+                and job.type in CHANGE_REQUEST_NOTICES
+                and self._takes_change_requests(group.organisation_id)
                 else None
             )
             organisation = (
@@ -326,14 +331,7 @@ class JobRunner:
         ):
             log.info("job.skipped", job_id=job.id, reason=NO_RECIPIENT)
             return NO_RECIPIENT
-        stale = is_stale(
-            job.pinned_start, booking, job.type, proposal=proposal, change=change, now=now
-        )
-        if job.type in CHANGE_REQUEST_NOTICES and not self._takes_change_requests(
-            group.organisation_id
-        ):
-            stale = True  # switched off since: open requests stop too (ADR 0023 step 2)
-        if stale:
+        if is_stale(job.pinned_start, booking, job.type, proposal=proposal, change=change, now=now):
             log.info("job.skipped", job_id=job.id, reason=STALE)
             return STALE
         if job.type in TEAM_INVITES and not group.sends_team_invite:

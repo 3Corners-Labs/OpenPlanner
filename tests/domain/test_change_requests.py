@@ -7,12 +7,11 @@ Calendar: "now" is Thursday 1 January 2026 08:00 UTC; group ``demo`` is staffed 
 
 from dataclasses import replace
 from datetime import timedelta
-from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any
 
 import pytest
 
-from app.domain.booking import Booking, BookingStatus
+from app.domain.booking import BookingStatus
 from app.domain.change_request_service import (
     MATCHED,
     NO_MATCH,
@@ -23,7 +22,6 @@ from app.domain.change_requests import (
     ChangeAction,
     ChangeRequest,
     ChangeStatus,
-    appointment_code,
     code_matches,
     derive_code,
     format_code,
@@ -35,7 +33,7 @@ from app.domain.job_plan import JobType, is_stale
 from app.domain.participant_links import PublicRef
 from app.domain.scheduling import GroupSummary
 from app.domain.services import BookingService
-from app.domain.tokens import derive_token, hash_token
+from app.domain.tokens import derive_token, hash_token, key_for_booking
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.agent_api import api_caller
@@ -111,14 +109,8 @@ def test_the_code_is_eight_digits_derived_from_the_salt_and_key() -> None:
 def test_the_code_follows_the_key_the_token_was_made_with() -> None:
     old_hash = hash_token(derive_token(OTHER_KEY, "salt"))
 
-    booking = cast(Booking, SimpleNamespace(token_salt="salt", token_hash=old_hash))
-
-    assert appointment_code((TEST_TOKEN_KEY, OTHER_KEY), booking) == format_code(
-        derive_code(OTHER_KEY, "salt")
-    )
-    assert appointment_code((TEST_TOKEN_KEY,), booking) == format_code(
-        derive_code(TEST_TOKEN_KEY, "salt")
-    )
+    assert key_for_booking((TEST_TOKEN_KEY, OTHER_KEY), "salt", old_hash) == OTHER_KEY
+    assert key_for_booking((TEST_TOKEN_KEY,), "salt", old_hash) == TEST_TOKEN_KEY
     assert code_matches((TEST_TOKEN_KEY, OTHER_KEY), "salt", derive_code(OTHER_KEY, "salt"))
     assert not code_matches((TEST_TOKEN_KEY,), "salt", derive_code(OTHER_KEY, "salt"))
 
