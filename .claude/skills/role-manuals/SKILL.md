@@ -113,7 +113,8 @@ The scripts are in `scripts/` and run from the root of the checkout; `<ws>` is t
    (agenda, week, rights matrix, audit log) are captured 1440 px wide so their tables are whole.
    What needs Webex Meetings is captured on a test installation that has it; until then the build
    shows "Schermafdruk volgt", and a shot taken without it gets the note from `without_webex` in
-   its caption.
+   its caption. `freeze.sh` accepts only the shots of the capture it freezes, so such a shot
+   needs a record in that capture's state before it can enter a frozen version (not built yet).
 5. **Build.** `node .../build.mjs <ws>` is the one parse of the sources. It writes
    `build/<name>.docx`, `.html` and a tagged `.pdf` with bookmarks (`--no-pdf` skips the PDF),
    `build/manuals.json` (per manual its role, tasks, figures and bold spans, each with its line,

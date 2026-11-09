@@ -47,7 +47,7 @@ REPO = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from checkout_guard import guard_outside_checkout  # noqa: E402
+from workspace import Workspace  # noqa: E402
 
 from app.domain.authorization import MATRIX, PARTICIPANT_ACTIONS, Permission, Role  # noqa: E402
 from app.i18n.po import load_catalogues  # noqa: E402
@@ -105,19 +105,6 @@ class Report:
         for name, lines in self.sections.items():
             out += ["", f"## {name}", "", *[f"- {line}" for line in lines]]
         return "\n".join(out) + "\n"
-
-
-@dataclass
-class Workspace:
-    """The folders of one organisation's manuals."""
-
-    root: Path
-
-    def __post_init__(self) -> None:
-        """Resolve the folders below the root."""
-        self.sources = self.root / "sources"
-        self.img = self.root / "img"
-        self.evidence = self.root / "evidence"
 
 
 def git(*args: str) -> str:
@@ -385,11 +372,11 @@ def load_inputs(ws: Workspace) -> Inputs:
     shots_file = ws.evidence / "shots.json"
     if not shots_file.exists():
         sys.exit(f"check.py: {shots_file} is missing; run capture.mjs {ws.root} --list first")
-    found = ws.root / "build" / "manuals.json"
+    found = ws.build / "manuals.json"
     if not found.exists():
         sys.exit(f"check.py: {found} is missing; run build.mjs {ws.root} first")
     shots = shots_file.read_bytes()
-    variables = (ws.root / "variables.json").read_bytes()
+    variables = ws.variables.read_bytes()
     raw = {p: p.read_bytes() for p in sorted(ws.sources.glob("*.md"))}
     build = found.read_bytes()
     try:
@@ -521,8 +508,7 @@ def main() -> int:
     )
     parser.add_argument("--fix", action="store_true", help="write renamed labels into the sources")
     args = parser.parse_args()
-    ws = Workspace(args.workspace.resolve())
-    guard_outside_checkout(ws.root)
+    ws = Workspace(args.workspace)
     inputs = load_inputs(ws)
     config, sources, manuals = inputs.config, inputs.sources, inputs.manuals
     report = Report()

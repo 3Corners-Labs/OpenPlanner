@@ -282,9 +282,9 @@ def test_only_a_commit_hash_is_passed_to_git(
 
 
 def test_a_workspace_inside_a_checkout_is_refused_also_through_a_link(tmp_path: Path) -> None:
-    """The guard follows a symbolic link before it looks for a checkout above the folder."""
-    check.guard_outside_checkout(tmp_path)
+    """Opening a workspace follows a symbolic link before it looks for a checkout above it."""
+    assert check.Workspace(tmp_path).evidence == tmp_path.resolve() / "evidence"
     link = tmp_path / "manuals"
     link.symlink_to(check.REPO / "docs")
     with pytest.raises(SystemExit, match="inside the checkout"):
-        check.guard_outside_checkout(link)
+        check.Workspace(link)

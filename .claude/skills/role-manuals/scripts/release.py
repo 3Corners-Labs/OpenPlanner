@@ -39,7 +39,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from checkout_guard import guard_outside_checkout  # noqa: E402
+from workspace import Workspace  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[4]
 STACK = Path(".claude/skills/verify-openplanner/scripts/stack.sh")
@@ -56,6 +56,9 @@ VERSION = re.compile(r"\d+(\.\d+)*")
 
 RECORD = Path("evidence/afhechting.md")
 """What a person reread and what stays open, written before a version is frozen."""
+
+READ_BY_FREEZE = ("variables.json", "build/manuals.json")
+"""The workspace files freeze reads itself, so the check it relies on must have read them too."""
 
 PARTS = ("build", "sources", "img", "evidence")
 """The folders a version consists of; besides them variables.json and the workspace's own
@@ -147,9 +150,9 @@ def _write(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
 
 
-def capture(workspace: Path) -> dict:
+def capture(ws: Workspace) -> dict:
     """Return the record of the last capture, ``evidence/state.json``."""
-    path = workspace / "evidence" / "state.json"
+    path = ws.evidence / "state.json"
     if not path.exists():
         sys.exit(f"release.py: {path} is missing; capture first (update.sh)")
     return _read(path)
@@ -175,13 +178,12 @@ def capture_release(state: dict, repo: Path) -> tuple[str, str, bool]:
 
 def record(workspace: Path, repo: Path = REPO) -> str:
     """Write the label of the release the capture shows into variables.json; return it."""
-    guard_outside_checkout(workspace)
-    commit, tag, same = capture_release(capture(workspace), repo)
+    ws = Workspace(workspace)
+    commit, tag, same = capture_release(capture(ws), repo)
     label = software_label(tag, commit, same)
-    path = workspace / "variables.json"
-    data = _read(path)
+    data = _read(ws.variables)
     data["software_version"] = label
-    _write(path, data)
+    _write(ws.variables, data)
     return label
 
 
@@ -208,14 +210,15 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def check_passed(workspace: Path) -> None:
+def check_passed(ws: Workspace) -> None:
     """Refuse unless the last check passed on the files as they are now.
 
     ``check.py`` writes its verdict to ``evidence/check.json``: the number of blocking findings
     and the sha256 of every file it read, by its path in the workspace. Each of them must be
-    unchanged, and no source may have been added since, which a verdict cannot list.
+    unchanged. The verdict must also name every source there is now (one added since cannot be
+    listed) and the files freeze reads itself (``READ_BY_FREEZE``).
     """
-    path = workspace / "evidence" / "check.json"
+    path = ws.evidence / "check.json"
     if not path.exists():
         sys.exit("release.py: evidence/check.json is missing; freeze.sh checks first")
     verdict = _read(path)
@@ -224,14 +227,14 @@ def check_passed(workspace: Path) -> None:
     listed: dict[str, str] = verdict.get("inputs", {})
 
     def unchanged(name: str) -> bool:
-        file = workspace / name
+        file = ws.root / name
         inside = not Path(name).is_absolute() and ".." not in Path(name).parts
         return inside and file.is_file() and _sha256(file) == listed[name]
 
-    added = {f"sources/{p.name}" for p in (workspace / "sources").glob("*.md")} - set(listed)
-    changed = sorted(added | {name for name in listed if not unchanged(name)})
-    if changed:
-        sys.exit(f"release.py: changed after the last check: {', '.join(changed)}; run freeze.sh")
+    expected = {f"sources/{p.name}" for p in ws.sources.glob("*.md")} | set(READ_BY_FREEZE)
+    differ = sorted((expected - set(listed)) | {name for name in listed if not unchanged(name)})
+    if differ:
+        sys.exit(f"release.py: not what the last check read: {', '.join(differ)}; run freeze.sh")
 
 
 def _files(folder: Path) -> list[Path]:
@@ -258,7 +261,7 @@ def _writable(folder: Path) -> None:
         path.chmod(0o755 if path.is_dir() else 0o644)
 
 
-def earlier_images(workspace: Path, state: dict) -> list[str]:
+def earlier_images(ws: Workspace, state: dict) -> list[str]:
     """Return the screenshots in ``img/`` that this capture did not take.
 
     ``update.sh`` starts every capture with a new state and keeps the images of the one before,
@@ -267,22 +270,22 @@ def earlier_images(workspace: Path, state: dict) -> list[str]:
     records = state.get("records", {})
     return sorted(
         image.stem
-        for image in (workspace / "img").glob("*.png")
+        for image in ws.img.glob("*.png")
         if records.get(image.stem, {}).get("status") != "captured"
     )
 
 
 def freeze(workspace: Path, repo: Path = REPO, today: dt.date | None = None) -> Path:
     """Freeze the settled version of the manuals into ``versies/``; return its folder."""
-    guard_outside_checkout(workspace)
-    state = capture(workspace)
+    ws = Workspace(workspace)
+    state = capture(ws)
     captured_from, tag, same = capture_release(state, repo)
     if not same:
         sys.exit(
             "release.py: the capture is a trial: its image is no release tag's; "
             "run update.sh from a checkout of the release tag"
         )
-    variables = _read(workspace / "variables.json")
+    variables = _read(ws.variables)
     label = software_label(tag, captured_from, same)
     if variables.get("software_version") != label:
         sys.exit(
@@ -290,22 +293,22 @@ def freeze(workspace: Path, repo: Path = REPO, today: dt.date | None = None) -> 
             f"capture shows {label!r}; freeze.sh records it first"
         )
     commit = git(repo, "rev-parse", "--verify", "--quiet", f"refs/tags/{tag}^{{commit}}")
-    version, version_text = manual_version(_read(workspace / "build" / "manuals.json")["manuals"])
-    if not (workspace / RECORD).exists():
+    version, version_text = manual_version(_read(ws.build / "manuals.json")["manuals"])
+    if not (ws.root / RECORD).exists():
         sys.exit(f"release.py: write {RECORD} first: what was reread and what stays open")
-    earlier = earlier_images(workspace, state)
+    earlier = earlier_images(ws, state)
     if earlier:
         sys.exit(
             f"release.py: not taken by this capture, so from an earlier one: {', '.join(earlier)}; "
             "capture them again, or remove them from img/ so the manuals say they follow"
         )
-    check_passed(workspace)
+    check_passed(ws)
     started = str(state.get("started", ""))
     if not re.match(r"\d{4}-\d{2}-\d{2}", started):
         sys.exit("release.py: evidence/state.json holds no start of the capture")
     captured = dt.date.fromisoformat(started[:10])
     name = f"{captured.isoformat()}_software-{tag.removeprefix('v')}_handleiding-{version}"
-    versions = workspace / "versies"
+    versions = ws.root / "versies"
     target, archive = versions / name, versions / f"{name}.zip"
     if target.exists() or archive.exists():
         sys.exit(f"release.py: {name} exists already; a frozen version never changes")
@@ -314,9 +317,9 @@ def freeze(workspace: Path, repo: Path = REPO, today: dt.date | None = None) -> 
     partial = versions / f".{name}.zip.part"
     try:
         for part in PARTS:
-            shutil.copytree(workspace / part, work / part, ignore=SKIP)
-        shutil.copy2(workspace / "variables.json", work)
-        for doc in sorted(workspace.glob("*.md")):
+            shutil.copytree(ws.root / part, work / part, ignore=SKIP)
+        shutil.copy2(ws.variables, work)
+        for doc in sorted(ws.root.glob("*.md")):
             if doc.name != "README.md":
                 shutil.copy2(doc, work)
         values = {
@@ -350,7 +353,7 @@ def freeze(workspace: Path, repo: Path = REPO, today: dt.date | None = None) -> 
     for path in (archive, checksum):
         path.chmod(0o444)
     variables["commit"] = commit[:12]
-    _write(workspace / "variables.json", variables)
+    _write(ws.variables, variables)
     return target
 
 

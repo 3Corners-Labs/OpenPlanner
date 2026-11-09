@@ -267,6 +267,11 @@ def _change(workspace: Path, change: str) -> None:
         (workspace / "sources" / "20-medewerker.md").write_text("# Medewerker\n")
     elif change == "shot list changed after the check":
         (workspace / "evidence" / "shots.json").write_text(json.dumps([{"id": "pl-09"}]))
+    elif change == "verdict without the variables":
+        path = workspace / "evidence" / "check.json"
+        verdict = json.loads(path.read_text())
+        del verdict["inputs"]["variables.json"]
+        path.write_text(json.dumps(verdict))
     else:
         _checked(workspace)
 
@@ -282,9 +287,10 @@ def _change(workspace: Path, change: str) -> None:
         ("no record", "afhechting.md first"),
         ("earlier image", "not taken by this capture, so from an earlier one: pl-02;"),
         ("blocking check", "found 2 blocking"),
-        ("edited after the check", "changed after the last check: sources/10-planner.md"),
-        ("added after the check", "changed after the last check: sources/20-medewerker.md"),
-        ("shot list changed after the check", "changed after the last check: evidence/shots.json"),
+        ("edited after the check", "not what the last check read: sources/10-planner.md"),
+        ("added after the check", "not what the last check read: sources/20-medewerker.md"),
+        ("shot list changed after the check", "not what the last check read: evidence/shots.json"),
+        ("verdict without the variables", "not what the last check read: variables.json;"),
     ],
 )
 def test_freeze_refuses_what_is_no_settled_release(
