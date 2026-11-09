@@ -49,7 +49,7 @@ def _speculative(request: Request) -> bool:
     click at all: a hover over a bookmark, an address the address bar predicts. The person's
     own request comes after it, without the header.
     """
-    return bool(request.headers.get("sec-purpose") or request.headers.get("purpose"))
+    return any(request.headers.get(name) for name in ("sec-purpose", "purpose"))
 
 
 def from_this_page(request: Request) -> bool:
