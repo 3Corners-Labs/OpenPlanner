@@ -111,6 +111,7 @@ from app.domain.usage import StaffFact, UsageCell, UsageFact
 from app.domain.usage_backfill import BackfillBooking
 from app.domain.usage_report import DayStatusCount, ReportGroup
 from app.domain.usage_rollup import UsageBatch, UsagePruned, UsageState
+from app.domain.usage_staff import StaffCell
 from app.domain.worker_check import WorkerHeartbeat
 
 
@@ -2155,6 +2156,20 @@ class UsageStore(Protocol):
 
     async def add_usage_cells(self, cells: Sequence[UsageCell]) -> None:
         """Add ``cells`` to the hourly table: a cell of an existing hour and cut adds to its row."""
+        ...
+
+    async def add_staff_cells(self, cells: Sequence[StaffCell]) -> None:
+        """Add the team members' cells to ``usage_staff_hour`` (ADR 0117 point 9)."""
+        ...
+
+    async def read_staff_cells(
+        self, scope: Scope, group_ids: Sequence[int], first_hour: datetime, last_hour: datetime
+    ) -> list[StaffCell]:
+        """Return the team cells of ``group_ids`` in ``scope`` in the half-open hour range."""
+        ...
+
+    async def read_staff_names(self, staff_ids: Sequence[int]) -> dict[int, str]:
+        """Return the display name of each of ``staff_ids`` that still has one."""
         ...
 
     async def advance_usage_watermark(self, last_event_id: int, at: datetime) -> None:

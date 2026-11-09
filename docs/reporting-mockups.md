@@ -22,7 +22,7 @@ Rules:
 
 | Element in the mockup | ADR 0117 step | State | Held by |
 |---|---|---|---|
-| Breadcrumb and the report family links (*Volume*, *Queue and calls*, *Capacity*, *Channels*, *Team*) | 5, 6, 7 | built, *Team* planned | `tests/admin/test_usage_screens.py` (`test_the_page_links_the_families_and_marks_the_current_one`) |
+| Breadcrumb and the report family links (*Volume*, *Queue and calls*, *Capacity*, *Channels*, *Team*) | 5, 6, 7 | built; *Team* only for who holds `reports.staff.view`, and marked *off* until the organisation switches it on | `tests/admin/test_usage_screens.py` (`test_the_page_links_the_families_and_marks_the_current_one`), `tests/admin/test_usage_team.py` |
 | Range form: from, to | 5 | built | `tests/admin/test_usage_routes.py` |
 | Range form: *Split by* (none, queue method, subject, language) and *Show* | 5 | **open**: no step names it | – |
 | *Export CSV* of the screen | 8 | planned | – |

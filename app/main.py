@@ -143,6 +143,7 @@ from app.domain.settings_service import SettingsService
 from app.domain.simulation import SimulationService
 from app.domain.staff_directory_service import DirectorySettings, StaffDirectoryService
 from app.domain.staff_lifecycle import StaffLifecycleService
+from app.domain.staff_usage import StaffUsage
 from app.domain.system_log import SystemLog
 from app.domain.tls import public_address
 from app.domain.tls_check import CertificateStatus, TlsWatch
@@ -458,6 +459,7 @@ def create_app(
             clock,
             lambda: live().reporting_min_cell_size,
             lambda organisation: per_organisation(organisation).reporting_org_min_cell_size,
+            lambda organisation: per_organisation(organisation).reporting_staff_view_enabled,
         )
         app.state.digest_admin = DigestAdmin(
             uow,
@@ -631,12 +633,22 @@ def create_app(
             cache=lambda: timedelta(seconds=live().maintenance_cache_seconds),
         )
         app.state.planning_service = PlanningService(uow, clock, app.state.admin_service)
+        # ADR 0117 point 9: a team member's usage facts, only while the organisation has them on.
+        staff_usage = StaffUsage(
+            [
+                k
+                for k in (agent_pseudonym_key(settings), agent_pseudonym_key_previous(settings))
+                if k is not None
+            ],
+            lambda organisation: per_organisation(organisation).reporting_staff_view_enabled,
+        )
         app.state.queue_service = QueueService(
             uow,
             clock,
             app.state.admin_service,
             agent_pseudonym_key(settings),
             agent_pseudonym_key_previous(settings),
+            staff_usage,
         )
         app.state.integration_service = IntegrationService(
             uow,
@@ -644,6 +656,7 @@ def create_app(
             app.state.admin_service,
             settings.app_version,
             probes=ProbeReports(ReportStore(app.state.engine)),
+            staff_usage=staff_usage,
         )
         # ADR 0082 points 5 and 7: the last inbound webhooks and the health of the connections.
         app.state.health_service = IntegrationHealthService(

@@ -14,6 +14,10 @@
       {% for code, key, href in views %}
       <li><a href="{{ href }}"{% if code == view %} aria-current="page"{% endif %}>{{ _(key) }}</a></li>
       {% endfor %}
+      {% if team_shown is defined and team_shown and not team_on %}
+      <li><span class="muted">{{ _("reports.view.team") }} ({{ _("reports.team.off") }})</span>
+        {% if can("settings.organisation.manage", organisation=usage.organisation_slug) %}<a href="/admin/organisations/{{ usage.organisation_slug }}/settings">{{ _("reports.team.switch_on") }}</a>{% endif %}</li>
+      {% endif %}
     </ul>
   </nav>
   <form method="get" action="{{ base }}" class="filters">

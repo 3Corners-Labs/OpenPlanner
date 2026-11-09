@@ -15,6 +15,7 @@ from app.domain.usage import StaffFact, UsageCell, UsageFact
 from app.domain.usage_backfill import BackfillBooking
 from app.domain.usage_report import DayStatusCount, ReportGroup
 from app.domain.usage_rollup import UsageBatch, UsagePruned, UsageState, merge
+from app.domain.usage_staff import StaffCell, merge_staff
 
 
 @dataclass
@@ -23,6 +24,8 @@ class UsageData:
 
     events: list[tuple[int, UsageFact | StaffFact]] = field(default_factory=list)
     cells: list[UsageCell] = field(default_factory=list)
+    staff_cells: list[StaffCell] = field(default_factory=list)
+    staff_names: dict[int, str] = field(default_factory=dict)
     last_event_id: int = 0
     rolled_at: datetime | None = None
     backfilled_at: datetime | None = None
@@ -60,6 +63,21 @@ class InMemoryUsageStore:
 
     async def add_usage_cells(self, cells: Sequence[UsageCell]) -> None:
         self.data.cells = merge([*self.data.cells, *cells])
+
+    async def add_staff_cells(self, cells: Sequence[StaffCell]) -> None:
+        self.data.staff_cells = merge_staff([*self.data.staff_cells, *cells])
+
+    async def read_staff_cells(
+        self, scope: Scope, group_ids: Sequence[int], first_hour: datetime, last_hour: datetime
+    ) -> list[StaffCell]:
+        return [
+            c
+            for c in self.data.staff_cells
+            if c.group_id in group_ids and first_hour <= c.bucket_hour < last_hour
+        ]
+
+    async def read_staff_names(self, staff_ids: Sequence[int]) -> dict[int, str]:
+        return {i: n for i, n in self.data.staff_names.items() if i in staff_ids}
 
     async def advance_usage_watermark(self, last_event_id: int, at: datetime) -> None:
         self.data.last_event_id = max(self.data.last_event_id, last_event_id)
