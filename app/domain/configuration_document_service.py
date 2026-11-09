@@ -140,6 +140,8 @@ class ConfigurationDocumentService:
         max_bytes: The largest document accepted (``configuration_package_max_mb``).
         max_changes: The most changes one apply may hold (``configuration_apply_max_changes``).
         issuer_of: Fetches a provider's discovery document; needed to create or move one.
+        plaintext_export: Whether the host allows an export without encryption
+            (``CONFIGURATION_PLAINTEXT_EXPORT_ALLOWED``, ADR 0099 point 8a); read on each use.
         formats: The format versions this release reads.
     """
 
@@ -158,6 +160,7 @@ class ConfigurationDocumentService:
         max_bytes: Callable[[], int],
         max_changes: Callable[[], int],
         issuer_of: IssuerOf | None = None,
+        plaintext_export: Callable[[], bool] = lambda: False,
         formats: Mapping[str, Format] = FORMATS,
     ) -> None:
         """Store the collaborators."""
@@ -173,22 +176,50 @@ class ConfigurationDocumentService:
         self._max_bytes = max_bytes
         self._max_changes = max_changes
         self._issuer_of = issuer_of
+        self._plaintext_export = plaintext_export
         self._formats = formats
 
     async def export(
-        self, actor: Actor, scope: Scope, passphrase: str | None, *, secrets: bool
+        self,
+        actor: Actor,
+        scope: Scope,
+        passphrase: str | None,
+        *,
+        secrets: bool,
+        plain: bool = False,
     ) -> bytes:
         """Write the configuration of ``scope`` as a document; audited.
 
         With ``secrets`` the passphrase seals them (see ``MIN_PASSPHRASE_LENGTH``); without, every
-        secret is left out and no passphrase is needed.
+        secret is left out and no passphrase is needed. With ``plain`` (which includes the
+        secrets) they are written in clear text and need no passphrase, when the host allows it.
 
         Raises:
             DomainError: ``configuration_passphrase_short``; ``integration_not_ready`` when
-                secrets are wanted and the installation has no settings key.
+                secrets are wanted and the installation has no settings key;
+                ``configuration_plaintext_disabled`` (audited) when ``plain`` is not allowed;
+                ``invalid_configuration`` for ``plain`` together with a passphrase.
         """
+        if plain and passphrase is not None:
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "plain")
+        secrets = secrets or plain
         self._may_export(actor, scope, secrets=secrets)
-        if secrets and (passphrase is None or len(passphrase) < MIN_PASSPHRASE_LENGTH):
+        if plain and not self._plaintext_export():
+            await self._admin.record(
+                actor.subject,
+                _route_permission(scope).value,
+                Outcome.DENIED,
+                ErrorCode.CONFIGURATION_PLAINTEXT_DISABLED.value,
+                scope.organisation,
+                None,
+                EXPORT_DETAIL + ",secrets,plain",
+            )
+            raise DomainError(ErrorCode.CONFIGURATION_PLAINTEXT_DISABLED, "plain")
+        if (
+            secrets
+            and not plain
+            and (passphrase is None or len(passphrase) < MIN_PASSPHRASE_LENGTH)
+        ):
             raise DomainError(ErrorCode.CONFIGURATION_PASSPHRASE_SHORT, "passphrase")
         async with self._uow.read() as tx:
             snapshot = await tx.read_configuration(
@@ -209,16 +240,18 @@ class ConfigurationDocumentService:
                 "app_version": self._app_version,
             },
         )
-        if secrets and passphrase is not None:
-            document = self._sealing.seal(document, passphrase)
-        else:
-            document = self._sealing.strip(document)
+        if not plain:
+            document = (
+                self._sealing.seal(document, passphrase)
+                if secrets and passphrase is not None
+                else self._sealing.strip(document)
+            )
         permission = _route_permission(scope)
-        detail = EXPORT_DETAIL + (",secrets" if secrets else "")
+        detail = EXPORT_DETAIL + (",secrets" if secrets else "") + (",plain" if plain else "")
         await self._admin.record(
             actor.subject, permission.value, Outcome.SUCCESS, "", scope.organisation, None, detail
         )
-        return self._codec.encode(to_json(document))
+        return self._codec.encode(to_json(document, plain_secrets=plain))
 
     async def plan(
         self,

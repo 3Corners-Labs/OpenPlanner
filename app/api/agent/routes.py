@@ -23,7 +23,7 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, Header, Query, Request
 from starlette.responses import JSONResponse, Response
 
-from app.adapters.configuration_json import MEDIA_TYPE
+from app.adapters.configuration_json import MEDIA_TYPE, document_response
 from app.api.agent.auth import AgentContext, RequireScope, api_access, client_key
 from app.api.agent.errors import ApiProblem
 from app.api.agent.schemas import (
@@ -72,6 +72,15 @@ ReadGroup = Annotated[
     AgentContext, Depends(RequireScope(ApiScope.AVAILABILITY_READ, group_param="slug"))
 ]
 Transfer = Annotated[AgentContext, Depends(RequireScope(ApiScope.CONFIGURATION_TRANSFER))]
+PlainSecrets = Annotated[
+    bool,
+    Header(
+        alias="X-Plain-Secrets",
+        description="`true` on an export writes the secrets in clear text, without a passphrase "
+        "(ADR 0099 point 8a). Refused with `configuration_plaintext_disabled` unless the host "
+        "allows it. The response must be kept as private as the secrets.",
+    ),
+]
 Passphrase = Annotated[
     str | None,
     Header(
@@ -214,25 +223,23 @@ async def availability(
 )
 @limiter.limit(agent_call_limit, key_func=client_key)
 async def export_configuration(
-    request: Request, context: Transfer, passphrase: Passphrase = None
+    request: Request, context: Transfer, passphrase: Passphrase = None, plain: PlainSecrets = False
 ) -> Response:
     """Return the configuration of the whole installation as a JSON document.
 
     Scope `configuration:transfer`, on the whole installation whatever organisation registered
     the client. With `X-Passphrase` the secrets are in the document, sealed under it; without,
-    the document holds none. Audited with the client id as actor. No participant data.
+    the document holds none. With `X-Plain-Secrets: true` they are in it in clear text (no
+    passphrase), when the host allows that. Audited with the client id as actor. No participant
+    data.
     """
     actor = Actor.api_client(context.caller.client.client_id)
     document = await _documents(request).export(
-        actor, Scope(), passphrase, secrets=passphrase is not None
+        actor, Scope(), passphrase, secrets=passphrase is not None or plain, plain=plain
     )
     current: Settings = request.app.state.settings
     name = document_filename(current.installation_name, request.app.state.clock.now())
-    return Response(
-        document,
-        media_type=MEDIA_TYPE,
-        headers={"content-disposition": f'attachment; filename="{name}"'},
-    )
+    return document_response(document, name)
 
 
 @router.post(

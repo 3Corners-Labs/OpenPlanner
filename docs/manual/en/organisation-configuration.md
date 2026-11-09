@@ -36,8 +36,10 @@ texts and rules.
 
 You need no separate tool to open the file: OpenPlanner opens each secret itself when it reads
 the file in and stores it under the installation's own key. In the file you see a `seal` block
-and values like `{"sealed": "..."}`; an export without secrets has neither. A secret cannot be
-written into the file by hand: enter it in the portal and export again.
+and values like `{"sealed": "..."}`; an export without secrets has neither. A secret can also be
+written into the file by hand as `{"plain": "…"}`; OpenPlanner seals it when it applies it. If
+the host administrator agrees, the superuser can also export without encryption (*Advanced
+settings → Configuration package*).
 
 ## Reading a document in
 

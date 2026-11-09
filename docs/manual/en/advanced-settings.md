@@ -216,7 +216,9 @@ Choose **Export document**, with or without secrets (sealed under a passphrase o
 characters, repeated). To read one in, choose the file and **Show plan**: you see for each
 object whether it is created, changed or deleted and which fields, never their values, and any
 refusal that stops it. Only then does **Apply plan** write everything in one go, or nothing if
-any part fails. A document holding sealed secrets asks for its passphrase again. A document in
+any part fails. A document holding sealed secrets asks for its passphrase again. A secret may also be written readable in a document as `{"plain": "…"}`; that is handy for writing a base installation by hand, and OpenPlanner seals it when it stores it. Keep such a file as private as the secret itself.
+
+**Exporting without encryption.** Under the export form is **Without encryption**, but only when the host administrator has allowed it (`CONFIGURATION_PLAINTEXT_EXPORT_ALLOWED=true` in the environment; off by default). The file then holds every secret readable and needs no passphrase. You must confirm you understand that, the export is in the audit log, and encrypting or sharing it safely is up to you (an AES zip, `age`, `sops` or a vault). A document in
 *replace* mode deletes what it does not list, so read its plan carefully. The organisation's
 own document is on **Overview → Configuration** of that organisation. Every applied change is
 in the audit log, without values, and you must have logged in recently.

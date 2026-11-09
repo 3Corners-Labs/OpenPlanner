@@ -2190,6 +2190,17 @@ and worker processes reload the settings within ten seconds. The audit log holds
 changed object (`configuration.apply`, with the plan hash prefix). A passphrase file is read
 from disk, never from the command line.
 
+**Secrets in clear text (ADR 0099 point 8a).** A document may carry a secret as
+`{"plain": "..."}`; reading one needs no setting. *Writing* them, so a file that is easy to edit
+and to wrap in your own encryption (an AES zip, `age`, `sops`), is off until the host allows it:
+set `CONFIGURATION_PLAINTEXT_EXPORT_ALLOWED=true` in `.env` (class B, never a portal setting) and
+restart `web` and `worker` (`docker compose up -d`). Then the superuser sees *Without
+encryption* under the export form, and `config export --plain-secrets config.json` and
+`X-Plain-Secrets: true` work. Every such export, and every attempt while the switch is off, is an
+audit event (`configuration.export,secrets,plain`, with the outcome and never a value). Treat the
+file as the secrets themselves: do not leave it in Downloads, a mailbox or git, and switch the
+setting off again when you are done.
+
 ## Configuration package (ADR 0089)
 
 The SQLite package of ADR 0089 is **no longer written** (ADR 0099 step 4): export the

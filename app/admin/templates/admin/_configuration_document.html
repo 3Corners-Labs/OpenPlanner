@@ -24,6 +24,20 @@
       <input id="document-passphrase-repeat" name="passphrase_repeat" type="password" autocomplete="new-password">
     </div>
     {% endif %}
+    {% if document.can_plain %}
+    <fieldset aria-describedby="document-plain-hint">
+      <legend>{{ _("admin.configuration.export.plain.title") }}</legend>
+      <p class="hint" id="document-plain-hint">{{ _("admin.configuration.export.plain.hint") }}</p>
+      <div class="choice__option">
+        <input id="document-plain" name="plain" type="checkbox" value="yes">
+        <label for="document-plain">{{ _("admin.configuration.export.plain.label") }}</label>
+      </div>
+      <div class="choice__option">
+        <input id="document-plain-confirm" name="plain_confirm" type="checkbox" value="yes">
+        <label for="document-plain-confirm">{{ _("admin.configuration.export.plain.confirm") }}</label>
+      </div>
+    </fieldset>
+    {% endif %}
     <button type="submit" class="button">{{ _("admin.configuration.export.button") }}</button>
   </form>
   <h3 id="document-upload-heading">{{ _("admin.configuration.upload.title") }}</h3>

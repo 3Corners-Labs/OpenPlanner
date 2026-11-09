@@ -60,6 +60,11 @@ flags a typo. The planner is the authority: it also checks everything the admin 
 - **Secrets** are `{"sealed": "..."}`: AES-256-GCM under a key derived from a passphrase (at
   least 16 characters) with scrypt, bound to the object and field they belong to. An export
   without secrets leaves them out; applying a document that omits a secret keeps the stored one.
+  A secret may also be written by hand as `{"plain": "..."}`: it is read as a secret (validated,
+  never printed, sealed under the installation's own key when stored). The host may allow an
+  export that writes every secret that way (`CONFIGURATION_PLAINTEXT_EXPORT_ALLOWED`, off by
+  default; ADR 0099 point 8a), for a file that is easy to edit and to share: keep it as private as
+  the secrets, and wrap it in a tool you trust (an AES zip, `age`, `sops`) before it travels.
 - **Files** (logo, fonts, closure images) are inline: media type, SHA-256 and base64 bytes.
 
 ## In the portal
@@ -80,6 +85,7 @@ attributes}` whatever the platform; for Webex Contact Center `attributes` holds
 ```bash
 python -m app.cli config export --format json --no-secrets config.json
 python -m app.cli config export --format json --passphrase-file pass.txt config.json
+python -m app.cli config export --format json --plain-secrets config.json   # needs the host switch
 python -m app.cli config export --format json --organisation acme --no-secrets acme.json
 python -m app.cli config plan config.json --passphrase-file pass.txt
 python -m app.cli config apply config.json --passphrase-file pass.txt --plan-hash <hash>
@@ -108,11 +114,15 @@ queues per group, login providers, API clients), the organisations and groups, t
 3. No separate tool is needed to open the file. Without the passphrase every secret stays sealed
    and useless; with it the installation opens each one itself and stores it under its own key.
 
+If you would rather encrypt the file yourself (and edit it by hand), the host can allow an
+export with the secrets in clear text instead (portal: *Without encryption*;
+`config export --plain-secrets`; API: `X-Plain-Secrets: true`). Such a file needs no passphrase
+to read in.
+
 A sealed value looks like `{"sealed": "..."}` and the file gets a `seal` block (key
 derivation parameters and a check value that tells a wrong passphrase before anything is
 planned). A file exported without secrets has neither. The sealed values are meant for
-OpenPlanner only. A document never carries a secret in clear text, so a secret cannot be
-written into the file by hand: enter or change it in the portal, then export again.
+OpenPlanner only. A secret can also be written into a file by hand as `{"plain": "..."}`.
 
 ## What a document cannot do
 

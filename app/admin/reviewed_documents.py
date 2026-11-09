@@ -3,7 +3,9 @@
 The portal shows a plan, then applies it. Between the two the document has to be the same one,
 so the upload is kept here, keyed by a random token, and the apply form carries only the token
 and the plan hash. What is kept is the document as uploaded: its secrets are still sealed under
-the passphrase, which is asked again at the apply and never stored. An entry belongs to one
+the passphrase, which is asked again at the apply and never stored, unless the author wrote them
+in clear text (``{"plain": ...}``, ADR 0099 point 8a), which then sit in this process's memory for
+the review time. An entry belongs to one
 admin and one scope, lives ``configuration_review_minutes`` and is replaced by the admin's next
 upload for that scope, so the store holds at most one document per admin and scope. It is
 memory of this process only: after a restart the admin uploads again, which costs a minute and

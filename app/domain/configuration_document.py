@@ -36,6 +36,7 @@ HEADER = ("format", "mode", "scope", "meta", "seal")
 
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _SEALED_KEYS = frozenset({"sealed"})
+_PLAIN_KEYS = frozenset({"plain"})
 _BINARY_KEYS = frozenset({"media_type", "sha256", "data"})
 _SCALARS = (str, int, float, bool)
 
@@ -339,7 +340,7 @@ def _read_value(spec: FieldSpec, raw: object, path: str) -> Value:
                 raise _invalid(path)
             return raw
         case FieldType.SECRET:
-            return _read_sealed(raw, path)
+            return _read_secret(raw, path)
         case FieldType.BINARY:
             return _read_binary(raw, path)
         case FieldType.STRINGS:
@@ -375,8 +376,17 @@ def _read_integer(spec: FieldSpec, raw: object, path: str) -> int:
     return raw
 
 
-def _read_sealed(raw: object, path: str) -> Sealed:
-    """Read a secret: only ``{"sealed": "<base64>"}``, never a clear-text value."""
+def _read_secret(raw: object, path: str) -> Sealed | Secret:
+    """Read a secret: ``{"sealed": "<base64>"}`` or, written by hand, ``{"plain": "<text>"}``.
+
+    A clear-text secret is read as an opened one (ADR 0099 point 8a); a bare string is never one,
+    so a secret is always marked as what it is. A refusal names the path, never the value.
+    """
+    if isinstance(raw, Mapping) and set(raw) == _PLAIN_KEYS:
+        text = raw["plain"]
+        if not isinstance(text, str) or not text:
+            raise _invalid(path)
+        return Secret(text)
     if not isinstance(raw, Mapping) or set(raw) != _SEALED_KEYS:
         raise _invalid(path)
     token = raw["sealed"]
@@ -457,14 +467,17 @@ def _json(value: Value) -> Json:
     return value
 
 
-def to_json(document: Document) -> dict[str, Json]:
+def to_json(document: Document, *, plain_secrets: bool = False) -> dict[str, Json]:
     """Write a document as JSON: what ``parse_document`` reads, without defaults added.
 
     Args:
         document: The document; any secret in it must be sealed.
+        plain_secrets: Write an opened secret as ``{"plain": "<text>"}`` instead of refusing it
+            (the export without encryption, ADR 0099 point 8a).
 
     Raises:
-        DomainError: ``invalid_configuration`` for a secret that is not sealed, with the path.
+        DomainError: ``invalid_configuration`` for a secret that is not sealed and is not
+            written in clear text, with the path.
     """
     out: dict[str, Json] = {"format": document.format}
     if document.mode is not Mode.MERGE:
@@ -475,41 +488,43 @@ def to_json(document: Document) -> dict[str, Json]:
         out["meta"] = copy.deepcopy(dict(document.meta))
     if document.seal is not None:
         out["seal"] = copy.deepcopy(dict(document.seal))
-    return out | _write_children(document.schema.root, document.root)
+    return out | _write_children(document.schema.root, document.root, plain_secrets)
 
 
-def _write_children(kind: Kind, entity: Entity) -> dict[str, Json]:
+def _write_children(kind: Kind, entity: Entity, plain: bool) -> dict[str, Json]:
     """Write the collections an object holds, in the order the kind declares them."""
     out: dict[str, Json] = {}
     for coll in kind.collections:
         if coll.name in entity.children:
-            out[coll.name] = _write_collection(coll, entity.children[coll.name])
+            out[coll.name] = _write_collection(coll, entity.children[coll.name], plain)
     return out
 
 
-def _write_collection(coll: Collection, entities: tuple[Entity, ...]) -> Json:
+def _write_collection(coll: Collection, entities: tuple[Entity, ...], plain: bool) -> Json:
     """Write the objects of one collection as its shape says."""
     if coll.shape is Shape.SINGLE:
-        return _write_entity(coll.kind, entities[0])
+        return _write_entity(coll.kind, entities[0], plain)
     if coll.shape is Shape.MAP:
-        return _write_map(coll.kind, entities)
+        return _write_map(coll.kind, entities, plain)
     if coll.shape is Shape.KEYS:
         return [entity.key[0] for entity in entities]
-    return [_write_entity(coll.kind, entity) for entity in entities]
+    return [_write_entity(coll.kind, entity, plain) for entity in entities]
 
 
-def _write_entity(kind: Kind, entity: Entity) -> dict[str, Json]:
+def _write_entity(kind: Kind, entity: Entity, plain: bool) -> dict[str, Json]:
     """Write one object: its key, its action unless it is an upsert, fields, collections."""
     out: dict[str, Json] = dict(zip(kind.key, entity.key, strict=True))
     if entity.action is not Action.UPSERT:
         out["action"] = entity.action.value
     for spec in kind.value_fields:
         if spec.name in entity.fields:
-            out[spec.name] = _write_value(entity.fields[spec.name], f"{entity.path}.{spec.name}")
-    return out | _write_children(kind, entity)
+            out[spec.name] = _write_value(
+                entity.fields[spec.name], f"{entity.path}.{spec.name}", plain
+            )
+    return out | _write_children(kind, entity, plain)
 
 
-def _write_map(kind: Kind, entities: tuple[Entity, ...]) -> Json:
+def _write_map(kind: Kind, entities: tuple[Entity, ...], plain: bool) -> Json:
     """Write the entries of a map, nested once per key part."""
     leaf = kind.value_field
     root: dict[str, Json] = {}
@@ -521,14 +536,16 @@ def _write_map(kind: Kind, entities: tuple[Entity, ...]) -> Json:
             level = nested
         deleted = entity.action is Action.DELETE
         level[entity.key[-1]] = (
-            None if deleted else _write_value(entity.fields[leaf.name], entity.path)
+            None if deleted else _write_value(entity.fields[leaf.name], entity.path, plain)
         )
     return root
 
 
-def _write_value(value: Value, path: str) -> Json:
-    """Write one value as JSON; a secret must be sealed, a file is written inline."""
+def _write_value(value: Value, path: str, plain: bool) -> Json:
+    """Write one value as JSON; a secret must be sealed or ``plain``, a file is written inline."""
     if isinstance(value, Secret):
+        if plain:
+            return {"plain": value.reveal()}
         raise _invalid(path)
     if isinstance(value, Sealed):
         return {"sealed": value.token}
