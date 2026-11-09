@@ -47,6 +47,7 @@ REPO = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import release_notes  # noqa: E402
 from workspace import Workspace  # noqa: E402
 
 from app.domain.authorization import MATRIX, PARTICIPANT_ACTIONS, Permission, Role  # noqa: E402
@@ -199,6 +200,14 @@ def is_approach(manual: dict) -> bool:
     return manual["file"].startswith("00-")
 
 
+def is_support(manual: dict) -> bool:
+    """Return whether a source belongs to no role: the approach or the release notes (``90-``).
+
+    Neither has tasks or rights; the release notes are still checked for their labels.
+    """
+    return release_notes.is_support(manual["file"])
+
+
 def manual_roles(role: str, config: dict[str, list[str]]) -> list[str] | None:
     """Return the matrix roles of a manual's ``role``, or None for the participants' manual."""
     for word, roles in config.items():
@@ -223,10 +232,11 @@ class Rights:
     def of(self, manual: dict) -> frozenset[str]:
         """Return the rights of a manual's readers.
 
-        None for the approach, the participant actions for the participants' manual (a role that
-        names no role word), else the rights of its matrix roles.
+        None for the approach and the release notes, the participant actions for the
+        participants' manual (a role that names no role word), else the rights of its matrix
+        roles.
         """
-        if is_approach(manual):
+        if is_support(manual):
             return frozenset()
         roles = manual_roles(manual["role"], self.roles)
         if roles is None:
@@ -268,7 +278,7 @@ def check_tasks(manual: dict, ctx: dict, report: Report) -> None:
                 "staat niet in de opnamelijst.",
                 blocking=True,
             )
-    if not manual["tasks"] and not is_approach(manual):
+    if not manual["tasks"] and not is_support(manual):
         report.add(
             "Koppelingen",
             f"{manual['file']}.md: geen taakkoppelingen (nodig voor contextgedreven hulp).",
@@ -477,6 +487,81 @@ def since(
         report.add(section, "Geen wijzigingen in teksten, hulp of sjablonen.")
 
 
+def check_release_notes(
+    ws: Workspace, sources: dict[Path, str], commit: str, hashes: dict[str, str], report: Report
+) -> None:
+    """Judge the document that says what is new against the changes since ``commit``.
+
+    ``release.py notes`` wrote the changes (``evidence/release-notes.json``). The document
+    (``sources/90-wat-is-nieuw.md``) must say, per point, where it comes from, and must leave
+    nothing of its template. A new feature it neither names nor leaves out on purpose blocks;
+    so does a point that rests on a change this release does not have. Other changes a reader can
+    notice that it neither names nor leaves out are listed. The verdict hashes the changes.
+    """
+    section = "Releasenotes"
+    found = ws.root / release_notes.RESULT_JSON
+    if not found.exists():
+        report.add(
+            section,
+            f"`{release_notes.RESULT_JSON}` ontbreekt; draai `release.py notes`.",
+            blocking=True,
+        )
+        return
+    raw = found.read_bytes()
+    data = json.loads(raw)
+    hashes[release_notes.RESULT_JSON] = _sha256(raw)
+    if not str(data.get("from", "")).startswith(commit):
+        report.add(
+            section,
+            f"de releasenotes beginnen bij {str(data.get('from', ''))[:9]}, niet bij {commit[:9]}; "
+            "draai `release.py notes` opnieuw.",
+            blocking=True,
+        )
+        return
+    changes = [release_notes.Change.from_json(item) for item in data.get("changes", [])]
+    visible = [change for change in changes if change.visible]
+    report.add(
+        section,
+        f"{len(changes)} wijzigingen sinds {commit[:9]}, {len(visible)} die een gebruiker kan "
+        f"merken; zie `{release_notes.RESULT_MD}`.",
+    )
+    name = f"{release_notes.DOCUMENT}.md"
+    document = next((path for path in sources if path.name == name), None)
+    if document is None:
+        if visible:
+            report.add(
+                section,
+                f"`sources/{name}` ontbreekt: zeg per rol wat er nieuw is (`release.py notes` "
+                "zet het sjabloon neer).",
+                blocking=True,
+            )
+        return
+    verdict = release_notes.judge(changes, sources[document])
+    for number in verdict.placeholders:
+        report.add(section, f"{name}:{number}: nog niet ingevuld (`> Invullen:`).", blocking=True)
+    for token in verdict.unknown:
+        report.add(
+            section,
+            f"{name}: `{token}` is geen wijziging van deze release; een punt van een andere "
+            "release? Haal het weg of corrigeer de bron.",
+            blocking=True,
+        )
+    for change in verdict.unhandled_features:
+        report.add(
+            section,
+            f"nieuwe functie {change.id} ({change.scope}: {change.subject}) staat niet in {name}: "
+            f"noem haar (`<!-- bron: {change.id} -->`) of laat haar weg met een reden "
+            f"(`<!-- niet opgenomen: {change.id} reden -->`).",
+            blocking=True,
+        )
+    for change in verdict.unhandled_other:
+        report.add(
+            section,
+            f"nog niet genoemd of weggelaten: {change.id} {change.type} "
+            f"({change.scope}: {change.subject}).",
+        )
+
+
 def visual_changes(ws: Workspace, report: Report) -> None:
     """Report the screenshots that differ from the previous capture (compare.mjs found them)."""
     section = "Schermafdrukken gewijzigd"
@@ -564,6 +649,7 @@ def main() -> int:
             sys.exit(f"check.py: commit in variables.json: {error}")
     if commit:
         since(commit, sources, manuals, args.fix, report)
+        check_release_notes(ws, sources, commit, inputs.hashes, report)
     visual_changes(ws, report)
     out = ws.evidence / "check.md"
     out.parent.mkdir(parents=True, exist_ok=True)

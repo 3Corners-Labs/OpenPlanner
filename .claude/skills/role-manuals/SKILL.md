@@ -143,17 +143,22 @@ The scripts are in `scripts/` and run from the root of the checkout; `<ws>` is t
    every id again and runs `check.py --since <commit of the last frozen version> --fix`: a label
    the catalogue only renamed is written into the sources, inside bold
    labels only; a removed label, a changed help topic or a changed template is reported with the
-   sections that use it. It records the release the capture shows for the title pages
-   (`release.py record`), builds everything and stops the stack. A person reads
-   `evidence/check.md`, looks at the differences and rewrites what the new version changed in
-   the way people work. Both Python scripts run with the checkout's own Python (`uv run`).
+   sections that use it. It collects what the release changed per role
+   (`release.py notes`, *Release notes per release*) and records the release the capture shows
+   for the title pages (`release.py record`), builds everything and stops the stack. A person
+   reads `evidence/check.md` and `evidence/release-notes.md`, looks at the differences and
+   rewrites what the new version changed in the way people work. Both Python scripts run with
+   the checkout's own Python (`uv run`).
 
 ## A version per release
 
 The manuals describe the software of one release and do not change after it: one version per
-minor release (0.6.0, 0.7.0, …), made from a checkout of its tag. A patch release gets one only
-when its check reports a changed text, help topic or screen. Between releases the last version
-stands; a run on anything other than a tag is a trial, never a version.
+minor or major release (`vX.Y.0`: 0.6.0, 0.7.0, … 1.0.0, 2.0.0), made from a checkout of its tag
+and shipped with a document that says what is new in it. A patch release gets a version only when
+its check reports a changed text, help topic or screen, or its release notes list a change a
+reader can notice. Between releases the last version stands; a run on anything other than a tag
+is a trial, never a version. The manuals' own version numbers (1.0, 2.0, …) count the versions,
+not the software: the title page and `OVERZICHT.md` say which release each one shows.
 
 1. **Check out the release** next to the main checkout, and install there once:
    `git worktree add ../openplanner-v0.7.0 v0.7.0`, then the two `npm ci` lines of the set-up.
@@ -169,27 +174,71 @@ stands; a run on anything other than a tag is a trial, never a version.
 3. **Read** `evidence/check.md`, rewrite what the release changed in the way people work, and
    settle every blocking finding. A right without a task gets one, or a line in
    `rights_without_task` that says why it has none.
-4. **Settle** the version. Set `version` and `date` in the front matter of every source, with the
+4. **Write what is new** in `sources/90-wat-is-nieuw.md`, from `evidence/release-notes.md`
+   (*Release notes per release*). Every point names its source, and the check blocks on a new
+   feature that is neither named nor left out.
+5. **Settle** the version. Set `version` and `date` in the front matter of every source, with the
    real dates: `version` starts with the version number (`2.0, vastgesteld op <date>`), `date`
    is the day of the capture. Write `evidence/afhechting.md`: what was reread and what stays
    open.
-5. **Freeze** it: `.claude/skills/role-manuals/scripts/freeze.sh <ws>` from the same checkout.
-   It records the release the capture shows again, builds Word, HTML and PDF, checks, and stops
-   on a blocking finding. Then `release.py freeze` copies the version into
+6. **Freeze** it: `.claude/skills/role-manuals/scripts/freeze.sh <ws>` from the same checkout.
+   It records the release the capture shows again, collects the release notes again, builds
+   Word, HTML and PDF, checks, and stops on a blocking finding. Then `release.py freeze` copies
+   the version into
    `<ws>/versies/<capture date>_software-<release>_handleiding-<version>/`: build, sources,
    screenshots and evidence without the previous capture, `variables.json` and the workspace's
    own Markdown files but not `README.md`, a `LEESMIJ.md` from `templates/leesmij.md`, a
    `MANIFEST.sha256` over every file, read-only, and a zip with its own checksum. It builds the
    copy beside `versies/` and moves it into place only when it is whole. It refuses a trial
    capture, title pages that name another release, a version that exists, sources that do not
-   all state the same version number, a missing `afhechting.md`, a screenshot in `img/` that
+   all state the same version number, a missing `afhechting.md`, release notes of another range
+   than the baseline to the capture, a screenshot in `img/` that
    this capture did not take (its shot failed, so the image is an earlier capture's: take it
    again, or remove it so the manual says it follows), and a check that blocked or read other
    files than there are now (`evidence/check.json`). Last, it sets `commit` to the release's
-   commit, the baseline of the next version's check; nothing else moves it.
+   commit, the baseline of the next version's check and release notes; nothing else moves it.
+   A baseline is always the commit of a release tag, which every later release descends from.
+   It then rewrites `versies/OVERZICHT.md`: every frozen version with its release, dates,
+   number of changes and zip checksum, generated, never edited by hand.
 
    Anyone can check a frozen version later with `shasum -a 256 -c MANIFEST.sha256` in its folder.
-   List each version in the workspace's own overview, with its release and dates.
+
+## Release notes per release
+
+Every version of the manuals comes with the answer to "what is new for me?", per role: the
+document `sources/90-wat-is-nieuw.md`, built like the manuals (Word, PDF, HTML) and sent by the
+communication plan when the release goes live. What it says is the writer's work; what it rests
+on is machine work, so it is neither invented nor incomplete.
+
+- **Input.** `release.py notes <ws>` (run by `update.sh` and `freeze.sh`) takes the commits on
+  the main line from the baseline (the release of the last frozen version) to the commit of the
+  capture, which is one commit per pull request. It writes `evidence/release-notes.md` for the
+  writer and `evidence/release-notes.json` for the check and the freeze. Types `feat`, `fix`,
+  `security` and `perf` are changes a reader can notice; `docs`, `test`, `chore`, `ci`, `build`
+  and `refactor` are listed apart, as a count and a list. The project's own `CHANGELOG.md` text
+  for the release comes along, as the highlights it wrote itself.
+- **Sorting.** A change lands under a role when the help topic of a screen changed
+  (`docs/manual/nl/<screen>.md`, which every admin change must update) and a task of that role
+  uses the screen, or when a participant page or the widget changed. What shows neither signal
+  is listed under *Nog te plaatsen*, never dropped. It is a proposal: the writer decides.
+- **The document.** `release.py notes` puts the template (`templates/wat-is-nieuw.md`) in the
+  sources when a reader can notice a change and there is no document yet; build again, then
+  fill it in. Per role: *Nieuw*, *Anders*, *Wat moet je doen*; plus *Kleine verbeteringen*. Write
+  what people notice, task first, in the language level of the role (B2 for beheerder and
+  planner, B1 for medewerker and the people who book), never how it was built. Name a screen
+  text exactly as the software shows it, in bold: the check holds it against the catalogue like
+  any label.
+- **Sources.** After each point, on a line of its own, an HTML comment readers never see:
+  `<!-- bron: #644, #673 -->`. A change left out on purpose: `<!-- niet opgenomen: #583 reden
+  -->`. A change without a pull request is named `c:` and its seven-character hash.
+- **Gate.** `check.py` blocks on: a `> Invullen:` line of the template that is still there; a
+  source number this release does not have (a point left over from the version before); a new
+  feature (`feat`) that is neither named nor left out; and a missing document while a reader can
+  notice a change. Other changes that are neither named nor left out are listed, not blocking.
+  `freeze` refuses release notes that were not collected from the baseline to this capture, and
+  a verdict that did not read them. Its first version has no baseline, so no release notes.
+- **Afterwards.** Record in `evidence/afhechting.md` what was left out and why in one line each,
+  next to what was reread. The document and the notes go into the frozen version.
 
 ## Build
 

@@ -25,6 +25,7 @@ from tests.support.skill_scripts import (
 release = load_skill_script("role-manuals/scripts/release.py")
 NAME = "2026-11-08_software-1.0.0_handleiding-2.0"
 TODAY = dt.date(2026, 11, 9)
+NOTES = "evidence/release-notes.json"
 
 
 @pytest.mark.parametrize(
@@ -52,8 +53,11 @@ def test_the_label_names_the_release_and_an_image_of_other_files(
 def checkout(git: Git, tmp_path: Path) -> Path:
     """An image of ``app/`` tagged ``v1.0.0`` and, annotated, its candidate on the same commit.
 
-    ``git describe`` prefers the annotated tag, so on its own it would name the candidate.
+    ``git describe`` prefers the annotated tag, so on its own it would name the candidate. One
+    commit comes before the image: the release of the last frozen version.
     """
+    (tmp_path / "README.md").write_text("the first version\n")
+    commit_all(git, "feat(booking): the first version (#1)")
     image_checkout(git, tmp_path)
     git("tag", "-a", "v1.0.0-rc.1", "-m", "candidate")
     git("tag", "v1.0.0")
@@ -61,10 +65,11 @@ def checkout(git: Git, tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def workspace(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """A workspace whose baseline is the commit of an earlier version."""
+def workspace(tmp_path_factory: pytest.TempPathFactory, git: Git, checkout: Path) -> Path:
+    """A workspace whose baseline is the commit of an earlier version, the one before the image."""
+    baseline = git("rev-parse", "HEAD~1").strip()[:12]
     return manuals_workspace(
-        tmp_path_factory.mktemp("workspace"), {"product": "de dienst", "commit": "d36485a6"}
+        tmp_path_factory.mktemp("workspace"), {"product": "de dienst", "commit": baseline}
     )
 
 
@@ -127,7 +132,7 @@ def test_record_names_the_release_when_the_image_is_the_tags(
     assert release.record(workspace, repo=checkout) == "1.0.0"
     assert json.loads((workspace / "variables.json").read_text()) == {
         "product": "de dienst",
-        "commit": "d36485a6",
+        "commit": git("rev-parse", "HEAD~1").strip()[:12],
         "software_version": "1.0.0",
     }
 
@@ -162,6 +167,8 @@ def _checked(workspace: Path, blocking: int = 0) -> None:
     """Write the verdict of check.py: the blocking count and the hash of every file it read."""
     names = ["variables.json", "build/manuals.json", "evidence/shots.json"]
     names += [f"sources/{p.name}" for p in sorted((workspace / "sources").glob("*.md"))]
+    if (workspace / NOTES).exists():
+        names.append(NOTES)
     inputs = {name: _sha256(workspace / name) for name in names}
     verdict = {"blocking": blocking, "inputs": inputs}
     (workspace / "evidence" / "check.json").write_text(json.dumps(verdict))
@@ -173,6 +180,12 @@ def _settled(
     """The workspace after update.sh on ``v1.0.0``, a person's settlement, a build and a check."""
     _captured_here(workspace, git, checkout)
     release.record(workspace, repo=checkout)
+    if json.loads((workspace / "variables.json").read_text()).get("commit"):
+        baseline = git(
+            "rev-parse", json.loads((workspace / "variables.json").read_text())["commit"]
+        )
+        notes = {"from": baseline.strip(), "to": _head(git), "changes": []}
+        (workspace / NOTES).write_text(json.dumps(notes))
     for folder in ("build", "sources", "img/previous", "evidence/previous"):
         (workspace / folder).mkdir(parents=True, exist_ok=True)
     files = {
@@ -237,7 +250,17 @@ def test_a_settled_version_is_frozen_whole_read_only_and_checkable(
         assert sorted(bundle.namelist()) == sorted(f"{NAME}/{p[2:]}" for p in files)
     baseline = json.loads((workspace / "variables.json").read_text())["commit"]
     assert baseline == _head(git)[:12]
-    assert sorted(p.name for p in versions.iterdir()) == [NAME, f"{NAME}.zip", f"{NAME}.zip.sha256"]
+    assert sorted(p.name for p in versions.iterdir()) == [
+        NAME,
+        f"{NAME}.zip",
+        f"{NAME}.zip.sha256",
+        "OVERZICHT.md",
+    ]
+    assert "**Wat is er nieuw:** `build/90-wat-is-nieuw.pdf`" in readme
+    assert (
+        "| 2.0 | 1.0.0 | 8 november 2026 | 9 november 2026 | 0 wijzigingen |"
+        in (versions / "OVERZICHT.md").read_text()
+    )
 
 
 def _change(workspace: Path, change: str) -> None:
@@ -263,6 +286,11 @@ def _change(workspace: Path, change: str) -> None:
         (workspace / "evidence" / "afhechting.md").unlink()
     elif change == "earlier image":
         (workspace / "img" / "pl-02.png").write_text("from the capture before")
+    elif change == "no notes":
+        (workspace / NOTES).unlink()
+    elif change == "notes of another range":
+        notes = json.loads((workspace / NOTES).read_text())
+        (workspace / NOTES).write_text(json.dumps(notes | {"from": "0" * 40}))
     if change == "blocking check":
         _checked(workspace, blocking=2)
     elif change == "edited after the check":
@@ -271,6 +299,11 @@ def _change(workspace: Path, change: str) -> None:
         (workspace / "sources" / "20-medewerker.md").write_text("# Medewerker\n")
     elif change == "shot list changed after the check":
         (workspace / "evidence" / "shots.json").write_text(json.dumps([{"id": "pl-09"}]))
+    elif change == "verdict without the notes":
+        path = workspace / "evidence" / "check.json"
+        verdict = json.loads(path.read_text())
+        del verdict["inputs"][NOTES]
+        path.write_text(json.dumps(verdict))
     elif change == "verdict without the variables":
         path = workspace / "evidence" / "check.json"
         verdict = json.loads(path.read_text())
@@ -295,6 +328,9 @@ def _change(workspace: Path, change: str) -> None:
         ("added after the check", "not what the last check read: sources/20-medewerker.md"),
         ("shot list changed after the check", "not what the last check read: evidence/shots.json"),
         ("verdict without the variables", "not what the last check read: variables.json;"),
+        ("no notes", "evidence/release-notes.json is missing"),
+        ("notes of another range", "not from the baseline"),
+        ("verdict without the notes", "not what the last check read: evidence/release-notes.json"),
     ],
 )
 def test_freeze_refuses_what_is_no_settled_release(
