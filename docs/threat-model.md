@@ -124,7 +124,8 @@ cookie on one, so a link on another site still works in such a browser. Every br
 Chrome 76, Firefox 90 and Safari 16.4 (March 2023) sends `Sec-Fetch-Site`, but only to an
 https address or to localhost: an installation without TLS (ADR 0064 makes https the default)
 has no cross-site guard on the downloads, and neither has one behind a reverse proxy of its own
-that strips `Sec-Fetch-*` (the runbook asks an own proxy to pass them; the bundled one does). And a navigation the admin starts outside a page arrives as `none`, also when
+that strips `Sec-Fetch-*` (the runbook asks an own proxy to pass them, and `Sec-Purpose` too:
+without it a prerender runs the export again; the bundled proxy passes both). And a navigation the admin starts outside a page arrives as `none`, also when
 it is redirected to the download: an address typed or bookmarked, or a link opened from another
 program such as a desktop mail or chat client. Either way the file stays in the admin's own
 browser and the attacker never sees it; what is left is an export line the admin did not mean.
