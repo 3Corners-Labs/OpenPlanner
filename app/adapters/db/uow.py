@@ -140,6 +140,7 @@ from app.domain.audit import (
 )
 from app.domain.authorization import Scope
 from app.domain.booking import (
+    APPOINTMENTS,
     HOLDS_PLACE,
     IN_AGENDA,
     Booking,
@@ -1491,7 +1492,7 @@ class SqlTransaction(
             .outerjoin(CallStatusRow, CallStatusRow.booking_id == BookingRow.id)
             .where(
                 BookingRow.group_id == group_id,
-                BookingRow.status != BookingStatus.REFUSED.value,  # no appointment (ADR 0066)
+                BookingRow.status.in_([s.value for s in APPOINTMENTS]),
                 SlotRow.start >= lower,
                 SlotRow.start < upper,
                 scope_filter(scope, OrganisationRow.slug, GroupRow.slug),

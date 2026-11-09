@@ -578,7 +578,7 @@ async def test_the_same_address_in_the_same_slot_is_refused(uow: InMemoryUnitOfW
 
     refused = await service.book(group_slug="balie", start=SLOT_0900, contact=shouting, locale="nl")
 
-    assert refused.booking.is_refused
+    assert refused.booking.status is BookingStatus.REFUSED
     await service.book(group_slug="balie", start=SLOT_0900, contact=BEA, locale="nl")
 
 
@@ -587,7 +587,9 @@ async def test_an_address_may_hold_up_to_the_group_maximum(uow: InMemoryUnitOfWo
     first = await book(service)  # on behalf of someone else: a second place is allowed
     await book(service, SLOT_0930)
 
-    assert (await book_pending(service, SLOT_0930 + timedelta(minutes=30))).booking.is_refused
+    assert (
+        await book_pending(service, SLOT_0930 + timedelta(minutes=30))
+    ).booking.status is BookingStatus.REFUSED
 
     await service.cancel(first.management_token)  # a cancelled booking frees the address
     again = await book_pending(service, SLOT_0930 + timedelta(minutes=30))
@@ -602,7 +604,7 @@ async def test_the_limit_counts_only_this_group_and_the_future(
     uow.state.groups[2] = make_group(id=2, slug="helpdesk", max_bookings_per_email=1)
     await service.book(group_slug="helpdesk", start=TUESDAY_0900, contact=ADA, locale="nl")
 
-    assert (await book_pending(service, SLOT_0930)).booking.is_refused
+    assert (await book_pending(service, SLOT_0930)).booking.status is BookingStatus.REFUSED
 
     later = BookingService(uow, FixedClock(SLOT_0930 + timedelta(minutes=1)), TEST_TOKEN_KEY)
     uow.state.groups[1] = make_group(

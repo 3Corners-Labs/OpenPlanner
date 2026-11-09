@@ -17,6 +17,7 @@ from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category, Outcome
 from app.domain.authorization import CustomRole, RoleCatalogue, Scope
 from app.domain.booking import (
+    APPOINTMENTS,
     IN_AGENDA,
     Booking,
     BookingKind,
@@ -853,9 +854,7 @@ class InMemoryTransaction:
         found = [
             b
             for b in self.state.bookings.values()
-            if b.group_id == group_id
-            and lower <= b.start < upper
-            and b.status is not BookingStatus.REFUSED
+            if b.group_id == group_id and lower <= b.start < upper and b.status in APPOINTMENTS
         ]
         return [
             BookingOverview(b, self.state.call_status.get(b.id or 0) or new_status(b.id or 0))

@@ -636,3 +636,36 @@ def test_the_wxcc_routing_task_and_job_get_neutral_places_and_survive_a_downgrad
     assert task == ("task-1",)
     assert jobs == [("dispatch_wxcc_task",), ("purge_pii",)]
     assert "group_contact_center" not in tables
+
+
+def test_refused_bookings_become_cancelled_with_a_purge_due_on_downgrade(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    # ADR 0066 step 8: without the status the rows cannot exist; the personal data goes at once.
+    import sqlite3
+    from contextlib import closing
+
+    command.upgrade(alembic_config, "head")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        database.executescript(
+            """
+            INSERT INTO organisations (id, name, slug) VALUES (1, 'Acme', 'acme');
+            INSERT INTO groups (id, organisation_id, name, slug, timezone, slot_minutes,
+                min_notice_minutes, horizon_days, phone_mode)
+                VALUES (1, 1, 'Team', 'team', 'Europe/Amsterdam', 30, 60, 60, 'optional');
+            INSERT INTO slots (id, group_id, start, "end", capacity_snapshot)
+                VALUES (1, 1, '2026-01-05 08:00:00', '2026-01-05 08:30:00', 1);
+            INSERT INTO bookings (id, slot_id, group_id, status, locale, management_token_hash,
+                management_token_salt, created_at, consents, public_ref)
+                VALUES (1, 1, 1, 'refused', 'nl', 'h', 's', '2026-01-01 08:00:00', '', 'fx0000000001');
+            """
+        )
+        database.commit()
+
+    command.downgrade(alembic_config, "0105")
+
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        status = database.execute("SELECT status, cancelled_at FROM bookings").fetchone()
+        jobs = database.execute("SELECT type, status FROM jobs").fetchall()
+    assert status == ("cancelled", "2026-01-01 08:00:00")
+    assert jobs == [("purge_pii", "pending")]

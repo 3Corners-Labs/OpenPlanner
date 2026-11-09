@@ -25,6 +25,7 @@ or booked (``group_closed``), and no direct call starts while one is active. A d
 also needs room under the group's cap of open direct calls (``direct_call_full``, ADR 0026).
 """
 
+import secrets
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
@@ -347,17 +348,12 @@ class BookingService:
             group = await self._group(tx, group_slug)
             details = await self._contact(tx, group, contact)
             routing = _routing(group, contact)
-            return await self._place(
-                tx,
-                group,
-                start,
-                details,
-                locale,
-                consents,
-                None,
-                pending=True,
-                routing=routing,
-                refuse_quietly=True,
+            now = self._clock.now()
+            slot = await self._reserve(tx, group, start, routing)
+            if not await _address_allows(tx, group, details, slot.start, now):
+                return await self._refuse(tx, group, slot, details, locale, routing)
+            return await self._store(
+                tx, group, slot, details, locale, consents, None, pending=True, routing=routing
             )
 
     async def direct_call_availability(self, group_slug: str) -> DirectAvailability:
@@ -796,8 +792,6 @@ class BookingService:
         booking = await tx.get_booking_by_token_hash(hash_token(management_token))
         if booking is None or not token_matches(management_token, booking.token_hash):
             raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
-        if booking.is_refused:  # its token never left the server; nothing to manage
-            raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
         return booking
 
     async def _place(
@@ -814,7 +808,6 @@ class BookingService:
         pending: bool = False,
         confirmed_at: datetime | None = None,
         routing: RoutingChoice | None = None,
-        refuse_quietly: bool = False,
     ) -> BookingReceipt:
         """Reserve a place at ``start`` and store the booking with its jobs.
 
@@ -825,20 +818,47 @@ class BookingService:
         new booking, or a moved one that was still pending, ADR 0056); otherwise it is placed
         confirmed and keeps ``confirmed_at`` of the booking it replaces.
 
-        ``refuse_quietly`` stores a refused booking instead of raising ``booking_limit_reached``
-        (a participant's own booking, ADR 0066 step 8); a move by a planner or a closure still
-        gets the error, because staff see why.
+        A move over the address limit gets the error: whoever moves already knows the booking
+        (ADR 0066). A participant's new booking is refused quietly instead (``book``).
 
         Raises:
             DomainError: ``group_not_found`` for an archived group (ADR 0084), the window,
                 schedule, closure, capacity and address errors of a booking.
         """
-        now = self._clock.now()
         slot = await self._reserve(tx, group, start, routing)
-        if not await _address_allows(tx, group, contact, slot.start, now):
-            if refuse_quietly:
-                return await self._refuse(tx, group, slot, contact, locale, routing)
+        if not await _address_allows(tx, group, contact, slot.start, self._clock.now()):
             raise DomainError(ErrorCode.BOOKING_LIMIT_REACHED)
+        return await self._store(
+            tx,
+            group,
+            slot,
+            contact,
+            locale,
+            consents,
+            rescheduled_from,
+            sms=sms,
+            pending=pending,
+            confirmed_at=confirmed_at,
+            routing=routing,
+        )
+
+    async def _store(
+        self,
+        tx: Transaction,
+        group: Group,
+        slot: Slot,
+        contact: Contact,
+        locale: str,
+        consents: frozenset[ChannelKind],
+        rescheduled_from: int | None,
+        *,
+        sms: bool = False,
+        pending: bool = False,
+        confirmed_at: datetime | None = None,
+        routing: RoutingChoice | None = None,
+    ) -> BookingReceipt:
+        """Store the booking in its reserved ``slot`` with its jobs (see ``_place``)."""
+        now = self._clock.now()
         window = (
             confirm_window(
                 now=now,
@@ -891,13 +911,12 @@ class BookingService:
     ) -> BookingReceipt:
         """Store a refused booking: no place, one email, purged a day later (ADR 0066 step 8).
 
-        It gets a token like any booking, so the answer cannot be told from a real one, but the
-        token is never sent and ``_booking`` finds nothing behind it. Nothing is counted as a
-        booking made (``record_placed``).
+        The receipt looks like any booking's, so the answer cannot be told from a real one, but
+        its token is random and unrelated to the stored hash: no management link can ever
+        resolve to this row, whichever resolver looks. Nothing is counted as a booking made
+        (``record_placed``).
         """
         now = self._clock.now()
-        salt = new_token_salt()
-        token = derive_token(self._token_key, salt)
         booking = await tx.add_booking(
             Booking(
                 id=None,
@@ -908,14 +927,14 @@ class BookingService:
                 status=BookingStatus.REFUSED,
                 contact=contact,
                 locale=locale,
-                token_hash=hash_token(token),
+                token_hash=hash_token(secrets.token_urlsafe(32)),
                 created_at=now,
-                token_salt=salt,
+                token_salt=new_token_salt(),
                 routing=routing,
             )
         )
         await tx.replace_jobs(_id(booking), plan_for_refusal(now=now))
-        return BookingReceipt(booking, token)
+        return BookingReceipt(booking, secrets.token_urlsafe(32))
 
     async def _reserve(
         self, tx: Transaction, group: Group, start: datetime, routing: RoutingChoice | None

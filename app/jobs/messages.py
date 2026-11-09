@@ -80,6 +80,8 @@ class MessageKind:
         confirm: A request to confirm a new booking (ADR 0056): no name, link to the confirm
             page, and the deadline in the texts is ``Booking.confirm_by``.
         book_again: Whether the message links to the group page to make a new appointment.
+        anonymous: The address is not verified, so the greeting names nobody (ADR 0056 §7, and
+            a refusal, ADR 0066 step 8). A request to confirm is anonymous too.
         link: Where the link to the booking goes (``ManageLink``); only the plain management
             link carries the join and trial links.
     """
@@ -95,6 +97,7 @@ class MessageKind:
     calendar: bool = True
     confirm: bool = False
     book_again: bool = False
+    anonymous: bool = False
     link: ManageLink = ManageLink.MANAGE
 
     @property
@@ -278,7 +281,7 @@ MESSAGE_KINDS: dict[JobType, MessageKind] = {
         False,
         False,
         calendar=False,
-        confirm=True,
+        anonymous=True,
     ),
 }
 
@@ -472,7 +475,7 @@ class MessageComposer:
         )
         greeting = (
             _("message.greeting_anonymous")  # ADR 0056 §7: the address is not verified yet
-            if kind.confirm
+            if kind.confirm or kind.anonymous
             else _("message.greeting", first_name=booking.contact.first_name)
         )
         context = {

@@ -281,11 +281,6 @@ class Booking:
         return self.status is BookingStatus.AWAITING_REBOOK
 
     @property
-    def is_refused(self) -> bool:
-        """Whether the booking was refused for its address's limit (ADR 0066 step 8)."""
-        return self.status is BookingStatus.REFUSED
-
-    @property
     def awaits_confirmation(self) -> bool:
         """Whether the participant still has to confirm the booking by email link (ADR 0056)."""
         return self.status is BookingStatus.PENDING_CONFIRMATION
@@ -412,6 +407,10 @@ HOLDS_PLACE = frozenset(
     {BookingStatus.CONFIRMED, BookingStatus.SUSPENDED, BookingStatus.PENDING_CONFIRMATION}
 )
 """Statuses that take a place in their slot (counted against its capacity)."""
+
+APPOINTMENTS = frozenset(BookingStatus) - {BookingStatus.REFUSED}
+"""Statuses of a real appointment: all but a refused booking, which only carries the email that
+explains the refusal (ADR 0066 step 8). Staff lists show these."""
 
 IN_AGENDA = frozenset({BookingStatus.CONFIRMED, BookingStatus.PENDING_CONFIRMATION})
 """Statuses the planner's agenda counts in a slot: confirmed, and those awaiting the
