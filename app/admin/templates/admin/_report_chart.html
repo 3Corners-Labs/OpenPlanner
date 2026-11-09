@@ -45,7 +45,7 @@
       <rect class="rchart__bar rchart__s{{ col.series + 1 }}{% if col.series == 0 %} rchart__bar--solid{% endif %}" data-i="{{ col.category }}" data-s="{{ col.series }}"{% if col.series > 0 %} fill="url(#{{ c.chart_id }}-p{{ col.series }})"{% endif %} x="{{ col.x }}" y="{{ col.y }}" width="{{ col.width }}" height="{{ col.height }}"><title>{{ col.title }}</title></rect>
       {% endfor %}
       {% for run in g.runs %}
-      <polyline class="rchart__line rchart__s{{ run.series + 1 }}" points="{{ run.points }}"/>
+      <polyline class="rchart__line rchart__s{{ run.series + 1 }}" data-s="{{ run.series }}" points="{{ run.points }}"/>
       {% endfor %}
       {% for m in g.markers %}{{ marker_shape(m.series, m.x, m.y, m) }}{% endfor %}
       {% for gap in g.gaps %}

@@ -25,7 +25,7 @@ test('arrow keys show a tip made from the table, and Escape closes it', async ({
   await page.keyboard.press('ArrowRight');
   const tip = page.locator('.rchart__tip').first();
   await expect(tip).toBeVisible();
-  await expect(frame).toHaveAttribute('aria-describedby', /rchart-tip-/);
+  await expect(frame).toHaveAttribute('aria-describedby', /rchart-hint-/);
   await page.keyboard.press('Escape');
   await expect(tip).toBeHidden();
   await expect(frame).toBeFocused();

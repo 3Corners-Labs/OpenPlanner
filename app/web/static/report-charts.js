@@ -36,6 +36,15 @@ function save(blob, name) {
 }
 
 // A copy of the drawing that carries its own colours, so the file looks right outside the page.
+// The colour the chart sits on: the first opaque background on the way up, else white.
+function surface(el) {
+  for (let n = el; n; n = n.parentElement) {
+    const c = getComputedStyle(n).backgroundColor;
+    if (c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent') return c;
+  }
+  return '#fff';
+}
+
 function standalone(svg) {
   const clone = svg.cloneNode(true);
   const from = svg.querySelectorAll('*');
@@ -47,9 +56,14 @@ function standalone(svg) {
       const v = css.getPropertyValue(p);
       if (v) to[i].style.setProperty(p, v);
     });
-    if (css.display === 'none') to[i].remove();
+    if (el.classList.contains('rchart__off')) to[i].remove();
   });
   const box = svg.viewBox.baseVal;
+  const back = document.createElementNS(SVG_NS, 'rect');
+  back.setAttribute('width', String(box.width));
+  back.setAttribute('height', String(box.height));
+  back.style.setProperty('fill', surface(svg));
+  clone.insertBefore(back, clone.firstChild);
   clone.setAttribute('xmlns', SVG_NS);
   clone.setAttribute('width', String(box.width));
   clone.setAttribute('height', String(box.height));
@@ -64,7 +78,7 @@ function hatch(ctx, x, y, w, h, kind, color) {
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
   ctx.lineWidth = 2;
-  if (kind === '3') {
+  if (kind === '4') {
     for (let d = -h; d < w + h; d += 6) {
       for (const s of [1, -1]) {
         ctx.beginPath();
@@ -73,7 +87,7 @@ function hatch(ctx, x, y, w, h, kind, color) {
         ctx.stroke();
       }
     }
-  } else if (kind === '4' || kind === '2') {
+  } else if (kind === '3') {
     for (let px = x + 3; px < x + w; px += 6) {
       for (let py = y + 3; py < y + h; py += 6) {
         ctx.beginPath();
@@ -100,15 +114,15 @@ function paint(svg, scale) {
   canvas.height = box.height * scale;
   const ctx = canvas.getContext('2d');
   ctx.scale(scale, scale);
-  const page = getComputedStyle(document.body);
-  ctx.fillStyle = page.backgroundColor === 'rgba(0, 0, 0, 0)' ? '#fff' : page.backgroundColor;
+  const back = surface(svg);
+  ctx.fillStyle = back;
   ctx.fillRect(0, 0, box.width, box.height);
   svg.querySelectorAll('rect, line, polyline, polygon, circle, text').forEach((el) => {
     if (el.closest('defs, pattern')) return;
     const css = getComputedStyle(el);
     if (css.display === 'none') return;
     const stroke = css.stroke !== 'none' ? css.stroke : null;
-    const fill = css.fill.startsWith('url') ? null : css.fill;
+    const fill = css.fill.startsWith('url') || css.fill === 'none' ? null : css.fill;
     ctx.lineWidth = parseFloat(css.strokeWidth) || 1;
     ctx.setLineDash((css.strokeDasharray || '').split(/[ ,]+/).map(Number).filter((n) => n > 0));
     if (el.tagName === 'text') {
@@ -132,9 +146,9 @@ function paint(svg, scale) {
       const [x, y, w, h] = ['x', 'y', 'width', 'height'].map((n) => parseFloat(el.getAttribute(n)));
       const pattern = PATTERNED.exec(el.getAttribute('class') || '');
       if (css.fill.startsWith('url') && pattern) {
-        ctx.fillStyle = page.backgroundColor || '#fff';
+        ctx.fillStyle = back;
         ctx.fillRect(x, y, w, h);
-        hatch(ctx, x, y, w, h, pattern[1], getComputedStyle(el).getPropertyValue('--rchart-color') || '#000');
+        hatch(ctx, x, y, w, h, pattern[1], getComputedStyle(el).getPropertyValue('--rchart-color').trim() || '#000');
       } else if (fill) {
         ctx.fillStyle = fill;
         ctx.fillRect(x, y, w, h);
@@ -155,7 +169,7 @@ function paint(svg, scale) {
       ctx.strokeStyle = stroke || '#000';
       ctx.stroke();
     } else {
-      const points = el.getAttribute('points').trim().split(/\s+/).map((p) => p.split(',').map(Number));
+      const points = (el.getAttribute('points') || '').trim().split(/\s+/).map((p) => p.split(',').map(Number));
       ctx.beginPath();
       points.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
       if (el.tagName === 'polygon') ctx.closePath();
@@ -194,6 +208,11 @@ class ReportChart extends HTMLElement {
     frame.appendChild(this.tip);
     figure.appendChild(this.status);
 
+    // The tip replaces the browser's own hover text; the table keeps every number.
+    svg.querySelectorAll('[data-i] > title').forEach((t) => t.remove());
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !this.tip.hidden) this.hide();
+    });
     this.addToolbar(figure, frame);
     this.addPointer();
     this.addKeyboard();
@@ -219,6 +238,8 @@ class ReportChart extends HTMLElement {
     if (this.dataset.hint) {
       const hint = document.createElement('p');
       hint.className = 'muted rchart__hint';
+      this.hintId = `rchart-hint-${counter}`;
+      hint.id = this.hintId;
       hint.textContent = this.dataset.hint;
       figure.insertBefore(hint, frame);
     }
@@ -258,14 +279,20 @@ class ReportChart extends HTMLElement {
     this.tip.textContent = words;
     this.tip.hidden = false;
     const base = this.frame.getBoundingClientRect();
-    const spot = (anchor || this.svg.querySelector(`[data-i="${i}"]`) || this.svg).getBoundingClientRect();
-    this.tip.style.setProperty('left', `${Math.max(0, spot.left - base.left + this.frame.scrollLeft)}px`);
+    const target =
+      anchor || Array.from(this.svg.querySelectorAll(`[data-i="${i}"]`)).find((n) => n.getClientRects().length) || this.svg;
+    if (!anchor && target.scrollIntoView) target.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    const spot = target.getBoundingClientRect();
+    const room = this.frame.scrollLeft + this.frame.clientWidth - this.tip.offsetWidth;
+    const left = Math.min(Math.max(0, spot.left - base.left + this.frame.scrollLeft), Math.max(0, room));
+    this.tip.style.setProperty('left', `${left}px`);
     this.tip.style.setProperty('top', `${Math.max(0, spot.top - base.top - this.tip.offsetHeight - 4)}px`);
     this.status.textContent = words;
   }
 
   hide() {
     this.tip.hidden = true;
+    this.current = -1;
     this.mark(-1);
   }
 
@@ -281,9 +308,10 @@ class ReportChart extends HTMLElement {
 
   addKeyboard() {
     const last = this.rows.length - 1;
-    this.frame.setAttribute('aria-describedby', this.tip.id);
+    if (this.hintId) this.frame.setAttribute('aria-describedby', this.hintId);
     this.frame.addEventListener('blur', () => this.hide());
     this.frame.addEventListener('keydown', (e) => {
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
       const moves = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
       if (e.key in moves) {
         e.preventDefault();
@@ -295,7 +323,7 @@ class ReportChart extends HTMLElement {
         this.hide();
       } else if (e.key === 'Enter' && this.current >= 0) {
         const link = this.rows[this.current].querySelector('a[href]');
-        if (link) window.location.assign(link.href);
+        if (link && new URL(link.href).origin === window.location.origin) window.location.assign(link.href);
       }
     });
   }
