@@ -11223,7 +11223,7 @@ msgid "admin.configuration.export.secrets"
 msgstr "Include secrets, sealed with a passphrase"
 
 msgid "admin.configuration.export.secrets_hint"
-msgstr "Without secrets the file needs no passphrase. With secrets the passphrase is at least {length} characters; keep it safe, it cannot be recovered."
+msgstr "Without secrets the file holds no passwords or keys and needs no passphrase. With secrets OpenPlanner seals each secret (SMTP, SMS, Webex, contact center, login, API clients) separately under this passphrase, at least {length} characters. You need no separate tool to open it: read the file in on the new installation (here, with the config apply command, or with the installer) and type the same passphrase. The passphrase cannot be recovered; keep it apart from the file."
 
 msgid "admin.configuration.export.button"
 msgstr "Export document"
@@ -11232,7 +11232,7 @@ msgid "admin.configuration.upload.title"
 msgstr "Upload and plan"
 
 msgid "admin.configuration.upload.intro"
-msgstr "Choose a configuration document (JSON, at most {max_mb} MB). You get a plan to read; nothing changes yet."
+msgstr "Choose a configuration document (JSON, at most {max_mb} MB), for example an export of another installation. If the file holds secrets, enter the same passphrase as when it was exported. You get a plan to read; nothing changes yet."
 
 msgid "admin.configuration.upload.file"
 msgstr "Configuration document"
