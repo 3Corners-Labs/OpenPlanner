@@ -71,8 +71,9 @@ async def test_settings_preselect_the_group_time_zone(site: Site) -> None:
     form = page.split('<main id="content"', 1)[1]
     assert '<option value="Europe/Amsterdam" selected>' in form
     # time zone, dispatch kind, fallback (ADR 0082), free pick, phone mode, trial call, Webex
-    # page (ADR 0075), embedding (the direct call is offered per staffing block since ADR 0072)
-    assert form.count(" selected>") == 8
+    # page (ADR 0075), embedding (the direct call is offered per staffing block since ADR 0072),
+    # automatic proposals (ADR 0057)
+    assert form.count(" selected>") == 9
 
 
 async def test_new_group_rejects_an_unknown_time_zone(site: Site) -> None:
