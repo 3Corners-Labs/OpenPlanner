@@ -657,7 +657,8 @@ def test_refused_bookings_become_cancelled_with_a_purge_due_on_downgrade(
                 VALUES (1, 1, '2026-01-05 08:00:00', '2026-01-05 08:30:00', 1);
             INSERT INTO bookings (id, slot_id, group_id, status, locale, management_token_hash,
                 management_token_salt, created_at, consents, public_ref)
-                VALUES (1, 1, 1, 'refused', 'nl', 'h', 's', '2026-01-01 08:00:00', '', 'fx0000000001');
+                VALUES (1, 1, 1, 'refused', 'nl', 'h', 's', '2026-01-01 08:00:00', '',
+                    'fx0000000001');
             """
         )
         database.commit()
