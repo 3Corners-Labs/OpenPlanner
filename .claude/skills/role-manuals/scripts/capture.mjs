@@ -145,6 +145,9 @@ async function main() {
     console.log(`capture.mjs: ${ws.log} rewritten from ${ws.state}`);
     return 0;
   }
+  // The covered years come from the capture's start: checked before anything needs the stack.
+  state.started ??= stamp();
+  const years = yearsOf(ws, state.started);
   let stack;
   let steps;
   try {
@@ -159,8 +162,6 @@ async function main() {
   }
   const { id, instance, web, keycloak, mail, build } = stack;
   Object.assign(state, { agenda_day: args.day, installation: instance, stack: { id, instance, web, keycloak, mail, build } });
-  state.started ??= stamp();
-  const years = yearsOf(ws, state.started);
   console.log(`capture.mjs: installation ${stack.instance} (run ${stack.id}, commit ${stack.build.commit.slice(0, 12)}) at ${stack.web}`);
 
   const safe = (text) => safeText(stack, text);
