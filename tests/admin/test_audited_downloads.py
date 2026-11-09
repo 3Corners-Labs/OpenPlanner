@@ -59,6 +59,32 @@ async def test_a_download_from_the_portal_or_the_address_bar_goes_ahead_and_is_a
     assert (SUPER.subject, AUDITED_DOWNLOADS[route], Outcome.SUCCESS) in events
 
 
+@pytest.mark.parametrize("route", AUDITED_DOWNLOADS)
+@pytest.mark.parametrize(
+    "ahead",
+    [
+        {"sec-fetch-site": "none", "sec-purpose": "prefetch;prerender"},
+        {"sec-fetch-site": "same-origin", "sec-purpose": "prefetch"},
+        {"purpose": "prefetch"},
+    ],
+)
+async def test_a_download_loaded_in_advance_is_refused_without_an_event(
+    site: Site, route: str, ahead: dict[str, str]
+) -> None:
+    # A prerender on a hover over a bookmark, or of an address the address bar predicts, would
+    # export in the admin's name without a click. The click itself asks again, without the
+    # header, and downloads. Nobody attacks here, so no security event either.
+    await site.login_as(SUPER)
+
+    response = await site.client.get(address(route), headers=ahead)
+
+    assert response.status_code == 403
+    assert "content-disposition" not in response.headers
+    actions = {action for _, action, _, _ in await audit_events(site)}
+    assert AUDITED_DOWNLOADS[route] not in actions
+    assert REQUEST_REJECTED not in actions
+
+
 @pytest.mark.parametrize(
     ("download", "page"),
     [

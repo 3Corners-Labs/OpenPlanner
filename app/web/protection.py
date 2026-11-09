@@ -3,7 +3,8 @@
 Forms carry no CSRF token. The primary signal is Fetch Metadata: browsers send
 ``Sec-Fetch-Site`` with every request and pages cannot forge it. Only when it is missing
 (older browsers) is ``Origin`` compared instead. A cross-site POST, or a cross-site GET of an
-audited download, is refused (``RejectedRequest``) and becomes a security event (ADR 0053).
+audited download, is refused (``RejectedRequest``) and becomes a security event (ADR 0053); an
+audited download that the browser loads in advance (prefetch, prerender) is refused without one.
 
 Rate limits use slowapi, keyed by client IP (behind a proxy, uvicorn's ``--proxy-headers``
 supplies the real address). slowapi buckets per request path, so links that match no booking
@@ -41,6 +42,16 @@ class RejectedRequest(Exception):  # noqa: N818 - reads as an outcome, like HTTP
         self.reason = reason
 
 
+def _speculative(request: Request) -> bool:
+    """Return whether the browser loads the address ahead of the person: prefetch or prerender.
+
+    ``Sec-Purpose`` in current browsers, ``Purpose`` in older ones. Such a load may follow no
+    click at all: a hover over a bookmark, an address the address bar predicts. The person's
+    own request comes after it, without the header.
+    """
+    return bool(request.headers.get("sec-purpose") or request.headers.get("purpose"))
+
+
 def from_this_page(request: Request) -> bool:
     """Return whether ``request`` comes from the very page it asks for, by the person's action.
 
@@ -56,7 +67,7 @@ def from_this_page(request: Request) -> bool:
     site's own origin in the ``Referer`` as well. Without a ``Referer`` (stripped by a proxy or
     an extension) nothing is shown: it fails closed.
     """
-    if request.headers.get("sec-purpose") or request.headers.get("purpose"):
+    if _speculative(request):
         return False
     referer = urlsplit(request.headers.get("referer", ""))
     if referer.path != request.url.path:
@@ -72,28 +83,31 @@ def require_same_origin(request: Request) -> None:
 
     Every form post depends on it, and so do the audited downloads, the admin ``GET`` routes
     that write an audit event when they are opened (ASVS V3.5.3). ``none`` passes: typed,
-    bookmarked or opened from another program, a navigation the person made themselves. A
-    ``GET`` that shows personal data asks more (``from_this_page``): only its own page counts.
+    bookmarked or opened from another program, a navigation the person made themselves. Such a
+    ``GET`` loaded in advance (prefetch or prerender) is refused as well, without a security
+    event: it may follow no click, and the click asks again. A ``GET`` that shows personal data
+    asks more (``from_this_page``): only its own page counts.
 
     ``Origin`` is not trusted when ``Sec-Fetch-Site`` is present: some referrer policies make
     browsers send ``Origin: null`` even for same-origin form posts.
 
     Raises:
         RejectedRequest: 403 if ``Sec-Fetch-Site`` is not same-origin/none, or, without it,
-            if ``Origin`` differs from this site.
+            if ``Origin`` differs from this site; 403 without a reason for a ``GET`` loaded in
+            advance.
     """
     site = request.headers.get("sec-fetch-site")
-    if site is not None:
-        if site in ("same-origin", "none"):
-            return
+    if site is not None and site not in ("same-origin", "none"):
         log.info("request.rejected", reason=CROSS_SITE, sec_fetch_site=site[:32])
         raise RejectedRequest(403, CROSS_SITE)
     origin = request.headers.get("origin")
     expected = f"{request.url.scheme}://{request.url.netloc}"
-    if origin is not None and origin != expected:
+    if site is None and origin is not None and origin != expected:
         # Origins are not personal data; logging them makes misconfigured proxies visible.
         log.info("request.rejected", reason=ORIGIN_MISMATCH, origin=origin[:200], expected=expected)
         raise RejectedRequest(403, ORIGIN_MISMATCH)
+    if request.method == "GET" and _speculative(request):
+        raise RejectedRequest(403)
 
 
 def is_action(request: Request) -> bool:
