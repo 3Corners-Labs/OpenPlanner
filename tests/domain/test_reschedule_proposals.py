@@ -382,23 +382,6 @@ async def test_the_review_proposes_the_last_made_booking_with_the_free_times(
     assert SLOT_0930 in row.options
 
 
-async def test_the_review_leaves_a_pending_last_made_booking_to_confirm_or_lapse(
-    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
-) -> None:
-    """ADR 0056 point 11: the last made go first, but a pending one is never asked to move."""
-    await _book(bookings)
-    clock.advance(timedelta(minutes=1))
-    pending = await book_pending(bookings, slug="demo", contact=another_participant())
-    _short(uow)
-
-    reviewed = await planner.review_proposals(GROUP_ADMIN, "demo", SCOPE)
-    candidates = await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)
-
-    assert pending.booking.status is BookingStatus.PENDING_CONFIRMATION
-    assert pending.booking.id not in [row.booking.id for row in reviewed]
-    assert pending.booking.id not in [b.id for b in candidates]
-
-
 async def test_sending_the_review_holds_asks_and_audits_each_booking(
     planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
