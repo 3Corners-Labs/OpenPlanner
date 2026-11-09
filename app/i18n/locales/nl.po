@@ -4393,8 +4393,8 @@ msgstr "Taken"
 msgid "admin.nav.alerts"
 msgstr "Meldingen"
 
-msgid "admin.topbar.tasks.count"
-msgstr "{label}, {count} lopend of mislukt"
+msgid "admin.topbar.tasks.count_words"
+msgstr "lopend of mislukt"
 
 msgid "admin.scope.label"
 msgstr "Werkgebied"
@@ -8924,6 +8924,12 @@ msgstr "Het configuratiepakket is als document toegepast: {count} organisatie(s)
 msgid "admin.form.error.configuration_passphrase_short"
 msgstr "De wachtwoordzin is te kort, of de herhaling verschilt. Gebruik minstens 16 tekens."
 
+msgid "admin.form.error.configuration_plaintext_disabled"
+msgstr "Een export zonder versleuteling staat uit op deze installatie. De beheerder van de host moet dat eerst toestaan."
+
+msgid "admin.form.error.configuration_plaintext_unconfirmed"
+msgstr "Vink aan dat u begrijpt dat het bestand alle geheimen leesbaar bevat, of kies een export met wachtwoord."
+
 msgid "admin.form.error.configuration_passphrase_wrong"
 msgstr "De wachtwoordzin past niet bij dit pakket."
 
@@ -9658,8 +9664,8 @@ msgstr "Wachttijd in de wachtrij"
 msgid "admin.audit.reason.wait_over_warning"
 msgstr "Deelnemers wachten langer dan de ingestelde grens."
 
-msgid "admin.topbar.alerts.count"
-msgstr "{label}, {count} open"
+msgid "admin.topbar.alerts.count_words"
+msgstr "open"
 
 msgid "settings.field.idp_domain_grace_days.label"
 msgstr "Tolerantie verdwenen domeinrecord (dagen)"
@@ -10872,6 +10878,15 @@ msgstr "Afspraak bevestigd namens de deelnemer"
 msgid "admin.audit.detail.booking_contact_viewed"
 msgstr "Contactgegevens van de deelnemer getoond"
 
+msgid "admin.done.contact_center_registered"
+msgstr "Opgeslagen. Het contactcenter meldt de taken van deze organisatie nu op haar eigen webhookadres."
+
+msgid "admin.done.contact_center_saved_not_ready"
+msgstr "Opgeslagen. Het webhookadres wordt aangemeld zodra het clientgeheim en het refresh-token zijn ingevuld."
+
+msgid "admin.done.contact_center_not_registered"
+msgstr "Opgeslagen, maar het contactcenter weigerde het webhookadres of was niet bereikbaar. Controleer de rechten van de Service App en maak daarna een nieuw webhookgeheim; dat meldt het adres opnieuw aan."
+
 msgid "reports.view.volume"
 msgstr "Volume"
 
@@ -11279,6 +11294,18 @@ msgstr "Geheimen opnemen, verzegeld met een wachtwoord"
 
 msgid "admin.configuration.export.secrets_hint"
 msgstr "Zonder geheimen bevat het bestand geen wachtwoorden of sleutels en heeft het geen wachtwoord nodig. Met geheimen zet OpenPlanner elk geheim (SMTP, SMS, Webex, contactcenter, inlog, API-clients) apart vast onder dit wachtwoord, minstens {length} tekens. Je hebt geen aparte tool nodig om het te openen: lees het bestand op de nieuwe omgeving in (hier, met het commando config apply, of met de installer) en typ hetzelfde wachtwoord. Het wachtwoord is niet terug te halen; bewaar het apart van het bestand."
+
+msgid "admin.configuration.export.plain.title"
+msgstr "Zonder versleuteling"
+
+msgid "admin.configuration.export.plain.hint"
+msgstr "Alle wachtwoorden, sleutels en tokens staan dan leesbaar in het bestand. Wie het bestand heeft, heeft toegang tot die diensten. Bewaar het zo privé als de geheimen zelf, en versleutel het zelf voordat u het deelt."
+
+msgid "admin.configuration.export.plain.label"
+msgstr "Geheimen leesbaar in het bestand zetten, zonder wachtwoord"
+
+msgid "admin.configuration.export.plain.confirm"
+msgstr "Ik begrijp dat het bestand alle geheimen leesbaar bevat"
 
 msgid "admin.configuration.export.button"
 msgstr "Document exporteren"

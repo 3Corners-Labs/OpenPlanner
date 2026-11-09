@@ -34,13 +34,13 @@ CLEAR_SECRETS = (LOG_DESTINATION["secret"],)
 """Secrets the sweep stored through the portal; none may be readable in a document."""
 
 EXPORTS = {
+    "adapters/configuration_json.py": "the configuration document (portal and machine API), below, "
+    "and tests/api/test_privacy_sweep_api.py",
     "admin/audit_routes.py": "the audit export, per role below",
     "admin/branding_routes.py": "theme.css: colours of the organisation, swept as a page",
-    "admin/configuration_routes.py": "the configuration document, below",
     "admin/idp_mapping_routes.py": "the claim mapping text, swept as a page",
     "admin/settings_routes.py": "the CSR and the internal CA certificate (public), swept as pages",
     "admin/usage_routes.py": "the usage report CSVs: counts and codes, swept below",
-    "api/agent/routes.py": "the machine API, tests/api/test_privacy_sweep_api.py",
 }
 
 

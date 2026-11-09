@@ -41,14 +41,23 @@ async def test_deleting_an_organisation_deletes_its_sealed_records(engine: Async
     from sqlalchemy import select
 
     from app.adapters.db.models import IntegrationCredentialRow, OrganisationRow
-    from app.adapters.db.record_names import bot_credential_name, contact_center_credential_name
+    from app.adapters.db.record_names import (
+        bot_credential_name,
+        contact_center_credential_name,
+        organisation_tokens_name,
+    )
     from app.domain.scheduling import Organisation
 
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:
         stored = await tx.add_organisation(Organisation(0, "Weg", "weg"))
     async with uow.locked() as tx:
-        for name in (bot_credential_name(stored.id), contact_center_credential_name(stored.id)):
+        names = (
+            bot_credential_name(stored.id),
+            contact_center_credential_name(stored.id),
+            organisation_tokens_name(stored.id),
+        )
+        for name in names:
             tx._session.add(  # type: ignore[attr-defined]  # noqa: SLF001
                 IntegrationCredentialRow(name=name, nonce=b"n", ciphertext=b"c", updated_at=NOW)
             )
@@ -57,6 +66,6 @@ async def test_deleting_an_organisation_deletes_its_sealed_records(engine: Async
     async with uow.read() as tx:
         session = tx._session  # type: ignore[attr-defined]  # noqa: SLF001
         assert await session.get(IntegrationCredentialRow, bot_credential_name(stored.id)) is None
-        name = contact_center_credential_name(stored.id)
-        assert await session.get(IntegrationCredentialRow, name) is None
+        for name in names:
+            assert await session.get(IntegrationCredentialRow, name) is None
         assert (await session.scalars(select(OrganisationRow.id))).all() == []

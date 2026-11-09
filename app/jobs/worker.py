@@ -224,6 +224,7 @@ async def run_worker(
                 wired.dispatchers,
                 integration,
                 lambda: timedelta(minutes=live.settings.task_reconcile_after_minutes),
+                wired.organisations,
             ),
             health,
             clock,
@@ -245,6 +246,7 @@ async def run_worker(
                 ),
                 video=wired.video,
                 dispatchers=wired.dispatchers,
+                organisations=wired.organisations,
                 integration=integration,
                 fallback=fallback,
                 retention=lambda: live.settings.event_retention,
@@ -426,7 +428,7 @@ async def run_worker(
         poll_seconds=settings.worker_poll_seconds,
         fallback_mail=fallback_mail(settings) is not None,
         video_enabled=wired.video is not None,
-        dispatch_enabled=bool(wired.dispatchers),
+        dispatch_enabled=wired.dispatch_configured,
         release_check=settings.update_repository is not None,
     )
     try:

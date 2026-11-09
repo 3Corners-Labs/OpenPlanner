@@ -1169,7 +1169,10 @@ fieldset.card {
   color: var(--adm-text);
   font-size: 0.85rem;
   font-weight: 600;
-  white-space: nowrap;
+  /* A long label wraps instead of widening the page (WCAG 1.4.10, ADR 0118 step 2). */
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .chip--accent {
@@ -1412,7 +1415,7 @@ fieldset.card {
 
 .widget-list__item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, max-content);
   column-gap: 0.75rem;
   align-items: center;
   padding: 0.5rem 0;

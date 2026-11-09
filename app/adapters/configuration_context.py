@@ -94,4 +94,5 @@ def document_service(
         max_bytes=lambda: settings().configuration_package_max_mb * 1024 * 1024,
         max_changes=lambda: settings().configuration_apply_max_changes,
         issuer_of=issuer_fetcher(discovery, production=settings().environment == "prod"),
+        plaintext_export=lambda: settings().configuration_plaintext_export_allowed,
     )

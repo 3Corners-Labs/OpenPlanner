@@ -52,8 +52,15 @@ def add_arguments(
         default="json",
         help="the file format; the SQLite package is no longer written (ADR 0099 step 4)",
     )
-    export_cmd.add_argument(
+    secrets_mode = export_cmd.add_mutually_exclusive_group()
+    secrets_mode.add_argument(
         "--no-secrets", action="store_true", help="leave every secret out (no passphrase needed)"
+    )
+    secrets_mode.add_argument(
+        "--plain-secrets",
+        action="store_true",
+        help="write the secrets in clear text, without a passphrase; refused unless the host "
+        "sets CONFIGURATION_PLAINTEXT_EXPORT_ALLOWED=true (ADR 0099 point 8a)",
     )
     export_cmd.add_argument(
         "--passphrase-file",
@@ -150,7 +157,13 @@ async def _run(
     try:
         passphrase = passphrase_from(args.passphrase_file)
         if args.action == "export":
-            data = await service.export(ACTOR, scope, passphrase, secrets=not args.no_secrets)
+            data = await service.export(
+                ACTOR,
+                scope,
+                passphrase,
+                secrets=not args.no_secrets,
+                plain=args.plain_secrets,
+            )
             write_private(args.path, data)
             return f"document written: {args.path}\n", 0
         document = await asyncio.to_thread(_read_limited, Path(args.path), settings)

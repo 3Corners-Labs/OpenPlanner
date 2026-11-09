@@ -19,7 +19,6 @@ from app.adapters.certificate_pem import CryptographyPemReader
 from app.adapters.certificate_volume import FileCertificateVolume
 from app.adapters.clock import SystemClock
 from app.adapters.configuration_context import document_service
-from app.adapters.contact_center_connections import sealed_connections
 from app.adapters.db.backup import database_path
 from app.adapters.db.configuration_package import (
     SqliteConfigurationTransfer,
@@ -39,6 +38,7 @@ from app.adapters.idp_registry import OrganisationProviders
 from app.adapters.integrations import (
     Integrations,
     build_integrations,
+    sealed_connections,
     secret_box,
     webex_fingerprint,
 )
@@ -368,6 +368,7 @@ def create_app(
                 wired.dispatchers,
                 agent_start_label,
                 app.state.fallback_service,
+                wired.organisations,
             )
             app.state.trial_call_service = TrialCallService(
                 uow, wired.video, app.state.integration_service, clock
@@ -718,7 +719,11 @@ def create_app(
         # ADR 0032 point 9: each organisation's own contact-center connection, sealed.
         app.state.contact_center_connections = sealed_connections(app.state.engine, settings)
         app.state.contact_center_connection_service = ContactCenterConnectionService(
-            uow, clock, app.state.admin_service, app.state.contact_center_connections
+            uow,
+            clock,
+            app.state.admin_service,
+            app.state.contact_center_connections,
+            lambda: app.state.integrations.organisations,
         )
         app.state.alert_target_service = AlertTargetService(
             uow,

@@ -5,7 +5,7 @@ through a ``Runner``; ``FakeGh`` is that runner, so no test talks to GitHub.
 """
 
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from scripts.adr_issues import Issue
 
@@ -22,13 +22,20 @@ class FakeGh:
     """Stands in for ``gh``: answers the reads from canned data and records every call.
 
     ``label list`` and ``issue list`` answer from ``labels`` and ``issues``, ``issue create``
-    prints the address of issue 42 and ``pr view`` the state ``pr_state`` gives; every other
-    call, a write, prints nothing.
+    prints the address of issue 42, ``pr view`` the state ``pr_state`` gives and
+    ``api repos/<owner>/<repo>/pulls/<n>`` the pull request ``pulls`` holds under ``n``; every
+    other call, a write, prints nothing.
     """
 
-    def __init__(self, labels: Sequence[str] = (), issues: Sequence[Issue] = ()) -> None:
+    def __init__(
+        self,
+        labels: Sequence[str] = (),
+        issues: Sequence[Issue] = (),
+        pulls: Mapping[int, Mapping[str, object]] | None = None,
+    ) -> None:
         self.labels = list(labels)
         self.issues = list(issues)
+        self.pulls = dict(pulls or {})
         self.calls: list[list[str]] = []
 
     def __call__(self, args: Sequence[str]) -> str:
@@ -52,4 +59,6 @@ class FakeGh:
                 return "https://github.com/o/r/issues/42\n"
             case ["pr", "view"]:
                 return json.dumps({"state": pr_state(int(args[2]))})
+            case ["api", path] if "/pulls/" in path:
+                return json.dumps(self.pulls[int(path.rsplit("/", 1)[1])])
         return ""

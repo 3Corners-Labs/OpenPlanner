@@ -4393,8 +4393,8 @@ msgstr "Tasks"
 msgid "admin.nav.alerts"
 msgstr "Alerts"
 
-msgid "admin.topbar.tasks.count"
-msgstr "{label}, {count} running or failed"
+msgid "admin.topbar.tasks.count_words"
+msgstr "running or failed"
 
 msgid "admin.scope.label"
 msgstr "Scope"
@@ -8911,6 +8911,12 @@ msgstr "The configuration package was applied as a document: {count} organisatio
 msgid "admin.form.error.configuration_passphrase_short"
 msgstr "The passphrase is too short, or the repetition differs. Use at least 16 characters."
 
+msgid "admin.form.error.configuration_plaintext_disabled"
+msgstr "An export without encryption is switched off on this installation. The host administrator must allow it first."
+
+msgid "admin.form.error.configuration_plaintext_unconfirmed"
+msgstr "Tick that you understand the file contains every secret in readable form, or choose an export with a passphrase."
+
 msgid "admin.form.error.configuration_passphrase_wrong"
 msgstr "The passphrase does not fit this package."
 
@@ -9645,8 +9651,8 @@ msgstr "Queue wait"
 msgid "admin.audit.reason.wait_over_warning"
 msgstr "Participants wait longer than the set limit."
 
-msgid "admin.topbar.alerts.count"
-msgstr "{label}, {count} open"
+msgid "admin.topbar.alerts.count_words"
+msgstr "open"
 
 msgid "settings.field.idp_domain_grace_days.label"
 msgstr "Grace for a missing domain record (days)"
@@ -10859,6 +10865,15 @@ msgstr "Appointment confirmed for the participant"
 msgid "admin.audit.detail.booking_contact_viewed"
 msgstr "Participant's contact details shown"
 
+msgid "admin.done.contact_center_registered"
+msgstr "Saved. The contact center now reports this organisation's tasks at its own webhook address."
+
+msgid "admin.done.contact_center_saved_not_ready"
+msgstr "Saved. The webhook address is registered once the client secret and the refresh token are filled in."
+
+msgid "admin.done.contact_center_not_registered"
+msgstr "Saved, but the contact center refused the webhook address or could not be reached. Check the Service App's rights, then make a new webhook secret; that registers the address again."
+
 msgid "reports.view.volume"
 msgstr "Volume"
 
@@ -11266,6 +11281,18 @@ msgstr "Include secrets, sealed with a passphrase"
 
 msgid "admin.configuration.export.secrets_hint"
 msgstr "Without secrets the file holds no passwords or keys and needs no passphrase. With secrets OpenPlanner seals each secret (SMTP, SMS, Webex, contact center, login, API clients) separately under this passphrase, at least {length} characters. You need no separate tool to open it: read the file in on the new installation (here, with the config apply command, or with the installer) and type the same passphrase. The passphrase cannot be recovered; keep it apart from the file."
+
+msgid "admin.configuration.export.plain.title"
+msgstr "Without encryption"
+
+msgid "admin.configuration.export.plain.hint"
+msgstr "Every password, key and token is then readable in the file. Whoever has the file has access to those services. Keep it as private as the secrets themselves, and encrypt it yourself before you share it."
+
+msgid "admin.configuration.export.plain.label"
+msgstr "Write the secrets readable in the file, without a passphrase"
+
+msgid "admin.configuration.export.plain.confirm"
+msgstr "I understand the file contains every secret in readable form"
 
 msgid "admin.configuration.export.button"
 msgstr "Export document"

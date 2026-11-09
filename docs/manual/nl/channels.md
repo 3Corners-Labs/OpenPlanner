@@ -91,9 +91,14 @@ denkt dat het is uitgelekt; het oude werkt dan meteen niet meer. **Eigen koppeli
 wist de koppeling en haar geheimen.
 
 Zolang een organisatie geen eigen koppeling heeft, gebruikt zij de koppeling van de installatie.
-Die terugval verdwijnt in een volgende versie. Het versturen van taken via de eigen koppeling
-komt in de volgende stap; tot dan legt deze kaart de koppeling en het webhookadres vast. Het
-webhookadres werkt pas als OpenPlanner in die stap de melding bij het contactcenter aanmeldt.
+Die terugval verdwijnt in een volgende versie. Met een eigen koppeling gaan de taken van deze
+organisatie alleen via die koppeling; ontbreekt het clientgeheim of het refresh-token, dan wachten
+ze tot de koppeling compleet is. Een API-adres op deze server of in een intern netwerk wordt
+geweigerd. Bij het opslaan meldt OpenPlanner het webhookadres met het geheim aan bij het contactcenter,
+en opnieuw na **Nieuw webhookgeheim maken**. Lukt dat niet, dan zegt de melding bovenaan het
+scherm dat; controleer de rechten van de Service App (cjp:config_write) en maak daarna een
+nieuw webhookgeheim. Koppel of ontkoppel een organisatie als er geen taken open staan:
+een taak die via de vorige koppeling is gemaakt, wordt niet meer via de nieuwe afgesloten.
 
 ## Wat wordt vastgelegd
 

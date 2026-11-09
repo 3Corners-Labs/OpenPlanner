@@ -38,8 +38,9 @@ teksten en regels.
 U hebt geen aparte tool nodig om het bestand te openen: OpenPlanner ontsleutelt elk geheim zelf
 bij het inlezen en bewaart het onder de eigen sleutel van de omgeving. In het bestand ziet u
 een `seal`-blok en waarden als `{"sealed": "..."}`; een export zonder geheimen heeft die niet.
-Een geheim kunt u niet met de hand in het bestand zetten: voer het in het portaal in en
-exporteer opnieuw.
+Een geheim kunt u ook met de hand in het bestand zetten, als `{"plain": "…"}`; OpenPlanner
+verzegelt het bij het toepassen. Is de beheerder van de host akkoord, dan kan de superuser ook
+exporteren zonder versleuteling (*Geavanceerde instellingen → Configuratiepakket*).
 
 ## Een document inlezen
 

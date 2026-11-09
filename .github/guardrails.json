@@ -17,12 +17,35 @@
   ],
   "known_unseen": {
     "rulesets/release tags/bypass_actors": "A read-only token sees the bypass actors through GraphQL without their mode (first audit runs, 2026-11-02). Every use of a bypass is still checked in the rule suites; only the release app's tag bypass is expected.",
-    "rulesets/release line creation/bypass_actors": "As for the release tags: a read-only token sees the bypass actors without their mode. Only the release app's creation of a line is expected (ADR 0116)."
+    "rulesets/release line creation/bypass_actors": "As for the release tags: a read-only token sees the bypass actors without their mode. Only the release app's creation of a line is expected (ADR 0116).",
+    "actions_policies": "GitHub serves Actions policies only to a token with Administration: write (its permission tables, 2026-11-09), and the audit app only reads. An administrator's own gh login compares them (runbook, Guardrail drift); the hourly run sees a policy that stops the gate as runs of the decision gate that GitHub did not start (ADR 0120)."
   },
   "actions": {
     "allowed_actions": "all",
     "enabled": true,
     "sha_pinning_required": false
+  },
+  "actions_policies": {
+    "decision gate": {
+      "conditions": {
+        "workflow_path": {
+          "exclude": [],
+          "include": [
+            ".github/workflows/decision-gate.yml"
+          ]
+        }
+      },
+      "enforcement": "active",
+      "rules": {
+        "restrict_action_events": {
+          "allowed_events": [
+            "merge_group",
+            "pull_request_target"
+          ]
+        }
+      },
+      "source_type": "Repository"
+    }
   },
   "collaborators": {
     "3c-unified-git": "write",

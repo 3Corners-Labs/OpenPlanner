@@ -83,6 +83,9 @@ DONE_MESSAGES: dict[str, str] = {
     "idp_key_rotated": "admin.done.idp_key_rotated",
     "webhook_secret_rotated": "admin.done.webhook_secret_rotated",
     "contact_center_refused": "admin.done.contact_center_refused",
+    "contact_center_registered": "admin.done.contact_center_registered",
+    "contact_center_saved_not_ready": "admin.done.contact_center_saved_not_ready",
+    "contact_center_not_registered": "admin.done.contact_center_not_registered",
     "confirmed_by_staff": "admin.done.confirmed_by_staff",
     "not_pending": "admin.done.not_pending",
     "confirm_lapsed": "admin.done.confirm_lapsed",
@@ -292,6 +295,10 @@ FIELD_TARGET: dict[str, str] = {
 CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CONFIGURATION_PASSPHRASE_SHORT: "admin.form.error.configuration_passphrase_short",
     ErrorCode.CONFIGURATION_PASSPHRASE_WRONG: "admin.form.error.configuration_passphrase_wrong",
+    ErrorCode.CONFIGURATION_PLAINTEXT_DISABLED: "admin.form.error.configuration_plaintext_disabled",
+    ErrorCode.CONFIGURATION_PLAINTEXT_UNCONFIRMED: (
+        "admin.form.error.configuration_plaintext_unconfirmed"
+    ),
     ErrorCode.CONFIGURATION_PACKAGE_INVALID: "admin.form.error.configuration_package_invalid",
     ErrorCode.CONFIGURATION_PACKAGE_VERSION: "admin.form.error.configuration_package_version",
     ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE: "admin.form.error.configuration_package_too_large",

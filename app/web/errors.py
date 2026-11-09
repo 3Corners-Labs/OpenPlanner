@@ -120,6 +120,10 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     # ADR 0089: the configuration package.
     ErrorCode.CONFIGURATION_PASSPHRASE_SHORT: "admin.form.error.configuration_passphrase_short",
     ErrorCode.CONFIGURATION_PASSPHRASE_WRONG: "admin.form.error.configuration_passphrase_wrong",
+    ErrorCode.CONFIGURATION_PLAINTEXT_DISABLED: "admin.form.error.configuration_plaintext_disabled",
+    ErrorCode.CONFIGURATION_PLAINTEXT_UNCONFIRMED: (
+        "admin.form.error.configuration_plaintext_unconfirmed"
+    ),
     ErrorCode.CONFIGURATION_PACKAGE_INVALID: "admin.form.error.configuration_package_invalid",
     ErrorCode.CONFIGURATION_PACKAGE_VERSION: "admin.form.error.configuration_package_version",
     ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE: "admin.form.error.configuration_package_too_large",

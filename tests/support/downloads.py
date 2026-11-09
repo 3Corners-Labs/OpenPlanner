@@ -5,13 +5,12 @@ from app.domain.idp_mapping import EXPORTED_EVENT
 from app.domain.usage_export_service import EXPORT_EVENT as REPORT_EXPORT_EVENT
 
 DOWNLOAD_MODULES = {
+    "adapters/configuration_json.py",
     "admin/audit_routes.py",
     "admin/branding_routes.py",
-    "admin/configuration_routes.py",
     "admin/idp_mapping_routes.py",
     "admin/settings_routes.py",
     "admin/usage_routes.py",
-    "api/agent/routes.py",
 }
 """Every module that sets a ``content-disposition`` header; a new download is added here."""
 

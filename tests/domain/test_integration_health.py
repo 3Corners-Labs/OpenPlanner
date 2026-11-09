@@ -27,7 +27,7 @@ from app.domain.ports import IntegrationError
 from app.domain.request_log import REQUEST_EVENT
 from app.domain.security_log import TOKEN_REFRESH_FAILED
 from tests.fakes.clock import FixedClock
-from tests.fakes.integrations import FakeDispatcher, webex_cc
+from tests.fakes.integrations import FakeDispatcher, FakeOrganisationDispatchers, webex_cc
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.closures import confirmed_booking, three_groups
 from tests.support.domain import SLOT_0900
@@ -164,15 +164,19 @@ class Recorder:
 
 
 def reconciler(
-    uow: InMemoryUnitOfWork, dispatcher: FakeDispatcher | None, clock: FixedClock | None = None
+    uow: InMemoryUnitOfWork,
+    dispatcher: FakeDispatcher | None,
+    clock: FixedClock | None = None,
+    organisations: FakeOrganisationDispatchers | None = None,
 ) -> tuple[TaskReconciler, list[tuple[int, EventKind, str]]]:
     recorder = Recorder()
     run = TaskReconciler(
         uow,
         clock or FixedClock(NOW),
         webex_cc(dispatcher) if dispatcher else {},
-        recorder,
-        timedelta(minutes=10),  # type: ignore[arg-type]
+        recorder,  # type: ignore[arg-type]
+        timedelta(minutes=10),
+        organisations,
     )
     return run, recorder.written
 
@@ -276,3 +280,32 @@ async def test_the_watch_runs_on_its_interval(uow: InMemoryUnitOfWork) -> None:
     assert not await watch.run()
     clock.advance(timedelta(minutes=6))
     assert await watch.run()
+
+
+async def test_an_organisations_task_is_read_through_its_own_connection(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    """ADR 0032 point 13: never through the installation's tenant."""
+    with_task(uow, TaskState.QUEUED)
+    own, installation = FakeDispatcher(), FakeDispatcher()
+    own.snapshots["t-10"] = TaskSnapshot(TaskState.ENDED, "ended")
+    organisation_id = uow.state.groups[uow.state.bookings[10].group_id].organisation_id
+    organisations = FakeOrganisationDispatchers({organisation_id: own})
+    run, written = reconciler(uow, installation, organisations=organisations)
+
+    assert await run.run() == 1
+    assert written == [(10, EventKind.TASK_ENDED, RECONCILED)]
+    assert own.read == ["t-10"]
+    assert installation.read == []
+
+
+async def test_an_incomplete_own_connection_reads_nothing(uow: InMemoryUnitOfWork) -> None:
+    with_task(uow, TaskState.QUEUED)
+    installation = FakeDispatcher()
+    organisation_id = uow.state.groups[uow.state.bookings[10].group_id].organisation_id
+    organisations = FakeOrganisationDispatchers({organisation_id: None})
+    run, written = reconciler(uow, installation, organisations=organisations)
+
+    assert await run.run() == 0
+    assert written == []
+    assert installation.read == []

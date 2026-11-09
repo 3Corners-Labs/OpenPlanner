@@ -91,6 +91,7 @@ Every refusal is `{"error": "<code>"}`; it never repeats input.
 | 401 | `invalid_client` | Wrong, expired or disabled credentials, or a network that is not allowed |
 | 401 | `invalid_token` | Token missing, expired or revoked: get a new one |
 | 403 | `insufficient_scope` | The client may not do this, or not for this team |
+| 403 | `configuration_plaintext_disabled` | An export in clear text (`X-Plain-Secrets`) while the host has not allowed it |
 | 404 | `group_not_found`, `not_found`, `change_request_not_found` | Unknown team or path, or not a change request of this client |
 | 409 | `slot_unavailable` | The requested new time is not free |
 | 409 | `configuration_plan_stale`, `configuration_package_version` | The plan is not the one named by `X-Plan-Hash`, or a plan that deletes came without it; a SQLite package is of another schema revision |
@@ -119,7 +120,11 @@ X-Passphrase: <at least 16 characters>   (optional)
 ```
 
 Answers `200` with the document of the platform. With `X-Passphrase` the secrets are in it,
-sealed under the passphrase; without, it holds none. No booking, slot or other participant
+sealed under the passphrase; without, it holds none.
+With `X-Plain-Secrets: true` they are in it in clear text instead, with no passphrase; that needs
+the host to have set `CONFIGURATION_PLAINTEXT_EXPORT_ALLOWED=true` and is otherwise refused with
+`403 configuration_plaintext_disabled`. The response is `Cache-Control: no-store`; keep the file as
+private as the secrets. A document with `{"plain": "..."}` secrets applies without a passphrase. No booking, slot or other participant
 data is in it.
 
 Read what a document would do before you write it:

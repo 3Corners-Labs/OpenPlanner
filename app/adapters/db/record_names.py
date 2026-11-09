@@ -19,13 +19,22 @@ def contact_center_credential_name(organisation_id: int) -> str:
     return f"contact-center:{organisation_id}"
 
 
+def organisation_tokens_name(organisation_id: int) -> str:
+    """Return the credential name of the access tokens of an organisation's own connection."""
+    return f"contact-center-tokens:{organisation_id}"
+
+
 def organisation_records(organisation_id: int) -> tuple[str, ...]:
     """Return every sealed record of an organisation that has no foreign key to it.
 
     Deleting the organisation (portal or configuration package) deletes these in the same
     transaction, so a later organisation with a reused id never inherits a secret.
     """
-    return (bot_credential_name(organisation_id), contact_center_credential_name(organisation_id))
+    return (
+        bot_credential_name(organisation_id),
+        contact_center_credential_name(organisation_id),
+        organisation_tokens_name(organisation_id),
+    )
 
 
 def channel_secret_name(organisation_id: int, channel: ChannelKind) -> str:

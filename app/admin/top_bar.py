@@ -24,11 +24,15 @@ COUNTS_ATTRIBUTE = "top_counts"
 HELP_KEY = "top.help"
 """The register key of the manual link, which opens the page's own topic when it has one."""
 
-COUNT_LABELS = {
-    "top.tasks": "admin.topbar.tasks.count",
-    "top.alerts": "admin.topbar.alerts.count",
+COUNT_WORDS = {
+    "top.tasks": "admin.topbar.tasks.count_words",
+    "top.alerts": "admin.topbar.alerts.count_words",
 }
-"""The words a screen reader gets for a link with a count; also the list of links that have one."""
+"""The words after the count, for screen readers only; also the list of links that have one.
+
+The link has no ``aria-label``: its accessible name is its own text, the visible label and
+count followed by these hidden words, so it starts with what a speech user sees (WCAG 2.5.3).
+"""
 
 
 @dataclass(frozen=True)
@@ -41,7 +45,7 @@ class TopLink:
         current: Whether it is the page being shown.
         icon: The icon name from ``admin/_icons.html``.
         count: The number next to the label; 0 shows nothing.
-        aria_label: The accessible name when there is a count (it starts with the label).
+        count_words: What the count means, visually hidden after it (empty without a count).
     """
 
     label: str
@@ -49,7 +53,7 @@ class TopLink:
     current: bool
     icon: str
     count: int = 0
-    aria_label: str = ""
+    count_words: str = ""
 
 
 async def load_top_counts(request: Request) -> None:
@@ -107,6 +111,6 @@ def top_links(
             continue
         label = translate(link.label_key)
         count = counts.get(link.key, 0)
-        aria = translate(COUNT_LABELS[link.key], label=label, count=count) if count else ""
-        links.append(TopLink(label, link.path, current, link.icon, count, aria))
+        words = translate(COUNT_WORDS[link.key]) if count else ""
+        links.append(TopLink(label, link.path, current, link.icon, count, words))
     return links
