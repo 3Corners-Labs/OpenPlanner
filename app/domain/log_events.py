@@ -32,6 +32,7 @@ from typing import Any
 
 from app.domain.authorization import ApiScope, Permission
 from app.domain.job_plan import JobType
+from app.domain.usage_log import LOG_FIELDS
 
 
 class LogCategory(StrEnum):
@@ -354,6 +355,25 @@ _OPERATIONS = (
         "A message was sent (or given up on) but its fact for the reports was not written "
         "(ADR 0117); the message and its job are not affected.",
         _CHECK_HOST,
+    ),
+    _e(
+        "usage.fact",
+        _OPS,
+        "info",
+        " ".join(LOG_FIELDS),
+        "Usage fact {kind} for hour {bucket_hour}.",
+        "One state change counted for the reports (ADR 0117 point 15), sent only while "
+        "reporting_usage_events_to_log is on: the allow-listed codes and counts, the UTC hour "
+        "and the duration bucket, never a person, a booking or a time with minutes.",
+    ),
+    _e(
+        "usage.emit_failed",
+        _OPS,
+        "error",
+        "error",
+        "A usage fact could not be written to the log stream: {error}.",
+        "The fact is in the reports; its copy as a usage.fact line failed (ADR 0117 point 15).",
+        "Compare the facts counted in the reports with the log platform for the period.",
     ),
     _e(
         "usage.fact_dropped",

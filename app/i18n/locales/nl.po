@@ -11423,6 +11423,8 @@ msgstr "Voorgestelde tijd vrijgeven"
 msgid "audit.job.send_proposal_released"
 msgstr "Melding vrijgegeven voorstel sturen"
 
+msgid "settings.field.reporting_usage_events_to_log.label"
+msgstr "Gebruiksfeiten ook naar de logdoelen sturen"
 msgid "admin.agenda.propose"
 msgstr "Nieuwe tijd voorstellen"
 
