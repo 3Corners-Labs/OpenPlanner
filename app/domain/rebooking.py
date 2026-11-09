@@ -19,9 +19,9 @@ Times of day are compared in the group's time zone, so a proposal keeps the part
 time across a daylight-saving change.
 """
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from app.domain.agenda import AgendaSlot
 from app.domain.booking import Booking
@@ -56,6 +56,14 @@ class Proposal:
     booking_id: int
     old_start: datetime
     new_start: datetime | None
+
+
+DEFAULT_REACH = Reach(search_days=14, tolerance_minutes=60)
+"""The defaults of ``reschedule_search_days`` and ``reschedule_time_tolerance_minutes``."""
+
+SUGGESTED = 3
+"""How many free times the participant's reschedule page marks as suggested (ADR 0057 point 8,
+"the next two or three candidates"); a fixed presentation rule, not a setting."""
 
 
 def last_made(bookings: Iterable[Booking], count: int) -> list[Booking]:
@@ -152,6 +160,44 @@ def propose(
             Proposal(_id(booking), booking.start, None if best is None else best.start)
         )
     return proposals
+
+
+def suggested(
+    group: Group,
+    old_start: datetime,
+    starts: Iterable[datetime],
+    reach: Reach,
+    exclude: Collection[datetime] = (),
+) -> list[datetime]:
+    """Return up to ``SUGGESTED`` of the free ``starts``, best first, as new times (point 8).
+
+    The participant's own reschedule page offers them as *suggested*; they are not held. A
+    start in ``exclude`` (the time already proposed) and ``old_start`` itself are left out,
+    and so is a start beyond ``reach``. The order follows the module's ranking.
+    """
+    fitting = {
+        start
+        for start in starts
+        if start != old_start and start not in exclude and _within(group, old_start, start, reach)
+    }
+    return sorted(fitting, key=lambda start: _rank(group, old_start, start))[:SUGGESTED]
+
+
+def search_window(
+    group: Group, days: Collection[date], reach: Reach, now: datetime
+) -> tuple[date, date] | None:
+    """Return the local days to look for new times for bookings on ``days``, or ``None``.
+
+    From ``reach.search_days`` before the earliest day (never before today) to as many after
+    the latest; ``None`` when nothing of it lies ahead. One rule for the planner's review and
+    the participant's suggestions.
+    """
+    if not days:
+        return None
+    spread = timedelta(days=reach.search_days)
+    first = max(group.today(now), min(days) - spread)
+    last = max(days) + spread
+    return (first, last) if first <= last else None
 
 
 def _within(group: Group, old_start: datetime, start: datetime, reach: Reach) -> bool:

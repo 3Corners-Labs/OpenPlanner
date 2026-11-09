@@ -47,6 +47,7 @@ _NOT_FOUND = {
     ErrorCode.API_CLIENT_NOT_FOUND,
     ErrorCode.UPDATE_REQUEST_NOT_FOUND,
     ErrorCode.QUEUE_NOT_ENABLED,
+    ErrorCode.STAFF_VIEW_OFF,
 }
 
 

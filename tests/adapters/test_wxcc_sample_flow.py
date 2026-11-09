@@ -23,7 +23,7 @@ SCHEMA = {
     key: (key == "bookingReference", True)
     for key in ("bookingReference", "firstName", "startTime", "groupName", "meetingLink", "kind")
 }
-ROUTES = [Route("aangifte", "ORG_videoafspraak_aangifte_01"), Route("toeslagen", "toeslagen")]
+ROUTES = [Route("balie", "ORG_videoafspraak_balie_01"), Route("helpdesk", "helpdesk")]
 
 
 def _config(flow: dict[str, Any]) -> WxccConfig:
@@ -32,8 +32,8 @@ def _config(flow: dict[str, Any]) -> WxccConfig:
         assets=(Asset("as-1", CHANNEL, "ch-1", ADDRESS, SCHEMA),),
         entry_points=(EntryPoint("ep-1", "videoafspraak_prototype", "as-1", "fl-1", True),),
         queues=(
-            Queue("q-1", "ORG_videoafspraak_aangifte_01", "WORK_ITEM"),
-            Queue("q-2", "toeslagen", "WORK_ITEM"),
+            Queue("q-1", "ORG_videoafspraak_balie_01", "WORK_ITEM"),
+            Queue("q-2", "helpdesk", "WORK_ITEM"),
             Queue("q-3", "telefonie", "TELEPHONY"),
             Queue("q-4", "ORG_fallback", "WORK_ITEM"),
         ),
@@ -47,7 +47,7 @@ def _checks(flow: dict[str, Any]) -> list[CheckResult]:
 
 
 def test_the_sample_flow_passes_the_flow_check_without_warnings() -> None:
-    flow = sample_flow("openplanner_aangifte", ROUTES, "ORG_fallback")
+    flow = sample_flow("openplanner_balie", ROUTES, "ORG_fallback")
 
     results = _checks(flow)
 
@@ -57,13 +57,13 @@ def test_the_sample_flow_passes_the_flow_check_without_warnings() -> None:
 
 
 def test_a_flow_with_only_one_branch_leaves_the_other_group_on_the_default_branch() -> None:
-    flow = sample_flow("openplanner_aangifte", ROUTES[:1], "ORG_fallback")
+    flow = sample_flow("openplanner_balie", ROUTES[:1], "ORG_fallback")
 
     warnings = [r for r in _checks(flow) if not r.ok]
 
     assert [(r.name, r.required) for r in warnings] == [
-        ("[toeslagen] flow branch", False),
-        ("[toeslagen] queue naming", False),
+        ("[helpdesk] flow branch", False),
+        ("[helpdesk] queue naming", False),
     ]
 
 
@@ -81,7 +81,7 @@ def _graph(flow: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], dict[tuple[
 
 
 def test_probe_ends_before_any_queue_and_every_branch_reaches_a_queue() -> None:
-    flow = sample_flow("openplanner_aangifte", ROUTES, "ORG_fallback", {"toeslagen": "id-2"})
+    flow = sample_flow("openplanner_balie", ROUTES, "ORG_fallback", {"helpdesk": "id-2"})
     nodes, edges = _graph(flow)
 
     assert nodes["CaseKind"]["menuLinks_input"] == ["probe"]
@@ -97,7 +97,7 @@ def test_probe_ends_before_any_queue_and_every_branch_reaches_a_queue() -> None:
 
 def test_every_activity_and_link_is_on_the_canvas() -> None:
     # A file without its diagram imports as an empty canvas (seen 2026-11-02).
-    flow = sample_flow("openplanner_aangifte", ROUTES, "ORG_fallback")
+    flow = sample_flow("openplanner_balie", ROUTES, "ORG_fallback")
     widgets = flow["diagram"]["widgets"]
     activities = flow["process"]["activities"]
 
@@ -107,7 +107,7 @@ def test_every_activity_and_link_is_on_the_canvas() -> None:
 
 
 def test_the_sample_flow_reads_routing_and_meeting_link_and_carries_no_participant_data() -> None:
-    flow = sample_flow("openplanner_aangifte", ROUTES, "ORG_fallback")
+    flow = sample_flow("openplanner_balie", ROUTES, "ORG_fallback")
     nodes, _ = _graph(flow)
 
     assert [v["name"] for v in flow["variables"]] == ["openplannerGroup"]

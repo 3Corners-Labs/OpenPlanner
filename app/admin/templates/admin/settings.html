@@ -7,7 +7,7 @@
   <h2 id="status-heading">{{ _("admin.settings.status.title") }}</h2>
   <p>{{ _("admin.settings.status.intro") }}</p>
   <dl class="facts">
-    <div><dt>{{ _("admin.settings.status.environment") }}</dt><dd><code>{{ environment }}</code></dd></div>
+    <div><dt>{{ _("admin.settings.status.environment") }}</dt><dd>{{ environment_label }}</dd></div>
   </dl>
   {% if log_summary %}
   <h3 id="logging-heading">{{ _("admin.settings.logging.title") }}</h3>
@@ -166,7 +166,7 @@
     <label for="tls-csr">{{ _("admin.settings.tls.source.csr_pending") }}</label>
     <textarea id="tls-csr" readonly rows="8" aria-describedby="tls-csr-hint">{{ source.pending_csr }}</textarea>
   </div>
-  <p><a href="/admin/settings/tls/csr.pem" download="openplanner.csr">{{ _("admin.settings.tls.source.csr_download") }}</a></p>
+  <p><a href="/admin/settings/tls/csr.pem">{{ _("admin.settings.tls.source.csr_download") }}</a></p>
   {% endif %}
   <form method="post" action="/admin/settings/tls/csr" class="setting-form">
     {{ error_message(source.errors.get("tls_csr"), "error-tls_csr") }}

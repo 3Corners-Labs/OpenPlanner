@@ -216,6 +216,11 @@ class CallStatus:
     updated_at: datetime | None = None
     fallback: bool = False
     """The booking is in the own queue as a fallback (ADR 0082 point 11)."""
+    lobby_since: datetime | None = None
+    """When the participant joined and started waiting for an agent (ADR 0043 point 6); cleared
+    when everyone left or the meeting ended, so a rejoin waits from the rejoin."""
+    not_picked_up_at: datetime | None = None
+    """When the worker reported the booking as not picked up (ADR 0043 point 8); once only."""
     peak_participants: int = 0
     """The most people seen in the meeting at once; kept when the meeting ends (metric U11)."""
     guest_joined_at: datetime | None = None
@@ -244,10 +249,15 @@ def apply_event(status: CallStatus, kind: EventKind, at: datetime) -> CallStatus
             changes |= {"host_joined": True, "host_joined_at": status.host_joined_at or at}
         else:
             changes["guest_joined_at"] = status.guest_joined_at or at
+            if not status.host_joined:
+                changes["lobby_since"] = status.lobby_since or at
     elif kind is EventKind.PARTICIPANT_LEFT:
         changes["participants"] = max(0, status.participants - 1)
+        if changes["participants"] == 0:
+            changes["lobby_since"] = None
     elif kind is EventKind.MEETING_ENDED:
         changes |= {"call": CallState.ENDED, "ended_at": at, "participants": 0}
+        changes["lobby_since"] = None
     elif kind is EventKind.TASK_CREATED:
         changes |= {"task": TaskState.QUEUED, "task_created_at": at}
     elif kind is EventKind.TASK_CONNECTED:
@@ -288,12 +298,18 @@ def apply_polled(status: CallStatus, polled: MeetingStatus, at: datetime) -> Cal
     is lost. A meeting that has ended stays ended, and a host who joined once stays joined.
     """
     ended = polled.state is CallState.ENDED
+    participants = 0 if ended else polled.participants
+    host_joined = status.host_joined or polled.host_joined
+    lobby_since = None
+    if participants > 0 and not host_joined:
+        lobby_since = status.lobby_since or at
     guests = polled.participants - (1 if polled.host_joined else 0)
     return replace(
         status,
         call=CallState.ENDED if status.call is CallState.ENDED else polled.state,
-        participants=0 if ended else polled.participants,
-        host_joined=status.host_joined or polled.host_joined,
+        participants=participants,
+        host_joined=host_joined,
+        lobby_since=lobby_since if participants > 0 else None,
         host_joined_at=status.host_joined_at or (at if polled.host_joined else None),
         peak_participants=max(status.peak_participants, polled.participants),
         guest_joined_at=status.guest_joined_at or (at if guests > 0 else None),

@@ -45,6 +45,8 @@ stays open to every role as usual.
 | Archive groups (`group.delete`) | Organisation | – | yes | yes | – | – | – |
 | Close every team of an organisation at once (`organisation.closure`) | Organisation | needs `closure.manage` | yes | yes | – | – | – |
 | View retention (`retention.view`) | Organisation | – | yes | yes | – | yes | – |
+| Manage the digest of the reports (`reports.digest.manage`) | Organisation | needs `reports.view` | yes | yes | – | – | – |
+| See the load per team member in the reports (`reports.staff.view`) | Organisation | personal data, needs `reports.view` | yes | yes | – | – | – |
 | Manage staff (`staff.manage`) | Organisation | needs `staff.view` | yes | yes | – | – | – |
 | Send a password reset or invitation (`staff.reset_password`) | Organisation | needs `staff.view` | yes | yes | – | – | – |
 | Manage embedding on websites (`embedding.manage`) | Organisation | – | yes | yes | – | – | – |
@@ -64,6 +66,7 @@ stays open to every role as usual.
 | Change bookings (`bookings.manage`) | Group | personal data, needs `bookings.view`, `group.view` | yes | yes | yes | – | – |
 | Close a team in an emergency and handle appointments on hold (`closure.manage`) | Group | needs `group.view` | yes | yes | yes | – | – |
 | View usage reports (`reports.view`) | Group | – | yes | yes | yes | yes | – |
+| Download usage reports (`reports.export`) | Group | needs `reports.view` | yes | yes | yes | yes | – |
 | View staff (`staff.view`) | Group | – | yes | yes | yes | yes | – |
 | Pick up appointments in the own queue (`queue.work`) | Group | personal data | yes | yes | yes | – | yes |
 
@@ -79,9 +82,9 @@ Held back from custom roles for now: `branding.manage` (ADR 0039 B3, until O5).
 
 | Template | Reach | Delegable permissions |
 |---|---|---|
-| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `embedding.manage`, `group.create`, `group.delete`, `group.edit`, `group.view`, `holidays.assign`, `identity_providers.view`, `idp_mapping.manage`, `idp_mapping.view`, `logging.view`, `matrix.view`, `organisation.closure`, `organisation.view`, `queue.work`, `reminders.manage`, `reports.view`, `retention.view`, `rights.view`, `schedule.manage`, `settings.organisation.manage`, `settings.platform.view`, `staff.manage`, `staff.reset_password`, `staff.view`, `texts.manage`, `texts.organisation.manage` |
-| Group admin | groups | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `logging.view`, `matrix.view`, `queue.work`, `reminders.manage`, `reports.view`, `rights.view`, `schedule.manage`, `settings.platform.view`, `staff.view`, `texts.manage` |
-| Compliance and privacy (read-only) | organisations | `audit.export`, `audit.view`, `dashboard.view`, `group.view`, `identity_providers.view`, `idp_mapping.view`, `logging.view`, `matrix.view`, `organisation.view`, `reports.view`, `retention.view`, `rights.view`, `settings.platform.view`, `staff.view` |
+| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `embedding.manage`, `group.create`, `group.delete`, `group.edit`, `group.view`, `holidays.assign`, `identity_providers.view`, `idp_mapping.manage`, `idp_mapping.view`, `logging.view`, `matrix.view`, `organisation.closure`, `organisation.view`, `queue.work`, `reminders.manage`, `reports.digest.manage`, `reports.export`, `reports.staff.view`, `reports.view`, `retention.view`, `rights.view`, `schedule.manage`, `settings.organisation.manage`, `settings.platform.view`, `staff.manage`, `staff.reset_password`, `staff.view`, `texts.manage`, `texts.organisation.manage` |
+| Group admin | groups | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `logging.view`, `matrix.view`, `queue.work`, `reminders.manage`, `reports.export`, `reports.view`, `rights.view`, `schedule.manage`, `settings.platform.view`, `staff.view`, `texts.manage` |
+| Compliance and privacy (read-only) | organisations | `audit.export`, `audit.view`, `dashboard.view`, `group.view`, `identity_providers.view`, `idp_mapping.view`, `logging.view`, `matrix.view`, `organisation.view`, `reports.export`, `reports.view`, `retention.view`, `rights.view`, `settings.platform.view`, `staff.view` |
 
 ## Participants
 
@@ -108,4 +111,6 @@ the scopes below. There is no superuser equivalent for machines.
 | Scope | Level |
 |---|---|
 | Read free times (`availability:read`) | Group |
+| Read the hourly usage figures (`reports:read`) | Group |
 | Export and import the configuration package (whole installation) (`configuration:transfer`) | Portal |
+| Ask to cancel or move (with phone number and appointment code; the participant confirms) (`bookings:request_change`) | Group |

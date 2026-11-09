@@ -26,6 +26,7 @@ class UsageQueries:
 
     _session: AsyncSession
     _usage_enabled: Callable[[], bool]
+    written_usage: list[UsageFact]
 
     async def record_usage(self, fact: UsageFact | StaffFact) -> bool:
         """Write ``fact`` to the outbox in a savepoint; return whether it was written.
@@ -44,4 +45,6 @@ class UsageQueries:
         except SQLAlchemyError:
             log.warning("usage.fact_dropped", kind=fact.kind.value)
             return False
+        if isinstance(fact, UsageFact):
+            self.written_usage.append(fact)
         return True

@@ -37,13 +37,21 @@ from app.domain import booking_changes
 from app.domain.audit import Outcome
 from app.domain.booking import Booking
 from app.domain.call_service import CallService
+from app.domain.change_request_service import request_still_open
 from app.domain.channels import ChannelKind
 from app.domain.diagnostics import DiagnosticLog
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.event_context import bind_booking, current, trace_scope
 from app.domain.fallback import FallbackService
 from app.domain.integration import IntegrationService
-from app.domain.job_plan import BACKOFF, TEAM_INVITES, JobType, is_stale
+from app.domain.job_plan import (
+    BACKOFF,
+    CHANGE_REQUEST_NOTICES,
+    PROPOSAL_NOTICES,
+    TEAM_INVITES,
+    JobType,
+    is_stale,
+)
 from app.domain.message_usage import record_message
 from app.domain.ports import (
     Clock,
@@ -105,9 +113,11 @@ NO_TEAM_INVITE = "no_team_invite"
 LAPSES: dict[JobType, Callable[[Transaction, Booking, datetime], Awaitable[bool]]] = {
     JobType.LAPSE_REBOOK: booking_changes.lapse,
     JobType.EXPIRE_UNCONFIRMED: booking_changes.lapse_unconfirmed,
+    JobType.EXPIRE_PROPOSAL: booking_changes.expire_proposal,
 }
-"""Jobs that cancel a booking left unanswered: a request to rebook (ADR 0044) or to confirm
-(ADR 0056). Each re-reads the booking and does nothing when it was answered in time."""
+"""Jobs that end what was left unanswered: a request to rebook (ADR 0044) or to confirm (ADR
+0056) cancels the booking; a proposed new time (ADR 0057) releases its held place. Each re-reads
+the booking and does nothing when it was answered in time."""
 
 MESSAGE_CHANNELS = frozenset({ChannelKind.EMAIL, ChannelKind.SMS})
 """Channels whose message jobs are claimed when a sender directory is available."""
@@ -130,6 +140,10 @@ class JobRunner:
             write times in their group's organisation's format.
         product_footer: Whether an organisation (by id) keeps "Appointments via OpenPlanner"
             in its emails (ADR 0060 §6); ``None`` keeps it.
+        change_requests: Whether an organisation (by id) takes a bot's change requests
+            (``agent_change_requests_enabled``, ADR 0023 step 2): its messages show the
+            appointment code, and a change request's message goes out only while it is on.
+            ``None`` is off. The worker passes it only where the deployment runs the API.
         after_purge: Called once after a round that ran ``purge_pii`` jobs (the worker passes
             the WAL checkpoint, WP-A3); a failure is logged and never fails the round.
     """
@@ -148,6 +162,7 @@ class JobRunner:
         retention: EventRetention | Callable[[], EventRetention] | None = None,
         clock_style: Callable[[int], str] | None = None,
         product_footer: Callable[[int], bool] | None = None,
+        change_requests: Callable[[int], bool] | None = None,
         after_purge: Callable[[], Awaitable[None]] | None = None,
         fallback: FallbackService | None = None,
     ) -> None:
@@ -158,6 +173,7 @@ class JobRunner:
         self._retention = retention or EventRetention()
         self._clock_style = clock_style
         self._product_footer = product_footer
+        self._change_requests = change_requests
         self._diagnostics = DiagnosticLog(uow, clock)
         self._pruned_at: datetime | None = None
         self._uow = uow
@@ -286,6 +302,30 @@ class JobRunner:
                 else None
             )
             texts = await tx.get_group_texts(group.id) if group else {}
+            proposal = (
+                await tx.get_open_proposal(booking.id)
+                if booking and booking.id is not None and job.type in PROPOSAL_NOTICES
+                else None
+            )
+            change = (
+                await tx.get_latest_change_request(booking.id)
+                if booking and booking.id is not None and job.type in CHANGE_REQUEST_NOTICES
+                else None
+            )
+            if (
+                change is not None
+                and booking is not None
+                and group is not None
+                and not await request_still_open(
+                    tx,
+                    change,
+                    booking,
+                    group,
+                    self._takes_change_requests(group.organisation_id),
+                    now,
+                )
+            ):
+                change = None  # no longer open (ADR 0023 step 2b): ``is_stale`` stops the message
             organisation = (
                 await tx.get_organisation_by_id(group.organisation_id)
                 if group and job.type in TEAM_INVITES
@@ -301,7 +341,7 @@ class JobRunner:
         ):
             log.info("job.skipped", job_id=job.id, reason=NO_RECIPIENT)
             return NO_RECIPIENT
-        if is_stale(job.pinned_start, booking, job.type):
+        if is_stale(job.pinned_start, booking, job.type, proposal=proposal, change=change, now=now):
             log.info("job.skipped", job_id=job.id, reason=STALE)
             return STALE
         if job.type in TEAM_INVITES and not group.sends_team_invite:
@@ -330,6 +370,9 @@ class JobRunner:
                     closure=closure,
                     product_footer=self._product_footer is None
                     or self._product_footer(group.organisation_id),
+                    proposal=proposal,
+                    change=change,
+                    show_code=self._takes_change_requests(group.organisation_id),
                 )
         step = self._step(job, "compose", step)
         await sender.send(message)
@@ -337,6 +380,10 @@ class JobRunner:
         log.info("job.sent", job_id=job.id, type=job.type.value, channel=channel.value)
         await self._usage(job, now, sent=True)
         return None
+
+    def _takes_change_requests(self, organisation_id: int) -> bool:
+        """Whether the organisation takes a bot's change requests now (ADR 0023 step 2)."""
+        return self._change_requests is not None and self._change_requests(organisation_id)
 
     @staticmethod
     def _step(job: ClaimedJob, name: str, since: float) -> float:

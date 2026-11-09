@@ -102,11 +102,6 @@ async def test_the_claim_fact_is_rolled_back_with_the_claim(
 # --- the rebooking funnel ------------------------------------------------------------------
 
 
-@pytest.fixture
-def planner(uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService) -> PlannerService:
-    return PlannerService(uow, clock, AdminService(uow, clock), bookings, alert_per_hour=50)
-
-
 async def test_a_request_accepted_and_one_that_lapses_are_the_funnel(
     planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:

@@ -3,18 +3,9 @@
 from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
 
+from app.web.route_dependencies import all_routes, dependants
 
-def all_routes(routes: list[object]) -> list[APIRoute]:
-    """Flatten an app's routes, including routers mounted with include_router."""
-    found: list[APIRoute] = []
-    for route in routes:
-        if isinstance(route, APIRoute):
-            found.append(route)
-        inner = getattr(route, "original_router", None)  # FastAPI's included-router wrapper
-        if inner is not None:
-            found.extend(all_routes(inner.routes))
-    return found
-
+__all__ = ["SCOPE_PARAMETERS", "all_routes", "parameter_names", "scoped_routes"]
 
 SCOPE_PARAMETERS = frozenset(
     {"slug", "org", "organisation", "organisation_id", "group", "group_id"}
@@ -24,10 +15,11 @@ SCOPE_PARAMETERS = frozenset(
 
 def parameter_names(dependant: Dependant) -> set[str]:
     """Return every path and query parameter of a route, through its dependencies."""
-    names = {p.name for p in (*dependant.path_params, *dependant.query_params)}
-    for inner in dependant.dependencies:
-        names |= parameter_names(inner)
-    return names
+    return {
+        parameter.name
+        for inner in dependants(dependant)
+        for parameter in (*inner.path_params, *inner.query_params)
+    }
 
 
 def scoped_routes(routes: list[APIRoute]) -> dict[str, APIRoute]:

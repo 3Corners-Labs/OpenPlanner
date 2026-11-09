@@ -10,27 +10,33 @@ from app.web import charts
 from app.web.charts import (
     BAR_HEIGHT,
     BAR_WIDTH,
+    GAP_HEIGHT,
     LABEL_LIMIT,
     PIE_SIZE,
     SERIES_CLASSES,
     ChartKind,
     Datum,
+    ReportChart,
+    ReportKind,
+    ReportSeries,
     bar_chart,
     build,
     describe,
     line_chart,
+    nice_max,
     pie_chart,
+    report_geometry,
     series_of,
     shorten,
 )
 
-THREE = [Datum("Aangifte", 4), Datum("Bezwaar", 2), Datum("Toeslagen", 0)]
+THREE = [Datum("Demo", 4), Datum("Balie", 2), Datum("Helpdesk", 0)]
 SIX = [Datum(f"Groep {n}", n) for n in range(1, 7)]
 PATH_NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
 
 
 def test_a_label_is_shortened_with_an_ellipsis_only_when_too_long() -> None:
-    assert shorten("Aangifte") == "Aangifte"
+    assert shorten("Balie") == "Balie"
     assert shorten("x" * LABEL_LIMIT) == "x" * LABEL_LIMIT
     assert shorten("x" * (LABEL_LIMIT + 1)) == "x" * (LABEL_LIMIT - 1) + "…"
     assert shorten("Demo: videogesprek", 10) == "Demo: vid…"
@@ -47,7 +53,7 @@ def test_the_summary_names_the_title_and_every_value() -> None:
 
     summary = describe("Afspraken vandaag", THREE, sentence, "; ")
 
-    assert summary == "Afspraken vandaag: Aangifte: 4; Bezwaar: 2; Toeslagen: 0"
+    assert summary == "Afspraken vandaag: Demo: 4; Balie: 2; Helpdesk: 0"
     assert describe("Leeg", [], sentence, "; ") == "Leeg: "
 
 
@@ -66,7 +72,7 @@ def test_vertical_bars_are_proportional_and_carry_their_value_as_text() -> None:
     assert half.height == pytest.approx(tall.height / 2, abs=0.1)
     assert none.height == 0
     assert [m.value_text for m in chart.marks] == ["4", "2", "0"]  # a zero bar still says so
-    assert [m.full_label for m in chart.marks] == ["Aangifte", "Bezwaar", "Toeslagen"]
+    assert [m.full_label for m in chart.marks] == ["Demo", "Balie", "Helpdesk"]
     assert tall.y + tall.height == pytest.approx(chart.axis[1])  # bars stand on the axis
     assert tall.value_y < tall.y  # the value sits above its bar
     assert tall.x < half.x < none.x
@@ -144,7 +150,7 @@ def test_a_pie_draws_a_slice_only_for_values_above_zero_but_lists_every_item() -
     assert chart.kind is ChartKind.PIE
     assert (chart.width, chart.height) == (PIE_SIZE, PIE_SIZE)
     assert [bool(m.path) for m in chart.marks] == [True, True, False]
-    assert [m.full_label for m in chart.marks] == ["Aangifte", "Bezwaar", "Toeslagen"]
+    assert [m.full_label for m in chart.marks] == ["Demo", "Balie", "Helpdesk"]
     assert [m.value_text for m in chart.marks] == ["4", "2", "0"]
 
 
@@ -209,3 +215,219 @@ def test_the_module_imports_no_framework() -> None:
     }
 
     assert imported <= {"math", "collections", "dataclasses", "enum"}, imported
+
+
+# --- Report charts (ADR 0117 point 10) -----------------------------------------------------------
+
+
+def _report_chart(
+    values: tuple[int | None, ...] = (3, 10, 6),
+    *,
+    kind: ReportKind = ReportKind.COLUMN,
+    more: tuple[ReportSeries, ...] = (),
+    categories: tuple[str, ...] = ("a", "b", "c"),
+    y_max: int | None = None,
+) -> ReportChart:
+    return ReportChart(
+        chart_id="demo",
+        kind=kind,
+        title="Bookings per day",
+        description="Bookings in the range.",
+        categories=categories,
+        series=(ReportSeries("Bookings", values), *more),
+        unit="bookings",
+        hidden_label="< 5",
+        gap_note="Count hidden (< 5)",
+        y_max=y_max,
+    )
+
+
+def test_a_column_is_as_high_as_its_value_on_a_scale_that_fits_the_largest() -> None:
+    columns = report_geometry(_report_chart((3, 10, 6))).columns
+
+    assert columns[1].height == pytest.approx(columns[0].height * 10 / 3, rel=0.01)
+    assert columns[2].height == pytest.approx(columns[0].height * 2, rel=0.01)
+
+
+def test_the_same_chart_always_gives_the_same_geometry() -> None:
+    assert report_geometry(_report_chart()) == report_geometry(_report_chart())
+
+
+def test_a_hidden_cell_is_a_marker_of_a_fixed_height_with_its_label() -> None:
+    geometry = report_geometry(_report_chart((None, 10, 6)))
+
+    [gap] = geometry.gaps
+    assert gap.height == GAP_HEIGHT
+    assert gap.title == "a: < 5"
+    assert geometry.gap_legend is not None
+    assert len(geometry.columns) == 2
+
+
+def test_nothing_in_the_geometry_depends_on_a_hidden_value() -> None:
+    """The model has no number for a hidden cell, so no scale or height can carry one (R2)."""
+    chart = _report_chart((None, 10, 6))
+
+    assert report_geometry(chart) == report_geometry(_report_chart((None, 10, 6)))
+    # The scale is the one of the shown values: 10 fits in 0 to 10, whatever was hidden.
+    assert [g.label.text for g in report_geometry(chart).grid][-1] == "10"
+
+
+def test_a_gap_in_a_stack_sits_on_the_shown_part_at_the_same_fixed_height() -> None:
+    chart = _report_chart(
+        (4, 4, 4), kind=ReportKind.STACKED, more=(ReportSeries("Failed", (None, 2, 2)),)
+    )
+
+    geometry = report_geometry(chart)
+
+    [gap] = geometry.gaps
+    assert gap.height == GAP_HEIGHT
+    first = geometry.columns[0]
+    assert gap.y == pytest.approx(first.y - GAP_HEIGHT, abs=0.1)
+
+
+def test_an_all_hidden_chart_has_no_values_and_draws_no_column() -> None:
+    chart = _report_chart((None, None, None))
+
+    assert not chart.has_values
+    assert report_geometry(chart).columns == ()
+
+
+def test_zero_values_draw_no_column() -> None:
+    assert report_geometry(_report_chart((0, 0, 0))).columns == ()
+
+
+def test_stacked_series_add_up_and_the_later_ones_are_patterned() -> None:
+    chart = _report_chart(
+        (4, 5, 6),
+        kind=ReportKind.STACKED,
+        more=(ReportSeries("Failed", (4, 5, 6)), ReportSeries("Third", (1, 1, 1))),
+    )
+
+    geometry = report_geometry(chart)
+
+    assert geometry.patterns == (1, 2)
+    first_stack = [c for c in geometry.columns if c.x == geometry.columns[0].x]
+    assert [c.series for c in first_stack] == [0, 1, 2]
+    assert first_stack[0].y == pytest.approx(first_stack[1].y + first_stack[1].height, abs=0.2)
+
+
+def test_lines_break_at_a_hidden_cell_and_each_series_has_its_marker_shape() -> None:
+    chart = _report_chart(
+        (5, None, 7, 9),
+        kind=ReportKind.LINE,
+        more=(ReportSeries("Second", (1, 2, 3, 4)),),
+        categories=("a", "b", "c", "d"),
+    )
+
+    geometry = report_geometry(chart)
+
+    assert [(r.series, r.points.count(",")) for r in geometry.runs] == [(0, 2), (1, 4)]
+    assert {m.shape for m in geometry.markers if m.series == 0} == {"circle"}
+    assert {m.shape for m in geometry.markers if m.series == 1} == {"square"}
+    assert [g.title for g in geometry.gaps] == ["b: < 5"]
+    assert geometry.patterns == ()
+
+
+def test_a_fixed_top_of_the_scale_is_kept() -> None:
+    geometry = report_geometry(_report_chart((10, 20, 30), kind=ReportKind.LINE, y_max=100))
+
+    assert [g.label.text for g in geometry.grid][-1] == "100"
+
+
+def test_many_categories_show_every_nth_label_turned() -> None:
+    names = tuple(f"d{i}" for i in range(28))
+
+    labels = report_geometry(_report_chart(tuple(range(28)), categories=names)).categories
+
+    assert 0 < len(labels) <= 12
+    assert labels[0].text == "d0"
+    assert labels[0].rotate == -35
+
+
+def test_few_categories_all_show_flat() -> None:
+    labels = report_geometry(_report_chart()).categories
+
+    assert [label.text for label in labels] == ["a", "b", "c"]
+    assert {label.rotate for label in labels} == {0}
+
+
+def test_rows_give_the_table_beside_the_chart() -> None:
+    chart = _report_chart(
+        (3, None, 6), more=(ReportSeries("Failed", (1, 2, None)),), kind=ReportKind.STACKED
+    )
+
+    assert chart.rows() == [("a", (3, 1)), ("b", (None, 2)), ("c", (6, None))]
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (0, (1, 1)),
+        (1, (1, 1)),
+        (3, (3, 1)),
+        (10, (10, 2)),
+        (11, (15, 5)),
+        (47, (50, 10)),
+        (6, (6, 2)),
+    ],
+)
+def test_nice_max(value: int, expected: tuple[int, int]) -> None:
+    assert nice_max(value) == expected
+
+
+def test_a_chart_that_cannot_be_drawn_truthfully_is_refused() -> None:
+    def make(**kw: object) -> ReportChart:
+        base: dict[str, object] = {
+            "chart_id": "ok",
+            "kind": ReportKind.COLUMN,
+            "title": "t",
+            "description": "d",
+            "categories": ("a",),
+            "series": (ReportSeries("s", (1,)),),
+            "unit": "u",
+            "hidden_label": "<",
+            "gap_note": "n",
+        }
+        return ReportChart(**{**base, **kw})  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="id"):
+        make(chart_id="Bad Id")
+    with pytest.raises(ValueError, match="series"):
+        make(series=())
+    with pytest.raises(ValueError, match="one series"):
+        make(series=(ReportSeries("s", (1,)), ReportSeries("t", (1,))))
+    with pytest.raises(ValueError, match="per category"):
+        make(categories=("a", "b"))
+    with pytest.raises(ValueError, match="negative"):
+        make(series=(ReportSeries("s", (-1,)),))
+
+
+def test_four_lines_have_four_marker_shapes_and_the_legend_has_one_entry_each() -> None:
+    chart = _report_chart(
+        (1, 2, 3),
+        kind=ReportKind.LINE,
+        more=(
+            ReportSeries("B", (2, 3, 4)),
+            ReportSeries("C", (3, 4, 5)),
+            ReportSeries("D", (4, 5, 6)),
+        ),
+    )
+
+    geometry = report_geometry(chart)
+
+    assert {m.series: m.shape for m in geometry.markers} == {
+        0: "circle",
+        1: "square",
+        2: "triangle",
+        3: "diamond",
+    }
+    assert [item.label.text for item in geometry.legend] == ["Bookings", "B", "C", "D"]
+    assert all(m.points for m in geometry.markers if m.shape in ("triangle", "diamond"))
+
+
+def test_a_run_of_one_point_is_a_marker_without_a_line() -> None:
+    geometry = report_geometry(_report_chart((None, 5, None), kind=ReportKind.LINE))
+
+    assert geometry.runs == ()
+    assert len(geometry.markers) == 1
+    assert len(geometry.gaps) == 2

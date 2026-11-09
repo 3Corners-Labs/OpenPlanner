@@ -8,11 +8,18 @@ permissive.
 """
 
 import os
+from collections.abc import Callable
 
+from app.adapters.configuration_discovery import issuer_fetcher
+from app.adapters.configuration_json import JsonCodec
+from app.adapters.configuration_seal import PassphraseSealing
 from app.adapters.contact_centers import DESCRIPTORS
 from app.adapters.settings_report import combination_problem, locked_keys
 from app.config import Settings
+from app.domain.admin import AdminService
 from app.domain.configuration_changes import RuleContext
+from app.domain.configuration_document_service import ConfigurationDocumentService
+from app.domain.ports import Clock, DiscoveryFetcher, UnitOfWork
 
 LOCALES = frozenset({"nl", "en"})
 """The locales the application has a catalogue for."""
@@ -49,3 +56,42 @@ def rule_context(settings: Settings) -> RuleContext:
 def locked_settings() -> frozenset[str]:
     """Return the settings the environment locks, by registry key (ADR 0042)."""
     return locked_keys(os.environ)
+
+
+def document_service(
+    uow: UnitOfWork,
+    clock: Clock,
+    admin: AdminService,
+    *,
+    settings: Callable[[], Settings],
+    discovery: DiscoveryFetcher,
+    locked: Callable[[], frozenset[str]] = locked_settings,
+) -> ConfigurationDocumentService:
+    """Build the service that exports, plans and applies configuration documents (ADR 0099).
+
+    The one place the portal and the host commands get theirs from, so the two cannot drift.
+
+    Args:
+        uow: Opens database transactions.
+        clock: Current time.
+        admin: Writes the audit events of an export.
+        settings: The effective settings: the limits and the rules are read on each use (the
+            portal's follow the database); the installation name, release and environment when
+            the service is built.
+        discovery: Fetches the discovery document of a new or moved identity provider.
+        locked: The settings the environment locks.
+    """
+    return ConfigurationDocumentService(
+        uow,
+        clock,
+        admin,
+        JsonCodec(),
+        PassphraseSealing(),
+        installation=settings().installation_name or "",
+        app_version=settings().app_version or "",
+        context=lambda: rule_context(settings()),
+        locked=locked,
+        max_bytes=lambda: settings().configuration_package_max_mb * 1024 * 1024,
+        max_changes=lambda: settings().configuration_apply_max_changes,
+        issuer_of=issuer_fetcher(discovery, production=settings().environment == "prod"),
+    )

@@ -34,9 +34,13 @@ PURPOSES: dict[JobType, str] = {
     JobType.SEND_REBOOK_REQUEST: "rebook",
     JobType.SEND_REBOOK_REMINDER: "rebook",
     JobType.SEND_REBOOK_LAPSED: "rebook",
+    JobType.SEND_RESCHEDULE_PROPOSAL: "rebook",
+    JobType.SEND_PROPOSAL_REMINDER: "rebook",
+    JobType.SEND_PROPOSAL_RELEASED: "rebook",
     JobType.SEND_CONFIRM_REQUEST: "confirm_request",
     JobType.SEND_CONFIRM_REMINDER: "confirm_request",
     JobType.SEND_UNCONFIRMED_LAPSED: "confirm_request",
+    JobType.SEND_CHANGE_REQUEST: "change",
 }
 """The purpose of each message job, the second cut of metric M1 (a closed list)."""
 

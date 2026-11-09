@@ -17,7 +17,7 @@ from tests.support.domain import NOW, TEST_TOKEN_KEY, book, make_group, window
 def uow() -> InMemoryUnitOfWork:
     state = State()
     state.organisation_slugs = {1: "demo"}
-    state.groups[1] = make_group(id=1, organisation_id=1, slug="aangifte")
+    state.groups[1] = make_group(id=1, organisation_id=1, slug="balie")
     state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=1))]
     return InMemoryUnitOfWork(state)
 
@@ -38,7 +38,7 @@ async def test_a_booking_event_lands_on_the_bookings_group(uow: InMemoryUnitOfWo
             Outcome.RETRY,
             "timeout",
             "demo",
-            "aangifte",
+            "balie",
             "x:1",
             Source.SYSTEM,
             booking_id,

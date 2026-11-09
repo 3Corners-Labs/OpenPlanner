@@ -1,7 +1,5 @@
 """The widget register (ADR 0061 §2): every widget declared once, with a permission and titles."""
 
-from fastapi.routing import APIRoute
-
 from app.admin.authz import RequirePermission, can_function
 from app.config import Settings
 from app.domain.authorization import Permission, Principal, Role
@@ -9,6 +7,7 @@ from app.domain.job_plan import JobType
 from app.i18n import CATALOGUE_DIR, load_catalogues
 from app.main import create_app
 from app.web.job_labels import JOB_TYPE_LABELS
+from app.web.route_dependencies import guards
 from app.web.widgets import (
     DEFAULT_LAYOUTS,
     VIEW_LABELS,
@@ -17,8 +16,8 @@ from app.web.widgets import (
     WidgetScope,
     default_layout,
     fragment_path,
+    on_overview,
     resolve_view,
-    visible,
     widget,
 )
 from tests.admin.conftest import AGENT, AUDITOR, GROUP_ADMIN, SUPER
@@ -127,17 +126,6 @@ def test_widget_lookup_and_fragment_path() -> None:
     assert fragment_path(WIDGETS[-1]) == "/admin/overview/w/rights"
 
 
-def _permissions(route: APIRoute) -> list[Permission]:
-    found: list[Permission] = []
-    stack = list(route.dependant.dependencies)
-    while stack:
-        dependency = stack.pop()
-        if isinstance(dependency.call, RequirePermission):
-            found.append(dependency.call.permission)
-        stack.extend(dependency.dependencies)
-    return found
-
-
 def test_every_available_widget_has_a_fragment_route_with_its_own_permission(
     settings: Settings,
 ) -> None:
@@ -149,12 +137,14 @@ def test_every_available_widget_has_a_fragment_route_with_its_own_permission(
             assert path not in routes, f"{w.key} is not available yet and must have no route"
             continue
         assert path in routes, f"{w.key} needs a fragment route"
-        assert _permissions(routes[path]) == [w.permission], w.key
+        assert [r.permission for r in guards(routes[path], RequirePermission)] == [w.permission], (
+            w.key
+        )
 
 
 def test_visible_widgets_follow_the_matrix() -> None:
     def shown(principal: Principal) -> list[str]:
-        return [w.key for w in visible(principal, can_function(principal))]
+        return [w.key for w in on_overview(principal, can_function(principal), None)]
 
     assert shown(SUPER) == [
         "alerts",
@@ -218,3 +208,13 @@ def test_every_widget_view_has_a_label_in_dutch_and_english() -> None:
     for key in VIEW_LABELS.values():
         for locale in REQUIRED_LOCALES:
             assert catalogues[locale].get(key, "").strip(), (key, locale)
+
+
+def test_an_own_layout_decides_order_and_skips_what_the_matrix_refuses() -> None:
+    """ADR 0096 §1, §3: the stored order, minus a widget whose right was lost."""
+    allowed = can_function(GROUP_ADMIN)
+
+    own = on_overview(GROUP_ADMIN, allowed, ("rights", "status", "alerts"))
+
+    assert [w.key for w in own] == ["rights", "alerts"]  # status: settings.platform.view
+    assert on_overview(GROUP_ADMIN, allowed, ()) == []

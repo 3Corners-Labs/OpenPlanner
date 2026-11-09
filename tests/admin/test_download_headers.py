@@ -2,7 +2,9 @@
 
 A ``content-disposition`` filename is lower-case letters, digits, dots and hyphens only: no
 quote, path separator, control character or non-ASCII letter can end up in a header. The five
-places that set the header are pinned, so a new download has to be added here.
+places that set the header are pinned, so a new download has to be added here. The header names
+the file, so no link carries the HTML ``download`` attribute: with it the browser saves whatever
+comes back as that file, a login page after the session ended or a refusal included.
 """
 
 import re
@@ -12,9 +14,8 @@ from pathlib import Path
 import pytest
 
 from app.config import Settings
-from app.domain.configuration_package import package_filename
+from app.domain.configuration_document import document_filename
 from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
-from tests.support.configuration_package import PACKAGE_PASSPHRASE
 from tests.support.downloads import DOWNLOAD_MODULES
 
 SAFE_FILENAME = re.compile(r"^[a-z0-9.-]+$")
@@ -38,12 +39,24 @@ def test_only_the_known_modules_set_a_content_disposition() -> None:
     assert found == DOWNLOAD_MODULES  # a new download: add its test below, then this set
 
 
+def test_no_link_carries_the_download_attribute() -> None:
+    marked = [
+        str(path.relative_to(APP))
+        for path in APP.rglob("*.html")
+        if re.search(r"<a\b[^>]*\sdownload\b", path.read_text(encoding="utf-8"))
+    ]
+
+    assert marked == []  # ``content-disposition`` names the file; see the module docstring
+
+
 @pytest.mark.parametrize(
     "download",
     [
         "/admin/audit/export.csv",
         "/admin/organisations/demo/branding/theme.css",
         "/admin/idp-mapping/export.txt",
+        "/admin/groups/demo/usage/export.csv",
+        "/admin/groups/demo/usage/export.csv?view=tidy",
     ],
 )
 async def test_an_admin_download_has_a_safe_filename(site: Site, download: str) -> None:
@@ -55,28 +68,26 @@ async def test_an_admin_download_has_a_safe_filename(site: Site, download: str) 
     assert SAFE_FILENAME.fullmatch(_filename(response.headers["content-disposition"]))
 
 
-async def test_the_configuration_package_download_has_a_safe_filename(site: Site) -> None:
+async def test_the_configuration_document_download_has_a_safe_filename(site: Site) -> None:
     await site.login_as(SUPER)
 
     response = await site.client.post(
-        "/admin/settings/package/export",
-        data={"passphrase": PACKAGE_PASSPHRASE, "passphrase_repeat": PACKAGE_PASSPHRASE},
-        headers=SAME_ORIGIN,
+        "/admin/settings/configuration/export", data={}, headers=SAME_ORIGIN
     )
 
     assert response.status_code == 200
     assert SAFE_FILENAME.fullmatch(_filename(response.headers["content-disposition"]))
 
 
-def test_the_package_filename_is_safe_for_the_default_installation() -> None:
-    assert SAFE_FILENAME.fullmatch(package_filename("", EXPORTED))
-    assert SAFE_FILENAME.fullmatch(package_filename("docker01", EXPORTED))
+def test_the_document_filename_is_safe_for_the_default_installation() -> None:
+    assert SAFE_FILENAME.fullmatch(document_filename("", EXPORTED))
+    assert SAFE_FILENAME.fullmatch(document_filename("Docker 01/ä", EXPORTED))
 
 
 @pytest.mark.parametrize("installation", ["Prod", "test_host", "ACC-1.Nl"])
-def test_the_package_filename_is_safe_for_every_allowed_installation_name(
+def test_the_document_filename_is_safe_for_every_allowed_installation_name(
     installation: str, settings: Settings
 ) -> None:
     allowed = settings.model_copy(update={"installation_name": installation}).installation_name
 
-    assert SAFE_FILENAME.fullmatch(package_filename(allowed, EXPORTED))
+    assert SAFE_FILENAME.fullmatch(document_filename(allowed, EXPORTED))

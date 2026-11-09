@@ -32,6 +32,7 @@ from typing import Any
 
 from app.domain.authorization import ApiScope, Permission
 from app.domain.job_plan import JobType
+from app.domain.usage_log import LOG_FIELDS
 
 
 class LogCategory(StrEnum):
@@ -281,6 +282,24 @@ _OPERATIONS = (
         "Check the data volume's permissions and free space.",
     ),
     _e(
+        "change_requests.prune_failed",
+        _OPS,
+        "warning",
+        "error",
+        "Expired change requests could not be deleted: {error}.",
+        "Housekeeping could not delete the bots' change requests past their retention "
+        "(ADR 0023 step 2b).",
+        "The next hour tries again; check the database if it keeps failing.",
+    ),
+    _e(
+        "change_requests.pruned",
+        _OPS,
+        "info",
+        "requests",
+        "{requests} expired change requests deleted.",
+        "Housekeeping deleted change requests past `agent_change_request_retention_days`.",
+    ),
+    _e(
         "backups.pruned",
         _OPS,
         "info",
@@ -354,6 +373,63 @@ _OPERATIONS = (
         "A message was sent (or given up on) but its fact for the reports was not written "
         "(ADR 0117); the message and its job are not affected.",
         _CHECK_HOST,
+    ),
+    _e(
+        "reports.digest_run",
+        _OPS,
+        "info",
+        "digests sent skipped late failed",
+        "Digest run: {digests} due, {sent} mails sent, {skipped} recipients skipped, "
+        "{late} late, {failed} failed.",
+        "The worker sent the due digests of the usage reports (ADR 0117 point 16): counts only.",
+    ),
+    _e(
+        "reports.digest_failed",
+        _OPS,
+        "warning",
+        "error",
+        "A digest subscription could not be run: {error}.",
+        "One subscription stopped with an error; the others went on. Counts and the error "
+        "type only, never an address.",
+        _CHECK_HOST,
+    ),
+    _e(
+        "reports.digest_run_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The digest run failed: {error}.",
+        "The whole pass failed, for example before the schema was migrated; the worker goes on.",
+        _CHECK_HOST,
+    ),
+    _e(
+        "reports.digest_no_mail_channel",
+        _OPS,
+        "warning",
+        "digests",
+        "{digests} digests are held back: the organisation has no email channel.",
+        "A digest is due but its organisation has no way to send email; it is tried again "
+        "until it is too late.",
+        "Set up the organisation's email channel or the platform's fallback.",
+    ),
+    _e(
+        "usage.fact",
+        _OPS,
+        "info",
+        " ".join(LOG_FIELDS),
+        "Usage fact {kind} for hour {bucket_hour}.",
+        "One state change counted for the reports (ADR 0117 point 15), sent only while "
+        "reporting_usage_events_to_log is on: the allow-listed codes and counts, the UTC hour "
+        "and the duration bucket, never a person, a booking or a time with minutes.",
+    ),
+    _e(
+        "usage.emit_failed",
+        _OPS,
+        "error",
+        "error",
+        "A usage fact could not be written to the log stream: {error}.",
+        "The fact is in the reports; its copy as a usage.fact line failed (ADR 0117 point 15).",
+        "Compare the facts counted in the reports with the log platform for the period.",
     ),
     _e(
         "usage.fact_dropped",
@@ -601,6 +677,25 @@ _OPERATIONS = (
         "Test line for log destination {destination} ({kind}).",
         "*Send test line* on a log destination (ADR 0085 point 5); it reaches only that "
         "destination.",
+    ),
+    _e(
+        "queue.unpicked_found",
+        _OPS,
+        "info",
+        "bookings",
+        "{bookings} own-queue bookings were not picked up in time.",
+        "Nobody claimed these bookings `not_picked_up_minutes` after their start; each is a "
+        "`queue.not_picked_up` system event (ADR 0043 point 8).",
+        "None; the bookings show as not picked up in the queue, the agenda and the overview.",
+    ),
+    _e(
+        "queue.unpicked_watch_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The not-picked-up check did not run: {error}.",
+        "The worker could not look for own-queue bookings nobody claimed in time (ADR 0043).",
+        _CHECK_HOST,
     ),
     _e(
         "queue.wait_watch_failed",
@@ -1426,6 +1521,18 @@ _AUDIT = (
         "Check the entitlement values at the identity provider.",
     ),
     _e(
+        "booking.contact_reveals_alert",
+        _SYS,
+        "outcome",
+        "",
+        "Many requests for contact details by one person.",
+        "One person asked for participants' contact details more than "
+        "`contact_reveals_alert_per_hour` times within an hour (ADR 0044 §2). The detail names "
+        "the actor and the count; nothing was refused.",
+        "Ask the person whether the requests were theirs; if not, use *End all sessions* on their "
+        "page under Staff, which also lists what they did.",
+    ),
+    _e(
         "booking_rows.rollup",
         _SYS,
         "info outcome",
@@ -1694,8 +1801,12 @@ _AUDIT = (
         _SYS,
         "outcome",
         "",
-        "Planners were told about changes.",
-        "The alert about changed bookings went out (ADR 0044).",
+        "Many changes by one planner.",
+        "One person made more than `planner_changes_alert_per_hour` changes under "
+        "`bookings.manage` within an hour (ADR 0044): changes to bookings, retried calls, "
+        "fallbacks ended by hand. The detail names the actor and the count; nothing was refused.",
+        "Ask the person whether the changes were theirs; if not, use *End all sessions* on their "
+        "page under Staff, which also lists what they did.",
     ),
     _e(
         "public_address",
@@ -1829,6 +1940,26 @@ _AUDIT = (
         "Storage check: {outcome} ({reason}); {free_percent}% free, database {database_mb} MB.",
         "The worker's disk check changed grade (ADR 0040 point 3).",
         "On failure: free disk space on the host.",
+    ),
+    _e(
+        "queue.not_picked_up",
+        _SYS,
+        "outcome",
+        "minutes",
+        "Not picked up: {outcome} ({reason}); nobody claimed the booking {minutes} minutes after "
+        "its start.",
+        "A booking in an own queue was still unclaimed `not_picked_up_minutes` after its start "
+        "(ADR 0043 point 8); recorded once per booking.",
+        "Look at the group's queue and staffing; the participant may still be waiting.",
+    ),
+    _e(
+        "booking.details_corrected",
+        _SYS,
+        "outcome",
+        "booking_id fields",
+        "Details corrected: booking {booking_id}, fields {fields}.",
+        "The participant corrected name, phone or answers on the management page (ADR 0056 "
+        "point 10); the event names the fields, never their values.",
     ),
     _e(
         "queue.wait",

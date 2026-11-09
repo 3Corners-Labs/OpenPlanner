@@ -7,7 +7,16 @@ import pytest
 
 from app.domain.agenda import AgendaSlot
 from app.domain.booking import Booking, BookingStatus
-from app.domain.rebooking import Proposal, Reach, last_made, may_take, propose, ranked
+from app.domain.rebooking import (
+    SUGGESTED,
+    Proposal,
+    Reach,
+    last_made,
+    may_take,
+    propose,
+    ranked,
+    suggested,
+)
 from app.domain.scheduling import DispatchKind
 from tests.support.domain import NOW, SLOT_0900, make_group
 
@@ -221,3 +230,25 @@ def test_a_proposal_offers_only_slots_whose_blocks_offer_the_bookings_subject() 
     # A booking without a subject fits every block.
     assert MON_0930 in _starts(ranked(GROUP, MON_0900, [nearest, later], REACH, NOW))
     assert MON_0930 not in _starts(ranked(GROUP, MON_0900, [nearest, later], REACH, NOW, "general"))
+
+
+# --- suggested times for the participant (ADR 0057 point 8) -------------------------------
+
+
+def test_suggestions_rank_like_proposals_and_leave_out_old_held_and_far_times() -> None:
+    same_time_next_week = SLOT_0900 + timedelta(days=7)
+    half_hour_later = SLOT_0900 + timedelta(minutes=30)
+    two_hours_later = SLOT_0900 + timedelta(hours=2)
+    far_away = SLOT_0900 + timedelta(days=15)
+    held = SLOT_0900 + timedelta(days=1)
+    starts = [far_away, two_hours_later, half_hour_later, SLOT_0900, held, same_time_next_week]
+
+    result = suggested(GROUP, SLOT_0900, starts, REACH, exclude={held})
+
+    assert result == [same_time_next_week, half_hour_later]
+
+
+def test_at_most_three_times_are_suggested() -> None:
+    starts = [SLOT_0900 + timedelta(days=day) for day in range(1, 8)]
+
+    assert suggested(GROUP, SLOT_0900, starts, REACH) == starts[:SUGGESTED]

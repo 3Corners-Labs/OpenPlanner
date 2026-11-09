@@ -29,7 +29,7 @@ def test_group_defaults() -> None:
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("slug", "Aangifte 2026"),
+        ("slug", "Balie 2026"),
         ("slug", "-leading"),
         ("slug", "a" * 65),
         ("slug", ""),
@@ -331,7 +331,7 @@ def test_integrations_are_enabled_per_group() -> None:
 
     assert (plain.video_enabled, plain.dispatch_enabled) == (False, False)
     assert (wired.video_enabled, wired.dispatch_enabled) == (True, True)
-    assert plain.routing_value == "aangifte-2026"  # the slug unless set
+    assert plain.routing_value == "balie-2026"  # the slug unless set
     routed = make_group(contact_center=webex_routing(routing_value="team-7"))
     assert routed.routing_value == "team-7"
     # Dispatch needs both the business address and the channel.
@@ -372,7 +372,7 @@ def test_the_label_takes_no_part_in_equality_or_ordering() -> None:
     ("text", "slug"),
     [
         ("ACMEVIDEOGROEP1", "acmevideogroep1"),
-        ("Vergunningen loket", "vergunningen-loket"),
+        ("Klantenservice Noord", "klantenservice-noord"),
         ("  Café & Crème -- Zuid!  ", "cafe-creme-zuid"),
         ("Ĳsselmonde/Oost_2", "ijsselmonde-oost-2"),
         ("already-a-slug", "already-a-slug"),

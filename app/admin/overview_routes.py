@@ -47,8 +47,10 @@ from app.admin.authz import (
     admin_service,
     can_function,
     maintenance_service,
+    overview_layout,
 )
 from app.admin.closure_routes import closure_service
+from app.admin.forms import done_message
 from app.admin.integration_views import HEALTH_LABELS, PLATFORM_LABELS, worst_health
 from app.admin.live import key
 from app.admin.overview_charts import (
@@ -88,9 +90,9 @@ from app.web.authz_labels import PERMISSION_LABELS
 from app.web.charts import Datum
 from app.web.job_labels import JOB_TYPE_LABELS
 from app.web.locale import RequestLocale
-from app.web.templates import FragmentResponse, render
+from app.web.templates import ENVIRONMENT_LABELS, FragmentResponse, render
 from app.web.update_labels import STATUS_LABELS
-from app.web.widgets import OVERVIEW_PATH, View, Widget, resolve_view, visible, widget
+from app.web.widgets import OVERVIEW_PATH, View, Widget, on_overview, resolve_view, widget
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -204,6 +206,8 @@ class QueueRow:
     staff_available: int
     wait_state: str = ""
     wait_tone: str = ""
+    not_picked_up: int = 0
+    """Bookings nobody claimed in time (ADR 0043 point 8)."""
 
 
 @dataclass(frozen=True)
@@ -372,6 +376,7 @@ async def _queue(request: Request, locale: RequestLocale, principal: Principal) 
                 s.staff_available,
                 state,
                 tone,
+                not_picked_up=s.not_picked_up,
             )
         )
     return WidgetView(item, list(rows[: item.default_rows]), len(rows))
@@ -522,6 +527,7 @@ async def _status(request: Request, locale: RequestLocale, principal: Principal)
     diagnostics: DiagnosticsService = request.app.state.diagnostics_service
     modes = len(await diagnostics.active())
     problems = 0 if settings.environment == "prod" else len(settings.production_problems())
+    environment = _(ENVIRONMENT_LABELS[settings.environment])
     plaintext_mail = await _plaintext_mail(request, principal, settings, can)
     proxy_problem = await address_problem(request, locale, settings)
     updates_href = "/admin/updates" if can(Permission.SYSTEM_UPDATE) else None
@@ -600,11 +606,11 @@ async def _status(request: Request, locale: RequestLocale, principal: Principal)
             _("admin.overview.widget.status.environment"),
             _(
                 "admin.overview.widget.status.environment.problems",
-                environment=settings.environment,
+                environment=environment,
                 count=problems,
             )
             if problems
-            else _("admin.overview.widget.status.environment.ok", environment=settings.environment),
+            else _("admin.overview.widget.status.environment.ok", environment=environment),
             "warning" if problems else "",
             "/admin/settings",
         ),
@@ -745,13 +751,13 @@ def _shaped(
 
 
 async def _views(request: Request, locale: RequestLocale, principal: Principal) -> list[WidgetView]:
-    """Render every visible widget of the admin's default layout, in the views asked for.
+    """Render the widgets of the admin's overview (own layout or default), in the views asked for.
 
     The address names a view per widget (``/admin/?bookings-today=bar``); what it asks that a
     widget does not support is ignored (``resolve_view``).
     """
     allowed = can_function(principal)
-    items = visible(principal, allowed)
+    items = on_overview(principal, allowed, overview_layout(request))
     on_page = {w.key: w for w in items}
     selected = explicit_views(on_page, request.query_params)
     return [
@@ -824,6 +830,7 @@ async def overview(
         principal,
         {
             "live": live,
+            "done": done_message(request, locale.gettext),
             # The least urgent level that pops up for this admin; ``None``: no pop-ups (§7).
             "popup_level": floor.value if floor else None,
             "views": views,

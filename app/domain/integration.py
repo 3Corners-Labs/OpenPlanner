@@ -4,14 +4,15 @@ Webhook handlers call ``record_meeting_event`` and ``record_task_event``; jobs c
 ``record``. Each call writes the event and the updated ``CallStatus`` in one transaction.
 Webex and WxCC events carry an ``event_key``: it is remembered for ``WEBHOOK_MEMORY`` in the
 same transaction, so a replayed or redelivered event changes nothing the second time.
-Admins see a booking's timeline only with ``bookings.view`` on its group (ADR 0014).
+Admins see a booking's timeline only with ``bookings.view`` on the group of the page's address,
+and only a booking of that group (ADR 0014).
 """
 
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from enum import StrEnum
 
-from app.domain.admin import AdminService
+from app.domain.admin import AdminService, require
 from app.domain.audit import AuditEvent, AuditFilter
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.availability import utc_bounds
@@ -29,8 +30,10 @@ from app.domain.calls import (
 from app.domain.contact_center import ContactCenterKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobSummary
+from app.domain.lookups import group_booking
 from app.domain.ports import REASON_LIMIT, Clock, ProbeRegistry, Transaction, UnitOfWork
 from app.domain.request_log import REQUEST_EVENT
+from app.domain.staff_usage import StaffUsage
 
 WEBHOOK_MEMORY = timedelta(days=30)
 """How long a Webex event key is remembered; older keys are forgotten on the next event."""
@@ -92,13 +95,20 @@ class IntegrationService:
         admin: AdminService,
         version: str = "",
         probes: ProbeRegistry | None = None,
+        staff_usage: StaffUsage | None = None,
     ) -> None:
-        """Store the collaborators."""
+        """Store the collaborators; ``staff_usage`` adds a team member's usage facts."""
         self._uow = uow
         self._clock = clock
         self._admin = admin
         self._version = version
         self._probes = probes
+        self._staff_usage = staff_usage
+
+    @property
+    def staff_usage(self) -> StaffUsage | None:
+        """The writer of a team member's usage facts, for the poll that records call events too."""
+        return self._staff_usage
 
     async def record(
         self,
@@ -162,12 +172,15 @@ class IntegrationService:
         event_key: str = "",
         provider: ContactCenterKind,
         source: str,
+        organisation_id: int | None = None,
     ) -> EventOutcome:
         """Record a work item event once per ``event_key``; ``UNKNOWN`` for foreign tasks.
 
         The task is looked up at ``provider`` only (ADR 0032 point 6): a task id of one
         platform never finds a booking whose task is at another. ``source`` is the platform's
-        code from its adapter, under which its event keys are remembered.
+        code from its adapter, under which its event keys are remembered. With
+        ``organisation_id`` (an organisation's own webhook address, ADR 0032 point 10) a task of
+        another organisation's booking is unknown here.
 
         A ``task:new`` of a booking's task is ``IGNORED``: the dispatch job recorded the
         creation when it got the id. An unknown task may be the group check's probe (ADR
@@ -176,6 +189,10 @@ class IntegrationService:
         """
         async with self._uow.locked() as tx:
             booking = await tx.get_booking_by_task(task_id, provider)
+            if booking is not None and organisation_id is not None:
+                group = await tx.get_group_by_id(booking.group_id)
+                if group is None or group.organisation_id != organisation_id:
+                    booking = None
             if booking is not None and booking.id is not None:
                 if kind is EventKind.TASK_CREATED:
                     return EventOutcome.IGNORED
@@ -211,24 +228,22 @@ class IntegrationService:
         async with self._uow.read() as tx:
             return await tx.list_bookings(scope_for(principal, permission), group.id, lower, upper)
 
-    async def timeline(self, principal: Principal, booking_id: int) -> Timeline:
-        """Return the booking's timeline if ``principal`` may view its group's bookings.
+    async def timeline(self, principal: Principal, slug: str, booking_id: int) -> Timeline:
+        """Return the timeline of booking ``booking_id`` of group ``slug``.
+
+        ``bookings.view`` is decided on group ``slug``, the group of the page's address, never
+        on the booking's own group: another group's booking is not found, the same answer as
+        an unknown id, so an id tried through this group's address reveals nothing and files
+        no refusal under the other group.
 
         Raises:
-            DomainError: ``booking_not_found`` or ``not_permitted``.
+            DomainError: ``not_permitted`` or ``group_not_found`` (from the authorisation);
+                ``booking_not_found``, also for a booking of another group.
         """
-        async with self._uow.read() as tx:
-            booking = await tx.get_booking(booking_id)
-            group = await tx.get_group_by_id(booking.group_id) if booking else None
-        if booking is None or group is None:
-            raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
-        authorization = await self._admin.authorize(
-            principal, Permission.BOOKINGS_VIEW, group_slug=group.slug
-        )
-        if not authorization.decision.allowed:
-            raise DomainError(ErrorCode.NOT_PERMITTED)
         permission = Permission.BOOKINGS_VIEW
+        require(await self._admin.authorize(principal, permission, group_slug=slug))
         async with self._uow.read() as tx:
+            booking, _ = await group_booking(tx, slug, booking_id)
             events = await tx.get_booking_events(booking_id)
             status = await tx.get_call_status(booking_id) or new_status(booking_id)
             jobs = await tx.get_booking_jobs(booking_id)
@@ -251,7 +266,9 @@ class IntegrationService:
         """Write the event and the updated status in the caller's transaction."""
         status = await tx.get_call_status(booking_id) or new_status(booking_id)
         after = apply_event(status, kind, at)
-        await record_call_event(tx, booking_id, kind, status, after, at, detail)
+        await record_call_event(
+            tx, booking_id, kind, status, after, at, detail, staff=self._staff_usage
+        )
         await tx.add_booking_event(
             BookingEvent(booking_id, at, kind, detail[:128], message[:REASON_LIMIT], self._version)
         )

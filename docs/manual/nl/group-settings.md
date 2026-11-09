@@ -28,7 +28,7 @@ een nieuwe groep aan.
 
 De naam van de groep zoals deelnemers en medewerkers hem zien: op de afsprakenpagina, in
 bevestigingen en herinneringen, en in de taak bij het contactcenter. Kies een naam die een
-deelnemer herkent, bijvoorbeeld "Vergunningen" in plaats van een interne teamcode.
+deelnemer herkent, bijvoorbeeld "Klantenservice" in plaats van een interne teamcode.
 
 <!-- field: timezone -->
 ### Tijdzone
@@ -143,7 +143,7 @@ beveiliging.
 ### Agenda-uitnodiging naar (eigen wachtrij)
 
 Alleen bij de eigen wachtrij, en optioneel. Een gedeelde mailbox of verzendlijst van het team,
-zoals `team-aangifte@organisatie.nl`. Per afspraak krijgt dat adres een agenda-uitnodiging met
+zoals `team-balie@example.org`. Per afspraak krijgt dat adres een agenda-uitnodiging met
 de tijd, de voornaam van de deelnemer, het afspraaknummer en een link naar de wachtrij. Wordt
 de afspraak verzet, geannuleerd of opgeschort, dan wordt de uitnodiging ingetrokken.
 

@@ -41,6 +41,11 @@ from app.admin.group_routes import group_page
 from app.admin.pages import Locale, SameOrigin
 from app.domain.authorization import Permission
 from app.domain.booking import Booking, ChangeReason
+from app.domain.booking_changes import (
+    PlannerRule,
+    ensure_planner_may_change,
+    ensure_planner_may_request_rebook,
+)
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.planner_service import PlannerService
 from app.domain.ports import Clock
@@ -87,20 +92,25 @@ class BookingView:
 
 @dataclass(frozen=True)
 class WaitingView:
-    """A booking awaiting a new time: the booking, when the request lapses and why."""
+    """A booking awaiting a new time: the booking, when the request lapses and why.
+
+    With an open proposal (ADR 0057): the proposed time and until when it is held.
+    """
 
     booking: BookingView
     rebook_by: str
     reason: str
+    proposed: str | None = None
+    proposed_until: str | None = None
 
 
-def _planner(request: Request) -> PlannerService:
+def planner_of(request: Request) -> PlannerService:
     """Return the application's planner service."""
     service: PlannerService = request.app.state.planner_service
     return service
 
 
-def _booking_view(booking: Booking, group: Group, code: str) -> BookingView:
+def booking_view(booking: Booking, group: Group, code: str) -> BookingView:
     """Return what a form shows of ``booking``."""
     tz = group.tz
     return BookingView(
@@ -112,16 +122,22 @@ def _booking_view(booking: Booking, group: Group, code: str) -> BookingView:
     )
 
 
-def _agenda(slug: str, day: date) -> str:
+def agenda_url(slug: str, day: date) -> str:
     """Return the agenda URL of ``day``."""
     return f"/admin/groups/{slug}/agenda?day={day.isoformat()}"
 
 
-async def _changeable(request: Request, context: AdminContext, booking_id: int) -> Booking:
-    """Return the booking if it may still be changed; refusals become the HTTP error."""
+async def _changeable(
+    request: Request,
+    context: AdminContext,
+    booking_id: int,
+    *,
+    rule: PlannerRule = ensure_planner_may_change,
+) -> Booking:
+    """Return the booking if ``rule`` still lets it change; refusals become the HTTP error."""
     try:
-        return await _planner(request).booking(
-            context.principal, context.group.group.slug, booking_id
+        return await planner_of(request).booking(
+            context.principal, context.group.group.slug, booking_id, rule=rule
         )
     except DomainError as error:
         raise_refusal(error)
@@ -166,10 +182,10 @@ async def _move_response(
         context,
         "admin/planner_move.html",
         {
-            "booking": _booking_view(booking, group, locale.code),
+            "booking": booking_view(booking, group, locale.code),
             "field": field,
             "has_slots": bool(options),
-            "back": _agenda(group.slug, local_day(booking.start, group.tz)),
+            "back": agenda_url(group.slug, local_day(booking.start, group.tz)),
             "errors": form.errors,
         },
         status,
@@ -202,7 +218,7 @@ async def move(
     booking = await _changeable(request, context, booking_id)
     accept = form.text("accept_shortfall") == "yes"
     try:
-        moved = await _planner(request).move(
+        moved = await planner_of(request).move(
             context.principal, slug, booking_id, start, accept_shortfall=accept
         )
     except DomainError as error:
@@ -210,13 +226,13 @@ async def move(
         form.refusal(error)
         return await _move_response(request, locale, context, booking, form, status_for(error))
     group = context.group.group
-    return redirect_done(_agenda(slug, local_day(moved.start, group.tz)), "moved", 1)
+    return redirect_done(agenda_url(slug, local_day(moved.start, group.tz)), "moved", 1)
 
 
 # --- cancel -------------------------------------------------------------------------------
 
 
-def _reason_field(form: FormData, _: BoundGettext) -> Field:
+def reason_field(form: FormData, _: BoundGettext) -> Field:
     """Return the select of the fixed reasons."""
     return Field(
         "reason",
@@ -252,18 +268,18 @@ def _reason_response(
 ) -> HTMLResponse:
     """Render the form that asks for the reason of one change."""
     group = context.group.group
-    planner = _planner(request)
+    planner = planner_of(request)
     return group_page(
         request,
         locale,
         context,
         action.template,
         {
-            "booking": _booking_view(booking, group, locale.code),
-            "field": _reason_field(form, locale.gettext),
+            "booking": booking_view(booking, group, locale.code),
+            "field": reason_field(form, locale.gettext),
             "rebook_days": planner.rebook_days(group.organisation_id),
             "reminder_days": planner.reminder_days(group.organisation_id),
-            "back": _agenda(group.slug, local_day(booking.start, group.tz)),
+            "back": agenda_url(group.slug, local_day(booking.start, group.tz)),
             "errors": form.errors,
         },
         status,
@@ -283,7 +299,7 @@ async def _reason_post(
     booking = await _changeable(request, context, booking_id)
     if choice is None:
         return _reason_response(request, locale, context, booking, form, action, 422)
-    planner, slug = _planner(request), context.group.group.slug
+    planner, slug = planner_of(request), context.group.group.slug
     change = planner.cancel if action is CANCEL else planner.request_rebook
     try:
         await change(context.principal, slug, booking_id, ChangeReason(choice))
@@ -293,7 +309,7 @@ async def _reason_post(
         status = status_for(error)
         return _reason_response(request, locale, context, booking, form, action, status)
     group = context.group.group
-    return redirect_done(_agenda(slug, local_day(booking.start, group.tz)), action.done, 1)
+    return redirect_done(agenda_url(slug, local_day(booking.start, group.tz)), action.done, 1)
 
 
 @router.get("/groups/{slug}/agenda/bookings/{booking_id}/cancel", response_class=HTMLResponse)
@@ -319,6 +335,32 @@ async def cancel(
     return await _reason_post(request, locale, context, booking_id, CANCEL)
 
 
+# --- confirm on the participant's behalf (ADR 0056 point 11) ----------------------------------
+
+
+@router.post("/groups/{slug}/agenda/bookings/{booking_id}/confirm")
+async def confirm(
+    request: Request,
+    locale: Locale,
+    slug: str,
+    booking_id: int,
+    _: SameOrigin,
+    context: ManageBookings,
+) -> Response:
+    """Confirm a booking awaiting confirmation for the participant, for example on the phone."""
+    group = context.group.group
+    try:
+        booking = await planner_of(request).confirm(context.principal, slug, booking_id)
+    except DomainError as error:
+        raise_refusal(error)
+        if error.code is ErrorCode.BOOKING_NOT_FOUND:
+            raise
+        clock: Clock = request.app.state.clock
+        return redirect_done(agenda_url(slug, group.today(clock.now())), "not_pending")
+    done = "confirm_lapsed" if booking.lapsed_unconfirmed else "confirmed_by_staff"
+    return redirect_done(agenda_url(slug, local_day(booking.start, group.tz)), done)
+
+
 # --- ask to rebook ------------------------------------------------------------------------
 
 
@@ -327,7 +369,9 @@ async def rebook_form(
     request: Request, locale: Locale, slug: str, booking_id: int, context: ManageBookings
 ) -> HTMLResponse:
     """Ask for the reason before asking the participant to choose a new time."""
-    booking = await _changeable(request, context, booking_id)
+    booking = await _changeable(
+        request, context, booking_id, rule=ensure_planner_may_request_rebook
+    )
     form = FormData({}, locale.gettext)
     return _reason_response(request, locale, context, booking, form, REBOOK)
 
@@ -365,11 +409,11 @@ def _slot_response(
         {
             "start": start.isoformat(),
             "when": f"{format_day(local_day(start, tz), code)}, {format_clock(start, tz, code)}",
-            "bookings": [_booking_view(b, group, code) for b in candidates],
+            "bookings": [booking_view(b, group, code) for b in candidates],
             "ids": ",".join(str(b.id) for b in candidates),
-            "field": _reason_field(form, locale.gettext),
-            "rebook_days": _planner(request).rebook_days(group.organisation_id),
-            "back": _agenda(group.slug, local_day(start, tz)),
+            "field": reason_field(form, locale.gettext),
+            "rebook_days": planner_of(request).rebook_days(group.organisation_id),
+            "back": agenda_url(group.slug, local_day(start, tz)),
             "errors": form.errors,
         },
         status,
@@ -385,7 +429,7 @@ async def slot_rebook_form(
     if moment is None:
         raise RejectedRequest(400)
     try:
-        candidates = await _planner(request).slot_candidates(context.principal, slug, moment)
+        candidates = await planner_of(request).slot_candidates(context.principal, slug, moment)
     except DomainError as error:
         raise_refusal(error)
         raise
@@ -400,11 +444,11 @@ async def slot_rebook(
     """Ask the participants of exactly the confirmed bookings to choose a new time."""
     form = await read_form(request, locale)
     moment = parse_start(form.text("start"))
-    ids = _confirmed_ids(form.text("ids"))
+    ids = confirmed_ids(form.text("ids"))
     choice = form.choice("reason", {r.value for r in ChangeReason})
     if moment is None or ids is None:
         raise RejectedRequest(400)
-    planner = _planner(request)
+    planner = planner_of(request)
     if choice is not None:
         try:
             done = await planner.rebook_slot(
@@ -417,8 +461,8 @@ async def slot_rebook(
             form.refusal(error)
         else:
             group = context.group.group
-            day = _agenda(slug, local_day(moment, group.tz))
-            return redirect_done(day, "rebook_requested", len(done))
+            day = agenda_url(slug, local_day(moment, group.tz))
+            return redirect_done(day, "rebook_requested", done)
     try:
         candidates = await planner.slot_candidates(context.principal, slug, moment)
     except DomainError as error:
@@ -429,7 +473,7 @@ async def slot_rebook(
     )
 
 
-def _confirmed_ids(raw: str) -> frozenset[int] | None:
+def confirmed_ids(raw: str) -> frozenset[int] | None:
     """Return the booking ids of the confirmation page, or ``None`` when malformed."""
     parts = [p for p in raw.split(",") if p]
     if not parts or len(parts) > MAX_BULK or not all(p.isdigit() and len(p) <= 12 for p in parts):
@@ -447,16 +491,22 @@ async def waiting(
     """List the group's bookings awaiting a new time, with move and cancel."""
     group = context.group.group
     tz, code = group.tz, locale.code
-    bookings = await _planner(request).waiting(context.principal, slug)
+    waiting_rows = await planner_of(request).waiting(context.principal, slug)
+
+    def moment(at: datetime | None) -> str:
+        return f"{format_day(local_day(at, tz), code)}, {format_clock(at, tz, code)}" if at else "–"
+
     rows = [
         WaitingView(
-            _booking_view(b, group, code),
-            f"{format_day(local_day(b.rebook_by, tz), code)}, {format_clock(b.rebook_by, tz, code)}"
-            if b.rebook_by
+            booking_view(w.booking, group, code),
+            moment(w.booking.rebook_by),
+            locale.gettext(REASON_LABELS[w.booking.change_reason])
+            if w.booking.change_reason
             else "–",
-            locale.gettext(REASON_LABELS[b.change_reason]) if b.change_reason else "–",
+            moment(w.proposal.start) if w.proposal else None,
+            moment(w.proposal.confirm_by) if w.proposal else None,
         )
-        for b in bookings
+        for w in waiting_rows
     ]
     return group_page(request, locale, context, "admin/planner_waiting.html", {"rows": rows})
 
@@ -474,12 +524,12 @@ async def accept(
     if start is None:
         raise RejectedRequest(400)
     try:
-        await _planner(request).accept(context.principal, slug, start)
+        await planner_of(request).accept(context.principal, slug, start)
     except DomainError as error:
         raise_refusal(error)
         raise
     group = context.group.group
     anchor = f"slot-{start.astimezone(UTC):%Y%m%dT%H%M}"  # as the agenda: UTC
     return redirect_done(
-        _agenda(slug, local_day(start, group.tz)), "shortfall_accepted", anchor=anchor
+        agenda_url(slug, local_day(start, group.tz)), "shortfall_accepted", anchor=anchor
     )

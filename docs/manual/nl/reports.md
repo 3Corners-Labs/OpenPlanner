@@ -43,7 +43,100 @@ wanneer een boeking verandert, één klein gegeven per wijziging.
 - **Boekingen van voor de rapportage**: uitkomsten van boekingen die in dagtellingen waren
   samengevoegd voordat het gebruik werd geteld; meer is er niet van bekend.
 
+## De tegels, de grafieken en *Uitsplitsen naar*
+
+Bovenaan **Volume** staan vier tegels die het antwoord geven voordat u de tabellen leest: afspraken in de periode, het no-showpercentage, het aandeel dat door deelnemers is geannuleerd (met hoeveel daarvan minder dan een dag voor de start) en het aandeel bevestigd na de e-mail (met de klasse waarin de mediane tijd valt). **Capaciteit** heeft er ook vier: bezetting (met geboekte van alle plaatsen), ongebruikte plaatsen, volle blokken en het tekort aan medewerkers. Een tegel die uit een verborgen getal volgt, zegt *niet beschikbaar*; hij toont nooit een getal dat de tabellen verbergen. Onder elke tabel die een aantal verbergt, staat een zin waarom, ook dat er nog één aantal extra verborgen wordt als een enkel aantal het totaal zou verraden.
+
+Het bereikformulier van **Volume** heeft **Uitsplitsen naar**: geen, wachtrijmethode of taal. Een groep doet alleen mee als haar eigen totaal in de periode minstens vijf keer het minimum is; de pagina zegt hoeveel groepen buiten beschouwing bleven. Uitsplitsen naar onderwerp kan nog niet.
+
+## De rapportfamilies
+
+Bovenaan de pagina Gebruik schakelt een rij links tussen vier families van hetzelfde rapport (een vijfde, *Team*, is voor organisatiebeheerders wier organisatie het aanzette). De
+gekozen periode blijft staan; elke familie heeft een eigen adres dat u kunt bewaren. De eerste,
+**Volume**, is de set tabellen hierboven; de andere staan hieronder.
+
+### Wachtrij en gesprekken
+
+Hoe boekingen bij medewerkers komen en hoe de gesprekken verlopen.
+
+- **Hoe boekingen bij medewerkers komen**: boekingen per wachtrijmethode (contactcenter of de eigen
+  wachtrij) en per soort (gepland of direct gesprek), met totalen.
+- **Wachttijd tot een gesprek verbindt** (Q2): de tijd vanaf het aanmaken van een taak tot het
+  gesprek verbindt, in vaste klassen, met het gemiddelde.
+- **Wanneer de gastheer binnenkwam, ten opzichte van de start** (Q3): te vroeg staat er met *te
+  vroeg*, te laat met *te laat*. Alleen geplande gesprekken tellen mee.
+- **Deelnemer wacht op de gastheer** (Q4) en **hoe lang gesprekken duren** (Q5), met het
+  gemiddelde, het aantal afgeronde gesprekken en het gemiddeld aantal personen per gesprek (U11).
+- **Directe gesprekken** (Q6): gestart, weggegaan tijdens het wachten, niet op tijd opgepakt en
+  het aandeel dat wegging, met de wachttijd op het moment van weggaan.
+- **Eigen wachtrij: oppakken** (Q7): opgepakt, teruggegeven, teruggegeven per keer oppakken en de
+  tijd tot een boeking wordt opgepakt. Het aandeel opgepakte boekingen staat er niet: wat is
+  aangeboden wordt niet vastgelegd.
+- **Fouten bij het doorzetten** (Q8): per code uit een vaste lijst, nooit de tekst van het andere
+  systeem.
+- **Directe gesprekken tegelijk** (Q9): het hoogste aantal dat tegelijk wachtte of verbonden was,
+  per dag.
+- **Voorgestelde nieuwe tijden** (U8): voorgesteld na vraag van de planner of door de assistent,
+  geaccepteerd, verlopen, het aandeel geaccepteerd en de tijd tot accepteren.
+
+### Capaciteit
+
+Hoe vol de agenda is en wanneer het druk is.
+
+- **Bezettingsgraad per dag** (C1, C3): de boekingen die meetellen tegenover de capaciteit van de
+  momenten die begonnen zijn, en de plaatsen die niemand boekte. Een dag met weinig momenten is
+  verborgen, en een percentage dat maar een paar mensen vertegenwoordigt ook.
+- **Hoe vol de momenten waren** (C2): leeg, minder dan half, meer dan half en vol.
+- **Drukste dagen en uren** (C4): een tabel van weekdag bij uur, in de eigen tijd van de groep. In
+  elke cel staat het getal; de tint helpt alleen het oog. De tabel verschijnt bij een periode van
+  minstens 7 dagen en alleen voor groepen met in die periode minstens vijf keer het minimum aan
+  boekingen; kleinere groepen vallen buiten deze tabel, en de pagina zegt hoeveel.
+- **Blokken met te weinig bezetting** (C5): nog steeds te weinig, te weinig maar geaccepteerd door
+  een planner, opgelost.
+
+### Kanalen
+
+Hoe berichten aankomen, in welke taal mensen boeken en hoe het proefgesprek verloopt.
+
+- **Berichten verstuurd en mislukt** (M1): per doel en per kanaal, met het aandeel dat mislukte.
+- **Boekingen per taal** (M2): alleen voor groepen die groot genoeg zijn; kleinere groepen vallen
+  buiten de tabel en de pagina zegt hoeveel.
+- **Proefgesprekken** (T1): aangemaakt, de link gevolgd, in de vergadering gekomen en mislukt. Het
+  verschil tussen de laatste twee zijn mensen die in de lobby bleven hangen.
+
+## Grafieken
+
+Waar een grafiek helpt, staat die boven de eigen tabel, en de tabel bevat altijd dezelfde cijfers,
+zodat niets alleen in het plaatje staat. Een grafiek heeft een titel en een beschrijving voor
+schermlezers, reeksen verschillen in patroon of lijnstijl en niet alleen in kleur, en een
+verborgen aantal is een gestippelde markering van één vaste hoogte met het label *< 5*: die zegt
+niets over het echte getal. De grafieken hebben geen script nodig, schuiven op een smal scherm
+zijwaarts in hun kader en blijven weg bij het afdrukken; de tabellen blijven. Is voor een familie
+in de periode niets vastgelegd, dan zegt de pagina dat.
+
+Met scripts aan kunt u een grafiek ook verkennen: beweeg erover of focus erop en gebruik de pijltjestoetsen voor een tip met de cijfers van die categorie, zet een reeks uit met de knop ervan, download de grafiek als SVG of PNG, en druk op Enter bij een dag om alleen die dag te zien (de dag is een gewone koppeling in de tabel, dus het werkt ook zonder scripts). Zonder scripts staan de grafieken en tabellen er gewoon.
+
+## Downloaden als bestand
+
+Wie mag exporteren (de superuser, organisatiebeheerders, groepsbeheerders en de rol Compliance en privacy) ziet onder de periode op een Gebruik-pagina twee koppelingen.
+
+- **Dit rapport downloaden als CSV** geeft precies de tabellen van de familie waar u naar kijkt, na de regel voor kleine aantallen: een verborgen cijfer is een lege waarde met de opmerking *hidden*. Het bestand bevat geen interfacetekst, alleen codes (een dag, een uitkomst, een bucketnummer), dus het leest in elke taal hetzelfde.
+- **Alle uurcijfers downloaden als CSV** geeft één rij per uur, groep, maat en snede, voor analyse in uw eigen hulpmiddel (het formaat `openplanner.usage/1`, beschreven in `docs/reporting.md`). Een cel onder het minimum staat helemaal niet in het bestand.
+
+Beide openen in Excel (UTF-8, `;` als scheidingsteken). De platformbeheerder bepaalt hoeveel rijen en dagen één bestand mag bevatten; een langere periode wordt met een melding geweigerd en het bestand wordt niet afgekapt. Elke download staat in het auditlog met wie, welke familie, welke periode, hoeveel rijen en een controlegetal van het bestand, nooit de cijfers. Het controlegetal staat ook in de header `X-Content-SHA256` van het antwoord. Net als bij de export van het auditlog geeft een link naar een download op een andere website in een actuele browser een foutmelding, zodat een andere website geen download op uw naam in het log kan zetten.
+
+## De samenvatting per e-mail
+
+Organisatiebeheerders zien onderaan de pagina *Gebruik* van de organisatie een onderdeel **Samenvatting per e-mail**. Een abonnement geldt voor de hele organisatie of voor één groep en heeft een periode: elke dag, elke week (op een weekdag) of elke maand (op een dag van 1 tot 28). De mail gaat op het verzenduur van de organisatie (7:00, tenzij aangepast) in de tijdzone van de groep, beslaat de dagen sinds de vorige mail tot en met gisteren en bevat de kerncijfers (gemaakte boekingen, niet verschenen, de gemiddelde wachttijd tot een gesprek verbindt, bezettingsgraad) en een koppeling naar het rapport van die dagen. Een verborgen cijfer staat als streepje. Zet uw organisatie de cijfers uit, dan blijft alleen de koppeling over.
+
+Ontvangers zijn collega's die de rapporten van dat bereik mogen zien, gekozen uit een lijst. Er zijn geen vrije e-mailadressen en er gaat geen bestand mee: de koppeling leidt naar het rapport, waar u zoals altijd inlogt. Het recht wordt bij het versturen opnieuw gecontroleerd. Een collega die het kwijt is, wordt overgeslagen en de lijst zegt hoeveel; een collega zonder bekend adres ook. Het adres is het geverifieerde e-mailadres dat de inlogdienst bij de laatste login van de collega doorgaf (te zien op de pagina van de collega onder *Medewerkers*); een collega die sindsdien niet is ingelogd, wordt opgezocht in de meegeleverde inlogdienst. Een gemiste mail wordt nog tot 24 uur later verstuurd; daarna wordt hij overgeslagen en de lijst toont hoe de laatste mail verliep. Elke wijziging van een abonnement staat in het auditlog.
+
+### Team
+
+De werklast per teamlid: afgehandelde gesprekken, minuten in gesprek, uit de eigen wachtrij opgepakte boekingen en het aandeel geplande gesprekken waarbij de gastheer op tijd binnenkwam. Alleen voor organisatiebeheerders (het recht *De werklast per teamlid in de rapporten bekijken*) en **standaard uit**: zolang uw organisatie bij de instellingen **Toon de werklast per teamlid in de rapporten** niet aanzet, wordt er niets over een persoon vastgelegd en staat bij *Team* op de pagina Gebruik *uit*, met een koppeling naar de instelling. Aanzetten telt vanaf dat moment; eerdere gesprekken doen niet mee, en uitzetten stopt het tellen weer (wat geteld is, blijft tot het einde van de bewaartermijn).
+
+De tabel staat op naam. Er is geen rangorde, geen *top*- of *slechtste*-lijst, geen totaalrij en geen indeling naar groep of uur. Een getal onder het minimum is verborgen en staat als *< 5*; de minuten gaan mee met de gesprekken. Alleen gesprekken die een medewerker uit de eigen wachtrij heeft opgepakt, worden aan een persoon toegerekend; een gesprek dat het contactcenter afhandelde, heeft in deze installatie geen teamlid. Wordt een teamlid verwijderd, dan worden zijn of haar cijfers één rij, *Voormalige teamleden*, zodat de geschiedenis haar totalen houdt en er geen persoon overblijft. De Team-familie staat niet in de CSV-bestanden en niet in de machine-interface.
+
 ## Wat hier nog niet staat
 
-Wachttijden, gespreksduur, hoe vol de agenda is, de drukste uren, berichten en per teamlid. Die
-volgen in latere stappen van hetzelfde ontwerp.
+Het aandeel van de bezette tijd dat in gesprekken gaat (bezetting van het team) volgt in een latere stap.

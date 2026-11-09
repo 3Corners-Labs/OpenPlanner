@@ -21,7 +21,7 @@ def refused_field(build: object) -> str | None:
     return caught.value.field
 
 
-def phone(value: str = "14 020", **kwargs: dict[str, str]) -> ContactOption:
+def phone(value: str = "012 345 6789", **kwargs: dict[str, str]) -> ContactOption:
     return ContactOption.create(ContactKind.PHONE, value, **kwargs)
 
 
@@ -31,10 +31,10 @@ def phone(value: str = "14 020", **kwargs: dict[str, str]) -> ContactOption:
 @pytest.mark.parametrize(
     ("value", "href"),
     [
-        ("14 020", "tel:14020"),
-        ("020 - 624 1111", "tel:0206241111"),
-        ("+31 (0)20 624 1111", "tel:+31206241111"),
-        ("+31 20 624 1111", "tel:+31206241111"),
+        ("012 345 6789", "tel:0123456789"),
+        ("012 - 345 6789", "tel:0123456789"),
+        ("+31 (0)12 345 6789", "tel:+31123456789"),
+        ("+31 12 345 6789", "tel:+31123456789"),
         ("112", "tel:112"),
     ],
 )
@@ -43,12 +43,12 @@ def test_phone_numbers_link_with_digits_only(value: str, href: str) -> None:
 
 
 def test_phone_number_white_space_is_collapsed() -> None:
-    assert phone("  020   624  1111 ").value == "020 624 1111"
+    assert phone("  012   345  6789 ").value == "012 345 6789"
 
 
 @pytest.mark.parametrize(
     "value",
-    ["", "12", "020-CALL-NOW", "javascript:alert(1)", "+31 20 624 1111 1111 1111", "0"],
+    ["", "12", "020-CALL-NOW", "javascript:alert(1)", "+31 12 345 6789 1111 1111", "0"],
 )
 def test_phone_numbers_with_letters_or_odd_lengths_are_refused(value: str) -> None:
     assert refused_field(lambda: phone(value)) == "phone"
@@ -121,16 +121,16 @@ def test_the_scheme_may_be_written_in_capitals() -> None:
 
 def test_address_lines_are_trimmed_and_empty_lines_dropped() -> None:
     option = ContactOption.create(
-        ContactKind.ADDRESS, "  Stadhuis \r\n\r\nAmstel 1\n1011 PN  Amsterdam  "
+        ContactKind.ADDRESS, "  Kantoor \r\n\r\nVoorbeeldstraat 1\n1234 AB  Voorbeeldstad  "
     )
 
-    assert option.lines == ("Stadhuis", "Amstel 1", "1011 PN  Amsterdam")
+    assert option.lines == ("Kantoor", "Voorbeeldstraat 1", "1234 AB  Voorbeeldstad")
     assert option.href is None
 
 
 @pytest.mark.parametrize(
     "value",
-    ["", " \n ", "\n".join(["regel"] * (MAX_ADDRESS_LINES + 1)), "x" * 81, "Amstel\x001"],
+    ["", " \n ", "\n".join(["regel"] * (MAX_ADDRESS_LINES + 1)), "x" * 81, "Voorbeeldstraat\x001"],
 )
 def test_empty_long_or_odd_addresses_are_refused(value: str) -> None:
     assert refused_field(lambda: ContactOption.create(ContactKind.ADDRESS, value)) == "address"

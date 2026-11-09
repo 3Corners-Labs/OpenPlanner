@@ -133,6 +133,11 @@ JOB_LABELS: dict[JobType, str] = {
     JobType.SEND_UNCONFIRMED_LAPSED: "audit.job.send_unconfirmed_lapsed",
     JobType.SEND_TEAM_INVITE: "audit.job.send_team_invite",
     JobType.SEND_TEAM_CANCEL: "audit.job.send_team_cancel",
+    JobType.SEND_RESCHEDULE_PROPOSAL: "audit.job.send_reschedule_proposal",
+    JobType.SEND_PROPOSAL_REMINDER: "audit.job.send_proposal_reminder",
+    JobType.EXPIRE_PROPOSAL: "audit.job.expire_proposal",
+    JobType.SEND_PROPOSAL_RELEASED: "audit.job.send_proposal_released",
+    JobType.SEND_CHANGE_REQUEST: "audit.job.send_change_request",
 }
 """Catalogue key per job type: the jobs list of the booking page (ADR 0068) and the audit log."""
 

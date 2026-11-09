@@ -2,20 +2,64 @@
 {% macro cell(value, threshold) -%}
 {%- if value is none %}<span class="muted">{{ _("reports.hidden", n=threshold) }}</span>{% else %}{{ value }}{% endif -%}
 {%- endmacro %}
-{% macro count_table(id, title, head, table, kind, threshold, total_label) %}
+{% macro count_table(id, title, head, table, kind, threshold, total_label, share=false) %}
 <section class="card" aria-labelledby="{{ id }}-heading">
   <h2 id="{{ id }}-heading">{{ title }}</h2>
   <div class="table-scroll" role="region" aria-labelledby="{{ id }}-heading" tabindex="0">
   <table class="data-table">
     <caption class="visually-hidden">{{ title }}</caption>
-    <thead><tr><th scope="col">{{ head }}</th><th scope="col">{{ _("reports.count") }}</th></tr></thead>
+    <thead><tr><th scope="col">{{ head }}</th><th scope="col">{{ _("reports.count") }}</th>{% if share %}<th scope="col">{{ _("reports.share") }}</th>{% endif %}</tr></thead>
     <tbody>
       {% for row in table.rows %}
-      <tr><th scope="row">{{ label(kind, row.code) }}</th><td>{{ cell(row.count, threshold) }}</td></tr>
+      <tr><th scope="row">{{ label(kind, row.code) }}</th><td>{{ cell(row.count, threshold) }}</td>{% if share %}<td>{% if row.count is none or not table.total %}<span class="muted">{{ _("reports.unavailable") }}</span>{% else %}{{ (100 * row.count / table.total) | round | int }}%{% endif %}</td>{% endif %}</tr>
       {% endfor %}
     </tbody>
-    <tfoot><tr><th scope="row">{{ total_label }}</th><td>{{ cell(table.total, threshold) }}</td></tr></tfoot>
+    <tfoot><tr><th scope="row">{{ total_label }}</th><td>{{ cell(table.total, threshold) }}</td>{% if share %}<td></td>{% endif %}</tr></tfoot>
+  </table>
+  </div>
+  {% if table.rows | selectattr("count", "none") | list %}<p class="muted">{{ _("reports.table.suppressed", n=threshold) }}</p>{% endif %}
+</section>
+{% endmacro %}
+{#- The figure tiles at the top of a screen (``Tile`` objects). A hidden count reads "< n", a hidden derived figure "not available". -#}
+{% macro tiles(items, threshold) %}
+<div class="tiles" role="list">
+  {% for t in items %}
+  <div class="tile" role="listitem">
+    <span class="tile__label">{{ t.label }}</span>
+    <span class="tile__value">{% if t.value is none %}<span class="muted">{% if t.count %}{{ _("reports.hidden", n=threshold) }}{% else %}{{ _("reports.unavailable") }}{% endif %}</span>{% else %}{{ t.value }}{{ t.suffix }}{% endif %}</span>
+    <span class="tile__detail">{{ t.detail }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+{#- A figure that is made from other figures (a percentage, a mean): "not available" when any part is hidden or missing. -#}
+{% macro figure(value, suffix="") -%}
+{%- if value is none %}<span class="muted">{{ _("reports.unavailable") }}</span>{% else %}{{ value }}{{ suffix }}{% endif -%}
+{%- endmacro %}
+{#- A table of two cuts with the totals that may be shown (``GridTable``); a hidden total reads "< n". -#}
+{% macro grid_table(id, title, corner, grid, row_kind, col_kind, threshold, total_label) %}
+<section class="card" aria-labelledby="{{ id }}-heading">
+  <h2 id="{{ id }}-heading">{{ title }}</h2>
+  <div class="table-scroll" role="region" aria-labelledby="{{ id }}-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ title }}</caption>
+    <thead><tr><th scope="col">{{ corner }}</th>{% for c in grid.columns %}<th scope="col">{{ label(col_kind, c) }}</th>{% endfor %}<th scope="col">{{ total_label }}</th></tr></thead>
+    <tbody>
+      {% for r in grid.rows %}
+      {% set i = loop.index0 %}
+      <tr><th scope="row">{{ label(row_kind, r) }}</th>{% for v in grid.cells[i] %}<td>{{ cell(v, threshold) }}</td>{% endfor %}<td>{{ cell(grid.row_totals[i], threshold) }}</td></tr>
+      {% endfor %}
+    </tbody>
+    <tfoot><tr><th scope="row">{{ total_label }}</th>{% for t in grid.column_totals %}<td>{{ cell(t, threshold) }}</td>{% endfor %}<td>{{ cell(grid.total, threshold) }}</td></tr></tfoot>
   </table>
   </div>
 </section>
+{% endmacro %}
+{#- The mean of a duration under a table, when its total may be shown. -#}
+{% macro mean_line(title, seconds, signed=false) %}
+{% if seconds is not none %}<p>{{ title }}: {{ duration(seconds, signed) }}</p>{% endif %}
+{% endmacro %}
+{#- The page says so when nothing has been recorded for this family in the range. -#}
+{% macro nothing_yet() %}
+<section class="card"><p class="empty-state">{{ _("reports.empty") }}</p></section>
 {% endmacro %}

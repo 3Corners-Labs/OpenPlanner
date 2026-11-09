@@ -12,7 +12,7 @@
           {% if alert.href %}<a href="{{ alert.href }}">{{ _("admin.alerts.open") }}</a>{% endif %}
           <form method="get" action="/admin/alerts/close">
             <input type="hidden" name="token" value="{{ alert.token }}">
-            <input type="hidden" name="next" value="{{ back }}">
+            <input type="hidden" name="next" value="{{ return_to }}">
             <button type="submit" class="button button--ghost button--small" aria-label="{{ _("admin.alerts.close.label", title=alert.title) }}">{{ icon("close") }}<span>{{ _("admin.alerts.close") }}</span></button>
           </form>
         </div>

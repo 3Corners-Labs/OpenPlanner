@@ -27,6 +27,11 @@ def _w(*parts: str) -> str:
     return "".join(parts)
 
 
+_START = r"(?:\b|(?<=\\[nrt]))"
+"""Where a refused value starts: at a word boundary, or right after a `\\n`, `\\r` or `\\t`
+escape, which is how an address line starts in source text and where `\\b` sees no boundary. A
+value ends at a word boundary, so digits inside a hash or a digest do not count."""
+
 SECTOR = re.compile(
     "|".join(
         [
@@ -38,15 +43,28 @@ SECTOR = re.compile(
             _w("minis", "terie"),
             _w(r"\bg", r"ov\b"),
             _w(r"g", "ov-booking"),
-            _w("belasting", "dienst"),
+            _w("belas", "ting"),
             _w("fin", "[-_ ]?bld"),
             _w("rij", "ks"),
-            _w("inkomsten", "belasting"),
+            _w("toe", "slag"),
+            _w("inwo", "ner"),
+            _w("vergun", "ning"),
+            _w("aan", "gifte"),
+            # A real organisation's contact data, the closure example until 2026-11-08: its short
+            # number, its main number (spaced and compact) and its street address; and a second
+            # organisation's short number, a test marker until then.
+            _w(_START, "14", r" *020\b"),
+            _w(r"20 +(?:- +)?6", r"24 +1111\b"),
+            _w(r"20624", r"1111\b"),
+            _w(_START, "Am", r"stel 1\b"),
+            _w(_START, "1011", r" ?PN\b"),
+            _w(_START, "14", r" *030\b"),
         ]
     ),
     re.IGNORECASE,
 )
-"""The words that do not appear anywhere in the repository (client names, sector words)."""
+"""What does not appear anywhere in the repository: client names, sector words, and the contact
+data of a real organisation."""
 
 ALLOWED = (
     # The certificate programme and the API standards site of the Dutch state, cited as they are.
@@ -156,8 +174,28 @@ def test_no_client_and_no_sector_words_in_the_repository() -> None:
 def test_the_guard_sees_the_words() -> None:
     assert sector_words_in("a " + _w("citi", "zen") + " books")
     assert sector_words_in("een " + _w("bur", "ger") + " boekt")
-    assert sector_words_in(_w("Belasting", "dienst"))
+    assert sector_words_in(_w("Belas", "tingdienst"))
     assert sector_words_in("<" + _w("g", "ov-booking") + ">")
+    # Slipped through in the demo seed's subjects and in examples (2026-11-08).
+    assert sector_words_in(_w("Huur", "toe", "slag"))
+    assert sector_words_in(_w("Belas", "tingen"))
+    assert sector_words_in("vragen die " + _w("inwo", "ners") + " beantwoorden")
+    assert sector_words_in(_w("Vergun", "ningen") + " Loket")
+    # The default slug of the test groups, and so of many example addresses (2026-11-08).
+    assert sector_words_in("/g/" + _w("aan", "gifte") + "-2026")
+    assert sector_words_in("team-" + _w("Aan", "giftes") + "@example.org")
+    # A real organisation's contact data, each form it had in the examples (2026-11-08).
+    assert sector_words_in("Bel " + _w("14", " 020"))
+    assert sector_words_in("tel:" + _w("14", "020"))
+    assert sector_words_in("+31 (0)" + _w("20 6", "24 1111"))
+    assert sector_words_in(_w("020 - 6", "24 1111"))
+    assert sector_words_in("tel:+31" + _w("20624", "1111"))
+    assert sector_words_in("Kantoor\n" + _w("Am", "stel 1"))
+    assert sector_words_in(_w("1011", " PN") + " Stad")
+    # The same lines as source text, where a `\n` escape comes right before them.
+    assert sector_words_in(r'"Kantoor\n' + _w("Am", "stel 1") + r'\n"')
+    assert sector_words_in(r'"Kantoor\r\n' + _w("1011", " PN") + ' Stad"')
+    assert sector_words_in('phone="' + _w("14 0", "30") + '"')
 
 
 def test_the_guard_reads_the_text_of_an_office_file(tmp_path: Path) -> None:
@@ -185,6 +223,14 @@ def test_the_guard_lets_the_allowed_names_through() -> None:
     assert not sector_words_in(_w("PKI", "overheid", " certificates").replace("PKIover", "PKIover"))
     assert not sector_words_in("(" + _w("G", "OV.UK") + " and NL Design System)")
     assert not sector_words_in("een " + _w("bur", "gerlijk") + " woord")
+    # The made-up example contacts, and numbers that only look alike.
+    assert not sector_words_in("012 345 6789, +31 (0)12 345 6789, pebble:14000, 114 0200")
+    assert not sector_words_in("Kantoor\nVoorbeeldstraat 1\n1234 AB Voorbeeldstad, Amstel 10")
+    # The same digits inside a pinned commit or an image digest are no phone number.
+    assert not sector_words_in(
+        "uses: x/y@a" + _w("14", "020") + "bc9f and @c" + _w("140", "30") + "d"
+    )
+    assert not sector_words_in("sha256:e" + _w("206", "241111") + "f0")
 
 
 def test_the_exempt_files_exist() -> None:

@@ -47,15 +47,17 @@ async def test_groups_are_added_and_saved(engine: AsyncEngine) -> None:
 
     async with uow.locked() as tx:
         stored = await tx.add_group(
-            Group(0, organisation.id, "Vergunningen", "vergunningen", "Europe/Amsterdam", 20)
+            Group(0, organisation.id, "Klantenservice", "klantenservice", "Europe/Amsterdam", 20)
         )
     async with uow.locked() as tx:
-        await tx.save_group(replace(stored, name="Vergunningen-team", phone_mode=PhoneMode.HIDDEN))
+        await tx.save_group(
+            replace(stored, name="Klantenservice-team", phone_mode=PhoneMode.HIDDEN)
+        )
     async with uow.read() as tx:
-        reloaded = await tx.get_group("vergunningen")
+        reloaded = await tx.get_group("klantenservice")
 
     assert stored.id > 0
-    assert reloaded == replace(stored, name="Vergunningen-team", phone_mode=PhoneMode.HIDDEN)
+    assert reloaded == replace(stored, name="Klantenservice-team", phone_mode=PhoneMode.HIDDEN)
 
 
 async def test_schedule_items_carry_ids_and_stay_within_their_group(engine: AsyncEngine) -> None:
@@ -150,7 +152,7 @@ async def test_blocks_without_agents_and_labels_are_stored(engine: AsyncEngine) 
 
 
 async def test_future_bookings_are_counted_per_group(engine: AsyncEngine) -> None:
-    group_id = await seed_group(engine, slug="aangifte")
+    group_id = await seed_group(engine, slug="balie")
     uow = SqlUnitOfWork(engine)
     service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
     receipt = await book(service, SLOT_0900)

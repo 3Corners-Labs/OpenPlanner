@@ -195,3 +195,27 @@ Exactly these fields and no others; `staff_id` only on the separate team-member 
 - `capacity`
 - `booked`
 - `staff_id`
+
+## CSV export
+
+Both files are UTF-8 with a byte order mark, `;` as separator, RFC 4180 quoting and CRLF line
+ends; a text cell that starts like a formula gets a leading `'`. The response carries
+`X-Content-SHA256` (the checksum of the file) and the audit event `reports.export` keeps it, with
+the family, the range, the row count and who; never a figure. An export over
+`reporting_export_max_rows` rows or `reporting_export_max_days` days is refused, never cut short.
+Holders of `reports.export` download from the Usage page, for the groups of their scope.
+
+**Screen CSV** (`?view=volume`, `queue`, `capacity` or `channels`): exactly the tables of that
+page, after the small-cell rule, in the screen's order. Columns: `table`, `row`, `column`, `value`, `note`. `table` is the name of
+the table, `row` and `column` are codes (a day, an outcome, a bucket number, a weekday 0 to 6 with
+Monday first, an hour), `value` is the count, percent or seconds, `note` is `hidden` where the
+screen shows `< n` or no figure, and the value is then empty. A total has the row or column
+`total`. The file holds no interface text, so it does not change with the language.
+
+**Tidy CSV `openplanner.usage/1`** (`?view=tidy`): one row per hourly cell, for analysts. Columns:
+`hour`, `organisation`, `group`, `metric`, `booking_kind`, `dispatch_kind`, `subject`, `locale`, `channel`, `outcome`, `actor_class`, `reason`, `bucket`, `count`, `sum`, `max`. `hour` is the UTC hour (RFC 3339), `organisation` and `group` are slugs, `metric` is an ID
+of the table above, the cut columns hold the codes of the cell (empty when the metric is not cut
+by it), `bucket` is the duration bucket number, `count` is the number of facts, `sum` is what the
+metric adds up and `max` is the largest value (Q9's peak). A cell below the threshold is not in the
+file at all. The range is whole group-local days. The column list and its meaning change only with
+a new version, which needs an amendment of the ADR.

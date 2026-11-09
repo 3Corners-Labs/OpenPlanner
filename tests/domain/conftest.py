@@ -9,6 +9,7 @@ import pytest
 
 from app.domain.admin import AdminService
 from app.domain.closure_service import ClosureService
+from app.domain.planner_service import PlannerService
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.identity_providers import (
@@ -17,6 +18,7 @@ from tests.fakes.identity_providers import (
     discovery_document,
 )
 from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.support.admin import ALERT_THRESHOLDS
 from tests.support.closures import three_groups
 from tests.support.domain import NOW, TEST_TOKEN_KEY
 from tests.support.organisation_providers import OTHER_DISCOVERY, OTHER_ISSUER
@@ -36,6 +38,13 @@ def clock() -> FixedClock:
 @pytest.fixture
 def bookings(uow: InMemoryUnitOfWork, clock: FixedClock) -> BookingService:
     return BookingService(uow, clock, TEST_TOKEN_KEY)
+
+
+@pytest.fixture
+def planner(uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService) -> PlannerService:
+    """Return the planner service on these bookings, with the settings' defaults."""
+    admin = AdminService(uow, clock, alert_thresholds=ALERT_THRESHOLDS)
+    return PlannerService(uow, clock, admin, bookings)
 
 
 @pytest.fixture

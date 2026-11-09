@@ -75,6 +75,26 @@ Kies de provider, vul de API-host en de API-sleutel in, en de afzender die deeln
 naam van ten hoogste elf tekens of een geregistreerd nummer. De landcode geldt voor nummers die
 zonder landcode zijn ingevuld.
 
+## Contactcenter
+
+Alleen de superuser stelt dit in. Een organisatie kan haar eigen contactcenter koppelen, ook als
+dat een andere omgeving (tenant) is dan die van de installatie. Kies het **Platform**, vul het
+**API-adres** van uw regio in (alleen https), de **Client-ID** van de Service App en het
+**Clientgeheim**. Het **Refresh-token** is het token dat de Service App kreeg toen de beheerder
+van uw omgeving haar toestemming gaf. De geheimen worden versleuteld bewaard en nooit meer
+getoond; een leeg veld laat het bewaarde geheim staan.
+
+Na het opslaan ziet u het **Webhookadres** van deze organisatie. Het contactcenter meldt daar de
+status van taken. OpenPlanner controleert elke melding met een geheim dat de server zelf maakt;
+niemand typt of ziet het. Met **Nieuw webhookgeheim maken** vervangt u het, bijvoorbeeld als u
+denkt dat het is uitgelekt; het oude werkt dan meteen niet meer. **Eigen koppeling verwijderen**
+wist de koppeling en haar geheimen.
+
+Zolang een organisatie geen eigen koppeling heeft, gebruikt zij de koppeling van de installatie.
+Die terugval verdwijnt in een volgende versie. Het versturen van taken via de eigen koppeling
+komt in de volgende stap; tot dan legt deze kaart de koppeling en het webhookadres vast. Het
+webhookadres werkt pas als OpenPlanner in die stap de melding bij het contactcenter aanmeldt.
+
 ## Wat wordt vastgelegd
 
 Elke wijziging komt in het auditlog met de namen van de gewijzigde velden, nooit de waarden.

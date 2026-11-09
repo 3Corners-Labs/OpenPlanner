@@ -32,7 +32,7 @@ from app.domain.usage_recording import record_closure_change
 from app.domain.usage_rollup import roll
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
-from tests.support.admin import GROUP_ADMIN
+from tests.support.admin import ALERT_THRESHOLDS, GROUP_ADMIN
 from tests.support.closures import NOTICES, three_groups
 from tests.support.domain import (
     NOW,
@@ -81,7 +81,8 @@ async def _booking_scenario() -> list[UsageFact]:
     bookings = BookingService(uow, clock, TEST_TOKEN_KEY)
     closures = ClosureService(uow, clock, AdminService(uow, clock), bookings)
     integration = IntegrationService(uow, clock, AdminService(uow, clock))
-    planner = PlannerService(uow, clock, AdminService(uow, clock), bookings, alert_per_hour=50)
+    admin = AdminService(uow, clock, alert_thresholds=ALERT_THRESHOLDS)
+    planner = PlannerService(uow, clock, admin, bookings)
     closer = SlotCloser(uow, clock, lambda: timedelta(minutes=15))
     await closer.run(clock.now())
 
@@ -187,12 +188,12 @@ async def _queue_scenario() -> list[UsageFact]:
 async def _direct_scenario() -> list[UsageFact]:
     """A participant who gives up waiting for a direct call, with the call's creation."""
     state = State()
-    state.groups[1] = make_group(id=1, slug="aangifte", direct_call_max_concurrent=3)
+    state.groups[1] = make_group(id=1, slug="balie", direct_call_max_concurrent=3)
     state.rules[1] = [ScheduleRule(weekday=0, window=window("09:00", "10:00", 2, Offer.BOTH))]
     uow = InMemoryUnitOfWork(state)
     clock = FixedClock(datetime(2026, 1, 5, 8, 15, tzinfo=UTC))
     service = BookingService(uow, clock, TEST_TOKEN_KEY)
-    receipt = await service.start_direct(group_slug="aangifte", contact=_person(9), locale="nl")
+    receipt = await service.start_direct(group_slug="balie", contact=_person(9), locale="nl")
     integration = IntegrationService(uow, clock, AdminService(uow, clock))
     await integration.record(receipt.booking.id or 0, EventKind.TASK_CREATED)
     await service.leave_direct(receipt.management_token)

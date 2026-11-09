@@ -1,11 +1,11 @@
-{#- Queue across own groups: per own queue in reach, who waits and who is signed in (counts only). The longest wait is compared with the organisation's target and warning threshold (OV-7), in words with the colour repeating it. -#}
+{#- Queue across own groups: per own queue in reach, who waits, how many nobody picked up in time (ADR 0043) and who is signed in (counts only). The longest wait is compared with the organisation's target and warning threshold (OV-7), in words with the colour repeating it. -#}
 {% if view.chart %}
 {% include "admin/widgets/_chart.html" %}
 {% elif view.rows %}
 <table class="widget-table">
   <caption class="visually-hidden">{{ _(view.widget.title_key) }}</caption>
   <thead>
-    <tr><th scope="col">{{ _("admin.overview.widget.queue.group") }}</th><th scope="col" class="widget-table__number">{{ _("admin.overview.widget.queue.waiting") }}</th><th scope="col" class="widget-table__number">{{ _("admin.overview.widget.queue.longest_wait") }}</th><th scope="col" class="widget-table__number">{{ _("admin.overview.widget.queue.staff") }}</th></tr>
+    <tr><th scope="col">{{ _("admin.overview.widget.queue.group") }}</th><th scope="col" class="widget-table__number">{{ _("admin.overview.widget.queue.waiting") }}</th><th scope="col" class="widget-table__number">{{ _("admin.overview.widget.queue.longest_wait") }}</th><th scope="col" class="widget-table__number">{{ _("admin.overview.widget.queue.not_picked_up") }}</th><th scope="col" class="widget-table__number">{{ _("admin.overview.widget.queue.staff") }}</th></tr>
   </thead>
   <tbody>
     {% for row in view.rows %}
@@ -13,6 +13,7 @@
       <th scope="row"><a href="{{ row.href }}" aria-label="{{ _("admin.overview.widget.queue.queue_link", name=row.name) }}">{{ row.name }}</a><br><span class="widget-list__meta">{{ row.organisation }}</span></th>
       <td class="widget-table__number">{{ row.waiting }}</td>
       <td class="widget-table__number">{{ _("admin.overview.widget.queue.minutes", minutes=row.longest_wait_minutes) }}{% if row.wait_state %}<br><span class="chip chip--{{ row.wait_tone }}">{{ row.wait_state }}</span>{% endif %}</td>
+      <td class="widget-table__number">{{ row.not_picked_up }}{% if row.not_picked_up %}<br><span class="chip chip--danger">{{ _("admin.agenda.not_picked_up") }}</span>{% endif %}</td>
       <td class="widget-table__number">{{ row.staff_available }}</td>
     </tr>
     {% endfor %}

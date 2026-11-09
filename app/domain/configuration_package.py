@@ -7,34 +7,16 @@ the adapter's (``app/adapters/db/configuration_package``); the rules of an expor
 import are ``ConfigurationPackageService`` (``app.domain.configuration_service``).
 """
 
-import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.domain.authorization import Permission
-from app.domain.errors import DomainError, ErrorCode
 
 FORMAT = 1
 """The package format; a package of another format is refused."""
 
 MIN_PASSPHRASE_LENGTH = 16
 """A passphrase protects every secret of the platform: a protection, never a setting."""
-
-MEDIA_TYPE = "application/vnd.sqlite3"
-"""The media type of a package: a SQLite file."""
-
-PACKAGE_FILENAME = "openplanner-configuration-{installation}-{date}.sqlite"
-"""The download name of an exported package, in the portal and over the API."""
-
-
-def package_filename(installation: str, exported_at: datetime) -> str:
-    """Return the download name of a package exported on ``exported_at``.
-
-    The installation name is turned into a slug (lower case, every character outside
-    ``[a-z0-9.-]`` becomes ``-``) so the name always passes the filename rule.
-    """
-    slug = re.sub(r"[^a-z0-9.-]", "-", (installation or "openplanner").lower())
-    return PACKAGE_FILENAME.format(installation=slug, date=exported_at.strftime("%Y%m%d"))
 
 
 VERSION_TABLE = "alembic_version"
@@ -98,6 +80,8 @@ STATE_TABLES = frozenset(
         "integration_reports",
         "alert_deliveries",
         "jobs",
+        "reschedule_proposals",
+        "change_requests",
         "log_destination_status",
         "maintenance_state",
         "overview_layouts",
@@ -107,6 +91,8 @@ STATE_TABLES = frozenset(
         "public_address_checks",
         "release_checks",
         "release_listing",
+        "report_digest_runs",
+        "report_subscriptions",
         "running_versions",
         "shortfall_acceptances",
         "slots",
@@ -125,23 +111,11 @@ STATE_TABLES = frozenset(
 """The tables a package empties: bookings and their personal data, the log, staff, and what
 belongs to this host. A test fails when a table of the model is in neither set."""
 
-IN_USE_TABLES = ("bookings", "slots", "closures")
-"""An installation with a row in any of these is in use: an import is refused (point 5)."""
-
-PORTABLE_ENVIRONMENT = (
-    "oidc_discovery_url",
-    "oidc_client_id",
-    "oidc_client_secret",
-    "oidc_scopes",
-)
-"""The class A values that travel with a package (point 4): the login, nothing of the host."""
-
 PERMISSION = Permission.SETTINGS_PLATFORM_MANAGE
-"""Export and import are a change of the platform's configuration (point 6)."""
+"""Reading a package is a change of the platform's configuration (point 6)."""
 
-EXPORT_DETAIL = "configuration.export"
 IMPORT_DETAIL = "configuration.import"
-"""The audit detail of an export and an import; the import adds its counts."""
+"""The audit detail of a package import; it adds its counts."""
 
 COUNTED_TABLES = ("organisations", "groups", "identity_providers", "api_clients")
 """What a summary counts, in this order; the import's audit detail names the same."""
@@ -176,13 +150,3 @@ class PackageSummary:
         """The audit detail of an import: the counts as machine keys, never a value."""
         counts = ",".join(f"{name}:{self.counts.get(name, 0)}" for name in COUNTED_TABLES)
         return f"{IMPORT_DETAIL},{counts},secrets:{self.secrets}"
-
-
-def check_passphrase(passphrase: str) -> None:
-    """Refuse a passphrase shorter than ``MIN_PASSPHRASE_LENGTH``.
-
-    Raises:
-        DomainError: ``configuration_passphrase_short``.
-    """
-    if len(passphrase) < MIN_PASSPHRASE_LENGTH:
-        raise DomainError(ErrorCode.CONFIGURATION_PASSPHRASE_SHORT, "passphrase")

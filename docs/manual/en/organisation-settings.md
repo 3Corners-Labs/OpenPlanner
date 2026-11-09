@@ -38,6 +38,16 @@ page* at the top jumps to a topic; one *Save* button saves all topics together.
   overview says whether the longest wait stays within the target; when it goes above the limit,
   those who work the queue get one alert, which goes when the wait is back under the limit. The
   target may not be above the limit.
+- **Change requests by a bot (with appointment code)** and **Time to confirm a change request**
+  (10 to 1440 minutes, default 60): whether a contact-center bot may ask, for a caller, to
+  cancel or move an appointment. The caller gives the phone number and the eight-digit
+  appointment code together; that code is then on the booking page and in the confirmation,
+  change and reminder messages. Nothing changes until the participant confirms the request
+  through their own email or text message, within the set time. Switched off, the API refuses
+  requests and open requests lapse.
+- **Quiet period after a change request** (1 to 1440 minutes, default 10): after a request
+  reached an appointment, the participant gets no new message for that appointment during this
+  period, even if the bot asks again. Cannot be switched off.
 
 ## Changing a setting
 

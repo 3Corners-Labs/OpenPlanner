@@ -118,7 +118,7 @@ medewerkers **User management → Multimedia profiles**.
 Per team een wachtrij met *Channel type* **Work item**, met het team van medewerkers eraan
 gekoppeld en een RONA-tijd. Het *multimedia profile* van de medewerkers moet work items
 toestaan. Geef de wachtrij een naam waar de routeringswaarde van de groep in staat
-(bijvoorbeeld `ACME_video_vergunningen` bij routeringswaarde `vergunningen`): dan toont de
+(bijvoorbeeld `ACME_video_klantenservice` bij routeringswaarde `klantenservice`): dan toont de
 controle per groep welke wachtrij hij gebruikt.
 
 ## Stap 7. De velden van de groep in OpenPlanner

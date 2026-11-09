@@ -24,6 +24,7 @@ from enum import StrEnum
 from urllib.parse import urlsplit
 
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.form_fields import mailto_href
 
 CONTACT_LOCALES = ("nl", "en")
 """Locales a label, opening hours or heading may be given in; Dutch is the fallback."""
@@ -38,7 +39,7 @@ MAX_URL_LENGTH = 500
 MAX_EMAIL_LENGTH = 254
 MAX_PHONE_LENGTH = 30
 MIN_PHONE_DIGITS = 3
-"""Short numbers such as 112 and 14 020 are valid; a number has at most 15 digits (E.164)."""
+"""Short numbers such as 112 are valid; a number has at most 15 digits (E.164)."""
 MAX_PHONE_DIGITS = 15
 
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
@@ -193,7 +194,7 @@ class ContactOption:
             digits = "".join(c for c in number if c.isdigit())
             return f"tel:{'+' if number.startswith('+') else ''}{digits}"
         if self.kind is ContactKind.EMAIL:
-            return f"mailto:{self.value}"
+            return mailto_href(self.value)
         if self.kind is ContactKind.ADDRESS:
             return None
         return self.value

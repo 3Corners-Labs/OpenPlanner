@@ -71,7 +71,7 @@ async def _populate(url: str) -> None:
         )
         contact = replace(ADA, first_name=PII, last_name=f"{PII}-b", email=f"{PII}@example.org")
         await book(
-            BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY), SLOT_0900, "aangifte", contact
+            BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY), SLOT_0900, "balie", contact
         )
         destination = LogDestination(
             None,

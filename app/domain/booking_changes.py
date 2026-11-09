@@ -5,29 +5,45 @@ behalf; the participant is always told. Moving is ``BookingService.relocate``, s
 participant's own reschedule. This module holds the steps both callers run inside their own
 locked transaction, and the planner's limits:
 
-    planner may change?  confirmed, scheduled, not dispatched, starts after the lead
+    planner may change?  confirmed or pending, scheduled, not dispatched, starts after the lead
+    planner may rebook?  as above, and only confirmed (ADR 0056 point 11)
     cancel               status cancelled (+ reason) ─► jobs: end task, delete meeting,
                          cancellation mail (and SMS when reachable), purge
     request rebook       status awaiting_rebook (+ reason, rebook_by), place freed ─► jobs:
                          end task, delete meeting, request now, one reminder, lapse at
                          rebook_by, purge 24 h later (ADR 0044)
+    hold proposal        as request rebook, plus a held place in the proposed slot until
+                         confirm_by ─► jobs: proposal now, one reminder, expiry (ADR 0057)
+    release proposal     the held place goes (confirmed, chosen, cancelled, expired)
+    expire proposal      still open at confirm_by ─► released, "you can still choose" message
     lapse                still awaiting at rebook_by ─► cancelled, lapse message
     lapse unconfirmed    still pending at confirm_by ─► cancelled at confirm_by, lapse
                          message (ADR 0056; the participant's own lapse, kept beside the other)
 """
 
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from app.domain.booking import Booking, BookingKind, ChangeReason
+from app.domain.booking import Booking, BookingKind, ChangeReason, Slot
 from app.domain.channels import ChannelKind, reachable
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import (
     plan_for_cancellation,
     plan_for_lapse,
+    plan_for_proposal,
     plan_for_rebook,
+    plan_for_released_proposal,
     plan_for_unconfirmed_lapse,
 )
 from app.domain.ports import Transaction
+from app.domain.reschedule_proposal import (
+    HeldProposal,
+    ProposalHours,
+    ProposalOutcome,
+    proposal_deadline,
+    proposal_reminder,
+)
 from app.domain.scheduling import Group
 from app.domain.usage import ActorClass
 from app.domain.usage_recording import (
@@ -38,13 +54,34 @@ from app.domain.usage_recording import (
 )
 
 
+@dataclass(frozen=True)
+class ProposalTiming:
+    """The organisation's periods for a proposal (ADR 0044 and 0057 settings, class D).
+
+    Attributes:
+        rebook_days: ``planner_rebook_days``: the request to choose lapses this long after the
+            original start.
+        rebook_reminder_days: ``planner_rebook_reminder_days``: its one reminder before the lapse.
+        hours: How long the proposed place is held and when its reminder goes.
+    """
+
+    rebook_days: int
+    rebook_reminder_days: int
+    hours: ProposalHours
+
+
+PlannerRule = Callable[[Booking, Group, datetime], None]
+"""One of a planner's limits (``ensure_planner_may_*``): returns, or raises the refusal."""
+
+
 def ensure_planner_may_change(booking: Booking, group: Group, now: datetime) -> None:
     """Refuse a planner's change that needs a phone call instead of a message.
 
-    A booking can be changed while it is confirmed, scheduled (not a direct call), not yet
-    dispatched to the contact center, and starts more than the group's planner lead from now
-    (never less than the dispatch lead). A booking awaiting a new time can always be moved or
-    cancelled: it does not go ahead at its time anyway.
+    A booking can be changed while it is confirmed or awaiting the participant's confirmation
+    (ADR 0056 point 11: moved or cancelled like a confirmed one), scheduled (not a direct call),
+    not yet dispatched to the contact center, and starts more than the group's planner lead from
+    now (never less than the dispatch lead). A booking awaiting a new time can always be moved
+    or cancelled: it does not go ahead at its time anyway.
 
     Raises:
         DomainError: ``booking_not_active`` or ``planner_too_late``.
@@ -53,20 +90,58 @@ def ensure_planner_may_change(booking: Booking, group: Group, now: datetime) -> 
         raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
     if booking.awaits_rebook:
         return
-    if not booking.is_active:
+    if not (booking.is_active or booking.awaits_confirmation):
         raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
     lead = max(group.planner_lead, group.dispatch_lead)
     if booking.contact_center_task is not None or now >= booking.start - lead:
         raise DomainError(ErrorCode.PLANNER_TOO_LATE)
 
 
+def ensure_planner_may_request_rebook(booking: Booking, group: Group, now: datetime) -> None:
+    """Refuse asking ``booking``'s participant to choose a new time unless it is confirmed.
+
+    The one rule for both ways of asking: the request (ADR 0044) and the proposal (ADR 0057),
+    their forms, the review's list and the agenda's links. Asking is a change, so the limits
+    of ``ensure_planner_may_change`` come first and their refusal wins. Then only a confirmed
+    booking: one awaiting confirmation is moved, cancelled or left to lapse (ADR 0056 point 11),
+    one awaiting a new time already waits.
+
+    Raises:
+        DomainError: ``booking_not_active`` or ``planner_too_late``.
+    """
+    ensure_planner_may_change(booking, group, now)
+    if not booking.is_active:
+        raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
+
+
 def planner_may_change(booking: Booking, group: Group, now: datetime) -> bool:
     """Return whether a planner may still change ``booking`` now (for links and lists)."""
-    try:
-        ensure_planner_may_change(booking, group, now)
-    except DomainError:
-        return False
-    return True
+    return _allows(ensure_planner_may_change, booking, group, now)
+
+
+def planner_may_request_rebook(booking: Booking, group: Group, now: datetime) -> bool:
+    """Return whether a planner may ask ``booking``'s participant to choose a new time now."""
+    return _allows(ensure_planner_may_request_rebook, booking, group, now)
+
+
+def ensure_participant_may_move(booking: Booking, group: Group, now: datetime) -> None:
+    """Refuse a participant's move from the change deadline on (ADR 0069).
+
+    A booking on hold (suspended, or awaiting a new time) has no deadline: it does not go
+    ahead at its time anyway.
+    """
+    if booking.on_hold:
+        return
+    if now >= group.change_deadline(booking.start):
+        raise DomainError(ErrorCode.BOOKING_LOCKED)
+
+
+def ensure_participant_may_cancel(booking: Booking, group: Group, now: datetime) -> None:
+    """Refuse a participant's cancellation from the start on (ADR 0069); on hold has none."""
+    if booking.on_hold:
+        return
+    if now >= group.cancel_deadline(booking.start):
+        raise DomainError(ErrorCode.BOOKING_LOCKED)
 
 
 def sms_reachable(booking: Booking) -> bool:
@@ -103,10 +178,16 @@ async def cancel(
         DomainError: ``booking_not_active`` if it holds no place.
     """
     cancelled = booking.cancel(now, reason)
+    await release_proposal(tx, booking, now, ProposalOutcome.CANCELLED)
     await tx.save_booking(cancelled)
     await record_cancelled(tx, booking, group, now, actor, reason=reason)
+    # A booking awaiting confirmation was never sent to the team nor by SMS (ADR 0056): its
+    # cancellation goes by email only, and the team gets no withdrawal.
+    confirmed = not booking.awaits_confirmation
     jobs = plan_for_cancellation(
-        cancelled_at=now, sms=sms and sms_reachable(booking), team_invite=team_invite
+        cancelled_at=now,
+        sms=sms and confirmed and sms_reachable(booking),
+        team_invite=team_invite and confirmed,
     )
     await tx.replace_jobs(_id(booking), jobs)
     return cancelled
@@ -154,6 +235,91 @@ async def request_rebook(
     return waiting
 
 
+async def hold_proposal(
+    tx: Transaction,
+    booking: Booking,
+    group: Group,
+    slot: Slot,
+    now: datetime,
+    *,
+    reason: ChangeReason,
+    timing: ProposalTiming,
+    team_invite: bool = False,
+) -> HeldProposal:
+    """Propose ``slot`` as the new time of ``booking`` and hold a place there (ADR 0057 point 7).
+
+    The booking awaits a new time as after ``request_rebook``, so its own place is free at once;
+    the proposal holds one place in ``slot`` until its deadline. The caller has checked that the
+    slot is offered and has room (``BookingService.propose_in``).
+
+    Raises:
+        DomainError: ``booking_not_active`` if it is not confirmed.
+    """
+    rebook_by = booking.start + timedelta(days=timing.rebook_days)
+    waiting = booking.request_rebook(reason, rebook_by, now)
+    await tx.save_booking(waiting)
+    await record_rebook_proposed(tx, waiting, group, now, ActorClass.PLANNER)
+    confirm_by = proposal_deadline(
+        now, timing.hours.confirm, group.change_deadline(slot.start), rebook_by
+    )
+    proposal = await tx.add_proposal(
+        HeldProposal(None, _id(booking), _slot_id(slot), slot.start, slot.end, confirm_by, now)
+    )
+    jobs = plan_for_proposal(
+        now=now,
+        rebook_by=rebook_by,
+        rebook_reminder_at=rebook_by - timedelta(days=timing.rebook_reminder_days),
+        proposed_start=slot.start,
+        confirm_by=confirm_by,
+        proposal_reminder_at=proposal_reminder(now, confirm_by, timing.hours.reminder),
+        sms=sms_reachable(booking),
+        team_invite=team_invite,
+    )
+    await tx.replace_jobs(_id(booking), jobs)
+    return proposal
+
+
+async def release_proposal(
+    tx: Transaction, booking: Booking, now: datetime, outcome: ProposalOutcome
+) -> HeldProposal | None:
+    """Release the booking's open proposal with ``outcome``; return it, or ``None`` if none.
+
+    Only a booking awaiting a new time can have one, so no other booking costs a query.
+    """
+    if not booking.awaits_rebook:
+        return None
+    proposal = await tx.get_open_proposal(_id(booking))
+    if proposal is None:
+        return None
+    released = proposal.released(now, outcome)
+    await tx.save_proposal(released)
+    return released
+
+
+async def answer_proposal(
+    tx: Transaction, booking: Booking, now: datetime, new_start: datetime
+) -> None:
+    """Release the open proposal of a booking that moves to ``new_start`` (taken or not)."""
+    proposal = await tx.get_open_proposal(_id(booking)) if booking.awaits_rebook else None
+    if proposal is not None:
+        await tx.save_proposal(proposal.answered(new_start, now))
+
+
+async def expire_proposal(tx: Transaction, booking: Booking, now: datetime) -> bool:
+    """Release a proposal nobody answered by its deadline; return whether one expired.
+
+    The booking keeps awaiting a new time until the lapse of ADR 0044; the participant gets
+    the short message that the proposed time was released and that they can still choose
+    (ADR 0057 point 9). A proposal answered, withdrawn or replaced in time is left alone.
+    """
+    proposal = await tx.get_open_proposal(_id(booking))
+    if proposal is None or not proposal.is_due(now):
+        return False
+    await tx.save_proposal(proposal.released(now, ProposalOutcome.EXPIRED))
+    await tx.add_jobs(_id(booking), plan_for_released_proposal(now=now, sms=sms_reachable(booking)))
+    return True
+
+
 async def lapse(tx: Transaction, booking: Booking, now: datetime) -> bool:
     """Cancel ``booking`` if it still awaits a new time; return whether it lapsed.
 
@@ -161,6 +327,7 @@ async def lapse(tx: Transaction, booking: Booking, now: datetime) -> bool:
     """
     if not booking.awaits_rebook:
         return False
+    await release_proposal(tx, booking, now, ProposalOutcome.EXPIRED)
     await tx.save_booking(booking.cancel(now))
     group = await _group(tx, booking)
     await record_cancelled(tx, booking, group, now, ActorClass.SYSTEM)
@@ -184,12 +351,28 @@ async def lapse_unconfirmed(tx: Transaction, booking: Booking, now: datetime) ->
     return True
 
 
+def _allows(rule: PlannerRule, booking: Booking, group: Group, now: datetime) -> bool:
+    """Return whether ``rule`` lets a planner act on ``booking`` now, without raising."""
+    try:
+        rule(booking, group, now)
+    except DomainError:
+        return False
+    return True
+
+
 async def _group(tx: Transaction, booking: Booking) -> Group:
     """Return the booking's group; a booking without one is a programming error."""
     group = await tx.get_group_by_id(booking.group_id)
     if group is None:
         raise ValueError("booking has no group")
     return group
+
+
+def _slot_id(slot: Slot) -> int:
+    """Return the id of a stored slot; a missing id is a programming error."""
+    if slot.id is None:
+        raise ValueError("slot has not been stored")
+    return slot.id
 
 
 def _id(booking: Booking) -> int:

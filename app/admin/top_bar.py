@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 from fastapi import Request
 
-from app.admin.authz import admin_service, session_principal
+from app.admin.authz import admin_service, overview_layout_service, session_principal
 from app.i18n import BoundGettext
 from app.web.help import HelpTopic
 from app.web.navigation import TOP_BAR, Home, Screen
@@ -57,15 +57,23 @@ class TopLink:
 
 
 async def load_top_counts(request: Request) -> None:
-    """Put the counts of the top bar on ``request.state`` for the logged-in admin.
+    """Put the counts of the top bar, and the own overview layout, on ``request.state``.
 
     Only the number of running and failed background jobs has a source today, the same figure
-    the *Running tasks* widget shows. Nothing is read for a visitor.
+    the *Running tasks* widget shows. On a page (a GET) the admin's own overview layout is read
+    too, for the overview and the shortcuts to its widgets (ADR 0096). Nothing is read for a
+    visitor.
     """
-    if session_principal(request) is None or not hasattr(request.app.state, "admin_service"):
+    principal = session_principal(request)
+    if principal is None or not hasattr(request.app.state, "admin_service"):
         return
     active = await admin_service(request).active_jobs(1)
     setattr(request.state, COUNTS_ATTRIBUTE, {"top.tasks": active.total})
+    if request.method == "GET":
+        # ADR 0096: a shortcut to a widget shows only while the widget is on the overview.
+        request.state.overview_layout = await overview_layout_service(request).stored(
+            principal.subject
+        )
 
 
 def _shown(link: Screen, can: Callable[..., bool], on_overview: set[str]) -> bool:

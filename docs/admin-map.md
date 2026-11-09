@@ -12,7 +12,7 @@ forms and reading; a sub-page is `standard` unless the register lists it as wide
 
 | Entry | Path | Permission | Width | Also the home of |
 |---|---|---|---|---|
-| Overview | `/admin/` | `dashboard.view` | wide | – |
+| Overview | `/admin/` | `dashboard.view` | wide | `/admin/overview/add`, `/admin/overview/edit` |
 | Audit log | `/admin/audit` | `audit.view` | wide | – |
 | Retention | `/admin/retention` | `retention.view` | standard | – |
 | Reports | `/admin/reports` | `reports.view` | wide | – |
@@ -64,6 +64,7 @@ Side navigation: *Organisations*. A row *Tab › Sub-tab* is a sub-tab of that t
 | Overview › Settings | `/admin/organisations/{org}/settings` | `settings.organisation.manage` | standard | – |
 | Overview › Embedding | `/admin/organisations/{org}/embedding` | `embedding.manage` | standard | – |
 | Overview › Login | `/admin/organisations/{org}/login` | `identity_providers.view` | standard | `/admin/organisations/{org}/login/new`, `/admin/organisations/{org}/login/{idp_key}` |
+| Overview › Configuration | `/admin/organisations/{org}/configuration` | `settings.organisation.manage` | standard | – |
 | Overview › Usage | `/admin/organisations/{org}/usage` | `reports.view` | wide | – |
 | Participants | `/admin/organisations/{org}/branding` | `branding.manage` | standard | – |
 | Participants › Channels | `/admin/organisations/{org}/channels` | `integrations.manage` | standard | – |
@@ -80,7 +81,7 @@ Side navigation: *Groups*. A row *Tab › Sub-tab* is a sub-tab of that tab.
 |---|---|---|---|---|
 | Overview | `/admin/groups/{slug}` | `group.view` | wide | – |
 | Overview › Usage | `/admin/groups/{slug}/usage` | `reports.view` | wide | – |
-| Agenda | `/admin/groups/{slug}/agenda` | `bookings.view` | wide | `/admin/groups/{slug}/bookings/{booking_id}`, `/admin/groups/{slug}/agenda/week`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/move`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/cancel`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/rebook`, `/admin/groups/{slug}/agenda/slot-rebook`, `/admin/groups/{slug}/agenda/waiting` |
+| Agenda | `/admin/groups/{slug}/agenda` | `bookings.view` | wide | `/admin/groups/{slug}/bookings/{booking_id}`, `/admin/groups/{slug}/agenda/week`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/move`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/cancel`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/rebook`, `/admin/groups/{slug}/agenda/slot-rebook`, `/admin/groups/{slug}/agenda/waiting`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/propose`, `/admin/groups/{slug}/agenda/slot-propose` |
 | Agenda › Queue | `/admin/groups/{slug}/queue` | `queue.work` | wide | `/admin/groups/{slug}/queue/{booking_id}` |
 | Planning | `/admin/groups/{slug}/staffing` | `schedule.manage` | wide | `/admin/groups/{slug}/staffing/{rule_id}`, `/admin/groups/{slug}/staffing/{rule_id}/split` |
 | Planning › Staffing exceptions | `/admin/groups/{slug}/exceptions` | `schedule.manage` | standard | `/admin/groups/{slug}/exceptions/{override_id}` |

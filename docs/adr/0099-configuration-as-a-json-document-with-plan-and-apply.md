@@ -3,12 +3,13 @@
 Status: accepted (2026-11-08), build ordered by the product owner in the conversation of
 2026-11-08 ("je mag alle stappen bouwen, testen, mergen en fixen", with `po:approved` for the
 pull requests). Partly built: steps 1 (the domain: format `v1`, strict reading, planner, rules, natural
-keys) and 2 (the adapter, the host commands and the JSON Schema) are built; steps 3 to 5 are
-not; see *Build status*. Supersedes ADR 0089 points 1
+keys), 2 (the adapter, the host commands and the JSON Schema), 3 (the portal) and 4 (the API,
+the installer and the retirement of the SQLite export) are built; step 5, the removal of the
+SQLite import after one release, is not; see *Build status*. Supersedes ADR 0089 points 1
 (the package is a SQLite file) and 5 (import only into an installation not in use) once step 4
 is built; ADR 0089 points 2–4 and 6–8 carry over as amended below. Extends ADR 0008 (secrets at
 rest), ADR 0014 (authorisation) and ADR 0042 (settings classes). Amended by the section
-*Amendments from building step 1* below.
+*Amendments from building step 1*, *step 3* and *step 4* below.
 
 ## Context
 
@@ -237,12 +238,93 @@ completes the numbered point it names.
 - Webex service-app tokens rotate: applying them on a second installation invalidates the
   first's copy, so the export says so and the plan shows it.
 
+## Amendments from building step 3 (2026-11-08)
+
+- **Point 13, where it lives.** The platform's block sits on the existing sub-tab *Configuration
+  package* of *Advanced settings* above the SQLite block (which step 4 removes); the
+  organisation's is a new sub-tab *Configuration* of *Overview*, registered in
+  `app/web/navigation.py` and `docs/admin-map.md`. The routes are in
+  `app/admin/configuration_routes.py` for both scopes; each pins the document's scope to its
+  own.
+- **Reviewing and applying.** The plan page lists every change by path and field name, never a
+  value, the refusals in words, and the warnings: deletions, a changed claim value, a replaced
+  Webex Service App token. The upload is kept in memory of the web process (`ReviewedDocuments`)
+  under a random token, one per admin and scope, for `configuration_review_minutes` (class C);
+  the apply form carries the token and, for sealed secrets, the passphrase again, never kept. A
+  restart of the process loses a document under review, which costs one more upload. The apply
+  passes the hash of the plan that was shown, so what is written is what was read (point 6).
+- **Recent login.** Every portal change route requires a recent login, so export, plan and apply
+  all do: one rule instead of a `fresh` attribute per kind, at least as strict as the per-kind
+  rule the step 1 review asked for. A test pins that the three routes of each scope refuse an
+  old login.
+- **Export by rights.** An export leaves out the objects and fields the actor cannot manage
+  (`app/domain/configuration_visibility.py`); an organisation or a group stays as the frame of
+  what it holds. This is stricter than viewing, because a document is a way to change the
+  configuration elsewhere. A role that can only view (the auditor) therefore cannot export.
+- **Claim values.** The plan screen warns that a changed `idp_key` or `claim_value` locks people
+  out until the identity provider sends the new value; it does not count them, as the
+  entitlements of staff are not stored (ADR 0049).
+- **Identity providers over the portal and the host.** The issuer of a provider that is created
+  or moved is fetched through the outbound guard by `issuer_fetcher`
+  (`app/adapters/configuration_discovery.py`), in the portal and in the host commands, outside
+  the write lock; the step 2 refusal `integration_not_ready` on the host is gone.
+- **Contact center.** A group's `wxcc_*` columns became the provider-neutral routing of ADR 0032;
+  the document holds it as `contact_center {kind, routing_value, attributes}`, checked against
+  the descriptor of each platform the installation has an adapter for, and written the way the
+  portal writes it (the old columns for Webex Contact Center, ADR 0116 expand step).
+
+## Amendments from building step 4 (2026-11-08)
+
+- **Point 14, what changed for the SQLite package.** Nothing writes it any more: the portal's
+  export form, `config export` (now `--format json` only) and the agent API's `GET` are gone or
+  produce the document. A package is still *read* for one release, through
+  `SqliteConfigurationTransfer.to_document`: the package is opened on a temporary copy, its
+  secrets are sealed under the installation's key, the copy is read with the readers of the live
+  database, and the result is a `replace` document of the platform that
+  `ConfigurationPackageService.import_` plans and applies with the actor's rights. The old
+  gate "import only into an installation not in use" is gone; the planner's in-use rules
+  (bookings, closures, shortfall acceptances, API grants) and the rights per change replace it.
+  An import has no review step, as the package import never had: the plan it applies is the one
+  it computes. `configuration_installation_in_use` is gone from the error codes. `config show`
+  and `config env` keep reading the package (the installer takes the login from it).
+  The package export helper lives in `tests/support/legacy_package.py`, so the tests can still
+  make packages to read.
+- **The agent API.** `GET /api/agent/v1/configuration` exports the platform document (secrets
+  sealed only when `X-Passphrase` is given), `POST …/plan` and `POST …/apply` take a document
+  (`X-Plan-Hash` pins the reviewed plan), `PUT` applies a document as given, or converts a
+  package. The scope `configuration:transfer` stays global; its client acts as
+  `Actor.api_client`, which the matrix does not bind, like the host.
+- **The scope is a superuser's (decision for the product owner).** Point 11 says the agent API
+  scope `configuration:transfer` "is checked the same way" as a person's rights. It cannot be:
+  an API client holds no roles, so it applies as `Actor.api_client`, which the matrix does not
+  bind, as the host does. On an installation in use that client can therefore change anything
+  the configuration holds, API clients, identity providers, roles and claim values included;
+  under ADR 0089 it could do the same only on a new installation. The scope description in the
+  OpenAPI spec, the manual and the threat model now say so, and every applied change is audited
+  under the client id. If this is too much, the way out is to refuse those kinds to the API actor
+  (a `not_permitted` refusal in the plan); that would end provisioning of logins over the API.
+- **The agent API routes.** `PUT /configuration` is JSON only and is `POST …/apply` (with
+  `X-Plan-Hash`); an old package goes to `PUT /configuration/package`, which has its own
+  response and is deleted with the converter in step 5.
+- **The package is untrusted input.** Besides the revision, the converter compares the column
+  set of every configuration table, refuses a trigger or view the running database does not have
+  and turns `trusted_schema` off before it touches the copy; a damaged file is
+  `configuration_package_invalid`. A package import is confirmed by the call itself
+  (`apply_document(..., confirmed=True)`): what the package leaves out is deleted unless
+  something refers to it, the in-use rules and the change cap being the limits.
+- **The installer.** `--configuration FILE` takes a document (planned, then applied with the
+  plan hash) or an old package; a document carries no login, so the identity provider is asked
+  for as without a file.
+- **Step 5 stays.** The package import is removed in the release after the one that ships this
+  step (ADR 0116), together with `config show|env|import` and the converter.
+
 ## Settings
 
 | Key | Class | Default | Bounds | Permission | Note |
 |---|---|---|---|---|---|
 | `configuration_package_max_mb` | C platform | 64 | 1–512 | `settings.platform.manage` | unchanged from ADR 0089; now the largest document accepted |
 | `configuration_apply_max_changes` | C platform | 500 | 1–10000 | `settings.platform.manage` | an apply whose plan has more changes is refused (`configuration_too_many_changes`); a guard against a mistaken `replace` document |
+| `configuration_review_minutes` | C platform | 30 | 5–240 | `settings.platform.manage` | how long the portal keeps an uploaded document after showing its plan, so the apply is the reviewed one (step 3) |
 
 **Fixed on purpose:** the passphrase length (16), the scrypt parameters, the salt size and
 the associated data of a sealed value (crypto parameters, ADR 0008); the format versions and
@@ -257,8 +339,8 @@ portal); the requirement of a plan hash for deletions in the portal.
 | 0 | ADR proposed | #345 | merged |
 | 1 | Domain: format `v1` (registry of kinds, strict reading and writing), natural keys (migration 0099 for closure scenarios and alert targets), planner with actions, mode, scope, per-change rights and the integrity rules; tests per aggregate | #618 | merged |
 | 2 | Adapter: export with and without secrets, plan and apply in one transaction, sealed values with associated data, inline binaries; host commands `config export --format json\|plan\|apply`; `config-schema` and `docs/configuration-schema/v1.json`; setting `configuration_apply_max_changes` | #625 | merged |
-| 3 | Portal: *Configuration* on *Advanced settings* (upload → plan table → apply) and the organisation sub-tab *Configuration*; per-change permission checks; manual topics nl/en | | planned |
-| 4 | API `plan`/`apply`, `PUT` mapped to apply; installer applies a document; SQLite export removed, SQLite import converted for one release; `docs/agent-api.md`, `docs/install.md` | | planned |
+| 3 | Portal: *Configuration* on *Advanced settings* (upload → plan table → apply) and the organisation sub-tab *Configuration*; per-change permission checks; export by rights; manual topics nl/en; setting `configuration_review_minutes` | #642 | merged |
+| 4 | API `plan`/`apply`, `PUT` mapped to apply; installer applies a document; SQLite export removed, SQLite import converted for one release; `docs/agent-api.md`, `docs/install.md` | #645 | merged |
 | 5 | SQLite import removed after the release that converts it | | planned |
 
 ## Consequences

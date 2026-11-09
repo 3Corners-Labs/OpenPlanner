@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ _("details.title") }} – {{ group.name }}{% endblock %}
+{% block content %}
+{% include "_error_summary.html" %}
+<p class="eyebrow">{{ group.name }}</p>
+<h1>{{ _("details.title") }}</h1>
+<dl class="details">
+  <dt>{{ _("manage.when") }}</dt><dd>{{ slot_label }}</dd>
+  <dt>{{ _("details.email") }}</dt><dd>{{ email }}</dd>
+</dl>
+<p class="hint">{{ _("details.email_hint") }}</p>
+<form class="card" method="post" action="/b/m/{{ ref }}/details" novalidate>
+  {% include "_contact_fields.html" %}
+  <ul class="actions">
+    <li><button type="submit" class="button">{{ _("details.save") }}</button></li>
+    <li><a href="/b/m/{{ ref }}">{{ _("details.back") }}</a></li>
+  </ul>
+</form>
+{% endblock %}

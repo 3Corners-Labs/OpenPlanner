@@ -27,7 +27,7 @@ new group.
 
 The group's name as participants and staff see it: on the booking page, in confirmations and
 reminders, and in the contact-centre task. Choose a name a participant recognises, for example
-"Permits" rather than an internal team code.
+"Customer service" rather than an internal team code.
 
 <!-- field: timezone -->
 ### Time zone
@@ -138,7 +138,7 @@ the list. That is a working agreement within the team, not a protection.
 ### Calendar invite to (own queue)
 
 Only with the own queue, and optional. A shared mailbox or mailing list of the team, such as
-`team-aangifte@organisatie.nl`. Each appointment sends that address a calendar invite with the
+`team-balie@example.org`. Each appointment sends that address a calendar invite with the
 time, the participant's first name, the reference and a link to the queue. When the
 appointment is moved, cancelled or put on hold, the invite is withdrawn.
 

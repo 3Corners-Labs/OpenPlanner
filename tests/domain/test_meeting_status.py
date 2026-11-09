@@ -305,3 +305,14 @@ async def test_a_remembered_failure_is_forgotten_when_the_join_window_closes(
     await service.day_overview(GROUP_ADMIN, "demo", DAY)
 
     assert not service._failed  # noqa: SLF001
+
+
+def test_a_poll_sets_and_clears_the_lobby_wait() -> None:
+    """Security review: without webhooks the lobby wait still starts and ends."""
+    alone = MeetingStatus(CallState.IN_PROGRESS, participants=1)
+    status = apply_polled(new_status(1), alone, SLOT_0900)
+    assert status.lobby_since == SLOT_0900
+    later = SLOT_0900 + timedelta(minutes=1)
+    assert apply_polled(status, alone, later).lobby_since == SLOT_0900
+    empty = MeetingStatus(CallState.IN_PROGRESS, participants=0)
+    assert apply_polled(status, empty, later).lobby_since is None

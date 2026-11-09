@@ -36,8 +36,8 @@ from tests.support.domain import (
 @pytest.fixture
 def uow() -> InMemoryUnitOfWork:
     state = State()
-    state.groups[1] = make_group(id=1, slug="aangifte")
-    state.groups[2] = make_group(id=2, slug="toeslagen", phone_mode=PhoneMode.REQUIRED)
+    state.groups[1] = make_group(id=1, slug="balie")
+    state.groups[2] = make_group(id=2, slug="helpdesk", phone_mode=PhoneMode.REQUIRED)
     state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=1))]
     state.rules[2] = [ScheduleRule(weekday=1, window=window(capacity=1))]  # Tuesdays
     state.reminder_rules[1] = [ReminderRule(ChannelKind.EMAIL, minutes_before=24 * 60)]
@@ -52,7 +52,7 @@ def service(uow: InMemoryUnitOfWork) -> BookingService:
 async def test_availability_lists_free_slots(service: BookingService) -> None:
     await book(service)
 
-    slots = await service.availability("aangifte", MONDAY, MONDAY)
+    slots = await service.availability("balie", MONDAY, MONDAY)
 
     assert [s.start for s in slots] == [SLOT_0930]
 
@@ -61,7 +61,7 @@ async def test_availability_errors(service: BookingService) -> None:
     with pytest.raises(DomainError, match="group_not_found"):
         await service.availability("unknown", MONDAY, MONDAY)
     with pytest.raises(DomainError, match="invalid_range"):
-        await service.availability("aangifte", MONDAY, MONDAY - timedelta(days=1))
+        await service.availability("balie", MONDAY, MONDAY - timedelta(days=1))
 
 
 async def test_book_creates_slot_booking_and_jobs(
@@ -117,7 +117,7 @@ async def test_bookings_on_an_old_grid_count_against_overlapping_slots(
     # The window moves to 08:45: the grid becomes 08:45, 09:15 and both overlap 09:00.
     uow.state.rules[1] = [ScheduleRule(weekday=0, window=window("08:45", "10:00", 1))]
 
-    assert await service.availability("aangifte", MONDAY, MONDAY) == []
+    assert await service.availability("balie", MONDAY, MONDAY) == []
     with pytest.raises(DomainError, match="slot_full"):
         await book(service, SLOT_0900 - timedelta(minutes=15))
 
@@ -165,7 +165,7 @@ async def test_invalid_contact_stores_nothing(
 ) -> None:
     with pytest.raises(DomainError) as excinfo:
         await service.book(
-            group_slug="aangifte",
+            group_slug="balie",
             start=SLOT_0900,
             contact=ContactInput(first_name="Ada", last_name="Lovelace", email="not-an-email"),
             locale="nl",
@@ -179,7 +179,7 @@ async def test_invalid_contact_stores_nothing(
 async def test_group_phone_mode_is_applied(service: BookingService) -> None:
     with pytest.raises(DomainError, match="phone"):
         await service.book(
-            group_slug="toeslagen",
+            group_slug="helpdesk",
             start=TUESDAY_0900,
             contact=ContactInput(first_name="Ada", last_name="Lovelace", email="ada@example.org"),
             locale="en",
@@ -269,7 +269,7 @@ async def test_reschedule_into_the_same_slot(service: BookingService) -> None:
 async def test_reschedule_into_another_groups_slot_is_refused(
     service: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
-    # Abuse case: the Tuesday slot exists only for group "toeslagen".
+    # Abuse case: the Tuesday slot exists only for group "helpdesk".
     old = await book(service)
 
     with pytest.raises(DomainError, match="slot_unavailable"):
@@ -283,7 +283,7 @@ async def test_failed_reschedule_rolls_back(
     service: BookingService, uow: InMemoryUnitOfWork
 ) -> None:
     old = await book(service)
-    await service.book(group_slug="aangifte", start=SLOT_0930, contact=ADA, locale="en")
+    await service.book(group_slug="balie", start=SLOT_0930, contact=ADA, locale="en")
 
     with pytest.raises(DomainError, match="slot_full"):
         await service.reschedule(old.management_token, SLOT_0930)
@@ -339,7 +339,7 @@ async def test_availability_applies_overrides_in_range(
 ) -> None:
     uow.state.overrides[1] = [ScheduleOverride(day=MONDAY, window=window("09:30", "10:00", 1))]
 
-    slots = await service.availability("aangifte", MONDAY, MONDAY)
+    slots = await service.availability("balie", MONDAY, MONDAY)
 
     assert [s.start for s in slots] == [SLOT_0930]
 
@@ -351,7 +351,7 @@ async def test_consents_are_stored_and_kept_on_reschedule(
     consents = frozenset({ChannelKind.WHATSAPP})
     old = await book_confirmed(
         service,
-        group_slug="aangifte",
+        group_slug="balie",
         start=SLOT_0900,
         contact=ADA,
         locale="nl",
@@ -469,7 +469,7 @@ async def test_both_kinds_can_still_cancel_a_day_ahead_and_after_the_lead(
     uow: InMemoryUnitOfWork, kind: DispatchKind
 ) -> None:
     """The product owner's case: a Monday booking is not locked from Friday on."""
-    uow.state.groups[1] = make_group(id=1, slug="aangifte", dispatch_kind=kind)
+    uow.state.groups[1] = make_group(id=1, slug="balie", dispatch_kind=kind)
     receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
     sunday = BookingService(uow, FixedClock(SLOT_0900 - timedelta(days=1)), TEST_TOKEN_KEY)
 
@@ -482,7 +482,7 @@ async def test_both_kinds_can_still_cancel_a_day_ahead_and_after_the_lead(
 async def test_dispatch_job_follows_the_groups_dispatch_lead(uow: InMemoryUnitOfWork) -> None:
     uow.state.groups[1] = make_group(
         id=1,
-        slug="aangifte",
+        slug="balie",
         dispatch_lead_minutes=15,
         min_notice_minutes=60,
         participant_change_lead_minutes=15,
@@ -505,7 +505,7 @@ async def test_find_returns_group_and_changeability(service: BookingService) -> 
 
     details = await service.find(receipt.management_token)
 
-    assert details.group.slug == "aangifte"
+    assert details.group.slug == "balie"
     assert details.changeable is True
     assert details.change_deadline == SLOT_0900 - timedelta(minutes=60)
     assert details.cancellable is True
@@ -519,7 +519,7 @@ async def test_find_of_a_cancelled_booking_is_not_changeable(service: BookingSer
 
 
 async def test_get_group(service: BookingService) -> None:
-    assert (await service.get_group("aangifte")).id == 1
+    assert (await service.get_group("balie")).id == 1
     with pytest.raises(DomainError, match="group_not_found"):
         await service.get_group("nope")
 
@@ -531,7 +531,7 @@ async def test_an_archived_group_is_not_found_in_public(
     uow.state.groups[1] = replace(uow.state.groups[1], archived_at=NOW)
 
     with pytest.raises(DomainError, match="group_not_found"):
-        await service.get_group("aangifte")
+        await service.get_group("balie")
 
 
 def test_token_key_must_be_long_enough(uow: InMemoryUnitOfWork) -> None:
@@ -542,9 +542,9 @@ def test_token_key_must_be_long_enough(uow: InMemoryUnitOfWork) -> None:
 async def test_own_queue_team_gets_an_invite_and_its_withdrawal(uow: InMemoryUnitOfWork) -> None:
     uow.state.groups[1] = make_group(
         id=1,
-        slug="aangifte",
+        slug="balie",
         dispatch_kind=DispatchKind.OPENPLANNER_QUEUE,
-        calendar_invite_address="team-aangifte@example.org",
+        calendar_invite_address="team-balie@example.org",
     )
     service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
     receipt = await book(service)
@@ -565,7 +565,7 @@ BEA = ContactInput(first_name="Bea", last_name="de Vries", email="bea@example.or
 
 def _limit_service(uow: InMemoryUnitOfWork, limit: int) -> BookingService:
     """Return a service for group 1 with capacity 3 and ``limit`` bookings per address."""
-    uow.state.groups[1] = make_group(id=1, slug="aangifte", max_bookings_per_email=limit)
+    uow.state.groups[1] = make_group(id=1, slug="balie", max_bookings_per_email=limit)
     uow.state.rules[1] = [ScheduleRule(weekday=0, window=window("09:00", "12:00", 3))]
     return BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
 
@@ -576,10 +576,10 @@ async def test_the_same_address_in_the_same_slot_is_refused(uow: InMemoryUnitOfW
     shouting = ContactInput(first_name="Ada", last_name="L.", email="ADA@Example.org")
 
     with pytest.raises(DomainError) as excinfo:
-        await service.book(group_slug="aangifte", start=SLOT_0900, contact=shouting, locale="nl")
+        await service.book(group_slug="balie", start=SLOT_0900, contact=shouting, locale="nl")
 
     assert excinfo.value.code is ErrorCode.BOOKING_LIMIT_REACHED
-    await service.book(group_slug="aangifte", start=SLOT_0900, contact=BEA, locale="nl")
+    await service.book(group_slug="balie", start=SLOT_0900, contact=BEA, locale="nl")
 
 
 async def test_an_address_may_hold_up_to_the_group_maximum(uow: InMemoryUnitOfWork) -> None:
@@ -599,8 +599,8 @@ async def test_the_limit_counts_only_this_group_and_the_future(
 ) -> None:
     service = _limit_service(uow, 1)
     await book(service)
-    uow.state.groups[2] = make_group(id=2, slug="toeslagen", max_bookings_per_email=1)
-    await service.book(group_slug="toeslagen", start=TUESDAY_0900, contact=ADA, locale="nl")
+    uow.state.groups[2] = make_group(id=2, slug="helpdesk", max_bookings_per_email=1)
+    await service.book(group_slug="helpdesk", start=TUESDAY_0900, contact=ADA, locale="nl")
 
     with pytest.raises(DomainError, match="booking_limit_reached"):
         await book(service, SLOT_0930)
@@ -608,7 +608,7 @@ async def test_the_limit_counts_only_this_group_and_the_future(
     later = BookingService(uow, FixedClock(SLOT_0930 + timedelta(minutes=1)), TEST_TOKEN_KEY)
     uow.state.groups[1] = make_group(
         id=1,
-        slug="aangifte",
+        slug="balie",
         min_notice_minutes=0,
         dispatch_lead_minutes=0,
         max_bookings_per_email=1,

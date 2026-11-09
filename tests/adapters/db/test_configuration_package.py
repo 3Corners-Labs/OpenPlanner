@@ -1,4 +1,4 @@
-"""Configuration packages on SQLite (ADR 0089): export, inspect, import and the registry."""
+"""SQLite configuration packages (ADR 0089), read for one release as documents (ADR 0099)."""
 
 import sqlite3
 from contextlib import closing
@@ -8,31 +8,36 @@ import pytest
 from cryptography.exceptions import InvalidTag
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
+from app.adapters.configuration_context import document_service
 from app.adapters.crypto import SecretBox
 from app.adapters.db.configuration_package import (
     SqliteConfigurationTransfer,
     environment_values,
-    export_package,
-    import_package,
     inspect_package,
-    installation_in_use,
 )
 from app.adapters.db.credentials import CredentialStore
 from app.adapters.db.engine import create_engine
-from app.adapters.db.models import Base, SlotRow, StaffRow
+from app.adapters.db.models import Base, StaffRow
 from app.adapters.db.seed import seed_demo
-from app.domain.configuration_package import (
-    CONFIGURATION_TABLES,
-    STATE_TABLES,
-    VERSION_TABLE,
-)
+from app.adapters.db.uow import SqlUnitOfWork
+from app.config import Settings
+from app.domain.admin import AdminService
+from app.domain.authorization import Role
+from app.domain.configuration_document import Mode, Scope
+from app.domain.configuration_document_service import Actor, ConfigurationDocumentService
+from app.domain.configuration_package import CONFIGURATION_TABLES, STATE_TABLES, VERSION_TABLE
 from app.domain.errors import DomainError, ErrorCode
 from tests.adapters.db.conftest import seed_group
+from tests.fakes.clock import FixedClock
+from tests.fakes.identity_providers import FakeDiscoveryFetcher
 from tests.support.configuration_package import NOW, PASSPHRASE, SOURCE_BOX, database_path
 from tests.support.database import migrated_database
+from tests.support.legacy_package import export_package
+from tests.support.principals import principal
 
 TARGET_BOX = SecretBox(b"t" * 32)
 ENVIRONMENT = {"OIDC_DISCOVERY_URL": "https://idp.example/.well-known/openid-configuration"}
+HOST = Actor.host()
 
 
 async def _source(engine: AsyncEngine) -> None:
@@ -52,7 +57,7 @@ async def _source(engine: AsyncEngine) -> None:
         )
 
 
-def _export(database: Path, tmp_path: Path, **overrides: object) -> bytes:
+def _package(database: Path, tmp_path: Path, **overrides: object) -> bytes:
     options: dict[str, object] = {
         "created_at": NOW,
         "installation": "bron",
@@ -62,6 +67,19 @@ def _export(database: Path, tmp_path: Path, **overrides: object) -> bytes:
     }
     options.update(overrides)
     return export_package(database, SOURCE_BOX, PASSPHRASE, **options)  # type: ignore[arg-type]
+
+
+def _documents(engine: AsyncEngine) -> ConfigurationDocumentService:
+    clock = FixedClock(NOW)
+    uow = SqlUnitOfWork(engine, TARGET_BOX)
+    return document_service(
+        uow,
+        clock,
+        AdminService(uow, clock),
+        settings=lambda: Settings(_env_file=None, database_url="sqlite+aiosqlite:///x"),  # type: ignore[call-arg]
+        discovery=FakeDiscoveryFetcher(),
+        locked=frozenset,
+    )
 
 
 def test_every_table_of_the_model_is_configuration_or_state() -> None:
@@ -86,41 +104,34 @@ def test_every_sealed_column_of_a_configuration_table_is_resealed() -> None:
     }
 
     assert sealed == {(table, cipher) for table, _, cipher, _ in _SEALED}, (
-        "a sealed column needs an entry in _SEALED, or its secret is unreadable after an import"
+        "a sealed column needs an entry in _SEALED, or its secret is unreadable after a read"
     )
 
 
-async def test_export_keeps_configuration_and_drops_state(
+async def test_a_package_is_inspected_with_its_passphrase_and_not_without(
     engine: AsyncEngine, database_url: str, tmp_path: Path
 ) -> None:
     await _source(engine)
+    package = _package(database_path(database_url), tmp_path)
 
-    package = _export(database_path(database_url), tmp_path)
+    summary = inspect_package(package, PASSPHRASE, tmp_path / "work")
 
     assert package.startswith(b"SQLite format 3\x00")
-    assert b"Sanne" not in package  # staff is state, and vacuumed away
-    assert list((tmp_path / "work").glob("*.sqlite")) == []  # the copy is removed again
-    summary = inspect_package(package, PASSPHRASE, tmp_path / "work")
-    assert summary.counts == {
-        "organisations": 2,
-        "groups": 2,
-        "identity_providers": 0,
-        "api_clients": 0,
-    }
+    assert b"Sanne" not in package  # staff is state, vacuumed away
+    assert summary.counts["organisations"] == 2
     assert summary.secrets == 1
-    assert summary.installation == "bron"
-    assert summary.app_version == "1.2.3"
     assert summary.environment == ("OIDC_DISCOVERY_URL",)
-    assert summary.created_at == NOW
-    assert summary.revision  # the alembic revision travels with the package
+    assert environment_values(package, PASSPHRASE, tmp_path / "work") == ENVIRONMENT
+    with pytest.raises(DomainError) as refused:
+        inspect_package(package, "not the passphrase", tmp_path / "work")
+    assert refused.value.code is ErrorCode.CONFIGURATION_PASSPHRASE_WRONG
 
 
-async def test_secrets_are_sealed_under_the_passphrase_not_the_installation_key(
+async def test_a_package_secret_is_sealed_under_the_passphrase_not_the_installation_key(
     engine: AsyncEngine, database_url: str, tmp_path: Path
 ) -> None:
     await _source(engine)
-
-    package = _export(database_path(database_url), tmp_path)
+    package = _package(database_path(database_url), tmp_path)
 
     file = tmp_path / "p.sqlite"
     file.write_bytes(package)
@@ -130,59 +141,93 @@ async def test_secrets_are_sealed_under_the_passphrase_not_the_installation_key(
         ).fetchone()
     with pytest.raises(InvalidTag):
         SOURCE_BOX.open("webex_service_app", nonce, ciphertext)
-    with pytest.raises(DomainError) as refused:
-        inspect_package(package, "not the passphrase", tmp_path / "work")
-    assert refused.value.code is ErrorCode.CONFIGURATION_PASSPHRASE_WRONG
-    assert environment_values(package, PASSPHRASE, tmp_path / "work") == ENVIRONMENT
 
 
-async def test_import_replaces_the_configuration_and_reseals_the_secrets(
+async def test_a_package_becomes_a_replacing_document_of_the_platform(
+    engine: AsyncEngine, database_url: str, tmp_path: Path
+) -> None:
+    await _source(engine)
+    package = _package(database_path(database_url), tmp_path)
+    transfer = SqliteConfigurationTransfer(database_path(database_url), TARGET_BOX, now=lambda: NOW)
+
+    document, summary = await transfer.to_document(package, PASSPHRASE)
+
+    assert document.mode is Mode.REPLACE
+    assert document.scope == Scope()
+    assert {o.key for o in document.root.children["organisations"]} == {("andere",), ("demo",)}
+    assert summary.installation == "bron"
+    assert document.meta["installation"] == "bron"
+    assert list(transfer.work_dir.glob("*")) == []  # temporary copies are removed
+
+
+async def test_applying_the_converted_document_replaces_the_configuration_and_reseals(
     engine: AsyncEngine, database_url: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     await _source(engine)
-    package = _export(database_path(database_url), tmp_path)
+    package = _package(database_path(database_url), tmp_path)
     target_url = migrated_database(tmp_path, monkeypatch, "target")
     target = create_engine(target_url)
     try:
         await seed_group(target, slug="oud")  # configuration that must go
-        with closing(sqlite3.connect(database_path(target_url))) as db:
-            db.execute("INSERT INTO settings_version (id, version) VALUES (1, 7)")
-            db.commit()
-
-        summary = import_package(
-            database_path(target_url), package, PASSPHRASE, TARGET_BOX, tmp_path / "work"
+        transfer = SqliteConfigurationTransfer(
+            database_path(target_url), TARGET_BOX, now=lambda: NOW
         )
+        document, _ = await transfer.to_document(package, PASSPHRASE)
+        documents = _documents(target)
 
-        assert summary.counts["organisations"] == 2
-        store = CredentialStore(target, TARGET_BOX)
-        assert await store.get("webex_service_app") == {"token": "secret"}
+        plan = await documents.plan_document(HOST, document)
+        result = await documents.apply_document(HOST, document, plan.digest)
+
+        assert result.applied, plan.refusals
+        assert await CredentialStore(target, TARGET_BOX).get("webex_service_app") == {
+            "token": "secret"
+        }
         with closing(sqlite3.connect(database_path(target_url))) as db:
             slugs = [r[0] for r in db.execute("SELECT slug FROM organisations ORDER BY slug")]
-            version = db.execute("SELECT version FROM settings_version").fetchone()[0]
-            staff = db.execute("SELECT COUNT(*) FROM staff").fetchone()[0]
+            groups = [r[0] for r in db.execute("SELECT slug FROM groups ORDER BY slug")]
             assert db.execute("PRAGMA foreign_key_check").fetchone() is None
         assert slugs == ["andere", "demo"]
-        assert version == 8  # past the old value, so every process reloads
-        assert staff == 0  # the target's state is not touched (and the source's not copied)
+        assert "oud" not in groups  # replaced
     finally:
         await target.dispose()
 
 
-async def test_import_refuses_another_schema_revision_and_rubbish(
+async def test_a_replacing_package_refuses_what_the_actor_may_not_change(
+    engine: AsyncEngine, database_url: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await _source(engine)
+    package = _package(database_path(database_url), tmp_path)
+    target_url = migrated_database(tmp_path, monkeypatch, "target")
+    target = create_engine(target_url)
+    try:
+        transfer = SqliteConfigurationTransfer(
+            database_path(target_url), TARGET_BOX, now=lambda: NOW
+        )
+        document, _ = await transfer.to_document(package, PASSPHRASE)
+        nobody = Actor("someone", principal("someone", "Someone", [Role.ORG_ADMIN], ["demo"]))
+
+        plan = await _documents(target).plan_document(nobody, document)
+
+        assert not plan.ok
+        assert ErrorCode.NOT_PERMITTED in {r.code for r in plan.refusals}
+    finally:
+        await target.dispose()
+
+
+async def test_another_schema_revision_and_rubbish_are_refused(
     engine: AsyncEngine, database_url: str, tmp_path: Path
 ) -> None:
     await _source(engine)
-    package = _export(database_path(database_url), tmp_path)
+    package = _package(database_path(database_url), tmp_path)
     file = tmp_path / "other.sqlite"
     file.write_bytes(package)
     with closing(sqlite3.connect(file)) as db:
         db.execute("UPDATE alembic_version SET version_num = 'older'")
         db.commit()
+    transfer = SqliteConfigurationTransfer(database_path(database_url), SOURCE_BOX, now=lambda: NOW)
 
     with pytest.raises(DomainError) as version:
-        import_package(
-            database_path(database_url), file.read_bytes(), PASSPHRASE, SOURCE_BOX, tmp_path
-        )
+        await transfer.to_document(file.read_bytes(), PASSPHRASE)
     with pytest.raises(DomainError) as rubbish:
         inspect_package(b"not a database", PASSPHRASE, tmp_path)
     with pytest.raises(DomainError) as plain:
@@ -191,85 +236,38 @@ async def test_import_refuses_another_schema_revision_and_rubbish(
     assert version.value.code is ErrorCode.CONFIGURATION_PACKAGE_VERSION
     assert rubbish.value.code is ErrorCode.CONFIGURATION_PACKAGE_INVALID
     assert plain.value.code is ErrorCode.CONFIGURATION_PACKAGE_INVALID  # no package table
-
-
-async def test_an_installation_with_a_slot_is_in_use(
-    engine: AsyncEngine, database_url: str
-) -> None:
-    group = await seed_group(engine)
-    assert not installation_in_use(database_path(database_url))
-
-    async with AsyncSession(engine) as session, session.begin():
-        session.add(
-            SlotRow(group_id=group, start=NOW, end=NOW, capacity_snapshot=1, kind="scheduled")
-        )
-
-    assert installation_in_use(database_path(database_url))
+    assert list(transfer.work_dir.glob("*")) == []
 
 
 async def test_the_transfer_adapter_needs_a_settings_key(database_url: str) -> None:
-    transfer = SqliteConfigurationTransfer(
-        database_path(database_url),
-        None,
-        installation="x",
-        app_version="",
-        environment=dict,
-        now=lambda: NOW,
-    )
+    transfer = SqliteConfigurationTransfer(database_path(database_url), None, now=lambda: NOW)
 
     with pytest.raises(DomainError) as refused:
-        await transfer.export(PASSPHRASE)
+        await transfer.to_document(b"SQLite format 3\x00", PASSPHRASE)
 
     assert refused.value.code is ErrorCode.INTEGRATION_NOT_READY
-    assert not await transfer.in_use()
 
 
-async def test_the_transfer_adapter_round_trips(
+async def test_a_package_with_a_trigger_or_another_column_set_is_refused(
     engine: AsyncEngine, database_url: str, tmp_path: Path
 ) -> None:
     await _source(engine)
-    transfer = SqliteConfigurationTransfer(
-        database_path(database_url),
-        SOURCE_BOX,
-        installation="bron",
-        app_version="1.0.0",
-        environment=lambda: ENVIRONMENT,
-        now=lambda: NOW,
-    )
-
-    package = await transfer.export(PASSPHRASE)
-    summary = await transfer.import_(package, PASSPHRASE)
-
-    assert summary.counts["groups"] == 2
-    assert (await transfer.inspect(package, PASSPHRASE)).environment == ("OIDC_DISCOVERY_URL",)
-    assert transfer.work_dir == database_path(database_url).parent / "transfer"
-    assert list(transfer.work_dir.glob("*")) == []  # temporary copies are removed
-
-
-async def test_import_rechecks_the_installation_inside_its_own_write_lock(
-    engine: AsyncEngine, database_url: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # Release audit v0.4.0 P2 (#516): a booking committed after the service's first check but
-    # before the write lock must stop the import, or its data attaches to imported IDs.
-    await _source(engine)
-    package = _export(database_path(database_url), tmp_path)
-    target_url = migrated_database(tmp_path, monkeypatch, "target")
-    target = create_engine(target_url)
-    try:
-        group = await seed_group(target, slug="oud")
-        async with AsyncSession(target) as session, session.begin():
-            session.add(
-                SlotRow(group_id=group, start=NOW, end=NOW, capacity_snapshot=1, kind="scheduled")
-            )
+    package = _package(database_path(database_url), tmp_path)
+    transfer = SqliteConfigurationTransfer(database_path(database_url), SOURCE_BOX, now=lambda: NOW)
+    crafted = {
+        "trigger": "CREATE TRIGGER evil AFTER UPDATE ON organisations BEGIN SELECT 1; END",
+        "view": "CREATE VIEW evil AS SELECT 1",
+        "column": "ALTER TABLE organisations ADD COLUMN extra TEXT",
+    }
+    for name, statement in crafted.items():
+        file = tmp_path / f"{name}.sqlite"
+        file.write_bytes(package)
+        with closing(sqlite3.connect(file)) as db:
+            db.execute(statement)
+            db.commit()
 
         with pytest.raises(DomainError) as refused:
-            import_package(
-                database_path(target_url), package, PASSPHRASE, TARGET_BOX, tmp_path / "work"
-            )
+            await transfer.to_document(file.read_bytes(), PASSPHRASE)
 
-        assert refused.value.code is ErrorCode.CONFIGURATION_INSTALLATION_IN_USE
-        with closing(sqlite3.connect(database_path(target_url))) as db:
-            slugs = [r[0] for r in db.execute("SELECT slug FROM groups")]
-        assert slugs == ["oud"]  # nothing was replaced
-    finally:
-        await target.dispose()
+        assert refused.value.code is ErrorCode.CONFIGURATION_PACKAGE_INVALID, name
+    assert list(transfer.work_dir.glob("*")) == []

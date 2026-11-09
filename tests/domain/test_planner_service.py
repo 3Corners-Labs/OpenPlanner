@@ -1,9 +1,10 @@
-import itertools
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from datetime import timedelta
 
 import pytest
 
+from app.domain.activity_alert import CHANGES_ALERT
 from app.domain.admin import AdminService
 from app.domain.agenda_service import AgendaService
 from app.domain.audit import SYSTEM_ACTOR, Outcome, Source
@@ -13,20 +14,24 @@ from app.domain.channels import ChannelKind
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.errors import DomainError
 from app.domain.job_plan import JobType
-from app.domain.planner_service import ALERT_ACTION, PlannerService
+from app.domain.planner_service import PlannerService, ReviewScope
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
+from app.domain.usage import ActorClass, FactKind, UsageFact
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
-from tests.support.admin import AUDITOR, GROUP_ADMIN, OTHER_TEAM
+from tests.support.admin import AUDITOR, GROUP_ADMIN, OTHER_TEAM, SUPER
+from tests.support.cross_group import booking_id_methods, refused_as_unknown
 from tests.support.domain import (
     ADA,
     MONDAY,
     NOW,
     SLOT_0900,
     SLOT_0930,
+    another_participant,
+    book_another,
     book_confirmed,
-    participant,
+    book_pending,
     window,
     with_team_invite,
 )
@@ -34,27 +39,10 @@ from tests.support.domain import (
 SMS = frozenset({ChannelKind.SMS})
 
 
-@pytest.fixture
-def planner(uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService) -> PlannerService:
-    return PlannerService(uow, clock, AdminService(uow, clock), bookings, alert_per_hour=50)
-
-
-_PARTICIPANTS = itertools.count(1)
-"""Each booking of ``_book`` is another participant, so the address limit (ADR 0066) stays out."""
-
-
 async def _book(
     bookings: BookingService, start=SLOT_0900, slug: str = "demo", consents=frozenset()
 ) -> int:
-    receipt = await book_confirmed(
-        bookings,
-        group_slug=slug,
-        start=start,
-        contact=participant(next(_PARTICIPANTS)),
-        locale="nl",
-        consents=consents,
-    )
-    return receipt.booking.id or 0
+    return (await book_another(bookings, start, slug, consents)).booking.id or 0
 
 
 def _staff(uow: InMemoryUnitOfWork, agents: int) -> None:
@@ -112,17 +100,6 @@ async def test_a_move_that_causes_a_shortfall_needs_confirmation(
     moved = await planner.move(GROUP_ADMIN, "demo", first, SLOT_0930, accept_shortfall=True)
 
     assert moved.start == SLOT_0930
-
-
-async def test_a_booking_of_another_group_cannot_be_reached_through_this_group(
-    planner: PlannerService, bookings: BookingService
-) -> None:
-    other = await _book(bookings, slug="andere-team")
-
-    with pytest.raises(DomainError, match="booking_not_found"):
-        await planner.move(GROUP_ADMIN, "demo", other, SLOT_0930)
-    with pytest.raises(DomainError, match="booking_not_found"):
-        await planner.cancel(GROUP_ADMIN, "demo", other, ChangeReason.STAFFING)
 
 
 async def test_a_full_slot_stays_full(planner: PlannerService, bookings: BookingService) -> None:
@@ -254,13 +231,14 @@ async def test_a_slot_without_shortfall_cannot_be_accepted(
 async def test_many_changes_by_one_planner_raise_one_system_event(
     uow: InMemoryUnitOfWork, clock: FixedClock, bookings: BookingService
 ) -> None:
-    planner = PlannerService(uow, clock, AdminService(uow, clock), bookings, alert_per_hour=1)
+    admin = AdminService(uow, clock, alert_thresholds={CHANGES_ALERT: 1})
+    planner = PlannerService(uow, clock, admin, bookings)
     ids = [await _book(bookings, start) for start in (SLOT_0900, SLOT_0900, SLOT_0930)]
 
     for booking_id in ids:
         await planner.cancel(GROUP_ADMIN, "demo", booking_id, ChangeReason.UNFORESEEN)
 
-    alerts = [e for e in uow.state.audit if e.action == ALERT_ACTION]
+    alerts = [e for e in uow.state.audit if e.action == CHANGES_ALERT.action]
     assert len(alerts) == 1
     (alert,) = alerts
     assert (alert.actor, alert.source, alert.outcome, alert.group) == (
@@ -286,7 +264,7 @@ async def test_asking_to_rebook_frees_the_place_and_tells_the_participant(
     assert waiting.status is BookingStatus.AWAITING_REBOOK
     assert waiting.rebook_by == SLOT_0900 + timedelta(days=14)
     assert (JobType.SEND_REBOOK_REQUEST, ChannelKind.SMS) in _messages(uow, booking_id)
-    assert [b.id for b in await planner.waiting(GROUP_ADMIN, "demo")] == [booking_id]
+    assert [w.booking.id for w in await planner.waiting(GROUP_ADMIN, "demo")] == [booking_id]
     (event,) = [e for e in uow.state.audit if e.action == "bookings.manage"]
     assert (event.detail, event.booking_id) == ("planner.rebook,reason:staffing", booking_id)
 
@@ -334,7 +312,8 @@ async def test_a_bulk_request_takes_the_last_made_bookings_as_many_as_short(
     )
 
     assert [b.id for b in candidates] == [ids[1]]  # the newest one
-    assert [b.id for b in done] == [ids[1]]
+    assert done == 1
+    assert uow.state.bookings[ids[1]].status is BookingStatus.AWAITING_REBOOK
     assert uow.state.bookings[ids[0]].status is BookingStatus.CONFIRMED
     with pytest.raises(DomainError, match="slot_unavailable"):  # no shortfall left
         await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)
@@ -365,3 +344,228 @@ async def test_only_who_may_manage_asks_to_rebook(
         await planner.slot_candidates(AUDITOR, "demo", SLOT_0900)
     with pytest.raises(DomainError, match="not_permitted"):
         await planner.waiting(AUDITOR, "demo")
+
+
+# --- confirm on the participant's behalf (ADR 0056 point 11) --------------------------------
+
+
+async def test_a_planner_confirms_for_the_participant_who_gets_the_full_confirmation(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    receipt = await book_pending(bookings, slug="demo", contact=another_participant())
+    booking_id = receipt.booking.id or 0
+
+    confirmed = await planner.confirm(GROUP_ADMIN, "demo", booking_id)
+
+    assert confirmed.status is BookingStatus.CONFIRMED
+    assert (JobType.SEND_CONFIRMATION, ChannelKind.EMAIL) in _messages(uow, booking_id)
+    [event] = [e for e in uow.state.audit if e.detail == "booking.confirmed_by_staff"]
+    assert (event.actor, event.outcome, event.booking_id) == (
+        GROUP_ADMIN.subject,
+        Outcome.SUCCESS,
+        booking_id,
+    )
+
+
+async def test_only_a_pending_booking_can_be_confirmed(
+    planner: PlannerService, bookings: BookingService
+) -> None:
+    confirmed = await _book(bookings)
+    with pytest.raises(DomainError) as not_pending:
+        await planner.confirm(GROUP_ADMIN, "demo", confirmed)
+    with pytest.raises(DomainError) as refused:
+        await planner.confirm(AUDITOR, "demo", confirmed)
+
+    assert not_pending.value.code.value == "booking_not_pending"
+    assert refused.value.code.value == "not_permitted"
+
+
+async def test_after_its_deadline_a_pending_booking_lapses_instead(
+    planner: PlannerService, bookings: BookingService, clock: FixedClock, uow: InMemoryUnitOfWork
+) -> None:
+    receipt = await book_pending(bookings, slug="demo", contact=another_participant())
+    booking_id = receipt.booking.id or 0
+    confirm_by = receipt.booking.confirm_by
+    assert confirm_by is not None
+    clock.advance(confirm_by - clock.now() + timedelta(minutes=1))
+
+    result = await planner.confirm(GROUP_ADMIN, "demo", booking_id)
+
+    assert result.status is not BookingStatus.CONFIRMED
+    assert not [e for e in uow.state.audit if e.detail == "booking.confirmed_by_staff"]
+
+
+async def test_a_pending_booking_holds_its_place_in_the_agenda(
+    bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """ADR 0056 point 11: counted towards occupancy and shortfall, and marked as pending."""
+    await _book(bookings)
+    await book_pending(bookings, slug="demo", contact=another_participant())
+
+    agenda = AgendaService(uow, clock, AdminService(uow, clock), horizon_days=14)
+    days = await agenda.days(GROUP_ADMIN, "demo", SLOT_0900.date(), 1)
+
+    [slot] = [s for s in days[0].slots if s.start == SLOT_0900]
+    assert (slot.booked, slot.pending) == (2, 1)
+
+
+async def test_a_bulk_request_never_asks_an_older_booking_for_a_newer_pending_one(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """ADR 0044 §5: the last made go first, a pending one too; it is left to lapse or confirm."""
+    older = await _book(bookings)
+    clock.advance(timedelta(minutes=1))
+    await book_pending(bookings, slug="demo", contact=another_participant())
+    _staff(uow, 1)
+
+    candidates = await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)
+
+    assert older not in [b.id for b in candidates]
+
+
+async def test_a_pending_last_made_booking_leaves_nobody_to_ask_in_bulk_or_in_review(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """ADR 0056 point 11: the slot's excess place is the pending one's, which is never asked."""
+    await _book(bookings)
+    clock.advance(timedelta(minutes=1))
+    await book_pending(bookings, slug="demo", contact=another_participant())
+    _staff(uow, 1)
+
+    candidates = await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)
+    reviewed = await planner.review_proposals(GROUP_ADMIN, "demo", ReviewScope.slot(SLOT_0900))
+
+    assert (candidates, reviewed) == ([], [])
+
+
+async def test_a_confirmation_by_a_planner_is_counted_as_the_planners(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    """The reports tell a planner's confirmation from the participant's own (metric U9)."""
+    receipt = await book_pending(bookings, slug="demo", contact=another_participant())
+
+    await planner.confirm(GROUP_ADMIN, "demo", receipt.booking.id or 0)
+
+    [fact] = [
+        f
+        for f in uow.state.usage_facts
+        if isinstance(f, UsageFact) and f.kind is FactKind.BOOKING_CONFIRMED
+    ]
+    assert fact.actor_class is ActorClass.PLANNER
+
+
+# --- move and cancel a pending booking (ADR 0056 step 3b) -----------------------------------
+
+
+async def test_a_moved_pending_booking_stays_pending_with_its_own_deadline(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    receipt = await book_pending(bookings, slug="demo", contact=another_participant())
+
+    moved = await planner.move(GROUP_ADMIN, "demo", receipt.booking.id or 0, SLOT_0930)
+
+    assert moved.status is BookingStatus.PENDING_CONFIRMATION
+    assert moved.start == SLOT_0930
+    assert moved.confirm_by is not None
+    old = uow.state.bookings[receipt.booking.id or 0]
+    assert old.status is not BookingStatus.PENDING_CONFIRMATION
+
+
+async def test_a_pending_booking_can_be_cancelled_but_not_asked_to_rebook(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    first = await book_pending(bookings, slug="demo", contact=another_participant())
+    second = await book_pending(bookings, slug="demo", contact=another_participant())
+
+    await planner.cancel(GROUP_ADMIN, "demo", first.booking.id or 0, ChangeReason.STAFFING)
+    with pytest.raises(DomainError, match="booking_not_active"):
+        await planner.request_rebook(
+            GROUP_ADMIN, "demo", second.booking.id or 0, ChangeReason.STAFFING
+        )
+
+    assert uow.state.bookings[first.booking.id or 0].status is BookingStatus.CANCELLED
+    assert uow.state.bookings[second.booking.id or 0].status is BookingStatus.PENDING_CONFIRMATION
+
+
+STAFFING = ChangeReason.STAFFING
+NEXT_0900 = SLOT_0900 + timedelta(days=7)
+ON_ONE_BOOKING: dict[str, Callable[[PlannerService, int], Awaitable[object]]] = {
+    "booking": lambda s, b: s.booking(GROUP_ADMIN, "demo", b),
+    "move": lambda s, b: s.move(GROUP_ADMIN, "demo", b, SLOT_0930),
+    "confirm": lambda s, b: s.confirm(GROUP_ADMIN, "demo", b),
+    "cancel": lambda s, b: s.cancel(GROUP_ADMIN, "demo", b, STAFFING),
+    "request_rebook": lambda s, b: s.request_rebook(GROUP_ADMIN, "demo", b, STAFFING),
+    "booking_proposal": lambda s, b: s.booking_proposal(GROUP_ADMIN, "demo", b),
+    "propose": lambda s, b: s.propose(GROUP_ADMIN, "demo", b, SLOT_0930, STAFFING),
+    "withdraw": lambda s, b: s.withdraw(GROUP_ADMIN, "demo", b),
+    "confirm_proposal": lambda s, b: s.confirm_proposal(GROUP_ADMIN, "demo", b),
+}
+"""Every use case on one booking, by the group admin of ``demo`` through their own group."""
+
+
+async def _booking_in(
+    group: str, state: str, planner: PlannerService, bookings: BookingService
+) -> int:
+    """Book in ``group``: pending, confirmed, with an open proposal, or cancelled."""
+    if state == "pending":
+        receipt = await book_pending(bookings, slug=group, contact=another_participant())
+    else:
+        receipt = await book_another(bookings, slug=group)
+    booking_id = receipt.booking.id or 0
+    if state == "proposed":
+        await planner.propose(SUPER, group, booking_id, NEXT_0900, STAFFING)
+    if state == "cancelled":
+        await bookings.cancel(receipt.management_token)
+    return booking_id
+
+
+def test_every_use_case_on_one_booking_is_tried_through_another_group() -> None:
+    assert set(ON_ONE_BOOKING) == booking_id_methods(PlannerService)
+
+
+@pytest.mark.parametrize("state", ["pending", "confirmed", "proposed", "cancelled"])
+@pytest.mark.parametrize("group", ["andere-team", "demo-twee"])
+@pytest.mark.parametrize("action", list(ON_ONE_BOOKING))
+async def test_another_groups_booking_is_not_found_through_this_group(
+    action: str,
+    group: str,
+    state: str,
+    planner: PlannerService,
+    bookings: BookingService,
+    uow: InMemoryUnitOfWork,
+) -> None:
+    """The group check comes first: no hint that the booking exists, nothing changed.
+
+    The booking is in another organisation's group or in a sibling group of ``demo``. Each use
+    case acts on it in one of the first three states (``confirm`` on a pending one,
+    ``withdraw`` and ``confirm_proposal`` on a proposed one, the others on a confirmed one), so
+    a missing group check fails. A cancelled one is refused by each use case's own rule with
+    another code, so a group check made after that rule fails too.
+    """
+    other = await _booking_in(group, state, planner, bookings)
+
+    await refused_as_unknown(uow, other, ON_ONE_BOOKING[action](planner, other))
+
+
+async def test_a_pending_booking_is_told_by_email_only_and_the_team_gets_no_withdrawal(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    """ADR 0056: never sent to the team nor by SMS, so nothing of either on a change."""
+    uow.state.groups[1] = with_team_invite(uow.state.groups[1])
+    contact = replace(another_participant(), phone="+31612345678")
+    moving = await book_pending(bookings, slug="demo", contact=another_participant())
+    cancelling = await book_pending(bookings, slug="demo", contact=contact)
+
+    moved = await planner.move(GROUP_ADMIN, "demo", moving.booking.id or 0, SLOT_0930)
+    await planner.cancel(GROUP_ADMIN, "demo", cancelling.booking.id or 0, ChangeReason.STAFFING)
+
+    old_jobs = {j.type for j in uow.state.jobs[moving.booking.id or 0]}
+    new_jobs = {j.type for j in uow.state.jobs[moved.id or 0]}
+    cancel_jobs = _messages(uow, cancelling.booking.id or 0)
+    assert JobType.SEND_TEAM_CANCEL not in old_jobs
+    assert JobType.SEND_CONFIRM_REQUEST in new_jobs
+    assert JobType.SEND_CHANGE not in new_jobs
+    assert cancel_jobs == {(JobType.SEND_CANCELLATION, ChannelKind.EMAIL)}
+    assert JobType.SEND_TEAM_CANCEL not in {
+        j.type for j in uow.state.jobs[cancelling.booking.id or 0]
+    }

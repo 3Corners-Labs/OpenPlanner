@@ -48,9 +48,9 @@ the routing value, the probe branch and the Screen Pop (`tests/adapters/test_wxc
 On the host, in the `web` container:
 
 ```sh
-docker compose exec web python -m app.cli wxcc-sample-flow --group aangifte \
-  --queue aangifte=ORG_videoafspraak_aangifte_01 --fallback-queue ORG_videoafspraak_overig \
-  > openplanner_aangifte.json
+docker compose exec web python -m app.cli wxcc-sample-flow --group balie \
+  --queue balie=ORG_videoafspraak_balie_01 --fallback-queue ORG_videoafspraak_overig \
+  > openplanner_balie.json
 ```
 
 - `--group` names one group (its web address). The flow gets a branch for its routing value

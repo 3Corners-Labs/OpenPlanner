@@ -336,11 +336,14 @@ same commit and rollback behaviour as the SQL one.
 | Join page, direct call, webhook endpoints | `app/api/join_pages.py`, `direct_pages.py`, `webhooks.py` |
 | Agenda per slot with agents and shortfalls, day and week view (ADR 0044) | `app/domain/agenda.py`, `app/domain/agenda_service.py`, `app/admin/agenda_routes.py`, `app/admin/shortfalls.py` |
 | A planner's changes: move, cancel with a fixed reason, accept a shortfall (ADR 0044) | `app/domain/planner_service.py`, `app/admin/planner_routes.py` |
+| A participant's contact details on the booking page, on request and audited (ADR 0044 §2) | `app/domain/participant_contact.py`, `app/admin/call_routes.py` |
+| A warning when one person does an audited thing unusually often within an hour: many changes, many requests for contact details (ADR 0044) | `app/domain/activity_alert.py` |
 | Cancelling on the participant's behalf, shared by closure and planner; the planner's limits; asking to rebook and its lapse (ADR 0044) | `app/domain/booking_changes.py`, `app/jobs/runner.py` (`lapse_rebook`) |
 | Rebooking assistant: which bookings of a short slot move and which slot each is proposed, same time on the nearest day first (ADR 0057) | `app/domain/rebooking.py` |
 | Booking timeline, integrations page (last checks read-only) | `app/admin/call_routes.py`, `app/admin/routes.py`, `app/admin/integration_views.py` |
 | OIDC login (ADR 0013) | `app/adapters/oidc.py` |
 | Admin routes, permission dependency, session | `app/admin/routes.py`, `app/admin/authz.py`, `app/admin/session.py` |
+| Where an admin comes back to after login, re-login or a "return to" form (`next`): the redirect guard and the allow-list of view parameters | `app/admin/return_to.py` |
 | Machine API for bots: clients, credentials, tokens, scopes (ADR 0023) | `app/domain/api_clients.py`, `app/domain/api_access.py`, `app/adapters/db/api_clients.py` |
 | Machine API over HTTP: token endpoint, `RequireScope`, routes, JSON errors, docs page | `app/api/agent/` |
 | API clients and switches in the admin portal (superuser) | `app/admin/api_routes.py` |
@@ -349,6 +352,7 @@ same commit and rollback behaviour as the SQL one.
 | Manual and context-sensitive help (ADR 0033) | `docs/manual/`, `app/web/help.py`, `app/admin/help_routes.py`, `with_manual` in `app/admin/pages.py` |
 | Generated matrix document | `app/web/authz_report.py`, `app/cli.py` (`authz-matrix`) |
 | Admin structure: side navigation, top bar, object tabs (ADR 0047) | `app/web/navigation.py`, `page` and `group_page` in `app/admin/`, `docs/admin-map.md` via `app/cli.py` (`admin-map`) |
+| Own overview layout: storage, rules, *Add widget* / *Edit overview* (ADR 0096) | `app/domain/overview_layout.py`, `app/adapters/db/overview_layouts.py`, `app/admin/overview_layout_routes.py`, `on_overview` in `app/web/widgets.py` |
 | Readiness checklist of a group and an organisation (ADR 0047 §5) | `app/domain/readiness.py`, `app/admin/readiness_view.py`, `admin/_readiness.html` |
 | List pattern: search and organisation filter shared by the admin lists (ADR 0047 §4) | `app/admin/list_search.py` |
 | Tables, migrations | `app/adapters/db/models.py`, `migrations/versions/` |
@@ -1015,7 +1019,7 @@ repository's `pre-pr-review` skill before the PR (`docs/skills.md`).
 | 0096 | Overview widgets chosen by the admin (accepted, step 1 built) |
 | 0097 | The OIDC issuer is pinned |
 | 0098 | Admin sessions held on the server |
-| 0099 | Configuration as a JSON document with plan and apply (the domain is built; adapter, CLI, portal and API follow) |
+| 0099 | Configuration as a JSON document with plan and apply (domain, adapter, host commands, portal, API and installer are built; the SQLite import is removed in the next release) |
 | 0100 | Admin login requires a second factor, shown by the identity provider |
 | 0101 | Sub-tabs on a side-navigation entry; Advanced settings in three |
 | 0102 | Retention: open closures, back-ups, and what remains after a purge |

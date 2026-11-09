@@ -15,6 +15,7 @@ from dataclasses import asdict, replace
 from datetime import date, datetime
 from typing import Any
 
+import structlog
 from sqlalchemy import (
     ColumnElement,
     Select,
@@ -36,6 +37,7 @@ from app.adapters.db.alert_targets import AlertTargetQueries
 from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.call_status_rows import call_status_of
 from app.adapters.db.certificate import CertificateQueries
+from app.adapters.db.change_requests import ChangeRequestQueries
 from app.adapters.db.configuration_document import ConfigurationDocumentQueries
 from app.adapters.db.contact_center_rows import (
     has_task,
@@ -96,8 +98,13 @@ from app.adapters.db.overview_layouts import OverviewLayoutQueries
 from app.adapters.db.own_certificate import OwnCertificateQueries
 from app.adapters.db.participant_links import ParticipantLinkQueries
 from app.adapters.db.platform_settings import PlatformSettingsQueries
+from app.adapters.db.proposals import ProposalQueries, places_taken
 from app.adapters.db.public_address import PublicAddressQueries
-from app.adapters.db.record_names import bot_credential_name, channel_secret_name
+from app.adapters.db.record_names import (
+    channel_secret_name,
+    organisation_records,
+)
+from app.adapters.db.report_digest import ReportDigestQueries
 from app.adapters.db.retention import RetentionQueries
 from app.adapters.db.roles import RoleQueries
 from app.adapters.db.rollup import RollupQueries
@@ -117,6 +124,7 @@ from app.adapters.db.usage import UsageQueries
 from app.adapters.db.usage_reports import UsageReportQueries
 from app.adapters.db.usage_rollup import UsageRollupQueries
 from app.adapters.db.usage_slots import UsageSlotQueries
+from app.adapters.db.usage_staff import UsageStaffQueries
 from app.domain.agenda import ShortfallAcceptance
 from app.domain.agent_term import TERM_KEYS
 from app.domain.audit import (
@@ -133,6 +141,7 @@ from app.domain.audit import (
 from app.domain.authorization import Scope
 from app.domain.booking import (
     HOLDS_PLACE,
+    IN_AGENDA,
     Booking,
     BookingKind,
     BookingStatus,
@@ -198,7 +207,11 @@ from app.domain.scheduling import (
 from app.domain.staff import StaffStatus
 from app.domain.tasks import ActiveJob, ActiveJobs, JobState
 from app.domain.theme import Theme
+from app.domain.usage import UsageFact
+from app.domain.usage_log import fact_fields
 from app.domain.worker_check import WorkerHeartbeat
+
+log = structlog.get_logger()
 
 _PENDING = "pending"
 _RUNNING = "running"
@@ -467,6 +480,8 @@ def _channel_config(channel: ChannelKind, settings: str) -> ChannelConfig:
 
 class SqlTransaction(
     AdminSessionQueries,
+    ProposalQueries,
+    ChangeRequestQueries,
     AlertTargetQueries,
     ConfigurationDocumentQueries,
     HealthQueries,
@@ -480,8 +495,10 @@ class SqlTransaction(
     RollupQueries,
     UsageQueries,
     UsageRollupQueries,
+    UsageStaffQueries,
     UsageSlotQueries,
     UsageReportQueries,
+    ReportDigestQueries,
     StaffQueries,
     MaintenanceQueries,
     RoleQueries,
@@ -524,6 +541,8 @@ class SqlTransaction(
         self._usage_enabled = usage_enabled
         self.written_events: list[AuditEvent] = []
         """Audit events added in this transaction, for the post-commit emit (ADR 0034)."""
+        self.written_usage: list[UsageFact] = []
+        """Usage facts written in this transaction, for the post-commit log line (ADR 0117)."""
 
     async def list_groups(self, scope: Scope, *, archived: bool = False) -> list[GroupSummary]:
         """Return the groups inside ``scope``, ordered by organisation and name.
@@ -871,12 +890,13 @@ class SqlTransaction(
     async def delete_organisation(self, organisation_id: int) -> None:
         """Erase the organisation's row; the schema's cascades take the rest.
 
-        The sealed Webex bot token (ADR 0082 point 9) has no foreign key, so it is deleted here
-        in the same transaction: a later organisation with a reused id never inherits it.
+        The sealed Webex bot token (ADR 0082 point 9) and contact-center connection (ADR 0032
+        point 9) have no foreign key, so they are deleted here in the same transaction: a later
+        organisation with a reused id never inherits them.
         """
         await self._session.execute(
             delete(IntegrationCredentialRow).where(
-                IntegrationCredentialRow.name == bot_credential_name(organisation_id)
+                IntegrationCredentialRow.name.in_(organisation_records(organisation_id))
             )
         )
         await self._session.execute(
@@ -1535,6 +1555,8 @@ class SqlTransaction(
                 connected_at=status.connected_at,
                 updated_at=status.updated_at,
                 fallback=status.fallback,
+                lobby_since=status.lobby_since,
+                not_picked_up_at=status.not_picked_up_at,
                 peak_participants=status.peak_participants,
                 guest_joined_at=status.guest_joined_at,
             )
@@ -1718,18 +1740,17 @@ class SqlTransaction(
     async def get_slot_usage(
         self, group_id: int, lower: datetime, upper: datetime
     ) -> list[SlotUsage]:
-        """Return capacity and the bookings holding a place in existing slots, in one query."""
-        active = func.count(case((BookingRow.status.in_(_HOLDS_PLACE), 1)))
+        """Return capacity and the places taken in existing slots, in one query.
+
+        A place is taken by a booking that holds one and by an open proposal (ADR 0057).
+        """
         rows = await self._session.execute(
-            select(SlotRow.start, SlotRow.capacity_snapshot, active)
-            .outerjoin(BookingRow, BookingRow.slot_id == SlotRow.id)
-            .where(
+            select(SlotRow.start, SlotRow.capacity_snapshot, places_taken()).where(
                 SlotRow.group_id == group_id,
                 SlotRow.start >= lower,
                 SlotRow.start < upper,
                 SlotRow.kind == BookingKind.SCHEDULED.value,
             )
-            .group_by(SlotRow.id)
         )
         return [SlotUsage(start, capacity, int(count)) for start, capacity, count in rows]
 
@@ -1760,12 +1781,9 @@ class SqlTransaction(
         return Slot(row.id, slot.group_id, slot.start, slot.end, slot.capacity_snapshot, slot.kind)
 
     async def count_active_bookings(self, slot_id: int) -> int:
-        """Return the number of bookings holding a place in the slot (confirmed or on hold)."""
+        """Return the places taken in the slot: bookings holding one and open proposals."""
         count = await self._session.scalar(
-            select(func.count()).where(
-                BookingRow.slot_id == slot_id,
-                BookingRow.status.in_(_HOLDS_PLACE),
-            )
+            select(places_taken()).select_from(SlotRow).where(SlotRow.id == slot_id)
         )
         return int(count or 0)
 
@@ -1819,6 +1837,20 @@ class SqlTransaction(
         self._session.add(row)
         await self._session.flush()
         return _booking(row, await self._slot_row(row.slot_id))
+
+    async def find_bookings_by_phone(self, group_id: int, phone: str) -> list[Booking]:
+        """Return the group's confirmed bookings with this phone number (ADR 0023 step 2)."""
+        result = await self._session.execute(
+            select(BookingRow, SlotRow)
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .where(
+                BookingRow.group_id == group_id,
+                BookingRow.phone == phone,
+                BookingRow.status == BookingStatus.CONFIRMED.value,
+            )
+            .order_by(BookingRow.id)
+        )
+        return [_booking(*found) for found in result.all()]
 
     async def get_booking(self, booking_id: int) -> Booking | None:
         """Return the booking with ``booking_id``."""
@@ -1894,6 +1926,20 @@ class SqlTransaction(
                 rebook_by=booking.rebook_by,
                 rebook_requested_at=booking.rebook_requested_at,
                 confirmed_at=booking.confirmed_at,
+            )
+        )
+
+    async def save_contact(self, booking_id: int, contact: Contact) -> None:
+        """Replace the booking's contact columns and answers (ADR 0056 point 10)."""
+        await self._session.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id)
+            .values(
+                first_name=contact.first_name,
+                last_name=contact.last_name,
+                email=contact.email,
+                phone=contact.phone,
+                form_answers=answers_json(contact.answers),
             )
         )
 
@@ -2046,16 +2092,15 @@ class SqlTransaction(
             )
         )
 
-    async def count_audit_events(
-        self, actor: str, actions: Collection[str], since: datetime
-    ) -> int:
-        """Return how many of ``actor``'s events with one of ``actions`` happened since then."""
+    async def count_audit_successes(self, actor: str, action: str, since: datetime) -> int:
+        """Return how many successful events with ``action`` ``actor`` has had since then."""
         count = await self._session.scalar(
             select(func.count())
             .select_from(AuditEventRow)
             .where(
                 AuditEventRow.actor == actor,
-                AuditEventRow.action.in_(list(actions)),
+                AuditEventRow.action == action,
+                AuditEventRow.outcome == Outcome.SUCCESS.value,
                 AuditEventRow.at >= since,
             )
         )
@@ -2110,12 +2155,28 @@ class SqlTransaction(
         self, group_id: int, lower: datetime, upper: datetime | None
     ) -> list[Booking]:
         """Return the group's confirmed scheduled bookings with lower <= start < upper."""
+        return await self._scheduled(group_id, lower, upper, {BookingStatus.CONFIRMED})
+
+    async def find_agenda_bookings(
+        self, group_id: int, lower: datetime, upper: datetime
+    ) -> list[Booking]:
+        """Return the group's scheduled bookings in the agenda (``IN_AGENDA``) in [lower, upper)."""
+        return await self._scheduled(group_id, lower, upper, IN_AGENDA)
+
+    async def _scheduled(
+        self,
+        group_id: int,
+        lower: datetime,
+        upper: datetime | None,
+        statuses: Collection[BookingStatus],
+    ) -> list[Booking]:
+        """Return the group's scheduled bookings with one of ``statuses``, by start."""
         query = (
             select(BookingRow, SlotRow)
             .join(SlotRow, SlotRow.id == BookingRow.slot_id)
             .where(
                 BookingRow.group_id == group_id,
-                BookingRow.status == BookingStatus.CONFIRMED.value,
+                BookingRow.status.in_([status.value for status in statuses]),
                 SlotRow.kind == BookingKind.SCHEDULED.value,
                 SlotRow.start >= lower,
             )
@@ -2205,6 +2266,8 @@ class SqlUnitOfWork:
         sink: Receives committed audit events; ``None`` ships nothing (tests, the CLI).
         usage_enabled: Whether usage facts are written (``reporting_enabled``, read live);
             on by default, so the CLI and tests write them like the web process does.
+        usage_to_log: Whether a committed usage fact is also written as the log line ``usage.fact``
+            (``reporting_usage_events_to_log``, read live); off by default.
     """
 
     def __init__(
@@ -2213,12 +2276,14 @@ class SqlUnitOfWork:
         box: SecretBox | None = None,
         sink: EventSink | None = None,
         usage_enabled: Callable[[], bool] = lambda: True,
+        usage_to_log: Callable[[], bool] = lambda: False,
     ) -> None:
-        """Store the engine, the secret box, the sink and the usage switch."""
+        """Store the engine, the secret box, the sink and the usage switches."""
         self._engine = engine
         self._box = box
         self._sink = sink
         self._usage_enabled = usage_enabled
+        self._usage_to_log = usage_to_log
 
     @asynccontextmanager
     async def read(self) -> AsyncIterator[SqlTransaction]:
@@ -2242,9 +2307,15 @@ class SqlUnitOfWork:
         self._emit(tx)
 
     def _emit(self, tx: SqlTransaction) -> None:
-        """Hand the committed transaction's audit events to the sink."""
+        """Hand the audit events to the sink and the usage facts to the log, after the commit."""
         if self._sink is not None and tx.written_events:
             self._sink.emit(tx.written_events)
+        if tx.written_usage and self._usage_to_log():
+            try:
+                for fact in tx.written_usage:
+                    log.info("usage.fact", **fact_fields(fact))
+            except Exception as exc:  # after commit nothing may fail the request
+                log.error("usage.emit_failed", error=type(exc).__name__)
 
 
 @asynccontextmanager

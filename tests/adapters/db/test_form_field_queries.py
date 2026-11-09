@@ -69,7 +69,7 @@ async def test_answers_are_stored_raised_to_pii_and_purged(engine: AsyncEngine) 
         await tx.save_form(group_id, FormDefinition(2, (TOPIC, PEOPLE)))
     service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
     receipt = await service.book(
-        group_slug="aangifte",
+        group_slug="balie",
         start=SLOT_0900,
         contact=replace(ADA, answers={"topic": "rent", "people": "2"}),
         locale="nl",

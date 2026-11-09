@@ -41,6 +41,20 @@ def statuses(*codes: int) -> dict[str, int]:
 #   reads overview, rights, matrix, manual and group page, and works the own queue of its groups.
 EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/": {"/admin/": statuses(200, 200, 200, 200, 200, 200, 403)},
+    # ADR 0096: every admin who opens the overview arranges their own; an empty form is refused.
+    "GET /admin/overview/add": {"/admin/overview/add": statuses(200, 200, 200, 200, 200, 200, 403)},
+    "POST /admin/overview/add": {
+        "/admin/overview/add": statuses(422, 422, 422, 422, 422, 422, 403)
+    },
+    "GET /admin/overview/edit": {
+        "/admin/overview/edit": statuses(200, 200, 200, 200, 200, 200, 403)
+    },
+    "POST /admin/overview/edit": {
+        "/admin/overview/edit": statuses(422, 422, 422, 422, 422, 422, 403)
+    },
+    "POST /admin/overview/reset": {
+        "/admin/overview/reset": statuses(303, 303, 303, 303, 303, 303, 403)
+    },
     "GET /admin/rights": {"/admin/rights": statuses(200, 200, 200, 200, 200, 200, 403)},
     # ADR 0061: overview widgets, each with the permission of the widget register. The
     # auditor and the agent hold no bookings.view; the agent holds no audit.view.
@@ -107,6 +121,23 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     "GET /admin/organisations/{org}/usage": {
         "/admin/organisations/demo/usage": statuses(200, 200, 403, 403, 200, 403, 403)
+    },
+    # ADR 0117 point 12: the CSV of a page, the same scope as the page (reports.export).
+    "GET /admin/groups/{slug}/usage/export.csv": {
+        "/admin/groups/demo/usage/export.csv": statuses(200, 200, 200, 403, 200, 403, 403)
+    },
+    "GET /admin/organisations/{org}/usage/export.csv": {
+        "/admin/organisations/demo/usage/export.csv": statuses(200, 200, 403, 403, 200, 403, 403)
+    },
+    # ADR 0117 point 16: digest subscriptions, organisation level and the organisation admin only
+    # (reports.digest.manage); an empty form answers 422, a subscription that is not there 303.
+    "POST /admin/organisations/{org}/usage/digest": {
+        "/admin/organisations/demo/usage/digest": statuses(422, 422, 403, 403, 403, 403, 403)
+    },
+    "POST /admin/organisations/{org}/usage/digest/{subscription_id}/delete": {
+        "/admin/organisations/demo/usage/digest/999/delete": statuses(
+            303, 303, 403, 403, 403, 403, 403
+        )
     },
     # ADR 0042 §5, §11: System status and Advanced settings, read-only: superuser and auditor.
     "GET /admin/settings": {"/admin/settings": statuses(200, 403, 403, 403, 200, 403, 403)},
@@ -195,12 +226,38 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/settings/tls/check": {
         "/admin/settings/tls/check": statuses(303, 403, 403, 403, 403, 403, 403),
     },
-    # ADR 0089: the configuration package; an empty form is a short passphrase or no file.
-    "POST /admin/settings/package/export": {
-        "/admin/settings/package/export": statuses(422, 403, 403, 403, 403, 403, 403),
-    },
+    # ADR 0089, read for one release (ADR 0099 point 14): an empty form is no file.
     "POST /admin/settings/package/import": {
         "/admin/settings/package/import": statuses(422, 403, 403, 403, 403, 403, 403),
+    },
+    # ADR 0099: the configuration document. The platform's is the superuser's, the
+    # organisation's its admin's (and the superuser's). An export without secrets succeeds, an
+    # empty upload has no document (422) and an apply without a reviewed plan is stale (409).
+    "POST /admin/settings/configuration/export": {
+        "/admin/settings/configuration/export": statuses(200, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/settings/configuration/plan": {
+        "/admin/settings/configuration/plan": statuses(422, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/settings/configuration/apply": {
+        "/admin/settings/configuration/apply": statuses(409, 403, 403, 403, 403, 403, 403),
+    },
+    "GET /admin/organisations/{org}/configuration": {
+        "/admin/organisations/demo/configuration": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/configuration": statuses(200, 403, 403, 200, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/configuration/export": {
+        "/admin/organisations/demo/configuration/export": statuses(
+            200, 200, 403, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/configuration/plan": {
+        "/admin/organisations/demo/configuration/plan": statuses(422, 422, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/configuration/apply": {
+        "/admin/organisations/demo/configuration/apply": statuses(
+            409, 409, 403, 403, 403, 403, 403
+        ),
     },
     # ADR 0046: staff in the own scope; an unknown or invisible person is a 404, not a 403.
     "GET /admin/staff": {"/admin/staff": statuses(200, 200, 200, 200, 200, 403, 403)},
@@ -497,6 +554,22 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/organisations/{org}/channels/sms": {
         "/admin/organisations/demo/channels/sms": statuses(422, 403, 403, 403, 403, 403, 403),
     },
+    # ADR 0032 point 9: the organisation's own contact-center connection (integrations.manage).
+    "POST /admin/organisations/{org}/channels/contact-center": {
+        "/admin/organisations/demo/channels/contact-center": statuses(
+            422, 403, 403, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/channels/contact-center/webhook-secret": {
+        "/admin/organisations/demo/channels/contact-center/webhook-secret": statuses(
+            303, 403, 403, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/channels/contact-center/delete": {
+        "/admin/organisations/demo/channels/contact-center/delete": statuses(
+            303, 403, 403, 403, 403, 403, 403
+        ),
+    },
     "POST /admin/organisations/{org}/channels/{channel}/remove": {
         "/admin/organisations/demo/channels/sms/remove": statuses(
             409, 403, 403, 403, 403, 403, 403
@@ -777,6 +850,15 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             404, 404, 404, 403, 403, 403, 403
         ),
     },
+    # ADR 0056 point 11: confirming on the participant's behalf (bookings.manage).
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/confirm": {
+        "/admin/groups/demo/agenda/bookings/999999/confirm": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/agenda/bookings/999999/confirm": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
     "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/cancel": {
         "/admin/groups/demo/agenda/bookings/999999/cancel": statuses(
             404, 404, 404, 403, 403, 403, 403
@@ -797,6 +879,41 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/andere-team/agenda/bookings/999999/rebook": statuses(
             404, 403, 403, 404, 403, 403, 403
         ),
+    },
+    "GET /admin/groups/{slug}/agenda/bookings/{booking_id}/propose": {
+        "/admin/groups/demo/agenda/bookings/999999/propose": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/propose": {
+        "/admin/groups/demo/agenda/bookings/999999/propose": statuses(
+            400, 400, 400, 403, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/agenda/bookings/999999/propose": statuses(
+            400, 403, 403, 400, 403, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/proposal/withdraw": {
+        "/admin/groups/demo/agenda/bookings/999999/proposal/withdraw": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/agenda/bookings/999999/proposal/withdraw": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/agenda/bookings/{booking_id}/proposal/confirm": {
+        "/admin/groups/demo/agenda/bookings/999999/proposal/confirm": statuses(
+            404, 404, 404, 403, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/agenda/bookings/999999/proposal/confirm": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "GET /admin/groups/{slug}/agenda/slot-propose": {
+        "/admin/groups/demo/agenda/slot-propose": statuses(400, 400, 400, 403, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/agenda/slot-propose": {
+        "/admin/groups/demo/agenda/slot-propose": statuses(400, 400, 400, 403, 403, 403, 403),
     },
     "GET /admin/groups/{slug}/agenda/slot-rebook": {
         "/admin/groups/demo/agenda/slot-rebook": statuses(400, 400, 400, 403, 403, 403, 403),

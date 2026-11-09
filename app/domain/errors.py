@@ -25,6 +25,7 @@ class ErrorCode(StrEnum):
     BOOKING_NOT_ACTIVE = "booking_not_active"
     BOOKING_NOT_PENDING = "booking_not_pending"
     BOOKING_LOCKED = "booking_locked"
+    PROPOSAL_NOT_OPEN = "proposal_not_open"
     SAME_SLOT = "same_slot"
     DATABASE_BUSY = "database_busy"
     NOT_PERMITTED = "not_permitted"
@@ -69,6 +70,7 @@ class ErrorCode(StrEnum):
     MAINTENANCE = "maintenance"
     MAINTENANCE_FROM_ENVIRONMENT = "maintenance_from_environment"
     QUEUE_NOT_ENABLED = "queue_not_enabled"
+    STAFF_VIEW_OFF = "staff_view_off"
     QUEUE_EMPTY = "queue_empty"
     ALREADY_CLAIMED = "already_claimed"
     FREE_PICK_NOT_ALLOWED = "free_pick_not_allowed"
@@ -125,7 +127,6 @@ class ErrorCode(StrEnum):
     CONFIGURATION_PACKAGE_INVALID = "configuration_package_invalid"
     CONFIGURATION_PACKAGE_VERSION = "configuration_package_version"
     CONFIGURATION_PACKAGE_TOO_LARGE = "configuration_package_too_large"
-    CONFIGURATION_INSTALLATION_IN_USE = "configuration_installation_in_use"
     CONFIGURATION_FORMAT_UNSUPPORTED = "configuration_format_unsupported"
     """ADR 0099: the document's ``format`` is not a version this release reads."""
     CONFIGURATION_UNKNOWN_FIELD = "configuration_unknown_field"
@@ -148,6 +149,12 @@ class ErrorCode(StrEnum):
     """ADR 0099 point 7: a booking, a slot or an active closure still refers to the object."""
     CONFIGURATION_CAPACITY_BELOW_BOOKED = "configuration_capacity_below_booked"
     """ADR 0099 point 7: a capacity lower than the places already booked in that window."""
+    CHANGE_REQUESTS_DISABLED = "change_requests_disabled"
+    """ADR 0023 step 2: the organisation has not switched on change requests by a bot."""
+    INVALID_APPOINTMENT_CODE = "invalid_appointment_code"
+    """ADR 0023 step 2: the appointment code is not eight digits."""
+    CHANGE_REQUEST_NOT_FOUND = "change_request_not_found"
+    """ADR 0023 step 2: no such request of this client, or nothing open to confirm."""
 
 
 class DomainError(Exception):

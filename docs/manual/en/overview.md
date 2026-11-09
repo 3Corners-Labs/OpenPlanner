@@ -35,8 +35,9 @@ The overview never shows participants' personal data: only counts, group names a
   full list** opens the audit log itself.
 
 - **Queue across my groups**: for each group with an own queue within your reach, how many
-  participants wait, how long the longest wait has been and how many staff who may work the queue
-  are signed in now. A participant with an appointment counts once they are in the lobby; a
+  participants wait, how long the longest wait has been, how many appointments nobody picked up
+  in time (**Not picked up**, the time set for the group) and how many staff who may work the
+  queue are signed in now. A participant with an appointment counts once they are in the lobby; a
   direct call counts from the request, even before the link is opened. The group name opens
   the queue. Counts and minutes only, never names. Under the longest wait it says whether it is
   within the target, above it, or above the limit at which an alert is raised (*Target wait* and
@@ -86,8 +87,25 @@ upright. The line for the queue connects the groups, so it is not a development 
 ## Default layout per role
 
 Each role starts with its own order: an agent sees the queue first, the Compliance and privacy
-role the changes and the system status. A personal layout comes later (ADR 0062). On a tablet
-at most two widgets sit side by side, on a phone one.
+role the changes and the system status. You can make your own layout of it (see below). On a
+tablet at most two widgets sit side by side, on a phone one.
+
+## Your own layout
+
+At the top of the overview, next to **Refresh**, are two buttons:
+
+- **Add widget** shows the widgets your rights allow that are not on your overview yet. **Add**
+  puts one at the bottom. A widget you may not see is never offered.
+- **Edit overview** shows your widgets in their order. **Up** and **Down** move a widget one
+  place, **Remove** takes it off. Everything works with the keyboard; there is nothing to drag.
+
+As soon as you change something it is your own layout; only you see it, and it stays when you
+log in again. **Restore default layout** removes your own layout, so you see your role's default
+again. The *Tasks* and *Alerts* shortcuts in the top bar follow your layout: remove that widget
+and its shortcut goes too. If you lose the right to a widget, it disappears from your overview by itself. The number
+of widgets has a maximum the superuser sets (*Most widgets on an own overview*, 12 by default). A
+layout is a personal preference: it does not go into the audit log, and it holds no personal
+data.
 
 ## Your profile menu
 

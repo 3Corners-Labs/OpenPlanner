@@ -194,6 +194,8 @@ async def test_the_queue_widget_counts_the_waiting_participant_and_the_agent_sig
     assert 'aria-label="Wachtrij van Demo: videogesprek"' in text
     assert '<td class="widget-table__number">1</td>' in text  # waiting, and the agent signed in
     assert "3 min" in text
+    assert '<th scope="col" class="widget-table__number">Niet opgepakt</th>' in text
+    assert '<td class="widget-table__number">0</td>' in text  # nobody past the group's limit
     assert "Ada" not in text
     assert "ada@example.org" not in text
     assert "webex.example" not in text
@@ -259,6 +261,17 @@ async def test_the_status_widget_tells_version_update_maintenance_worker_and_env
     assert "/admin/updates" not in text  # the auditor may not open the updates page
     await site.login_as(SUPER)
     assert 'href="/admin/updates"' in (await site.client.get("/admin/overview/w/status")).text
+
+
+async def test_the_status_widget_names_the_environment_in_words(site: Site) -> None:
+    """Like System status: the environment's name, not the value of ``ENVIRONMENT``."""
+    await site.login_as(AUDITOR)
+
+    text = (await site.client.get("/admin/overview/w/status")).text
+
+    assert ">Testomgeving" in text
+    assert ">test<" not in text
+    assert ">test," not in text
 
 
 async def test_the_status_widget_shows_maintenance_and_a_fresh_worker_heartbeat(

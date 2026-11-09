@@ -181,6 +181,8 @@ SECTIONS = (
                 "/admin/",
                 Permission.DASHBOARD_VIEW,
                 "dashboard",
+                # ADR 0096: the admin arranges their own overview on two sub-pages.
+                ("/admin/overview/add", "/admin/overview/edit"),
                 width=Width.WIDE,
             ),
             Screen(
@@ -458,6 +460,14 @@ OBJECTS = (
                             f"{_ORGANISATION}/login/{{idp_key}}",
                         ),
                     ),
+                    # ADR 0099: the organisation's configuration as a JSON document, whole.
+                    Screen(
+                        "organisation.configuration",
+                        "admin.tab.configuration",
+                        f"{_ORGANISATION}/configuration",
+                        Permission.SETTINGS_ORGANISATION_MANAGE,
+                        "export",
+                    ),
                     # ADR 0117 point 11: how the organisation's groups are used (counts only).
                     Screen(
                         "organisation.usage",
@@ -566,6 +576,8 @@ OBJECTS = (
                     f"{_GROUP}/agenda/bookings/{{booking_id}}/rebook",
                     f"{_GROUP}/agenda/slot-rebook",
                     f"{_GROUP}/agenda/waiting",
+                    f"{_GROUP}/agenda/bookings/{{booking_id}}/propose",
+                    f"{_GROUP}/agenda/slot-propose",
                 ),
                 width=Width.WIDE,
                 wide_subpages=(f"{_GROUP}/agenda/week",),

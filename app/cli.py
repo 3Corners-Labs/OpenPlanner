@@ -22,6 +22,7 @@ Usage:
     ``python -m app.cli settings-doc``  print the settings reference (docs/settings.md)
     ``python -m app.cli logging-doc``  print the logging reference (docs/logging.md, ADR 0103)
     ``python -m app.cli reporting-doc``  print the metric catalogue (docs/reporting.md, ADR 0117)
+    ``python -m app.cli reporting-api-doc``  print the usage API reference (docs/reporting-api.md)
     ``python -m app.cli usage-backfill``  turn existing bookings into usage facts (ADR 0117 point 5)
     ``python -m app.cli init [--out PATH]``  generate the bootstrap keys (secrets/secrets.env)
 
@@ -104,9 +105,7 @@ from app.adapters.db.backup import (
     restore_database,
 )
 from app.adapters.db.configuration_package import (
-    SqliteConfigurationTransfer,
     environment_values,
-    portable_environment,
 )
 from app.adapters.db.engine import create_engine
 from app.adapters.db.maintenance import checkpoint_wal
@@ -173,6 +172,7 @@ from app.adapters.wxcc import channel_and_address, wxcc_mapping
 from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, region_check
 from app.adapters.wxcc_sample_flow import Route, sample_flow
 from app.cli_config import add_arguments as add_document_arguments
+from app.cli_config import package_service
 from app.cli_config import passphrase_from as _passphrase
 from app.cli_config import render_schema as render_config_schema
 from app.cli_config import run as run_document
@@ -186,6 +186,7 @@ from app.domain.audit import Outcome
 from app.domain.authorization import Grant, Principal, Role, RoleCatalogue, Scope
 from app.domain.client_pseudonym import UNKNOWN_CLIENT, ClientPseudonyms
 from app.domain.closure_service import ClosureInput, ClosureService, GroupOutcome
+from app.domain.configuration_document_service import Actor
 from app.domain.configuration_package import (
     COUNTED_TABLES,
     PackageSummary,
@@ -193,7 +194,6 @@ from app.domain.configuration_package import (
 from app.domain.configuration_package import (
     PERMISSION as PLATFORM_MANAGE,
 )
-from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.entitlements import ClaimMode, resolve
 from app.domain.errors import DomainError
 from app.domain.evidence import Report, Row, Section, render_json
@@ -228,6 +228,7 @@ from app.keys import client_pseudonym_key, management_token_key
 from app.web import navigation
 from app.web.authz_report import render_markdown
 from app.web.logging_doc import render_markdown as render_logging_doc
+from app.web.reporting_doc import render_api_markdown as render_reporting_api_doc
 from app.web.reporting_doc import render_markdown as render_reporting_doc
 from app.web.settings_doc import render_markdown as render_settings_doc
 
@@ -1322,17 +1323,21 @@ CONFIG_ACTOR = "system:cli"
 
 
 def _config_parser(commands: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
-    """Add ``config export|show|import|env`` (ADR 0089): the configuration package on the host."""
+    """Add ``config export|plan|apply|import|show|env``: the configuration on the host.
+
+    ``export``, ``plan`` and ``apply`` work on the JSON document (ADR 0099); ``import``,
+    ``show`` and ``env`` still read a SQLite package (ADR 0089) for one release.
+    """
     config_cmd = commands.add_parser(
-        "config", help="export or import a configuration package (ADR 0089)"
+        "config", help="export, plan and apply the configuration as a JSON document (ADR 0099)"
     )
     actions = config_cmd.add_subparsers(dest="action", required=True)
-    export_cmd = actions.add_parser("export", help="write a package of this installation")
-    export_cmd.add_argument("path", type=Path, help="the package file to write (mode 600)")
-    show_cmd = actions.add_parser("show", help="what a package holds")
+    export_cmd = actions.add_parser("export", help="write the configuration as a document")
+    export_cmd.add_argument("path", type=Path, help="the document file to write (mode 600)")
+    show_cmd = actions.add_parser("show", help="what a SQLite package holds")
     show_cmd.add_argument("path", type=Path, help="the package file")
     import_cmd = actions.add_parser(
-        "import", help="replace this installation's configuration (not in use only)"
+        "import", help="apply a SQLite package as a replacing document (read for one release)"
     )
     import_cmd.add_argument("path", type=Path, help="the package file")
     plan_cmd = actions.add_parser("plan", help="what a configuration document would change")
@@ -1346,12 +1351,6 @@ def _config_parser(commands: "argparse._SubParsersAction[argparse.ArgumentParser
         required=True,
         help="the env file to write (600), or - for standard output (the installer's one-off "
         "container, whose filesystem is read-only; ADR 0089 point 8)",
-    )
-    export_cmd.add_argument(
-        "--passphrase-file",
-        type=Path,
-        metavar="PATH",
-        help="a file whose first line is the passphrase (never on the command line)",
     )
     for sub in (show_cmd, import_cmd, env_cmd):
         sub.add_argument(
@@ -1379,51 +1378,28 @@ def _summary_lines(summary: PackageSummary) -> str:
 
 async def _config(settings: Settings, args: argparse.Namespace) -> tuple[str, int]:
     """Run a ``config`` command; return the report and exit code. Never prints a secret."""
-    if args.action in ("plan", "apply") or (
-        args.action == "export" and getattr(args, "format", "sqlite") == "json"
-    ):
+    if args.action in ("export", "plan", "apply"):
         return await run_document(settings, args)
-    if getattr(args, "organisation", None):
-        return "Refused (invalid_configuration): --organisation needs --format json.\n", 2
-    if args.passphrase_file is None:
-        return "Refused (configuration_passphrase_short).\n", 2
     passphrase = _passphrase(args.passphrase_file) or ""
-    engine = create_engine(settings.database_url)
-    clock = SystemClock()
-    transfer = SqliteConfigurationTransfer(
-        database_path(settings.database_url),
-        secret_box(settings),
-        installation=settings.installation_name,
-        app_version=settings.app_version,
-        environment=lambda: portable_environment(settings),
-        now=clock.now,
-    )
-    service = ConfigurationPackageService(
-        transfer,
-        clock,
-        AdminService(SqlUnitOfWork(engine), clock),
-        max_bytes=lambda: settings.configuration_package_max_mb * 1024 * 1024,
-    )
-    try:
-        if args.action == "export":
-            _write_private(args.path, await service.export(CONFIG_ACTOR, passphrase))
-            return f"package written: {args.path}\n", 0
-        package = await asyncio.to_thread(Path(args.path).read_bytes)
-        if args.action == "show":
-            return _summary_lines(await service.inspect(package, passphrase)), 0
-        if args.action == "env":
-            values = environment_values(package, passphrase, transfer.work_dir)
-            lines = "".join(f"{key}={value}\n" for key, value in values.items())
-            if str(args.out) == "-":
-                return lines, 0
-            _write_private(args.out, lines.encode())
-            return f"env file written: {args.out} ({len(values)} variables)\n", 0
-        summary = await service.import_(CONFIG_ACTOR, package, passphrase)
-        return "configuration imported\n" + _summary_lines(summary), 0
-    except DomainError as error:
-        return f"Refused ({error.code.value}).\n", 2
-    finally:
-        await engine.dispose()
+    async with httpx.AsyncClient(timeout=10.0) as http:
+        service, engine, transfer = package_service(settings, http)
+        try:
+            package = await asyncio.to_thread(Path(args.path).read_bytes)
+            if args.action == "show":
+                return _summary_lines(await service.inspect(package, passphrase)), 0
+            if args.action == "env":
+                values = environment_values(package, passphrase, transfer.work_dir)
+                lines = "".join(f"{key}={value}\n" for key, value in values.items())
+                if str(args.out) == "-":
+                    return lines, 0
+                _write_private(args.out, lines.encode())
+                return f"env file written: {args.out} ({len(values)} variables)\n", 0
+            summary = await service.import_(Actor.host(), package, passphrase)
+            return "configuration imported\n" + _summary_lines(summary), 0
+        except DomainError as error:
+            return f"Refused ({error.code.value}).\n", 2
+        finally:
+            await engine.dispose()
 
 
 def _closure_parser(commands: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
@@ -1800,6 +1776,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     commands.add_parser("logging-doc", help="print the logging reference as Markdown")
     commands.add_parser("reporting-doc", help="print the reporting metric catalogue as Markdown")
+    commands.add_parser(
+        "reporting-api-doc",
+        help="print the usage API reference as Markdown (docs/reporting-api.md)",
+    )
     commands.add_parser("usage-backfill", help="turn existing bookings into usage facts (ADR 0117)")
     init_cmd = commands.add_parser("init", help="generate the bootstrap keys (first install)")
     init_cmd.add_argument("--out", type=Path, default=DEFAULT_PATH, metavar="PATH")
@@ -1865,6 +1845,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "reporting-doc":
         sys.stdout.write(render_reporting_doc())
+        return 0
+    if args.command == "reporting-api-doc":
+        sys.stdout.write(render_reporting_api_doc())
         return 0
     if args.command == "update-claim":
         sys.stdout.write(asyncio.run(_update_claim(Settings())))

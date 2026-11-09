@@ -13,8 +13,10 @@ any route missing from ``SWEPT``, fails the registry test until it is added here
 import pytest
 from fastapi.routing import APIRoute
 
+from app.config import Settings
+from app.domain.change_request_service import ChangeRequestService
 from app.domain.services import BookingService, ContactInput
-from tests.support.agent_api import BASE, OPEN_ROUTES, TRANSFER, Agent
+from tests.support.agent_api import BASE, OPEN_ROUTES, TRANSFER, Agent, agent_api
 from tests.support.configuration_package import PASSPHRASE
 from tests.support.domain import SLOT_0900, book_confirmed
 from tests.support.privacy_sweep import MARKERS
@@ -27,8 +29,14 @@ SWEPT = frozenset(
         "GET /me",
         "GET /groups",
         "GET /groups/{slug}/availability",
+        "GET /reports/usage",
         "GET /configuration",
+        "POST /configuration/plan",
+        "POST /configuration/apply",
         "PUT /configuration",
+        "PUT /configuration/package",
+        "POST /groups/{slug}/change-requests",
+        "GET /change-requests/{request_id}",
     }
 )
 """Every route of the agent API except the open ones (token, docs); a new one is added here."""
@@ -68,7 +76,14 @@ def test_every_route_of_the_agent_api_is_swept_and_only_one_addresses_a_group(ag
 
     keys = {f"{m} {r.path}" for r in routes if r.path not in OPEN_ROUTES for m in r.methods}
     assert keys == SWEPT, "a new agent API route: sweep it in this file"
-    assert set(scoped_routes(routes)) == {"GET /groups/{slug}/availability"}
+    # The usage API has a `group` query that only narrows within the grant (tested in
+    # test_agent_api_usage.py: a foreign group is group_not_found). A change request names its
+    # group in the path, checked by the same RequireScope as the availability.
+    assert set(scoped_routes(routes)) == {
+        "GET /groups/{slug}/availability",
+        "GET /reports/usage",
+        "POST /groups/{slug}/change-requests",
+    }
 
 
 @pytest.mark.parametrize(
@@ -100,18 +115,72 @@ async def test_the_answers_hold_no_marker_and_only_the_clients_own_groups(
         assert other not in response.text, "the other tenant in an answer"
 
 
-async def test_the_configuration_package_holds_no_booking_no_token_and_no_client_secret(
+async def test_the_configuration_document_holds_no_booking_no_token_and_no_client_secret(
     booked: Agent,
 ) -> None:
     issued = await booked.register(organisation="andere", groups=[OTHER], **TRANSFER)
-    headers = {**await booked.bearer(issued), "x-passphrase": PASSPHRASE}
+    token = await booked.bearer(issued)
 
-    exported = await booked.client.get(f"{BASE}/configuration", headers=headers)
+    for passphrase in (None, PASSPHRASE):
+        headers = {**token, **({"x-passphrase": passphrase} if passphrase else {})}
+        exported = await booked.client.get(f"{BASE}/configuration", headers=headers)
 
-    assert exported.status_code == 200, exported.text
-    package = exported.content
-    assert _markers_in(package.decode("latin-1")) == set(), "personal data in the package"
-    token = headers["authorization"].removeprefix("Bearer ")
-    for secret in (issued.secret, token, PASSPHRASE):
-        assert secret.encode() not in package, "a credential in clear text in the package"
-    assert issued.client.client_id.encode() in package, "the client itself is configuration"
+        assert exported.status_code == 200, exported.text
+        document = exported.content
+        assert _markers_in(document.decode()) == set(), "personal data in the document"
+        bearer = token["authorization"].removeprefix("Bearer ")
+        for secret in (issued.secret, bearer, PASSPHRASE):
+            assert secret.encode() not in document, "a credential in clear text in the document"
+        assert issued.client.client_id.encode() in document, "the client itself is configuration"
+
+
+@pytest.mark.parametrize("fmt", ["json", "csv", "ndjson"])
+async def test_the_usage_answers_hold_no_marker_in_any_format(booked: Agent, fmt: str) -> None:
+    issued = await booked.register(scopes=["reports:read"])
+    headers = await booked.bearer(issued)
+
+    response = await booked.client.get(
+        f"{BASE}/reports/usage", params={**WINDOW, "format": fmt}, headers=headers
+    )
+
+    assert response.status_code == 200, response.text
+    assert _markers_in(response.text) == set(), "personal data in a usage answer"
+
+
+async def test_a_change_request_answer_holds_no_marker_matched_or_not(
+    settings: Settings, database_url: str
+) -> None:
+    on = settings.model_copy(
+        update={
+            "database_url": database_url,
+            "agent_api_enabled": True,
+            "agent_change_requests_enabled": True,
+        }
+    )
+    async for running in agent_api(on, enabled=True):
+        service: BookingService = running.app.state.booking_service
+        receipt = await book_confirmed(
+            service, group_slug="demo", start=SLOT_0900, contact=_participant(9), locale="nl"
+        )
+        changes: ChangeRequestService = running.app.state.change_request_service
+        details = await service.find(receipt.management_token)
+        code = changes.code(receipt.booking, details.group.organisation_id)
+        assert code is not None
+        headers = await running.bearer(await running.register(scopes=["bookings:request_change"]))
+
+        answers = []
+        for tried in (code, "0000 0000"):
+            asked = await running.client.post(
+                f"{BASE}/groups/demo/change-requests",
+                json={"action": "cancel", "phone": "06 2468 1357", "code": tried},
+                headers=headers,
+            )
+            status = await running.client.get(
+                f"{BASE}/change-requests/{asked.json()['id']}", headers=headers
+            )
+            answers += [asked, status]
+
+        assert [a.status_code for a in answers] == [202, 200, 202, 200]
+        for answer in answers:
+            assert _markers_in(answer.text) == set(), "personal data in a change request answer"
+            assert code.replace(" ", "") not in answer.text.replace(" ", "")

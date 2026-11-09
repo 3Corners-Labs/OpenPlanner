@@ -13,12 +13,13 @@ import re
 from collections.abc import Iterable, Mapping, Sequence, Set
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, tzinfo
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, urlencode
 
 from fastapi import Request
 from starlette.responses import RedirectResponse
 
 from app.admin.authz import AccessDenied
+from app.admin.connection_inputs import CONNECTION_MESSAGES, CONNECTION_TARGETS
 from app.admin.routing_inputs import ROUTING_MESSAGE, ROUTING_TARGETS
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.theme import TOKENS, TokenKind
@@ -59,7 +60,14 @@ DONE_MESSAGES: dict[str, str] = {
     "diagnostics_off": "admin.done.diagnostics_off",
     "released": "admin.done.released",
     "saved": "admin.done.saved",
+    # ADR 0096: the admin's own overview layout.
+    "widget_added": "admin.done.widget_added",
+    "widget_moved": "admin.done.widget_moved",
+    "widget_removed": "admin.done.widget_removed",
+    "layout_reset": "admin.done.layout_reset",
     "unchanged": "admin.done.unchanged",
+    "digest_added": "reports.digest.done.added",
+    "digest_removed": "reports.digest.done.removed",
     "field_retired": "admin.done.field_retired",
     "added": "admin.done.added",
     "removed": "admin.done.removed",
@@ -73,6 +81,11 @@ DONE_MESSAGES: dict[str, str] = {
     "idp_enabled": "admin.done.idp_enabled",
     "idp_disabled": "admin.done.idp_disabled",
     "idp_key_rotated": "admin.done.idp_key_rotated",
+    "webhook_secret_rotated": "admin.done.webhook_secret_rotated",
+    "contact_center_refused": "admin.done.contact_center_refused",
+    "confirmed_by_staff": "admin.done.confirmed_by_staff",
+    "not_pending": "admin.done.not_pending",
+    "confirm_lapsed": "admin.done.confirm_lapsed",
     "idp_domain_claimed": "admin.done.idp_domain_claimed",
     "idp_domain_verified": "admin.done.idp_domain_verified",
     "idp_domain_not_found_yet": "admin.done.idp_domain_not_found_yet",
@@ -100,6 +113,7 @@ DONE_MESSAGES: dict[str, str] = {
     "fallback_ended": "admin.done.fallback_ended",
     "certificate_uploaded": "admin.done.certificate_uploaded",
     "package_imported": "admin.done.package_imported",
+    "configuration_applied": "admin.done.configuration_applied",
     "certificate_removed": "admin.done.certificate_removed",
     "certificate_checked": "admin.done.certificate_checked",
     "csr_generated": "admin.done.csr_generated",
@@ -121,6 +135,11 @@ DONE_MESSAGES: dict[str, str] = {
     "moved": "admin.done.moved",
     "shortfall_accepted": "admin.done.shortfall_accepted",
     "rebook_requested": "admin.done.rebook_requested",
+    "proposed": "admin.done.proposed",
+    "proposals_sent": "admin.done.proposals_sent",
+    "proposal_withdrawn": "admin.done.proposal_withdrawn",
+    "proposal_confirmed_by_staff": "admin.done.proposal_confirmed_by_staff",
+    "proposal_gone": "admin.done.proposal_gone",
     "organisation_closed": "admin.done.organisation_closed",
     "organisation_lifted": "admin.done.organisation_lifted",
     "client_enabled": "admin.done.client_enabled",
@@ -172,6 +191,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "wxcc_routing_value": "admin.form.error.integration_text",
     # ADR 0032: the routing's own refusals, linked to the settings form's inputs (FIELD_TARGET).
     **dict.fromkeys(ROUTING_TARGETS, ROUTING_MESSAGE),
+    **CONNECTION_MESSAGES,
     "offer": "admin.form.error.choice",
     "embedding_enabled": "admin.form.error.choice",
     "trial_call_enabled": "admin.form.error.choice",
@@ -262,6 +282,7 @@ FIELD_TARGET: dict[str, str] = {
     "schedule_rules": "opens",
     "schedule_overrides": "day",
     **ROUTING_TARGETS,
+    **CONNECTION_TARGETS,
 }
 """Schedule-level refusals are linked to the input the admin most likely needs to change."""
 
@@ -271,9 +292,6 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CONFIGURATION_PACKAGE_INVALID: "admin.form.error.configuration_package_invalid",
     ErrorCode.CONFIGURATION_PACKAGE_VERSION: "admin.form.error.configuration_package_version",
     ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE: "admin.form.error.configuration_package_too_large",
-    ErrorCode.CONFIGURATION_INSTALLATION_IN_USE: (
-        "admin.form.error.configuration_installation_in_use"
-    ),
     ErrorCode.SLUG_TAKEN: "admin.form.error.slug_taken",
     ErrorCode.SCENARIO_NAME_TAKEN: "admin.form.error.scenario_name_taken",
     ErrorCode.ALERT_TARGET_TAKEN: "admin.form.error.alert_target_taken",
@@ -582,23 +600,6 @@ def done_message(request: Request, _: BoundGettext) -> str | None:
     return _(DONE_MESSAGES[key], count=count) if key in DONE_MESSAGES else None
 
 
-def safe_next(value: str | None) -> str:
-    """Return ``value`` if it is an admin path on this site; otherwise the dashboard.
-
-    For every "return to" target that arrives with a request (login, re-login, the update
-    banner's snooze), so none can send the admin off the portal.
-    """
-    if (
-        value
-        and value.startswith("/admin")
-        and not value.startswith("//")
-        and "\\" not in value
-        and "://" not in value
-    ):
-        return value
-    return "/admin/"
-
-
 def redirect_done(
     url: str, done: str, count: int | None = None, *, anchor: str = ""
 ) -> RedirectResponse:
@@ -612,6 +613,29 @@ def redirect_done(
     suffix = f"&count={count}" if count is not None else ""
     fragment = f"#{anchor}" if anchor else ""
     return RedirectResponse(f"{url}{separator}done={done}{suffix}{fragment}", status_code=303)
+
+
+def refused_message(request: Request, texts: Mapping[str, str], _: BoundGettext) -> str | None:
+    """Return why the page's action was refused, named by ``?refused=``, if ``texts`` knows it.
+
+    The counterpart of ``done_message`` for a refusal that sends the admin back to the page
+    (``redirect_refused``), such as an export over a limit. ``texts`` is the page's closed list
+    of codes and catalogue keys; any other value shows nothing and is never echoed.
+    """
+    code = request.query_params.get("refused", "")
+    return _(texts[code]) if code in texts else None
+
+
+def redirect_refused(url: str, code: str) -> RedirectResponse:
+    """Answer a refused action with a redirect to the page ``url`` and the reason ``code``.
+
+    Post/redirect/get, as ``redirect_done``: the page shows the reason (``refused_message``),
+    and nothing at the action's own address does, so a reload, a link or a login there cannot
+    run the action again. ``url`` may carry a query of its own; ``code`` is a code of the
+    page's closed list.
+    """
+    separator = "&" if "?" in url else "?"
+    return RedirectResponse(f"{url}{separator}{urlencode({'refused': code})}", status_code=303)
 
 
 async def read_form(request: Request, locale: RequestLocale) -> FormData:

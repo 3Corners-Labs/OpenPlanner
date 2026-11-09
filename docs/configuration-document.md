@@ -62,6 +62,19 @@ flags a typo. The planner is the authority: it also checks everything the admin 
   without secrets leaves them out; applying a document that omits a secret keeps the stored one.
 - **Files** (logo, fonts, closure images) are inline: media type, SHA-256 and base64 bytes.
 
+## In the portal
+
+The superuser works on *Advanced settings › Configuration package*, an organisation admin (and
+the superuser) on *Organisations › organisation › Overview › Configuration*. **Export document**
+downloads the scope's configuration, leaving out what the admin could not change themselves;
+with *Include secrets* they are sealed under a passphrase typed twice. **Show plan** reads an
+uploaded file and lists, per object, the action and the field names (never values), the
+refusals, and warnings for deletions, a changed claim value and a replaced Webex Service App
+token. **Apply plan** then writes exactly the reviewed document, or nothing. Every one of these
+needs a recent login. A group's contact center is `contact_center {kind, routing_value,
+attributes}` whatever the platform; for Webex Contact Center `attributes` holds
+`business_address` and `channel`.
+
 ## Commands on the host
 
 ```bash
@@ -78,6 +91,28 @@ writes all or nothing; a plan with deletions needs the hash of the plan you revi
 (`configuration_plan_stale` if the configuration moved on), and a plan above
 `CONFIGURATION_APPLY_MAX_CHANGES` is refused. Every applied change is an audit event with its
 action, kind and natural key, never a value.
+
+## Setting up a new installation from a file
+
+The aim of an export with secrets is a ready base installation without typing everything again:
+the integrations (SMTP, SMS, Webex Service App and its URLs, contact-center connection and
+queues per group, login providers, API clients), the organisations and groups, texts and rules.
+
+1. On the source installation: **Export document**, tick *Include secrets*, type a passphrase
+   (at least 16 characters) twice. Keep the passphrase apart from the file.
+2. On the new installation, one of:
+   - the portal: *Advanced settings › Configuration package*, upload the file, type the
+     passphrase, **Show plan**, then **Apply plan**;
+   - the host: `python -m app.cli config apply config.json --passphrase-file pass.txt`;
+   - the installer: `scripts/install.sh --configuration config.json --passphrase-file pass.txt`.
+3. No separate tool is needed to open the file. Without the passphrase every secret stays sealed
+   and useless; with it the installation opens each one itself and stores it under its own key.
+
+A sealed value looks like `{"sealed": "..."}` and the file gets a `seal` block (key
+derivation parameters and a check value that tells a wrong passphrase before anything is
+planned). A file exported without secrets has neither. The sealed values are meant for
+OpenPlanner only. A document never carries a secret in clear text, so a secret cannot be
+written into the file by hand: enter or change it in the portal, then export again.
 
 ## What a document cannot do
 
