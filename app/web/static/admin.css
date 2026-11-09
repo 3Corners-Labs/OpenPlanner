@@ -2216,6 +2216,26 @@ fieldset.card {
   margin: 0;
 }
 
+/* A table row's actions, one per line: each target at least 24×24 px with space between, so
+   no target's 24 px area overlaps the next (WCAG 2.2 SC 2.5.8). */
+.row-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row-actions > li > a,
+.row-actions > li > .inline-form > .button {
+  display: inline-flex;
+  align-items: center;
+  min-width: 24px;
+  min-height: 24px;
+}
+
 /* --- Alerts -------------------------------------------------------------------------------- */
 .alert {
   display: flex;
@@ -2574,10 +2594,7 @@ fieldset.card {
   gap: 0.25rem 1rem;
 }
 
-/* A link on a line of its own (the day navigation, an agenda row's actions) is a 24 px target
-   (WCAG 2.5.8), also right above the row's confirm button. */
-.day-nav a,
-.agenda-actions a {
+.day-nav a {
   display: inline-block;
   min-height: 24px;
   padding: 0.25rem 0;

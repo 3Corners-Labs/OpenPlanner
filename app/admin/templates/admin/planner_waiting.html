@@ -28,8 +28,10 @@
         <td>{{ row.reason }}</td>
         <td>{{ row.rebook_by }}</td>
         <td>
-          <a href="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ row.booking.id }}/move">{{ _("admin.agenda.move") }}<span class="visually-hidden"> {{ row.booking.reference }}</span></a>
-          <br><a href="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ row.booking.id }}/cancel">{{ _("admin.agenda.cancel") }}<span class="visually-hidden"> {{ row.booking.reference }}</span></a>
+          <ul class="row-actions">
+            <li><a href="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ row.booking.id }}/move">{{ _("admin.agenda.move") }}<span class="visually-hidden"> {{ row.booking.reference }}</span></a></li>
+            <li><a href="/admin/groups/{{ summary.group.slug }}/agenda/bookings/{{ row.booking.id }}/cancel">{{ _("admin.agenda.cancel") }}<span class="visually-hidden"> {{ row.booking.reference }}</span></a></li>
+          </ul>
         </td>
       </tr>
       {% endfor %}
