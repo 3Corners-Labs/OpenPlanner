@@ -14,7 +14,7 @@ from app.domain.channels import ChannelKind
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.errors import DomainError
 from app.domain.job_plan import JobType
-from app.domain.planner_service import PlannerService
+from app.domain.planner_service import PlannerService, ReviewScope
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
 from app.domain.usage import ActorClass, FactKind, UsageFact
@@ -421,6 +421,21 @@ async def test_a_bulk_request_never_asks_an_older_booking_for_a_newer_pending_on
     candidates = await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)
 
     assert older not in [b.id for b in candidates]
+
+
+async def test_a_pending_last_made_booking_leaves_nobody_to_ask_in_bulk_or_in_review(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """ADR 0056 point 11: the slot's excess place is the pending one's, which is never asked."""
+    await _book(bookings)
+    clock.advance(timedelta(minutes=1))
+    await book_pending(bookings, slug="demo", contact=another_participant())
+    _staff(uow, 1)
+
+    candidates = await planner.slot_candidates(GROUP_ADMIN, "demo", SLOT_0900)
+    reviewed = await planner.review_proposals(GROUP_ADMIN, "demo", ReviewScope.slot(SLOT_0900))
+
+    assert (candidates, reviewed) == ([], [])
 
 
 async def test_a_confirmation_by_a_planner_is_counted_as_the_planners(

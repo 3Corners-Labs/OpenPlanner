@@ -34,7 +34,7 @@ from app.domain.agenda import AgendaSlot, ShortfallAcceptance
 from app.domain.agenda_service import agenda_days
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.booking import Booking, BookingStatus, ChangeReason, stored_id
-from app.domain.booking_changes import ProposalTiming
+from app.domain.booking_changes import PlannerRule, ProposalTiming
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.lookups import group_booking, group_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
@@ -184,11 +184,17 @@ class PlannerService:
         return value_for(self._reminder_days, organisation_id)
 
     async def booking(
-        self, principal: Principal, slug: str, booking_id: int, *, rebook: bool = False
+        self,
+        principal: Principal,
+        slug: str,
+        booking_id: int,
+        *,
+        rule: PlannerRule = booking_changes.ensure_planner_may_change,
     ) -> Booking:
-        """Return one booking of the group that the planner may still change (for a form).
+        """Return one booking of the group that ``rule`` lets the planner change (for a form).
 
-        With ``rebook``, only one whose participant may be asked to choose a new time.
+        The form names the rule of its action: any change by default, or
+        ``ensure_planner_may_request_rebook`` for asking the participant to choose a new time.
 
         Raises:
             DomainError: ``not_permitted``, ``group_not_found``, ``booking_not_found``,
@@ -196,7 +202,7 @@ class PlannerService:
         """
         await self._authorize(principal, slug)
         async with self._uow.read() as tx:
-            booking, _ = await self._changeable(tx, slug, booking_id, rebook=rebook)
+            booking, _ = await self._changeable(tx, slug, booking_id, rule=rule)
         return booking
 
     async def move(
@@ -291,7 +297,9 @@ class PlannerService:
         """
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            booking, group = await self._changeable(tx, slug, booking_id, rebook=True)
+            booking, group = await self._changeable(
+                tx, slug, booking_id, rule=booking_changes.ensure_planner_may_request_rebook
+            )
             waiting = await self._request(tx, group, booking, reason)
             detail = f"planner.rebook,reason:{reason.value}"
             await self._audit(tx, principal, authorization, detail, booking_id)
@@ -318,7 +326,9 @@ class PlannerService:
         """
         authorization = await self._authorize(principal, slug)
         async with self._uow.locked() as tx:
-            booking, group = await self._changeable(tx, slug, booking_id)
+            booking, group = await self._changeable(
+                tx, slug, booking_id, rule=booking_changes.ensure_planner_may_request_rebook
+            )
             proposal = await self._propose(tx, group, booking, start, reason)
             detail = f"planner.propose,reason:{reason.value}"
             await self._audit(tx, principal, authorization, detail, booking_id)
@@ -456,9 +466,9 @@ class PlannerService:
         """
         await self._authorize(principal, slug)
         async with self._uow.read() as tx:
-            booking, group = await self._changeable(tx, slug, booking_id)
-            if not booking.is_active:
-                raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
+            booking, group = await self._changeable(
+                tx, slug, booking_id, rule=booking_changes.ensure_planner_may_request_rebook
+            )
             (row,) = await self._assist(tx, group, [booking])
         return row
 
@@ -479,7 +489,7 @@ class PlannerService:
         await self._authorize(principal, slug)
         async with self._uow.read() as tx:
             group = await group_by_slug(tx, slug)
-            movers = [b for b in await self._movers(tx, group, scope) if b.is_active]
+            movers = await self._movers(tx, group, scope)
             return await self._assist(tx, group, movers)
 
     async def send_review(
@@ -651,17 +661,20 @@ class PlannerService:
         return movers
 
     async def _changeable(
-        self, tx: Transaction, slug: str, booking_id: int, *, rebook: bool = False
+        self,
+        tx: Transaction,
+        slug: str,
+        booking_id: int,
+        *,
+        rule: PlannerRule = booking_changes.ensure_planner_may_change,
     ) -> tuple[Booking, Group]:
-        """Return the group's booking ``booking_id`` if a planner may change it now.
+        """Return the group's booking ``booking_id`` if ``rule`` lets a planner change it now.
 
-        With ``rebook``, only if its participant may also be asked to choose a new time. The
-        group comes with it, so the caller needs no second look-up.
+        The group check comes first: another group's booking is not found, whatever its status.
+        The group comes with it, so the caller needs no second look-up.
         """
         booking, group = await group_booking(tx, slug, booking_id)
-        booking_changes.ensure_planner_may_change(booking, group, self._clock.now())
-        if rebook and not booking.is_active:
-            raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
+        rule(booking, group, self._clock.now())
         return booking, group
 
     async def _slot(self, tx: Transaction, group: Group, start: datetime) -> AgendaSlot | None:

@@ -5,7 +5,7 @@ Calendar: "now" is Thursday 1 January 2026 08:00 UTC; group ``demo`` is staffed 
 09:30 slots of two places each.
 """
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -25,7 +25,15 @@ from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import AUDITOR, GROUP_ADMIN
-from tests.support.domain import NOW, SLOT_0900, SLOT_0930, book_another, window
+from tests.support.domain import (
+    NOW,
+    SLOT_0900,
+    SLOT_0930,
+    another_participant,
+    book_another,
+    book_pending,
+    window,
+)
 
 NEXT_0900 = SLOT_0900 + timedelta(days=7)
 NEXT_0930 = SLOT_0930 + timedelta(days=7)
@@ -161,6 +169,25 @@ async def test_only_a_planner_may_propose(
         await planner.propose(AUDITOR, "demo", booking_id, NEXT_0900, ChangeReason.STAFFING)
 
     assert caught.value.code is ErrorCode.NOT_PERMITTED
+
+
+@pytest.mark.parametrize("start", [SLOT_0900, NEXT_0900], ids=["own-slot", "free-slot"])
+async def test_only_a_confirmed_booking_is_offered_or_sent_a_proposal(
+    planner: PlannerService, bookings: BookingService, uow: InMemoryUnitOfWork, start: datetime
+) -> None:
+    """ADR 0056 point 11: the rule of asking for a new time comes first, whatever the slot."""
+    pending = await book_pending(bookings, slug="demo", contact=another_participant())
+    waiting, _token = await _book(bookings)
+    await planner.request_rebook(GROUP_ADMIN, "demo", waiting, ChangeReason.STAFFING)
+
+    for booking_id in (pending.booking.id or 0, waiting):
+        with pytest.raises(DomainError, match="booking_not_active"):
+            await planner.booking_proposal(GROUP_ADMIN, "demo", booking_id)
+        with pytest.raises(DomainError, match="booking_not_active"):
+            await planner.propose(GROUP_ADMIN, "demo", booking_id, start, ChangeReason.STAFFING)
+
+    assert pending.booking.status is BookingStatus.PENDING_CONFIRMATION
+    assert not uow.state.proposals
 
 
 # --- answering ------------------------------------------------------------------------------

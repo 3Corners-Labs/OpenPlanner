@@ -41,6 +41,11 @@ from app.admin.group_routes import group_page
 from app.admin.pages import Locale, SameOrigin
 from app.domain.authorization import Permission
 from app.domain.booking import Booking, ChangeReason
+from app.domain.booking_changes import (
+    PlannerRule,
+    ensure_planner_may_change,
+    ensure_planner_may_request_rebook,
+)
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.planner_service import PlannerService
 from app.domain.ports import Clock
@@ -123,12 +128,16 @@ def agenda_url(slug: str, day: date) -> str:
 
 
 async def _changeable(
-    request: Request, context: AdminContext, booking_id: int, *, rebook: bool = False
+    request: Request,
+    context: AdminContext,
+    booking_id: int,
+    *,
+    rule: PlannerRule = ensure_planner_may_change,
 ) -> Booking:
-    """Return the booking if it may still be changed; refusals become the HTTP error."""
+    """Return the booking if ``rule`` still lets it change; refusals become the HTTP error."""
     try:
         return await planner_of(request).booking(
-            context.principal, context.group.group.slug, booking_id, rebook=rebook
+            context.principal, context.group.group.slug, booking_id, rule=rule
         )
     except DomainError as error:
         raise_refusal(error)
@@ -360,7 +369,9 @@ async def rebook_form(
     request: Request, locale: Locale, slug: str, booking_id: int, context: ManageBookings
 ) -> HTMLResponse:
     """Ask for the reason before asking the participant to choose a new time."""
-    booking = await _changeable(request, context, booking_id, rebook=True)
+    booking = await _changeable(
+        request, context, booking_id, rule=ensure_planner_may_request_rebook
+    )
     form = FormData({}, locale.gettext)
     return _reason_response(request, locale, context, booking, form, REBOOK)
 
