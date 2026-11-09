@@ -1459,6 +1459,28 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=1440,
     ),
     S(
+        "agent_change_request_cooldown_minutes",
+        K.INT,
+        10,
+        _D,
+        T.PLANNER,
+        "After a bot's change request reached a booking, minutes in which a new one for it sends "
+        "the participant nothing (ADR 0023 step 2b). Cannot be switched off.",
+        minimum=1,
+        maximum=1440,
+    ),
+    S(
+        "agent_change_request_retention_days",
+        K.INT,
+        30,
+        _C,
+        T.RETENTION,
+        "Days after expiry that a bot's change request is kept, matched or not; then it is "
+        "deleted and its status no longer found (ADR 0023 step 2b).",
+        minimum=1,
+        maximum=365,
+    ),
+    S(
         "admin_session_hours",
         K.INT,
         8,

@@ -45,6 +45,9 @@ page* at the top jumps to a topic; one *Save* button saves all topics together.
   change and reminder messages. Nothing changes until the participant confirms the request
   through their own email or text message, within the set time. Switched off, the API refuses
   requests and open requests lapse.
+- **Quiet period after a change request** (1 to 1440 minutes, default 10): after a request
+  reached an appointment, the participant gets no new message for that appointment during this
+  period, even if the bot asks again. Cannot be switched off.
 
 ## Changing a setting
 

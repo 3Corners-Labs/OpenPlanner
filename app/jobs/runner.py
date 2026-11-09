@@ -37,6 +37,7 @@ from app.domain import booking_changes
 from app.domain.audit import Outcome
 from app.domain.booking import Booking
 from app.domain.call_service import CallService
+from app.domain.change_request_service import request_still_open
 from app.domain.channels import ChannelKind
 from app.domain.diagnostics import DiagnosticLog
 from app.domain.errors import DomainError, ErrorCode
@@ -142,7 +143,7 @@ class JobRunner:
         change_requests: Whether an organisation (by id) takes a bot's change requests
             (``agent_change_requests_enabled``, ADR 0023 step 2): its messages show the
             appointment code, and a change request's message goes out only while it is on.
-            ``None`` is off.
+            ``None`` is off. The worker passes it only where the deployment runs the API.
         after_purge: Called once after a round that ran ``purge_pii`` jobs (the worker passes
             the WAL checkpoint, WP-A3); a failure is logged and never fails the round.
     """
@@ -306,16 +307,25 @@ class JobRunner:
                 if booking and booking.id is not None and job.type in PROPOSAL_NOTICES
                 else None
             )
-            # Switched off since the request: no request, so ``is_stale`` stops it (ADR 0023).
             change = (
                 await tx.get_latest_change_request(booking.id)
-                if booking
-                and booking.id is not None
-                and group
-                and job.type in CHANGE_REQUEST_NOTICES
-                and self._takes_change_requests(group.organisation_id)
+                if booking and booking.id is not None and job.type in CHANGE_REQUEST_NOTICES
                 else None
             )
+            if (
+                change is not None
+                and booking is not None
+                and group is not None
+                and not await request_still_open(
+                    tx,
+                    change,
+                    booking,
+                    group,
+                    self._takes_change_requests(group.organisation_id),
+                    now,
+                )
+            ):
+                change = None  # no longer open (ADR 0023 step 2b): ``is_stale`` stops the message
             organisation = (
                 await tx.get_organisation_by_id(group.organisation_id)
                 if group and job.type in TEAM_INVITES

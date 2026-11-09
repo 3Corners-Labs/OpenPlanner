@@ -208,6 +208,12 @@ async def _report(
     _ = locale.gettext
     result: UsageScreen[Any]
     extra: dict[str, object] = {}
+
+    def drill(day: date) -> str:
+        """The page for one day: the drill-down link of a chart's day (suppression applies)."""
+        query = {"view": view, "from": day.isoformat(), "to": day.isoformat()}
+        return f"{base}?{urlencode(query)}"
+
     if view == TEAM:
         if organisation is None:
             raise DomainError(ErrorCode.INVALID_RANGE)
@@ -219,10 +225,10 @@ async def _report(
         )
     elif view == "queue":
         result = await service.queue(principal, **scope)
-        extra["charts"] = queue_charts(result.report, _)
+        extra["charts"] = queue_charts(result.report, _, drill)
     elif view == "capacity":
         result = await service.capacity(principal, **scope)
-        extra["charts"] = capacity_charts(result.report, _)
+        extra["charts"] = capacity_charts(result.report, _, drill)
         extra["tiles_"] = capacity_tiles(result.report, _)
     elif view == "channels":
         result = await service.channels(principal, **scope)
@@ -230,7 +236,7 @@ async def _report(
     else:
         split = _split(request)
         result = await service.volume(principal, **scope, split=split)
-        extra["charts"] = volume_charts(result.report, _)
+        extra["charts"] = volume_charts(result.report, _, drill)
         extra["tiles_"] = volume_tiles(result.report, _)
         extra["split"] = split or ""
     context = {**_view(request, locale, result, view, base, team_on), **extra}
@@ -274,6 +280,7 @@ async def _organisation_page(
             **digest,
             **(extra or {}),
         },
+        scripts=True,
     )
 
 
@@ -289,7 +296,7 @@ async def _group_page(
     template, _result, ctx = await _report(
         request, locale, context.principal, f"/admin/groups/{slug}/usage", group=slug, view=view
     )
-    return group_page(request, locale, context, template, {**ctx, **(extra or {})})
+    return group_page(request, locale, context, template, {**ctx, **(extra or {})}, scripts=True)
 
 
 @router.get("/organisations/{org}/usage", response_class=HTMLResponse)

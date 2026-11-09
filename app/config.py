@@ -503,6 +503,9 @@ class Settings(BaseSettings):
     agent_change_requests_enabled: bool = False
     agent_change_request_minutes: int = Field(default=60, ge=10, le=1440)
     agent_change_requests_per_hour: int = Field(default=20, ge=1, le=120)
+    # ADR 0023 step 2b: a quiet period per booking (D) and how long requests are kept (C).
+    agent_change_request_cooldown_minutes: int = Field(default=10, ge=1, le=1440)
+    agent_change_request_retention_days: int = Field(default=30, ge=1, le=365)
 
     # Updates from the admin portal (ADR 0029). APP_VERSION is baked into release images by
     # main.yml; UPDATE_REPOSITORY (owner/name) switches the hourly release check on. The token
@@ -594,6 +597,15 @@ class Settings(BaseSettings):
     integration_recovery_minutes: int = Field(default=10, ge=1, le=120)
     # Class C (ADR 0082 point 9): a lasting alert is sent to its targets again at this interval.
     alert_repeat_hours: int = Field(default=4, ge=1, le=168)
+
+    @property
+    def takes_change_requests(self) -> bool:
+        """Whether a bot's change requests are on (ADR 0023 step 2).
+
+        The deployment runs the machine API and the organisation switched them on; read on an
+        organisation's settings.
+        """
+        return self.agent_api_enabled and self.agent_change_requests_enabled
 
     @model_validator(mode="after")
     def _cross_field_rules(self) -> "Settings":
