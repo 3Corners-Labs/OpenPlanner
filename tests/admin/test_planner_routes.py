@@ -367,6 +367,37 @@ async def test_the_rebook_form_is_refused_for_a_pending_booking(site: Site) -> N
     assert response.status_code == 409
 
 
+async def test_a_rebook_post_for_a_pending_booking_is_refused_as_its_form_is(site: Site) -> None:
+    """A stale or forged POST meets the form's own rule: the same 409 page, nothing written."""
+    pending = await _book_pending(site)
+    await site.login_as(GROUP_ADMIN)
+    path = f"{AGENDA}/bookings/{pending}/rebook"
+
+    refused = await site.client.get(path)
+    with_reason = await _post(site, path, {"reason": "staffing"})
+    without_reason = await _post(site, path, {})
+
+    assert refused.status_code == 409
+    for response in (with_reason, without_reason):
+        assert response.status_code == 409
+        assert response.text == refused.text  # the error page, not the form with the refusal
+    assert (await _status(site, pending))[0] is BookingStatus.PENDING_CONFIRMATION
+
+
+async def test_a_pending_booking_is_cancelled_like_a_confirmed_one(site: Site) -> None:
+    """ADR 0056 point 11: the cancel form and its POST keep the rule of any change."""
+    pending = await _book_pending(site)
+    await site.login_as(GROUP_ADMIN)
+    path = f"{AGENDA}/bookings/{pending}/cancel"
+
+    form = await site.client.get(path)
+    response = await _post(site, path, {"reason": "unforeseen"})
+
+    assert form.status_code == 200
+    assert response.status_code == 303
+    assert await _status(site, pending) == (BookingStatus.CANCELLED, ChangeReason.UNFORESEEN)
+
+
 # --- the rebooking assistant (ADR 0057 step 3) -------------------------------------------
 
 
