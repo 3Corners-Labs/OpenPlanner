@@ -4,7 +4,7 @@ Rule 4 of ``redact.js`` covers the year of a capture, the one before and the fiv
 (``coveredYears`` in ``evidence.mjs``). The window comes from the capture's recorded start, so
 the screenshots and a log rewritten later name the same years. ``capture.mjs`` checks that start
 once: a start without a year stops a run before it needs a stack, and a log rewrite before it
-writes anything. Runs the scripts in node, as the capture does, on a workspace outside the
+writes the log. Runs the scripts in node, as the capture does, on a workspace outside the
 checkout.
 """
 
@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.support.skill_scripts import SKILLS
+from tests.support.skill_scripts import SKILLS, manuals_workspace
 
 NODE = shutil.which("node")
 SCRIPTS = SKILLS / "role-manuals" / "scripts"
@@ -53,10 +53,7 @@ def covered_years(argument: str) -> subprocess.CompletedProcess[str]:
 @pytest.fixture
 def workspace(tmp_path: Path) -> Path:
     """A workspace outside the checkout, with no variables and no capture yet."""
-    root = tmp_path / "manuals"
-    (root / "evidence").mkdir(parents=True)
-    (root / "variables.json").write_text("{}\n")
-    return root
+    return manuals_workspace(tmp_path / "manuals", {})
 
 
 def capture(workspace: Path, started: str | None, *args: str) -> subprocess.CompletedProcess[str]:
@@ -122,9 +119,9 @@ def test_a_run_stops_on_a_recorded_start_without_a_year_before_it_needs_a_stack(
 
 
 def test_a_log_rewrite_names_the_start_and_its_years(workspace: Path) -> None:
-    """A valid start gives the log its moment and the window the screenshots covered."""
-    done = capture(workspace, "2026-11-09 15:23:13 CET", "--log-only")
+    """A valid start gives the log its moment and the window of that start, not of today."""
+    done = capture(workspace, "2030-03-04 10:00:00 CET", "--log-only")
     assert done.returncode == 0, done.stderr
     log = (workspace / "evidence" / "log.md").read_text()
-    assert "Opname gestart 2026-11-09 15:23:13 CET" in log
-    assert "het jaartal (2025 tot en met 2031)" in log
+    assert "Opname gestart 2030-03-04 10:00:00 CET" in log
+    assert "het jaartal (2029 tot en met 2035)" in log
