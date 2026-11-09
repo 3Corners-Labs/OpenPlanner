@@ -19,6 +19,7 @@ from app.domain.staff import Membership, StaffMember
 from app.domain.tokens import agent_pseudonym
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
+from tests.support.cross_group import booking_id_methods, refused_as_unknown
 from tests.support.domain import (
     ADA,
     NOW,
@@ -26,7 +27,6 @@ from tests.support.domain import (
     SLOT_0930,
     TEST_TOKEN_KEY,
     book_confirmed,
-    booking_id_methods,
     make_group,
     window,
 )
@@ -183,10 +183,9 @@ async def test_release_by_the_agent_or_a_group_admin_only(
 
 
 async def test_an_unknown_booking_does_not_exist_here(
-    queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
+    queue: QueueService, uow: InMemoryUnitOfWork
 ) -> None:
     uow.state.groups[2] = replace(uow.state.groups[2], queue_free_pick_allowed=True)
-    clock.advance(SLOT_0900 - clock.now())
 
     with pytest.raises(DomainError) as excinfo:
         await queue.claim(OTHER_TEAM, "andere", 999)
@@ -207,14 +206,15 @@ def test_every_use_case_on_one_booking_is_tried_through_another_group() -> None:
 
 @pytest.mark.parametrize("state", ["unclaimed", "claimed", "cancelled"])
 @pytest.mark.parametrize("action", list(ON_ONE_BOOKING))
-async def test_another_groups_booking_is_not_found_here(
+async def test_another_groups_booking_is_not_found_through_this_group(
     action: str, state: str, queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
     """A group admin, who may release any claim of their group, finds no other group's booking.
 
-    Unclaimed or claimed, a use case would claim, show or release it, or answer another code,
-    so a missing group check fails. Cancelled, the queue's own rule answers
-    ``booking_not_active``, so a group check made after that rule fails too.
+    The booking is in ``andere``, a sibling group of ``demo``. Unclaimed or claimed, a use case
+    would claim, show or release it, or answer another code, so a missing group check fails.
+    Cancelled, the queue's own rule answers ``booking_not_active``, so a group check made after
+    that rule fails too.
     """
     uow.state.groups[1] = replace(uow.state.groups[1], queue_free_pick_allowed=True)
     other = await _book(uow, clock, slug="andere")
@@ -224,15 +224,8 @@ async def test_another_groups_booking_is_not_found_here(
     if state == "cancelled":
         booking = uow.state.bookings[other]
         uow.state.bookings[other] = replace(booking, status=BookingStatus.CANCELLED)
-    before = uow.state.bookings[other]
-    audited = len(uow.state.audit)
 
-    with pytest.raises(DomainError) as excinfo:
-        await ON_ONE_BOOKING[action](queue, other)
-
-    assert excinfo.value.code is ErrorCode.BOOKING_NOT_FOUND
-    assert uow.state.bookings[other] == before
-    assert len(uow.state.audit) == audited
+    await refused_as_unknown(uow, other, ON_ONE_BOOKING[action](queue, other))
 
 
 @pytest.mark.parametrize("principal", [OTHER_TEAM, AUDITOR])

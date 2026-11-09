@@ -23,6 +23,7 @@ from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.closures import NOTICES, three_groups
+from tests.support.cross_group import booking_id_methods, refused_as_unknown
 from tests.support.domain import (
     ADA,
     MONDAY,
@@ -31,7 +32,6 @@ from tests.support.domain import (
     SLOT_0930,
     book_confirmed,
     book_pending,
-    booking_id_methods,
     with_team_invite,
 )
 from tests.support.principals import principal
@@ -220,12 +220,12 @@ async def test_other_groups_admin_cannot_close_or_touch_bookings(
 
 
 ON_ONE_BOOKING: dict[str, Callable[[ClosureService, int], Awaitable[object]]] = {
-    "booking": lambda s, b: s.booking(OTHER_TEAM, "andere-team", b),
-    "reinstate": lambda s, b: s.reinstate(OTHER_TEAM, "andere-team", b),
-    "cancel": lambda s, b: s.cancel(OTHER_TEAM, "andere-team", b),
-    "move": lambda s, b: s.move(OTHER_TEAM, "andere-team", b, NEXT_MONDAY),
+    "booking": lambda s, b: s.booking(GROUP_ADMIN, "demo", b),
+    "reinstate": lambda s, b: s.reinstate(GROUP_ADMIN, "demo", b),
+    "cancel": lambda s, b: s.cancel(GROUP_ADMIN, "demo", b),
+    "move": lambda s, b: s.move(GROUP_ADMIN, "demo", b, NEXT_MONDAY),
 }
-"""Every use case on one booking, by the group admin of ``andere-team`` through their own group."""
+"""Every use case on one booking, by the group admin of ``demo`` through their own group."""
 
 
 def test_every_use_case_on_one_booking_is_tried_through_another_group() -> None:
@@ -233,9 +233,11 @@ def test_every_use_case_on_one_booking_is_tried_through_another_group() -> None:
 
 
 @pytest.mark.parametrize("state", ["on_hold", "not_on_hold"])
+@pytest.mark.parametrize("group", ["andere-team", "demo-twee"])
 @pytest.mark.parametrize("action", list(ON_ONE_BOOKING))
 async def test_another_groups_booking_is_not_found_through_this_group(
     action: str,
+    group: str,
     state: str,
     closures: ClosureService,
     bookings: BookingService,
@@ -243,21 +245,15 @@ async def test_another_groups_booking_is_not_found_through_this_group(
 ) -> None:
     """The group check comes first, before the rule that only a booking on hold is handled.
 
-    On hold, a use case would show, reinstate, cancel or move the booking, so a missing group
-    check fails. Not on hold, that rule answers ``booking_not_active``, so a group check made
-    after it fails too.
+    The booking is in another organisation's group or in a sibling group of ``demo``. On hold,
+    a use case would show, reinstate, cancel or move it, so a missing group check fails. Not on
+    hold, that rule answers ``booking_not_active``, so a group check made after it fails too.
     """
-    booking_id = await _book(bookings)
+    booking_id = await _book(bookings, slug=group)
     if state == "on_hold":
-        await closures.close_group(GROUP_ADMIN, "demo", UNTIL_TUESDAY)
-    before = uow.state.bookings[booking_id]
-    audited = len(uow.state.audit)
+        await closures.close_group(SUPER, group, UNTIL_TUESDAY)
 
-    with pytest.raises(DomainError, match="booking_not_found"):
-        await ON_ONE_BOOKING[action](closures, booking_id)
-
-    assert uow.state.bookings[booking_id] == before
-    assert len(uow.state.audit) == audited
+    await refused_as_unknown(uow, booking_id, ON_ONE_BOOKING[action](closures, booking_id))
 
 
 # --- the participant --------------------------------------------------------------------------

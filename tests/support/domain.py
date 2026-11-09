@@ -5,7 +5,6 @@ open on Monday 5 January 09:00-10:00 Amsterdam time (08:00-09:00 UTC) in 30-minu
 The demo group that the HTTP tests seed is open on weekdays (``FRIDAY``, ``FRIDAY_0900``).
 """
 
-import inspect
 import itertools
 from dataclasses import replace
 from datetime import UTC, date, datetime, time
@@ -150,16 +149,3 @@ async def book_another(
         locale="nl",
         consents=consents,
     )
-
-
-def booking_id_methods(service: type) -> set[str]:
-    """Return the public use cases of ``service`` that act on one booking (``booking_id``).
-
-    A test that tries each of them with another group's booking compares its list with this
-    one, so a use case added later is tried too.
-    """
-    return {
-        name
-        for name, method in inspect.getmembers(service, inspect.iscoroutinefunction)
-        if not name.startswith("_") and "booking_id" in inspect.signature(method).parameters
-    }
