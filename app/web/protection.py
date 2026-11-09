@@ -20,6 +20,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.domain.security_log import CROSS_SITE, ORIGIN_MISMATCH
+from app.web.route_dependencies import dependency_calls
 
 log = structlog.get_logger()
 
@@ -93,6 +94,17 @@ def require_same_origin(request: Request) -> None:
         # Origins are not personal data; logging them makes misconfigured proxies visible.
         log.info("request.rejected", reason=ORIGIN_MISMATCH, origin=origin[:200], expected=expected)
         raise RejectedRequest(403, ORIGIN_MISMATCH)
+
+
+def is_action(request: Request) -> bool:
+    """Return whether the request's route is an action: it depends on ``require_same_origin``.
+
+    Every form post is, and so is a ``GET`` with an effect, such as an audited download
+    (ASVS V3.5.3). Nothing may lead back to an action by itself: a login returns to the page
+    that asked for it (``app.admin.return_to``), and a page served at a ``GET`` action's
+    address gets language links to the overview (``app.web.templates.switch_href``).
+    """
+    return require_same_origin in dependency_calls(request.scope.get("route"))
 
 
 @dataclass

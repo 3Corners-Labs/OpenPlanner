@@ -18,7 +18,9 @@ from starlette.responses import HTMLResponse
 
 from app.logging import tracer
 from app.web.locale import LANG_PARAM, RequestLocale
+from app.web.protection import is_action
 from app.web.static_assets import ASSETS
+from app.web.widgets import OVERVIEW_PATH
 
 KEPT_QUERY_PARAMS = ("start", "month", "day", "days", "from", "until")
 """Query parameters the language switcher carries over; anything else is dropped so that
@@ -65,8 +67,9 @@ class LanguageOption:
         code: Locale code, used for the ``lang`` and ``hreflang`` attributes.
         autonym: The language's name in that language (``"English"``).
         href: A query-only relative URL (``?lang=en``) that keeps the current path and the
-            other query parameters. It never contains the request path, so a crafted path
-            cannot turn it into a link to another host.
+            other query parameters; on a page at a ``GET`` action's address, the overview
+            with ``?lang=`` (``switch_href``). It never contains the request path, so a crafted
+            path cannot turn it into a link to another host.
         current: Whether this is the page's language.
     """
 
@@ -121,8 +124,12 @@ def switch_href(request: Request, param: str, value: str) -> str:
     """Return a query-only link (``?lang=en``) that sets ``param`` on the current page.
 
     Keeps only ``kept_query``, and never contains the request path, so a crafted path cannot
-    turn it into a link to another host.
+    turn it into a link to another host. A page served at a ``GET`` action's address (the
+    refusal of an audited download) is not a page to come back to: a link to it would ask for
+    the action again (ASVS V3.5.3), so there the link sets ``param`` on the overview instead.
     """
+    if is_action(request) and request.method == "GET":
+        return f"{OVERVIEW_PATH}?{urlencode([(param, value)])}"
     return f"?{urlencode([*kept_query(request), (param, value)])}"
 
 

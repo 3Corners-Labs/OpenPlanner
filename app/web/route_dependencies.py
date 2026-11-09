@@ -2,8 +2,8 @@
 
 For code that decides from the guards a route declares rather than from its path: which
 permission a form's action needs while maintenance is on (``app.admin.frozen_forms``), whether
-a ``GET`` is an action that a login must not replay (``app.admin.return_to``), and the tests
-that every route declares exactly one permission or scope.
+a request's route is an action (``app.web.protection.is_action``), and the tests that every
+route declares exactly one permission or scope.
 """
 
 from fastapi.dependencies.models import Dependant

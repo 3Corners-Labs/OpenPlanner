@@ -14,8 +14,7 @@ from urllib.parse import parse_qsl, urlencode
 
 from fastapi import Request
 
-from app.web.protection import require_same_origin
-from app.web.route_dependencies import dependency_calls
+from app.web.protection import is_action
 from app.web.templates import KEPT_QUERY_PARAMS
 
 DASHBOARD = "/admin/"
@@ -83,15 +82,6 @@ def safe_next(value: str | None) -> str:
     return f"{path}?{kept}{anchor}" if kept else f"{path}{anchor}"
 
 
-def _is_action(request: Request) -> bool:
-    """Return whether the request's route is an action: it depends on ``require_same_origin``.
-
-    Every form post is, and so is a GET with an effect, such as an audited download
-    (ASVS V3.5.3).
-    """
-    return require_same_origin in dependency_calls(request.scope.get("route"))
-
-
 def _page(request: Request) -> tuple[str, str]:
     """Return the path and raw query of the page the admin is on.
 
@@ -100,7 +90,7 @@ def _page(request: Request) -> tuple[str, str]:
     identity provider's redirect back to it would arrive cross-site and be refused. A forged
     referer cannot leave the portal, because every target goes through ``safe_next``.
     """
-    if request.method == "GET" and not _is_action(request):
+    if request.method == "GET" and not is_action(request):
         return request.url.path, request.url.query
     referer = request.headers.get("referer", "")
     rest = referer.split("://", 1)[-1].partition("/")[2].split("#", 1)[0]
