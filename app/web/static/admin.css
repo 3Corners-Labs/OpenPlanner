@@ -3375,6 +3375,9 @@ op-report-chart {
   border-color: var(--wb-warn);
   color: var(--wb-warn);
 }
+.wb__pause[hidden] {
+  display: none;
+}
 .wb__pause-on,
 .wb[data-paused] .wb__pause-off {
   display: none;

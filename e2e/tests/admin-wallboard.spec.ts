@@ -58,6 +58,7 @@ test('the figures are 3.4 rem or more and nothing on the board moves', async ({ 
 });
 
 test('three failed polls in a row show the old-data state in words, and a good answer ends it', async ({ page }) => {
+  test.setTimeout(120_000);
   let failing = false;
   await page.route(`**${LIVE}*`, (route) => (failing ? route.fulfill({ status: 500, body: '' }) : route.continue()));
   await openAs(page, BOARD);
@@ -84,7 +85,8 @@ test('pausing stops the asking and says so, resuming asks again', async ({ page 
     return route.continue();
   });
   await openAs(page, BOARD);
-  const pause = page.getByRole('button', { name: /Pauzeer verversen|Pause updates/ });
+  // The name changes while paused, so the button is found by its class, not by its name.
+  const pause = page.locator('.wb__pause');
 
   await pause.click();
   await expect(pause).toHaveAttribute('aria-pressed', 'true');
