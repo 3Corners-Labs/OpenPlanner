@@ -1,6 +1,6 @@
 # 0066. Bookings per email address
 
-Status: accepted (2026-10-30), requested by the product owner. Extends ADR 0027 and ADR 0056. Built: steps 1–7 in #128, step 8 in #PRNUM; see *Build status*.
+Status: accepted (2026-10-30), requested by the product owner. Extends ADR 0027 and ADR 0056. Built: steps 1–7 in #128, step 8 in #700; see *Build status*.
 
 ## Context
 
@@ -73,7 +73,7 @@ legitimate use. The case folding rule is fixed (ASCII, both sides).
 | Step | What | PR | State |
 |---|---|---|---|
 | 1–7 | Per-email limit: same slot refused, maximum per group, setting, migration 0054 | #128 | merged |
-| 8 | A refused booking is explained by email only: status `refused` (migration 0106), the `send_refusal` email, purge a day after the attempt | #PRNUM | merged |
+| 8 | A refused booking is explained by email only: status `refused` (migration 0106), the `send_refusal` email, purge a day after the attempt | #700 | merged |
 
 (State as checked against the code on 2026-11-09; the overview of every ADR is `docs/adr-status.md`.)
 
