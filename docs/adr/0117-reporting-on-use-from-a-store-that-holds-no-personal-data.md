@@ -450,7 +450,7 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 4 | Worker `usage_rollup`, retention pruning, `usage-backfill` CLI and automatic first run, rollup lag on *System status* | #608 | merged |
 | 5 | Permissions in the matrix, navigation (*Reports*, *Usage* sub-tab), scope-filtered query layer with suppression, *Volume* screen as tables, matrix sweep, manual nl/en | #619 | merged |
 | 6 | SVG charts (`app/web/charts.py`), *Queue and calls*, *Capacity*, *Channels* screens, axe and keyboard checks | #632 | merged |
-| 6b | Bring *Volume* and *Capacity* to the mockup ([`docs/reporting-mockups.md`](../reporting-mockups.md)): figure tiles, day bars, stacked outcome bar, *split by*, per-table suppression note | | planned |
+| 6b | Bring *Volume* and *Capacity* to the mockup ([`docs/reporting-mockups.md`](../reporting-mockups.md)): figure tiles, day bars, stacked outcome bar, *split by*, per-table suppression note | #PR | merged |
 | 7 | *Team* screen and `usage_staff_hour` (setting off by default, folding on removal) | #683 | merged |
 | 8 | CSV export of the screen and the tidy `openplanner.usage/1` file, limits, audit event | #652 | merged |
 | 9 | Machine API `/api/v1/reports/usage`, API client scope, `docs/reporting-api.md`, schemathesis | #678 | merged |

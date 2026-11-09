@@ -24,22 +24,24 @@ Rules:
 |---|---|---|---|
 | Breadcrumb and the report family links (*Volume*, *Queue and calls*, *Capacity*, *Channels*, *Team*) | 5, 6, 7 | built; *Team* only for who holds `reports.staff.view`, and marked *off* until the organisation switches it on | `tests/admin/test_usage_screens.py` (`test_the_page_links_the_families_and_marks_the_current_one`), `tests/admin/test_usage_team.py` |
 | Range form: from, to | 5 | built | `tests/admin/test_usage_routes.py` |
-| Range form: *Split by* (none, queue method, subject, language) and *Show* | 5 | **open**: no step names it | – |
+| Range form: *Split by* (none, queue method, language) | 6b | built; **subject is not offered**: subject codes are not rolled up yet (ADR 0081 is unbuilt), the row follows that ADR | `tests/domain/test_usage_report.py`, `tests/admin/test_usage_screens.py` |
 | *Export CSV* of the screen | 8 | planned | – |
 | *As of* line, the last 24 hours marked provisional, the threshold sentence | 5 | built | `tests/admin/test_usage_routes.py` |
-| Four figure tiles: bookings in the period (U1), no-show rate (U3), cancelled by participant (U4, with the late share), confirmed after e-mail (U9, with the median) | 5 | **open**: the screen shows tables only | – |
-| Bars per day with weekend toggle, *Copy SVG*, arrow keys and *filter on this day* | 6 (SVG), 12 (script) | **open**: *Volume* got no chart in step 6 | – |
+| Four figure tiles: bookings in the period (U1), no-show rate (U3), cancelled by participant (U4, with the late share), confirmed after e-mail (U9, with the median bucket) | 6b | built; the median is the duration bucket it falls in, as the store holds buckets, not seconds | `tests/domain/test_usage_report.py`, `tests/admin/test_usage_screens.py` |
+| Bars per day, weekday and weekend as two series told apart by pattern | 6b | built | `tests/admin/test_usage_screens.py` |
+| Weekend toggle, *Copy SVG*, arrow keys and *filter on this day* | 12 | planned (script) | – |
 | The same numbers as a table directly after each chart, with `< 5` for a hidden cell | 6 | built for the charts that exist | `tests/web/test_charts.py`, `tests/admin/test_usage_screens.py` |
-| Stacked outcome bar with its table and shares | 6 | **open**: the outcome is a table | – |
-| Note on complementary suppression when two cells are hidden | 5 | **open**: only the general rule sentence exists, not the per-table note | – |
+| Stacked outcome bar with its table and shares | 6b | built (four series; the table keeps the finer outcomes and has a share column) | `tests/admin/test_usage_screens.py` |
+| Note on complementary suppression under every table that hides a count | 6b | built | `tests/admin/test_usage_screens.py` (`test_a_table_with_a_hidden_count_says_why`) |
 | Note on bookings from before reporting started (counts per day only) | 5 | built | `tests/admin/test_usage_routes.py` |
 
 ## View 2: Capacity
 
 | Element | Step | State | Held by |
 |---|---|---|---|
-| Four figure tiles: utilisation (C1), unused places (C3), full blocks (C2), staff shortfall (C5) | 6 | **open**: the screen has a utilisation line and the heat table; the tiles are not there | – |
-| Busiest hours as a heat table: number in every cell, colour only as a second signal, legend, cell explanation by mouse and arrow keys | 6 (table), 12 (explanation) | **open**: check the screen; the explanation needs the script | – |
+| Four figure tiles: utilisation (C1, with booked of total places), unused places (C3), full blocks (C2), staff shortfall (C5, with the accepted ones) | 6b | built | `tests/admin/test_usage_screens.py` |
+| Busiest hours as a heat table: number in every cell, colour only as a second signal | 6 | built | `tests/admin/test_usage_screens.py` |
+| Cell explanation by mouse and arrow keys | 12 | planned (script) | – |
 | Hour figures only over 7 days or more and only above five times the threshold, with the sentence | 5 | built | `tests/admin/test_usage_screens.py` (`test_the_heat_table_is_not_offered_for_a_short_range`) |
 
 ## View 3: Wallboard
@@ -65,12 +67,5 @@ Rules:
 
 | Element | Step | State | Held by |
 |---|---|---|---|
-| New subscription form and list | 10 | planned | – |
-| Preview of the mail (link, optional numbers) | 10 | planned | – |
-
-## Open rows
-
-Every row marked **open** above that no step names gets a step. They are added to the *Build
-status* table of ADR 0117 as step 6b (Volume tiles, day chart, outcome bar, split by) so that the
-reports are not declared done while the *Volume* screen is still tables. The Capacity rows are
-checked against the running screen in the same step and turned into *built* or into their own row.
+| New subscription form and list | 10 | built | `tests/admin/test_usage_digest_routes.py` |
+| Preview of the mail (link, optional numbers) | 10 | built as the mail itself, no separate preview | `tests/domain/test_report_digest.py` |

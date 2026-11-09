@@ -11719,3 +11719,105 @@ msgstr "Voormalige teamleden"
 
 msgid "reports.team.note"
 msgstr "Een getal onder {n} is verborgen en staat als < {n}; de minuten gaan mee met de gesprekken. Er is geen totaalrij: verwijderde teamleden zijn één rij, zodat de geschiedenis haar totalen houdt en er geen persoon overblijft."
+
+msgid "reports.share"
+msgstr "Aandeel"
+
+msgid "reports.table.suppressed"
+msgstr "Aantallen onder {n} zijn verborgen. Is maar één aantal van een tabel verborgen, dan verbergen we ook het eerstvolgende kleinste, zodat het totaal niet terug te rekenen is."
+
+msgid "reports.provisional.note"
+msgstr "De laatste 24 uur zijn voorlopig: afspraken kunnen nog worden geannuleerd of verzet."
+
+msgid "reports.provisional.days"
+msgstr "Voorlopige dagen"
+
+msgid "reports.chart.unit.bookings"
+msgstr "afspraken"
+
+msgid "reports.volume.days.title"
+msgstr "Afspraken per dag (de dag van de afspraak, in de tijdzone van de groep)"
+
+msgid "reports.volume.days.weekday"
+msgstr "Werkdag"
+
+msgid "reports.volume.days.weekend"
+msgstr "Weekend"
+
+msgid "reports.volume.outcome.title"
+msgstr "Uitkomst van afspraken"
+
+msgid "reports.volume.outcome.cancelled"
+msgstr "Geannuleerd"
+
+msgid "reports.volume.outcome.all"
+msgstr "Alle afspraken"
+
+msgid "reports.split.label"
+msgstr "Uitsplitsen naar"
+
+msgid "reports.split.none"
+msgstr "Geen"
+
+msgid "reports.split.queue"
+msgstr "Wachtrijmethode"
+
+msgid "reports.split.locale"
+msgstr "Taal"
+
+msgid "reports.split.title"
+msgstr "Gemaakte afspraken, uitgesplitst"
+
+msgid "reports.split.left_out"
+msgstr "{n} groep(en) zijn te klein om uit te splitsen en blijven buiten beschouwing."
+
+msgid "reports.tile.created"
+msgstr "Afspraken in periode"
+
+msgid "reports.tile.created.detail"
+msgstr "gemaakt per lokale dag"
+
+msgid "reports.tile.no_show"
+msgstr "No-showpercentage"
+
+msgid "reports.tile.no_show.of"
+msgstr "van {n} afgeronde"
+
+msgid "reports.tile.cancel"
+msgstr "Geannuleerd door deelnemer"
+
+msgid "reports.tile.cancel.late"
+msgstr "{percent}% minder dan een dag van tevoren"
+
+msgid "reports.tile.confirmed"
+msgstr "Bevestigd na e-mail"
+
+msgid "reports.tile.confirmed.median"
+msgstr "mediaan {range}"
+
+msgid "reports.tile.utilisation"
+msgstr "Bezetting"
+
+msgid "reports.tile.utilisation.of"
+msgstr "{booked} van {capacity} plaatsen"
+
+msgid "reports.tile.idle"
+msgstr "Ongebruikte plaatsen"
+
+msgid "reports.tile.idle.detail"
+msgstr "plaatsen die niemand boekte"
+
+msgid "reports.tile.full"
+msgstr "Volle blokken"
+
+msgid "reports.tile.full.of"
+msgstr "{n} van {m}"
+
+msgid "reports.tile.shortfall"
+msgstr "Tekort aan medewerkers"
+
+msgid "reports.tile.shortfall.detail"
+msgstr "blokken"
+
+msgid "reports.tile.shortfall.accepted"
+msgstr "{n} geaccepteerd"

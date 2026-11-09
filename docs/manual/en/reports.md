@@ -41,6 +41,12 @@ changes, one small record per change.
 - **Bookings from before reporting**: outcomes of bookings that were merged into daily counts before
   usage was counted; nothing more is known about them.
 
+## The tiles, the charts and *Split by*
+
+At the top of **Volume** four tiles give the answer before the tables: bookings in the period, the no-show rate, the share cancelled by participants (with how many of those were less than a day before the start) and the share confirmed after the email (with the bucket the median time falls in). **Capacity** has four as well: utilisation (with booked of all places), unused places, full blocks and the staff shortfall. A tile made from a figure that is hidden says *not available*; it never shows a number the tables hide. Under every table that hides a count a sentence says why, including that one more count is hidden when a single one would give the total away.
+
+The range form on **Volume** has **Split by**: none, queue method or language. A group takes part in a split only when its own total in the period is at least five times the minimum; the page says how many groups were left out. Splitting by subject is not offered yet.
+
 ## The report families
 
 At the top of the Usage page a row of links switches between four families of the same report (a fifth, *Team*, is for organisation admins whose organisation switched it on). The
