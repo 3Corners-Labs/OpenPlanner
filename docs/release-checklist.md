@@ -17,6 +17,9 @@ copy the checklist into the release PR's conversation or an issue titled `Releas
       `uv run python -m scripts.adr_issues --counts` and `docs/adr-status.md` agree with the code.
 - [ ] Issue *Guardrail drift* is closed: settings equal `.github/guardrails.json` or the
       baseline was changed in a decision PR (ADR 0109).
+- [ ] An administrator's own audit (`guardrail_audit --full`) does not mention
+      `actions_policies`: the hourly audit app cannot read the Actions event policies
+      (ADR 0120; runbook, *Guardrail drift*).
 - [ ] Latest release candidate on `main` is green, runs on the test host (docker01), and the
       walk-through of `docs/runbook.md` (booking, confirm, join, cancel, closure, update) was done
       on it, by a person.

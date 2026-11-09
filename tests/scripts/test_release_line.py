@@ -1,13 +1,29 @@
 """Maintenance lines release/X.Y (ADR 0116 point 3): the target, cutting, candidates, tags."""
 
+import json
+import re
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
+import yaml
 
 from scripts import release_line, release_plan
-from scripts.release_line import backport_lines, may_cut, newest_release, tag_target
+from scripts.release_line import (
+    Backport,
+    backport,
+    backport_lines,
+    backports,
+    may_cut,
+    newest_release,
+    pushed_pull_requests,
+    tag_target,
+)
 from scripts.release_plan import MAIN, LineError, Target
-from tests.scripts.conftest import Git, commit_all, cut_line
+from scripts.report_issue import Runner
+from tests.scripts.conftest import Git, commit_all, cut_line, workflow_events
+
+BACKPORT = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "backport.yml"
 
 # The target: main or a line.
 
@@ -80,11 +96,6 @@ def test_backport_labels_name_lines() -> None:
     labels = ["backport:0.5", "ci:full", "backport:0.10", "backport:0.5", "backport:x"]
 
     assert backport_lines(labels) == ["0.5", "0.10"]
-
-
-def test_an_option_shaped_label_is_only_a_label(capsys: pytest.CaptureFixture[str]) -> None:
-    assert release_line.main(["backport-lines", "--", "--help", "backport:0.5", "ci:full"]) == 0
-    assert capsys.readouterr().out == "0.5\n"
 
 
 # In a repository: v0.5.0, then a feature on main; line release/0.5 cut from it.
@@ -200,3 +211,120 @@ def test_every_step_that_pipes_into_tee_fails_with_its_command() -> None:
 
     assert piped
     assert all("pipefail" in block for block in piped)
+
+
+# ADR 0120: the backport starts from the merge to main, never from an event of a pull request.
+
+
+def pull(number: int, *labels: str, merged: bool = True, base: str = "main") -> dict[str, object]:
+    """A pull request as ``GET /repos/{repo}/pulls/{number}`` returns it."""
+    return {
+        "number": number,
+        "title": f"fix: number {number}",
+        "merged": merged,
+        "merge_commit_sha": f"sha{number}",
+        "base": {"ref": base},
+        "labels": [{"name": label} for label in labels],
+    }
+
+
+PULLS = {
+    5: pull(5, "ci:full", "backport:0.5", "backport:0.6"),
+    6: pull(6, "ci:full"),
+    7: pull(7, "backport:0.5", merged=False),
+    8: pull(8, "backport:x"),
+    9: pull(9, "backport:0.5", base="feature-x"),
+}
+
+
+def fake_api(calls: list[str]) -> Runner:
+    """A ``gh api repos/o/r/pulls/N`` that answers from ``PULLS`` and records each call."""
+
+    def run(args: Sequence[str]) -> str:
+        calls.append(args[1])
+        return json.dumps(PULLS[int(args[1].rsplit("/", 1)[1])])
+
+    return run
+
+
+def test_a_push_names_its_pull_requests_by_the_squash_subjects() -> None:
+    event = {
+        "commits": [
+            {"id": "a" * 40, "message": "fix: one (#5)\n\nthe body mentions (#99)"},
+            {"id": "b" * 40, "message": "feat: a title (#12) that names another (#6)"},
+        ]
+    }
+
+    assert pushed_pull_requests(event) == [5, 6]
+
+
+def test_a_pushed_commit_that_names_no_pull_request_stops_the_run() -> None:
+    """Everything on main comes through the queue; a backport is never skipped quietly."""
+    event = {"commits": [{"id": "c" * 40, "message": "chore: pushed by hand"}]}
+
+    with pytest.raises(LineError, match="names no pull request"):
+        pushed_pull_requests(event)
+
+
+def test_only_a_pull_request_merged_into_main_with_a_line_label_is_backported() -> None:
+    assert backport(PULLS[5]) == Backport(5, "sha5", "fix: number 5", ["0.5", "0.6"])
+    assert backport(PULLS[6]) is None, "no backport label"
+    assert backport(PULLS[7]) is None, "not merged: nothing on main to cherry-pick"
+    assert backport(PULLS[8]) is None, "backport:x names no line"
+    assert backport(PULLS[9]) is None, "merged elsewhere: no fix of main"
+
+
+def test_each_pull_request_is_read_once() -> None:
+    calls: list[str] = []
+
+    found = backports([6, 5, 7, 5, 8, 9], "o/r", fake_api(calls))
+
+    assert [item.number for item in found] == [5]
+    assert calls == [f"repos/o/r/pulls/{n}" for n in (5, 6, 7, 8, 9)]
+
+
+def test_the_command_prints_one_json_list_for_a_push_or_a_dispatch(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    event = tmp_path / "event.json"
+    event.write_text(json.dumps({"commits": [{"id": "d", "message": "fix: x (#5)"}]}))
+    run = fake_api([])
+
+    assert release_line.main(["backports", "--repository", "o/r", "--event", str(event)], run) == 0
+    assert json.loads(capsys.readouterr().out) == [
+        {"number": 5, "commit": "sha5", "title": "fix: number 5", "lines": ["0.5", "0.6"]}
+    ]
+    assert release_line.main(["backports", "--repository", "o/r", "--pull", "6"], run) == 0
+    assert json.loads(capsys.readouterr().out) == []
+
+
+def test_a_dispatch_with_anything_but_a_number_stops() -> None:
+    for value in ("5;touch x", "-5", "²", ""):
+        with pytest.raises(SystemExit):
+            release_line.main(["backports", "--repository", "o/r", "--pull", value], fake_api([]))
+
+
+def test_the_backport_starts_from_a_merge_to_main_or_a_dispatch() -> None:
+    workflow = yaml.safe_load(BACKPORT.read_text())
+    on = workflow[True]  # YAML 1.1 reads the key `on` as true
+    find, job = workflow["jobs"]["find"], workflow["jobs"]["backport"]
+
+    assert workflow_events(BACKPORT) == {"push", "workflow_dispatch"}, "never pull_request_target"
+    assert on["push"] == {"branches": ["main"]}
+    assert on["workflow_dispatch"]["inputs"]["pull_request"]["required"] is True
+    assert "environment" not in find
+    assert "secrets." not in json.dumps(find), "the job that reads pull requests holds no secret"
+    assert "scripts.release_line backports" in find["steps"][-1]["run"]
+    assert job["needs"] == "find"
+    assert job["if"] == "needs.find.outputs.backports != '[]'"
+    assert job["environment"] == "release"
+
+
+def test_the_job_with_the_key_reads_exactly_the_fields_find_lists() -> None:
+    """The cherry-pick loop takes number, commit, title and lines from ``find``'s list."""
+    workflow = yaml.safe_load(BACKPORT.read_text())
+    script = workflow["jobs"]["backport"]["steps"][-1]["run"]
+    used = set(re.findall(r'"\.\[\$i\]\.(\w+)', script))
+
+    assert used == set(Backport.__dataclass_fields__)
+    assert "gh api" not in script, "nothing is read again in the job that holds the key"

@@ -12,7 +12,13 @@ section, and this script compares the two without any network call:
   values the baseline lists under ``known_unseen``: a read-only token can never see them, so
   they are listed for information and do not keep the issue open;
 - every bypass of a ruleset in the last day that the baseline does not expect (the release
-  app creating a ``v*`` tag is expected).
+  app creating a ``v*`` tag is expected);
+- every run of the decision gate since the day before, among its latest 100, that GitHub did
+  not start (``startup_failure``): what a missing, switched-off or narrowed Actions event
+  policy does to the gate (ADR 0120). The policies themselves are a section like any other,
+  but GitHub serves them only to *Administration: write*, so the read-only audit app cannot
+  see them; the baseline lists a section it is refused under ``known_unseen`` too. ``--full``
+  is for an administrator's own login, which reads every section: nothing is unseen then.
 
 ``--post`` keeps the report as the one open issue ``Guardrail drift <date>`` through
 ``scripts/report_issue.py``; ``--snapshot`` prints the live state in the baseline's shape, for
@@ -24,7 +30,7 @@ import argparse
 import json
 import sys
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -59,6 +65,8 @@ ORGANISATION_KEYS = (
 )
 ACTIONS_KEYS = ("enabled", "allowed_actions", "sha_pinning_required")
 WORKFLOW_KEYS = ("default_workflow_permissions", "can_approve_pull_request_reviews")
+NOT_STARTED = "startup_failure"
+"""The conclusion of a run that GitHub refused to start, for instance by an event policy."""
 
 Json = Any
 """A value parsed from JSON."""
@@ -68,18 +76,23 @@ class UnreadableError(Exception):
     """A section of the live state is missing or cannot be parsed."""
 
 
-def _rule(rule: Mapping[str, Json]) -> dict[str, Json]:
-    """One ruleset rule, with lists that GitHub returns in any order sorted."""
+UNORDERED: dict[str, Callable[[Json], str | tuple[str, str]]] = {
+    "required_status_checks": lambda check: str(check.get("context", "")),
+    "allowed_merge_methods": str,
+    "allowed_events": str,
+    "allowed_actors": lambda actor: (str(actor.get("type")), str(actor.get("id"))),
+}
+"""Rule parameters that GitHub returns in any order, with the key that sorts each: a ruleset's
+checks and merge methods, an Actions event policy's events and actors (ADR 0120)."""
+
+
+def _parameters(rule: Mapping[str, Json]) -> dict[str, Json]:
+    """One rule's parameters (of a ruleset or an event policy), unordered lists sorted."""
     parameters = dict(rule.get("parameters") or {})
-    checks = parameters.get("required_status_checks")
-    if isinstance(checks, list):
-        parameters["required_status_checks"] = sorted(checks, key=lambda c: c.get("context", ""))
-    for key in ("allowed_merge_methods",):
+    for key, order in UNORDERED.items():
         if isinstance(parameters.get(key), list):
-            parameters[key] = sorted(parameters[key])
-    return (
-        {"type": rule["type"], "parameters": parameters} if parameters else {"type": rule["type"]}
-    )
+            parameters[key] = sorted(parameters[key], key=order)
+    return parameters
 
 
 def normalise_rulesets(rulesets: Iterable[Mapping[str, Json]]) -> dict[str, Json]:
@@ -105,10 +118,31 @@ def normalise_rulesets(rulesets: Iterable[Mapping[str, Json]]) -> dict[str, Json
                 ),
                 key=lambda a: (str(a["actor_type"]), str(a["actor_id"])),
             ),
-            "rules": {
-                str(rule["type"]): _rule(rule).get("parameters", {})
-                for rule in ruleset.get("rules") or []
-            },
+            "rules": {str(rule["type"]): _parameters(rule) for rule in ruleset.get("rules") or []},
+        }
+    return found
+
+
+def normalise_policies(policies: Iterable[Mapping[str, Json]]) -> dict[str, Json]:
+    """The Actions event policies by name (ADR 0120), without ids, links and timestamps.
+
+    The workflow paths are sorted and a missing ``include`` or ``exclude`` is an empty list,
+    and the rules' lists are sorted as a ruleset's are, so neither the order GitHub returns them
+    in nor how the policy was entered (in the browser or through the API) shows as drift.
+    """
+    found = {}
+    for policy in policies:
+        conditions = dict(policy.get("conditions") or {})
+        paths = conditions.get("workflow_path")
+        if isinstance(paths, Mapping):
+            conditions["workflow_path"] = {
+                key: sorted(paths.get(key) or []) for key in ("include", "exclude")
+            }
+        found[str(policy["name"])] = {
+            "source_type": policy.get("source_type"),
+            "enforcement": policy.get("enforcement"),
+            "conditions": conditions,
+            "rules": {str(rule["type"]): _parameters(rule) for rule in policy.get("rules") or []},
         }
     return found
 
@@ -153,6 +187,7 @@ SECTIONS: dict[str, tuple[str, Callable[[Json], Json]]] = {
     "rulesets": ("rulesets", normalise_rulesets),
     "repository": ("repository", normalise_repository),
     "actions": ("actions", lambda value: _pick(value, ACTIONS_KEYS)),
+    "actions_policies": ("actions_policies", normalise_policies),
     "workflow_token": ("actions_workflow", lambda value: _pick(value, WORKFLOW_KEYS)),
     "environments": ("environments", normalise_environments),
     "collaborators": (
@@ -239,32 +274,68 @@ def unexpected_bypasses(
     ]
 
 
+def runs_not_started(runs: Iterable[Mapping[str, Json]], today: date) -> list[Mapping[str, Json]]:
+    """The runs since the day before ``today`` that GitHub refused to start (ADR 0120).
+
+    A run of the decision gate ends in ``startup_failure``, without a job, when an event policy
+    (or GitHub's default one) blocks its event, or when its workflow file cannot be read.
+
+    Raises:
+        KeyError: A run has no ``created_at``.
+        ValueError: A run's ``created_at`` is no ISO 8601 time; the audit fails closed on both.
+    """
+    since = today - timedelta(days=1)
+    return [
+        run
+        for run in runs
+        if datetime.fromisoformat(str(run["created_at"])).date() >= since
+        and run.get("conclusion") == NOT_STARTED
+    ]
+
+
 class Findings:
-    """What the audit found: drifted values, unreadable sections and unexpected bypasses."""
+    """What the audit found: drift, unreadable sections, bypasses and gate runs not started."""
 
     def __init__(self) -> None:
         """Start empty."""
         self.drift: list[str] = []
         self.unreadable: list[str] = []
         self.bypasses: list[Mapping[str, Json]] = []
+        self.gate_not_started: list[Mapping[str, Json]] = []
+        """Runs of the decision gate that GitHub did not start (ADR 0120)."""
         self.known_unseen: list[str] = []
         """Unseen values the baseline expects to be unseen: reported, but no finding."""
 
     def __bool__(self) -> bool:
         """Whether anything was found."""
-        return bool(self.drift or self.unreadable or self.bypasses)
+        return bool(self.drift or self.unreadable or self.bypasses or self.gate_not_started)
 
 
-def audit(baseline: Mapping[str, Json], directory: Path) -> Findings:
-    """Compare every section of the baseline with the live files in ``directory``."""
+def audit(
+    baseline: Mapping[str, Json], directory: Path, today: date, *, full: bool = False
+) -> Findings:
+    """Compare every section of the baseline with the live files in ``directory``.
+
+    Args:
+        baseline: The expected state, ``.github/guardrails.json``.
+        directory: The files of ``scripts/guardrail-fetch.sh``.
+        today: The day of the report; the decision gate's runs count from the day before.
+        full: An administrator's own login read the files: nothing is unseen by design, so
+            the baseline's ``known_unseen`` does not apply and everything must be read.
+    """
     findings = Findings()
     live = snapshot(directory)
+    known = set() if full else set(baseline.get("known_unseen", {}))
     for section, (name, _) in SECTIONS.items():
         if section not in live:
-            findings.unreadable.append(name)
+            # Only a section the token was refused (no file) can be unseen by design (ADR
+            # 0120); a file that is there but cannot be parsed is unreadable, never known.
+            if section in known and not (directory / f"{name}.json").exists():
+                findings.known_unseen.append(section)
+            else:
+                findings.unreadable.append(name)
         elif section in baseline:
             unseen = hidden(baseline[section], live[section], section)
-            known = set(baseline.get("known_unseen", {}))
             findings.unreadable.extend(path for path in unseen if path not in known)
             findings.known_unseen.extend(path for path in unseen if path in known)
             expected = _blank(json.loads(json.dumps(baseline[section])), unseen, section)
@@ -274,6 +345,10 @@ def audit(baseline: Mapping[str, Json], directory: Path) -> Findings:
         findings.bypasses = unexpected_bypasses(bypasses, baseline.get("expected_bypasses", []))
     except UnreadableError:
         findings.unreadable.append("bypasses")
+    try:
+        findings.gate_not_started = runs_not_started(read_live(directory, "gate_runs"), today)
+    except (UnreadableError, KeyError, TypeError, ValueError):
+        findings.unreadable.append("gate_runs")
     return findings
 
 
@@ -299,6 +374,21 @@ def render(findings: Findings, today: date) -> str:
             for b in findings.bypasses
         ]
         lines.append("")
+    if findings.gate_not_started:
+        lines += ["## Runs of the decision gate that GitHub did not start", ""]
+        lines += [
+            f"- {run.get('event')} at {run.get('created_at')}: {run.get('html_url')}"
+            for run in findings.gate_not_started
+        ]
+        lines += [
+            "",
+            "The annotation on the run page says why. When it names `pull_request_target` or an "
+            "Actions event policy, the policy `decision gate` is missing, switched off or "
+            "narrowed (ADR 0120): an administrator restores it from `.github/guardrails.json` "
+            "and starts the gate again with a new event on the pull request (runbook, *The "
+            "decision gate did not start*).",
+            "",
+        ]
     if findings.unreadable:
         lines += ["## What could not be read or seen (the audit fails closed)", ""]
         lines += [f"- `{name}`" for name in findings.unreadable]
@@ -329,6 +419,11 @@ def main(argv: Sequence[str] | None = None, run: Runner = run_gh) -> int:
     )
     parser.add_argument("--dry-run", action="store_true", help="with --post: write nothing")
     parser.add_argument(
+        "--full",
+        action="store_true",
+        help="an administrator's own login read the files: every section must be read",
+    )
+    parser.add_argument(
         "--today", type=date.fromisoformat, default=datetime.now(UTC).date(), help="report date"
     )
     args = parser.parse_args(argv)
@@ -341,7 +436,7 @@ def main(argv: Sequence[str] | None = None, run: Runner = run_gh) -> int:
     except (OSError, ValueError) as error:
         print(f"::error::the baseline {args.baseline} cannot be read: {error}")
         return 2
-    findings = audit(baseline, args.live)
+    findings = audit(baseline, args.live, args.today, full=args.full)
     text = render(findings, args.today)
     print(text, end="")
     if args.post:
