@@ -9,7 +9,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-import { EMAIL_WIDTH, GREY, MOBILE, PAD, SCALE, VIEWPORT, WIDE, maskProduct } from './shots.mjs';
+import { EMAIL_WIDTH, GREY, MOBILE, PAD, SCALE, VIEWPORT, WIDE, YEARS, maskProduct } from './shots.mjs';
 
 export const TZ = 'Europe/Amsterdam';
 
@@ -74,6 +74,7 @@ const KIND = {
   field: 'veld',
   version: 'versie',
   'version-field': 'versieveld',
+  year: 'jaartal',
 };
 
 /**
@@ -127,7 +128,10 @@ export function writeLog({ ws, stack, state, steps, hidden }) {
       + 'een rij, kolom of veld waarvan het label zo\'n term is, als geheel.',
     '- Afdekregel 3: geen leesbare versie: softwareversies (zoals 0.5.1, v0.5.1, 0.5.1-rc.2 en het label dev), '
       + '"Versie onbekend", "Geen release(versie)", commit-hashes, image-id\'s en digests, en de waarden van de '
-      + 'versievelden Commit en Nieuwste versie. Datums en tijden blijven staan.',
+      + 'versievelden Commit en Nieuwste versie.',
+    `- Afdekregel 4: het jaartal (${YEARS[0]} tot en met ${YEARS.at(-1)}), in datums, koppen en datumvelden, zodat een `
+      + 'afbeelding niet laat zien wanneer hij gemaakt is. Dag, maand en tijd blijven staan; er komt nooit een ander '
+      + 'jaartal voor in de plaats. De echte datum van elke opname staat in dit log.',
     '- Verzonnen deelnemers met adressen op voorbeeld.nl; medewerkers zijn de ontwikkelgebruikers van de '
       + 'identiteitsprovider. Geen token, wachtwoord of e-mailtekst in dit log.',
     '',

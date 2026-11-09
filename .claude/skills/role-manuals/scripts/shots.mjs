@@ -20,6 +20,12 @@ export const PAD = 2;
 /** Version fields whose whole value is covered, and texts that say there is no version (rule 3 of redact.js). */
 const VERSION_FIELDS = [LABEL.admin.commit, LABEL.admin.latest];
 const VERSION_TEXTS = [textOf('admin', 'noReleaseBuild'), textOf('admin', 'noRelease'), textOf('admin', 'versionUnknown')];
+/**
+ * The years covered (rule 4 of redact.js): the year of the capture, the one before it (a capture
+ * early in January shows December) and five after it (bookings two months ahead, holidays,
+ * retention and certificate dates). A number outside them, such as a key size of 2048, stays.
+ */
+export const YEARS = Array.from({ length: 7 }, (_, i) => new Date().getFullYear() - 1 + i);
 
 /** Texts that show because the installation has no Webex Meetings (logged per capture). */
 export const NO_VIDEO_PHRASES = textsOf('noVideo');
@@ -158,7 +164,7 @@ export async function shoot(page, { id, img, hidden, crop = new Viewport(), role
   try {
     if (crop.stretch) await stretch(page);
     facts = await page.evaluate(pageFacts, NO_VIDEO_PHRASES);
-    boxes = await page.evaluate(detect, { ...hidden, versionFields: VERSION_FIELDS, versionTexts: VERSION_TEXTS });
+    boxes = await page.evaluate(detect, { ...hidden, versionFields: VERSION_FIELDS, versionTexts: VERSION_TEXTS, years: YEARS });
     [clip, crops] = await crop.clip(page, page.viewportSize() ?? old);
     if (clip.y < 1 && new URL(page.url(), 'http://x').pathname.startsWith('/admin')) {
       const bar = await page.evaluate(envBarBottom);
