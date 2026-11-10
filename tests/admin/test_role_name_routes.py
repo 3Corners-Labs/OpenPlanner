@@ -32,7 +32,7 @@ async def test_the_chosen_name_shows_next_to_the_rights_with_the_standard_name(s
     assert "Hoofdbeheer (Organisatiebeheerder)" in rights
     matrix = (await site.client.get("/admin/matrix")).text
     assert "Hoofdbeheer (Organisatiebeheerder)" in matrix
-    assert "Teamleider (Groepsbeheerder)" in matrix
+    assert "Teamleider (Dienstbeheerder)" in matrix
 
 
 async def test_the_top_bar_shows_the_chosen_name_on_the_page_of_a_group(site: Site) -> None:
@@ -43,14 +43,14 @@ async def test_the_top_bar_shows_the_chosen_name_on_the_page_of_a_group(site: Si
     page = (await site.client.get("/admin/groups/demo/staffing")).text
 
     assert ">Teamleider<" in page
-    assert ">Groepsbeheerder<" not in page
+    assert ">Dienstbeheerder<" not in page
 
 
 async def test_a_name_of_another_role_is_refused_whatever_its_case(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
     refused = await site.client.post(
-        TEXTS, data={ORG_KEY: "GROEPSBEHEERDER", GROUP_KEY: ""}, headers=SAME_ORIGIN
+        TEXTS, data={ORG_KEY: "DIENSTBEHEERDER", GROUP_KEY: ""}, headers=SAME_ORIGIN
     )
 
     assert refused.status_code == 422

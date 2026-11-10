@@ -56,7 +56,7 @@ async def test_the_bookings_widget_draws_a_bar_chart_with_every_value_as_text(si
     text = (await site.client.get("/admin/overview/w/bookings-today?view=bar")).text
 
     assert 'role="img"' in text
-    assert _svg_label(text).startswith("Staafdiagram, Afspraken vandaag per groep: ")
+    assert _svg_label(text).startswith("Staafdiagram, Afspraken vandaag per dienst: ")
     assert "Demo: videogesprek: 0 afspraken vandaag" in _svg_label(text)
     assert 'class="chart__value"' in text  # the value is printed on the bar
     assert 'class="widget-list"' not in text
@@ -81,7 +81,7 @@ async def test_the_bookings_widget_draws_a_pie_with_a_legend_and_shares(site: Si
     await site.login_as(ORG_ADMIN)
     text = (await site.client.get("/admin/overview/w/bookings-today?view=pie")).text
 
-    assert _svg_label(text).startswith("Taartdiagram, Afspraken vandaag per groep: ")
+    assert _svg_label(text).startswith("Taartdiagram, Afspraken vandaag per dienst: ")
     assert 'class="chart-legend"' in text
     assert "Demo: videogesprek: 0 (0%)" in text
     assert "<path" not in text  # every count is zero: no slice, but the legend still lists them
@@ -95,7 +95,7 @@ async def test_every_chart_has_its_data_as_a_table_behind_details(site: Site) ->
 
         assert "<details" in text
         assert "<summary>Gegevens als tabel</summary>" in text
-        assert '<th scope="col">Groep</th>' in text
+        assert '<th scope="col">Dienst</th>' in text
         assert '<th scope="col" class="widget-table__number">Afspraken vandaag</th>' in text
         assert '<th scope="row">Demo: videogesprek</th>' in text
 
@@ -139,9 +139,9 @@ async def test_the_queue_widget_draws_waiting_per_group_as_bar_and_line(site: Si
     line = (await site.client.get("/admin/overview/w/queue?view=line")).text
 
     assert (
-        _svg_label(bar) == "Staafdiagram, Wachtrij in mijn groepen: Demo: videogesprek: 0 wachtend"
+        _svg_label(bar) == "Staafdiagram, Wachtrij in mijn diensten: Demo: videogesprek: 0 wachtend"
     )
-    assert _svg_label(line).startswith("Lijndiagram, Wachtrij in mijn groepen: ")
+    assert _svg_label(line).startswith("Lijndiagram, Wachtrij in mijn diensten: ")
     assert 'class="chart__line"' in line
     assert 'class="chart__marker"' in line
     assert 'class="chart__bar chart-series-0"' in bar
@@ -163,7 +163,7 @@ async def test_the_english_chart_texts(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
     text = (await site.client.get("/admin/overview/w/bookings-today?view=bar&lang=en")).text
 
-    assert _svg_label(text).startswith("Bar chart, Bookings today per group: ")
+    assert _svg_label(text).startswith("Bar chart, Bookings today per service: ")
     assert "<summary>Data as a table</summary>" in text
 
 
@@ -186,7 +186,7 @@ async def test_the_switcher_links_keep_the_other_widgets_as_they_are(site: Site)
     await site.login_as(ORG_ADMIN)
     text = (await site.client.get("/admin/?bookings-today=bar")).text
 
-    assert 'aria-label="Weergave van Afspraken vandaag per groep"' in text
+    assert 'aria-label="Weergave van Afspraken vandaag per dienst"' in text
     assert (
         '<span class="widget__view widget__view--current" aria-current="true">Staaf</span>' in text
     )

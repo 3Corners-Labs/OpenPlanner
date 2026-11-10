@@ -22,7 +22,7 @@ async def test_a_login_puts_the_admin_in_the_list(site: Site) -> None:
     assert '<h1 id="page-title">Medewerkers</h1>' in text
     assert ">Gina Group</a>" in text
     assert ">Olaf Org</a>" in text
-    assert "Groepsbeheerder" in text
+    assert "Dienstbeheerder" in text
     assert 'href="/admin/staff"' in text  # the menu entry
 
 
@@ -66,7 +66,7 @@ async def test_the_detail_page_shows_access_times_and_activity(site: Site) -> No
     text = (await site.client.get(f"/admin/staff/{gina}")).text
 
     assert '<h1 id="page-title">Gina Group</h1>' in text
-    assert "Groepsbeheerder" in text
+    assert "Dienstbeheerder" in text
     assert "Laatst afgemeld" in text
     assert "Eerste keer ingelogd" in text  # the staff.created event in the activity table
     assert "Uitloggen" in text  # the logout event

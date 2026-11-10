@@ -83,7 +83,7 @@ async def test_the_settings_page_offers_the_check(checked: tuple[Site, FakeCheck
     page = (await site.client.get(SETTINGS)).text
 
     assert 'action="/admin/groups/demo/check"' in page
-    assert "Deze groep is nog niet gecontroleerd." in page
+    assert "Deze dienst is nog niet gecontroleerd." in page
     assert checker.calls == []  # opening the page checks nothing
 
 
@@ -188,7 +188,7 @@ async def test_a_crashing_check_never_blocks_the_save(
     assert checker.calls == [("demo", ["demo"])]
     page = (await site.client.get(SETTINGS)).text
     assert 'value="host@example.nl"' in page
-    assert "Deze groep is nog niet gecontroleerd." in page
+    assert "Deze dienst is nog niet gecontroleerd." in page
 
 
 # --- ADR 0082 point 3: the Service App check on Koppelingen ----------------------------------

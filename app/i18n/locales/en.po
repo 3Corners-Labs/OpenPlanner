@@ -372,7 +372,7 @@ msgid "error.already_claimed"
 msgstr "Already picked up by a colleague. Pick up the next one."
 
 msgid "error.free_pick_not_allowed"
-msgstr "In this group you always pick up the next appointment."
+msgstr "In this service you always pick up the next appointment."
 
 msgid "error.not_claimed"
 msgstr "You did not pick up this appointment."
@@ -584,7 +584,7 @@ msgid "admin.nav.section.platform"
 msgstr "Platform"
 
 msgid "admin.nav.object.group"
-msgstr "Group"
+msgstr "Service"
 
 msgid "admin.profile.source"
 msgstr "Your role comes from your organisation account and cannot be changed here."
@@ -653,13 +653,13 @@ msgid "admin.dashboard.title"
 msgstr "Overview"
 
 msgid "admin.dashboard.intro"
-msgstr "What needs attention now, and the groups you have rights for."
+msgstr "What needs attention now, and the services you have rights for."
 
 msgid "admin.dashboard.groups"
-msgstr "Your groups"
+msgstr "Your services"
 
 msgid "admin.dashboard.no_groups"
-msgstr "You have no rights for any group yet. Ask your administrator for access."
+msgstr "You have no rights for any service yet. Ask your administrator for access."
 
 msgid "admin.overview.refresh"
 msgstr "Refresh"
@@ -677,16 +677,16 @@ msgid "admin.overview.widget.alerts.title"
 msgstr "Alerts"
 
 msgid "admin.overview.widget.queue.title"
-msgstr "Queue across my groups"
+msgstr "Queue across my services"
 
 msgid "admin.overview.widget.bookings_today.title"
-msgstr "Bookings today per group"
+msgstr "Bookings today per service"
 
 msgid "admin.overview.widget.bookings_today.agenda_link"
 msgstr "Agenda of {name}"
 
 msgid "admin.overview.widget.bookings_today.empty"
-msgstr "No groups within your reach."
+msgstr "No services within your reach."
 
 msgid "admin.overview.widget.changes.title"
 msgstr "Recent configuration changes"
@@ -752,7 +752,7 @@ msgid "admin.group.phone_required"
 msgstr "Required"
 
 msgid "admin.group.your_rights"
-msgstr "Your rights for this group"
+msgstr "Your rights for this service"
 
 msgid "admin.rights.title"
 msgstr "My rights"
@@ -776,19 +776,19 @@ msgid "admin.rights.scope_portal"
 msgstr "The administration portal"
 
 msgid "admin.rights.scope_everything"
-msgstr "All organisations and groups"
+msgstr "All organisations and services"
 
 msgid "admin.rights.scope_organisations"
 msgstr "Organisations: {names}"
 
 msgid "admin.rights.scope_groups"
-msgstr "Groups: {names}"
+msgstr "Services: {names}"
 
 msgid "admin.matrix.title"
 msgstr "Rights matrix"
 
 msgid "admin.matrix.intro"
-msgstr "What each role may do, per organisation and per group. Permissions marked Superuser only are fixed. Permissions marked Personal data show participants' data. Only the superuser can adjust roles; every change is recorded and listed at the bottom of this page. Your organisation assigns roles in its identity provider."
+msgstr "What each role may do, per organisation and per service. Permissions marked Superuser only are fixed. Permissions marked Personal data show participants' data. Only the superuser can adjust roles; every change is recorded and listed at the bottom of this page. Your organisation assigns roles in its identity provider."
 
 msgid "admin.matrix.level"
 msgstr "Level"
@@ -818,7 +818,7 @@ msgid "admin.audit.title"
 msgstr "Audit log"
 
 msgid "admin.audit.intro"
-msgstr "Logins, refused actions, changes and what the system did itself (messages, video meetings, queue tasks), only for your own organisation or groups."
+msgstr "Logins, refused actions, changes and what the system did itself (messages, video meetings, queue tasks), only for your own organisation or services."
 
 msgid "admin.audit.when"
 msgstr "When"
@@ -833,7 +833,7 @@ msgid "admin.audit.outcome"
 msgstr "Outcome"
 
 msgid "admin.audit.target"
-msgstr "Organisation / group"
+msgstr "Organisation / service"
 
 msgid "admin.audit.empty"
 msgstr "There are no events yet."
@@ -890,7 +890,7 @@ msgid "authz.role.org_admin"
 msgstr "Organisation admin"
 
 msgid "authz.role.group_admin"
-msgstr "Group admin"
+msgstr "Service admin"
 
 msgid "authz.role.auditor"
 msgstr "Compliance and privacy (read-only)"
@@ -905,7 +905,7 @@ msgid "authz.level.organisation"
 msgstr "Organisation"
 
 msgid "authz.level.group"
-msgstr "Group"
+msgstr "Service"
 
 msgid "authz.permission.dashboard_view"
 msgstr "View overview"
@@ -938,16 +938,16 @@ msgid "authz.permission.integrations_manage"
 msgstr "Manage integrations and secrets"
 
 msgid "authz.permission.group_create"
-msgstr "Create groups"
+msgstr "Create services"
 
 msgid "authz.permission.group_delete"
-msgstr "Archive groups"
+msgstr "Archive services"
 
 msgid "authz.permission.group_view"
-msgstr "View group"
+msgstr "View service"
 
 msgid "authz.permission.group_edit"
-msgstr "Change group settings"
+msgstr "Change service settings"
 
 msgid "authz.permission.schedule_manage"
 msgstr "Manage staffing and staffing exceptions"
@@ -986,7 +986,7 @@ msgid "authz.condition.management_link"
 msgstr "With the management link from the confirmation"
 
 msgid "authz.condition.management_link_before_change_deadline"
-msgstr "With the management link, until the number of minutes before the start that the group sets"
+msgstr "With the management link, until the number of minutes before the start that the service sets"
 
 msgid "authz.condition.management_link_before_start"
 msgstr "With the management link, until the start"
@@ -1031,7 +1031,7 @@ msgid "admin.done.added"
 msgstr "Added."
 
 msgid "admin.done.created"
-msgstr "The group has been created. Now set its staffing."
+msgstr "The service has been created. Now set its staffing."
 
 msgid "admin.done.released"
 msgstr "The appointment was released and is back in the queue."
@@ -1058,7 +1058,7 @@ msgid "admin.tab.exceptions"
 msgstr "Staffing exceptions"
 
 msgid "admin.group.sections"
-msgstr "Group sections"
+msgstr "Service sections"
 
 msgid "admin.group.open_public_page"
 msgstr "Public page"
@@ -1070,13 +1070,13 @@ msgid "admin.settings.lead"
 msgstr "Changes apply to new appointments; existing appointments stay as they are."
 
 msgid "admin.new_group.title"
-msgstr "New group"
+msgstr "New service"
 
 msgid "admin.new_group.lead"
-msgstr "A group is a team with one queue in the contact centre. After creating it you set its staffing: the number of {agents} per block."
+msgstr "A service is what your organisation offers to participants, with its own page, staffing and queue. After creating it you set its staffing: the number of {agents} per block."
 
 msgid "admin.new_group.create"
-msgstr "Create group"
+msgstr "Create service"
 
 msgid "admin.field.organisation"
 msgstr "Organisation"
@@ -1097,7 +1097,7 @@ msgid "admin.field.timezone"
 msgstr "Time zone"
 
 msgid "admin.field.timezone_hint"
-msgstr "This group's times apply in this zone. Summer and winter time are handled automatically."
+msgstr "This service's times apply in this zone. Summer and winter time are handled automatically."
 
 msgid "admin.field.slot_minutes"
 msgstr "Length of a call (minutes)"
@@ -1181,7 +1181,7 @@ msgid "admin.field.trial_call_enabled"
 msgstr "Trial call for the participant"
 
 msgid "admin.field.trial_call_enabled_hint"
-msgstr "Yes: the participant can try beforehand, in a real Webex meeting, whether camera, microphone and speakers work. The meeting belongs to this group's Webex host; nobody from the team joins. Only with a Webex host."
+msgstr "Yes: the participant can try beforehand, in a real Webex meeting, whether camera, microphone and speakers work. The meeting belongs to this service's Webex host; nobody from the team joins. Only with a Webex host."
 
 msgid "admin.field.join_client"
 msgstr "Webex page for the participant"
@@ -1286,7 +1286,7 @@ msgid "admin.form.error.slug_taken"
 msgstr "This web address is already in use. Choose another one."
 
 msgid "admin.form.error.organisation"
-msgstr "Choose an organisation you may create groups for."
+msgstr "Choose an organisation you may create services for."
 
 msgid "admin.form.error.timezone"
 msgstr "Choose a time zone from the list."
@@ -1544,7 +1544,7 @@ msgid "admin.field.wxcc_routing_value"
 msgstr "Routing value for the WxCC flow"
 
 msgid "admin.field.wxcc_routing_value_hint"
-msgstr "The flow chooses the queue with it. Empty: the group's web address."
+msgstr "The flow chooses the queue with it. Empty: the service's web address."
 
 msgid "admin.field.direct_call_enabled"
 msgstr "Start a call right away"
@@ -1553,7 +1553,7 @@ msgid "admin.field.embedding_enabled"
 msgstr "Embed on websites"
 
 msgid "admin.field.embedding_enabled_hint"
-msgstr "Also shows the group in the widget on the websites the organisation allows under Embedding. Off: only the group's own page."
+msgstr "Also shows the service in the widget on the websites the organisation allows under Embedding. Off: only the service's own page."
 
 msgid "admin.field.not_picked_up_minutes"
 msgstr "Not picked up after (minutes)"
@@ -1778,13 +1778,13 @@ msgid "call.event.meeting_failed"
 msgstr "Creating the video meeting failed"
 
 msgid "call.hint.meeting.rejected_400"
-msgstr "Webex refused the meeting; Webex's answer is shown above. Often this group's Webex host (Settings) is not a user with a Meetings licence in the Service App's Webex organisation, or the Service App may not schedule on that host's behalf. Press Check integration on the group: it schedules a probe meeting exactly as a booking does. A new or rescheduled booking tries again."
+msgstr "Webex refused the meeting; Webex's answer is shown above. Often this service's Webex host (Settings) is not a user with a Meetings licence in the Service App's Webex organisation, or the Service App may not schedule on that host's behalf. Press Check integration on the service: it schedules a probe meeting exactly as a booking does. A new or rescheduled booking tries again."
 
 msgid "call.hint.meeting.rejected_403"
 msgstr "Webex denied access: the Service App lacks the scope to schedule meetings or has not been authorised by an administrator of the Webex organisation. Fix that in Control Hub, then put a new refresh token in WEBEX_REFRESH_TOKEN."
 
 msgid "call.hint.meeting.rejected_404"
-msgstr "Webex does not know this group's Webex host. Check the email address under Settings."
+msgstr "Webex does not know this service's Webex host. Check the email address under Settings."
 
 msgid "call.hint.meeting.other"
 msgstr "The video meeting could not be created. The code is the reason; Webex's answer is shown when Webex gave one. The worker log has more at integration.refused and job.failed."
@@ -1793,7 +1793,7 @@ msgid "call.hint.task.meeting_missing"
 msgstr "The task waited for the video meeting, but it never came. Fix the meeting failure first."
 
 msgid "call.hint.task.other"
-msgstr "Webex Contact Center did not accept the task. Check the group's entry point and channel under Settings and the WxCC setup under Integrations; the code is WxCC's reason."
+msgstr "Webex Contact Center did not accept the task. Check the service's entry point and channel under Settings and the WxCC setup under Integrations; the code is WxCC's reason."
 
 msgid "call.hint.integration.other"
 msgstr "Webex refused a request. Webex's answer is shown when Webex gave one; the worker log also has a trackingId at integration.refused."
@@ -2183,7 +2183,7 @@ msgid "admin.integrations.secret_missing"
 msgstr "No secret set: the address is disabled"
 
 msgid "admin.integrations.groups"
-msgstr "Groups"
+msgstr "Services"
 
 msgid "join.refresh"
 msgstr "Refresh status"
@@ -2434,7 +2434,7 @@ msgid "admin.branding.fonts"
 msgstr "Fonts"
 
 msgid "admin.branding.fonts_lead"
-msgstr "Own fonts as WOFF2 files, at most {kb} kB per file. They are loaded from this service, never from another website. Make sure the font's licence allows this."
+msgstr "Own fonts as WOFF2 files, at most {kb} kB per file. They are loaded from this installation, never from another website. Make sure the font's licence allows this."
 
 msgid "admin.branding.font.text"
 msgstr "Text (regular)"
@@ -3029,7 +3029,7 @@ msgid "admin.form.error.reminder_offset"
 msgstr "Choose a moment between 5 minutes and 30 days before the call."
 
 msgid "admin.form.error.reminder_limit"
-msgstr "A group has at most 5 reminders."
+msgstr "A service has at most 5 reminders."
 
 msgid "admin.form.error.reminder_exists"
 msgstr "This reminder already exists."
@@ -3095,7 +3095,7 @@ msgid "admin.reminders.add_lead"
 msgstr "An SMS only goes to participants who entered a phone number."
 
 msgid "admin.reminders.no_phone"
-msgstr "This group's booking form does not ask for a phone number, so SMS is not possible."
+msgstr "This service's booking form does not ask for a phone number, so SMS is not possible."
 
 msgid "admin.reminders.amount"
 msgstr "How long"
@@ -3158,7 +3158,7 @@ msgid "admin.messages.default"
 msgstr "Default text."
 
 msgid "admin.messages.custom"
-msgstr "This group's own text."
+msgstr "This service's own text."
 
 msgid "admin.messages.placeholders"
 msgstr "You can use: {names}."
@@ -3176,7 +3176,7 @@ msgid "admin.organisations.title"
 msgstr "Organisations"
 
 msgid "admin.organisations.lead"
-msgstr "The client organisations in this installation. An organisation has its own groups, branding and admins."
+msgstr "The client organisations in this installation. An organisation has its own services, branding and admins."
 
 msgid "admin.organisations.list"
 msgstr "All organisations"
@@ -3188,7 +3188,7 @@ msgid "admin.new_organisation.title"
 msgstr "New organisation"
 
 msgid "admin.new_organisation.lead"
-msgstr "After creating it you set its branding, and organisation admins create its groups."
+msgstr "After creating it you set its branding, and organisation admins create its services."
 
 msgid "admin.new_organisation.create"
 msgstr "Create organisation"
@@ -3508,13 +3508,13 @@ msgid "admin.holidays.title"
 msgstr "Holidays"
 
 msgid "admin.holidays.lead"
-msgstr "Calendars of closed days, set up once and reused by organisations and groups."
+msgstr "Calendars of closed days, set up once and reused by organisations and services."
 
 msgid "admin.holidays.calendars"
 msgstr "Calendars"
 
 msgid "admin.holidays.calendars_lead"
-msgstr "The superuser maintains the calendars and their dates. Organisations choose which calendars apply to their groups."
+msgstr "The superuser maintains the calendars and their dates. Organisations choose which calendars apply to their services."
 
 msgid "admin.holidays.no_calendars"
 msgstr "There are no holiday calendars yet."
@@ -3535,7 +3535,7 @@ msgid "admin.holidays.holiday_name"
 msgstr "Name"
 
 msgid "admin.holidays.used_by"
-msgstr "Chosen by organisations and groups: {count}"
+msgstr "Chosen by organisations and services: {count}"
 
 msgid "admin.holidays.days_of_year"
 msgstr "Dates in {year}"
@@ -3568,13 +3568,13 @@ msgid "admin.holidays.delete"
 msgstr "Delete calendar"
 
 msgid "admin.holidays.delete_lead"
-msgstr "Only possible while no organisation or group has chosen this calendar. All its dates go with it."
+msgstr "Only possible while no organisation or service has chosen this calendar. All its dates go with it."
 
 msgid "admin.holidays.delete_button"
 msgstr "Delete {name}"
 
 msgid "admin.holidays.organisation_lead"
-msgstr "Choose which holiday calendars apply to this organisation's groups. Groups with their own choice do not change."
+msgstr "Choose which holiday calendars apply to this organisation's services. Services with their own choice do not change."
 
 msgid "admin.holidays.choose"
 msgstr "Calendars"
@@ -3583,10 +3583,10 @@ msgid "admin.holidays.upcoming"
 msgstr "Upcoming holidays"
 
 msgid "admin.holidays.upcoming_lead"
-msgstr "The holidays of the coming year from the calendars that apply to this group. Participants cannot book on a closed day."
+msgstr "The holidays of the coming year from the calendars that apply to this service. Participants cannot book on a closed day."
 
 msgid "admin.holidays.state"
-msgstr "This group"
+msgstr "This service"
 
 msgid "admin.holidays.state_closed"
 msgstr "Closed"
@@ -3613,16 +3613,16 @@ msgid "admin.holidays.see_exceptions"
 msgstr "See staffing exceptions"
 
 msgid "admin.holidays.none_upcoming"
-msgstr "No holidays apply to this group in the coming year."
+msgstr "No holidays apply to this service in the coming year."
 
 msgid "admin.holidays.group_choice"
 msgstr "Which calendars apply"
 
 msgid "admin.holidays.group_choice_lead"
-msgstr "A staffing exception of the group's own on a holiday always wins; that way {agents} can still be scheduled on a holiday."
+msgstr "A staffing exception of the service's own on a holiday always wins; that way {agents} can still be scheduled on a holiday."
 
 msgid "admin.holidays.source"
-msgstr "Calendars for this group"
+msgstr "Calendars for this service"
 
 msgid "admin.holidays.source_inherit"
 msgstr "Follow the organisation"
@@ -3649,7 +3649,7 @@ msgid "admin.form.error.calendars"
 msgstr "Choose existing calendars only."
 
 msgid "admin.form.error.calendar_in_use"
-msgstr "This calendar is still chosen by an organisation or group and cannot be deleted."
+msgstr "This calendar is still chosen by an organisation or service and cannot be deleted."
 
 msgid "holiday.nl.new_year"
 msgstr "New Year's Day"
@@ -3739,7 +3739,7 @@ msgid "admin.audit.filter"
 msgstr "Filter"
 
 msgid "admin.audit.group"
-msgstr "Group"
+msgstr "Service"
 
 msgid "admin.audit.booking"
 msgstr "Appointment number"
@@ -3781,7 +3781,7 @@ msgid "admin.audit.reason.not_permitted"
 msgstr "The role does not grant this right."
 
 msgid "admin.audit.reason.out_of_scope"
-msgstr "Outside the own organisation or group."
+msgstr "Outside the own organisation or service."
 
 msgid "admin.audit.reason.stale"
 msgstr "No longer needed: the appointment was moved or cancelled."
@@ -3853,7 +3853,7 @@ msgid "admin.audit.diagnostics.title"
 msgstr "Diagnostic mode"
 
 msgid "admin.audit.diagnostics.intro"
-msgstr "While diagnostic mode is on, the platform writes extra debug entries about that group or organisation into this log. The group's admins see them too. The mode ends by itself after the set time (24 hours by default), and also when the disk is nearly full."
+msgstr "While diagnostic mode is on, the platform writes extra debug entries about that service or organisation into this log. The service's admins see them too. The mode ends by itself after the set time (24 hours by default), and also when the disk is nearly full."
 
 msgid "admin.audit.diagnostics.active"
 msgstr "{target}: on until {until}"
@@ -3868,7 +3868,7 @@ msgid "admin.audit.diagnostics.none"
 msgstr "Diagnostic mode is off everywhere."
 
 msgid "admin.audit.diagnostics.target"
-msgstr "Group or organisation"
+msgstr "Service or organisation"
 
 msgid "admin.done.diagnostics_on"
 msgstr "Diagnostic mode is on."
@@ -3955,10 +3955,10 @@ msgid "admin.audit.reason.invalid_signature"
 msgstr "Signature or timestamp does not verify."
 
 msgid "admin.audit.reason.unauthorized"
-msgstr "The service refuses our credentials."
+msgstr "The external system refuses our credentials."
 
 msgid "admin.audit.reason.unreachable"
-msgstr "The service cannot be reached."
+msgstr "The external system cannot be reached."
 
 msgid "admin.audit.detail.suppressed"
 msgstr "{count} more since the previous entry"
@@ -4406,16 +4406,16 @@ msgid "admin.scope.organisation"
 msgstr "Organisation"
 
 msgid "admin.scope.group"
-msgstr "Group"
+msgstr "Service"
 
 msgid "admin.scope.all_organisations"
 msgstr "All organisations"
 
 msgid "admin.scope.all_groups"
-msgstr "All groups"
+msgstr "All services"
 
 msgid "admin.scope.hint"
-msgstr "Narrows the groups, bookings, queue and changes on this page to what you may already see. Tasks, status and rights stay platform-wide."
+msgstr "Narrows the services, bookings, queue and changes on this page to what you may already see. Tasks, status and rights stay platform-wide."
 
 msgid "admin.scope.apply"
 msgstr "Show"
@@ -4559,7 +4559,7 @@ msgid "admin.integrations.reason.unfiltered"
 msgstr "No hostEmail filter: reports every meeting of the organisation."
 
 msgid "admin.integrations.reason.unknown_host"
-msgstr "Host account that no group uses."
+msgstr "Host account that no service uses."
 
 msgid "admin.integrations.reason.unused_event"
 msgstr "Event OpenPlanner does not use."
@@ -4648,13 +4648,13 @@ msgid "admin.check.title"
 msgstr "Check integration"
 
 msgid "admin.check.lead"
-msgstr "Checks at Webex and Webex Contact Center whether this group's calls arrive correctly: the host, the routing of the work item to the queue, and the webhooks. Nothing is changed; only a signed test message to OpenPlanner itself."
+msgstr "Checks at Webex and Webex Contact Center whether this service's calls arrive correctly: the host, the routing of the work item to the queue, and the webhooks. Nothing is changed; only a signed test message to OpenPlanner itself."
 
 msgid "admin.check.button"
 msgstr "Check now"
 
 msgid "admin.check.never"
-msgstr "This group has not been checked yet."
+msgstr "This service has not been checked yet."
 
 msgid "admin.check.help"
 msgstr "How to fix this"
@@ -4699,7 +4699,7 @@ msgid "admin.check.platform.not_configured"
 msgstr "No Webex Service App is configured; there is nothing to check."
 
 msgid "admin.check.webex.no_host"
-msgstr "No Webex host entered: this group gets no video calls."
+msgstr "No Webex host entered: this service gets no video calls."
 
 msgid "admin.check.webex.host_ok"
 msgstr "A probe meeting for host {host} was scheduled exactly as a booking does, and deleted again."
@@ -4744,7 +4744,7 @@ msgid "admin.check.wxcc.not_configured"
 msgstr "Webex Contact Center is not configured; the routing was not checked."
 
 msgid "admin.check.wxcc.no_mapping"
-msgstr "Work item channel or business address is missing: this group creates no work items."
+msgstr "Work item channel or business address is missing: this service creates no work items."
 
 msgid "admin.check.wxcc.config_refused"
 msgstr "Webex Contact Center's configuration could not be read ({error}): it needs cjp:config_read and the Contact Center admin role."
@@ -4783,7 +4783,7 @@ msgid "admin.check.wxcc.schema.ok"
 msgstr "The asset's schema has the fields OpenPlanner sends."
 
 msgid "admin.check.wxcc.schema.refused"
-msgstr "Webex Contact Center refuses the work item because the asset's data schema does not match. In Control Hub, open Contact Center > Digital settings > Assets > this group's asset and change its Data schema: add these fields (Viewable Yes, Required No): {missing}; set Required to No for: {extra}. Only bookingReference has Required Yes."
+msgstr "Webex Contact Center refuses the work item because the asset's data schema does not match. In Control Hub, open Contact Center > Digital settings > Assets > this service's asset and change its Data schema: add these fields (Viewable Yes, Required No): {missing}; set Required to No for: {extra}. Only bookingReference has Required Yes."
 
 msgid "admin.check.wxcc.schema.hidden"
 msgstr "These fields are not visible to agents: {fields}."
@@ -4807,7 +4807,7 @@ msgid "admin.check.wxcc.routing.ok"
 msgstr "The flow reads openplannerGroup to choose the queue."
 
 msgid "admin.check.wxcc.routing.shared"
-msgstr "The flow does not read openplannerGroup, so groups {groups} all land in the same queue."
+msgstr "The flow does not read openplannerGroup, so services {groups} all land in the same queue."
 
 msgid "admin.check.wxcc.routing.not_read"
 msgstr "The flow does not read openplannerGroup: every work item of this entry point goes to the same queue."
@@ -4828,7 +4828,7 @@ msgid "admin.check.wxcc.queues.wrong_type"
 msgstr "These queues are not work item queues: {queues}."
 
 msgid "admin.check.wxcc.naming.ok"
-msgstr "The queue name fits the group ({queues})."
+msgstr "The queue name fits the service ({queues})."
 
 msgid "admin.check.wxcc.naming.no_match"
 msgstr "No queue with {value} in its name (a convention, not a requirement)."
@@ -4870,7 +4870,7 @@ msgid "admin.check.webhooks.listing_refused"
 msgstr "The webhooks at {platform} could not be listed ({error})."
 
 msgid "admin.check.webhooks.webex_ok"
-msgstr "The Webex webhooks for this group's host are active on the current address."
+msgstr "The Webex webhooks for this service's host are active on the current address."
 
 msgid "admin.check.webhooks.webex_missing"
 msgstr "These Webex webhooks are missing for the host: {events}. Run register-webhooks (runbook)."
@@ -4902,7 +4902,7 @@ msgid "admin.simulator.lead"
 msgstr "Play what Webex and Webex Contact Center would report, without an agent or a tunnel. Each event goes signed through the real webhook endpoint and lands on the timeline. This card does not exist in production."
 
 msgid "admin.simulator.prepare_lead"
-msgstr "This booking has no meeting or work item yet. Give it stand-in ids first, so the events can find it. If the group offers a trial call, the booking also gets an open stand-in trial call."
+msgstr "This booking has no meeting or work item yet. Give it stand-in ids first, so the events can find it. If the service offers a trial call, the booking also gets an open stand-in trial call."
 
 msgid "admin.simulator.prepare"
 msgstr "Create stand-in meeting and task"
@@ -4941,7 +4941,7 @@ msgid "admin.done.simulated"
 msgstr "The event was delivered and is on the timeline."
 
 msgid "admin.done.simulated_prepared"
-msgstr "The booking now has a stand-in meeting and task, and an open stand-in trial call if the group offers one."
+msgstr "The booking now has a stand-in meeting and task, and an open stand-in trial call if the service offers one."
 
 msgid "admin.done.simulator_no_ids"
 msgstr "This booking has no meeting or task for that. Create a stand-in meeting and task first."
@@ -4989,7 +4989,7 @@ msgid "admin.retention.title"
 msgstr "Retention"
 
 msgid "admin.retention.intro"
-msgstr "Checks, per group, whether participants' personal data is removed on time. This page shows counts and times only, never participants' data."
+msgstr "Checks, per service, whether participants' personal data is removed on time. This page shows counts and times only, never participants' data."
 
 msgid "admin.retention.in_order"
 msgstr "In order: no personal data is past its retention period and no removal failed."
@@ -5001,10 +5001,10 @@ msgid "admin.retention.summary"
 msgstr "Summary"
 
 msgid "admin.retention.groups"
-msgstr "Retention per group"
+msgstr "Retention per service"
 
 msgid "admin.retention.group"
-msgstr "Group"
+msgstr "Service"
 
 msgid "admin.retention.holding"
 msgstr "With personal data"
@@ -5037,7 +5037,7 @@ msgid "admin.retention.rule"
 msgstr "Personal data is removed 24 hours after the end of the appointment or after the cancellation. After an emergency closure, it is removed at most 30 days after the closure ends. A booking counts as past the retention period when its data is still there an hour after that moment."
 
 msgid "admin.retention.empty"
-msgstr "There are no groups to check yet."
+msgstr "There are no services to check yet."
 
 msgid "contacts.heading"
 msgstr "Other ways to reach us"
@@ -5216,13 +5216,13 @@ msgid "admin.roles.copy"
 msgstr "New role"
 
 msgid "admin.roles.copy_lead"
-msgstr "Choose the built-in role to start from. Its reach (per organisation or per group) stays fixed afterwards."
+msgstr "Choose the built-in role to start from. Its reach (per organisation or per service) stays fixed afterwards."
 
 msgid "admin.roles.template"
 msgstr "Copy of"
 
 msgid "admin.roles.template_hint"
-msgstr "Organisation admin and Compliance and privacy work per organisation, group admin per group. A copy of Compliance and privacy stays read-only and without personal data."
+msgstr "Organisation admin and Compliance and privacy work per organisation, service admin per service. A copy of Compliance and privacy stays read-only and without personal data."
 
 msgid "admin.roles.new"
 msgstr "Make a new role"
@@ -5797,16 +5797,16 @@ msgid "admin.audit.detail.organisation_remove"
 msgstr "organisation removed: {value}"
 
 msgid "admin.audit.detail.group_add"
-msgstr "group added: {value}"
+msgstr "service added: {value}"
 
 msgid "admin.audit.detail.group_remove"
-msgstr "group removed: {value}"
+msgstr "service removed: {value}"
 
 msgid "admin.staff.title"
 msgstr "Staff"
 
 msgid "admin.staff.intro"
-msgstr "Who uses the admin portal, with which role and for which organisations and groups. You only see staff within your own organisations or groups."
+msgstr "Who uses the admin portal, with which role and for which organisations and services. You only see staff within your own organisations or services."
 
 msgid "admin.staff.filter"
 msgstr "Filter staff"
@@ -5815,7 +5815,7 @@ msgid "admin.staff.organisation"
 msgstr "Organisation"
 
 msgid "admin.staff.group"
-msgstr "Group"
+msgstr "Service"
 
 msgid "admin.staff.role"
 msgstr "Role"
@@ -5842,7 +5842,7 @@ msgid "admin.staff.organisations"
 msgstr "Organisations"
 
 msgid "admin.staff.groups"
-msgstr "Groups"
+msgstr "Services"
 
 msgid "admin.staff.first_seen"
 msgstr "First login"
@@ -5875,7 +5875,7 @@ msgid "admin.staff.whole_organisation"
 msgstr "Whole organisation"
 
 msgid "admin.staff.source"
-msgstr "Roles, organisations and groups come from the identity provider and were updated at the last login. Change them there."
+msgstr "Roles, organisations and services come from the identity provider and were updated at the last login. Change them there."
 
 msgid "admin.staff.empty"
 msgstr "No staff match this selection."
@@ -5893,16 +5893,16 @@ msgid "admin.staff.activity"
 msgstr "Recent activity"
 
 msgid "admin.staff.activity_intro"
-msgstr "The latest {count} events from the audit log within your own organisations or groups."
+msgstr "The latest {count} events from the audit log within your own organisations or services."
 
 msgid "admin.staff.activity_empty"
-msgstr "No activity within your organisations or groups."
+msgstr "No activity within your organisations or services."
 
 msgid "admin.embedding.title"
 msgstr "Embedding on websites"
 
 msgid "admin.embedding.org_lead"
-msgstr "The websites on which the groups of {name} may appear as a widget. A group appears only once it switches embedding on in its own settings."
+msgstr "The websites on which the services of {name} may appear as a widget. A service appears only once it switches embedding on in its own settings."
 
 msgid "admin.embedding.form"
 msgstr "Allowed websites"
@@ -5923,10 +5923,10 @@ msgid "admin.embedding.origins_hint_local"
 msgstr "Only the start of the web address, such as https://www.acme.nl. No path, no asterisks; a subdomain counts as a website of its own. On this test installation http://localhost with a port is allowed too. At most {count}."
 
 msgid "admin.embedding.groups"
-msgstr "Groups"
+msgstr "Services"
 
 msgid "admin.embedding.groups_lead"
-msgstr "Whether a group appears in the widget is switched on under Group settings › Embed on websites."
+msgstr "Whether a service appears in the widget is switched on under Service settings › Embed on websites."
 
 msgid "admin.embedding.col.embedded"
 msgstr "In the widget"
@@ -5938,7 +5938,7 @@ msgid "admin.embedding.off"
 msgstr "Off"
 
 msgid "admin.embedding.no_groups"
-msgstr "This organisation has no groups yet."
+msgstr "This organisation has no services yet."
 
 msgid "admin.embedding.error.origin"
 msgstr "Line {line} is not a website. Enter only the start of the web address, such as https://www.acme.nl."
@@ -5980,7 +5980,7 @@ msgid "admin.embedding.code_no_build"
 msgstr "This installation has no build of the widget script; the code is shown without integrity."
 
 msgid "admin.embedding.code_none"
-msgstr "First switch on Embed on websites for a group."
+msgstr "First switch on Embed on websites for a service."
 
 msgid "admin.nav.settings"
 msgstr "Advanced settings"
@@ -6301,7 +6301,7 @@ msgid "settings.field.oidc_organisation_claim.label"
 msgstr "Claim with the organisations"
 
 msgid "settings.field.oidc_group_claim.label"
-msgstr "Claim with the groups"
+msgstr "Claim with the services (groups)"
 
 msgid "settings.field.oidc_role_superuser.label"
 msgstr "Role value superuser"
@@ -6310,7 +6310,7 @@ msgid "settings.field.oidc_role_org_admin.label"
 msgstr "Role value organisation admin"
 
 msgid "settings.field.oidc_role_group_admin.label"
-msgstr "Role value group admin"
+msgstr "Role value service admin"
 
 msgid "settings.field.oidc_role_auditor.label"
 msgstr "Role value compliance and privacy"
@@ -6412,7 +6412,7 @@ msgid "settings.field.maintenance_alert_repeat_hours.label"
 msgstr "Repeat the long-maintenance report every (hours)"
 
 msgid "settings.field.integration_check_interval_hours.label"
-msgstr "Check every group's integration every (hours)"
+msgstr "Check every service's integration every (hours)"
 
 msgid "settings.field.security_event_max_sources.label"
 msgstr "Most sources tracked for security events"
@@ -6472,7 +6472,7 @@ msgid "admin.org_settings.page_title"
 msgstr "Settings of {name}"
 
 msgid "admin.org_settings.page_lead"
-msgstr "These values apply to this organisation's groups, participant pages, emails and admins. A change applies within ten seconds."
+msgstr "These values apply to this organisation's services, participant pages, emails and admins. A change applies within ten seconds."
 
 msgid "admin.org_settings.settings"
 msgstr "Settings"
@@ -6799,7 +6799,7 @@ msgid "admin.settings.login.title"
 msgstr "Change the login mapping"
 
 msgid "admin.settings.login.intro"
-msgstr "Which claims of the identity provider carry the roles, organisations and groups, and which value is which role. After testing you log in again; the new mapping is only saved if you are still superuser afterwards."
+msgstr "Which claims of the identity provider carry the roles, organisations and services, and which value is which role. After testing you log in again; the new mapping is only saved if you are still superuser afterwards."
 
 msgid "admin.settings.login.test"
 msgstr "Test with a new login"
@@ -6814,7 +6814,7 @@ msgid "admin.form.error.login_lockout"
 msgstr "With this mapping you would no longer be superuser; it was not saved."
 
 msgid "admin.overview.widget.queue.group"
-msgstr "Group"
+msgstr "Service"
 
 msgid "admin.overview.widget.queue.waiting"
 msgstr "Waiting"
@@ -7071,13 +7071,13 @@ msgid "admin.check.worker.no_dispatch_jobs"
 msgstr "The worker creates no work items: it was started without the WxCC settings. Restart the worker once WXCC_API_BASE_URL is set."
 
 msgid "admin.check.worker.jobs_ok"
-msgstr "No failed or overdue jobs in this group."
+msgstr "No failed or overdue jobs in this service."
 
 msgid "admin.check.worker.failed_jobs"
-msgstr "{count} jobs of this group failed. Open the booking in the agenda to see why and try again."
+msgstr "{count} jobs of this service failed. Open the booking in the agenda to see why and try again."
 
 msgid "admin.check.worker.overdue_jobs"
-msgstr "{count} jobs of this group have waited longer than {minutes} minutes for the worker."
+msgstr "{count} jobs of this service have waited longer than {minutes} minutes for the worker."
 
 msgid "audit.event.integration_service_app_check"
 msgstr "Service App checked"
@@ -7089,13 +7089,13 @@ msgid "admin.audit.reason.already_done"
 msgstr "Already done: the meeting or task exists."
 
 msgid "admin.audit.reason.no_video"
-msgstr "Not needed: this group has no Webex host."
+msgstr "Not needed: this service has no Webex host."
 
 msgid "admin.audit.reason.own_queue"
-msgstr "Not needed: this group uses OpenPlanner's own queue, so no contact center task is made."
+msgstr "Not needed: this service uses OpenPlanner's own queue, so no contact center task is made."
 
 msgid "admin.audit.reason.no_dispatch"
-msgstr "Not possible: this group has no work item channel or business address."
+msgstr "Not possible: this service has no work item channel or business address."
 
 msgid "admin.audit.detail.retry_create_video_room"
 msgstr "video meeting planned again"
@@ -7113,7 +7113,7 @@ msgid "settings.field.integration_request_retention_days.label"
 msgstr "Keep requests to Webex and WxCC (days)"
 
 msgid "settings.field.group_erase_after_days.label"
-msgstr "Erase an archived group after (days)"
+msgstr "Erase an archived service after (days)"
 
 msgid "settings.field.integration_probe_timeout_seconds.label"
 msgstr "Wait for the probe work item's events (seconds)"
@@ -7415,7 +7415,7 @@ msgid "admin.overview.chart.joiner"
 msgstr "; "
 
 msgid "admin.overview.chart.group"
-msgstr "Group"
+msgstr "Service"
 
 msgid "admin.overview.chart.table"
 msgstr "Data as a table"
@@ -7579,13 +7579,13 @@ msgid "admin.org_texts.title"
 msgstr "Texts for participants"
 
 msgid "admin.org_texts.lead"
-msgstr "Change the texts that participants of {name} see on the group pages and in emails and text messages. Layout, links and the calendar attachment stay fixed; you only change the text."
+msgstr "Change the texts that participants of {name} see on the service pages and in emails and text messages. Layout, links and the calendar attachment stay fixed; you only change the text."
 
 msgid "admin.org_texts.languages_heading"
 msgstr "Language of the texts"
 
 msgid "admin.org_texts.order"
-msgstr "Order: a group's own text comes first, then the organisation's text, then the default text."
+msgstr "Order: a service's own text comes first, then the organisation's text, then the default text."
 
 msgid "admin.org_texts.custom"
 msgstr "This organisation's own text."
@@ -7597,7 +7597,7 @@ msgid "admin.org_texts.section_pages"
 msgstr "Pages for participants"
 
 msgid "admin.org_texts.page.group_intro"
-msgstr "Introduction on the group's page"
+msgstr "Introduction on the service's page"
 
 msgid "admin.org_texts.page.direct_card_title"
 msgstr "Card for a direct call: title"
@@ -7775,7 +7775,7 @@ msgid "authz.permission.idp_mapping_view"
 msgstr "View the identity provider mapping"
 
 msgid "authz.permission.idp_mapping_manage"
-msgstr "Change a group's IdP value"
+msgstr "Change a service's IdP value"
 
 msgid "settings.field.oidc_entitlement_claim.label"
 msgstr "Claim holding the entitlements"
@@ -7793,7 +7793,7 @@ msgid "admin.form.error.idp_key_taken"
 msgstr "This IdP value is already in use. Choose another one."
 
 msgid "admin.login_refused.ambiguous_claims"
-msgstr "Your account holds more than one role for more than one organisation or group, so OpenPlanner cannot tell which role applies where. Ask the IdP team for rights per organisation or group (entitlements) or to split the roles."
+msgstr "Your account holds more than one role for more than one organisation or service, so OpenPlanner cannot tell which role applies where. Ask the IdP team for rights per organisation or service (entitlements) or to split the roles."
 
 msgid "admin.login_refused.too_many_entitlements"
 msgstr "Your account sends more rights than OpenPlanner can handle. Ask the IdP team to send only the rights for OpenPlanner."
@@ -7826,7 +7826,7 @@ msgid "audit.event.organisation_idp_key_changed"
 msgstr "IdP value of the organisation changed"
 
 msgid "audit.event.group_idp_key_changed"
-msgstr "IdP value of the group changed"
+msgstr "IdP value of the service changed"
 
 msgid "audit.event.idp_mapping_exported"
 msgstr "Identity provider mapping downloaded"
@@ -7835,7 +7835,7 @@ msgid "admin.idp_mapping.title"
 msgstr "Identity provider mapping"
 
 msgid "admin.idp_mapping.intro"
-msgstr "The identity provider must send these values in the claim {claim}. One value per role per organisation or group. The IdP team grants rights; here you see what it must send and what came in."
+msgstr "The identity provider must send these values in the claim {claim}. One value per role per organisation or service. The IdP team grants rights; here you see what it must send and what came in."
 
 msgid "admin.idp_mapping.export"
 msgstr "Download as text"
@@ -7847,7 +7847,7 @@ msgid "admin.idp_mapping.mode"
 msgstr "Source of the rights"
 
 msgid "admin.idp_mapping.mode.legacy"
-msgstr "Three claims (roles, organisations, groups)"
+msgstr "Three claims (roles, organisations, services)"
 
 msgid "admin.idp_mapping.mode.shadow"
 msgstr "Three claims, entitlement claim compared (shadow mode)"
@@ -7889,7 +7889,7 @@ msgid "admin.idp_mapping.never"
 msgstr "never"
 
 msgid "admin.idp_mapping.group"
-msgstr "Group"
+msgstr "Service"
 
 msgid "admin.idp_mapping.organisations_empty"
 msgstr "There are no organisations within your reach."
@@ -7928,10 +7928,10 @@ msgid "admin.idp_mapping.reason.unknown_organisation"
 msgstr "unknown organisation"
 
 msgid "admin.idp_mapping.reason.unknown_group"
-msgstr "unknown group"
+msgstr "unknown service"
 
 msgid "admin.idp_mapping.reason.group_not_in_organisation"
-msgstr "group does not belong to this organisation"
+msgstr "service does not belong to this organisation"
 
 msgid "admin.idp_mapping.reason.scope_not_allowed"
 msgstr "target does not fit the role's reach"
@@ -7943,7 +7943,7 @@ msgid "admin.group.idp_key.title"
 msgstr "Identity provider mapping"
 
 msgid "admin.group.idp_key.lead"
-msgstr "The value the identity provider names this group by in a right, for example openplanner:group_admin:org-a/balie. The full list is on the Identity provider mapping page."
+msgstr "The value the identity provider names this service by in a right, for example openplanner:group_admin:org-a/balie. The full list is on the Identity provider mapping page."
 
 msgid "admin.group.idp_key.hint"
 msgstr "Lower-case letters, digits and hyphens; unique within the organisation. A change needs a fresh login."
@@ -7970,7 +7970,7 @@ msgid "admin.staff.refused_received"
 msgstr "Received"
 
 msgid "admin.rights.grants"
-msgstr "Rights per organisation or group"
+msgstr "Rights per organisation or service"
 
 msgid "admin.rights.refused"
 msgstr "Rights not recognised"
@@ -7979,13 +7979,13 @@ msgid "admin.rights.refused_intro"
 msgstr "The identity provider sent these values at your last login, but this installation does not recognise them. Pass them on to the IdP team."
 
 msgid "admin.roles.entitlement_notice"
-msgstr "When the installation uses an entitlement claim, the identity provider sends one value per organisation or group with this role's key, for example openplanner:custom.3:org-a. The key and the exact values are on the Identity provider mapping page."
+msgstr "When the installation uses an entitlement claim, the identity provider sends one value per organisation or service with this role's key, for example openplanner:custom.3:org-a. The key and the exact values are on the Identity provider mapping page."
 
 msgid "admin.form.error.idp_key"
 msgstr "Use only lower-case letters, digits and hyphens (at most 63 characters), starting with a letter or digit."
 
 msgid "admin.nav.groups"
-msgstr "Groups"
+msgstr "Services"
 
 msgid "admin.nav.object.organisation"
 msgstr "Organisation"
@@ -8015,16 +8015,16 @@ msgid "admin.organisation.subsections"
 msgstr "Sections of this tab"
 
 msgid "admin.organisation.groups"
-msgstr "Groups"
+msgstr "Services"
 
 msgid "admin.organisation.groups_lead"
-msgstr "This organisation's groups you have rights on. A group opens on its own page."
+msgstr "This organisation's services you have rights on. A service opens on its own page."
 
 msgid "admin.organisation.no_groups"
-msgstr "This organisation has no groups you have rights on yet."
+msgstr "This organisation has no services you have rights on yet."
 
 msgid "admin.organisation.all_groups"
-msgstr "These groups in the Groups list"
+msgstr "These services in the Services list"
 
 msgid "admin.organisation.profile"
 msgstr "Profile"
@@ -8033,16 +8033,16 @@ msgid "admin.organisation.edit"
 msgstr "Change name and language"
 
 msgid "admin.organisations.groups"
-msgstr "Groups"
+msgstr "Services"
 
 msgid "admin.organisations.groups_of"
-msgstr "Groups of {name}"
+msgstr "Services of {name}"
 
 msgid "admin.groups.title"
-msgstr "Groups"
+msgstr "Services"
 
 msgid "admin.groups.lead"
-msgstr "Every group you have rights on, with its organisation. A group opens on its own page."
+msgstr "Every service you have rights on, with its organisation. A service opens on its own page."
 
 msgid "admin.groups.filter"
 msgstr "Filter"
@@ -8060,13 +8060,13 @@ msgid "admin.groups.clear"
 msgstr "Clear filters"
 
 msgid "admin.groups.count"
-msgstr "Number of groups: {count}"
+msgstr "Number of services: {count}"
 
 msgid "admin.groups.of_total"
-msgstr "Of {total} groups in all."
+msgstr "Of {total} services in all."
 
 msgid "admin.groups.none"
-msgstr "No groups found."
+msgstr "No services found."
 
 msgid "admin.groups.duration"
 msgstr "Duration"
@@ -8108,7 +8108,7 @@ msgid "admin.org_texts.role.org_admin"
 msgstr "Name of the organisation admin"
 
 msgid "admin.org_texts.role.group_admin"
-msgstr "Name of the group admin"
+msgstr "Name of the service admin"
 
 msgid "admin.org_texts.role.hint"
 msgstr "Only a name on the screen: the rights do not change. Next to the rights, the standard name stays visible."
@@ -8117,25 +8117,25 @@ msgid "admin.form.error.role_display_name"
 msgstr "Enter a name of {min} to {max} characters, without braces, that is not the name of another role."
 
 msgid "admin.done.archived"
-msgstr "The group has been archived. Its participant page is gone; the portal shows the group read-only under the Archived filter."
+msgstr "The service has been archived. Its participant page is gone; the portal shows the service read-only under the Archived filter."
 
 msgid "admin.form.error.group_archived"
-msgstr "This group is archived and can no longer be changed."
+msgstr "This service is archived and can no longer be changed."
 
 msgid "admin.form.error.confirmation_mismatch"
 msgstr "Type the name exactly as it is shown above."
 
 msgid "admin.group.archive.title"
-msgstr "Archive group"
+msgstr "Archive service"
 
 msgid "admin.group.archive.settings_lead"
-msgstr "An archived group takes no more appointments and leaves the portal. Its web address stays reserved."
+msgstr "An archived service takes no more appointments and leaves the portal. Its web address stays reserved."
 
 msgid "admin.group.archive.open"
-msgstr "Archive group…"
+msgstr "Archive service…"
 
 msgid "admin.group.archive.lead"
-msgstr "Archiving cannot be undone in the portal. Read what happens, then type the group's name."
+msgstr "Archiving cannot be undone in the portal. Read what happens, then type the service's name."
 
 msgid "admin.group.archive.what_happens"
 msgstr "What happens"
@@ -8144,43 +8144,43 @@ msgid "admin.group.archive.effect_public"
 msgstr "The page /g/{slug} and the widget answer “not found” at once; new appointments are no longer possible."
 
 msgid "admin.group.archive.effect_portal"
-msgstr "The group leaves the overview, the lists and the menus. The filter “Archived groups only” still shows it, read-only."
+msgstr "The service leaves the overview, the lists and the menus. The filter “Archived services only” still shows it, read-only."
 
 msgid "admin.group.archive.effect_slug"
-msgstr "The web address stays reserved: a new group cannot take it."
+msgstr "The web address stays reserved: a new service cannot take it."
 
 msgid "admin.group.archive.effect_data"
-msgstr "Past appointments stay until the usual clean-up period; after that the portal erases the group by itself. The log keeps the web address."
+msgstr "Past appointments stay until the usual clean-up period; after that the portal erases the service by itself. The log keeps the web address."
 
 msgid "admin.group.archive.bookings_ahead"
 msgstr "{count} appointments still lie ahead. Archiving is possible once they have taken place, were moved or were cancelled."
 
 msgid "admin.group.archive.close_first"
-msgstr "Close the group first (emergency closure)."
+msgstr "Close the service first (emergency closure)."
 
 msgid "admin.group.archive.confirm_heading"
 msgstr "Confirm"
 
 msgid "admin.group.archive.confirmation"
-msgstr "Name of the group"
+msgstr "Name of the service"
 
 msgid "admin.group.archive.confirmation_hint"
 msgstr "Type “{name}” to confirm."
 
 msgid "admin.group.archive.button"
-msgstr "Archive group"
+msgstr "Archive service"
 
 msgid "admin.group.archive.blocked_hint"
 msgstr "The portal refuses while appointments lie ahead."
 
 msgid "admin.group.archived_notice"
-msgstr "This group is archived. You can still read, not change."
+msgstr "This service is archived. You can still read, not change."
 
 msgid "admin.groups.archived_only"
-msgstr "Archived groups only"
+msgstr "Archived services only"
 
 msgid "admin.groups.archived_lead"
-msgstr "Archived groups: read-only, without a participant page."
+msgstr "Archived services: read-only, without a participant page."
 
 msgid "admin.audit.detail.archived"
 msgstr "archived"
@@ -8189,7 +8189,7 @@ msgid "admin.done.organisation_deleted"
 msgstr "The organisation has been deleted."
 
 msgid "admin.form.error.organisation_has_groups"
-msgstr "This organisation still has groups, archived ones included. Deleting is possible once they are gone."
+msgstr "This organisation still has services, archived ones included. Deleting is possible once they are gone."
 
 msgid "admin.form.error.organisation_has_api_clients"
 msgstr "This organisation still has API clients. Delete those first."
@@ -8198,7 +8198,7 @@ msgid "admin.organisation.delete.title"
 msgstr "Delete organisation"
 
 msgid "admin.organisation.delete.form_lead"
-msgstr "An organisation without groups and API clients can be deleted, with everything that belongs to it."
+msgstr "An organisation without services and API clients can be deleted, with everything that belongs to it."
 
 msgid "admin.organisation.delete.open"
 msgstr "Delete organisation…"
@@ -8222,10 +8222,10 @@ msgid "admin.organisation.delete.not_empty"
 msgstr "The organisation is not empty yet:"
 
 msgid "admin.organisation.delete.groups_left"
-msgstr "{count} groups, archived ones included. An archived group goes by itself after the erase period."
+msgstr "{count} services, archived ones included. An archived service goes by itself after the erase period."
 
 msgid "admin.organisation.delete.see_archived"
-msgstr "See the groups."
+msgstr "See the services."
 
 msgid "admin.organisation.delete.api_clients_left"
 msgstr "{count} API clients."
@@ -8276,7 +8276,7 @@ msgid "admin.holidays.rename"
 msgstr "Change name"
 
 msgid "admin.holidays.rename_lead"
-msgstr "The calendar's web address stays the same; organisations and groups that use it follow the new name."
+msgstr "The calendar's web address stays the same; organisations and services that use it follow the new name."
 
 msgid "admin.holidays.calendar_name"
 msgstr "Name of the calendar"
@@ -8540,7 +8540,7 @@ msgid "admin.idp.test_result.grants"
 msgstr "Rights the values resolve to"
 
 msgid "admin.idp.test_result.no_grants"
-msgstr "No rights: the values are missing, carry another prefix or name unknown organisations or groups."
+msgstr "No rights: the values are missing, carry another prefix or name unknown organisations or services."
 
 msgid "admin.idp.test_result.refused"
 msgstr "Refused values"
@@ -8579,7 +8579,7 @@ msgid "admin.api.delete"
 msgstr "Delete API client"
 
 msgid "admin.api.delete_lead"
-msgstr "Deleting erases the client with its tokens and group links. The log keeps its id. A client must be switched off first."
+msgstr "Deleting erases the client with its tokens and service links. The log keeps its id. A client must be switched off first."
 
 msgid "admin.api.delete_disable_first"
 msgstr "Switch the client off first to be able to delete it."
@@ -8588,7 +8588,7 @@ msgid "admin.api.delete_button"
 msgstr "Delete {name}"
 
 msgid "admin.api.archived_groups"
-msgstr "This client's access names archived groups: {groups}. While the link stays, the group is not erased. Save the form below or delete the client to let the link lapse."
+msgstr "This client's access names archived services: {groups}. While the link stays, the service is not erased. Save the form below or delete the client to let the link lapse."
 
 msgid "admin.nav.logging"
 msgstr "Log destinations"
@@ -8744,7 +8744,7 @@ msgid "admin.logging.include_diagnostic"
 msgstr "Diagnostic events"
 
 msgid "admin.logging.include_diagnostic_hint"
-msgstr "Debug detail that is only written while diagnostic mode is on for a group. They leave the installation only to a destination that asks for them."
+msgstr "Debug detail that is only written while diagnostic mode is on for a service. They leave the installation only to a destination that asks for them."
 
 msgid "admin.logging.state"
 msgstr "State"
@@ -9056,7 +9056,7 @@ msgid "admin.staff.manage.place"
 msgstr "Place"
 
 msgid "admin.staff.manage.place_hint"
-msgstr "An organisation or a group. Only the superuser role applies to the whole platform."
+msgstr "An organisation or a service. Only the superuser role applies to the whole platform."
 
 msgid "admin.staff.manage.whole_platform"
 msgstr "Whole platform"
@@ -9829,7 +9829,7 @@ msgid "admin.logging_in.continue"
 msgstr "Continue to the login service"
 
 msgid "admin.alerts.text.check"
-msgstr "The check of this group's integration found a problem ({code}). Open the group and choose Check integration for the explanation."
+msgstr "The check of this service's integration found a problem ({code}). Open the service and choose Check integration for the explanation."
 
 msgid "settings.field.task_reconcile_interval_minutes.label"
 msgstr "Reconcile task states every (minutes)"
@@ -9952,7 +9952,7 @@ msgid "admin.routing.summary"
 msgstr "{subjects} subjects, {attributes} routing questions, {mapped} passed to the contact center."
 
 msgid "admin.routing.summary_none"
-msgstr "This group asks no subject and no routing questions."
+msgstr "This service asks no subject and no routing questions."
 
 msgid "admin.routing.open"
 msgstr "Open subjects and routing"
@@ -9997,13 +9997,13 @@ msgid "admin.routing.subject.add"
 msgstr "Add a subject"
 
 msgid "admin.routing.subject.add_lead"
-msgstr "A group has at most {count} subjects."
+msgstr "A service has at most {count} subjects."
 
 msgid "admin.routing.subject.add_button"
 msgstr "Add subject"
 
 msgid "admin.routing.subject.limit_reached"
-msgstr "This group has the maximum of {count} subjects."
+msgstr "This service has the maximum of {count} subjects."
 
 msgid "admin.routing.subject.edit_lead"
 msgstr "Code {code}; it stays the same."
@@ -10054,13 +10054,13 @@ msgid "admin.routing.source.subject"
 msgstr "Subject"
 
 msgid "admin.routing.error.subject_code"
-msgstr "Choose a code of lower-case letters, digits and hyphens that this group does not have yet."
+msgstr "Choose a code of lower-case letters, digits and hyphens that this service does not have yet."
 
 msgid "admin.routing.error.subject_label"
 msgstr "Enter the name, at most 80 characters."
 
 msgid "admin.routing.error.subjects"
-msgstr "This group already has the maximum number of subjects."
+msgstr "This service already has the maximum number of subjects."
 
 msgid "admin.routing.error.subject_in_use"
 msgstr "A block still offers this subject. Remove it from that block first."
@@ -10081,7 +10081,7 @@ msgid "admin.field.block_subjects_hint"
 msgstr "Nothing ticked: the block offers every subject. A participant who chooses a subject only sees the times of blocks that offer it."
 
 msgid "settings.field.max_subjects_per_group.label"
-msgstr "Subjects per group (at most)"
+msgstr "Subjects per service (at most)"
 
 msgid "admin.tab.planning"
 msgstr "Planning"
@@ -10126,19 +10126,19 @@ msgid "admin.readiness.state.not_needed"
 msgstr "Not needed"
 
 msgid "admin.dashboard.filter"
-msgstr "Filter groups"
+msgstr "Filter services"
 
 msgid "admin.dashboard.only_closed"
-msgstr "Only groups with an active emergency closure"
+msgstr "Only services with an active emergency closure"
 
 msgid "admin.dashboard.closed_count"
-msgstr "Groups with an active emergency closure: {count} of {total}"
+msgstr "Services with an active emergency closure: {count} of {total}"
 
 msgid "admin.dashboard.closed"
 msgstr "Emergency closure active"
 
 msgid "admin.dashboard.no_closed"
-msgstr "No group has an active emergency closure right now."
+msgstr "No service has an active emergency closure right now."
 
 msgid "admin.api.filter"
 msgstr "Filter API clients"
@@ -10189,7 +10189,7 @@ msgid "alert.message.organisation"
 msgstr "Organisation: {organisation}."
 
 msgid "alert.message.group"
-msgstr "Group: {group}."
+msgstr "Service: {group}."
 
 msgid "alert.message.repeated"
 msgstr "Reported {count} more times since the previous message."
@@ -10464,7 +10464,7 @@ msgid "admin.fallback.banner.title"
 msgstr "Fallback active"
 
 msgid "admin.fallback.banner.text"
-msgstr "The contact center has been down since {time}. This group's appointments now come to this queue."
+msgstr "The contact center has been down since {time}. This service's appointments now come to this queue."
 
 msgid "admin.fallback.end"
 msgstr "End the fallback"
@@ -10479,7 +10479,7 @@ msgid "admin.alerts.source.fallback"
 msgstr "Fallback to the own queue"
 
 msgid "admin.alerts.text.fallback"
-msgstr "This group falls back to its own queue because the contact center is down. Open the queue to pick up appointments."
+msgstr "This service falls back to its own queue because the contact center is down. Open the queue to pick up appointments."
 
 msgid "call.event.fallback_queued"
 msgstr "Put in the own queue (fallback)"
@@ -10545,10 +10545,10 @@ msgid "reports.list.title"
 msgstr "Reports"
 
 msgid "reports.list.intro"
-msgstr "How the groups you may see are used: bookings created in the last four weeks. Open a group for the full figures."
+msgstr "How the services you may see are used: bookings created in the last four weeks. Open a service for the full figures."
 
 msgid "reports.list.group"
-msgstr "Group"
+msgstr "Service"
 
 msgid "reports.list.created"
 msgstr "Bookings created (28 days)"
@@ -10557,10 +10557,10 @@ msgid "reports.list.open"
 msgstr "Open usage"
 
 msgid "reports.list.empty"
-msgstr "There is no group you may see reports for."
+msgstr "There is no service you may see reports for."
 
 msgid "reports.list.rule"
-msgstr "A count below the minimum is hidden; there is no total across groups."
+msgstr "A count below the minimum is hidden; there is no total across services."
 
 msgid "reports.usage.title"
 msgstr "Usage"
@@ -10569,7 +10569,7 @@ msgid "reports.usage.heading"
 msgstr "Usage"
 
 msgid "reports.usage.lead"
-msgstr "Counts only, no personal data. Days are whole days in the group's own time zone."
+msgstr "Counts only, no personal data. Days are whole days in the service's own time zone."
 
 msgid "reports.usage.from"
 msgstr "From"
@@ -10587,7 +10587,7 @@ msgid "reports.usage.not_yet"
 msgstr "Not rolled up yet"
 
 msgid "reports.usage.groups"
-msgstr "Groups included"
+msgstr "Services included"
 
 msgid "reports.usage.rule"
 msgstr "A count below {n} is hidden and written as < {n}. A total is hidden too when it would give a hidden count back."
@@ -10782,7 +10782,7 @@ msgid "admin.channels.cc_not_connected"
 msgstr "Installation's connection"
 
 msgid "admin.channels.cc_lead"
-msgstr "This organisation's connection to its own contact center: the platform, the API address and the OAuth client. Tasks of this organisation's groups go through this connection."
+msgstr "This organisation's connection to its own contact center: the platform, the API address and the OAuth client. Tasks of this organisation's services go through this connection."
 
 msgid "admin.channels.cc_fallback"
 msgstr "As long as nothing is set here, this organisation uses the connection set for the whole installation."
@@ -10914,7 +10914,7 @@ msgid "reports.wallboard.open_kiosk"
 msgstr "Open full screen"
 
 msgid "reports.wallboard.groups"
-msgstr "Groups on this board"
+msgstr "Services on this board"
 
 msgid "reports.wallboard.pause"
 msgstr "Pause updates"
@@ -10953,7 +10953,7 @@ msgid "reports.wallboard.refresh"
 msgstr "updates every {n} seconds"
 
 msgid "reports.wallboard.live.none"
-msgstr "Live figures are shown for groups with an own queue, to readers who may work the queue."
+msgstr "Live figures are shown for services with an own queue, to readers who may work the queue."
 
 msgid "reports.wallboard.as_of"
 msgstr "as of {time}"
@@ -10968,7 +10968,7 @@ msgid "reports.wallboard.tile.connected"
 msgstr "In a call"
 
 msgid "reports.wallboard.tile.connected.groups"
-msgstr "{n} of {m} groups have an own queue"
+msgstr "{n} of {m} services have an own queue"
 
 msgid "reports.wallboard.tile.connected.detail"
 msgstr "participants in a call now"
@@ -11034,7 +11034,7 @@ msgid "reports.display.error.networks"
 msgstr "The networks are not valid ranges, are more than 20, or are wider than the organisation's default."
 
 msgid "reports.display.error.group"
-msgstr "That group is not part of this organisation."
+msgstr "That service is not part of this organisation."
 
 msgid "reports.display.status.not_opened"
 msgstr "Not opened yet"
@@ -11082,7 +11082,7 @@ msgid "reports.display.form.board"
 msgstr "Which wallboard"
 
 msgid "reports.display.form.all_groups"
-msgstr "All groups of the organisation"
+msgstr "All services of the organisation"
 
 msgid "reports.display.form.name"
 msgstr "Name of the screen"
@@ -11151,7 +11151,7 @@ msgid "reports.views.label"
 msgstr "Report"
 
 msgid "reports.empty"
-msgstr "Nothing has been recorded for this report in this period yet. Choose another period, or come back when the group has been used."
+msgstr "Nothing has been recorded for this report in this period yet. Choose another period, or come back when the service has been used."
 
 msgid "reports.unavailable"
 msgstr "not available"
@@ -11460,13 +11460,13 @@ msgid "reports.capacity.heat.range"
 msgstr "The busiest hours are shown for a period of at least {n} days."
 
 msgid "reports.capacity.heat.none"
-msgstr "No booking was placed in a group that is big enough to be cut by hour."
+msgstr "No booking was placed in a service that is big enough to be cut by hour."
 
 msgid "reports.capacity.heat.left_out"
-msgstr "{n} group(s) are too small to be cut by hour and are left out of this table."
+msgstr "{n} service(s) are too small to be cut by hour and are left out of this table."
 
 msgid "reports.capacity.heat.rule"
-msgstr "Hours are shown only for a group with at least {n} bookings in the period. Hours are local to each group. The number is in every cell; the shade only helps the eye."
+msgstr "Hours are shown only for a service with at least {n} bookings in the period. Hours are local to each service. The number is in every cell; the shade only helps the eye."
 
 msgid "reports.capacity.shortfall.title"
 msgstr "Blocks short of staff"
@@ -11505,7 +11505,7 @@ msgid "reports.channels.locales.locale"
 msgstr "Language"
 
 msgid "reports.channels.locales.left_out"
-msgstr "{n} group(s) are too small to be cut by language and are left out of this table."
+msgstr "{n} service(s) are too small to be cut by language and are left out of this table."
 
 msgid "reports.channels.trial.title"
 msgstr "Trial calls"
@@ -11616,7 +11616,7 @@ msgid "admin.configuration.warning.deletes"
 msgstr "Note: this plan deletes {count} object(s). That cannot be undone."
 
 msgid "admin.configuration.warning.claims"
-msgstr "Note: this plan changes a claim value (the key of an organisation or group, or a role's claim value). People who match the old value lose access until the identity provider sends the new value."
+msgstr "Note: this plan changes a claim value (the key of an organisation or service, or a role's claim value). People who match the old value lose access until the identity provider sends the new value."
 
 msgid "admin.configuration.warning.webex"
 msgstr "Note: this plan replaces the tokens of the Webex Service App. The installation the document came from can no longer connect."
@@ -11652,7 +11652,7 @@ msgid "reports.export.refused.too_many_days"
 msgstr "The export covers too many days. Choose a shorter period."
 
 msgid "reports.export.refused.too_many_rows"
-msgstr "The export has too many rows. Choose a shorter period or one group."
+msgstr "The export has too many rows. Choose a shorter period or one service."
 
 msgid "error.proposal_not_open"
 msgstr "This proposed time is no longer available. You can still choose a new time yourself."
@@ -11774,7 +11774,7 @@ msgid "authz.permission.reports_staff_view"
 msgstr "See the load per team member in the reports"
 
 msgid "authz.permission.reports_wallboard_view"
-msgstr "Show the live wallboard of the groups"
+msgstr "Show the live wallboard of the services"
 
 msgid "authz.permission.reports_wallboard_link_manage"
 msgstr "Make and revoke display links for the wallboard"
@@ -11795,7 +11795,7 @@ msgid "settings.field.reporting_digest_max_subscriptions.label"
 msgstr "Most digest subscriptions per organisation"
 
 msgid "reports.digest.all_groups"
-msgstr "all groups"
+msgstr "all services"
 
 msgid "reports.digest.subject"
 msgstr "Usage of {group} ({organisation}): {period}"
@@ -11903,7 +11903,7 @@ msgid "reports.digest.add_button"
 msgstr "Add subscription"
 
 msgid "reports.digest.field.group"
-msgstr "Group"
+msgstr "Service"
 
 msgid "reports.digest.field.period"
 msgstr "How often"
@@ -12141,7 +12141,7 @@ msgid "reports.chart.unit.bookings"
 msgstr "bookings"
 
 msgid "reports.volume.days.title"
-msgstr "Bookings per day (the booking's own day, in the group's time zone)"
+msgstr "Bookings per day (the booking's own day, in the service's time zone)"
 
 msgid "reports.volume.days.weekday"
 msgstr "Weekday"
@@ -12174,13 +12174,13 @@ msgid "reports.split.title"
 msgstr "Bookings created, split"
 
 msgid "reports.split.left_out"
-msgstr "{n} group(s) are too small to be split and are left out."
+msgstr "{n} service(s) are too small to be split and are left out."
 
 msgid "reports.tile.created"
 msgstr "Bookings in the period"
 
 msgid "reports.tile.created.detail"
-msgstr "created per group-local day"
+msgstr "created per service-local day"
 
 msgid "reports.tile.no_show"
 msgstr "No-show rate"

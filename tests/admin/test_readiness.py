@@ -87,7 +87,7 @@ async def test_active_closures_are_a_filter_of_the_overview(site: Site) -> None:
     everything = (await site.client.get("/admin/?lang=en")).text
 
     assert (old.status_code, old.headers["location"]) == (308, "/admin/?closures=1")
-    assert "No group has an active emergency closure right now." in filtered
+    assert "No service has an active emergency closure right now." in filtered
     assert 'href="/admin/groups/demo"' not in filtered.split('id="groups-heading"', 1)[1]
     assert 'href="/admin/groups/demo"' in everything
 

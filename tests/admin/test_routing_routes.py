@@ -26,7 +26,7 @@ async def test_the_settings_link_to_the_routing_screen(site: Site) -> None:
     settings = (await site.client.get("/admin/groups/demo/settings")).text
     page = await site.client.get(PAGE)
     assert f'href="{PAGE}"' in settings
-    assert "Deze groep vraagt geen onderwerp" in settings
+    assert "Deze dienst vraagt geen onderwerp" in settings
     assert page.status_code == 200
     assert "Nog geen onderwerpen" in page.text
     assert 'aria-current="page"' in page.text  # the Settings tab stays selected

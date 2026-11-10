@@ -22,7 +22,7 @@ forms and reading; a sub-page is `standard` unless the register lists it as wide
 | Entry | Path | Permission | Width | Also the home of |
 |---|---|---|---|---|
 | Organisations | `/admin/organisations` | `organisation.view` | wide | `/admin/organisations/new` |
-| Groups | `/admin/groups` | `group.view` | wide | `/admin/groups/new` |
+| Services | `/admin/groups` | `group.view` | wide | `/admin/groups/new` |
 | Staff | `/admin/staff` | `staff.view` | wide | `/admin/staff/invite`, `/admin/staff/{member_id}` |
 | Identity provider mapping | `/admin/idp-mapping` | `idp_mapping.view` | standard | – |
 | My rights | `/admin/rights` | `rights.view` | standard | – |
@@ -73,9 +73,9 @@ Side navigation: *Organisations*. A row *Tab › Sub-tab* is a sub-tab of that t
 | Holidays | `/admin/organisations/{org}/holidays` | `holidays.assign` | standard | – |
 | Emergency closure | `/admin/organisations/{org}/closure` | `organisation.closure` | standard | `/admin/organisations/{org}/closure/scenarios`, `/admin/organisations/{org}/closure/scenarios/{scenario_id}`, `/admin/organisations/{org}/closure/scenarios/{scenario_id}/contacts` |
 
-### Group (`/admin/groups/{slug}`)
+### Service (`/admin/groups/{slug}`)
 
-Side navigation: *Groups*. A row *Tab › Sub-tab* is a sub-tab of that tab.
+Side navigation: *Services*. A row *Tab › Sub-tab* is a sub-tab of that tab.
 
 | Entry | Path | Permission | Width | Also the home of |
 |---|---|---|---|---|

@@ -24,7 +24,7 @@ async def test_the_menu_entry_opens_the_list_with_every_group_in_scope(site: Sit
 
     assert f'<a href="{LIST}"' in overview
     assert _rows(page) == ["/admin/groups/andere-team", "/admin/groups/demo"]
-    assert "Aantal groepen: 2" in page
+    assert "Aantal diensten: 2" in page
     assert 'href="/admin/organisations/demo"' in page
     assert 'href="/admin/groups/new"' in page
     assert 'href="/g/demo"' in page
@@ -60,8 +60,8 @@ async def test_search_and_organisation_filter_narrow_the_list(site: Site) -> Non
     nothing = (await site.client.get(LIST, params={"q": "bestaat niet"})).text
 
     assert _rows(by_name) == ["/admin/groups/demo"]
-    assert "Aantal groepen: 1" in by_name
-    assert "Van 2 groepen in totaal." in by_name
+    assert "Aantal diensten: 1" in by_name
+    assert "Van 2 diensten in totaal." in by_name
     # The typed text is never shown again (ADR 0063 §3); the page only says a search is active.
     assert "VIDEO" not in by_name.split("<main", 1)[1]
     assert "A search is active" not in by_name  # the Dutch page says it in Dutch
@@ -70,7 +70,7 @@ async def test_search_and_organisation_filter_narrow_the_list(site: Site) -> Non
     assert '<option value="andere" selected>' in by_org
     assert 'href="/admin/groups"' in by_org  # clear filters
     assert _rows(nothing) == []
-    assert "Geen groepen gevonden." in nothing
+    assert "Geen diensten gevonden." in nothing
 
 
 async def test_a_filter_value_outside_the_scope_is_ignored_and_never_echoed(site: Site) -> None:

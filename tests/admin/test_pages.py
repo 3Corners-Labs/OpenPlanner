@@ -104,7 +104,7 @@ async def test_help_and_profile_sit_in_the_top_bar(site: Site) -> None:
     assert 'href="/admin/help/overview"' in top_bar
     assert '<details class="admin-profile">' in top_bar
     assert 'action="/admin/logout"' in top_bar
-    assert "Group admin" in top_bar
+    assert "Service admin" in top_bar
 
 
 async def test_a_sub_page_marks_its_entry_and_tab_as_current(site: Site) -> None:
@@ -154,7 +154,7 @@ async def test_a_group_page_shows_the_path_groups_organisation_group(site: Site)
     crumbs = page.split('<nav class="breadcrumbs"', 1)[1].split("</nav>", 1)[0]
 
     assert _hrefs(crumbs) == ["/admin/groups", "/admin/organisations/demo"]
-    assert crumbs.index("Groepen") < crumbs.index("Demo-acme") < crumbs.index("Demo: videogesprek")
+    assert crumbs.index("Diensten") < crumbs.index("Demo-acme") < crumbs.index("Demo: videogesprek")
 
 
 async def test_a_group_admin_sees_the_organisation_in_the_path_without_a_link(site: Site) -> None:
@@ -432,7 +432,7 @@ async def test_the_panel_head_shows_the_name_in_bold_and_the_role_under_it(site:
 
     head = panel.split('<div class="admin-profile__head">', 1)[1].split("</div>", 1)[0]
     assert f'<p class="admin-profile__who">{GROUP_ADMIN.display_name}</p>' in head
-    assert '<p class="admin-profile__role">Group admin</p>' in head
+    assert '<p class="admin-profile__role">Service admin</p>' in head
     assert "Signed in as" not in panel
     assert 'class="chip"' not in panel
     assert '<p class="admin-profile__role">Superuser</p>' in super_panel

@@ -72,7 +72,7 @@ async def test_texts_show_the_default_and_store_only_changes(site: Site) -> None
     assert saved.headers["location"] == f"{TEXTS}/nl?done=texts_saved"
     page = (await site.client.get(f"{TEXTS}/nl")).text
     assert 'value="Denkt u aan {date}?"' in page
-    assert "Eigen tekst van deze groep." in page
+    assert "Eigen tekst van deze dienst." in page
     english = (await site.client.get(f"{TEXTS}/en")).text
     assert "Reminder: video call on {date} at {time}" in english  # other locale untouched
 

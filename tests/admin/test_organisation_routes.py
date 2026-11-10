@@ -129,7 +129,7 @@ async def test_create_shows_the_new_organisation_and_audits_it(site: Site) -> No
     assert "<dd>noord</dd>" in page
     assert "<dd>English</dd>" in page
     assert 'href="/admin/organisations/noord/branding"' in page
-    assert "Deze organisatie heeft nog geen groepen" in page
+    assert "Deze organisatie heeft nog geen diensten" in page
     form = (await site.client.get(f"{LIST}/noord/edit")).text
     assert 'value="noord" readonly' in form
     assert '<option value="en" selected>' in form
@@ -244,7 +244,7 @@ async def test_an_organisation_with_groups_or_a_wrong_name_stays(site: Site) -> 
     assert wrong.status_code == 422
     assert "Typ de naam precies zo over" in wrong.text
     assert full.status_code == 422
-    assert "heeft nog groepen" in full.text
+    assert "heeft nog diensten" in full.text
     assert (await site.client.get(f"{LIST}/demo")).status_code == 200
 
 

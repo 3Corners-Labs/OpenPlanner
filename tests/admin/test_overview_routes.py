@@ -96,7 +96,7 @@ async def test_the_rights_widget_shows_roles_and_permissions_without_values(site
     await site.login_as(GROUP_ADMIN)
     text = (await site.client.get("/admin/overview/w/rights")).text
 
-    assert "Groepsbeheerder" in text
+    assert "Dienstbeheerder" in text
     assert 'href="/admin/rights"' in text
 
 

@@ -43,7 +43,7 @@ async def test_org_admin_creates_a_group_and_lands_on_it(site: Site) -> None:
     assert response.headers["location"] == "/admin/groups/klantenservice?done=created"
     page = (await site.client.get(response.headers["location"])).text
     assert 'role="status"' in page
-    assert "De groep is aangemaakt" in page
+    assert "De dienst is aangemaakt" in page
     assert ("sub-org", "group.create", "success", "") in [
         (a, b, str(c), d) for a, b, c, d in await audit_events(site)
     ]
@@ -963,16 +963,16 @@ async def test_archiving_removes_the_public_page_and_makes_the_group_read_only(
 
     assert done.headers["location"] == "/admin/groups?done=archived"  # type: ignore[attr-defined]
     listing = (await site.client.get("/admin/groups?done=archived")).text
-    assert "De groep is gearchiveerd" in listing
+    assert "De dienst is gearchiveerd" in listing
     assert f'href="{GROUP}"' not in listing
     archived = (await site.client.get("/admin/groups?archived=1")).text
     assert f'href="{GROUP}"' in archived
-    assert "Gearchiveerde groepen" in archived
+    assert "Gearchiveerde diensten" in archived
 
     assert (await site.client.get("/g/demo")).status_code == 404
     overview = await site.client.get(GROUP)
     assert overview.status_code == 200
-    assert "Deze groep is gearchiveerd" in overview.text
+    assert "Deze dienst is gearchiveerd" in overview.text
     refused = await _post(site, f"{GROUP}/settings", dict(SETTINGS_FORM))
     assert refused.status_code == 409  # type: ignore[attr-defined]
     assert "gearchiveerd en kan niet meer worden gewijzigd" in refused.text  # type: ignore[attr-defined]

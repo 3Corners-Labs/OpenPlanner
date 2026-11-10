@@ -209,7 +209,7 @@ async def test_pages_show_the_role_names_and_the_history(site: Site) -> None:
     editor = await site.client.get(f"/admin/roles/{role_id}")
     assert editor.status_code == 200
     assert 'name="version" value="1"' in editor.text
-    assert "Kopie van Groepsbeheerder" in editor.text
+    assert "Kopie van Dienstbeheerder" in editor.text
     assert 'id="perm.integrations.manage"' not in editor.text  # locked: no checkbox
     overview = await site.client.get("/admin/roles")
     assert "openplanner-custom" in overview.text

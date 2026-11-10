@@ -134,7 +134,7 @@ async def test_a_calendar_in_use_cannot_be_deleted(site: Site) -> None:
     response = await site.client.post(f"{CALENDAR}/delete", headers=SAME_ORIGIN)
 
     assert response.status_code == 409
-    assert "nog gekozen door een organisatie of groep" in response.text
+    assert "nog gekozen door een organisatie of dienst" in response.text
 
 
 async def test_an_inherited_holiday_closes_the_participant_calendar(site: Site) -> None:
@@ -176,7 +176,7 @@ async def test_group_admin_chooses_no_holidays_for_their_group(site: Site) -> No
 
     assert saved.headers["location"] == f"{GROUP}?done=saved"
     assert 'value="own" checked' in page
-    assert "Er gelden geen feestdagen voor deze groep" in page
+    assert "Er gelden geen feestdagen voor deze dienst" in page
     assert "Eerst mogelijk:</strong> donderdag 1 januari" in (await site.client.get("/g/demo")).text
 
 

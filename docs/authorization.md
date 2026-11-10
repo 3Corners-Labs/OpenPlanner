@@ -17,7 +17,7 @@ Maintenance (ADR 0038): while maintenance mode is on, every change is refused ex
 for the permissions marked *maintenance*, and those only for the superuser. Reading
 stays open to every role as usual.
 
-| Permission | Level | Bounds | Superuser | Organisation admin | Group admin | Compliance and privacy (read-only) | Agent |
+| Permission | Level | Bounds | Superuser | Organisation admin | Service admin | Compliance and privacy (read-only) | Agent |
 |---|---|---|---|---|---|---|---|
 | View overview (`dashboard.view`) | Portal | – | yes | yes | yes | yes | yes |
 | View own rights (`rights.view`) | Portal | – | yes | yes | yes | yes | yes |
@@ -41,8 +41,8 @@ stays open to every role as usual.
 | Manage integrations and secrets (`integrations.manage`) | Organisation | locked, maintenance | yes | – | – | – | – |
 | Manage an organisation's branding (`branding.manage`) | Organisation | – | yes | – | – | – | – |
 | Choose holiday calendars for an organisation (`holidays.assign`) | Organisation | – | yes | yes | – | – | – |
-| Create groups (`group.create`) | Organisation | – | yes | yes | – | – | – |
-| Archive groups (`group.delete`) | Organisation | – | yes | yes | – | – | – |
+| Create services (`group.create`) | Organisation | – | yes | yes | – | – | – |
+| Archive services (`group.delete`) | Organisation | – | yes | yes | – | – | – |
 | Close every team of an organisation at once (`organisation.closure`) | Organisation | needs `closure.manage` | yes | yes | – | – | – |
 | View retention (`retention.view`) | Organisation | – | yes | yes | – | yes | – |
 | Manage the digest of the reports (`reports.digest.manage`) | Organisation | needs `reports.view` | yes | yes | – | – | – |
@@ -54,23 +54,23 @@ stays open to every role as usual.
 | Change the organisation's settings (`settings.organisation.manage`) | Organisation | – | yes | yes | – | – | – |
 | Change the organisation's texts (`texts.organisation.manage`) | Organisation | – | yes | yes | – | – | – |
 | View the identity provider mapping (`idp_mapping.view`) | Organisation | – | yes | yes | – | yes | – |
-| Change a group's IdP value (`idp_mapping.manage`) | Organisation | needs `idp_mapping.view` | yes | yes | – | – | – |
+| Change a service's IdP value (`idp_mapping.manage`) | Organisation | needs `idp_mapping.view` | yes | yes | – | – | – |
 | See the organisation's identity providers (`identity_providers.view`) | Organisation | – | yes | yes | – | yes | – |
-| View audit log (`audit.view`) | Group | – | yes | yes | yes | yes | – |
-| Export audit log (`audit.export`) | Group | – | yes | yes | – | yes | – |
-| View group (`group.view`) | Group | – | yes | yes | yes | yes | yes |
-| Change group settings (`group.edit`) | Group | needs `group.view` | yes | yes | – | – | – |
-| Manage staffing and staffing exceptions (`schedule.manage`) | Group | needs `group.view` | yes | yes | yes | – | – |
-| Manage texts (`texts.manage`) | Group | needs `group.view` | yes | yes | yes | – | – |
-| Manage reminders (`reminders.manage`) | Group | needs `group.view` | yes | yes | – | – | – |
-| View bookings (`bookings.view`) | Group | personal data | yes | yes | yes | – | – |
-| Change bookings (`bookings.manage`) | Group | personal data, needs `bookings.view`, `group.view` | yes | yes | yes | – | – |
-| Close a team in an emergency and handle appointments on hold (`closure.manage`) | Group | needs `group.view` | yes | yes | yes | – | – |
-| View usage reports (`reports.view`) | Group | – | yes | yes | yes | yes | – |
-| Download usage reports (`reports.export`) | Group | needs `reports.view` | yes | yes | yes | yes | – |
-| Show the live wallboard of the groups (`reports.wallboard.view`) | Group | needs `reports.view` | yes | yes | yes | – | – |
-| View staff (`staff.view`) | Group | – | yes | yes | yes | yes | – |
-| Pick up appointments in the own queue (`queue.work`) | Group | personal data | yes | yes | yes | – | yes |
+| View audit log (`audit.view`) | Service | – | yes | yes | yes | yes | – |
+| Export audit log (`audit.export`) | Service | – | yes | yes | – | yes | – |
+| View service (`group.view`) | Service | – | yes | yes | yes | yes | yes |
+| Change service settings (`group.edit`) | Service | needs `group.view` | yes | yes | – | – | – |
+| Manage staffing and staffing exceptions (`schedule.manage`) | Service | needs `group.view` | yes | yes | yes | – | – |
+| Manage texts (`texts.manage`) | Service | needs `group.view` | yes | yes | yes | – | – |
+| Manage reminders (`reminders.manage`) | Service | needs `group.view` | yes | yes | – | – | – |
+| View bookings (`bookings.view`) | Service | personal data | yes | yes | yes | – | – |
+| Change bookings (`bookings.manage`) | Service | personal data, needs `bookings.view`, `group.view` | yes | yes | yes | – | – |
+| Close a team in an emergency and handle appointments on hold (`closure.manage`) | Service | needs `group.view` | yes | yes | yes | – | – |
+| View usage reports (`reports.view`) | Service | – | yes | yes | yes | yes | – |
+| Download usage reports (`reports.export`) | Service | needs `reports.view` | yes | yes | yes | yes | – |
+| Show the live wallboard of the services (`reports.wallboard.view`) | Service | needs `reports.view` | yes | yes | yes | – | – |
+| View staff (`staff.view`) | Service | – | yes | yes | yes | yes | – |
+| Pick up appointments in the own queue (`queue.work`) | Service | personal data | yes | yes | yes | – | yes |
 
 ## Custom roles
 
@@ -85,7 +85,7 @@ Held back from custom roles for now: `branding.manage` (ADR 0039 B3, until O5).
 | Template | Reach | Delegable permissions |
 |---|---|---|
 | Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `embedding.manage`, `group.create`, `group.delete`, `group.edit`, `group.view`, `holidays.assign`, `identity_providers.view`, `idp_mapping.manage`, `idp_mapping.view`, `logging.view`, `matrix.view`, `organisation.closure`, `organisation.view`, `queue.work`, `reminders.manage`, `reports.digest.manage`, `reports.export`, `reports.staff.view`, `reports.view`, `reports.wallboard.link.manage`, `reports.wallboard.view`, `retention.view`, `rights.view`, `schedule.manage`, `settings.organisation.manage`, `settings.platform.view`, `staff.manage`, `staff.reset_password`, `staff.view`, `texts.manage`, `texts.organisation.manage` |
-| Group admin | groups | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `logging.view`, `matrix.view`, `queue.work`, `reminders.manage`, `reports.export`, `reports.view`, `reports.wallboard.view`, `rights.view`, `schedule.manage`, `settings.platform.view`, `staff.view`, `texts.manage` |
+| Service admin | groups | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `logging.view`, `matrix.view`, `queue.work`, `reminders.manage`, `reports.export`, `reports.view`, `reports.wallboard.view`, `rights.view`, `schedule.manage`, `settings.platform.view`, `staff.view`, `texts.manage` |
 | Compliance and privacy (read-only) | organisations | `audit.export`, `audit.view`, `dashboard.view`, `group.view`, `identity_providers.view`, `idp_mapping.view`, `logging.view`, `matrix.view`, `organisation.view`, `reports.export`, `reports.view`, `reports.wallboard.view`, `retention.view`, `rights.view`, `settings.platform.view`, `staff.view` |
 
 ## Participants
@@ -100,7 +100,7 @@ dispatch lead), cancelling at the start.
 | View available times (`participant.availability_view`) | Anyone |
 | Book an appointment (`participant.book`) | Anyone |
 | View own appointment (`participant.booking_view`) | With the management link from the confirmation |
-| Move own appointment (`participant.booking_change`) | With the management link, until the number of minutes before the start that the group sets |
+| Move own appointment (`participant.booking_change`) | With the management link, until the number of minutes before the start that the service sets |
 | Cancel own appointment (`participant.booking_cancel`) | With the management link, until the start |
 | Move or cancel an appointment on hold (`participant.suspended_booking_change`) | With the management link, while the appointment is on hold |
 
@@ -112,7 +112,7 @@ the scopes below. There is no superuser equivalent for machines.
 
 | Scope | Level |
 |---|---|
-| Read free times (`availability:read`) | Group |
-| Read the hourly usage figures (`reports:read`) | Group |
+| Read free times (`availability:read`) | Service |
+| Read the hourly usage figures (`reports:read`) | Service |
 | Export and import the configuration package (whole installation) (`configuration:transfer`) | Portal |
-| Ask to cancel or move (with phone number and appointment code; the participant confirms) (`bookings:request_change`) | Group |
+| Ask to cancel or move (with phone number and appointment code; the participant confirms) (`bookings:request_change`) | Service |
