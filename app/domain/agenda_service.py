@@ -15,13 +15,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from app.domain.admin import AdminService, require
+from app.domain.admin import AdminService
 from app.domain.agenda import AgendaSlot, agenda_day, first_shortfall
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.availability import utc_bounds
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holiday_service import effective_schedule
-from app.domain.lookups import group_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Group, windows_on
 from app.domain.tunable import value_for
@@ -78,11 +77,10 @@ class AgendaService:
         Raises:
             DomainError: ``not_permitted``, ``group_not_found`` or ``invalid_range``.
         """
-        await self._authorize(principal, slug)
+        group = await self._authorize(principal, slug)
         if not 1 <= days <= MAX_AGENDA_DAYS:
             raise DomainError(ErrorCode.INVALID_RANGE)
         async with self._uow.read() as tx:
-            group = await group_by_slug(tx, slug)
             return await agenda_days(tx, group, first_day, days, self._clock.now())
 
     async def shortfalls(self, principal: Principal, slug: str) -> ShortfallSummary:
@@ -91,9 +89,9 @@ class AgendaService:
         Raises:
             DomainError: ``not_permitted`` or ``group_not_found``.
         """
-        await self._authorize(principal, slug)
+        group = await self._authorize(principal, slug)
         async with self._uow.read() as tx:
-            return await self._summary(tx, await group_by_slug(tx, slug))
+            return await self._summary(tx, group)
 
     async def summaries(self, principal: Principal) -> dict[str, ShortfallSummary]:
         """Return the shortfall summary of every group whose bookings ``principal`` may view."""
@@ -126,9 +124,9 @@ class AgendaService:
         short = [s for d in days for s in d.slots if s.open_shortfall and s.start >= now]
         return ShortfallSummary(len(short), first_shortfall(short, now), horizon)
 
-    async def _authorize(self, principal: Principal, slug: str) -> None:
-        """Require ``bookings.view`` on the group."""
-        require(await self._admin.authorize(principal, Permission.BOOKINGS_VIEW, group_slug=slug))
+    async def _authorize(self, principal: Principal, slug: str) -> Group:
+        """Require ``bookings.view`` on the group and return it."""
+        return (await self._admin.authorize_group(principal, Permission.BOOKINGS_VIEW, slug)).group
 
 
 async def agenda_days(

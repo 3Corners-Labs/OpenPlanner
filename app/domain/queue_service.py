@@ -21,7 +21,7 @@ Every row and the claimed booking carry the video link's state and the participa
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from app.domain.admin import AdminService, record_change, require
+from app.domain.admin import AdminService, record_change
 from app.domain.authorization import Permission, Principal, Scope, Target, decide, scope_for
 from app.domain.booking import Booking, Claim
 from app.domain.calls import CallStatus, new_status
@@ -308,14 +308,10 @@ class QueueService:
 
     async def _group(self, principal: Principal, slug: str) -> GroupSummary:
         """Authorise ``queue.work`` on the group and return it if it has an own queue."""
-        authorization = require(
-            await self._admin.authorize(principal, Permission.QUEUE_WORK, group_slug=slug)
-        )
-        if authorization.group is None:
-            raise DomainError(ErrorCode.GROUP_NOT_FOUND)
-        if not authorization.group.group.queue_open:
+        summary = await self._admin.authorize_group(principal, Permission.QUEUE_WORK, slug)
+        if not summary.group.queue_open:
             raise DomainError(ErrorCode.QUEUE_NOT_ENABLED)
-        return authorization.group
+        return summary
 
     async def _entries(
         self, tx: Transaction, principal: Principal, group: Group, now: datetime

@@ -28,7 +28,6 @@ from app.domain.calls import (
     new_status,
 )
 from app.domain.contact_center import ContactCenterKind
-from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobSummary
 from app.domain.lookups import group_booking
 from app.domain.ports import REASON_LIMIT, Clock, ProbeRegistry, Transaction, UnitOfWork
@@ -219,10 +218,7 @@ class IntegrationService:
             DomainError: ``group_not_found`` or ``not_permitted``.
         """
         permission = Permission.BOOKINGS_VIEW
-        authorization = await self._admin.authorize(principal, permission, group_slug=slug)
-        if not authorization.decision.allowed or authorization.group is None:
-            raise DomainError(ErrorCode.NOT_PERMITTED)
-        group = authorization.group.group
+        group = (await self._admin.authorize_group(principal, permission, slug)).group
         # Midnight to midnight in group time: a day can last 23 or 25 hours (DST).
         lower, upper = utc_bounds(group, day, day)
         async with self._uow.read() as tx:

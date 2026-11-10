@@ -224,9 +224,8 @@ class PlanningService:
 
     async def future_bookings(self, principal: Principal, slug: str) -> int:
         """Return how many bookings that hold a place lie ahead, for the archive page."""
-        require(await self._admin.authorize(principal, Permission.GROUP_DELETE, group_slug=slug))
+        group = (await self._admin.authorize_group(principal, Permission.GROUP_DELETE, slug)).group
         async with self._uow.read() as tx:
-            group = await group_by_slug(tx, slug)
             return await tx.count_future_bookings(group.id, self._clock.now())
 
     # --- opening hours and exceptions --------------------------------------------------------
@@ -237,9 +236,8 @@ class PlanningService:
         Raises:
             DomainError: ``not_permitted`` or ``group_not_found``.
         """
-        require(await self._admin.authorize(principal, Permission.GROUP_VIEW, group_slug=slug))
+        group = (await self._admin.authorize_group(principal, Permission.GROUP_VIEW, slug)).group
         async with self._uow.read() as tx:
-            group = await group_by_slug(tx, slug)
             rules, overrides = await tx.get_schedule_items(group.id, group.today(self._clock.now()))
         return Schedule(
             sorted(rules, key=lambda r: (r.weekday, r.window, r.valid_from or date.min)),
@@ -252,10 +250,9 @@ class PlanningService:
         Only days with slots are returned. Holidays count (ADR 0025); bookings, notice and
         horizon are left out: this shows what the opening hours produce, not what is free.
         """
-        require(await self._admin.authorize(principal, Permission.GROUP_VIEW, group_slug=slug))
+        group = (await self._admin.authorize_group(principal, Permission.GROUP_VIEW, slug)).group
         days = max(1, min(days, MAX_PREVIEW_DAYS))
         async with self._uow.read() as tx:
-            group = await group_by_slug(tx, slug)
             today = group.today(self._clock.now())
             last = today + timedelta(days=days - 1)
             rules, overrides = await effective_schedule(tx, group, today, last)

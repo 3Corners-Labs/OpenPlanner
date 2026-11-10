@@ -33,7 +33,13 @@ from app.domain.holidays import (
 from app.domain.lookups import group_by_slug
 from app.domain.organisations import organisation_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
-from app.domain.scheduling import Group, Organisation, ScheduleOverride, ScheduleRule
+from app.domain.scheduling import (
+    Group,
+    GroupSummary,
+    Organisation,
+    ScheduleOverride,
+    ScheduleRule,
+)
 
 UPCOMING_DAYS = 366
 """How far ahead the group page lists holidays."""
@@ -325,9 +331,8 @@ class HolidayService:
         Raises:
             DomainError: ``not_permitted`` or ``group_not_found``.
         """
-        await self._schedule(principal, slug)
+        group = (await self._schedule_group(principal, slug)).group
         async with self._uow.read() as tx:
-            group = await group_by_slug(tx, slug)
             choice = await tx.get_group_holidays(group.id)
             inherited = await tx.get_organisation_holiday_calendars(group.organisation_id)
             calendars = await tx.get_holiday_calendars()
@@ -429,6 +434,10 @@ class HolidayService:
         return require(
             await self._admin.authorize(principal, Permission.SCHEDULE_MANAGE, group_slug=slug)
         )
+
+    async def _schedule_group(self, principal: Principal, slug: str) -> GroupSummary:
+        """Authorise ``schedule.manage`` on group ``slug`` and return the group."""
+        return await self._admin.authorize_group(principal, Permission.SCHEDULE_MANAGE, slug)
 
     async def _audit_global(
         self, tx: Transaction, principal: Principal, slug: str, detail: str
