@@ -213,6 +213,24 @@
       ]
     },
     {
+      "name": "group usage wallboard",
+      "path": "/admin/groups/demo/usage?view=wallboard",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "group usage wallboard full screen",
+      "path": "/admin/groups/demo/usage?view=wallboard&layout=kiosk",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
       "name": "organisation usage queue and calls",
       "path": "/admin/organisations/demo/usage?view=queue",
       "user": "super",

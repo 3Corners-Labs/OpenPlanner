@@ -20,7 +20,7 @@ from starlette.responses import RedirectResponse
 
 from app.admin.authz import AccessDenied
 from app.admin.connection_inputs import CONNECTION_MESSAGES, CONNECTION_TARGETS
-from app.admin.routing_inputs import ROUTING_MESSAGE, ROUTING_TARGETS
+from app.admin.routing_inputs import ROUTING_FIELDS, ROUTING_MESSAGE, ROUTING_TARGETS
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.theme import TOKENS, TokenKind
 from app.i18n import BoundGettext
@@ -83,6 +83,9 @@ DONE_MESSAGES: dict[str, str] = {
     "idp_key_rotated": "admin.done.idp_key_rotated",
     "webhook_secret_rotated": "admin.done.webhook_secret_rotated",
     "contact_center_refused": "admin.done.contact_center_refused",
+    "contact_center_registered": "admin.done.contact_center_registered",
+    "contact_center_saved_not_ready": "admin.done.contact_center_saved_not_ready",
+    "contact_center_not_registered": "admin.done.contact_center_not_registered",
     "confirmed_by_staff": "admin.done.confirmed_by_staff",
     "not_pending": "admin.done.not_pending",
     "confirm_lapsed": "admin.done.confirm_lapsed",
@@ -182,13 +185,14 @@ FIELD_MESSAGES: dict[str, str] = {
     "queue_visible_from_minutes": "admin.form.error.queue_visible_from_minutes",
     "queue_free_pick_allowed": "admin.form.error.choice",
     "max_bookings_per_email": "admin.form.error.max_bookings_per_email",
+    "reschedule_auto_send": "admin.form.error.choice",
+    "reschedule_auto_delay_minutes": "admin.form.error.reschedule_auto_delay_minutes",
+    "reschedule_auto_max_bookings": "admin.form.error.reschedule_auto_max_bookings",
     "calendar_invite_address": "admin.form.error.calendar_invite_address",
     "fallback_space_room_id": "admin.form.error.fallback_space_room_id",
     "phone_mode": "admin.form.error.phone_mode",
     "video_host_email": "admin.form.error.video_host_email",
-    "wxcc_business_address": "admin.form.error.integration_text",
-    "wxcc_channel": "admin.form.error.integration_text",
-    "wxcc_routing_value": "admin.form.error.integration_text",
+    **dict.fromkeys(ROUTING_FIELDS, ROUTING_MESSAGE),
     # ADR 0032: the routing's own refusals, linked to the settings form's inputs (FIELD_TARGET).
     **dict.fromkeys(ROUTING_TARGETS, ROUTING_MESSAGE),
     **CONNECTION_MESSAGES,

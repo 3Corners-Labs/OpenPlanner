@@ -173,6 +173,13 @@ async def test_outsiders_and_unknown_objects_are_refused(service: ReadinessServi
     assert unknown.value.code in {ErrorCode.GROUP_NOT_FOUND, ErrorCode.NOT_PERMITTED}
 
 
+async def test_an_unknown_organisation_has_no_checklist(service: ReadinessService) -> None:
+    with pytest.raises(DomainError) as unknown:
+        await service.organisation(SUPER, "nope")
+
+    assert unknown.value.code is ErrorCode.ORGANISATION_NOT_FOUND
+
+
 async def test_staffing_that_ends_today_counts_on_the_groups_own_date(
     uow: InMemoryUnitOfWork,
 ) -> None:

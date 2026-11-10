@@ -9,6 +9,18 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+APPROACH = "00-"
+RELEASE_NOTES = "90-"
+"""The prefixes of the sources that belong to no role: the approach and the release notes."""
+
+
+def is_support(stem: str) -> bool:
+    """Return whether a source (by its file stem) is the approach or the release notes.
+
+    They have no role of their own: no tasks, no rights, no matrix role.
+    """
+    return stem.startswith((APPROACH, RELEASE_NOTES))
+
 
 def guard_outside_checkout(path: Path) -> None:
     """Stop when ``path`` lies inside a checkout of the software (same rule as workspace.mjs).

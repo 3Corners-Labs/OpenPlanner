@@ -7,7 +7,7 @@ import pytest
 from app.domain.booking import BookingStatus
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.job_plan import JobType
+from app.domain.job_plan import PURGE_AFTER, JobType
 from app.domain.scheduling import (
     DispatchKind,
     PhoneMode,
@@ -28,6 +28,7 @@ from tests.support.domain import (
     TUESDAY_0900,
     book,
     book_confirmed,
+    book_pending,
     make_group,
     window,
 )
@@ -575,10 +576,9 @@ async def test_the_same_address_in_the_same_slot_is_refused(uow: InMemoryUnitOfW
     await book(service)
     shouting = ContactInput(first_name="Ada", last_name="L.", email="ADA@Example.org")
 
-    with pytest.raises(DomainError) as excinfo:
-        await service.book(group_slug="balie", start=SLOT_0900, contact=shouting, locale="nl")
+    refused = await service.book(group_slug="balie", start=SLOT_0900, contact=shouting, locale="nl")
 
-    assert excinfo.value.code is ErrorCode.BOOKING_LIMIT_REACHED
+    assert refused.booking.status is BookingStatus.REFUSED
     await service.book(group_slug="balie", start=SLOT_0900, contact=BEA, locale="nl")
 
 
@@ -587,11 +587,13 @@ async def test_an_address_may_hold_up_to_the_group_maximum(uow: InMemoryUnitOfWo
     first = await book(service)  # on behalf of someone else: a second place is allowed
     await book(service, SLOT_0930)
 
-    with pytest.raises(DomainError, match="booking_limit_reached"):
-        await book(service, SLOT_0930 + timedelta(minutes=30))
+    assert (
+        await book_pending(service, SLOT_0930 + timedelta(minutes=30))
+    ).booking.status is BookingStatus.REFUSED
 
     await service.cancel(first.management_token)  # a cancelled booking frees the address
-    await book(service, SLOT_0930 + timedelta(minutes=30))
+    again = await book_pending(service, SLOT_0930 + timedelta(minutes=30))
+    assert again.booking.awaits_confirmation  # the refused attempt did not count
 
 
 async def test_the_limit_counts_only_this_group_and_the_future(
@@ -602,8 +604,7 @@ async def test_the_limit_counts_only_this_group_and_the_future(
     uow.state.groups[2] = make_group(id=2, slug="helpdesk", max_bookings_per_email=1)
     await service.book(group_slug="helpdesk", start=TUESDAY_0900, contact=ADA, locale="nl")
 
-    with pytest.raises(DomainError, match="booking_limit_reached"):
-        await book(service, SLOT_0930)
+    assert (await book_pending(service, SLOT_0930)).booking.status is BookingStatus.REFUSED
 
     later = BookingService(uow, FixedClock(SLOT_0930 + timedelta(minutes=1)), TEST_TOKEN_KEY)
     uow.state.groups[1] = make_group(
@@ -614,6 +615,28 @@ async def test_the_limit_counts_only_this_group_and_the_future(
         max_bookings_per_email=1,
     )
     await book(later, SLOT_0930 + timedelta(minutes=30))  # the 09:00 booking has ended
+
+
+async def test_a_refused_booking_holds_no_place_sends_one_email_and_is_purged(
+    uow: InMemoryUnitOfWork,
+) -> None:
+    """ADR 0066 step 8: the page reveals nothing; the refusal is explained by email only."""
+    service = _limit_service(uow, 1)
+    await book(service)
+
+    refused = await book_pending(service, SLOT_0930)
+
+    booking_id = refused.booking.id or 0
+    assert refused.booking.status is BookingStatus.REFUSED
+    assert refused.booking.confirm_by is None
+    assert [(j.type, j.run_at, j.channel) for j in uow.state.jobs[booking_id]] == [
+        (JobType.SEND_REFUSAL, NOW, ChannelKind.EMAIL),
+        (JobType.PURGE_PII, NOW + PURGE_AFTER, None),
+    ]
+    with pytest.raises(DomainError, match="booking_not_found"):  # it has nothing to manage
+        await service.find(refused.management_token)
+    usage = await service.availability("balie", SLOT_0930.date(), SLOT_0930.date())
+    assert next(s for s in usage if s.start == SLOT_0930).remaining == 3
 
 
 async def test_rescheduling_does_not_count_the_booking_it_moves(

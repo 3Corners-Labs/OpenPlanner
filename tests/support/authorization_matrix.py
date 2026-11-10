@@ -122,6 +122,16 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "GET /admin/organisations/{org}/usage": {
         "/admin/organisations/demo/usage": statuses(200, 200, 403, 403, 200, 403, 403)
     },
+    # ADR 0117 point 20: the wallboard's live fragment, reports.wallboard.view: the organisation
+    # admin and the group admin, not the auditor (a live view of the floor is no audit need).
+    "GET /admin/groups/{slug}/usage/wallboard/live": {
+        "/admin/groups/demo/usage/wallboard/live": statuses(200, 200, 200, 403, 403, 403, 403)
+    },
+    "GET /admin/organisations/{org}/usage/wallboard/live": {
+        "/admin/organisations/demo/usage/wallboard/live": statuses(
+            200, 200, 403, 403, 403, 403, 403
+        )
+    },
     # ADR 0117 point 12: the CSV of a page, the same scope as the page (reports.export).
     "GET /admin/groups/{slug}/usage/export.csv": {
         "/admin/groups/demo/usage/export.csv": statuses(200, 200, 200, 403, 200, 403, 403)

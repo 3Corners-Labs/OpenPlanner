@@ -68,8 +68,32 @@ Hoeveel toekomstige afspraken één e-mailadres tegelijk bij dit team mag hebben
 Standaard 3. Mensen boeken vaak voor een ander, bijvoorbeeld een ouder voor een kind of een
 mantelzorger voor een naaste; zet het getal daarom niet te laag. Een afspraak die is geannuleerd
 of voorbij is, telt niet mee. Hetzelfde e-mailadres twee keer op hetzelfde moment kan nooit:
-dat is bijna altijd een dubbele klik. De deelnemer krijgt bij een weigering een algemene melding,
-zonder dat de pagina zegt dat er al een afspraak is.
+dat is bijna altijd een dubbele klik. Bij een weigering toont de pagina hetzelfde scherm
+"controleer uw e-mail" als bij elke afspraak; alleen de e-mail aan dat adres legt uit waarom de
+afspraak niet kon. Een geweigerde poging staat niet in de agenda.
+
+<!-- field: reschedule_auto_send -->
+### Voorstellen automatisch versturen
+
+Standaard uit. Zijn er te weinig medewerkers voor de afspraken in een tijdslot, dan kan de
+assistent zelf nieuwe tijden voorstellen aan de laatst gemaakte afspraken, zonder dat een planner
+die eerst bekijkt. Zet dit alleen aan voor een team dat daarmee akkoord is. De deelnemer
+bevestigt altijd zelf, kiest een andere tijd of annuleert: zonder de deelnemer verschuift niets.
+Elk automatisch voorstel staat in het auditlog, met het systeem als uitvoerder.
+
+<!-- field: reschedule_auto_delay_minutes -->
+### Wachttijd voor automatische voorstellen
+
+Hoe lang een tekort precies hetzelfde moet blijven voordat de voorstellen worden verstuurd, van 5
+tot 120 minuten. Standaard 15. Zo kunt u een typefout in de bezetting nog herstellen: verandert
+het tekort of verdwijnt het, dan begint het wachten opnieuw.
+
+<!-- field: reschedule_auto_max_bookings -->
+### Hoogste aantal afspraken voor automatisch versturen
+
+Van 1 tot 100, standaard 10. Zijn er meer afspraken betrokken, dan verstuurt de assistent niets en
+vraagt hij een planner de voorstellen op de agenda te bekijken; de planners krijgen daar één keer
+bericht van. Zo verplaatst een fout in de bezetting niet een hele dag.
 
 <!-- field: dispatch_kind -->
 ### Hoe afspraken bij medewerkers komen

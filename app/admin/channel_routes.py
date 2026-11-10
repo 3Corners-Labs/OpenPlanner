@@ -32,7 +32,12 @@ from app.admin import forms
 from app.admin.alert_routes import alert_view
 from app.admin.authz import AdminContext
 from app.admin.channel_fields import Manage, channels_url, secret_field, value_of
-from app.admin.contact_center_routes import CONNECTION_ANCHOR, connection_service, connection_view
+from app.admin.contact_center_routes import (
+    CONNECTION_ANCHOR,
+    SAVED_DONE,
+    connection_service,
+    connection_view,
+)
 from app.admin.forms import Field, FormData, moment_label
 from app.admin.pages import Locale, SameOrigin, organisation_header
 from app.admin.pages import page as _page
@@ -532,12 +537,14 @@ async def save_contact_center(
                 client_secret=form.values.get("cc_client_secret") or None,
                 refresh_token=form.values.get("cc_refresh_token") or None,
             )
-            await connection_service(request).save(context.principal, org, change)
+            outcome = await connection_service(request).save(context.principal, org, change)
         except DomainError as error:
             forms.raise_refusal(error)
             form.refusal(error)
         else:
-            return forms.redirect_done(channels_url(org), "saved", anchor=CONNECTION_ANCHOR)
+            return forms.redirect_done(
+                channels_url(org), SAVED_DONE[outcome], anchor=CONNECTION_ANCHOR
+            )
     return await _form_page(request, locale, context, org, {}, 422, connection=form)
 
 

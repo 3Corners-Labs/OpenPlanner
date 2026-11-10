@@ -38,7 +38,7 @@ kind of work outside the code.
 | Word output | `anthropic-skills:docx` | docx-js conventions and output checks |
 | Reader test | `anthropic-skills:doc-coauthoring` | Its reader-testing stage: a reader without context tries the role's tasks with the manual |
 | Process pictures | `diagram` | A role's flow as Mermaid, SVG and PNG |
-| After a release | `/document-release` | Lists documentation debt per change; `role-manuals` then updates text and screenshots from a checkout of the release tag and freezes one version of the manuals per release |
+| After a release | `/document-release` | Lists documentation debt per change; `role-manuals` then updates text and screenshots from a checkout of the release tag, collects the release's changes per role into the document that says what is new, and freezes one version of the manuals per release |
 | The participant pages | `ux-heuristics` | Finds friction that the FAQ or the page texts must cover |
 
 The per-screen manual in `docs/manual/{nl,en}/` (ADR 0033) stays the built-in help; a role

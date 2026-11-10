@@ -14,20 +14,23 @@ import httpx
 import structlog
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.adapters.contact_center_connections import SealedConnections
 from app.adapters.crypto import SecretBox
 from app.adapters.db.credentials import CredentialStore
 from app.adapters.db.probes import ProbeReports
 from app.adapters.db.reports import ReportStore
 from app.adapters.group_check import CheckerConfig, PlatformChecker
+from app.adapters.organisation_dispatch import OrganisationWxcc
 from app.adapters.webex_auth import AuthorizedClient, ServiceAppConfig, WebexTokens
 from app.adapters.webex_meetings import WebexMeetings
-from app.adapters.wxcc import WxccTasks
+from app.adapters.wxcc import wxcc_tasks
 from app.config import Settings
 from app.domain.contact_center import ContactCenterKind
 from app.domain.ports import (
     Clock,
     ContactCenterDispatchers,
     IntegrationChecker,
+    OrganisationConnections,
     RequestLog,
     VideoProvider,
 )
@@ -41,13 +44,21 @@ log = structlog.get_logger()
 class Integrations:
     """The configured integration adapters (``None`` or empty when not configured).
 
-    ``dispatchers`` holds one dispatcher per contact-center platform (ADR 0032 point 5).
+    ``dispatchers`` holds the installation's dispatcher per contact-center platform (ADR 0032
+    point 5); ``organisations`` builds each organisation's own (point 9), ``None`` without a
+    settings key.
     """
 
     tokens: WebexTokens | None = None
     video: VideoProvider | None = None
     dispatchers: ContactCenterDispatchers = field(default_factory=dict)
     checker: IntegrationChecker | None = None
+    organisations: OrganisationConnections | None = None
+
+    @property
+    def dispatch_configured(self) -> bool:
+        """Whether tasks can go anywhere: the installation's dispatcher or an organisation's."""
+        return bool(self.dispatchers) or self.organisations is not None
 
 
 def webex_fingerprint(settings: Settings) -> str:
@@ -89,6 +100,17 @@ def sealed_store(engine: AsyncEngine, settings: Settings) -> CredentialStore | N
     return CredentialStore(engine, box) if box is not None else None
 
 
+def webex_oauth_url(settings: Settings) -> str:
+    """Return the Webex token endpoint every Service App signs in at."""
+    return f"{settings.webex_api_base_url.rstrip('/')}/access_token"
+
+
+def sealed_connections(engine: AsyncEngine, settings: Settings) -> SealedConnections | None:
+    """Return the organisations' contact-center connections, or ``None`` without a key."""
+    store = sealed_store(engine, settings)
+    return SealedConnections(store) if store is not None else None
+
+
 def installation_box(settings: Settings) -> SecretBox:
     """Return the box under the current ``SETTINGS_ENCRYPTION_KEY``, reading the previous one too.
 
@@ -119,23 +141,28 @@ def build_integrations(
         settings.webex_client_secret,
         settings.webex_refresh_token,
     )
+    organisations = _organisation_dispatchers(settings, engine, http, clock, security, request_log)
     if not client_id or secret is None or refresh is None:
-        return Integrations()
+        return Integrations(organisations=organisations)
     config = ServiceAppConfig(
         client_id=client_id,
         client_secret=secret.get_secret_value(),
         bootstrap_refresh_token=refresh.get_secret_value(),
-        oauth_url=f"{settings.webex_api_base_url.rstrip('/')}/access_token",
+        oauth_url=webex_oauth_url(settings),
     )
     store = CredentialStore(engine, installation_box(settings))
-    tokens = WebexTokens(config, http, store, clock, security)
+    tokens, tasks = wxcc_tasks(
+        config,
+        http,
+        store,
+        clock,
+        settings.wxcc_api_base_url or "",
+        security=security,
+        request_log=request_log,
+    )
     client = AuthorizedClient(http, tokens, request_log)
     video = WebexMeetings(client, settings.webex_api_base_url, clock)
-    dispatcher = (
-        WxccTasks(client, settings.wxcc_api_base_url, clock)
-        if settings.dispatch_configured and settings.wxcc_api_base_url
-        else None
-    )
+    dispatcher = tasks if settings.dispatch_configured and settings.wxcc_api_base_url else None
     webex_secret, wxcc_secret = settings.webex_webhook_secret, settings.wxcc_webhook_secret
     checker = PlatformChecker(
         http,
@@ -157,4 +184,28 @@ def build_integrations(
     dispatchers: ContactCenterDispatchers = (
         {ContactCenterKind.WEBEX_CC: dispatcher} if dispatcher else {}
     )
-    return Integrations(tokens, video, dispatchers, checker)
+    return Integrations(tokens, video, dispatchers, checker, organisations)
+
+
+def _organisation_dispatchers(
+    settings: Settings,
+    engine: AsyncEngine,
+    http: httpx.AsyncClient,
+    clock: Clock,
+    security: SecurityLog | None,
+    request_log: RequestLog | None,
+) -> OrganisationWxcc | None:
+    """Return the organisations' own dispatchers, or ``None`` without a settings key."""
+    store = sealed_store(engine, settings)
+    if store is None:
+        return None
+    return OrganisationWxcc(
+        SealedConnections(store),
+        store,
+        http,
+        clock,
+        webex_oauth_url(settings),
+        security,
+        request_log,
+        settings.webhook_base,
+    )

@@ -92,6 +92,7 @@ from app.jobs.runner import JobRunner
 from app.jobs.usage import backfill_usage, close_slots, roll_up_usage
 from app.keys import management_token_key, management_token_key_previous
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
+from app.service_wiring import booking_service, planner_service
 from app.web.alert_text import alert_composer
 from app.web.digest_text import compose_digest
 from app.web.fallback_text import SpaceTexts
@@ -223,6 +224,7 @@ async def run_worker(
                 wired.dispatchers,
                 integration,
                 lambda: timedelta(minutes=live.settings.task_reconcile_after_minutes),
+                wired.organisations,
             ),
             health,
             clock,
@@ -244,6 +246,7 @@ async def run_worker(
                 ),
                 video=wired.video,
                 dispatchers=wired.dispatchers,
+                organisations=wired.organisations,
                 integration=integration,
                 fallback=fallback,
                 retention=lambda: live.settings.event_retention,
@@ -284,6 +287,10 @@ async def run_worker(
         keep = timedelta(days=live.settings.agent_change_request_retention_days)
         return await prune_change_requests(uow, clock, keep)
 
+    planner = planner_service(
+        uow, clock, AdminService(uow, clock), booking_service(uow, clock, settings, live), live
+    )
+
     staff_lifecycle = StaffLifecycleService(uow, clock)
 
     async def erase_staff() -> int:
@@ -307,6 +314,7 @@ async def run_worker(
             uow, clock, lambda: timedelta(days=live.settings.booking_row_retention_days)
         ).run,
         prune_requests,
+        planner.run_automatic,
     )
     # ADR 0117: usage facts into the hourly table, and the retention of both.
     usage = UsageRollup(
@@ -420,7 +428,7 @@ async def run_worker(
         poll_seconds=settings.worker_poll_seconds,
         fallback_mail=fallback_mail(settings) is not None,
         video_enabled=wired.video is not None,
-        dispatch_enabled=bool(wired.dispatchers),
+        dispatch_enabled=wired.dispatch_configured,
         release_check=settings.update_repository is not None,
     )
     try:

@@ -4,14 +4,15 @@ Status: accepted for the organisation connection (2026-11-08, the product owner:
 per organisatie is inderdaad wat moet kunnen"; see *Amendment: the organisation connection*);
 proposed (2026-10-25) for the rest until CC-0 names the next platform. Renumbered from 0021 on
 2026-10-27: two ADRs were given number 0021 in parallel; ADR 0021 is "Ending the work item of a
-cancelled booking". Extends ADR 0007 and ADR 0018; it replaces their per-group mapping (ADR
-0018 point 1) with the model below. Partly built: steps CC-1 and CC-2 (domain, schema, port and
-registry), CC-3 (webhook route per kind), CC-4a (the organisation's connection) and CC-5 (docs)
-are merged, see *Build status* and `docs/adr-status.md`.
-Note (2026-11-01 review): point 8 (first name and host join URL only) contradicts point 5 and
-ADR 0018 §2, whose payload is what is sent (`app/adapters/wxcc.py`: booking reference, first
-name, start label, group name, meeting link, kind). Point 8 amended by ADR 0081 §6. ADR 0043
-was built without this ADR. ADR 0028 cites this ADR as ADR 0021 (its number before renumbering).
+cancelled booking". Extends ADR 0007 and ADR 0018; it replaces their per-group mapping (ADR 0018
+point 1) with the model below. Partly built: steps CC-1 and CC-2 (domain, schema, port and
+registry), CC-3 (webhook route per kind), CC-4a (the organisation's connection), CC-4b (dispatch
+through it), CC-4c (the group form from the descriptor), CC-4d (registering its webhook address)
+and CC-5 (docs) are merged, see *Build status* and `docs/adr-status.md`. Note (2026-11-01
+review): point 8 (first name and host join URL only) contradicts point 5 and ADR 0018 §2, whose
+payload is what is sent (`app/adapters/wxcc.py`: booking reference, first name, start label,
+group name, meeting link, kind). Point 8 amended by ADR 0081 §6. ADR 0043 was built without this
+ADR. ADR 0028 cites this ADR as ADR 0021 (its number before renumbering).
 
 ## Context
 
@@ -109,10 +110,22 @@ organisatie is inderdaad wat moet kunnen".
     (`WEBEX_CLIENT_*`, `WXCC_API_BASE_URL`, `WXCC_WEBHOOK_SECRET`) and its events keep arriving
     at `/webhooks/contact-center/{kind}` and `/webhooks/wxcc`. The minor after that drops the
     fallback, the installation-wide WxCC settings and the address without an organisation.
-12. **Open for CC-4b.** Before the dispatcher sends an organisation's client secret and refresh
-    token to its API host, CC-4b decides whether hosts on loopback, private or link-local
-    addresses are refused (credential redirection). Only the superuser can set the host, so
-    CC-4a accepts any https host name.
+12. **Internal hosts are refused** (decided in CC-4b). Before the dispatcher sends an
+    organisation's tokens to its API host, `localhost` and names under it, and IP literals that
+    are loopback, private, link-local, reserved or unspecified, are refused as API host
+    (credential redirection). A host name that resolves to such an address is not checked: the
+    platforms' hosts are public names and only the superuser sets the host.
+13. **An organisation's tasks never go to another tenant.** An organisation with its own
+    connection dispatches, ends and reconciles its tasks only through it. While that connection
+    lacks a secret, a dispatch fails with the retryable `connection_incomplete`: the job retries
+    (ADR 0068) and a final failure hands the booking to the fallback of ADR 0082. Only an
+    organisation without a connection uses the installation's (point 11). Its access tokens are
+    kept sealed under `contact-center-tokens:{organisation id}` and deleted with the connection
+    and with the organisation. Accepted limit: a task is ended and reconciled through the
+    connection the organisation has *now*, so a task created before it connected (or before it
+    removed its connection) is ended at the wrong tenant, which answers 404; the booking's
+    timeline shows `end_not_possible`. Connect or disconnect an organisation when none of its
+    tasks is open; the manual says so.
 
 **Settings.** The amendment adds no setting. The connection is integration data, sealed per
 organisation (ADR 0008), not a class D setting: its secrets are write-only and the webhook
@@ -129,8 +142,9 @@ parameter) and the field shapes (an https host with at most a port; client id
 | CC-2 | Port and registry: `ContactCenterTask`, `ContactCenterDispatchers` (one dispatcher per kind), `ProviderDescriptor` per adapter with generic validation in the domain; the WxCC adapter maps the neutral task to Create Task v2 unchanged; recorded-payload test on the allow-list of CLAUDE.md (point 8 as amended by ADR 0081 §6) | #616 | merged |
 | CC-3 | Webhooks at `/webhooks/contact-center/{kind}`, verified by the adapter within 300 s; `/webhooks/wxcc` kept as alias. Each adapter defines its `InboundWebhook` (check, parsing, secret), listed in `contact_centers.INBOUND`; a task is looked up with its platform. OpenPlanner still registers the WxCC subscription at `/webhooks/wxcc`; moving the registration comes with the organisation connection (CC-4) | #626 | merged |
 | CC-4a | The organisation's connection (points 9–11): one sealed record under `contact-center:{id}` (no migration), the card on organisation → *Kanalen* (`integrations.manage`, audited, write-only), the generated and rotatable webhook secret (ADR 0042 step 6b-2 for the organisation), and `/webhooks/contact-center/{kind}/{organisation}` verified with it | #630 | merged |
-| CC-4b | Dispatch, end and reconcile with the organisation's own credentials and API host, the installation's as fallback; rotating the secret re-registers the organisation's subscription | – | planned |
-| CC-4c | The group form rendered from the adapter's `ProviderDescriptor` | – | planned |
+| CC-4b | Dispatch, end and reconcile with the organisation's own credentials and API host, the installation's as fallback (points 12–13): `DispatcherChoice`, `OrganisationWxcc`, tokens under `contact-center-tokens:{id}`, internal hosts refused | #631 | merged |
+| CC-4d | Register the organisation's WxCC subscription at its own address with its own credentials on save, and again on rotating the secret: `ConnectionRegistrar`, `replace_wxcc` (the subscriptions at that address are replaced, so a new secret takes effect); the outcome is audited and shown | #633 | merged |
+| CC-4c | The group form rendered from the adapter's `ProviderDescriptor`: the routing inputs, their order, labels and hints (the routing value's label and hint now in the descriptor too) come from it, with no `if kind` in routes or templates; a new routing is for the only platform with an adapter until CC-6 | #634 | merged |
 | CC-5 | Docs: architecture, dataflow, webhooks, threat model, `scripts/diagrams/content.py`. Describes what CC-1 to CC-3 built (webhooks and threat model largely came with CC-3, #626); the organisation connection of CC-4 updates the same places when it lands | #627 | merged |
 | CC-6 | Second platform adapter (for example Genesys Cloud) | – | planned (needs its own ADR) |
 

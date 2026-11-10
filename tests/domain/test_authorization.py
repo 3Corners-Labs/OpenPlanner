@@ -88,6 +88,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.REPORTS_EXPORT,  # ADR 0117 point 12
         Permission.REPORTS_DIGEST_MANAGE,  # ADR 0117 point 16
         Permission.REPORTS_STAFF_VIEW,  # ADR 0117 point 9
+        Permission.REPORTS_WALLBOARD_VIEW,  # ADR 0117 point 20
         Permission.STAFF_VIEW,  # ADR 0046
         Permission.STAFF_MANAGE,  # ADR 0095
         Permission.STAFF_RESET_PASSWORD,  # ADR 0095
@@ -113,6 +114,7 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.STAFF_VIEW,  # ADR 0046: read-only, the own groups
         Permission.REPORTS_VIEW,  # ADR 0117: how the own groups are used
         Permission.REPORTS_EXPORT,  # ADR 0117 point 12
+        Permission.REPORTS_WALLBOARD_VIEW,  # ADR 0117 point 20
         Permission.QUEUE_WORK,  # ADR 0043
     }
     # ADR 0043: the agent works the own queue of its groups and reads its own rights.

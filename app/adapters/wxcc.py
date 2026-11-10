@@ -27,7 +27,15 @@ from datetime import UTC, datetime
 from typing import Any, NamedTuple
 from urllib.parse import quote
 
-from app.adapters.webex_auth import AuthorizedClient
+import httpx
+
+from app.adapters.webex_auth import (
+    CREDENTIAL_NAME,
+    AuthorizedClient,
+    ServiceAppConfig,
+    TokenStore,
+    WebexTokens,
+)
 from app.domain import calls
 from app.domain.calls import ContactCenterTask, TaskSnapshot, TaskState
 from app.domain.contact_center import (
@@ -36,7 +44,8 @@ from app.domain.contact_center import (
     ContactCenterRouting,
     ProviderDescriptor,
 )
-from app.domain.ports import Clock, IntegrationError
+from app.domain.ports import Clock, IntegrationError, RequestLog
+from app.domain.security_log import SecurityLog
 
 ROUTING_KEY = "openplannerGroup"
 
@@ -53,6 +62,8 @@ DESCRIPTOR = ProviderDescriptor(
         AttributeSpec(CHANNEL, 255, True, "admin.field.wxcc_channel"),
     ),
     routing_value_max_length=512,
+    routing_value_label_key="admin.field.wxcc_routing_value",
+    routing_value_hint_key="admin.field.wxcc_routing_value_hint",
 )
 """What a group needs for WxCC (ADR 0032 point 4); the limits are WxCC's (``flowSettings``
 values up to 512 bytes), fixed by the platform and so constants, not settings."""
@@ -243,3 +254,23 @@ def task_snapshot(payload: object) -> TaskSnapshot:
         else None
     )
     return TaskSnapshot(TASK_STATES.get(status, TaskState.NONE), status, changed_at)
+
+
+def wxcc_tasks(
+    config: ServiceAppConfig,
+    http: httpx.AsyncClient,
+    store: TokenStore,
+    clock: Clock,
+    base_url: str,
+    *,
+    security: SecurityLog | None = None,
+    request_log: RequestLog | None = None,
+    name: str = CREDENTIAL_NAME,
+) -> tuple[WebexTokens, WxccTasks]:
+    """Return a Service App's tokens and the WxCC dispatcher signed in with them.
+
+    The one wiring of ``ServiceAppConfig`` → ``WebexTokens`` → ``AuthorizedClient`` →
+    ``WxccTasks``, for the installation's connection and an organisation's own (``name``).
+    """
+    tokens = WebexTokens(config, http, store, clock, security, name=name)
+    return tokens, WxccTasks(AuthorizedClient(http, tokens, request_log), base_url, clock)

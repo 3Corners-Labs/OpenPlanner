@@ -23,7 +23,8 @@ from app.domain.admin import AdminService, record_change, require
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Level, Outcome, Source
 from app.domain.authorization import Permission, Principal
 from app.domain.diagnostic_mode import DiagnosticMode
-from app.domain.errors import DomainError, ErrorCode
+from app.domain.lookups import group_in_organisation
+from app.domain.organisations import organisation_by_slug
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.tunable import value_of
 
@@ -73,11 +74,9 @@ class DiagnosticsService:
         now = self._clock.now()
         async with self._uow.locked() as tx:
             if group is not None:
-                summary = await tx.get_group_summary(group)
-                if summary is None or summary.organisation_slug != organisation:
-                    raise DomainError(ErrorCode.GROUP_NOT_FOUND)
-            elif await tx.get_organisation(organisation) is None:
-                raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
+                await group_in_organisation(tx, organisation, group)
+            else:
+                await organisation_by_slug(tx, organisation)
             mode = DiagnosticMode(
                 organisation, group, now + value_of(self._duration), principal.subject
             )

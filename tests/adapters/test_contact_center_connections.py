@@ -36,13 +36,13 @@ async def test_a_blank_secret_keeps_the_stored_one_and_the_webhook_secret_stays(
     webhook = secrets.values["contact-center:1"]["webhook_secret"]
 
     await connections.save(
-        1, ConnectionChange(WXCC, "https://api.wxcc-eu2.cisco.com", "other"), NOW
+        1, ConnectionChange(WXCC, "https://api.wxcc-eu1.cisco.com", "client"), NOW
     )
 
     record = secrets.values["contact-center:1"]
     assert record["client_secret"] == "client-secret"
-    assert record["client_id"] == "other"
-    assert record["webhook_secret"] == webhook
+    assert record["refresh_token"] == "refresh-token"
+    assert record["webhook_secret"] == webhook  # same tenant: the address keeps its secret
 
 
 async def test_rotating_replaces_the_webhook_secret_and_does_nothing_without_a_connection() -> None:
@@ -72,5 +72,21 @@ async def test_the_webhook_secret_is_only_for_the_connected_kind_and_organisatio
         == secrets.values["contact-center:1"]["webhook_secret"]
     )
     assert await connections.webhook_secret(2, WXCC) is None
+    secrets.values["contact-center-tokens:1"] = {"access_token": "issued"}
     await connections.delete(1)
     assert await connections.webhook_secret(1, WXCC) is None
+    assert secrets.values == {}  # its access tokens go with it
+
+
+async def test_another_tenant_gets_a_new_webhook_secret() -> None:
+    """A changed host or client: the previous tenant's subscription must stop verifying."""
+    secrets = FakeSecrets()
+    connections = SealedConnections(secrets)
+    await connections.save(1, CHANGE, NOW)
+    before = await connections.webhook_secret(1, WXCC)
+
+    await connections.save(
+        1, ConnectionChange(WXCC, "https://api.wxcc-us1.cisco.com", "client"), NOW
+    )
+
+    assert await connections.webhook_secret(1, WXCC) != before

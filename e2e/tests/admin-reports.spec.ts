@@ -45,7 +45,7 @@ test('the families are reachable with the keyboard and the current one is marked
   await openAs(page, `${GROUP}?view=queue`);
 
   const links = page.getByRole('navigation', { name: 'Rapport' }).getByRole('link');
-  await expect(links).toHaveCount(4);
+  await expect(links).toHaveCount(5);
   await expect(links.filter({ hasText: 'Wachtrij en gesprekken' })).toHaveAttribute('aria-current', 'page');
 
   await tabTo(page, links.filter({ hasText: 'Capaciteit' }));

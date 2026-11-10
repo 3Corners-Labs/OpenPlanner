@@ -26,6 +26,7 @@ from app.domain.authorization import Permission, Principal, Role, Scope, scope_f
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.login_domains import suffix_conflicts
 from app.domain.login_mapping import LOGIN_KEYS, validate_mapping
+from app.domain.organisations import organisation_by_slug
 from app.domain.platform_settings import usable
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Organisation
@@ -275,10 +276,7 @@ class SettingsService:
         """
         require(await self._admin.authorize(principal, _ORGANISATION, organisation_slug=slug))
         async with self._uow.read() as tx:
-            found = await tx.get_organisation(slug)
-        if found is None:
-            raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
-        return found
+            return await organisation_by_slug(tx, slug)
 
     async def change_organisation(
         self, principal: Principal, organisation: str, key: str, raw: str
@@ -297,7 +295,7 @@ class SettingsService:
             value = parse(spec, raw)
             now = self._clock.now()
             async with self._uow.locked() as tx:
-                organisation_id = await _organisation_id(tx, organisation)
+                organisation_id = (await organisation_by_slug(tx, organisation)).id
                 stored = (await tx.organisation_settings()).get(organisation_id, {})
                 if self._organisation_combination(organisation_id, {**stored, key: value}):
                     raise DomainError(ErrorCode.SETTING_COMBINATION, key)
@@ -326,7 +324,7 @@ class SettingsService:
             _class_d(key)
             now = self._clock.now()
             async with self._uow.locked() as tx:
-                organisation_id = await _organisation_id(tx, organisation)
+                organisation_id = (await organisation_by_slug(tx, organisation)).id
                 stored = (await tx.organisation_settings()).get(organisation_id, {})
                 if key not in stored:
                     return False
@@ -562,18 +560,6 @@ def _class_d(key: str) -> SettingSpec:
     if spec is None or spec.class_ is not SettingClass.ORGANISATION:
         raise DomainError(ErrorCode.SETTING_NOT_EDITABLE, key if spec else None)
     return spec
-
-
-async def _organisation_id(tx: Transaction, slug: str) -> int:
-    """Return the id of the organisation with ``slug``.
-
-    Raises:
-        DomainError: ``organisation_not_found``.
-    """
-    found = await tx.get_organisation(slug)
-    if found is None:
-        raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
-    return found.id
 
 
 async def _audit(

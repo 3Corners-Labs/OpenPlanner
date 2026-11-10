@@ -66,8 +66,32 @@ How many future appointments one email address may have with this team at the sa
 1 to 10. Default 3. People often book for someone else, such as a parent for a child or a carer
 for a relative, so do not set the number too low. A cancelled or past appointment does not
 count. The same email address twice at the same time is never possible: that is almost always
-a double click. A refused participant gets a general message; the page does not say that an
-appointment already exists.
+a double click. The page shows a refused participant the same "check your email" page as
+anyone else; only the email to that address explains why the appointment could not be made.
+A refused attempt does not appear in the agenda.
+
+<!-- field: reschedule_auto_send -->
+### Send proposals automatically
+
+Off by default. When there are too few agents for the bookings of a slot, the assistant can
+propose new times to the most recently made appointments by itself, without a planner reviewing
+them first. Switch it on only for a team that agrees to that. The participant always confirms,
+chooses another time or cancels: nothing moves without them. Every automatic proposal is in the
+audit log with the system as actor.
+
+<!-- field: reschedule_auto_delay_minutes -->
+### Wait before automatic proposals
+
+How long a shortfall must stay exactly the same before the proposals go out, from 5 to 120
+minutes. Default 15. This gives you time to correct a typing error in the staffing: when the
+shortfall changes or disappears, the waiting starts again.
+
+<!-- field: reschedule_auto_max_bookings -->
+### Most appointments for automatic sending
+
+From 1 to 100, default 10. When more appointments are affected, the assistant sends nothing and
+asks a planner to review the proposals on the agenda; the planners are told once. This keeps a
+mistake in the staffing from moving a whole day.
 
 <!-- field: dispatch_kind -->
 ### How appointments reach staff

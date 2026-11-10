@@ -288,3 +288,29 @@ def test_a_workspace_inside_a_checkout_is_refused_also_through_a_link(tmp_path: 
     link.symlink_to(check.REPO / "docs")
     with pytest.raises(SystemExit, match="inside the checkout"):
         check.Workspace(link)
+
+
+def test_the_check_judges_the_release_notes_and_the_verdict_holds_their_hash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With a baseline, main() blocks on a feature the document leaves out, and names the notes."""
+    notes = load_skill_script("role-manuals/scripts/release_notes.py")
+    change = notes.Change("#1", "feat", "planner", "hold a booking", visible=True)
+    document = "# Wat is er nieuw\n"
+    root = _built_workspace(
+        tmp_path,
+        {"commit": "a" * 12},
+        {"00-aanpak": "# Aanpak\n", "90-wat-is-nieuw": document},
+    )
+    result = notes.Result("a" * 40, "b" * 40, "", "", (change,))
+    (root / "evidence" / "release-notes.json").write_text(result.as_json())
+    monkeypatch.setattr(check, "since", lambda *args, **kwargs: None)
+    monkeypatch.setattr(sys, "argv", ["check.py", str(root)])
+    assert check.main() == 1
+    verdict = json.loads((root / "evidence" / "check.json").read_text())
+    digest = hashlib.sha256((root / "evidence" / "release-notes.json").read_bytes()).hexdigest()
+    assert verdict["inputs"]["evidence/release-notes.json"] == digest
+    assert "nieuwe functie #1" in (root / "evidence" / "check.md").read_text()
+    (root / "sources" / "90-wat-is-nieuw.md").write_text(document + "\n<!-- bron: #1 -->\n")
+    _built_workspace(root, {"commit": "a" * 12})
+    assert check.main() == 0

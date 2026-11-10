@@ -43,6 +43,7 @@ from app.admin.forms import (
 )
 from app.admin.group_routes import group_page
 from app.admin.pages import Locale, SameOrigin, admin_moment, organisation_header, page
+from app.admin.wallboard_routes import WALLBOARD, wallboard_page, wallboard_shown
 from app.domain.authorization import Permission, Principal
 from app.domain.csv_export import ExportRefusal, ExportRefused
 from app.domain.errors import DomainError, ErrorCode
@@ -67,6 +68,7 @@ VIEW_LABELS: dict[str, str] = {
     "queue": "reports.view.queue",
     "capacity": "reports.view.capacity",
     "channels": "reports.view.channels",
+    WALLBOARD: "reports.view.wallboard",
 }
 TEMPLATES: dict[str, str] = {
     TEAM: "admin/usage_team.html",
@@ -153,6 +155,30 @@ def _split(request: Request) -> str | None:
     return split
 
 
+def _nav(
+    base: str,
+    first: str | None,
+    last: str | None,
+    *,
+    team_on: bool = False,
+    wallboard_on: bool = False,
+) -> list[tuple[str, str, str]]:
+    """Return the links between the report families: code, label key and address.
+
+    The days are carried over to the families that have days; the wallboard is about today.
+    """
+    codes = (*VIEWS, *((TEAM,) if team_on else ()), *((WALLBOARD,) if wallboard_on else ()))
+    days = {"from": first, "to": last} if first and last else {}
+    return [
+        (
+            code,
+            VIEW_LABELS[code],
+            f"{base}?{urlencode({'view': code, **({} if code == WALLBOARD else days)})}",
+        )
+        for code in codes
+    ]
+
+
 def _view(
     request: Request,
     locale: Locale,
@@ -160,12 +186,15 @@ def _view(
     view: str,
     base: str,
     team_on: bool = False,
+    wallboard_on: bool = False,
 ) -> dict[str, object]:
     """Return the template's context shared by every report: range, words and the view links.
 
     ``team_on`` adds the *Team* link, which only the organisation's page of a reader with
-    ``reports.staff.view`` has, while the organisation has the team view on. ``export_error``
-    is why an export of the report was refused, after it sent the admin back here.
+    ``reports.staff.view`` has, while the organisation has the team view on. ``screen_export``
+    says whether the report on screen can be exported as it is: every family but the team,
+    which is never exported. ``export_error`` is why an export of the report was refused,
+    after it sent the admin back here.
     """
     _ = locale.gettext
     report = result.report
@@ -174,20 +203,14 @@ def _view(
         "usage": result,
         "report": report,
         "view": view,
-        "views": [
-            (
-                code,
-                VIEW_LABELS[code],
-                f"{base}?{urlencode({'view': code, 'from': first, 'to': last})}",
-            )
-            for code in (*VIEWS, *((TEAM,) if team_on else ()))
-        ],
+        "views": _nav(base, first, last, team_on=team_on, wallboard_on=wallboard_on),
         "as_of": admin_moment(request, locale, report.as_of) if report.as_of else "",
         "label": lambda table, code: label(_, table, code),
         "duration": lambda seconds, signed=False: duration_text(_, seconds, signed=signed),
         "form_from": first,
         "form_to": last,
         "base": base,
+        "screen_export": view in VIEWS,
         "export_error": refused_message(request, EXPORT_REFUSALS, _),
     }
 
@@ -201,6 +224,7 @@ async def _report(
     organisation: str | None = None,
     group: str | None = None,
     team_on: bool = False,
+    wallboard_on: bool = False,
 ) -> tuple[str, UsageScreen[Any], dict[str, object]]:
     """Read the report family the query asks for (``view``) and return its page parts.
 
@@ -249,7 +273,7 @@ async def _report(
         extra["charts"] = volume_charts(result.report, _, drill)
         extra["tiles_"] = volume_tiles(result.report, _)
         extra["split"] = split or ""
-    context = {**_view(request, locale, result, view, base, team_on), **extra}
+    context = {**_view(request, locale, result, view, base, team_on, wallboard_on), **extra}
     return TEMPLATES[view], result, context
 
 
@@ -271,8 +295,18 @@ async def _organisation_page(
     base = f"/admin/organisations/{org}/usage"
     shown = can_function(principal)(Permission.REPORTS_STAFF_VIEW, organisation=org)
     team_on = shown and await report_service(request).team_view_on(principal, org)
+    wallboard_on = wallboard_shown(principal, organisation=org)
+    if request.query_params.get("view") == WALLBOARD:  # the service refuses (audited) without it
+        nav = _nav(base, None, None, team_on=team_on, wallboard_on=True)
+        return await wallboard_page(request, locale, principal, base, nav, organisation=org)
     template, result, ctx = await _report(
-        request, locale, principal, base, organisation=org, team_on=team_on
+        request,
+        locale,
+        principal,
+        base,
+        organisation=org,
+        team_on=team_on,
+        wallboard_on=wallboard_on,
     )
     header = organisation_header(request, locale, principal, result.organisation_name, org)
     digest = await digest_context(request, locale, principal, org)
@@ -309,8 +343,13 @@ async def group_usage(
     request: Request, locale: Locale, slug: str, context: ViewGroup
 ) -> HTMLResponse:
     """Show a usage report (``view``) of one group."""
+    base = f"/admin/groups/{slug}/usage"
+    wallboard_on = wallboard_shown(context.principal, group=context.group)
+    if request.query_params.get("view") == WALLBOARD:  # the service refuses (audited) without it
+        nav = _nav(base, None, None, wallboard_on=True)
+        return await wallboard_page(request, locale, context.principal, base, nav, group=context)
     template, _result, ctx = await _report(
-        request, locale, context.principal, f"/admin/groups/{slug}/usage", group=slug
+        request, locale, context.principal, base, group=slug, wallboard_on=wallboard_on
     )
     return group_page(request, locale, context, template, ctx, scripts=True)
 

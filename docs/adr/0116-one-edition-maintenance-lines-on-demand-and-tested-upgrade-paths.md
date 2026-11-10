@@ -13,7 +13,9 @@ inside a window) and ADR 0114 (point 11: the channel level `minor` is withdrawn 
 line pin). Extends ADR 0029, 0050, 0059, 0079 (the mechanics it reuses), ADR 0036 (one writer:
 rings, not traffic canaries), ADR 0054 (the licence that shapes the commercial model) and ADR
 0099 (the configuration document as the portable configuration). The analysis, the options
-and the comparable practice are in `docs/research/release-and-update-models.md`.
+and the comparable practice are in `docs/research/release-and-update-models.md`. Point 3
+amended by ADR 0120: the backport starts from the merge's push to `main`, and a
+`backport:X.Y` label set after the merge needs a dispatch of the workflow.
 
 ## Context
 

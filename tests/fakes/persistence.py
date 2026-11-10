@@ -16,7 +16,9 @@ from app.domain.alert_model import AlertTarget, DeliveryState
 from app.domain.api_clients import AccessToken, ApiClient, ApiSettings
 from app.domain.audit import AuditEntry, AuditEvent, AuditFilter, Category, Outcome
 from app.domain.authorization import CustomRole, RoleCatalogue, Scope
+from app.domain.auto_rebooking import ShortfallWatch
 from app.domain.booking import (
+    APPOINTMENTS,
     IN_AGENDA,
     Booking,
     BookingKind,
@@ -143,6 +145,7 @@ class State:
     group_holidays: dict[int, holiday_model.GroupHolidays] = field(default_factory=dict)
     closures: dict[int, Closure] = field(default_factory=dict)
     acceptances: dict[tuple[int, datetime], ShortfallAcceptance] = field(default_factory=dict)
+    watches: dict[tuple[int, datetime], ShortfallWatch] = field(default_factory=dict)
     closure_images: dict[int, ImageFile] = field(default_factory=dict)
     scenarios: dict[int, ClosureScenario] = field(default_factory=dict)
     scenario_images: dict[int, ImageFile] = field(default_factory=dict)
@@ -525,6 +528,7 @@ class InMemoryTransaction:
                             status.task,
                             organisation,
                             group.slug,
+                            group.organisation_id,
                         ),
                     )
                 )
@@ -853,7 +857,7 @@ class InMemoryTransaction:
         found = [
             b
             for b in self.state.bookings.values()
-            if b.group_id == group_id and lower <= b.start < upper
+            if b.group_id == group_id and lower <= b.start < upper and b.status in APPOINTMENTS
         ]
         return [
             BookingOverview(b, self.state.call_status.get(b.id or 0) or new_status(b.id or 0))
@@ -1180,6 +1184,7 @@ class InMemoryTransaction:
                     and b.confirm_by is not None
                     and b.confirm_by < candidates_before
                 )
+                or (b.status is BookingStatus.REFUSED and b.created_at < candidates_before)
             ):
                 ends = closure.ends_at if closure else None
                 due.append(
@@ -1195,6 +1200,7 @@ class InMemoryTransaction:
                             b.confirm_by,
                             self.state.groups[b.group_id].organisation_id,
                             b.closure_id,
+                            b.created_at,
                         ),
                     )
                 )
@@ -1271,6 +1277,7 @@ class InMemoryTransaction:
                     b.end < candidates_before
                     or (b.cancelled_at is not None and b.cancelled_at < candidates_before)
                     or b.status is BookingStatus.SUSPENDED
+                    or (b.status is BookingStatus.REFUSED and b.created_at < candidates_before)
                 ):
                     ends = closure.ends_at if closure else None
                     candidates.append(
@@ -1282,6 +1289,7 @@ class InMemoryTransaction:
                             ends,
                             organisation_id=self.state.groups[b.group_id].organisation_id,
                             closure_id=b.closure_id,
+                            created_at=b.created_at,
                         )
                     )
         return RetentionFacts(counts, candidates)
@@ -1351,6 +1359,17 @@ class InMemoryTransaction:
 
     async def save_shortfall_acceptance(self, acceptance: ShortfallAcceptance) -> None:
         self.state.acceptances[(acceptance.group_id, acceptance.start)] = acceptance
+
+    async def get_shortfall_watches(self, group_id: int) -> list[ShortfallWatch]:
+        return [w for (gid, _), w in sorted(self.state.watches.items()) if gid == group_id]
+
+    async def save_shortfall_watches(self, watches: Sequence[ShortfallWatch]) -> None:
+        for w in watches:
+            self.state.watches[(w.group_id, w.slot_start)] = w
+
+    async def delete_shortfall_watches(self, group_id: int, starts: Sequence[datetime]) -> None:
+        for start in starts:
+            self.state.watches.pop((group_id, start), None)
 
     async def count_audit_successes(self, actor: str, action: str, since: datetime) -> int:
         return sum(

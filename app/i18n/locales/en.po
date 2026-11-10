@@ -1135,6 +1135,24 @@ msgstr "Appointments per email address"
 msgid "admin.field.max_bookings_per_email_hint"
 msgstr "How many future appointments one email address may have with this team at the same time. Above 1 so people can also book for someone else. The same address twice at the same time is never possible. 1 to 10."
 
+msgid "admin.field.reschedule_auto_send"
+msgstr "Send proposals automatically"
+
+msgid "admin.field.reschedule_auto_send_hint"
+msgstr "When there are too few agents, the assistant proposes new times to the last-made appointments without a planner reviewing them first. Off: a planner reviews every proposal. The participant always confirms themselves."
+
+msgid "admin.field.reschedule_auto_delay_minutes"
+msgstr "Wait before automatic proposals (minutes)"
+
+msgid "admin.field.reschedule_auto_delay_minutes_hint"
+msgstr "How long a shortfall must stay the same before the proposals are sent, so a typo in the staffing can be undone first. 5 to 120."
+
+msgid "admin.field.reschedule_auto_max_bookings"
+msgstr "Most appointments for automatic sending"
+
+msgid "admin.field.reschedule_auto_max_bookings_hint"
+msgstr "When more appointments are affected, the assistant sends nothing and asks a planner to review the proposals. 1 to 100."
+
 msgid "admin.field.calendar_invite_address"
 msgstr "Calendar invite to (own queue)"
 
@@ -1302,6 +1320,12 @@ msgstr "This slot would then have more bookings than {agents}. Confirm that you 
 
 msgid "admin.form.error.max_bookings_per_email"
 msgstr "Enter a number from 1 to 10."
+
+msgid "admin.form.error.reschedule_auto_delay_minutes"
+msgstr "Enter a number of minutes from 5 to 120."
+
+msgid "admin.form.error.reschedule_auto_max_bookings"
+msgstr "Enter a number from 1 to 100."
 
 msgid "admin.form.error.calendar_invite_address"
 msgstr "Enter a valid email address, or leave the field empty."
@@ -2619,6 +2643,12 @@ msgstr "appointment on hold moved"
 
 msgid "audit.event.planner_changes_alert"
 msgstr "Many changes by one planner"
+
+msgid "audit.event.planner_auto_review_waiting"
+msgstr "Automatic proposals are waiting for a planner"
+
+msgid "audit.event.planner_auto_proposal"
+msgstr "Automatic proposal for a new time"
 
 msgid "audit.event.contact_reveals_alert"
 msgstr "Many requests for contact details by one person"
@@ -4363,8 +4393,8 @@ msgstr "Tasks"
 msgid "admin.nav.alerts"
 msgstr "Alerts"
 
-msgid "admin.topbar.tasks.count"
-msgstr "{label}, {count} running or failed"
+msgid "admin.topbar.tasks.count_words"
+msgstr "running or failed"
 
 msgid "admin.scope.label"
 msgstr "Scope"
@@ -6941,6 +6971,9 @@ msgstr "Expire unconfirmed booking"
 msgid "audit.job.send_unconfirmed_lapsed"
 msgstr "Send notice of an expired booking"
 
+msgid "audit.job.send_refusal"
+msgstr "Send notice of a refused booking"
+
 msgid "audit.job.send_team_invite"
 msgstr "Send calendar invite to the team"
 
@@ -7167,6 +7200,12 @@ msgstr "Your appointment with {group_name} has lapsed"
 
 msgid "message.unconfirmed_lapsed.intro"
 msgstr "You did not confirm your video call with {group_name} on {date} at {time} in time. The appointment has lapsed and the place has been freed."
+
+msgid "message.refused.subject"
+msgstr "We could not make your appointment with {group_name}"
+
+msgid "message.refused.intro"
+msgstr "This email address was used to request a video call with {group_name} on {date} at {time}. We could not make that appointment: this address already has an appointment at that time, or already the maximum number of appointments with this team. Do you have an appointment? Then use the link in its confirmation email to move or cancel it. Did you not request anything? Then you can ignore this email."
 
 msgid "message.book_again"
 msgstr "You can always make a new appointment."
@@ -9612,8 +9651,8 @@ msgstr "Queue wait"
 msgid "admin.audit.reason.wait_over_warning"
 msgstr "Participants wait longer than the set limit."
 
-msgid "admin.topbar.alerts.count"
-msgstr "{label}, {count} open"
+msgid "admin.topbar.alerts.count_words"
+msgstr "open"
 
 msgid "settings.field.idp_domain_grace_days.label"
 msgstr "Grace for a missing domain record (days)"
@@ -10472,6 +10511,12 @@ msgstr "Smallest count in the organisation's reports"
 msgid "settings.field.reporting_staff_view_enabled.label"
 msgstr "Show the load of each team member in the reports"
 
+msgid "settings.field.reporting_wallboard_refresh_seconds.label"
+msgstr "Seconds between two updates of the wallboard"
+
+msgid "settings.field.reporting_wallboard_wait_alert_minutes.label"
+msgstr "Minutes of waiting after which the wallboard says long wait"
+
 msgid "settings.field.reporting_export_max_rows.label"
 msgstr "Most rows in a CSV export of a usage report"
 
@@ -10712,6 +10757,9 @@ msgstr "Waiting for a new time"
 msgid "reports.status.pending_confirmation"
 msgstr "Waiting for confirmation"
 
+msgid "reports.status.refused"
+msgstr "Refused (address limit)"
+
 msgid "admin.channels.cc_title"
 msgstr "Contact center"
 
@@ -10823,6 +10871,15 @@ msgstr "Appointment confirmed for the participant"
 msgid "admin.audit.detail.booking_contact_viewed"
 msgstr "Participant's contact details shown"
 
+msgid "admin.done.contact_center_registered"
+msgstr "Saved. The contact center now reports this organisation's tasks at its own webhook address."
+
+msgid "admin.done.contact_center_saved_not_ready"
+msgstr "Saved. The webhook address is registered once the client secret and the refresh token are filled in."
+
+msgid "admin.done.contact_center_not_registered"
+msgstr "Saved, but the contact center refused the webhook address or could not be reached. Check the Service App's rights, then make a new webhook secret; that registers the address again."
+
 msgid "reports.view.volume"
 msgstr "Volume"
 
@@ -10834,6 +10891,111 @@ msgstr "Capacity"
 
 msgid "reports.view.channels"
 msgstr "Channels"
+
+msgid "reports.view.wallboard"
+msgstr "Wallboard"
+
+msgid "reports.wallboard.lead"
+msgstr "A live display of today for a screen in the team's room. Counts only: no names, references or links."
+
+msgid "reports.wallboard.open_kiosk"
+msgstr "Open full screen"
+
+msgid "reports.wallboard.groups"
+msgstr "Groups on this board"
+
+msgid "reports.wallboard.pause"
+msgstr "Pause updates"
+
+msgid "reports.wallboard.resume"
+msgstr "Resume updates"
+
+msgid "reports.wallboard.refresh_now"
+msgstr "Refresh now"
+
+msgid "reports.wallboard.exit"
+msgstr "Back to the report"
+
+msgid "reports.wallboard.paused"
+msgstr "Updates are paused. The figures are as of {time}, not current."
+
+msgid "reports.wallboard.stale"
+msgstr "The data is old since {time}. The figures below are not current."
+
+msgid "reports.wallboard.stale.announce"
+msgstr "The wallboard could not be refreshed. Its figures are old since {time}."
+
+msgid "reports.wallboard.long_wait"
+msgstr "long wait"
+
+msgid "reports.wallboard.long_wait.announce"
+msgstr "Long wait: someone has waited longer than the limit of the organisation."
+
+msgid "reports.wallboard.long_wait.beyond"
+msgstr "longer than the limit of the organisation"
+
+msgid "reports.wallboard.wait.unit"
+msgstr "minutes and seconds, the first in the queue"
+
+msgid "reports.wallboard.refresh"
+msgstr "updates every {n} seconds"
+
+msgid "reports.wallboard.live.none"
+msgstr "Live figures are shown for groups with an own queue, to readers who may work the queue."
+
+msgid "reports.wallboard.as_of"
+msgstr "as of {time}"
+
+msgid "reports.wallboard.tile.waiting"
+msgstr "Waiting now"
+
+msgid "reports.wallboard.tile.longest"
+msgstr "Longest wait"
+
+msgid "reports.wallboard.tile.connected"
+msgstr "In a call"
+
+msgid "reports.wallboard.tile.connected.groups"
+msgstr "{n} of {m} groups have an own queue"
+
+msgid "reports.wallboard.tile.connected.detail"
+msgstr "participants in a call now"
+
+msgid "reports.wallboard.tile.today"
+msgstr "Appointments today"
+
+msgid "reports.wallboard.tile.today.noshows"
+msgstr "no-shows so far"
+
+msgid "reports.wallboard.tile.block"
+msgstr "Fill of the current block"
+
+msgid "reports.wallboard.tile.block.next"
+msgstr "Next block: {percent}%"
+
+msgid "reports.wallboard.tile.failed"
+msgstr "Failed hand-overs, this hour and the one before"
+
+msgid "reports.wallboard.tile.failed.detail"
+msgstr "task or meeting not created at the provider"
+
+msgid "reports.wallboard.bars.title"
+msgstr "Appointments per hour today"
+
+msgid "reports.wallboard.bars.hour"
+msgstr "Hour"
+
+msgid "reports.wallboard.bars.state"
+msgstr "State"
+
+msgid "reports.wallboard.bars.now"
+msgstr "the running hour"
+
+msgid "reports.wallboard.bars.planned"
+msgstr "planned, still to come"
+
+msgid "reports.wallboard.bars.note"
+msgstr "Lightly shaded bars are appointments still to come. Counts only, no names."
 
 msgid "reports.views.label"
 msgstr "Report"
@@ -11460,6 +11622,9 @@ msgid "settings.field.reporting_api_rate_per_minute.label"
 msgstr "Calls per minute per API client to the usage API"
 msgid "authz.permission.reports_staff_view"
 msgstr "See the load per team member in the reports"
+
+msgid "authz.permission.reports_wallboard_view"
+msgstr "Show the live wallboard of the groups"
 
 msgid "authz.permission.reports_digest_manage"
 msgstr "Manage the digest of the reports"

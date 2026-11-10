@@ -4,6 +4,9 @@ Status: accepted (2026-11-02, `po:approved` on #454), requested by the product o
 ADR 0078, ADR 0104 and ADR 0107: they set the guardrails, this ADR notices when one changes or
 is passed. Built: the audit runs hourly with the audit app since 2026-11-02; one value, who may
 bypass the tag ruleset, cannot be seen by a read-only token and is listed as `known_unseen`.
+Extended by ADR 0120: the baseline records the Actions event policy of the decision gate, which
+a read-only token cannot read either, and the audit reports every gate run that GitHub did not
+start.
 
 ## Context
 

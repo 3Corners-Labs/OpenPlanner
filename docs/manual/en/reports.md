@@ -49,7 +49,7 @@ The range form on **Volume** has **Split by**: none, queue method or language. A
 
 ## The report families
 
-At the top of the Usage page a row of links switches between four families of the same report (a fifth, *Team*, is for organisation admins whose organisation switched it on). The
+At the top of the Usage page a row of links switches between four families of the same report (a fifth, *Team*, is for organisation admins whose organisation switched it on, and a sixth, *Wallboard*, is for readers with the right to show it). The
 period you chose stays; every family has a URL you can bookmark. The first, **Volume**, is the set
 of tables above; the others are below.
 
@@ -129,7 +129,15 @@ Recipients are colleagues who hold the right to see the reports for that scope, 
 
 The load per team member: calls handled, minutes in calls, claims from the own queue and the share of scheduled calls the host joined on time. It is for organisation admins only (the right *See the load per team member in the reports*) and **off by default**: until your organisation switches on **Show the load of each team member in the reports** in its settings, nothing about a person is written, and the *Team* link on the Usage page says *off* with a link to the setting. Switching it on counts from that moment; earlier calls are not in it, and switching it off stops the counting again (what was counted stays until the retention period ends).
 
-The table is sorted by name. There is no ranking, no *top* or *worst* list, no total row and no cut by group or hour. A figure below the minimum is hidden and written as *< 5*, and the minutes go with the calls. Only calls an agent claimed from the own queue are attributed to a person; a call the contact center handled has no team member in this installation. When a team member is removed, their figures become one row, *Former team members*, so the history keeps its totals and no individual remains. The Team family is not in the CSV files or the machine interface.
+The table is sorted by name. There is no ranking, no *top* or *worst* list, no total row and no cut by group or hour. A figure below the minimum is hidden and written as *< 5*, and the minutes go with the calls. Only calls an agent claimed from the own queue are attributed to a person; a call the contact center handled has no team member in this installation. When a team member is removed, their figures become one row, *Former team members*, so the history keeps its totals and no individual remains. The Team family is not in the CSV files or the machine interface, so its page offers only the file of all hourly figures.
+
+### Wallboard
+
+A live display of today for a screen in the team's room, for organisation admins and group admins (the right *Show the live wallboard of the groups*). It is the **Wallboard** link on the Usage page, of a group or of the organisation's groups, and **Open full screen** shows it without the menu. It shows six tiles, each with the words for what it is and *as of* when: **Waiting now**, **Longest wait**, **In a call**, **Appointments today** (with the no-shows so far), **Fill of the current block** (with the next block) and **Failed hand-overs**, this hour and the one before. Under them are the appointments per hour of today, the part of the day still to come lightly shaded.
+
+Only counts: no name, reference or link. The three live tiles (waiting, longest wait, in a call) are exact and come from the own queue; you see them for groups that have an own queue and only when you may also work the queue, otherwise the tile says so. The other tiles come from the same hourly statistics as the other reports: a figure below the minimum reads *< 5*, and a percentage is shown only when the number of bookings behind it is. Those tiles say as of when the statistics were last made up, which can be earlier than the live tiles.
+
+The board asks for fresh figures every few seconds (10 by default; the platform administrator sets it) and needs a script for that; without one it shows what it loaded with and a **Refresh now** link. **Pause updates** keeps the figures as they are, and the board says so. When the board cannot be refreshed three times in a row, or the sign-in ended, it says in words that its data is old since that time and the numbers are struck through, so a screen that has stopped is never read as current. A wait beyond the limit of your organisation (5 minutes by default, **Minutes of waiting after which the wallboard says long wait** in the organisation's settings) shows the tile with the words *long wait* and is announced once; there is no sound and nothing blinks. Text sizes grow with the screen and are meant for a 1080p display.
 
 ## What is not here yet
 

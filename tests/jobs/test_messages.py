@@ -836,3 +836,17 @@ def test_the_code_is_in_messages_that_link_the_booking_when_switched_on(
     assert f"<dd>{code}</dd>" in (shown.html or "")
     assert code not in hidden.text
     assert code not in cancelled.text
+
+
+def test_a_refusal_names_nobody_and_links_nowhere(composer: MessageComposer) -> None:
+    """ADR 0066 step 8: the address is not verified; the email carries no name, link or code."""
+    message = composer.compose(JobType.SEND_REFUSAL, BOOKING, GROUP, NOW)
+
+    text, html = message.text, message.html or ""
+    assert message.recipient == "ada@example.org"
+    assert "Ada" not in text + html
+    assert "Lovelace" not in text + html
+    assert "/b/" not in text + html
+    assert "http" not in text.replace("https://afspraak.example.nl/static", "")
+    assert not message.attachments
+    assert "Dienstverlening" in text  # names the team, so the recipient knows what it is about

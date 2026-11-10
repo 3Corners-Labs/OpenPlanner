@@ -162,7 +162,8 @@ antwoorden, teksten voor de website.
    elk kwartaal.
 2. **Feedbacklus:** vraag → vragenlog → vragen en antwoorden → handleiding.
 3. **Bij elke softwareversie:** lees de wijzigingen, pas de handleiding en de schermafdrukken
-   aan, en verhoog de versie van het materiaal.
+   aan, schrijf per rol **Wat is er nieuw** en verhoog de versie van het materiaal. Dat document
+   gaat bij de livegang van de release naar elke rol, als onderdeel van het communicatieplan.
 4. **Nieuwe collega's:** de werkkaart en de handleiding van de rol zijn hun startpakket; de
    sleutelgebruiker is hun maatje in de eerste week.
 
@@ -248,7 +249,10 @@ ondersteuning op de werkvloer net zo belangrijk als de training.
   gegevens. De productnaam is zichtbaar afgedekt, nooit vervangen. Het bewijslog noemt per
   schermafdruk de softwareversie, het tijdstip, de rol en het adres.
 - **Versies.** De versie van het materiaal hoort bij een softwareversie en staat op de
-  titelpagina, met de echte datum. Een wijzigingslog houdt bij wat er per versie veranderde.
+  titelpagina, met de echte datum. Bij elke versie hoort een document **Wat is er nieuw**, per
+  rol, gemaakt uit de wijzigingen van de software tussen twee releases; elk punt noemt zijn bron,
+  zodat er niets in staat dat niet in die release zit, en niets ontbreekt zonder reden. Een
+  overzicht houdt alle vastgestelde versies bij.
 - **Productie.** Eén bron in Markdown; de bouwstraat maakt er Word, PDF en HTML van. Branding (naam,
   logo, kleuren) komt er later met één aanpassing in.
 
@@ -263,12 +267,14 @@ wat een nieuwe versie raakt. Eén opdracht doet het hele rondje:
    schermafdruk loopt een script daarna het echte gebruikerspad door. Versienummers en het jaartal
    worden in beeld afgedekt; de echte versie en datum staan op de titelpagina. De vorige opname
    blijft ernaast bewaard.
-2. **Controleren.** Een controlescript vergelijkt de handleidingen met de software (zie de tabel).
-3. **Herstellen.** Een knop of schermtekst die alleen een andere naam kreeg, vervangt het script
+2. **Releasenotes verzamelen.** Het script zet alle wijzigingen tussen de vorige vastgestelde
+   versie en deze release op een rij, per rol: dat is de invoer voor **Wat is er nieuw**.
+3. **Controleren.** Een controlescript vergelijkt de handleidingen met de software (zie de tabel).
+4. **Herstellen.** Een knop of schermtekst die alleen een andere naam kreeg, vervangt het script
    zelf in de bron. Al het andere komt als bevinding in het controlerapport.
-4. **Beoordelen.** Een mens leest het rapport, bekijkt de verschilbeelden en past de tekst aan waar
-   de werkwijze veranderde.
-5. **Bouwen.** Word, PDF en HTML opnieuw, met de nieuwe softwareversie op de titelpagina.
+5. **Beoordelen en schrijven.** Een mens leest het rapport, bekijkt de verschilbeelden, past de
+   tekst aan waar de werkwijze veranderde en schrijft per rol wat er nieuw is.
+6. **Bouwen.** Word, PDF en HTML opnieuw, met de nieuwe softwareversie op de titelpagina.
 
 | Controle | Vindt | Gevolg |
 |---|---|---|
@@ -277,6 +283,7 @@ wat een nieuwe versie raakt. Eén opdracht doet het hele rondje:
 | Gewijzigd sinds de vorige versie | hernoemde of verdwenen schermteksten, gewijzigde hulp per scherm, gewijzigde schermsjablonen | hernoemen gaat automatisch; de rest nalezen |
 | Schermafdrukken | opnames die meer dan 0,2 % van het beeld verschillen, met een verschilbeeld | de tekst bij die stap nalezen |
 | Niet noemen | woorden die de organisatie (nog) niet wil noemen, en de productnaam | blokkeert |
+| Releasenotes | een nieuwe functie die **Wat is er nieuw** niet noemt en niet met een reden weglaat; een punt dat niet in deze release zit; een nog niet ingevuld sjabloon | blokkeert |
 
 > **Tip:** De opdracht is `.claude/skills/role-manuals/scripts/update.sh <werkmap>`, vanuit de
 > map met de software. Het rapport staat daarna in `evidence/check.md`, de verschilbeelden in

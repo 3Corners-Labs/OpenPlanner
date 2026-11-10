@@ -1135,6 +1135,24 @@ msgstr "Afspraken per e-mailadres"
 msgid "admin.field.max_bookings_per_email_hint"
 msgstr "Hoeveel toekomstige afspraken één e-mailadres tegelijk bij dit team mag hebben. Hoger dan 1 zodat mensen ook voor een ander kunnen boeken. Hetzelfde adres twee keer op hetzelfde moment kan nooit. 1 tot 10."
 
+msgid "admin.field.reschedule_auto_send"
+msgstr "Voorstellen automatisch versturen"
+
+msgid "admin.field.reschedule_auto_send_hint"
+msgstr "Bij een tekort aan medewerkers stelt de assistent nieuwe tijden voor aan de laatst gemaakte afspraken, zonder dat een planner dat eerst bekijkt. Uit: de planner bekijkt elk voorstel zelf. De deelnemer bevestigt altijd zelf."
+
+msgid "admin.field.reschedule_auto_delay_minutes"
+msgstr "Wachttijd voor automatische voorstellen (minuten)"
+
+msgid "admin.field.reschedule_auto_delay_minutes_hint"
+msgstr "Zo lang moet een tekort hetzelfde blijven voordat de voorstellen worden verstuurd, zodat een typefout in de bezetting eerst hersteld kan worden. 5 tot 120."
+
+msgid "admin.field.reschedule_auto_max_bookings"
+msgstr "Hoogste aantal afspraken voor automatisch versturen"
+
+msgid "admin.field.reschedule_auto_max_bookings_hint"
+msgstr "Zijn er meer afspraken betrokken, dan verstuurt de assistent niets en vraagt hij een planner de voorstellen te bekijken. 1 tot 100."
+
 msgid "admin.field.calendar_invite_address"
 msgstr "Agenda-uitnodiging naar (eigen wachtrij)"
 
@@ -1302,6 +1320,12 @@ msgstr "In dit tijdslot zijn dan meer afspraken dan {agents}. Bevestig dat u het
 
 msgid "admin.form.error.max_bookings_per_email"
 msgstr "Vul een aantal in van 1 tot 10."
+
+msgid "admin.form.error.reschedule_auto_delay_minutes"
+msgstr "Vul een aantal minuten in van 5 tot 120."
+
+msgid "admin.form.error.reschedule_auto_max_bookings"
+msgstr "Vul een aantal in van 1 tot 100."
 
 msgid "admin.form.error.calendar_invite_address"
 msgstr "Vul een geldig e-mailadres in, of laat het veld leeg."
@@ -2619,6 +2643,12 @@ msgstr "opgeschorte afspraak verzet"
 
 msgid "audit.event.planner_changes_alert"
 msgstr "Veel wijzigingen door één planner"
+
+msgid "audit.event.planner_auto_review_waiting"
+msgstr "Automatische voorstellen wachten op een planner"
+
+msgid "audit.event.planner_auto_proposal"
+msgstr "Automatisch voorstel voor een nieuwe tijd"
 
 msgid "audit.event.contact_reveals_alert"
 msgstr "Veel verzoeken om contactgegevens door één persoon"
@@ -4363,8 +4393,8 @@ msgstr "Taken"
 msgid "admin.nav.alerts"
 msgstr "Meldingen"
 
-msgid "admin.topbar.tasks.count"
-msgstr "{label}, {count} lopend of mislukt"
+msgid "admin.topbar.tasks.count_words"
+msgstr "lopend of mislukt"
 
 msgid "admin.scope.label"
 msgstr "Werkgebied"
@@ -6954,6 +6984,9 @@ msgstr "Onbevestigde afspraak laten vervallen"
 msgid "audit.job.send_unconfirmed_lapsed"
 msgstr "Melding vervallen afspraak sturen"
 
+msgid "audit.job.send_refusal"
+msgstr "Melding geweigerde afspraak sturen"
+
 msgid "audit.job.send_team_invite"
 msgstr "Agenda-uitnodiging naar het team sturen"
 
@@ -7180,6 +7213,12 @@ msgstr "Uw afspraak met {group_name} is vervallen"
 
 msgid "message.unconfirmed_lapsed.intro"
 msgstr "U heeft uw videogesprek met {group_name} op {date} om {time} niet op tijd bevestigd. De afspraak is vervallen en de plek is vrijgegeven."
+
+msgid "message.refused.subject"
+msgstr "We konden uw afspraak met {group_name} niet maken"
+
+msgid "message.refused.intro"
+msgstr "Met dit e-mailadres is een videogesprek met {group_name} aangevraagd op {date} om {time}. Die afspraak konden we niet maken: dit adres heeft op dat moment al een afspraak, of al het hoogste aantal afspraken met dit team. Heeft u een afspraak? Gebruik dan de link in de bevestigingsmail om die te verzetten of te annuleren. Heeft u niets aangevraagd? Dan kunt u deze e-mail negeren."
 
 msgid "message.book_again"
 msgstr "U kunt altijd een nieuwe afspraak maken."
@@ -9625,8 +9664,8 @@ msgstr "Wachttijd in de wachtrij"
 msgid "admin.audit.reason.wait_over_warning"
 msgstr "Deelnemers wachten langer dan de ingestelde grens."
 
-msgid "admin.topbar.alerts.count"
-msgstr "{label}, {count} open"
+msgid "admin.topbar.alerts.count_words"
+msgstr "open"
 
 msgid "settings.field.idp_domain_grace_days.label"
 msgstr "Tolerantie verdwenen domeinrecord (dagen)"
@@ -10485,6 +10524,12 @@ msgstr "Kleinste aantal in de rapporten van de organisatie"
 msgid "settings.field.reporting_staff_view_enabled.label"
 msgstr "Toon de werklast per teamlid in de rapporten"
 
+msgid "settings.field.reporting_wallboard_refresh_seconds.label"
+msgstr "Seconden tussen twee verversingen van het wallboard"
+
+msgid "settings.field.reporting_wallboard_wait_alert_minutes.label"
+msgstr "Minuten wachten waarna het wallboard lange wachttijd meldt"
+
 msgid "settings.field.reporting_export_max_rows.label"
 msgstr "Meeste rijen in een CSV-export van een gebruiksrapport"
 
@@ -10725,6 +10770,9 @@ msgstr "Wacht op een nieuwe tijd"
 msgid "reports.status.pending_confirmation"
 msgstr "Wacht op bevestiging"
 
+msgid "reports.status.refused"
+msgstr "Geweigerd (limiet per adres)"
+
 msgid "admin.channels.cc_title"
 msgstr "Contactcenter"
 
@@ -10836,6 +10884,15 @@ msgstr "Afspraak bevestigd namens de deelnemer"
 msgid "admin.audit.detail.booking_contact_viewed"
 msgstr "Contactgegevens van de deelnemer getoond"
 
+msgid "admin.done.contact_center_registered"
+msgstr "Opgeslagen. Het contactcenter meldt de taken van deze organisatie nu op haar eigen webhookadres."
+
+msgid "admin.done.contact_center_saved_not_ready"
+msgstr "Opgeslagen. Het webhookadres wordt aangemeld zodra het clientgeheim en het refresh-token zijn ingevuld."
+
+msgid "admin.done.contact_center_not_registered"
+msgstr "Opgeslagen, maar het contactcenter weigerde het webhookadres of was niet bereikbaar. Controleer de rechten van de Service App en maak daarna een nieuw webhookgeheim; dat meldt het adres opnieuw aan."
+
 msgid "reports.view.volume"
 msgstr "Volume"
 
@@ -10847,6 +10904,111 @@ msgstr "Capaciteit"
 
 msgid "reports.view.channels"
 msgstr "Kanalen"
+
+msgid "reports.view.wallboard"
+msgstr "Wallboard"
+
+msgid "reports.wallboard.lead"
+msgstr "Een live weergave van vandaag voor een scherm in de teamruimte. Alleen aantallen: geen namen, referenties of links."
+
+msgid "reports.wallboard.open_kiosk"
+msgstr "Open schermvullend"
+
+msgid "reports.wallboard.groups"
+msgstr "Groepen op dit bord"
+
+msgid "reports.wallboard.pause"
+msgstr "Pauzeer verversen"
+
+msgid "reports.wallboard.resume"
+msgstr "Ga door met verversen"
+
+msgid "reports.wallboard.refresh_now"
+msgstr "Nu verversen"
+
+msgid "reports.wallboard.exit"
+msgstr "Terug naar het rapport"
+
+msgid "reports.wallboard.paused"
+msgstr "Verversen staat gepauzeerd. De getallen zijn van {time}, niet actueel."
+
+msgid "reports.wallboard.stale"
+msgstr "Gegevens zijn oud sinds {time}. De getallen hieronder zijn niet actueel."
+
+msgid "reports.wallboard.stale.announce"
+msgstr "Het wallboard kon niet worden ververst. De getallen zijn oud sinds {time}."
+
+msgid "reports.wallboard.long_wait"
+msgstr "lange wachttijd"
+
+msgid "reports.wallboard.long_wait.announce"
+msgstr "Lange wachttijd: iemand wacht langer dan de grens van de organisatie."
+
+msgid "reports.wallboard.long_wait.beyond"
+msgstr "langer dan de grens van de organisatie"
+
+msgid "reports.wallboard.wait.unit"
+msgstr "minuten en seconden, de eerste in de wachtrij"
+
+msgid "reports.wallboard.refresh"
+msgstr "ververst elke {n} seconden"
+
+msgid "reports.wallboard.live.none"
+msgstr "Live getallen zie je voor groepen met een eigen wachtrij, als je de wachtrij mag werken."
+
+msgid "reports.wallboard.as_of"
+msgstr "per {time}"
+
+msgid "reports.wallboard.tile.waiting"
+msgstr "Wachtend nu"
+
+msgid "reports.wallboard.tile.longest"
+msgstr "Langste wachttijd"
+
+msgid "reports.wallboard.tile.connected"
+msgstr "In gesprek"
+
+msgid "reports.wallboard.tile.connected.groups"
+msgstr "{n} van {m} groepen hebben een eigen wachtrij"
+
+msgid "reports.wallboard.tile.connected.detail"
+msgstr "deelnemers nu in gesprek"
+
+msgid "reports.wallboard.tile.today"
+msgstr "Afspraken vandaag"
+
+msgid "reports.wallboard.tile.today.noshows"
+msgstr "no-shows tot nu toe"
+
+msgid "reports.wallboard.tile.block"
+msgstr "Bezetting huidig blok"
+
+msgid "reports.wallboard.tile.block.next"
+msgstr "Volgend blok: {percent}%"
+
+msgid "reports.wallboard.tile.failed"
+msgstr "Mislukte doorzettingen, dit uur en het uur ervoor"
+
+msgid "reports.wallboard.tile.failed.detail"
+msgstr "taak of vergadering niet aangemaakt bij de aanbieder"
+
+msgid "reports.wallboard.bars.title"
+msgstr "Afspraken per uur vandaag"
+
+msgid "reports.wallboard.bars.hour"
+msgstr "Uur"
+
+msgid "reports.wallboard.bars.state"
+msgstr "Toestand"
+
+msgid "reports.wallboard.bars.now"
+msgstr "het lopende uur"
+
+msgid "reports.wallboard.bars.planned"
+msgstr "gepland, nog te komen"
+
+msgid "reports.wallboard.bars.note"
+msgstr "Vaag gearceerde staven zijn afspraken die nog komen. Alleen aantallen, geen namen."
 
 msgid "reports.views.label"
 msgstr "Rapport"
@@ -11473,6 +11635,9 @@ msgid "settings.field.reporting_api_rate_per_minute.label"
 msgstr "Aanroepen per minuut per API-client naar de gebruiks-API"
 msgid "authz.permission.reports_staff_view"
 msgstr "De werklast per teamlid in de rapporten bekijken"
+
+msgid "authz.permission.reports_wallboard_view"
+msgstr "Het live wallboard van de groepen tonen"
 
 msgid "authz.permission.reports_digest_manage"
 msgstr "Samenvattingen van de rapporten beheren"

@@ -20,8 +20,18 @@ from app.domain.calls import (
     TaskState,
 )
 from app.domain.checks import Finding
-from app.domain.contact_center import ConnectionChange, ContactCenterKind, OrganisationConnection
-from app.domain.ports import ContactCenterDispatcher, IntegrationError, RequestRecord
+from app.domain.contact_center import (
+    ConnectionChange,
+    ContactCenterKind,
+    OrganisationConnection,
+    Registration,
+)
+from app.domain.ports import (
+    ContactCenterDispatcher,
+    IntegrationError,
+    OwnConnection,
+    RequestRecord,
+)
 from app.domain.scheduling import Group
 
 
@@ -242,3 +252,26 @@ class FakeContactCenterConnections:
 
     async def delete(self, organisation_id: int) -> None:
         self.connections.pop(organisation_id, None)
+
+
+class FakeOrganisationDispatchers:
+    """``OrganisationConnections`` in memory: per organisation id its dispatcher, or ``None``;
+    registering answers ``outcome`` and is remembered."""
+
+    def __init__(
+        self,
+        own: dict[int, ContactCenterDispatcher | None] | None = None,
+        outcome: Registration = Registration.REGISTERED,
+    ) -> None:
+        self.connections = own or {}
+        self.outcome = outcome
+        self.registered: list[tuple[int, str]] = []
+
+    async def register(self, organisation_id: int, organisation: str) -> Registration:
+        self.registered.append((organisation_id, organisation))
+        return self.outcome
+
+    async def own(self, organisation_id: int, kind: ContactCenterKind) -> OwnConnection | None:
+        if organisation_id not in self.connections:
+            return None
+        return OwnConnection(self.connections[organisation_id])

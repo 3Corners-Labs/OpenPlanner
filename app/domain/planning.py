@@ -25,6 +25,7 @@ from app.domain.contact_center import ContactCenterRouting
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holiday_service import effective_schedule
 from app.domain.lookups import group_by_slug
+from app.domain.organisations import organisation_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import (
     RESERVED_SLUGS,
@@ -79,6 +80,9 @@ class GroupSettings:
     queue_visible_from_minutes: int
     queue_free_pick_allowed: bool
     max_bookings_per_email: int
+    reschedule_auto_send: bool
+    reschedule_auto_delay_minutes: int
+    reschedule_auto_max_bookings: int
     calendar_invite_address: str | None
     dispatch_fallback: DispatchFallback
     fallback_space_room_id: str | None
@@ -145,9 +149,7 @@ class PlanningService:
         )
         require(authorization)
         async with self._uow.locked() as tx:
-            organisation = await tx.get_organisation(new.organisation_slug)
-            if organisation is None:
-                raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
+            organisation = await organisation_by_slug(tx, new.organisation_slug)
             group = Group(
                 id=0,
                 organisation_id=organisation.id,

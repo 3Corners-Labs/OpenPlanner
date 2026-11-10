@@ -17,12 +17,14 @@ A routing may be incomplete (an admin filled in one attribute of two): it is sto
 and the group does not dispatch until it is complete, as before ADR 0032.
 """
 
+import ipaddress
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from types import MappingProxyType
+from urllib.parse import urlsplit
 
 from app.domain.errors import DomainError, ErrorCode
 
@@ -99,12 +101,16 @@ class ProviderDescriptor:
         label_key: i18n key of the platform's name, for the admin form.
         attributes: The routing attributes, in form order.
         routing_value_max_length: Longest routing value the platform accepts.
+        routing_value_label_key: i18n key of the routing value's label in the group form.
+        routing_value_hint_key: i18n key of its hint, if it has one.
     """
 
     kind: ContactCenterKind
     label_key: str
     attributes: tuple[AttributeSpec, ...]
     routing_value_max_length: int
+    routing_value_label_key: str
+    routing_value_hint_key: str | None = None
 
     def __post_init__(self) -> None:
         """Refuse duplicate attribute names or a routing value limit below 1.
@@ -248,7 +254,7 @@ class ConnectionChange:
 
     def __post_init__(self) -> None:
         """Validate every field and drop a trailing slash; secrets are checked for shape only."""
-        if not API_HOST.fullmatch(self.api_base_url):
+        if not API_HOST.fullmatch(self.api_base_url) or not _public_host(self.api_base_url):
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}api_base_url")
         object.__setattr__(self, "api_base_url", self.api_base_url.rstrip("/"))
         if not CLIENT_ID.fullmatch(self.client_id):
@@ -265,6 +271,38 @@ class ConnectionChange:
         return tuple(name for name, value in sent if value)
 
 
+def _public_host(url: str) -> bool:
+    """Whether the API host is not this machine or an internal network (ADR 0032 point 12).
+
+    Refused: ``localhost`` and names under it, IP literals that are loopback, private,
+    link-local, reserved or unspecified, and hosts whose last label is a number or hex (the
+    short and integer IPv4 spellings a resolver still maps to an address, such as ``127.1``).
+    A host name that resolves to such an address is not caught here; the platforms' hosts are
+    public names.
+    """
+    host = (urlsplit(url).hostname or "").lower()
+    if not host or host == "localhost" or host.endswith(".localhost"):
+        return False
+    try:
+        return ipaddress.ip_address(host.strip("[]")).is_global
+    except ValueError:
+        last = host.rsplit(".", 1)[-1]
+        return not (last.isdigit() or last.startswith("0x"))
+
+
 def _secret_shape(value: str) -> bool:
     """Whether a submitted secret is one printable token without spaces, within the cap."""
     return 0 < len(value) <= SECRET_MAX_LENGTH and value.isprintable() and " " not in value
+
+
+class Registration(StrEnum):
+    """What telling the platform about an organisation's webhook address came to (CC-4d)."""
+
+    REGISTERED = "registered"
+    """The platform signs the organisation's events with its current secret now."""
+    NOT_READY = "not_ready"
+    """A secret is missing; the address is registered once the connection is complete."""
+    REFUSED = "refused"
+    """The platform refused (rights, address or secret); the reason is in the request log."""
+    FAILED = "failed"
+    """The platform could not be reached; trying again later may work."""

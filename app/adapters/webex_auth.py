@@ -77,6 +77,8 @@ class WebexTokens:
         store: Encrypted token storage.
         clock: Current time.
         security: Records a failing refresh as a security event (ADR 0034); ``None``: log only.
+        name: The credential the tokens are kept under: the installation's Service App, or an
+            organisation's own (``organisation_tokens_name``, ADR 0032 point 9).
     """
 
     def __init__(
@@ -86,8 +88,10 @@ class WebexTokens:
         store: TokenStore,
         clock: Clock,
         security: SecurityLog | None = None,
+        name: str = CREDENTIAL_NAME,
     ) -> None:
         """Store the collaborators."""
+        self._name = name
         self._security = security
         self._config = config
         self._http = http
@@ -107,7 +111,7 @@ class WebexTokens:
         """
         async with self._lock:
             now = self._clock.now()
-            stored = await self._store.get(CREDENTIAL_NAME)
+            stored = await self._store.get(self._name)
             if stored and stored.get("bootstrap") != self._fingerprint:
                 stored = None  # a new bootstrap token in the environment wins
             if (
@@ -121,14 +125,14 @@ class WebexTokens:
             )
             tokens = await self._refresh(str(refresh_token), now)
             tokens["bootstrap"] = self._fingerprint
-            await self._store.put(CREDENTIAL_NAME, tokens, now)
+            await self._store.put(self._name, tokens, now)
             if _expires(tokens, "refresh_expires_at") - now < EXPIRY_WARNING:
                 log.warning("webex.refresh_token_expiring")
             return str(tokens["access_token"])
 
     async def health(self) -> TokenHealth:
         """Return when the tokens expire, for the admin portal."""
-        stored = await self._store.get(CREDENTIAL_NAME)
+        stored = await self._store.get(self._name)
         if not stored:
             return TokenHealth(True, None, None, False)
         refresh_at = _expires(stored, "refresh_expires_at")

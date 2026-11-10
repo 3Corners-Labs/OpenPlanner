@@ -355,6 +355,19 @@ async def test_an_unknown_organisation_is_not_found(
     assert caught.value.code is ErrorCode.ORGANISATION_NOT_FOUND
 
 
+async def test_opening_or_resetting_an_unknown_organisation_is_not_found(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    super_service = _service(uow, clock)
+
+    with pytest.raises(DomainError) as opened:
+        await super_service.organisation(SUPER, "nope")
+    with pytest.raises(DomainError) as reset:
+        await super_service.reset_organisation(SUPER, "nope", "time_format")
+
+    assert opened.value.code is reset.value.code is ErrorCode.ORGANISATION_NOT_FOUND
+
+
 def test_the_platform_default_of_a_class_d_setting_is_editable() -> None:
     assert editable(BY_KEY["time_format"])
     assert editable(BY_KEY["planner_rebook_days"])

@@ -9,6 +9,7 @@ changed. ``purge_pii`` is not pinned: it must also run for cancelled bookings.
                (confirm_by) ──► purge_pii (confirm_by + 24 h)            (ADR 0056)
     confirmed (participant clicked) ──► as booked below
     lapsed ──► send_unconfirmed_lapsed (now); the purge planned while pending stays
+    refused (address limit) ──► send_refusal (now) ──► purge_pii (now + 24 h)  (ADR 0066)
     booked ──► create_video_room (now) ─► send_confirmation | send_change (now)
            ──► send_reminder × rules (start − offset, if still ahead and reachable)
            ──► dispatch_wxcc_task (start − dispatch lead) ──► purge_pii (end + 24 h)
@@ -97,6 +98,7 @@ class JobType(StrEnum):
     EXPIRE_PROPOSAL = "expire_proposal"
     SEND_PROPOSAL_RELEASED = "send_proposal_released"
     SEND_CHANGE_REQUEST = "send_change_request"
+    SEND_REFUSAL = "send_refusal"
 
     @classmethod
     def _missing_(cls, value: object) -> "JobType | None":
@@ -440,6 +442,18 @@ def plan_for_unconfirmed_lapse(*, now: datetime) -> list[PlannedJob]:
     The purge planned with the request to confirm stays.
     """
     return [PlannedJob(JobType.SEND_UNCONFIRMED_LAPSED, now, None, ChannelKind.EMAIL)]
+
+
+def plan_for_refusal(*, now: datetime) -> list[PlannedJob]:
+    """Return the jobs of a booking refused for its address's limit (ADR 0066 step 8).
+
+    The page said "check your email" as for any booking; this email explains the refusal, and
+    the personal data goes ``PURGE_AFTER`` after the attempt.
+    """
+    return [
+        PlannedJob(JobType.SEND_REFUSAL, now, None, ChannelKind.EMAIL),
+        PlannedJob(JobType.PURGE_PII, now + PURGE_AFTER, None),
+    ]
 
 
 def plan_for_suspension(

@@ -23,8 +23,8 @@ from app.domain.authorization import Permission, Principal
 from app.domain.branding import Branding
 from app.domain.channel_settings import ChannelSettings
 from app.domain.checks import CheckStatus, GroupCheck
-from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration_check import has_chain
+from app.domain.organisations import organisation_by_slug
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.scheduling import Group, ScheduleRule
 
@@ -187,9 +187,7 @@ class ReadinessService:
             )
         )
         async with self._uow.read() as tx:
-            organisation = await tx.get_organisation(slug)
-            if organisation is None:
-                raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
+            organisation = await organisation_by_slug(tx, slug)
             channels = await tx.get_channel_settings(organisation.id)
             contact = await tx.get_contact_block(organisation.id)
         return organisation_checklist(

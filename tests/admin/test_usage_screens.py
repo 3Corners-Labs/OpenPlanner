@@ -90,7 +90,7 @@ async def test_the_page_links_the_families_and_marks_the_current_one(site: Site)
     text = (await _get(site, "/admin/groups/demo", "queue")).text
 
     nav = text.split('class="report-views"', 1)[1].split("</nav>", 1)[0]
-    assert nav.count("<a ") == 4
+    assert nav.count("<a ") == 5
     assert nav.count('aria-current="page"') == 1
     assert "view=queue" in nav.split('aria-current="page"')[0].rsplit("<a ", 1)[1]
     assert 'name="view" value="queue"' in text

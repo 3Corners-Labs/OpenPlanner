@@ -6,6 +6,7 @@ from datetime import timedelta
 import pytest
 
 from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.wxcc import DESCRIPTOR
 from app.domain.authorization import Scope
 from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
 from tests.support.admin_site import audit_events
@@ -62,6 +63,20 @@ async def test_time_zone_is_a_select_with_amsterdam_preselected(site: Site) -> N
     assert form.index("Europe/Amsterdam") < form.index("Africa/Abidjan")
 
 
+async def test_the_contact_center_inputs_follow_the_descriptor(site: Site) -> None:
+    """ADR 0032 CC-4c: the inputs, their order, labels and hint come from the descriptor."""
+    await site.login_as(ORG_ADMIN)
+
+    form = (await site.client.get(f"{GROUP}/settings")).text.split('<main id="content"', 1)[1]
+
+    names = [*(f"wxcc_{spec.name}" for spec in DESCRIPTOR.attributes), "wxcc_routing_value"]
+    places = [form.index(f'name="{name}"') for name in names]
+    assert places == sorted(places)
+    for label in ("WxCC business address", "WxCC work item-kanaal", "Routeringswaarde voor de"):
+        assert label in form
+    assert 'id="wxcc_routing_value-hint"' in form
+
+
 async def test_settings_preselect_the_group_time_zone(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
@@ -71,8 +86,9 @@ async def test_settings_preselect_the_group_time_zone(site: Site) -> None:
     form = page.split('<main id="content"', 1)[1]
     assert '<option value="Europe/Amsterdam" selected>' in form
     # time zone, dispatch kind, fallback (ADR 0082), free pick, phone mode, trial call, Webex
-    # page (ADR 0075), embedding (the direct call is offered per staffing block since ADR 0072)
-    assert form.count(" selected>") == 8
+    # page (ADR 0075), embedding (the direct call is offered per staffing block since ADR 0072),
+    # automatic proposals (ADR 0057)
+    assert form.count(" selected>") == 9
 
 
 async def test_new_group_rejects_an_unknown_time_zone(site: Site) -> None:
@@ -233,6 +249,9 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
         "trial_calls_per_booking": "3",
         "queue_visible_from_minutes": "15",
         "max_bookings_per_email": "3",
+        "reschedule_auto_send": "no",
+        "reschedule_auto_delay_minutes": "15",
+        "reschedule_auto_max_bookings": "10",
         "queue_free_pick_allowed": "no",
         "calendar_invite_address": "team-demo@example.nl",
         "phone_mode": "optional",
@@ -291,6 +310,9 @@ async def test_dispatch_fields_are_checked(site: Site, kind: str, minutes: str, 
         "trial_calls_per_booking": "3",
         "queue_visible_from_minutes": "15",
         "max_bookings_per_email": "3",
+        "reschedule_auto_send": "no",
+        "reschedule_auto_delay_minutes": "15",
+        "reschedule_auto_max_bookings": "10",
         "queue_free_pick_allowed": "no",
         "phone_mode": "optional",
         "embedding_enabled": "no",
@@ -327,6 +349,9 @@ async def test_invalid_settings_show_the_field_error(site: Site) -> None:
             "planner_change_min_lead_minutes": "60",
             "queue_visible_from_minutes": "15",
             "max_bookings_per_email": "3",
+            "reschedule_auto_send": "no",
+            "reschedule_auto_delay_minutes": "15",
+            "reschedule_auto_max_bookings": "10",
             "queue_free_pick_allowed": "no",
             "phone_mode": "optional",
             "not_picked_up_minutes": "10",
@@ -664,6 +689,9 @@ async def test_audit_log_says_what_changed(site: Site) -> None:
             "planner_change_min_lead_minutes": "60",
             "queue_visible_from_minutes": "15",
             "max_bookings_per_email": "3",
+            "reschedule_auto_send": "no",
+            "reschedule_auto_delay_minutes": "15",
+            "reschedule_auto_max_bookings": "10",
             "queue_free_pick_allowed": "no",
             "phone_mode": "optional",
             "not_picked_up_minutes": "10",
@@ -706,6 +734,9 @@ async def test_the_direct_call_cap_is_optional(site: Site) -> None:
         "planner_change_min_lead_minutes": "60",
         "queue_visible_from_minutes": "15",
         "max_bookings_per_email": "3",
+        "reschedule_auto_send": "no",
+        "reschedule_auto_delay_minutes": "15",
+        "reschedule_auto_max_bookings": "10",
         "queue_free_pick_allowed": "no",
         "phone_mode": "optional",
         "not_picked_up_minutes": "10",
