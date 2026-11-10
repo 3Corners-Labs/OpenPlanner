@@ -217,7 +217,7 @@
       "roles": [
         "superuser",
         "org-beheer",
-        "dienst",
+        "dienstbeheer",
         "agent",
         "auditor"
       ],
@@ -276,7 +276,7 @@
     "steps": [
       {
         "title": "Richt een team in",
-        "text": "In het portaal richt u per dienst alles in: openingstijden, bezetting, feestdagen, teksten en huisstijl, alles op één plek. Geen code, geen ontwikkelaar nodig."
+        "text": "In het portaal richt u per dienst de openingstijden, bezetting, feestdagen, teksten en huisstijl in, alles op één plek. Geen code, geen ontwikkelaar nodig."
       },
       {
         "title": "Link naar de boekingspagina",

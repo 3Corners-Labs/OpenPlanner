@@ -217,7 +217,7 @@
       "roles": [
         "superuser",
         "org admin",
-        "service",
+        "service admin",
         "agent",
         "auditor"
       ],
@@ -276,7 +276,7 @@
     "steps": [
       {
         "title": "Set up a team",
-        "text": "In the portal you set up everything per service: opening hours, staffing, holidays, texts and house style, all in one place. No code, no developer needed."
+        "text": "In the portal you set up opening hours, staffing, holidays, texts and house style per service, all in one place. No code, no developer needed."
       },
       {
         "title": "Link to its booking page",
