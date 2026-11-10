@@ -23,9 +23,8 @@ from app.domain.authorization import Permission, Principal
 from app.domain.branding import Branding
 from app.domain.channel_settings import ChannelSettings
 from app.domain.checks import CheckStatus, GroupCheck
-from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration_check import has_chain
-from app.domain.lookups import group_by_slug
+from app.domain.organisations import organisation_by_slug
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.scheduling import Group, ScheduleRule
 
@@ -161,9 +160,8 @@ class ReadinessService:
         Raises:
             DomainError: ``not_permitted`` or ``group_not_found``.
         """
-        require(await self._admin.authorize(principal, Permission.GROUP_VIEW, group_slug=slug))
+        group = (await self._admin.authorize_group(principal, Permission.GROUP_VIEW, slug)).group
         async with self._uow.read() as tx:
-            group = await group_by_slug(tx, slug)
             today = group.today(self._clock.now())
             rules, _ = await tx.get_schedule(group.id, today, today)
             texts = await tx.get_group_texts(group.id)
@@ -189,9 +187,7 @@ class ReadinessService:
             )
         )
         async with self._uow.read() as tx:
-            organisation = await tx.get_organisation(slug)
-            if organisation is None:
-                raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
+            organisation = await organisation_by_slug(tx, slug)
             channels = await tx.get_channel_settings(organisation.id)
             contact = await tx.get_contact_block(organisation.id)
         return organisation_checklist(

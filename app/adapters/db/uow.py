@@ -90,6 +90,7 @@ from app.adapters.db.models import (
     ScheduleOverrideRow,
     ScheduleRuleRow,
     ShortfallAcceptanceRow,
+    ShortfallWatchRow,
     SlotRow,
     StaffRow,
     WebhookEventRow,
@@ -140,6 +141,7 @@ from app.domain.audit import (
     at_least,
 )
 from app.domain.authorization import Scope
+from app.domain.auto_rebooking import ShortfallWatch
 from app.domain.booking import (
     APPOINTMENTS,
     HOLDS_PLACE,
@@ -283,6 +285,9 @@ def _group(row: GroupRow, center: GroupContactCenterRow | None) -> Group:
         queue_visible_from_minutes=row.queue_visible_from_minutes,
         queue_free_pick_allowed=row.queue_free_pick_allowed,
         max_bookings_per_email=row.max_bookings_per_email,
+        reschedule_auto_send=row.reschedule_auto_send,
+        reschedule_auto_delay_minutes=row.reschedule_auto_delay_minutes,
+        reschedule_auto_max_bookings=row.reschedule_auto_max_bookings,
         calendar_invite_address=row.calendar_invite_address,
         dispatch_fallback=DispatchFallback(row.dispatch_fallback),
         fallback_space_room_id=row.fallback_space_room_id,
@@ -393,6 +398,9 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "queue_visible_from_minutes": group.queue_visible_from_minutes,
         "queue_free_pick_allowed": group.queue_free_pick_allowed,
         "max_bookings_per_email": group.max_bookings_per_email,
+        "reschedule_auto_send": group.reschedule_auto_send,
+        "reschedule_auto_delay_minutes": group.reschedule_auto_delay_minutes,
+        "reschedule_auto_max_bookings": group.reschedule_auto_max_bookings,
         "calendar_invite_address": group.calendar_invite_address,
         "dispatch_fallback": group.dispatch_fallback.value,
         "fallback_space_room_id": group.fallback_space_room_id,
@@ -2098,6 +2106,41 @@ class SqlTransaction(
                 actor=acceptance.actor,
             )
         )
+
+    async def get_shortfall_watches(self, group_id: int) -> list[ShortfallWatch]:
+        """Return the group's shortfall watches (ADR 0057 point 6), earliest slot first."""
+        rows = await self._session.scalars(
+            select(ShortfallWatchRow)
+            .where(ShortfallWatchRow.group_id == group_id)
+            .order_by(ShortfallWatchRow.slot_start)
+        )
+        return [
+            ShortfallWatch(r.group_id, r.slot_start, r.fingerprint, r.first_seen_at, r.notified_at)
+            for r in rows
+        ]
+
+    async def save_shortfall_watches(self, watches: Sequence[ShortfallWatch]) -> None:
+        """Store the watches; one for a slot already watched replaces it."""
+        for w in watches:
+            await self._session.merge(
+                ShortfallWatchRow(
+                    group_id=w.group_id,
+                    slot_start=w.slot_start,
+                    fingerprint=w.fingerprint,
+                    first_seen_at=w.first_seen_at,
+                    notified_at=w.notified_at,
+                )
+            )
+
+    async def delete_shortfall_watches(self, group_id: int, starts: Sequence[datetime]) -> None:
+        """Forget the group's watches of the slots starting at ``starts``."""
+        if starts:
+            await self._session.execute(
+                delete(ShortfallWatchRow).where(
+                    ShortfallWatchRow.group_id == group_id,
+                    ShortfallWatchRow.slot_start.in_(list(starts)),
+                )
+            )
 
     async def count_audit_successes(self, actor: str, action: str, since: datetime) -> int:
         """Return how many successful events with ``action`` ``actor`` has had since then."""

@@ -9,6 +9,10 @@ cannot disagree.
         ├─ decide() ──► allowed  ──► return
         └─────────────► denied   ──► audit event (denied, reason) ──► return
 
+    authorize_group(principal, permission, slug) -> GroupSummary
+        └─ the same, then ``require``: the group comes back without an Optional, for a use
+           case that also needs to show it (a write re-reads it in its own locked transaction)
+
 Logins and logouts are recorded once per organisation and group the admin holds a grant on
 (their ``Membership``s), so an organisation admin sees the logins of the admins of their own
 organisation; without such a context (superuser, no role) the event is global and only the
@@ -171,13 +175,56 @@ class AdminService:
                 change to an archived group.
             ValueError: If the target needed by the permission's level is missing.
         """
-        level = LEVELS[permission]
         group: GroupSummary | None = None
-        if level is not Level.GLOBAL and group_slug is not None:
-            async with self._uow.read() as tx:
-                group = await group_summary_by_slug(tx, group_slug)
-            if group.group.is_archived and permission not in READ_WHEN_ARCHIVED:
-                raise DomainError(ErrorCode.GROUP_ARCHIVED)
+        if LEVELS[permission] is not Level.GLOBAL and group_slug is not None:
+            group = await self._load_group(permission, group_slug)
+        return await self._decide(principal, permission, group, organisation_slug)
+
+    async def authorize_group(
+        self, principal: Principal, permission: Permission, slug: str
+    ) -> GroupSummary:
+        """Authorise ``permission`` on the group ``slug`` and return the group.
+
+        ``authorize`` and ``require`` in one: the group comes from the same read that decided,
+        so a use case that only needs to see it does not read it again. A use case that
+        changes the group still re-reads it inside its own locked transaction.
+
+        Raises:
+            DomainError: ``group_not_found``, ``group_archived`` for a change to an archived
+                group, or ``not_permitted`` (audited).
+            ValueError: If ``permission`` is global and so has no group.
+        """
+        if LEVELS[permission] is Level.GLOBAL:
+            raise ValueError(f"{permission} needs a group")
+        group = await self._load_group(permission, slug)
+        require(await self._decide(principal, permission, group, None))
+        return group
+
+    async def _load_group(self, permission: Permission, slug: str) -> GroupSummary:
+        """Return group ``slug``; an archived group refuses what is not read-only (ADR 0084).
+
+        Raises:
+            DomainError: ``group_not_found`` or ``group_archived``.
+        """
+        async with self._uow.read() as tx:
+            group = await group_summary_by_slug(tx, slug)
+        if group.group.is_archived and permission not in READ_WHEN_ARCHIVED:
+            raise DomainError(ErrorCode.GROUP_ARCHIVED)
+        return group
+
+    async def _decide(
+        self,
+        principal: Principal,
+        permission: Permission,
+        group: GroupSummary | None,
+        organisation_slug: str | None,
+    ) -> Authorization:
+        """Decide on the target ``permission``'s level asks for and audit a denial.
+
+        Raises:
+            ValueError: If that target is missing.
+        """
+        level = LEVELS[permission]
         if level is Level.GROUP:
             if group is None:
                 raise ValueError(f"{permission} needs a group")

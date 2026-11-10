@@ -1135,6 +1135,24 @@ msgstr "Appointments per email address"
 msgid "admin.field.max_bookings_per_email_hint"
 msgstr "How many future appointments one email address may have with this team at the same time. Above 1 so people can also book for someone else. The same address twice at the same time is never possible. 1 to 10."
 
+msgid "admin.field.reschedule_auto_send"
+msgstr "Send proposals automatically"
+
+msgid "admin.field.reschedule_auto_send_hint"
+msgstr "When there are too few agents, the assistant proposes new times to the last-made appointments without a planner reviewing them first. Off: a planner reviews every proposal. The participant always confirms themselves."
+
+msgid "admin.field.reschedule_auto_delay_minutes"
+msgstr "Wait before automatic proposals (minutes)"
+
+msgid "admin.field.reschedule_auto_delay_minutes_hint"
+msgstr "How long a shortfall must stay the same before the proposals are sent, so a typo in the staffing can be undone first. 5 to 120."
+
+msgid "admin.field.reschedule_auto_max_bookings"
+msgstr "Most appointments for automatic sending"
+
+msgid "admin.field.reschedule_auto_max_bookings_hint"
+msgstr "When more appointments are affected, the assistant sends nothing and asks a planner to review the proposals. 1 to 100."
+
 msgid "admin.field.calendar_invite_address"
 msgstr "Calendar invite to (own queue)"
 
@@ -1302,6 +1320,12 @@ msgstr "This slot would then have more bookings than {agents}. Confirm that you 
 
 msgid "admin.form.error.max_bookings_per_email"
 msgstr "Enter a number from 1 to 10."
+
+msgid "admin.form.error.reschedule_auto_delay_minutes"
+msgstr "Enter a number of minutes from 5 to 120."
+
+msgid "admin.form.error.reschedule_auto_max_bookings"
+msgstr "Enter a number from 1 to 100."
 
 msgid "admin.form.error.calendar_invite_address"
 msgstr "Enter a valid email address, or leave the field empty."
@@ -2619,6 +2643,12 @@ msgstr "appointment on hold moved"
 
 msgid "audit.event.planner_changes_alert"
 msgstr "Many changes by one planner"
+
+msgid "audit.event.planner_auto_review_waiting"
+msgstr "Automatic proposals are waiting for a planner"
+
+msgid "audit.event.planner_auto_proposal"
+msgstr "Automatic proposal for a new time"
 
 msgid "audit.event.contact_reveals_alert"
 msgstr "Many requests for contact details by one person"

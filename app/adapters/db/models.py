@@ -226,6 +226,10 @@ class GroupRow(Base):
     queue_free_pick_allowed: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     # ADR 0066: future bookings one email address may hold in this group.
     max_bookings_per_email: Mapped[int] = mapped_column(Integer, server_default=text("3"))
+    # ADR 0057 point 6: the rebooking assistant may send its proposals without a review.
+    reschedule_auto_send: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    reschedule_auto_delay_minutes: Mapped[int] = mapped_column(Integer, server_default=text("15"))
+    reschedule_auto_max_bookings: Mapped[int] = mapped_column(Integer, server_default=text("10"))
     calendar_invite_address: Mapped[str | None] = mapped_column(String(254))
     # ADR 0082 point 11: the fallback to the own queue, the team's space, and its state.
     dispatch_fallback: Mapped[str] = mapped_column(String(16), server_default=text("'none'"))
@@ -257,6 +261,12 @@ class GroupRow(Base):
         CheckConstraint("queue_visible_from_minutes BETWEEN 0 AND 120", name="queue_visible_from"),
         CheckConstraint("holiday_source IN ('inherit', 'own')", name="holiday_source"),
         CheckConstraint("max_bookings_per_email BETWEEN 1 AND 10", name="max_bookings_per_email"),
+        CheckConstraint(
+            "reschedule_auto_delay_minutes BETWEEN 5 AND 120", name="reschedule_auto_delay"
+        ),
+        CheckConstraint(
+            "reschedule_auto_max_bookings BETWEEN 1 AND 100", name="reschedule_auto_max"
+        ),
     )
 
 
@@ -607,6 +617,20 @@ class ShortfallAcceptanceRow(Base):
     booked: Mapped[int] = mapped_column(Integer)
     accepted_at: Mapped[datetime] = mapped_column(UTCDateTime())
     actor: Mapped[str] = mapped_column(String(255))
+
+
+class ShortfallWatchRow(Base):
+    """Since when a slot has been short at the same counts (ADR 0057 point 6); no personal data."""
+
+    __tablename__ = "shortfall_watches"
+
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    slot_start: Mapped[datetime] = mapped_column(UTCDateTime(), primary_key=True)
+    fingerprint: Mapped[str] = mapped_column(String(32))
+    first_seen_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    notified_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
 class ClosureRow(Base):

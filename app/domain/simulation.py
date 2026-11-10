@@ -18,7 +18,7 @@ group, and the composition root switches the service off in production (``enable
 from dataclasses import dataclass
 from datetime import timedelta
 
-from app.domain.admin import AdminService, require
+from app.domain.admin import AdminService
 from app.domain.audit import Outcome
 from app.domain.authorization import Permission, Principal
 from app.domain.booking import MeetingRef, TrialCall
@@ -167,10 +167,5 @@ class SimulationService:
         """Require the simulator on and ``group.edit``; return the organisation slug."""
         if not self.enabled:
             raise DomainError(ErrorCode.NOT_PERMITTED)
-        authorization = require(
-            await self._admin.authorize(principal, Permission.GROUP_EDIT, group_slug=slug)
-        )
-        organisation = authorization.target.organisation
-        if organisation is None:  # pragma: no cover - a group target always has one
-            raise DomainError(ErrorCode.GROUP_NOT_FOUND)
-        return organisation
+        summary = await self._admin.authorize_group(principal, Permission.GROUP_EDIT, slug)
+        return summary.organisation_slug

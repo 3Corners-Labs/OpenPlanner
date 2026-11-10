@@ -56,6 +56,7 @@ from app.domain.authorization import (
 )
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.lookups import group_summary_by_slug
+from app.domain.organisations import organisation_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import GroupSummary, Organisation
 
@@ -551,8 +552,7 @@ async def _check_grant(tx: Transaction, draft: ClientDraft) -> None:
     Raises:
         DomainError: ``organisation_not_found`` or ``invalid_configuration`` for ``groups``.
     """
-    if await tx.get_organisation(draft.organisation) is None:
-        raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
+    await organisation_by_slug(tx, draft.organisation)
     for slug in draft.groups:
         summary = await tx.get_group_summary(slug)
         if summary is None or summary.organisation_slug != draft.organisation:

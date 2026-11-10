@@ -215,6 +215,16 @@ vastgehouden tijd vrij en wacht de afspraak verder op een tijd van de deelnemer.
 Hoe lang een voorstel wordt vastgehouden, wanneer de herinnering gaat en hoe ver de assistent
 zoekt, stelt de beheerder van de organisatie in bij de instellingen (onderwerp Planner).
 
+### Automatische voorstellen
+
+Een groep kan de assistent zijn voorstellen zelf laten versturen (groepsinstellingen,
+**Voorstellen automatisch versturen**). Hij kijkt dan om de paar minuten naar de tijdsloten met
+een tekort. Blijft een tekort de hele wachttijd van de groep precies hetzelfde, dan krijgen de
+laatst gemaakte afspraken een voorstel, met de reden *bezetting*; verandert of verdwijnt het
+tekort, dan begint het wachten opnieuw. Zijn er meer afspraken betrokken dan het maximum van de
+groep, dan wordt er niets verstuurd en krijgen de planners daar één keer bericht van; het tekort
+blijft in de agenda staan om op de gewone manier te bekijken.
+
 ### Tekort accepteren
 
 Helpt er bijvoorbeeld een collega van een ander team, dan kiest u bij het tijdslot **Tekort

@@ -95,6 +95,7 @@ STATE_TABLES = frozenset(
         "report_subscriptions",
         "running_versions",
         "shortfall_acceptances",
+        "shortfall_watches",
         "slots",
         "staff",
         "staff_memberships",

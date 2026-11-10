@@ -93,6 +93,9 @@ COLUMNS = (
     "queue_visible_from_minutes",
     "queue_free_pick_allowed",
     "max_bookings_per_email",
+    "reschedule_auto_send",
+    "reschedule_auto_delay_minutes",
+    "reschedule_auto_max_bookings",
     "calendar_invite_address",
     "holiday_source",
 )

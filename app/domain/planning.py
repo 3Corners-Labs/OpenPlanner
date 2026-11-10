@@ -25,6 +25,7 @@ from app.domain.contact_center import ContactCenterRouting
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holiday_service import effective_schedule
 from app.domain.lookups import group_by_slug
+from app.domain.organisations import organisation_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import (
     RESERVED_SLUGS,
@@ -79,6 +80,9 @@ class GroupSettings:
     queue_visible_from_minutes: int
     queue_free_pick_allowed: bool
     max_bookings_per_email: int
+    reschedule_auto_send: bool
+    reschedule_auto_delay_minutes: int
+    reschedule_auto_max_bookings: int
     calendar_invite_address: str | None
     dispatch_fallback: DispatchFallback
     fallback_space_room_id: str | None
@@ -145,9 +149,7 @@ class PlanningService:
         )
         require(authorization)
         async with self._uow.locked() as tx:
-            organisation = await tx.get_organisation(new.organisation_slug)
-            if organisation is None:
-                raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
+            organisation = await organisation_by_slug(tx, new.organisation_slug)
             group = Group(
                 id=0,
                 organisation_id=organisation.id,
@@ -222,9 +224,8 @@ class PlanningService:
 
     async def future_bookings(self, principal: Principal, slug: str) -> int:
         """Return how many bookings that hold a place lie ahead, for the archive page."""
-        require(await self._admin.authorize(principal, Permission.GROUP_DELETE, group_slug=slug))
+        group = (await self._admin.authorize_group(principal, Permission.GROUP_DELETE, slug)).group
         async with self._uow.read() as tx:
-            group = await group_by_slug(tx, slug)
             return await tx.count_future_bookings(group.id, self._clock.now())
 
     # --- opening hours and exceptions --------------------------------------------------------
@@ -235,9 +236,8 @@ class PlanningService:
         Raises:
             DomainError: ``not_permitted`` or ``group_not_found``.
         """
-        require(await self._admin.authorize(principal, Permission.GROUP_VIEW, group_slug=slug))
+        group = (await self._admin.authorize_group(principal, Permission.GROUP_VIEW, slug)).group
         async with self._uow.read() as tx:
-            group = await group_by_slug(tx, slug)
             rules, overrides = await tx.get_schedule_items(group.id, group.today(self._clock.now()))
         return Schedule(
             sorted(rules, key=lambda r: (r.weekday, r.window, r.valid_from or date.min)),
@@ -250,10 +250,9 @@ class PlanningService:
         Only days with slots are returned. Holidays count (ADR 0025); bookings, notice and
         horizon are left out: this shows what the opening hours produce, not what is free.
         """
-        require(await self._admin.authorize(principal, Permission.GROUP_VIEW, group_slug=slug))
+        group = (await self._admin.authorize_group(principal, Permission.GROUP_VIEW, slug)).group
         days = max(1, min(days, MAX_PREVIEW_DAYS))
         async with self._uow.read() as tx:
-            group = await group_by_slug(tx, slug)
             today = group.today(self._clock.now())
             last = today + timedelta(days=days - 1)
             rules, overrides = await effective_schedule(tx, group, today, last)

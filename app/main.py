@@ -90,7 +90,6 @@ from app.domain.channel_service import ChannelSettingsService
 from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.closure_service import ClosureService
 from app.domain.configuration_service import ConfigurationPackageService
-from app.domain.confirmation import ConfirmPolicy
 from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.contact_service import ContactService
 from app.domain.csv_export import ExportLimits
@@ -117,7 +116,6 @@ from app.domain.organisations import OrganisationService
 from app.domain.overview_layout import OverviewLayoutService
 from app.domain.participant_contact import ParticipantContactService
 from app.domain.participant_link_service import ParticipantLinkService
-from app.domain.planner_service import PlannerService
 from app.domain.planning import PlanningService
 from app.domain.platform_settings import PlatformSettingsStore
 from app.domain.ports import (
@@ -132,15 +130,12 @@ from app.domain.ports import (
 from app.domain.proxy_watch import ProxyHeaderWatch
 from app.domain.queue_service import QueueService
 from app.domain.readiness import ReadinessService
-from app.domain.rebooking import Reach
 from app.domain.report_digest_service import DigestAdmin
 from app.domain.request_log import RequestEvents
-from app.domain.reschedule_proposal import ProposalHours
 from app.domain.roles import RoleService
 from app.domain.routing_service import RoutingService
 from app.domain.scenario_service import ScenarioService
 from app.domain.security_log import SecurityLog
-from app.domain.services import BookingService
 from app.domain.settings_service import SettingsService
 from app.domain.simulation import SimulationService
 from app.domain.staff_directory_service import DirectorySettings, StaffDirectoryService
@@ -168,6 +163,7 @@ from app.keys import (
     session_secret,
 )
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
+from app.service_wiring import booking_service, planner_service
 from app.web.alert_text import alert_composer
 from app.web.authz_labels import ROLE_LABELS
 from app.web.call_labels import agent_start_label
@@ -218,21 +214,6 @@ def oidc_provider(
     return OidcIdentityProvider(config, http)
 
 
-def _confirm_policy(settings: Settings) -> ConfirmPolicy:
-    """Return the rules for confirming a booking from one organisation's settings (ADR 0056)."""
-    return ConfirmPolicy.from_settings(
-        window_hours=settings.booking_confirm_window_hours,
-        cutoff_hours=settings.booking_confirm_cutoff_hours,
-        reminders=settings.booking_confirm_reminders,
-        min_minutes=settings.booking_confirm_min_minutes,
-    )
-
-
-def _reach(settings: Settings) -> Reach:
-    """Return how far proposed and suggested times may lie, from one organisation's settings."""
-    return Reach(settings.reschedule_search_days, settings.reschedule_time_tolerance_minutes)
-
-
 def _change_policy(settings: Settings) -> ChangePolicy:
     """Return one organisation's settings for a bot's change requests (ADR 0023 step 2).
 
@@ -242,13 +223,6 @@ def _change_policy(settings: Settings) -> ChangePolicy:
         settings.takes_change_requests,
         settings.agent_change_request_minutes,
         settings.agent_change_request_cooldown_minutes,
-    )
-
-
-def _proposal_hours(settings: Settings) -> ProposalHours:
-    """Return how long a proposal is held and when it is recalled (ADR 0057)."""
-    return ProposalHours(
-        settings.reschedule_proposal_confirm_hours, settings.reschedule_proposal_reminder_hours
     )
 
 
@@ -452,16 +426,7 @@ def create_app(
             lambda: timedelta(minutes=live().security_event_window_minutes),
             max_sources=lambda: live().security_event_max_sources,
         )
-        app.state.booking_service = BookingService(
-            uow,
-            clock,
-            token_key,
-            phone_region=lambda org: per_organisation(org).phone_default_region,
-            confirm_policy=lambda org: _confirm_policy(per_organisation(org)),
-            previous_token_key=management_token_key_previous(settings),
-            closure_retention=app.state.live_settings.closure_retention,
-            reach=lambda org: _reach(per_organisation(org)),
-        )
+        app.state.booking_service = booking_service(uow, clock, settings, app.state.live_settings)
         # ADR 0023 step 2: a bot's change request, confirmed by the participant.
         previous_key = management_token_key_previous(settings)
         app.state.change_request_service = ChangeRequestService(
@@ -846,15 +811,12 @@ def create_app(
             app.state.booking_service,
             app.state.live_settings.closure_retention,
         )
-        app.state.planner_service = PlannerService(
+        app.state.planner_service = planner_service(
             uow,
             clock,
             app.state.admin_service,
             app.state.booking_service,
-            rebook_days=lambda org: per_organisation(org).planner_rebook_days,
-            reminder_days=lambda org: per_organisation(org).planner_rebook_reminder_days,
-            proposal_hours=lambda org: _proposal_hours(per_organisation(org)),
-            reach=lambda org: _reach(per_organisation(org)),
+            app.state.live_settings,
         )
         app.state.role_service = RoleService(
             uow,

@@ -5,8 +5,9 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
-from sqlalchemy import func, select, update
+from sqlalchemy import func, not_, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.adapters.db.models import BookingRow
 from app.adapters.db.uow import SqlUnitOfWork
@@ -22,6 +23,38 @@ from tests.support.domain import NOW
 
 KEY = b"k" * 32
 LATER = NOW + timedelta(days=400)
+GENERATED_REF = "fx" + "[0-9]" * 10
+"""GLOB pattern of ``fx{n:010d}``, the reference of a generated booking (case-sensitive)."""
+DECOYS = ("fxAbCdEfGhIjKlMnOpQrSt", "FXaBcDeFgHiJkLmNoPqRsT", "FX0000000000")
+"""References of bookings the fixture did not generate, that start like a generated one.
+
+The first two are shaped like a random reference (22 characters), which may begin with ``fx`` in
+any case. The last has the generated length and digits in capitals: it is there to prove the
+match is case-sensitive, as SQLite's ``LIKE`` is not.
+"""
+
+
+def _is_generated() -> ColumnElement[bool]:
+    """Return the condition that a booking's public reference has the generated form."""
+    return BookingRow.public_ref.op("GLOB", is_comparison=True)(GENERATED_REF)
+
+
+async def _give_decoy_references(engine: AsyncEngine) -> None:
+    """Store ``DECOYS`` as the public reference of as many bookings the fixture did not generate."""
+    async with engine.begin() as connection:
+        ids = list(
+            await connection.scalars(
+                select(BookingRow.id)
+                .where(not_(_is_generated()))
+                .order_by(BookingRow.id)
+                .limit(len(DECOYS))
+            )
+        )
+        assert len(ids) == len(DECOYS)
+        for booking_id, ref in zip(ids, DECOYS, strict=True):
+            await connection.execute(
+                update(BookingRow).where(BookingRow.id == booking_id).values(public_ref=ref)
+            )
 
 
 async def test_the_fixture_holds_every_kind_of_row(engine: AsyncEngine, database_url: str) -> None:
@@ -68,17 +101,16 @@ async def test_the_large_fixture_adds_generated_bookings(
     engine: AsyncEngine, database_url: str
 ) -> None:
     await seed_upgrade_fixture(engine, NOW, KEY, version="0.6.0", commit="abc1234", bookings=2001)
+    await _give_decoy_references(engine)
 
     state = await inspect_fixture(database_url, LATER)
 
     async with engine.connect() as connection:
-        generated = await connection.scalar(
-            # A generated reference is ``fx`` and ten digits; a random one (22 characters) may
-            # also start with ``fx``, about once in 4096 bookings.
-            select(func.count()).where(
-                BookingRow.public_ref.like("fx%"), func.length(BookingRow.public_ref) == 12
-            )
+        generated = await connection.scalar(select(func.count()).where(_is_generated()))
+        decoys_stored = await connection.scalar(
+            select(func.count()).where(BookingRow.public_ref.in_(DECOYS))
         )
+    assert decoys_stored == len(DECOYS)
     assert generated == 2001
     assert state.purged > 1
     assert state.purged_with_data == 0

@@ -53,6 +53,7 @@ from app.domain.job_plan import (
     plan_purge,
 )
 from app.domain.lookups import group_booking, group_by_slug
+from app.domain.organisations import organisation_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scenario_service import usable_scenario
 from app.domain.scheduling import Group, GroupSummary, Organisation
@@ -424,8 +425,7 @@ class ClosureService:
         states = []
         scope = scope_for(principal, Permission.ORGANISATION_CLOSURE)
         async with self._uow.read() as tx:
-            if await tx.get_organisation(organisation_slug) is None:
-                raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
+            await organisation_by_slug(tx, organisation_slug)
             for summary in await self._organisation_groups(tx, principal, organisation_slug):
                 closures = await tx.get_closures(summary.group.id, now)
                 suspended = await tx.list_suspended_bookings(scope, summary.group.id)

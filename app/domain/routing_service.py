@@ -84,9 +84,8 @@ class RoutingService:
         Raises:
             DomainError: ``not_permitted`` or ``group_not_found``.
         """
-        require(await self._admin.authorize(principal, _PERMISSION, group_slug=slug))
+        summary = await self._admin.authorize_group(principal, _PERMISSION, slug)
         async with self._uow.read() as tx:
-            summary = await group_summary_by_slug(tx, slug)
             bound = await _bound(tx, summary.group.id)
         return GroupRoutingView(summary, summary.group.routing, value_of(self._max), bound)
 
