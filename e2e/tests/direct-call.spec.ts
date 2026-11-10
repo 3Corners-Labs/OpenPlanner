@@ -52,15 +52,15 @@ test('a participant starts a call right away and the admin sees it', async ({ pa
   // each page. It takes about 17 s alone, so the default 30 s leaves no room on a busy runner.
   test.slow();
   const slug = `e2e-direct-${testInfo.project.name}-${testInfo.repeatEachIndex}-${Date.now().toString(36)}`;
-  const tabs = page.getByRole('navigation', { name: 'Onderdelen van de groep' });
+  const tabs = page.getByRole('navigation', { name: 'Onderdelen van de dienst' });
 
   // Admin: group open around the clock (but 23:55–00:00), every block offers direct calls.
   await loginAs(page, 'orgadmin', '/admin/groups/new');
   await page.getByLabel('Naam', { exact: true }).fill(`Direct ${testInfo.project.name}`);
   await page.getByLabel('Webadres', { exact: true }).fill(slug);
   await page.getByLabel('Tijdzone', { exact: true }).selectOption(zoneAwayFromMidnight());
-  await page.getByRole('button', { name: 'Groep aanmaken' }).press('Enter');
-  await expect(page.getByRole('status')).toContainText('De groep is aangemaakt');
+  await page.getByRole('button', { name: 'Dienst aanmaken' }).press('Enter');
+  await expect(page.getByRole('status')).toContainText('De dienst is aangemaakt');
   await tabs.getByRole('link', { name: 'Planning', exact: true }).click();
   await addAllDayHours(page);
   await expect(page.locator('.window__offer', { hasText: 'Afspraken en direct gesprek' })).toHaveCount(WEEKDAYS.length);

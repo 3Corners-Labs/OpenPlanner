@@ -372,7 +372,7 @@ msgid "error.already_claimed"
 msgstr "Al opgepakt door een collega. Pak de volgende op."
 
 msgid "error.free_pick_not_allowed"
-msgstr "In deze groep pakt u altijd de volgende afspraak op."
+msgstr "In deze dienst pakt u altijd de volgende afspraak op."
 
 msgid "error.not_claimed"
 msgstr "Deze afspraak is niet door u opgepakt."
@@ -584,7 +584,7 @@ msgid "admin.nav.section.platform"
 msgstr "Platform"
 
 msgid "admin.nav.object.group"
-msgstr "Groep"
+msgstr "Dienst"
 
 msgid "admin.profile.source"
 msgstr "Uw rol komt uit uw organisatie-account en is hier niet te wijzigen."
@@ -653,13 +653,13 @@ msgid "admin.dashboard.title"
 msgstr "Overzicht"
 
 msgid "admin.dashboard.intro"
-msgstr "Wat nu aandacht vraagt, en de groepen waarvoor u rechten heeft."
+msgstr "Wat nu aandacht vraagt, en de diensten waarvoor u rechten heeft."
 
 msgid "admin.dashboard.groups"
-msgstr "Uw groepen"
+msgstr "Uw diensten"
 
 msgid "admin.dashboard.no_groups"
-msgstr "U heeft (nog) geen rechten op een groep. Vraag uw beheerder om toegang."
+msgstr "U heeft (nog) geen rechten op een dienst. Vraag uw beheerder om toegang."
 
 msgid "admin.overview.refresh"
 msgstr "Vernieuwen"
@@ -677,16 +677,16 @@ msgid "admin.overview.widget.alerts.title"
 msgstr "Meldingen"
 
 msgid "admin.overview.widget.queue.title"
-msgstr "Wachtrij in mijn groepen"
+msgstr "Wachtrij in mijn diensten"
 
 msgid "admin.overview.widget.bookings_today.title"
-msgstr "Afspraken vandaag per groep"
+msgstr "Afspraken vandaag per dienst"
 
 msgid "admin.overview.widget.bookings_today.agenda_link"
 msgstr "Agenda van {name}"
 
 msgid "admin.overview.widget.bookings_today.empty"
-msgstr "Geen groepen in uw bereik."
+msgstr "Geen diensten in uw bereik."
 
 msgid "admin.overview.widget.changes.title"
 msgstr "Recente configuratiewijzigingen"
@@ -752,7 +752,7 @@ msgid "admin.group.phone_required"
 msgstr "Verplicht"
 
 msgid "admin.group.your_rights"
-msgstr "Uw rechten voor deze groep"
+msgstr "Uw rechten voor deze dienst"
 
 msgid "admin.rights.title"
 msgstr "Mijn rechten"
@@ -776,19 +776,19 @@ msgid "admin.rights.scope_portal"
 msgstr "Het beheerportaal"
 
 msgid "admin.rights.scope_everything"
-msgstr "Alle organisaties en groepen"
+msgstr "Alle organisaties en diensten"
 
 msgid "admin.rights.scope_organisations"
 msgstr "Organisaties: {names}"
 
 msgid "admin.rights.scope_groups"
-msgstr "Groepen: {names}"
+msgstr "Diensten: {names}"
 
 msgid "admin.matrix.title"
 msgstr "Rechtenmatrix"
 
 msgid "admin.matrix.intro"
-msgstr "Overzicht van wat elke rol mag, per organisatie en per groep. Rechten met het kenmerk Alleen superuser liggen vast. Rechten met het kenmerk Persoonsgegevens tonen gegevens van deelnemers. Alleen de superuser kan rollen aanpassen; elke wijziging wordt vastgelegd en staat onderaan deze pagina. Welke rol iemand heeft, regelt uw organisatie in de identity provider."
+msgstr "Overzicht van wat elke rol mag, per organisatie en per dienst. Rechten met het kenmerk Alleen superuser liggen vast. Rechten met het kenmerk Persoonsgegevens tonen gegevens van deelnemers. Alleen de superuser kan rollen aanpassen; elke wijziging wordt vastgelegd en staat onderaan deze pagina. Welke rol iemand heeft, regelt uw organisatie in de identity provider."
 
 msgid "admin.matrix.level"
 msgstr "Niveau"
@@ -818,7 +818,7 @@ msgid "admin.audit.title"
 msgstr "Auditlog"
 
 msgid "admin.audit.intro"
-msgstr "Inlogpogingen, geweigerde acties, wijzigingen en wat het systeem zelf deed (berichten, videogesprekken, wachtrijtaken), alleen voor uw eigen organisatie of groepen."
+msgstr "Inlogpogingen, geweigerde acties, wijzigingen en wat het systeem zelf deed (berichten, videogesprekken, wachtrijtaken), alleen voor uw eigen organisatie of diensten."
 
 msgid "admin.audit.when"
 msgstr "Wanneer"
@@ -833,7 +833,7 @@ msgid "admin.audit.outcome"
 msgstr "Resultaat"
 
 msgid "admin.audit.target"
-msgstr "Organisatie / groep"
+msgstr "Organisatie / dienst"
 
 msgid "admin.audit.empty"
 msgstr "Er zijn nog geen gebeurtenissen."
@@ -890,7 +890,7 @@ msgid "authz.role.org_admin"
 msgstr "Organisatiebeheerder"
 
 msgid "authz.role.group_admin"
-msgstr "Groepsbeheerder"
+msgstr "Dienstbeheerder"
 
 msgid "authz.role.auditor"
 msgstr "Compliance en privacy (alleen lezen)"
@@ -905,7 +905,7 @@ msgid "authz.level.organisation"
 msgstr "Organisatie"
 
 msgid "authz.level.group"
-msgstr "Groep"
+msgstr "Dienst"
 
 msgid "authz.permission.dashboard_view"
 msgstr "Overzicht bekijken"
@@ -938,16 +938,16 @@ msgid "authz.permission.integrations_manage"
 msgstr "Koppelingen en geheimen beheren"
 
 msgid "authz.permission.group_create"
-msgstr "Groepen aanmaken"
+msgstr "Diensten aanmaken"
 
 msgid "authz.permission.group_delete"
-msgstr "Groepen archiveren"
+msgstr "Diensten archiveren"
 
 msgid "authz.permission.group_view"
-msgstr "Groep bekijken"
+msgstr "Dienst bekijken"
 
 msgid "authz.permission.group_edit"
-msgstr "Groepsinstellingen wijzigen"
+msgstr "Dienstinstellingen wijzigen"
 
 msgid "authz.permission.schedule_manage"
 msgstr "Bezetting en afwijkende bezetting beheren"
@@ -986,7 +986,7 @@ msgid "authz.condition.management_link"
 msgstr "Met de beheerlink uit de bevestiging"
 
 msgid "authz.condition.management_link_before_change_deadline"
-msgstr "Met de beheerlink, tot het aantal minuten voor de start dat de groep instelt"
+msgstr "Met de beheerlink, tot het aantal minuten voor de start dat de dienst instelt"
 
 msgid "authz.condition.management_link_before_start"
 msgstr "Met de beheerlink, tot de start"
@@ -1031,7 +1031,7 @@ msgid "admin.done.added"
 msgstr "Toegevoegd."
 
 msgid "admin.done.created"
-msgstr "De groep is aangemaakt. Stel nu de bezetting in."
+msgstr "De dienst is aangemaakt. Stel nu de bezetting in."
 
 msgid "admin.done.released"
 msgstr "De afspraak is vrijgegeven en staat weer in de wachtrij."
@@ -1058,7 +1058,7 @@ msgid "admin.tab.exceptions"
 msgstr "Afwijkende bezetting"
 
 msgid "admin.group.sections"
-msgstr "Onderdelen van de groep"
+msgstr "Onderdelen van de dienst"
 
 msgid "admin.group.open_public_page"
 msgstr "Publieke pagina"
@@ -1070,13 +1070,13 @@ msgid "admin.settings.lead"
 msgstr "Wijzigingen gelden voor nieuwe afspraken; bestaande afspraken blijven staan."
 
 msgid "admin.new_group.title"
-msgstr "Nieuwe groep"
+msgstr "Nieuwe dienst"
 
 msgid "admin.new_group.lead"
-msgstr "Een groep is een team met één wachtrij in het contactcenter. Na het aanmaken stelt u de bezetting in: per tijdblok het aantal {agents}."
+msgstr "Een dienst is wat uw organisatie aan deelnemers aanbiedt, met een eigen pagina, bezetting en wachtrij. Na het aanmaken stelt u de bezetting in: per tijdblok het aantal {agents}."
 
 msgid "admin.new_group.create"
-msgstr "Groep aanmaken"
+msgstr "Dienst aanmaken"
 
 msgid "admin.field.organisation"
 msgstr "Organisatie"
@@ -1097,7 +1097,7 @@ msgid "admin.field.timezone"
 msgstr "Tijdzone"
 
 msgid "admin.field.timezone_hint"
-msgstr "Tijden van deze groep gelden in deze zone. Zomer- en wintertijd gaan automatisch."
+msgstr "Tijden van deze dienst gelden in deze zone. Zomer- en wintertijd gaan automatisch."
 
 msgid "admin.field.slot_minutes"
 msgstr "Duur van een gesprek (minuten)"
@@ -1181,7 +1181,7 @@ msgid "admin.field.trial_call_enabled"
 msgstr "Proefgesprek voor de deelnemer"
 
 msgid "admin.field.trial_call_enabled_hint"
-msgstr "Ja: de deelnemer kan vooraf in een echte Webex-meeting uitproberen of camera, microfoon en luidsprekers werken. De meeting is van de Webex-host van deze groep; er komt niemand van het team in. Alleen met een Webex-host."
+msgstr "Ja: de deelnemer kan vooraf in een echte Webex-meeting uitproberen of camera, microfoon en luidsprekers werken. De meeting is van de Webex-host van deze dienst; er komt niemand van het team in. Alleen met een Webex-host."
 
 msgid "admin.field.join_client"
 msgstr "Webex-pagina voor de deelnemer"
@@ -1286,7 +1286,7 @@ msgid "admin.form.error.slug_taken"
 msgstr "Dit webadres is al in gebruik. Kies een ander."
 
 msgid "admin.form.error.organisation"
-msgstr "Kies een organisatie waarvoor u groepen mag aanmaken."
+msgstr "Kies een organisatie waarvoor u diensten mag aanmaken."
 
 msgid "admin.form.error.timezone"
 msgstr "Kies een tijdzone uit de lijst."
@@ -1544,7 +1544,7 @@ msgid "admin.field.wxcc_routing_value"
 msgstr "Routeringswaarde voor de WxCC-flow"
 
 msgid "admin.field.wxcc_routing_value_hint"
-msgstr "De flow kiest hiermee de wachtrij. Leeg: het webadres van de groep."
+msgstr "De flow kiest hiermee de wachtrij. Leeg: het webadres van de dienst."
 
 msgid "admin.field.direct_call_enabled"
 msgstr "Direct gesprek starten"
@@ -1553,7 +1553,7 @@ msgid "admin.field.embedding_enabled"
 msgstr "Insluiten op websites"
 
 msgid "admin.field.embedding_enabled_hint"
-msgstr "Toont de groep ook in de widget op de websites die de organisatie onder Insluiten heeft toegestaan. Uit: alleen de eigen pagina van de groep."
+msgstr "Toont de dienst ook in de widget op de websites die de organisatie onder Insluiten heeft toegestaan. Uit: alleen de eigen pagina van de dienst."
 
 msgid "admin.field.not_picked_up_minutes"
 msgstr "Niet opgepakt na (minuten)"
@@ -1778,13 +1778,13 @@ msgid "call.event.meeting_failed"
 msgstr "Videomeeting aanmaken mislukt"
 
 msgid "call.hint.meeting.rejected_400"
-msgstr "Webex weigerde de meeting; het antwoord van Webex staat hierboven. Vaak is de Webex-host van deze groep (Instellingen) geen gebruiker met een Meetings-licentie in de Webex-organisatie van de Service App, of mag de Service App niet namens die host plannen. Druk bij de groep op Koppeling controleren: die plant een proefmeeting zoals een afspraak dat doet. Een nieuwe of verplaatste afspraak probeert het opnieuw."
+msgstr "Webex weigerde de meeting; het antwoord van Webex staat hierboven. Vaak is de Webex-host van deze dienst (Instellingen) geen gebruiker met een Meetings-licentie in de Webex-organisatie van de Service App, of mag de Service App niet namens die host plannen. Druk bij de dienst op Koppeling controleren: die plant een proefmeeting zoals een afspraak dat doet. Een nieuwe of verplaatste afspraak probeert het opnieuw."
 
 msgid "call.hint.meeting.rejected_403"
 msgstr "Webex weigerde de toegang: de Service App mist de scope om meetings te plannen of is niet geautoriseerd door een beheerder van de Webex-organisatie. Pas dat aan in Control Hub en zet daarna een nieuw refresh-token in WEBEX_REFRESH_TOKEN."
 
 msgid "call.hint.meeting.rejected_404"
-msgstr "Webex kent de Webex-host van deze groep niet. Controleer het e-mailadres onder Instellingen."
+msgstr "Webex kent de Webex-host van deze dienst niet. Controleer het e-mailadres onder Instellingen."
 
 msgid "call.hint.meeting.other"
 msgstr "De videomeeting kon niet worden aangemaakt. De code is de reden; het antwoord van Webex staat erbij als Webex er een gaf. Meer staat in het worker-log bij integration.refused en job.failed."
@@ -1793,7 +1793,7 @@ msgid "call.hint.task.meeting_missing"
 msgstr "De taak wachtte op de videomeeting, maar die kwam er niet. Los eerst de fout bij de meeting op."
 
 msgid "call.hint.task.other"
-msgstr "Webex Contact Center nam de taak niet aan. Controleer het entry point en kanaal van de groep onder Instellingen en de WxCC-inrichting onder Koppelingen; de code is de reden van WxCC."
+msgstr "Webex Contact Center nam de taak niet aan. Controleer het entry point en kanaal van de dienst onder Instellingen en de WxCC-inrichting onder Koppelingen; de code is de reden van WxCC."
 
 msgid "call.hint.integration.other"
 msgstr "Webex weigerde een aanroep. Het antwoord van Webex staat erbij als Webex er een gaf; het worker-log heeft bij integration.refused ook een trackingId."
@@ -2183,7 +2183,7 @@ msgid "admin.integrations.secret_missing"
 msgstr "Geen geheim ingesteld: het adres is uitgeschakeld"
 
 msgid "admin.integrations.groups"
-msgstr "Groepen"
+msgstr "Diensten"
 
 msgid "join.refresh"
 msgstr "Status verversen"
@@ -3029,7 +3029,7 @@ msgid "admin.form.error.reminder_offset"
 msgstr "Kies een moment tussen 5 minuten en 30 dagen voor het gesprek."
 
 msgid "admin.form.error.reminder_limit"
-msgstr "Een groep heeft hoogstens 5 herinneringen."
+msgstr "Een dienst heeft hoogstens 5 herinneringen."
 
 msgid "admin.form.error.reminder_exists"
 msgstr "Deze herinnering bestaat al."
@@ -3095,7 +3095,7 @@ msgid "admin.reminders.add_lead"
 msgstr "Een sms gaat alleen naar deelnemers die een telefoonnummer hebben opgegeven."
 
 msgid "admin.reminders.no_phone"
-msgstr "Het boekingsformulier van deze groep vraagt geen telefoonnummer, dus sms is niet mogelijk."
+msgstr "Het boekingsformulier van deze dienst vraagt geen telefoonnummer, dus sms is niet mogelijk."
 
 msgid "admin.reminders.amount"
 msgstr "Hoeveel"
@@ -3158,7 +3158,7 @@ msgid "admin.messages.default"
 msgstr "Standaardtekst."
 
 msgid "admin.messages.custom"
-msgstr "Eigen tekst van deze groep."
+msgstr "Eigen tekst van deze dienst."
 
 msgid "admin.messages.placeholders"
 msgstr "U kunt gebruiken: {names}."
@@ -3176,7 +3176,7 @@ msgid "admin.organisations.title"
 msgstr "Organisaties"
 
 msgid "admin.organisations.lead"
-msgstr "De klantorganisaties in deze installatie. Een organisatie heeft eigen groepen, een eigen huisstijl en eigen beheerders."
+msgstr "De klantorganisaties in deze installatie. Een organisatie heeft eigen diensten, een eigen huisstijl en eigen beheerders."
 
 msgid "admin.organisations.list"
 msgstr "Alle organisaties"
@@ -3188,7 +3188,7 @@ msgid "admin.new_organisation.title"
 msgstr "Nieuwe organisatie"
 
 msgid "admin.new_organisation.lead"
-msgstr "Na het aanmaken stelt u de huisstijl in en maken organisatiebeheerders de groepen aan."
+msgstr "Na het aanmaken stelt u de huisstijl in en maken organisatiebeheerders de diensten aan."
 
 msgid "admin.new_organisation.create"
 msgstr "Organisatie aanmaken"
@@ -3508,13 +3508,13 @@ msgid "admin.holidays.title"
 msgstr "Feestdagen"
 
 msgid "admin.holidays.lead"
-msgstr "Kalenders met sluitingsdagen, één keer ingesteld en hergebruikt door organisaties en groepen."
+msgstr "Kalenders met sluitingsdagen, één keer ingesteld en hergebruikt door organisaties en diensten."
 
 msgid "admin.holidays.calendars"
 msgstr "Kalenders"
 
 msgid "admin.holidays.calendars_lead"
-msgstr "De superuser beheert de kalenders en hun datums. Organisaties kiezen welke kalenders voor hun groepen gelden."
+msgstr "De superuser beheert de kalenders en hun datums. Organisaties kiezen welke kalenders voor hun diensten gelden."
 
 msgid "admin.holidays.no_calendars"
 msgstr "Er zijn nog geen feestdagenkalenders."
@@ -3535,7 +3535,7 @@ msgid "admin.holidays.holiday_name"
 msgstr "Naam"
 
 msgid "admin.holidays.used_by"
-msgstr "Gekozen door organisaties en groepen: {count}"
+msgstr "Gekozen door organisaties en diensten: {count}"
 
 msgid "admin.holidays.days_of_year"
 msgstr "Datums in {year}"
@@ -3568,13 +3568,13 @@ msgid "admin.holidays.delete"
 msgstr "Kalender verwijderen"
 
 msgid "admin.holidays.delete_lead"
-msgstr "Kan alleen zolang geen organisatie of groep deze kalender gekozen heeft. Alle datums verdwijnen mee."
+msgstr "Kan alleen zolang geen organisatie of dienst deze kalender gekozen heeft. Alle datums verdwijnen mee."
 
 msgid "admin.holidays.delete_button"
 msgstr "{name} verwijderen"
 
 msgid "admin.holidays.organisation_lead"
-msgstr "Kies welke feestdagenkalenders gelden voor de groepen van deze organisatie. Groepen die zelf kiezen, veranderen niet mee."
+msgstr "Kies welke feestdagenkalenders gelden voor de diensten van deze organisatie. Diensten die zelf kiezen, veranderen niet mee."
 
 msgid "admin.holidays.choose"
 msgstr "Kalenders"
@@ -3583,10 +3583,10 @@ msgid "admin.holidays.upcoming"
 msgstr "Komende feestdagen"
 
 msgid "admin.holidays.upcoming_lead"
-msgstr "De feestdagen van het komende jaar uit de kalenders die voor deze groep gelden. Op een gesloten dag kunnen deelnemers geen afspraak maken."
+msgstr "De feestdagen van het komende jaar uit de kalenders die voor deze dienst gelden. Op een gesloten dag kunnen deelnemers geen afspraak maken."
 
 msgid "admin.holidays.state"
-msgstr "Deze groep"
+msgstr "Deze dienst"
 
 msgid "admin.holidays.state_closed"
 msgstr "Gesloten"
@@ -3613,7 +3613,7 @@ msgid "admin.holidays.see_exceptions"
 msgstr "Bekijk afwijkende bezetting"
 
 msgid "admin.holidays.none_upcoming"
-msgstr "Er gelden geen feestdagen voor deze groep in het komende jaar."
+msgstr "Er gelden geen feestdagen voor deze dienst in het komende jaar."
 
 msgid "admin.holidays.group_choice"
 msgstr "Welke kalenders gelden"
@@ -3622,7 +3622,7 @@ msgid "admin.holidays.group_choice_lead"
 msgstr "Een eigen afwijkende bezetting op een feestdag gaat altijd voor; zo kunt u op een feestdag toch {agents} inplannen."
 
 msgid "admin.holidays.source"
-msgstr "Kalenders voor deze groep"
+msgstr "Kalenders voor deze dienst"
 
 msgid "admin.holidays.source_inherit"
 msgstr "Volg de organisatie"
@@ -3649,7 +3649,7 @@ msgid "admin.form.error.calendars"
 msgstr "Kies alleen bestaande kalenders."
 
 msgid "admin.form.error.calendar_in_use"
-msgstr "Deze kalender is nog gekozen door een organisatie of groep en kan niet worden verwijderd."
+msgstr "Deze kalender is nog gekozen door een organisatie of dienst en kan niet worden verwijderd."
 
 msgid "holiday.nl.new_year"
 msgstr "Nieuwjaarsdag"
@@ -3739,7 +3739,7 @@ msgid "admin.audit.filter"
 msgstr "Filter"
 
 msgid "admin.audit.group"
-msgstr "Groep"
+msgstr "Dienst"
 
 msgid "admin.audit.booking"
 msgstr "Afspraaknummer"
@@ -3781,7 +3781,7 @@ msgid "admin.audit.reason.not_permitted"
 msgstr "De rol geeft dit recht niet."
 
 msgid "admin.audit.reason.out_of_scope"
-msgstr "Buiten de eigen organisatie of groep."
+msgstr "Buiten de eigen organisatie of dienst."
 
 msgid "admin.audit.reason.stale"
 msgstr "Niet meer nodig: de afspraak is verplaatst of geannuleerd."
@@ -3853,7 +3853,7 @@ msgid "admin.audit.diagnostics.title"
 msgstr "Diagnosemodus"
 
 msgid "admin.audit.diagnostics.intro"
-msgstr "Zolang de diagnosemodus aan staat, schrijft het platform extra debugregels over die groep of organisatie in dit log. De beheerders van de groep zien ze ook. De modus gaat na de ingestelde tijd vanzelf uit (standaard 24 uur), en ook als de schijf bijna vol is."
+msgstr "Zolang de diagnosemodus aan staat, schrijft het platform extra debugregels over die dienst of organisatie in dit log. De beheerders van de dienst zien ze ook. De modus gaat na de ingestelde tijd vanzelf uit (standaard 24 uur), en ook als de schijf bijna vol is."
 
 msgid "admin.audit.diagnostics.active"
 msgstr "{target}: aan tot {until}"
@@ -3868,7 +3868,7 @@ msgid "admin.audit.diagnostics.none"
 msgstr "De diagnosemodus staat nergens aan."
 
 msgid "admin.audit.diagnostics.target"
-msgstr "Groep of organisatie"
+msgstr "Dienst of organisatie"
 
 msgid "admin.done.diagnostics_on"
 msgstr "De diagnosemodus staat aan."
@@ -4406,16 +4406,16 @@ msgid "admin.scope.organisation"
 msgstr "Organisatie"
 
 msgid "admin.scope.group"
-msgstr "Groep"
+msgstr "Dienst"
 
 msgid "admin.scope.all_organisations"
 msgstr "Alle organisaties"
 
 msgid "admin.scope.all_groups"
-msgstr "Alle groepen"
+msgstr "Alle diensten"
 
 msgid "admin.scope.hint"
-msgstr "Beperkt de groepen, afspraken, wachtrij en wijzigingen op deze pagina tot wat u al mag zien. Taken, status en rechten blijven voor het hele platform."
+msgstr "Beperkt de diensten, afspraken, wachtrij en wijzigingen op deze pagina tot wat u al mag zien. Taken, status en rechten blijven voor het hele platform."
 
 msgid "admin.scope.apply"
 msgstr "Tonen"
@@ -4559,7 +4559,7 @@ msgid "admin.integrations.reason.unfiltered"
 msgstr "Zonder hostEmail-filter: meldt elke meeting van de organisatie."
 
 msgid "admin.integrations.reason.unknown_host"
-msgstr "Hostaccount dat geen groep meer gebruikt."
+msgstr "Hostaccount dat geen dienst meer gebruikt."
 
 msgid "admin.integrations.reason.unused_event"
 msgstr "Gebeurtenis die OpenPlanner niet gebruikt."
@@ -4648,13 +4648,13 @@ msgid "admin.check.title"
 msgstr "Koppeling controleren"
 
 msgid "admin.check.lead"
-msgstr "Controleert bij Webex en Webex Contact Center of gesprekken van deze groep goed aankomen: de host, de routering van het work item naar de queue en de webhooks. Er wordt niets gewijzigd; alleen een ondertekend testbericht naar OpenPlanner zelf."
+msgstr "Controleert bij Webex en Webex Contact Center of gesprekken van deze dienst goed aankomen: de host, de routering van het work item naar de queue en de webhooks. Er wordt niets gewijzigd; alleen een ondertekend testbericht naar OpenPlanner zelf."
 
 msgid "admin.check.button"
 msgstr "Nu controleren"
 
 msgid "admin.check.never"
-msgstr "Deze groep is nog niet gecontroleerd."
+msgstr "Deze dienst is nog niet gecontroleerd."
 
 msgid "admin.check.help"
 msgstr "Zo lost u dit op"
@@ -4699,7 +4699,7 @@ msgid "admin.check.platform.not_configured"
 msgstr "Er is geen Webex Service App ingesteld; er valt niets te controleren."
 
 msgid "admin.check.webex.no_host"
-msgstr "Geen Webex-host ingevuld: deze groep krijgt geen videogesprekken."
+msgstr "Geen Webex-host ingevuld: deze dienst krijgt geen videogesprekken."
 
 msgid "admin.check.webex.host_ok"
 msgstr "Een proefmeeting voor host {host} is gepland zoals een afspraak dat doet, en weer verwijderd."
@@ -4744,7 +4744,7 @@ msgid "admin.check.wxcc.not_configured"
 msgstr "Webex Contact Center is niet ingesteld; de routering is niet gecontroleerd."
 
 msgid "admin.check.wxcc.no_mapping"
-msgstr "Werkitem-kanaal of business address ontbreekt: deze groep maakt geen work items aan."
+msgstr "Werkitem-kanaal of business address ontbreekt: deze dienst maakt geen work items aan."
 
 msgid "admin.check.wxcc.config_refused"
 msgstr "De configuratie van Webex Contact Center kon niet worden gelezen ({error}): nodig is cjp:config_read en de beheerrol voor Contact Center."
@@ -4783,7 +4783,7 @@ msgid "admin.check.wxcc.schema.ok"
 msgstr "Het schema van de asset bevat de velden die OpenPlanner meestuurt."
 
 msgid "admin.check.wxcc.schema.refused"
-msgstr "Webex Contact Center weigert het work item omdat het dataschema van de asset niet past. Open in Control Hub Contact Center > Digital settings > Assets > de asset van deze groep en pas het Data schema aan: voeg deze velden toe (Viewable Yes, Required No): {missing}; zet Required op No bij: {extra}. Alleen bookingReference heeft Required Yes."
+msgstr "Webex Contact Center weigert het work item omdat het dataschema van de asset niet past. Open in Control Hub Contact Center > Digital settings > Assets > de asset van deze dienst en pas het Data schema aan: voeg deze velden toe (Viewable Yes, Required No): {missing}; zet Required op No bij: {extra}. Alleen bookingReference heeft Required Yes."
 
 msgid "admin.check.wxcc.schema.hidden"
 msgstr "Deze velden zijn niet zichtbaar voor agents: {fields}."
@@ -4807,7 +4807,7 @@ msgid "admin.check.wxcc.routing.ok"
 msgstr "De flow leest openplannerGroup om de queue te kiezen."
 
 msgid "admin.check.wxcc.routing.shared"
-msgstr "De flow leest openplannerGroup niet, dus de groepen {groups} komen allemaal in dezelfde queue."
+msgstr "De flow leest openplannerGroup niet, dus de diensten {groups} komen allemaal in dezelfde queue."
 
 msgid "admin.check.wxcc.routing.not_read"
 msgstr "De flow leest openplannerGroup niet: alle work items van dit entry point gaan naar dezelfde queue."
@@ -4828,7 +4828,7 @@ msgid "admin.check.wxcc.queues.wrong_type"
 msgstr "Deze queues zijn geen werkitem-queues: {queues}."
 
 msgid "admin.check.wxcc.naming.ok"
-msgstr "De queuenaam past bij de groep ({queues})."
+msgstr "De queuenaam past bij de dienst ({queues})."
 
 msgid "admin.check.wxcc.naming.no_match"
 msgstr "Geen queue met {value} in de naam (afspraak, geen eis)."
@@ -4870,7 +4870,7 @@ msgid "admin.check.webhooks.listing_refused"
 msgstr "De webhooks bij {platform} konden niet worden opgevraagd ({error})."
 
 msgid "admin.check.webhooks.webex_ok"
-msgstr "De Webex-webhooks voor de host van deze groep zijn actief op het huidige adres."
+msgstr "De Webex-webhooks voor de host van deze dienst zijn actief op het huidige adres."
 
 msgid "admin.check.webhooks.webex_missing"
 msgstr "Deze Webex-webhooks ontbreken voor de host: {events}. Draai register-webhooks (runbook)."
@@ -4902,7 +4902,7 @@ msgid "admin.simulator.lead"
 msgstr "Speel na wat Webex en Webex Contact Center zouden melden, zonder agent of tunnel. Elk event gaat ondertekend door het echte webhook-endpoint en komt op de tijdlijn. Deze kaart bestaat niet in productie."
 
 msgid "admin.simulator.prepare_lead"
-msgstr "Deze boeking heeft nog geen meeting of work item. Geef haar eerst nep-id's, dan kunnen de events haar vinden. Biedt de groep een proefgesprek aan, dan krijgt de boeking ook een open nep-proefgesprek."
+msgstr "Deze boeking heeft nog geen meeting of work item. Geef haar eerst nep-id's, dan kunnen de events haar vinden. Biedt de dienst een proefgesprek aan, dan krijgt de boeking ook een open nep-proefgesprek."
 
 msgid "admin.simulator.prepare"
 msgstr "Nep-meeting en -taak aanmaken"
@@ -4941,7 +4941,7 @@ msgid "admin.done.simulated"
 msgstr "Het event is afgeleverd en staat op de tijdlijn."
 
 msgid "admin.done.simulated_prepared"
-msgstr "De boeking heeft nu een nep-meeting en een nep-taak, en een open nep-proefgesprek als de groep er een aanbiedt."
+msgstr "De boeking heeft nu een nep-meeting en een nep-taak, en een open nep-proefgesprek als de dienst er een aanbiedt."
 
 msgid "admin.done.simulator_no_ids"
 msgstr "Deze boeking heeft daarvoor geen meeting of taak. Maak eerst een nep-meeting en -taak aan."
@@ -4989,7 +4989,7 @@ msgid "admin.retention.title"
 msgstr "Bewaartermijnen"
 
 msgid "admin.retention.intro"
-msgstr "Controle of persoonsgegevens van deelnemers op tijd worden verwijderd, per groep. U ziet hier alleen aantallen en tijden, nooit gegevens van deelnemers."
+msgstr "Controle of persoonsgegevens van deelnemers op tijd worden verwijderd, per dienst. U ziet hier alleen aantallen en tijden, nooit gegevens van deelnemers."
 
 msgid "admin.retention.in_order"
 msgstr "In orde: er zijn geen persoonsgegevens over hun bewaartermijn en geen mislukte verwijderingen."
@@ -5001,10 +5001,10 @@ msgid "admin.retention.summary"
 msgstr "Samenvatting"
 
 msgid "admin.retention.groups"
-msgstr "Bewaartermijnen per groep"
+msgstr "Bewaartermijnen per dienst"
 
 msgid "admin.retention.group"
-msgstr "Groep"
+msgstr "Dienst"
 
 msgid "admin.retention.holding"
 msgstr "Met persoonsgegevens"
@@ -5037,7 +5037,7 @@ msgid "admin.retention.rule"
 msgstr "Persoonsgegevens worden 24 uur na het einde van de afspraak of na de annulering verwijderd. Bij een noodsluiting gebeurt dat uiterlijk 30 dagen na het einde van de sluiting. Een afspraak telt als over de bewaartermijn als de gegevens een uur na dat moment nog niet zijn verwijderd."
 
 msgid "admin.retention.empty"
-msgstr "Er zijn nog geen groepen om te controleren."
+msgstr "Er zijn nog geen diensten om te controleren."
 
 msgid "contacts.heading"
 msgstr "Andere manieren om ons te bereiken"
@@ -5216,13 +5216,13 @@ msgid "admin.roles.copy"
 msgstr "Nieuwe rol"
 
 msgid "admin.roles.copy_lead"
-msgstr "Kies de vaste rol die u als startpunt neemt. Het bereik van die rol (per organisatie of per groep) blijft daarna vast."
+msgstr "Kies de vaste rol die u als startpunt neemt. Het bereik van die rol (per organisatie of per dienst) blijft daarna vast."
 
 msgid "admin.roles.template"
 msgstr "Kopie van"
 
 msgid "admin.roles.template_hint"
-msgstr "Organisatiebeheerder en Compliance en privacy werken per organisatie, groepsbeheerder per groep. Een kopie van Compliance en privacy blijft alleen-lezen en zonder persoonsgegevens."
+msgstr "Organisatiebeheerder en Compliance en privacy werken per organisatie, dienstbeheerder per dienst. Een kopie van Compliance en privacy blijft alleen-lezen en zonder persoonsgegevens."
 
 msgid "admin.roles.new"
 msgstr "Nieuwe rol maken"
@@ -5797,16 +5797,16 @@ msgid "admin.audit.detail.organisation_remove"
 msgstr "organisatie eraf: {value}"
 
 msgid "admin.audit.detail.group_add"
-msgstr "groep erbij: {value}"
+msgstr "dienst erbij: {value}"
 
 msgid "admin.audit.detail.group_remove"
-msgstr "groep eraf: {value}"
+msgstr "dienst eraf: {value}"
 
 msgid "admin.staff.title"
 msgstr "Medewerkers"
 
 msgid "admin.staff.intro"
-msgstr "Wie het beheerportaal gebruikt, met welke rol en voor welke organisaties en groepen. U ziet alleen medewerkers binnen uw eigen organisaties of groepen."
+msgstr "Wie het beheerportaal gebruikt, met welke rol en voor welke organisaties en diensten. U ziet alleen medewerkers binnen uw eigen organisaties of diensten."
 
 msgid "admin.staff.filter"
 msgstr "Medewerkers filteren"
@@ -5815,7 +5815,7 @@ msgid "admin.staff.organisation"
 msgstr "Organisatie"
 
 msgid "admin.staff.group"
-msgstr "Groep"
+msgstr "Dienst"
 
 msgid "admin.staff.role"
 msgstr "Rol"
@@ -5842,7 +5842,7 @@ msgid "admin.staff.organisations"
 msgstr "Organisaties"
 
 msgid "admin.staff.groups"
-msgstr "Groepen"
+msgstr "Diensten"
 
 msgid "admin.staff.first_seen"
 msgstr "Eerste keer ingelogd"
@@ -5875,7 +5875,7 @@ msgid "admin.staff.whole_organisation"
 msgstr "Hele organisatie"
 
 msgid "admin.staff.source"
-msgstr "Rollen, organisaties en groepen komen van de identiteitsprovider en zijn bijgewerkt bij de laatste login. Wijzigen doet u daar."
+msgstr "Rollen, organisaties en diensten komen van de identiteitsprovider en zijn bijgewerkt bij de laatste login. Wijzigen doet u daar."
 
 msgid "admin.staff.empty"
 msgstr "Er zijn geen medewerkers die aan deze keuze voldoen."
@@ -5893,16 +5893,16 @@ msgid "admin.staff.activity"
 msgstr "Recente activiteit"
 
 msgid "admin.staff.activity_intro"
-msgstr "De laatste {count} gebeurtenissen uit de auditlog binnen uw eigen organisaties of groepen."
+msgstr "De laatste {count} gebeurtenissen uit de auditlog binnen uw eigen organisaties of diensten."
 
 msgid "admin.staff.activity_empty"
-msgstr "Geen activiteit binnen uw organisaties of groepen."
+msgstr "Geen activiteit binnen uw organisaties of diensten."
 
 msgid "admin.embedding.title"
 msgstr "Insluiten op websites"
 
 msgid "admin.embedding.org_lead"
-msgstr "De websites waarop de groepen van {name} als widget mogen staan. Een groep verschijnt pas als die in haar eigen instellingen insluiten aanzet."
+msgstr "De websites waarop de diensten van {name} als widget mogen staan. Een dienst verschijnt pas als die in haar eigen instellingen insluiten aanzet."
 
 msgid "admin.embedding.form"
 msgstr "Toegestane websites"
@@ -5923,10 +5923,10 @@ msgid "admin.embedding.origins_hint_local"
 msgstr "Alleen het begin van het webadres, zoals https://www.acme.nl. Geen pad, geen sterretjes; een subdomein telt als een eigen website. Op deze testomgeving mag ook http://localhost met poort. Maximaal {count}."
 
 msgid "admin.embedding.groups"
-msgstr "Groepen"
+msgstr "Diensten"
 
 msgid "admin.embedding.groups_lead"
-msgstr "Of een groep in de widget verschijnt, zet u aan bij Groepsinstellingen › Insluiten op websites."
+msgstr "Of een dienst in de widget verschijnt, zet u aan bij Dienstinstellingen › Insluiten op websites."
 
 msgid "admin.embedding.col.embedded"
 msgstr "In de widget"
@@ -5938,7 +5938,7 @@ msgid "admin.embedding.off"
 msgstr "Uit"
 
 msgid "admin.embedding.no_groups"
-msgstr "Deze organisatie heeft nog geen groepen."
+msgstr "Deze organisatie heeft nog geen diensten."
 
 msgid "admin.embedding.error.origin"
 msgstr "Regel {line} is geen website. Vul alleen het begin van het webadres in, zoals https://www.acme.nl."
@@ -5980,7 +5980,7 @@ msgid "admin.embedding.code_no_build"
 msgstr "Op deze installatie is het widgetscript niet gebouwd; de code staat hier zonder integrity."
 
 msgid "admin.embedding.code_none"
-msgstr "Zet eerst bij een groep Insluiten op websites aan."
+msgstr "Zet eerst bij een dienst Insluiten op websites aan."
 
 msgid "admin.nav.settings"
 msgstr "Geavanceerde instellingen"
@@ -6412,7 +6412,7 @@ msgid "settings.field.maintenance_alert_repeat_hours.label"
 msgstr "Melding lang onderhoud herhalen elke (uren)"
 
 msgid "settings.field.integration_check_interval_hours.label"
-msgstr "Koppeling van elke groep controleren elke (uren)"
+msgstr "Koppeling van elke dienst controleren elke (uren)"
 
 msgid "settings.field.security_event_max_sources.label"
 msgstr "Maximaal aantal bijgehouden bronnen voor beveiligingsgebeurtenissen"
@@ -6472,7 +6472,7 @@ msgid "admin.org_settings.page_title"
 msgstr "Instellingen van {name}"
 
 msgid "admin.org_settings.page_lead"
-msgstr "Deze waarden gelden voor de groepen, deelnemerspagina's, mails en beheerders van deze organisatie. Een wijziging geldt binnen tien seconden."
+msgstr "Deze waarden gelden voor de diensten, deelnemerspagina's, mails en beheerders van deze organisatie. Een wijziging geldt binnen tien seconden."
 
 msgid "admin.org_settings.settings"
 msgstr "Instellingen"
@@ -6799,7 +6799,7 @@ msgid "admin.settings.login.title"
 msgstr "Inlogkoppeling wijzigen"
 
 msgid "admin.settings.login.intro"
-msgstr "Welke claims van de identity provider de rollen, organisaties en groepen dragen, en welke waarde welke rol is. Na het testen logt u opnieuw in; de nieuwe koppeling wordt alleen bewaard als u daarna nog superuser bent."
+msgstr "Welke claims van de identity provider de rollen, organisaties en diensten dragen, en welke waarde welke rol is. Na het testen logt u opnieuw in; de nieuwe koppeling wordt alleen bewaard als u daarna nog superuser bent."
 
 msgid "admin.settings.login.test"
 msgstr "Testen met een nieuwe login"
@@ -6814,7 +6814,7 @@ msgid "admin.form.error.login_lockout"
 msgstr "Met deze koppeling zou u geen superuser meer zijn; ze is niet bewaard."
 
 msgid "admin.overview.widget.queue.group"
-msgstr "Groep"
+msgstr "Dienst"
 
 msgid "admin.overview.widget.queue.waiting"
 msgstr "Wachtend"
@@ -7084,13 +7084,13 @@ msgid "admin.check.worker.no_dispatch_jobs"
 msgstr "De worker maakt geen work items: hij is gestart zonder de WxCC-instellingen. Start de worker opnieuw nadat WXCC_API_BASE_URL is ingesteld."
 
 msgid "admin.check.worker.jobs_ok"
-msgstr "Geen mislukte of achterstallige taken in deze groep."
+msgstr "Geen mislukte of achterstallige taken in deze dienst."
 
 msgid "admin.check.worker.failed_jobs"
-msgstr "{count} taken van deze groep zijn mislukt. Open de afspraak in de agenda om te zien waarom en probeer het opnieuw."
+msgstr "{count} taken van deze dienst zijn mislukt. Open de afspraak in de agenda om te zien waarom en probeer het opnieuw."
 
 msgid "admin.check.worker.overdue_jobs"
-msgstr "{count} taken van deze groep wachten langer dan {minutes} minuten op de worker."
+msgstr "{count} taken van deze dienst wachten langer dan {minutes} minuten op de worker."
 
 msgid "audit.event.integration_service_app_check"
 msgstr "Service App gecontroleerd"
@@ -7102,13 +7102,13 @@ msgid "admin.audit.reason.already_done"
 msgstr "Al gedaan: de meeting of taak bestaat al."
 
 msgid "admin.audit.reason.no_video"
-msgstr "Niet nodig: deze groep heeft geen Webex-host."
+msgstr "Niet nodig: deze dienst heeft geen Webex-host."
 
 msgid "admin.audit.reason.own_queue"
-msgstr "Niet nodig: deze groep gebruikt de eigen wachtrij van OpenPlanner, er komt geen contactcentertaak."
+msgstr "Niet nodig: deze dienst gebruikt de eigen wachtrij van OpenPlanner, er komt geen contactcentertaak."
 
 msgid "admin.audit.reason.no_dispatch"
-msgstr "Niet mogelijk: deze groep heeft geen werkitem-kanaal of business address."
+msgstr "Niet mogelijk: deze dienst heeft geen werkitem-kanaal of business address."
 
 msgid "admin.audit.detail.retry_create_video_room"
 msgstr "videomeeting opnieuw gepland"
@@ -7126,7 +7126,7 @@ msgid "settings.field.integration_request_retention_days.label"
 msgstr "Verzoeken aan Webex en WxCC bewaren (dagen)"
 
 msgid "settings.field.group_erase_after_days.label"
-msgstr "Gearchiveerde groep wissen na (dagen)"
+msgstr "Gearchiveerde dienst wissen na (dagen)"
 
 msgid "settings.field.integration_probe_timeout_seconds.label"
 msgstr "Wachten op de events van het proef-work item (seconden)"
@@ -7428,7 +7428,7 @@ msgid "admin.overview.chart.joiner"
 msgstr "; "
 
 msgid "admin.overview.chart.group"
-msgstr "Groep"
+msgstr "Dienst"
 
 msgid "admin.overview.chart.table"
 msgstr "Gegevens als tabel"
@@ -7592,13 +7592,13 @@ msgid "admin.org_texts.title"
 msgstr "Teksten voor deelnemers"
 
 msgid "admin.org_texts.lead"
-msgstr "Hier past u de teksten aan die deelnemers van {name} zien op de pagina's van de groepen en in mails en sms'jes. Opmaak, links en de agenda-bijlage blijven vast; u past alleen de tekst aan."
+msgstr "Hier past u de teksten aan die deelnemers van {name} zien op de pagina's van de diensten en in mails en sms'jes. Opmaak, links en de agenda-bijlage blijven vast; u past alleen de tekst aan."
 
 msgid "admin.org_texts.languages_heading"
 msgstr "Taal van de teksten"
 
 msgid "admin.org_texts.order"
-msgstr "Volgorde: de eigen tekst van een groep gaat voor, dan de tekst van de organisatie, dan de standaardtekst."
+msgstr "Volgorde: de eigen tekst van een dienst gaat voor, dan de tekst van de organisatie, dan de standaardtekst."
 
 msgid "admin.org_texts.custom"
 msgstr "Eigen tekst van deze organisatie."
@@ -7610,7 +7610,7 @@ msgid "admin.org_texts.section_pages"
 msgstr "Pagina's voor deelnemers"
 
 msgid "admin.org_texts.page.group_intro"
-msgstr "Inleiding op de pagina van de groep"
+msgstr "Inleiding op de pagina van de dienst"
 
 msgid "admin.org_texts.page.direct_card_title"
 msgstr "Kaart voor een direct gesprek: titel"
@@ -7788,7 +7788,7 @@ msgid "authz.permission.idp_mapping_view"
 msgstr "Koppeling identiteitsprovider bekijken"
 
 msgid "authz.permission.idp_mapping_manage"
-msgstr "IdP-waarde van een groep wijzigen"
+msgstr "IdP-waarde van een dienst wijzigen"
 
 msgid "settings.field.oidc_entitlement_claim.label"
 msgstr "Claim met rechten (entitlements)"
@@ -7806,7 +7806,7 @@ msgid "admin.form.error.idp_key_taken"
 msgstr "Deze IdP-waarde is al in gebruik. Kies een andere."
 
 msgid "admin.login_refused.ambiguous_claims"
-msgstr "Uw account heeft meer dan één rol voor meer dan één organisatie of groep. Zo kan OpenPlanner niet zien welke rol waar geldt. Vraag het IdP-team om rechten per organisatie of groep (entitlements) of om de rollen te splitsen."
+msgstr "Uw account heeft meer dan één rol voor meer dan één organisatie of dienst. Zo kan OpenPlanner niet zien welke rol waar geldt. Vraag het IdP-team om rechten per organisatie of dienst (entitlements) of om de rollen te splitsen."
 
 msgid "admin.login_refused.too_many_entitlements"
 msgstr "Uw account stuurt meer rechten mee dan OpenPlanner kan verwerken. Vraag het IdP-team om alleen de rechten voor OpenPlanner mee te sturen."
@@ -7839,7 +7839,7 @@ msgid "audit.event.organisation_idp_key_changed"
 msgstr "IdP-waarde van de organisatie gewijzigd"
 
 msgid "audit.event.group_idp_key_changed"
-msgstr "IdP-waarde van de groep gewijzigd"
+msgstr "IdP-waarde van de dienst gewijzigd"
 
 msgid "audit.event.idp_mapping_exported"
 msgstr "Koppeling identiteitsprovider gedownload"
@@ -7848,7 +7848,7 @@ msgid "admin.idp_mapping.title"
 msgstr "Koppeling identiteitsprovider"
 
 msgid "admin.idp_mapping.intro"
-msgstr "Deze waarden moet de identiteitsprovider meesturen in de claim {claim}. Eén waarde per rol per organisatie of groep. Rechten toekennen doet het IdP-team; hier ziet u wat het moet sturen en wat er binnenkwam."
+msgstr "Deze waarden moet de identiteitsprovider meesturen in de claim {claim}. Eén waarde per rol per organisatie of dienst. Rechten toekennen doet het IdP-team; hier ziet u wat het moet sturen en wat er binnenkwam."
 
 msgid "admin.idp_mapping.export"
 msgstr "Downloaden als tekst"
@@ -7902,7 +7902,7 @@ msgid "admin.idp_mapping.never"
 msgstr "nooit"
 
 msgid "admin.idp_mapping.group"
-msgstr "Groep"
+msgstr "Dienst"
 
 msgid "admin.idp_mapping.organisations_empty"
 msgstr "Er zijn geen organisaties binnen uw bereik."
@@ -7941,10 +7941,10 @@ msgid "admin.idp_mapping.reason.unknown_organisation"
 msgstr "onbekende organisatie"
 
 msgid "admin.idp_mapping.reason.unknown_group"
-msgstr "onbekende groep"
+msgstr "onbekende dienst"
 
 msgid "admin.idp_mapping.reason.group_not_in_organisation"
-msgstr "groep hoort niet bij deze organisatie"
+msgstr "dienst hoort niet bij deze organisatie"
 
 msgid "admin.idp_mapping.reason.scope_not_allowed"
 msgstr "doel past niet bij het bereik van de rol"
@@ -7956,7 +7956,7 @@ msgid "admin.group.idp_key.title"
 msgstr "Koppeling identiteitsprovider"
 
 msgid "admin.group.idp_key.lead"
-msgstr "De waarde waarmee de identiteitsprovider deze groep noemt in een recht, bijvoorbeeld openplanner:group_admin:org-a/balie. De volledige lijst staat op de pagina Koppeling identiteitsprovider."
+msgstr "De waarde waarmee de identiteitsprovider deze dienst noemt in een recht, bijvoorbeeld openplanner:group_admin:org-a/balie. De volledige lijst staat op de pagina Koppeling identiteitsprovider."
 
 msgid "admin.group.idp_key.hint"
 msgstr "Kleine letters, cijfers en koppeltekens; uniek binnen de organisatie. Wijzigen vraagt een nieuwe login."
@@ -7983,7 +7983,7 @@ msgid "admin.staff.refused_received"
 msgstr "Ontvangen"
 
 msgid "admin.rights.grants"
-msgstr "Rechten per organisatie of groep"
+msgstr "Rechten per organisatie of dienst"
 
 msgid "admin.rights.refused"
 msgstr "Niet herkende rechten"
@@ -7992,13 +7992,13 @@ msgid "admin.rights.refused_intro"
 msgstr "Deze waarden stuurde de identiteitsprovider bij uw laatste login mee, maar deze installatie herkent ze niet. Geef ze door aan het IdP-team."
 
 msgid "admin.roles.entitlement_notice"
-msgstr "Werkt de installatie met een rechtenclaim, dan stuurt de identiteitsprovider per organisatie of groep één waarde met de sleutel van deze rol, bijvoorbeeld openplanner:custom.3:org-a. De sleutel en de exacte waarden staan op de pagina Koppeling identiteitsprovider."
+msgstr "Werkt de installatie met een rechtenclaim, dan stuurt de identiteitsprovider per organisatie of dienst één waarde met de sleutel van deze rol, bijvoorbeeld openplanner:custom.3:org-a. De sleutel en de exacte waarden staan op de pagina Koppeling identiteitsprovider."
 
 msgid "admin.form.error.idp_key"
 msgstr "Gebruik alleen kleine letters, cijfers en koppeltekens (hoogstens 63 tekens), beginnend met een letter of cijfer."
 
 msgid "admin.nav.groups"
-msgstr "Groepen"
+msgstr "Diensten"
 
 msgid "admin.nav.object.organisation"
 msgstr "Organisatie"
@@ -8028,16 +8028,16 @@ msgid "admin.organisation.subsections"
 msgstr "Onderdelen van dit tabblad"
 
 msgid "admin.organisation.groups"
-msgstr "Groepen"
+msgstr "Diensten"
 
 msgid "admin.organisation.groups_lead"
-msgstr "De groepen van deze organisatie waar u rechten op heeft. Een groep opent op haar eigen pagina."
+msgstr "De diensten van deze organisatie waar u rechten op heeft. Een dienst opent op haar eigen pagina."
 
 msgid "admin.organisation.no_groups"
-msgstr "Deze organisatie heeft nog geen groepen waar u rechten op heeft."
+msgstr "Deze organisatie heeft nog geen diensten waar u rechten op heeft."
 
 msgid "admin.organisation.all_groups"
-msgstr "Deze groepen in de lijst Groepen"
+msgstr "Deze diensten in de lijst Diensten"
 
 msgid "admin.organisation.profile"
 msgstr "Profiel"
@@ -8046,16 +8046,16 @@ msgid "admin.organisation.edit"
 msgstr "Naam en taal wijzigen"
 
 msgid "admin.organisations.groups"
-msgstr "Groepen"
+msgstr "Diensten"
 
 msgid "admin.organisations.groups_of"
-msgstr "Groepen van {name}"
+msgstr "Diensten van {name}"
 
 msgid "admin.groups.title"
-msgstr "Groepen"
+msgstr "Diensten"
 
 msgid "admin.groups.lead"
-msgstr "Alle groepen waar u rechten op heeft, met hun organisatie. Een groep opent op haar eigen pagina."
+msgstr "Alle diensten waar u rechten op heeft, met hun organisatie. Een dienst opent op haar eigen pagina."
 
 msgid "admin.groups.filter"
 msgstr "Filteren"
@@ -8073,13 +8073,13 @@ msgid "admin.groups.clear"
 msgstr "Wis filters"
 
 msgid "admin.groups.count"
-msgstr "Aantal groepen: {count}"
+msgstr "Aantal diensten: {count}"
 
 msgid "admin.groups.of_total"
-msgstr "Van {total} groepen in totaal."
+msgstr "Van {total} diensten in totaal."
 
 msgid "admin.groups.none"
-msgstr "Geen groepen gevonden."
+msgstr "Geen diensten gevonden."
 
 msgid "admin.groups.duration"
 msgstr "Duur"
@@ -8121,7 +8121,7 @@ msgid "admin.org_texts.role.org_admin"
 msgstr "Naam van de organisatiebeheerder"
 
 msgid "admin.org_texts.role.group_admin"
-msgstr "Naam van de groepsbeheerder"
+msgstr "Naam van de dienstbeheerder"
 
 msgid "admin.org_texts.role.hint"
 msgstr "Alleen een naam op het scherm: de rechten veranderen niet. Naast de rechten blijft de standaardnaam zichtbaar."
@@ -8130,25 +8130,25 @@ msgid "admin.form.error.role_display_name"
 msgstr "Vul een naam in van {min} tot {max} tekens, zonder accolades, die niet de naam van een andere rol is."
 
 msgid "admin.done.archived"
-msgstr "De groep is gearchiveerd. De pagina voor deelnemers is weg; het portaal toont de groep nog alleen-lezen onder het filter Gearchiveerd."
+msgstr "De dienst is gearchiveerd. De pagina voor deelnemers is weg; het portaal toont de dienst nog alleen-lezen onder het filter Gearchiveerd."
 
 msgid "admin.form.error.group_archived"
-msgstr "Deze groep is gearchiveerd en kan niet meer worden gewijzigd."
+msgstr "Deze dienst is gearchiveerd en kan niet meer worden gewijzigd."
 
 msgid "admin.form.error.confirmation_mismatch"
 msgstr "Typ de naam precies zo over als hij hierboven staat."
 
 msgid "admin.group.archive.title"
-msgstr "Groep archiveren"
+msgstr "Dienst archiveren"
 
 msgid "admin.group.archive.settings_lead"
-msgstr "Een gearchiveerde groep neemt geen afspraken meer aan en verdwijnt uit het portaal. Het webadres blijft gereserveerd."
+msgstr "Een gearchiveerde dienst neemt geen afspraken meer aan en verdwijnt uit het portaal. Het webadres blijft gereserveerd."
 
 msgid "admin.group.archive.open"
-msgstr "Groep archiveren…"
+msgstr "Dienst archiveren…"
 
 msgid "admin.group.archive.lead"
-msgstr "Archiveren kan niet ongedaan worden gemaakt in het portaal. Lees wat er gebeurt en typ dan de naam van de groep over."
+msgstr "Archiveren kan niet ongedaan worden gemaakt in het portaal. Lees wat er gebeurt en typ dan de naam van de dienst over."
 
 msgid "admin.group.archive.what_happens"
 msgstr "Wat er gebeurt"
@@ -8157,43 +8157,43 @@ msgid "admin.group.archive.effect_public"
 msgstr "De pagina /g/{slug} en de widget geven meteen “niet gevonden”; nieuwe afspraken zijn niet meer mogelijk."
 
 msgid "admin.group.archive.effect_portal"
-msgstr "De groep verdwijnt uit het overzicht, de lijsten en de menu's. Via het filter “Alleen gearchiveerde groepen” blijft hij alleen-lezen te zien."
+msgstr "De dienst verdwijnt uit het overzicht, de lijsten en de menu's. Via het filter “Alleen gearchiveerde diensten” blijft hij alleen-lezen te zien."
 
 msgid "admin.group.archive.effect_slug"
-msgstr "Het webadres blijft gereserveerd: een nieuwe groep kan het niet overnemen."
+msgstr "Het webadres blijft gereserveerd: een nieuwe dienst kan het niet overnemen."
 
 msgid "admin.group.archive.effect_data"
-msgstr "Afspraken uit het verleden blijven tot de gewone opruimtermijn; daarna wist het portaal de groep vanzelf. Het logboek houdt het webadres."
+msgstr "Afspraken uit het verleden blijven tot de gewone opruimtermijn; daarna wist het portaal de dienst vanzelf. Het logboek houdt het webadres."
 
 msgid "admin.group.archive.bookings_ahead"
 msgstr "Er staan nog {count} afspraken in de toekomst. Archiveren kan pas als die zijn geweest, verzet of geannuleerd."
 
 msgid "admin.group.archive.close_first"
-msgstr "Sluit de groep eerst (noodsluiting)."
+msgstr "Sluit de dienst eerst (noodsluiting)."
 
 msgid "admin.group.archive.confirm_heading"
 msgstr "Bevestigen"
 
 msgid "admin.group.archive.confirmation"
-msgstr "Naam van de groep"
+msgstr "Naam van de dienst"
 
 msgid "admin.group.archive.confirmation_hint"
 msgstr "Typ “{name}” over om te bevestigen."
 
 msgid "admin.group.archive.button"
-msgstr "Groep archiveren"
+msgstr "Dienst archiveren"
 
 msgid "admin.group.archive.blocked_hint"
 msgstr "Het portaal weigert zolang er afspraken in de toekomst staan."
 
 msgid "admin.group.archived_notice"
-msgstr "Deze groep is gearchiveerd. U kunt nog lezen, niet wijzigen."
+msgstr "Deze dienst is gearchiveerd. U kunt nog lezen, niet wijzigen."
 
 msgid "admin.groups.archived_only"
-msgstr "Alleen gearchiveerde groepen"
+msgstr "Alleen gearchiveerde diensten"
 
 msgid "admin.groups.archived_lead"
-msgstr "Gearchiveerde groepen: alleen-lezen, zonder pagina voor deelnemers."
+msgstr "Gearchiveerde diensten: alleen-lezen, zonder pagina voor deelnemers."
 
 msgid "admin.audit.detail.archived"
 msgstr "gearchiveerd"
@@ -8202,7 +8202,7 @@ msgid "admin.done.organisation_deleted"
 msgstr "De organisatie is verwijderd."
 
 msgid "admin.form.error.organisation_has_groups"
-msgstr "Deze organisatie heeft nog groepen, gearchiveerde meegerekend. Verwijderen kan pas als die weg zijn."
+msgstr "Deze organisatie heeft nog diensten, gearchiveerde meegerekend. Verwijderen kan pas als die weg zijn."
 
 msgid "admin.form.error.organisation_has_api_clients"
 msgstr "Deze organisatie heeft nog API-clients. Verwijder die eerst."
@@ -8211,7 +8211,7 @@ msgid "admin.organisation.delete.title"
 msgstr "Organisatie verwijderen"
 
 msgid "admin.organisation.delete.form_lead"
-msgstr "Een organisatie zonder groepen en API-clients kan worden verwijderd, met alles wat bij haar hoort."
+msgstr "Een organisatie zonder diensten en API-clients kan worden verwijderd, met alles wat bij haar hoort."
 
 msgid "admin.organisation.delete.open"
 msgstr "Organisatie verwijderen…"
@@ -8235,10 +8235,10 @@ msgid "admin.organisation.delete.not_empty"
 msgstr "De organisatie is nog niet leeg:"
 
 msgid "admin.organisation.delete.groups_left"
-msgstr "{count} groepen, gearchiveerde meegerekend. Een gearchiveerde groep verdwijnt vanzelf na de wistermijn."
+msgstr "{count} diensten, gearchiveerde meegerekend. Een gearchiveerde dienst verdwijnt vanzelf na de wistermijn."
 
 msgid "admin.organisation.delete.see_archived"
-msgstr "Bekijk de groepen."
+msgstr "Bekijk de diensten."
 
 msgid "admin.organisation.delete.api_clients_left"
 msgstr "{count} API-clients."
@@ -8289,7 +8289,7 @@ msgid "admin.holidays.rename"
 msgstr "Naam wijzigen"
 
 msgid "admin.holidays.rename_lead"
-msgstr "Het webadres van de kalender blijft hetzelfde; organisaties en groepen die hem gebruiken volgen de nieuwe naam."
+msgstr "Het webadres van de kalender blijft hetzelfde; organisaties en diensten die hem gebruiken volgen de nieuwe naam."
 
 msgid "admin.holidays.calendar_name"
 msgstr "Naam van de kalender"
@@ -8553,7 +8553,7 @@ msgid "admin.idp.test_result.grants"
 msgstr "Rechten die de waarden opleveren"
 
 msgid "admin.idp.test_result.no_grants"
-msgstr "Geen rechten: de waarden ontbreken, hebben een andere prefix of noemen onbekende organisaties of groepen."
+msgstr "Geen rechten: de waarden ontbreken, hebben een andere prefix of noemen onbekende organisaties of diensten."
 
 msgid "admin.idp.test_result.refused"
 msgstr "Geweigerde waarden"
@@ -8592,7 +8592,7 @@ msgid "admin.api.delete"
 msgstr "API-client verwijderen"
 
 msgid "admin.api.delete_lead"
-msgstr "Verwijderen wist de client met zijn tokens en groepskoppelingen. Het logboek houdt zijn id. Een client moet eerst zijn uitgeschakeld."
+msgstr "Verwijderen wist de client met zijn tokens en dienstkoppelingen. Het logboek houdt zijn id. Een client moet eerst zijn uitgeschakeld."
 
 msgid "admin.api.delete_disable_first"
 msgstr "Schakel de client eerst uit om hem te kunnen verwijderen."
@@ -8601,7 +8601,7 @@ msgid "admin.api.delete_button"
 msgstr "{name} verwijderen"
 
 msgid "admin.api.archived_groups"
-msgstr "De toegang van deze client noemt gearchiveerde groepen: {groups}. Zolang de koppeling blijft staan, wordt de groep niet gewist. Sla het formulier hieronder op of verwijder de client om de koppeling te laten vervallen."
+msgstr "De toegang van deze client noemt gearchiveerde diensten: {groups}. Zolang de koppeling blijft staan, wordt de dienst niet gewist. Sla het formulier hieronder op of verwijder de client om de koppeling te laten vervallen."
 
 msgid "admin.nav.logging"
 msgstr "Logbestemmingen"
@@ -8757,7 +8757,7 @@ msgid "admin.logging.include_diagnostic"
 msgstr "Diagnosegebeurtenissen"
 
 msgid "admin.logging.include_diagnostic_hint"
-msgstr "Foutopsporingsdetail dat alleen wordt vastgelegd zolang de diagnosemodus voor een groep aan staat. Ze verlaten de installatie alleen naar een bestemming die erom vraagt."
+msgstr "Foutopsporingsdetail dat alleen wordt vastgelegd zolang de diagnosemodus voor een dienst aan staat. Ze verlaten de installatie alleen naar een bestemming die erom vraagt."
 
 msgid "admin.logging.state"
 msgstr "Stand"
@@ -9069,7 +9069,7 @@ msgid "admin.staff.manage.place"
 msgstr "Plaats"
 
 msgid "admin.staff.manage.place_hint"
-msgstr "Een organisatie of een groep. Alleen de rol superuser geldt voor het hele platform."
+msgstr "Een organisatie of een dienst. Alleen de rol superuser geldt voor het hele platform."
 
 msgid "admin.staff.manage.whole_platform"
 msgstr "Hele platform"
@@ -9842,7 +9842,7 @@ msgid "admin.logging_in.continue"
 msgstr "Doorgaan naar de inlogdienst"
 
 msgid "admin.alerts.text.check"
-msgstr "De controle van de koppeling van deze groep vond een probleem ({code}). Open de groep en kies Koppeling controleren voor de uitleg."
+msgstr "De controle van de koppeling van deze dienst vond een probleem ({code}). Open de dienst en kies Koppeling controleren voor de uitleg."
 
 msgid "settings.field.task_reconcile_interval_minutes.label"
 msgstr "Taakstatus nalopen elke (minuten)"
@@ -9965,7 +9965,7 @@ msgid "admin.routing.summary"
 msgstr "{subjects} onderwerpen, {attributes} routingvragen, {mapped} doorgegeven aan het contactcenter."
 
 msgid "admin.routing.summary_none"
-msgstr "Deze groep vraagt geen onderwerp en geen routingvragen."
+msgstr "Deze dienst vraagt geen onderwerp en geen routingvragen."
 
 msgid "admin.routing.open"
 msgstr "Onderwerpen en routing openen"
@@ -10010,13 +10010,13 @@ msgid "admin.routing.subject.add"
 msgstr "Onderwerp toevoegen"
 
 msgid "admin.routing.subject.add_lead"
-msgstr "Een groep heeft hoogstens {count} onderwerpen."
+msgstr "Een dienst heeft hoogstens {count} onderwerpen."
 
 msgid "admin.routing.subject.add_button"
 msgstr "Onderwerp toevoegen"
 
 msgid "admin.routing.subject.limit_reached"
-msgstr "Deze groep heeft het maximum van {count} onderwerpen."
+msgstr "Deze dienst heeft het maximum van {count} onderwerpen."
 
 msgid "admin.routing.subject.edit_lead"
 msgstr "Code {code}; die blijft vast."
@@ -10067,13 +10067,13 @@ msgid "admin.routing.source.subject"
 msgstr "Onderwerp"
 
 msgid "admin.routing.error.subject_code"
-msgstr "Kies een code van kleine letters, cijfers en streepjes die deze groep nog niet heeft."
+msgstr "Kies een code van kleine letters, cijfers en streepjes die deze dienst nog niet heeft."
 
 msgid "admin.routing.error.subject_label"
 msgstr "Vul de naam in, hoogstens 80 tekens."
 
 msgid "admin.routing.error.subjects"
-msgstr "Deze groep heeft al het maximum aantal onderwerpen."
+msgstr "Deze dienst heeft al het maximum aantal onderwerpen."
 
 msgid "admin.routing.error.subject_in_use"
 msgstr "Een blok biedt dit onderwerp nog aan. Haal het eerst bij dat blok weg."
@@ -10094,7 +10094,7 @@ msgid "admin.field.block_subjects_hint"
 msgstr "Niets aangevinkt: het blok biedt alle onderwerpen. Een deelnemer die een onderwerp kiest, ziet alleen de tijden van blokken die het aanbieden."
 
 msgid "settings.field.max_subjects_per_group.label"
-msgstr "Onderwerpen per groep (maximaal)"
+msgstr "Onderwerpen per dienst (maximaal)"
 
 msgid "admin.tab.planning"
 msgstr "Planning"
@@ -10139,19 +10139,19 @@ msgid "admin.readiness.state.not_needed"
 msgstr "Niet nodig"
 
 msgid "admin.dashboard.filter"
-msgstr "Groepen filteren"
+msgstr "Diensten filteren"
 
 msgid "admin.dashboard.only_closed"
-msgstr "Alleen groepen met een actieve noodsluiting"
+msgstr "Alleen diensten met een actieve noodsluiting"
 
 msgid "admin.dashboard.closed_count"
-msgstr "Groepen met een actieve noodsluiting: {count} van {total}"
+msgstr "Diensten met een actieve noodsluiting: {count} van {total}"
 
 msgid "admin.dashboard.closed"
 msgstr "Noodsluiting actief"
 
 msgid "admin.dashboard.no_closed"
-msgstr "Geen enkele groep heeft nu een actieve noodsluiting."
+msgstr "Geen enkele dienst heeft nu een actieve noodsluiting."
 
 msgid "admin.api.filter"
 msgstr "API-clients filteren"
@@ -10202,7 +10202,7 @@ msgid "alert.message.organisation"
 msgstr "Organisatie: {organisation}."
 
 msgid "alert.message.group"
-msgstr "Groep: {group}."
+msgstr "Dienst: {group}."
 
 msgid "alert.message.repeated"
 msgstr "Sinds het vorige bericht nog {count} keer gemeld."
@@ -10477,7 +10477,7 @@ msgid "admin.fallback.banner.title"
 msgstr "Terugval actief"
 
 msgid "admin.fallback.banner.text"
-msgstr "Het contactcenter is onbereikbaar sinds {time}. De afspraken van deze groep komen nu in deze wachtrij."
+msgstr "Het contactcenter is onbereikbaar sinds {time}. De afspraken van deze dienst komen nu in deze wachtrij."
 
 msgid "admin.fallback.end"
 msgstr "Terugval beëindigen"
@@ -10492,7 +10492,7 @@ msgid "admin.alerts.source.fallback"
 msgstr "Terugval naar de eigen wachtrij"
 
 msgid "admin.alerts.text.fallback"
-msgstr "Deze groep valt terug op haar eigen wachtrij, omdat het contactcenter onbereikbaar is. Open de wachtrij om afspraken op te pakken."
+msgstr "Deze dienst valt terug op haar eigen wachtrij, omdat het contactcenter onbereikbaar is. Open de wachtrij om afspraken op te pakken."
 
 msgid "call.event.fallback_queued"
 msgstr "In de eigen wachtrij gezet (terugval)"
@@ -10558,10 +10558,10 @@ msgid "reports.list.title"
 msgstr "Rapporten"
 
 msgid "reports.list.intro"
-msgstr "Hoe de groepen die u mag zien worden gebruikt: boekingen van de laatste vier weken. Open een groep voor alle cijfers."
+msgstr "Hoe de diensten die u mag zien worden gebruikt: boekingen van de laatste vier weken. Open een dienst voor alle cijfers."
 
 msgid "reports.list.group"
-msgstr "Groep"
+msgstr "Dienst"
 
 msgid "reports.list.created"
 msgstr "Boekingen gemaakt (28 dagen)"
@@ -10570,10 +10570,10 @@ msgid "reports.list.open"
 msgstr "Gebruik openen"
 
 msgid "reports.list.empty"
-msgstr "Er is geen groep waarvan u de rapporten mag zien."
+msgstr "Er is geen dienst waarvan u de rapporten mag zien."
 
 msgid "reports.list.rule"
-msgstr "Een aantal onder het minimum wordt verborgen; er is geen totaal over groepen."
+msgstr "Een aantal onder het minimum wordt verborgen; er is geen totaal over diensten."
 
 msgid "reports.usage.title"
 msgstr "Gebruik"
@@ -10582,7 +10582,7 @@ msgid "reports.usage.heading"
 msgstr "Gebruik"
 
 msgid "reports.usage.lead"
-msgstr "Alleen aantallen, geen persoonsgegevens. Dagen zijn hele dagen in de tijdzone van de groep zelf."
+msgstr "Alleen aantallen, geen persoonsgegevens. Dagen zijn hele dagen in de tijdzone van de dienst zelf."
 
 msgid "reports.usage.from"
 msgstr "Van"
@@ -10795,7 +10795,7 @@ msgid "admin.channels.cc_not_connected"
 msgstr "Koppeling van de installatie"
 
 msgid "admin.channels.cc_lead"
-msgstr "De koppeling van deze organisatie met haar eigen contactcenter: het platform, het API-adres en de OAuth-client. Taken van de groepen van deze organisatie gaan via deze koppeling."
+msgstr "De koppeling van deze organisatie met haar eigen contactcenter: het platform, het API-adres en de OAuth-client. Taken van de diensten van deze organisatie gaan via deze koppeling."
 
 msgid "admin.channels.cc_fallback"
 msgstr "Zolang hier niets is ingesteld, gebruikt deze organisatie de koppeling die voor de hele installatie is ingesteld."
@@ -10927,7 +10927,7 @@ msgid "reports.wallboard.open_kiosk"
 msgstr "Open schermvullend"
 
 msgid "reports.wallboard.groups"
-msgstr "Groepen op dit bord"
+msgstr "Diensten op dit bord"
 
 msgid "reports.wallboard.pause"
 msgstr "Pauzeer verversen"
@@ -10966,7 +10966,7 @@ msgid "reports.wallboard.refresh"
 msgstr "ververst elke {n} seconden"
 
 msgid "reports.wallboard.live.none"
-msgstr "Live getallen zie je voor groepen met een eigen wachtrij, als je de wachtrij mag werken."
+msgstr "Live getallen zie je voor diensten met een eigen wachtrij, als je de wachtrij mag werken."
 
 msgid "reports.wallboard.as_of"
 msgstr "per {time}"
@@ -10981,7 +10981,7 @@ msgid "reports.wallboard.tile.connected"
 msgstr "In gesprek"
 
 msgid "reports.wallboard.tile.connected.groups"
-msgstr "{n} van {m} groepen hebben een eigen wachtrij"
+msgstr "{n} van {m} diensten hebben een eigen wachtrij"
 
 msgid "reports.wallboard.tile.connected.detail"
 msgstr "deelnemers nu in gesprek"
@@ -11047,7 +11047,7 @@ msgid "reports.display.error.networks"
 msgstr "De netwerken zijn geen geldige reeksen, zijn er meer dan 20, of zijn breder dan de standaard van de organisatie."
 
 msgid "reports.display.error.group"
-msgstr "Die groep hoort niet bij deze organisatie."
+msgstr "Die dienst hoort niet bij deze organisatie."
 
 msgid "reports.display.status.not_opened"
 msgstr "Nog niet geopend"
@@ -11095,7 +11095,7 @@ msgid "reports.display.form.board"
 msgstr "Welk wallboard"
 
 msgid "reports.display.form.all_groups"
-msgstr "Alle groepen van de organisatie"
+msgstr "Alle diensten van de organisatie"
 
 msgid "reports.display.form.name"
 msgstr "Naam van het scherm"
@@ -11164,7 +11164,7 @@ msgid "reports.views.label"
 msgstr "Rapport"
 
 msgid "reports.empty"
-msgstr "Voor dit rapport is in deze periode nog niets vastgelegd. Kies een andere periode, of kom terug als de groep is gebruikt."
+msgstr "Voor dit rapport is in deze periode nog niets vastgelegd. Kies een andere periode, of kom terug als de dienst is gebruikt."
 
 msgid "reports.unavailable"
 msgstr "niet beschikbaar"
@@ -11473,13 +11473,13 @@ msgid "reports.capacity.heat.range"
 msgstr "De drukste uren worden getoond voor een periode van minstens {n} dagen."
 
 msgid "reports.capacity.heat.none"
-msgstr "Er is geen boeking geplaatst in een groep die groot genoeg is om per uur te tonen."
+msgstr "Er is geen boeking geplaatst in een dienst die groot genoeg is om per uur te tonen."
 
 msgid "reports.capacity.heat.left_out"
-msgstr "{n} groep(en) zijn te klein om per uur te tonen en vallen buiten deze tabel."
+msgstr "{n} dienst(en) zijn te klein om per uur te tonen en vallen buiten deze tabel."
 
 msgid "reports.capacity.heat.rule"
-msgstr "Uren worden alleen getoond voor een groep met minstens {n} boekingen in de periode. Uren zijn lokaal voor elke groep. In elke cel staat het getal; de tint helpt alleen het oog."
+msgstr "Uren worden alleen getoond voor een dienst met minstens {n} boekingen in de periode. Uren zijn lokaal voor elke dienst. In elke cel staat het getal; de tint helpt alleen het oog."
 
 msgid "reports.capacity.shortfall.title"
 msgstr "Blokken met te weinig bezetting"
@@ -11518,7 +11518,7 @@ msgid "reports.channels.locales.locale"
 msgstr "Taal"
 
 msgid "reports.channels.locales.left_out"
-msgstr "{n} groep(en) zijn te klein om per taal te tonen en vallen buiten deze tabel."
+msgstr "{n} dienst(en) zijn te klein om per taal te tonen en vallen buiten deze tabel."
 
 msgid "reports.channels.trial.title"
 msgstr "Proefgesprekken"
@@ -11629,7 +11629,7 @@ msgid "admin.configuration.warning.deletes"
 msgstr "Let op: dit plan verwijdert {count} object(en). Dat kan niet ongedaan worden gemaakt."
 
 msgid "admin.configuration.warning.claims"
-msgstr "Let op: dit plan wijzigt een claimwaarde (de sleutel van een organisatie of groep, of de claimwaarde van een rol). Wie op de oude waarde matcht, verliest toegang totdat de identiteitsprovider de nieuwe waarde stuurt."
+msgstr "Let op: dit plan wijzigt een claimwaarde (de sleutel van een organisatie of dienst, of de claimwaarde van een rol). Wie op de oude waarde matcht, verliest toegang totdat de identiteitsprovider de nieuwe waarde stuurt."
 
 msgid "admin.configuration.warning.webex"
 msgstr "Let op: dit plan vervangt de tokens van de Webex Service App. De installatie waar het document vandaan komt, kan daardoor geen verbinding meer maken."
@@ -11665,7 +11665,7 @@ msgid "reports.export.refused.too_many_days"
 msgstr "De export beslaat te veel dagen. Kies een korter tijdvak."
 
 msgid "reports.export.refused.too_many_rows"
-msgstr "De export heeft te veel rijen. Kies een korter tijdvak of één groep."
+msgstr "De export heeft te veel rijen. Kies een korter tijdvak of één dienst."
 
 msgid "error.proposal_not_open"
 msgstr "Deze voorgestelde tijd is niet meer beschikbaar. U kunt nog wel zelf een nieuwe tijd kiezen."
@@ -11787,7 +11787,7 @@ msgid "authz.permission.reports_staff_view"
 msgstr "De werklast per teamlid in de rapporten bekijken"
 
 msgid "authz.permission.reports_wallboard_view"
-msgstr "Het live wallboard van de groepen tonen"
+msgstr "Het live wallboard van de diensten tonen"
 
 msgid "authz.permission.reports_wallboard_link_manage"
 msgstr "Displaylinks voor het wallboard maken en intrekken"
@@ -11808,7 +11808,7 @@ msgid "settings.field.reporting_digest_max_subscriptions.label"
 msgstr "Meeste abonnementen op de samenvatting per organisatie"
 
 msgid "reports.digest.all_groups"
-msgstr "alle groepen"
+msgstr "alle diensten"
 
 msgid "reports.digest.subject"
 msgstr "Gebruik van {group} ({organisation}): {period}"
@@ -11916,7 +11916,7 @@ msgid "reports.digest.add_button"
 msgstr "Abonnement toevoegen"
 
 msgid "reports.digest.field.group"
-msgstr "Groep"
+msgstr "Dienst"
 
 msgid "reports.digest.field.period"
 msgstr "Hoe vaak"
@@ -12154,7 +12154,7 @@ msgid "reports.chart.unit.bookings"
 msgstr "afspraken"
 
 msgid "reports.volume.days.title"
-msgstr "Afspraken per dag (de dag van de afspraak, in de tijdzone van de groep)"
+msgstr "Afspraken per dag (de dag van de afspraak, in de tijdzone van de dienst)"
 
 msgid "reports.volume.days.weekday"
 msgstr "Werkdag"
@@ -12187,7 +12187,7 @@ msgid "reports.split.title"
 msgstr "Gemaakte afspraken, uitgesplitst"
 
 msgid "reports.split.left_out"
-msgstr "{n} groep(en) zijn te klein om uit te splitsen en blijven buiten beschouwing."
+msgstr "{n} dienst(en) zijn te klein om uit te splitsen en blijven buiten beschouwing."
 
 msgid "reports.tile.created"
 msgstr "Afspraken in periode"

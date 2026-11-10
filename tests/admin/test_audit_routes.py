@@ -135,7 +135,7 @@ async def test_a_denial_shows_its_reason(site: Site) -> None:
 
     text = (await site.client.get("/admin/audit")).text
 
-    assert "Buiten de eigen organisatie of groep." in text
+    assert "Buiten de eigen organisatie of dienst." in text
     assert "<code>out_of_scope</code>" in text
 
 

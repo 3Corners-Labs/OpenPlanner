@@ -18,7 +18,7 @@ test('group admin sees only their own group and its own audit log', async ({ pag
   await loginAs(page, 'groupadmin');
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Overzicht');
-  const groups = page.getByRole('list', { name: 'Uw groepen' }).getByRole('listitem');
+  const groups = page.getByRole('list', { name: 'Uw diensten' }).getByRole('listitem');
   await expect(groups).toHaveCount(1);
   await expect(groups.first()).toContainText('Demo: videogesprek');
   await expectNoAxeViolations(page);
@@ -139,7 +139,7 @@ test("an outsider's refusal shows up in the superuser's audit log", async ({ pag
 
   await page.goto('/admin/');
   // Both seeded groups, in both organisations (other specs may have added more).
-  const groups = page.getByRole('list', { name: 'Uw groepen' });
+  const groups = page.getByRole('list', { name: 'Uw diensten' });
   await expect(groups.getByRole('link', { name: 'Demo: videogesprek', exact: true })).toBeVisible();
   await expect(groups.getByRole('link', { name: 'Andere: team', exact: true })).toBeVisible();
   await page.goto('/admin/?lang=en');

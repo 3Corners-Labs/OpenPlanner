@@ -50,7 +50,7 @@ function dayAhead(days: number): { value: string; label: string } {
 }
 
 function tabs(page: Page) {
-  return page.getByRole('navigation', { name: 'Onderdelen van de groep' });
+  return page.getByRole('navigation', { name: 'Onderdelen van de dienst' });
 }
 
 // ADR 0047 step 4: the second row of the current tab (Planning: Staffing, Exceptions, Holidays).
@@ -122,16 +122,16 @@ test('organisation admin creates a group and gives it staffing blocks', async ({
   await loginAs(page, 'orgadmin');
 
   await page.goto('/admin/groups');
-  await page.getByRole('link', { name: 'Nieuwe groep' }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Nieuwe groep');
+  await page.getByRole('link', { name: 'Nieuwe dienst' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Nieuwe dienst');
   await expectNoAxeViolations(page);
   await page.getByLabel('Naam', { exact: true }).fill(`E2E ${testInfo.project.name}`);
   await page.getByLabel('Webadres', { exact: true }).fill(slug);
   await page.getByLabel('Duur van een gesprek (minuten)').fill('20');
-  await page.getByRole('button', { name: 'Groep aanmaken' }).press('Enter');
+  await page.getByRole('button', { name: 'Dienst aanmaken' }).press('Enter');
 
   await expect(page).toHaveURL(new RegExp(`/admin/groups/${slug}\\?done=created$`));
-  await expect(page.getByRole('status')).toContainText('De groep is aangemaakt');
+  await expect(page.getByRole('status')).toContainText('De dienst is aangemaakt');
   await expect(page.getByText('Nog geen tijdsloten')).toBeVisible();
   await expectNoAxeViolations(page);
 
@@ -165,5 +165,5 @@ test('the superuser sees planning changes in the audit log', async ({ page }) =>
     .filter({ hasText: 'Bezetting en afwijkende bezetting beheren' })
     .filter({ hasText: 'demo / demo' });
   await expect(change.first()).toBeVisible();
-  await expect(page.getByRole('row').filter({ hasText: 'Groepen aanmaken' }).first()).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Diensten aanmaken' }).first()).toBeVisible();
 });

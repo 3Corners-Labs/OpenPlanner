@@ -166,7 +166,7 @@ async def test_no_own_queue_says_live_figures_are_not_shown(site: Site) -> None:
 
     text = (await site.client.get(LIVE)).text
 
-    assert "Live getallen zie je voor groepen met een eigen wachtrij" in text
+    assert "Live getallen zie je voor diensten met een eigen wachtrij" in text
 
 
 async def test_a_waiting_participant_is_counted_exactly_and_a_long_wait_has_words(
