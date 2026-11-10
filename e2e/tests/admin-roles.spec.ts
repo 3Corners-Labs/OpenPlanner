@@ -131,7 +131,7 @@ test("an outsider's refusal shows up in the superuser's audit log", async ({ pag
   const refusal = page
     .getByRole('row')
     .filter({ hasText: 'Otto Anders' })
-    .filter({ hasText: 'Groep bekijken' })
+    .filter({ hasText: 'Dienst bekijken' })
     .filter({ hasText: 'Geweigerd' })
     .filter({ hasText: 'demo / demo' });
   await expect(refusal.first()).toBeVisible();
