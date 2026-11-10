@@ -57,7 +57,7 @@ Organisation → ServiceOffering → ServiceFlow. Subject: per service (ADR 0081
 | `location_id` | required when attendance at a place is promised |
 | `booking_policy`, `message_policy` | resolved limits and notification choices |
 
-Closed combinations: video → `media_presence` → `open_video`; telephone → `automatic` → `call`; in person → `explicit_check_in` → `view_request` or `assign_workstation`; none → `automatic` → `view_request`. Drafts default to appointment intake and are not bookable; publishing validates every subject combination against the pool's guaranteed skills, the organisation of every reference and that the chosen mechanism is implemented. Telephone numbers never appear in public displays or unassigned queue rows, and choosing telephone does not add a phone field to an outbound provider payload without an explicit contract change.
+The allowed combinations of interaction kind, readiness and first action are the closed table of ADR 0121 point 4. Drafts default to appointment intake and are not bookable; publishing validates every subject combination against the pool's guaranteed skills, the organisation of every reference and that the chosen mechanism is implemented. Telephone numbers never appear in public displays or unassigned queue rows, and choosing telephone does not add a phone field to an outbound provider payload without an explicit contract change.
 
 ## Skills and capacity in one paragraph each
 
@@ -69,11 +69,11 @@ Closed combinations: video → `media_presence` → `open_video`; telephone → 
 
 Dimensions: reservation (existing booking states), attendance (expected, ready, departed, n/a), handling (pending, queued, assigned, called, in progress, recovery required, completed, cancelled, abandoned, expired, failed, no-show), media (not required, preparing, ready, connected, ended, failed), personal data (not collected, present, deleted). Keep separate arrival, queue, assigned, started and completed times. Idempotent check-in, ticket printing and provider events; one appointment never yields two active work items. Own queue and contact center never own the same assignment; a timed-out external create is `reconciliation_required` and not locally claimable until proven absent or fenced.
 
-Watchdog: 24 h after the reservation end (appointments) or accepted intake (on demand). Unstarted work becomes `expired` (not a no-show); started work becomes `recovery_required` and keeps its allocation; personal data is deleted at watchdog time plus 24 h; normal terminal states delete after 24 h. All derived provider ids, tickets and links belong to the deletion inventory (`app/domain/privacy.py`). The PII-on-Booking-only rule is amended when a request-level data record is introduced, in the same step as the purge inventory, masks and exports.
+Watchdog, expiry, recovery and the deletion deadlines: ADR 0121 point 7. All derived provider ids, tickets and links belong to the deletion inventory (`app/domain/privacy.py`). The PII-on-Booking-only rule is amended when a request-level data record is introduced, in the same step as the purge inventory, masks and exports.
 
 ## Compatibility and rollback
 
-Keep `groups.id`, `organisation_id`, slug, `idp_key`, `/g/{slug}`, `/admin/groups/...`, `group.*` permissions, `group_admin`, entitlement strings, `openplannerGroup`, job and event names and the configuration package. Backfill: one Group, one ServiceOffering with the same identity; explicit legacy flow wrappers for the appointment and direct paths; no inferred skills, no shared pools from equal queue names; legacy direct and scheduled capacity stay apart; converting a service to the shared model is a reviewable operation listing affected future reservations. An omitted flow resolves to the configured default; an explicit unknown, foreign or archived flow is refused. Follow ADR 0116: additive schema and readers first, then backfill, then activation, contraction later, nothing in a patch. Test the previous image on the expanded database after the new image wrote records and jobs, including a booking and a claim after rollback.
+What stays as it is: ADR 0121 point 8. Backfill: one Group, one ServiceOffering with the same identity; explicit legacy flow wrappers for the appointment and direct paths; no inferred skills, no shared pools from equal queue names; legacy direct and scheduled capacity stay apart; converting a service to the shared model is a reviewable operation listing affected future reservations. An omitted flow resolves to the configured default; an explicit unknown, foreign or archived flow is refused. Follow ADR 0116: additive schema and readers first, then backfill, then activation, contraction later, nothing in a patch. Test the previous image on the expanded database after the new image wrote records and jobs, including a booking and a claim after rollback.
 
 ## Fixture
 
@@ -252,7 +252,7 @@ Each screen was checked on paper against the admin structure, the matrix, the ac
 
 Findings:
 
-1. **Screen 3 works without JavaScript.** The mockup shows and hides fields in the browser. The built form is server-rendered: choosing a contact channel and saving the draft returns the form with the fields of that kind (a `<details>`-free, full page round trip); an island may enhance it later (ADR 0118), the server stays the judge of readiness.
+1. **Screen 3 works without JavaScript.** The mockup shows and hides fields in the browser. The built form is server-rendered: choosing a contact channel and saving the draft returns the form with the fields of that kind (a full page round trip, no script needed); an island may enhance it later (ADR 0118), the server stays the judge of readiness.
 2. **Screen 3, pressed buttons.** The contact-channel choice is a radio group in a `fieldset`, not buttons with `aria-pressed`; the mockup's buttons are a drawing shortcut.
 3. **Screen 6, colour.** The row an operator may not pick up is set apart by text ("not for you: you miss …"), not by the grey background alone.
 4. **Screen 6, the reservation notice** needs interval accounting and therefore appears in step 3 at the earliest; before that the queue of a legacy flow is unchanged.

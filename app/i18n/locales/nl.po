@@ -2434,7 +2434,7 @@ msgid "admin.branding.fonts"
 msgstr "Lettertypen"
 
 msgid "admin.branding.fonts_lead"
-msgstr "Eigen lettertypen als WOFF2-bestand, hoogstens {kb} kB per bestand. Ze worden vanaf deze dienst geladen, nooit van een andere website. Zorg dat de licentie van het lettertype dat toestaat."
+msgstr "Eigen lettertypen als WOFF2-bestand, hoogstens {kb} kB per bestand. Ze worden vanaf deze installatie geladen, nooit van een andere website. Zorg dat de licentie van het lettertype dat toestaat."
 
 msgid "admin.branding.font.text"
 msgstr "Tekst (normaal)"
@@ -3955,10 +3955,10 @@ msgid "admin.audit.reason.invalid_signature"
 msgstr "Handtekening of tijdstempel klopt niet."
 
 msgid "admin.audit.reason.unauthorized"
-msgstr "De dienst weigert onze inloggegevens."
+msgstr "Het externe systeem weigert onze inloggegevens."
 
 msgid "admin.audit.reason.unreachable"
-msgstr "De dienst is niet bereikbaar."
+msgstr "Het externe systeem is niet bereikbaar."
 
 msgid "admin.audit.detail.suppressed"
 msgstr "nog {count} keer sinds de vorige melding"
@@ -5902,7 +5902,7 @@ msgid "admin.embedding.title"
 msgstr "Insluiten op websites"
 
 msgid "admin.embedding.org_lead"
-msgstr "De websites waarop de diensten van {name} als widget mogen staan. Een dienst verschijnt pas als die in haar eigen instellingen insluiten aanzet."
+msgstr "De websites waarop de diensten van {name} als widget mogen staan. Een dienst verschijnt pas als die in zijn eigen instellingen insluiten aanzet."
 
 msgid "admin.embedding.form"
 msgstr "Toegestane websites"
@@ -6301,7 +6301,7 @@ msgid "settings.field.oidc_organisation_claim.label"
 msgstr "Claim met de organisaties"
 
 msgid "settings.field.oidc_group_claim.label"
-msgstr "Claim met de groepen"
+msgstr "Claim met de diensten (groups)"
 
 msgid "settings.field.oidc_role_superuser.label"
 msgstr "Rolwaarde superuser"
@@ -6310,7 +6310,7 @@ msgid "settings.field.oidc_role_org_admin.label"
 msgstr "Rolwaarde beheerder organisatie"
 
 msgid "settings.field.oidc_role_group_admin.label"
-msgstr "Rolwaarde beheerder groep"
+msgstr "Rolwaarde dienstbeheerder"
 
 msgid "settings.field.oidc_role_auditor.label"
 msgstr "Rolwaarde compliance en privacy"
@@ -7860,7 +7860,7 @@ msgid "admin.idp_mapping.mode"
 msgstr "Bron van de rechten"
 
 msgid "admin.idp_mapping.mode.legacy"
-msgstr "Drie claims (rollen, organisaties, groepen)"
+msgstr "Drie claims (rollen, organisaties, diensten)"
 
 msgid "admin.idp_mapping.mode.shadow"
 msgstr "Drie claims, rechtenclaim wordt vergeleken (schaduwmodus)"
@@ -8031,7 +8031,7 @@ msgid "admin.organisation.groups"
 msgstr "Diensten"
 
 msgid "admin.organisation.groups_lead"
-msgstr "De diensten van deze organisatie waar u rechten op heeft. Een dienst opent op haar eigen pagina."
+msgstr "De diensten van deze organisatie waar u rechten op heeft. Een dienst opent op zijn eigen pagina."
 
 msgid "admin.organisation.no_groups"
 msgstr "Deze organisatie heeft nog geen diensten waar u rechten op heeft."
@@ -8055,7 +8055,7 @@ msgid "admin.groups.title"
 msgstr "Diensten"
 
 msgid "admin.groups.lead"
-msgstr "Alle diensten waar u rechten op heeft, met hun organisatie. Een dienst opent op haar eigen pagina."
+msgstr "Alle diensten waar u rechten op heeft, met hun organisatie. Een dienst opent op zijn eigen pagina."
 
 msgid "admin.groups.filter"
 msgstr "Filteren"
@@ -10492,7 +10492,7 @@ msgid "admin.alerts.source.fallback"
 msgstr "Terugval naar de eigen wachtrij"
 
 msgid "admin.alerts.text.fallback"
-msgstr "Deze dienst valt terug op haar eigen wachtrij, omdat het contactcenter onbereikbaar is. Open de wachtrij om afspraken op te pakken."
+msgstr "Deze dienst valt terug op zijn eigen wachtrij, omdat het contactcenter onbereikbaar is. Open de wachtrij om afspraken op te pakken."
 
 msgid "call.event.fallback_queued"
 msgstr "In de eigen wachtrij gezet (terugval)"
