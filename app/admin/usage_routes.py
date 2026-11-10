@@ -34,6 +34,7 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission, admin_service, can_function
+from app.admin.display_link_routes import links_context
 from app.admin.forms import (
     done_message,
     raise_refusal,
@@ -298,7 +299,10 @@ async def _organisation_page(
     wallboard_on = wallboard_shown(principal, organisation=org)
     if request.query_params.get("view") == WALLBOARD:  # the service refuses (audited) without it
         nav = _nav(base, None, None, team_on=team_on, wallboard_on=True)
-        return await wallboard_page(request, locale, principal, base, nav, organisation=org)
+        links = await links_context(request, locale, principal, org) if wallboard_on else {}
+        return await wallboard_page(
+            request, locale, principal, base, nav, organisation=org, extra=links
+        )
     template, result, ctx = await _report(
         request,
         locale,

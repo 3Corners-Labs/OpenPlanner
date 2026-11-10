@@ -10530,6 +10530,18 @@ msgstr "Seconden tussen twee verversingen van het wallboard"
 msgid "settings.field.reporting_wallboard_wait_alert_minutes.label"
 msgstr "Minuten wachten waarna het wallboard lange wachttijd meldt"
 
+msgid "settings.field.reporting_wallboard_display_links_enabled.label"
+msgstr "Displaylinks voor het wallboard toestaan"
+
+msgid "settings.field.reporting_wallboard_link_networks.label"
+msgstr "Netwerken waarvandaan een displaylink werkt (één reeks per regel)"
+
+msgid "settings.field.reporting_wallboard_link_pin_default.label"
+msgstr "Een nieuwe displaylink standaard vastpinnen op het eerste adres"
+
+msgid "settings.field.reporting_wallboard_link_max_days.label"
+msgstr "Langste looptijd van een displaylink, in dagen"
+
 msgid "settings.field.reporting_export_max_rows.label"
 msgstr "Meeste rijen in een CSV-export van een gebruiksrapport"
 
@@ -11009,6 +11021,144 @@ msgstr "gepland, nog te komen"
 
 msgid "reports.wallboard.bars.note"
 msgstr "Vaag gearceerde staven zijn afspraken die nog komen. Alleen aantallen, geen namen."
+
+msgid "reports.display.refused.title"
+msgstr "Dit scherm kan niet worden getoond"
+
+msgid "reports.display.refused.link"
+msgstr "Deze link kan niet meer worden gebruikt. Vraag om een nieuwe link."
+
+msgid "reports.display.refused.network"
+msgstr "Dit scherm is niet toegestaan vanaf dit netwerk. Vraag om een nieuwe link."
+
+msgid "reports.display.refused.off"
+msgstr "Displaylinks staan uit voor deze organisatie. Vraag het aan uw organisatiebeheerder."
+
+msgid "reports.display.error.enabled"
+msgstr "Displaylinks staan uit voor deze organisatie."
+
+msgid "reports.display.error.name"
+msgstr "Geef het scherm een naam van maximaal 80 tekens."
+
+msgid "reports.display.error.days"
+msgstr "Kies een looptijd van een dag tot de langste die het platform toestaat."
+
+msgid "reports.display.error.networks"
+msgstr "De netwerken zijn geen geldige reeksen, zijn er meer dan 20, of zijn breder dan de standaard van de organisatie."
+
+msgid "reports.display.error.group"
+msgstr "Die groep hoort niet bij deze organisatie."
+
+msgid "reports.display.status.not_opened"
+msgstr "Nog niet geopend"
+
+msgid "reports.display.status.active"
+msgstr "Actief"
+
+msgid "reports.display.status.expired"
+msgstr "Verlopen"
+
+msgid "reports.display.status.revoked"
+msgstr "Ingetrokken"
+
+msgid "reports.display.done.revoked"
+msgstr "De displaylink is ingetrokken. Het scherm stopt binnen enkele seconden."
+
+msgid "reports.display.created.title"
+msgstr "Nieuwe displaylink: kopieer hem nu"
+
+msgid "reports.display.created.lead"
+msgstr "Dit adres wordt maar één keer getoond en kan één keer worden geopend. Daarna werkt alleen het scherm dat hem als eerste opende. Het wordt niet bewaard en kan niet opnieuw worden getoond."
+
+msgid "reports.display.created.label"
+msgstr "Adres voor {name}"
+
+msgid "reports.display.created.expires"
+msgstr "Geldig tot {date}."
+
+msgid "reports.display.created.back"
+msgstr "Terug naar het wallboard"
+
+msgid "reports.display.title"
+msgstr "Displaylinks"
+
+msgid "reports.display.lead"
+msgstr "Voor een scherm waar niemand inlogt. Een link toont dit wallboard, niets anders, en werkt één keer."
+
+msgid "reports.display.off"
+msgstr "Displaylinks staan uit voor deze organisatie."
+
+msgid "reports.display.switch_on"
+msgstr "Zet ze aan bij de instellingen van de organisatie."
+
+msgid "reports.display.form.board"
+msgstr "Welk wallboard"
+
+msgid "reports.display.form.all_groups"
+msgstr "Alle groepen van de organisatie"
+
+msgid "reports.display.form.name"
+msgstr "Naam van het scherm"
+
+msgid "reports.display.form.days"
+msgstr "Geldig voor"
+
+msgid "reports.display.form.days_option"
+msgstr "{n} dagen"
+
+msgid "reports.display.form.networks"
+msgstr "Netwerken die het scherm mag gebruiken (één reeks per regel)"
+
+msgid "reports.display.form.networks_hint"
+msgstr "Leeg betekent elk netwerk, tenzij de organisatie een standaard heeft. Een reeks kan alleen smaller zijn dan de standaard."
+
+msgid "reports.display.form.pin"
+msgstr "Vastpinnen op het eerste adres"
+
+msgid "reports.display.form.pin_hint"
+msgstr "Het adres bij het eerste gebruik wordt vastgelegd (IPv4 als één adres, IPv6 als /64). Een scherm dat van adres wisselt heeft een nieuwe link nodig."
+
+msgid "reports.display.form.submit"
+msgstr "Link maken"
+
+msgid "reports.display.list.title"
+msgstr "Bestaande links"
+
+msgid "reports.display.list.screen"
+msgstr "Scherm"
+
+msgid "reports.display.list.status"
+msgstr "Status"
+
+msgid "reports.display.list.pinned"
+msgstr "Gepind op"
+
+msgid "reports.display.list.networks"
+msgstr "Netwerken"
+
+msgid "reports.display.list.last_used"
+msgstr "Laatst gebruikt"
+
+msgid "reports.display.list.expires"
+msgstr "Verloopt"
+
+msgid "reports.display.list.revoke"
+msgstr "Intrekken"
+
+msgid "reports.display.list.pin_pending"
+msgstr "wordt vastgelegd bij eerste gebruik"
+
+msgid "reports.display.list.any_network"
+msgstr "elk netwerk"
+
+msgid "reports.display.list.never"
+msgstr "nooit"
+
+msgid "reports.display.list.note"
+msgstr "Een geweigerd verzoek (ander netwerk, of ander adres dan het gepinde) staat als één regel in het auditlog en beëindigt de link niet. Het adres zelf verschijnt alleen hier."
+
+msgid "reports.display.list.empty"
+msgstr "Er zijn nog geen displaylinks."
 
 msgid "reports.views.label"
 msgstr "Rapport"
@@ -11638,6 +11788,9 @@ msgstr "De werklast per teamlid in de rapporten bekijken"
 
 msgid "authz.permission.reports_wallboard_view"
 msgstr "Het live wallboard van de groepen tonen"
+
+msgid "authz.permission.reports_wallboard_link_manage"
+msgstr "Displaylinks voor het wallboard maken en intrekken"
 
 msgid "authz.permission.reports_digest_manage"
 msgstr "Samenvattingen van de rapporten beheren"

@@ -1,0 +1,18 @@
+{#- The one time a display link is shown (ADR 0117 point 20): its address, with the words that it is shown once and can be opened once. The response is not cached and not remembered by a redirect; the address is not in the audit log. -#}
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("reports.display.created.title") }} · {{ org_header.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_organisation_header.html" %}
+<section class="card" aria-labelledby="link-created-heading" role="status">
+  <div class="card__header">
+    <h2 id="link-created-heading">{{ _("reports.display.created.title") }}</h2>
+    <p class="card__lead">{{ _("reports.display.created.lead") }}</p>
+  </div>
+  <div class="field">
+    <label for="display-link">{{ _("reports.display.created.label", name=link_name) }}</label>
+    <input id="display-link" type="text" readonly value="{{ link_url }}" size="80" autocomplete="off" spellcheck="false">
+  </div>
+  <p class="muted">{{ _("reports.display.created.expires", date=link_expires) }}</p>
+  <p><a class="button" href="{{ back }}">{{ _("reports.display.created.back") }}</a></p>
+</section>
+{% endblock %}

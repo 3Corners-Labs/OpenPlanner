@@ -459,7 +459,13 @@ organisation's settings sub-tab); the exact topic is fixed in `settings_registry
 | 11 | Facts to log destinations (`usage.fact`, non-staff, hour and bucket only) | #675 | merged |
 | 12 | `report-charts.js`: tooltips, focus, series toggles, SVG/PNG download, drill-down links; script CSP on report pages; JS-off and axe runs | #689 | merged |
 | 13 | Wallboard: `view=wallboard`, kiosk layout, live tiles on the shared fragment poll, stale state, wait alert, `reports.wallboard.view` | #703 | merged |
-| 14 | Display links: creation, hash, expiry, revocation, kiosk session, audit, manual and threat model | | planned |
+| 14 | Display links: creation, hash, expiry, revocation, kiosk session, audit, manual and threat model | #711 | merged |
+
+**Open points after step 14 (not lost, each a follow-up):**
+- *Alert on a refused display screen* (point 20): a refusal for network or pin is one audit event per link and hour (`wallboard.session_refused`, reason only, no address), but the ADR's alert to the organisation admins is not built. `ALERT_RULES` alerts are a start and an end event; a refusal has no end, so it needs its own rule (for example an hourly count like `ActivityAlert`) and a decision on where it shows.
+- *Copy button* of the shown-once link: an island under ADR 0118 (own script, gates of `tests/islands.spec.ts`); until then the address is a read-only field.
+- *S2 team utilisation* (step 7 notes): needs a staffed-seconds fact.
+- Wallboard and display link Playwright specs (`e2e/tests/admin-wallboard.spec.ts`) run in CI only; the screen side (`/display`) has no axe run yet.
 
 **Build order (agreed with the product owner, 2026-11-08):** 1, 2, 4, 5, then 3, then 6 to 14. The
 *Volume* screen of step 5 needs only the booking facts of step 2, so the first visible screen comes

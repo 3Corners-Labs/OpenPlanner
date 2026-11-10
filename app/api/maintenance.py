@@ -51,6 +51,11 @@ GROUP_ROUTES = frozenset({"/g/{slug}", "/g/{slug}/book", "/g/{slug}/direct"})
 
 BOOKING_ROUTES = frozenset(
     {
+        # A screen with a display link (ADR 0117 point 20): the first use writes, so while the
+        # installation is in maintenance the screen is told so and its board says the data is old.
+        "/display",
+        "/display/live",
+        "/display/start/{token}",
         "/b/{token}/cancel",
         "/b/{token}/details",
         "/b/{token}/proposal",

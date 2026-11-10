@@ -10517,6 +10517,18 @@ msgstr "Seconds between two updates of the wallboard"
 msgid "settings.field.reporting_wallboard_wait_alert_minutes.label"
 msgstr "Minutes of waiting after which the wallboard says long wait"
 
+msgid "settings.field.reporting_wallboard_display_links_enabled.label"
+msgstr "Allow display links for the wallboard"
+
+msgid "settings.field.reporting_wallboard_link_networks.label"
+msgstr "Networks a display link works from (one range per line)"
+
+msgid "settings.field.reporting_wallboard_link_pin_default.label"
+msgstr "Pin a new display link to the first address by default"
+
+msgid "settings.field.reporting_wallboard_link_max_days.label"
+msgstr "Longest life of a display link, in days"
+
 msgid "settings.field.reporting_export_max_rows.label"
 msgstr "Most rows in a CSV export of a usage report"
 
@@ -10996,6 +11008,144 @@ msgstr "planned, still to come"
 
 msgid "reports.wallboard.bars.note"
 msgstr "Lightly shaded bars are appointments still to come. Counts only, no names."
+
+msgid "reports.display.refused.title"
+msgstr "This screen cannot be shown"
+
+msgid "reports.display.refused.link"
+msgstr "This link can no longer be used. Ask for a new link."
+
+msgid "reports.display.refused.network"
+msgstr "This screen is not allowed from this network. Ask for a new link."
+
+msgid "reports.display.refused.off"
+msgstr "Display links are switched off for this organisation. Ask your organisation admin."
+
+msgid "reports.display.error.enabled"
+msgstr "Display links are switched off for this organisation."
+
+msgid "reports.display.error.name"
+msgstr "Give the screen a name of up to 80 characters."
+
+msgid "reports.display.error.days"
+msgstr "Choose a life of one day up to the longest the platform allows."
+
+msgid "reports.display.error.networks"
+msgstr "The networks are not valid ranges, are more than 20, or are wider than the organisation's default."
+
+msgid "reports.display.error.group"
+msgstr "That group is not part of this organisation."
+
+msgid "reports.display.status.not_opened"
+msgstr "Not opened yet"
+
+msgid "reports.display.status.active"
+msgstr "Active"
+
+msgid "reports.display.status.expired"
+msgstr "Expired"
+
+msgid "reports.display.status.revoked"
+msgstr "Revoked"
+
+msgid "reports.display.done.revoked"
+msgstr "The display link was revoked. Its screen stops within a few seconds."
+
+msgid "reports.display.created.title"
+msgstr "New display link: copy it now"
+
+msgid "reports.display.created.lead"
+msgstr "This address is shown once and can be opened once. After that only the screen that opened it first keeps working. It is not stored and cannot be shown again."
+
+msgid "reports.display.created.label"
+msgstr "Address for {name}"
+
+msgid "reports.display.created.expires"
+msgstr "Valid until {date}."
+
+msgid "reports.display.created.back"
+msgstr "Back to the wallboard"
+
+msgid "reports.display.title"
+msgstr "Display links"
+
+msgid "reports.display.lead"
+msgstr "For a screen nobody signs in at. A link shows this wallboard, nothing else, and works once."
+
+msgid "reports.display.off"
+msgstr "Display links are switched off for this organisation."
+
+msgid "reports.display.switch_on"
+msgstr "Switch them on in the organisation's settings."
+
+msgid "reports.display.form.board"
+msgstr "Which wallboard"
+
+msgid "reports.display.form.all_groups"
+msgstr "All groups of the organisation"
+
+msgid "reports.display.form.name"
+msgstr "Name of the screen"
+
+msgid "reports.display.form.days"
+msgstr "Valid for"
+
+msgid "reports.display.form.days_option"
+msgstr "{n} days"
+
+msgid "reports.display.form.networks"
+msgstr "Networks the screen may use (one range per line)"
+
+msgid "reports.display.form.networks_hint"
+msgstr "Empty means any network, unless the organisation has a default. A range can only be narrower than the default."
+
+msgid "reports.display.form.pin"
+msgstr "Pin to the first address"
+
+msgid "reports.display.form.pin_hint"
+msgstr "The address at the first use is kept (IPv4 as a single address, IPv6 as a /64). A screen whose address changes needs a new link."
+
+msgid "reports.display.form.submit"
+msgstr "Make link"
+
+msgid "reports.display.list.title"
+msgstr "Existing links"
+
+msgid "reports.display.list.screen"
+msgstr "Screen"
+
+msgid "reports.display.list.status"
+msgstr "Status"
+
+msgid "reports.display.list.pinned"
+msgstr "Pinned to"
+
+msgid "reports.display.list.networks"
+msgstr "Networks"
+
+msgid "reports.display.list.last_used"
+msgstr "Last used"
+
+msgid "reports.display.list.expires"
+msgstr "Expires"
+
+msgid "reports.display.list.revoke"
+msgstr "Revoke"
+
+msgid "reports.display.list.pin_pending"
+msgstr "set at first use"
+
+msgid "reports.display.list.any_network"
+msgstr "any network"
+
+msgid "reports.display.list.never"
+msgstr "never"
+
+msgid "reports.display.list.note"
+msgstr "A refused request (another network, or another address than the pinned one) is one line in the audit log and does not end the link. The address itself is only shown here."
+
+msgid "reports.display.list.empty"
+msgstr "There are no display links yet."
 
 msgid "reports.views.label"
 msgstr "Report"
@@ -11625,6 +11775,9 @@ msgstr "See the load per team member in the reports"
 
 msgid "authz.permission.reports_wallboard_view"
 msgstr "Show the live wallboard of the groups"
+
+msgid "authz.permission.reports_wallboard_link_manage"
+msgstr "Make and revoke display links for the wallboard"
 
 msgid "authz.permission.reports_digest_manage"
 msgstr "Manage the digest of the reports"

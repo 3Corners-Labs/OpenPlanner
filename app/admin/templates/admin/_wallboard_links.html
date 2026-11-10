@@ -1,0 +1,84 @@
+{#- Display links of a wallboard (ADR 0117 point 20): the form that makes one and the list of the organisation's links with their state. Expects ``links`` (``display_link_routes.links_context``). The address of a new link is never on this page; it is shown once on the page that answers the form. -#}
+<section class="card" id="links" aria-labelledby="links-heading">
+  <div class="card__header">
+    <h2 id="links-heading">{{ _("reports.display.title") }}</h2>
+    <p class="card__lead">{{ _("reports.display.lead") }}</p>
+  </div>
+  {% if links.error %}<p class="error" role="alert">{{ links.error }}</p>{% endif %}
+  {% if not links.enabled %}
+  <p>{{ _("reports.display.off") }}
+    {% if can("settings.organisation.manage", organisation=usage_org) %}<a href="/admin/organisations/{{ usage_org }}/settings">{{ _("reports.display.switch_on") }}</a>{% endif %}</p>
+  {% else %}
+  <form method="post" action="/admin/organisations/{{ usage_org }}/usage/wallboard/links" class="stack">
+    <div class="field">
+      <label for="link-group">{{ _("reports.display.form.board") }}</label>
+      <select id="link-group" name="group">
+        <option value="">{{ _("reports.display.form.all_groups") }}</option>
+        {% for slug, name in links.groups %}<option value="{{ slug }}">{{ name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="link-name">{{ _("reports.display.form.name") }}</label>
+      <input id="link-name" name="name" type="text" maxlength="80" required>
+    </div>
+    <div class="field">
+      <label for="link-days">{{ _("reports.display.form.days") }}</label>
+      <select id="link-days" name="days">
+        {% for days in links.lives %}<option value="{{ days }}"{% if days == links.lives[-1] %} selected{% endif %}>{{ _("reports.display.form.days_option", n=days) }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="link-networks">{{ _("reports.display.form.networks") }}</label>
+      <textarea id="link-networks" name="networks" rows="3" aria-describedby="link-networks-hint">{{ links.default_networks }}</textarea>
+      <p class="muted" id="link-networks-hint">{{ _("reports.display.form.networks_hint") }}</p>
+    </div>
+    <div class="field field--check">
+      <input id="link-pin" name="pin" type="checkbox"{% if links.pin %} checked{% endif %}>
+      <label for="link-pin">{{ _("reports.display.form.pin") }}</label>
+      <p class="muted">{{ _("reports.display.form.pin_hint") }}</p>
+    </div>
+    <div class="form-actions"><button type="submit" class="button">{{ _("reports.display.form.submit") }}</button></div>
+  </form>
+  {% endif %}
+  <h3>{{ _("reports.display.list.title") }}</h3>
+  {% if links.rows %}
+  <div class="table-scroll" role="region" aria-labelledby="links-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("reports.display.list.title") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("reports.display.list.screen") }}</th>
+        <th scope="col">{{ _("reports.display.list.status") }}</th>
+        <th scope="col">{{ _("reports.display.list.pinned") }}</th>
+        <th scope="col">{{ _("reports.display.list.networks") }}</th>
+        <th scope="col">{{ _("reports.display.list.last_used") }}</th>
+        <th scope="col">{{ _("reports.display.list.expires") }}</th>
+        <th scope="col"><span class="visually-hidden">{{ _("admin.actions") }}</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in links.rows %}
+      <tr>
+        <th scope="row">{{ row.name }}<br><span class="muted">{% if row.scope %}{{ row.scope }}{% else %}{{ _("reports.display.form.all_groups") }}{% endif %}</span></th>
+        <td><span class="chip{% if row.tone %} chip--{{ row.tone }}{% endif %}">{{ _(row.status) }}</span></td>
+        <td>{% if row.pinned %}{{ row.pinned }}{% elif row.pin %}{{ _("reports.display.list.pin_pending") }}{% else %}<span class="muted">–</span>{% endif %}</td>
+        <td>{% if row.networks %}{{ row.networks|join(", ") }}{% else %}{{ _("reports.display.list.any_network") }}{% endif %}</td>
+        <td>{% if row.last_used %}{{ row.last_used }}{% else %}{{ _("reports.display.list.never") }}{% endif %}</td>
+        <td>{{ row.expires }}</td>
+        <td>
+          {% if row.can_revoke %}
+          <form method="post" action="/admin/organisations/{{ usage_org }}/usage/wallboard/links/{{ row.id }}/revoke">
+            <button type="submit" class="button button--secondary">{{ _("reports.display.list.revoke") }}<span class="visually-hidden"> {{ row.name }}</span></button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="muted">{{ _("reports.display.list.note") }}</p>
+  {% else %}
+  <p class="empty-state">{{ _("reports.display.list.empty") }}</p>
+  {% endif %}
+</section>

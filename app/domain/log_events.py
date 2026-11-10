@@ -1934,6 +1934,29 @@ _AUDIT = (
         "An admin prepared a booking for the integration simulator.",
     ),
     _e(
+        "wallboard.session_started",
+        _AUD,
+        "outcome",
+        "",
+        "A display link was used for the first time: a screen was opened.",
+        "The first request of a display link opened a screen session (ADR 0117 point 20). The "
+        "detail names the link, never its token, its cookie or the address.",
+        _ADMIN_SEEN,
+    ),
+    _e(
+        "wallboard.session_refused",
+        _SEC,
+        "outcome",
+        "reason",
+        "A screen with a display link was refused: {reason}.",
+        "A request with a display link came from a network outside its list (`network`) or "
+        "from another address than the one it is pinned to (`pin`); at most one event per link "
+        "and hour (ADR 0117 point 20, R10). The link stays valid for the right address; the "
+        "address that was refused is not recorded.",
+        "Ask who runs the screen. A screen whose address changed needs a new link; an address "
+        "nobody knows means the link leaked: revoke it on the wallboard page.",
+    ),
+    _e(
         "staff.created",
         _AUD,
         "outcome",

@@ -19,5 +19,6 @@
   <p class="muted">{{ _("reports.wallboard.groups") }}: {{ board_groups|join(", ") }}</p>
 </section>
 {% include "admin/_wallboard_region.html" %}
+{% if links is defined %}{% include "admin/_wallboard_links.html" %}{% endif %}
 {% endblock %}
 {% block scripts %}<script src="{{ static_url('live-region.js') }}" defer></script>{% endblock %}
