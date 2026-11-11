@@ -78,7 +78,7 @@ async def test_the_overview_is_read_under_organisation_view_and_says_who_may_cha
     assert [line.pool.name for line in seen.lines] == ["Loket"]
     assert (seen.editable, own.editable, own.limit, own.can_add) == (False, True, 2, True)
     with pytest.raises(DomainError):  # the form and the pages of one pool stay a manage right
-        await service.form(AUDITOR, "demo", None)
+        await service.form(AUDITOR, "demo")
 
 
 async def test_changes_are_audited_by_pool_number_and_an_equal_save_writes_nothing(
@@ -108,8 +108,8 @@ async def test_an_archived_pool_has_no_form_and_cannot_be_changed(
     await service.archive(ORG_ADMIN, "demo", pool.id)
 
     for call in (
-        service.form(ORG_ADMIN, "demo", pool.id),
-        service.pool(ORG_ADMIN, "demo", pool.id),
+        service.edit(ORG_ADMIN, "demo", pool.id),
+        service.page(ORG_ADMIN, "demo", pool.id),
         service.update(ORG_ADMIN, "demo", pool.id, "x", set()),
     ):
         with pytest.raises(DomainError) as refused:
@@ -124,7 +124,7 @@ async def test_a_legacy_pool_is_listed_and_never_opened_changed_or_archived(
 
     listed = await service.overview(ORG_ADMIN, "demo")
     for call in (
-        service.form(ORG_ADMIN, "demo", pool_id),
+        service.edit(ORG_ADMIN, "demo", pool_id),
         service.update(ORG_ADMIN, "demo", pool_id, "x", set()),
         service.archive(ORG_ADMIN, "demo", pool_id),
     ):
@@ -170,7 +170,7 @@ async def test_a_pool_takes_only_own_skills_and_another_organisations_pool_is_mi
     with pytest.raises(DomainError) as foreign_skill:
         await service.create(ORG_ADMIN, "demo", "Loket", {theirs_skill})
     for call in (
-        service.form(ORG_ADMIN, "demo", theirs.id),
+        service.edit(ORG_ADMIN, "demo", theirs.id),
         service.update(ORG_ADMIN, "demo", theirs.id, "x", set()),
         service.archive(ORG_ADMIN, "demo", theirs.id),
     ):

@@ -4,12 +4,14 @@ View models and form fields shared by the combined *Skills and capacity* page
 (``app.admin.skills_capacity_page``) and the pages of one pool (``app.admin.capacity_routes``).
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.admin.forms import Field, FormData
 from app.admin.skill_inputs import SkillChoice, choices, skill_label, ticked_ids
 from app.domain.capacity import PoolMode
-from app.domain.capacity_service import FlowRef, PoolForm, PoolLine
+from app.domain.capacity_service import FlowRef, PoolLine
+from app.domain.skills import Skill
 from app.web.locale import RequestLocale
 
 CHOICE_FIELD = "guaranteed_skill_ids"
@@ -80,7 +82,8 @@ def name_field(form: FormData, locale: RequestLocale, line: PoolLine | None) -> 
     )
 
 
-def pool_choices(found: PoolForm, form: FormData, locale: RequestLocale) -> list[SkillChoice]:
-    """Return the skills to choose from; the submitted ticks win over the stored ones."""
-    stored = found.line.pool.guaranteed_skill_ids if found.line else frozenset[int]()
-    return choices(found.choices, ticked_ids(form) if form.values else stored, locale.code)
+def pool_choices(
+    skills: Sequence[Skill], stored: frozenset[int], form: FormData, locale: RequestLocale
+) -> list[SkillChoice]:
+    """Return the skills to choose from; the submitted ticks win over the ``stored`` ones."""
+    return choices(skills, ticked_ids(form) if form.values else stored, locale.code)

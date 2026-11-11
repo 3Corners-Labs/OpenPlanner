@@ -99,10 +99,24 @@ class PoolOverview:
 
 @dataclass(frozen=True)
 class PoolForm:
-    """What a pool's form needs: the pool (``None`` for a new one) and the skills to choose from."""
+    """What the form of a new pool needs: the skills not archived to choose from."""
 
     organisation: Organisation
-    line: PoolLine | None
+    choices: tuple[Skill, ...]
+
+
+@dataclass(frozen=True)
+class PoolPage:
+    """One existing counted pool and the organisation it belongs to."""
+
+    organisation: Organisation
+    line: PoolLine
+
+
+@dataclass(frozen=True)
+class PoolEdit(PoolPage):
+    """What the form of an existing pool needs: the pool and the skills to choose from."""
+
     choices: tuple[Skill, ...]
 
 
@@ -159,7 +173,7 @@ class CapacityService:
             value_of(self._max),
         )
 
-    async def pool(self, principal: Principal, slug: str, pool_id: int) -> PoolLine:
+    async def page(self, principal: Principal, slug: str, pool_id: int) -> PoolPage:
         """Return one counted pool of the organisation, not archived.
 
         Raises:
@@ -171,27 +185,38 @@ class CapacityService:
         async with self._uow.read() as tx:
             organisation = await organisation_by_slug(tx, slug)
             pool = await _own_editable_pool(tx, scope, organisation, pool_id)
-            return await _line(tx, scope, pool, await _skills_by_id(tx, scope, organisation.id))
+            line = await _line(tx, scope, pool, await _skills_by_id(tx, scope, organisation.id))
+        return PoolPage(organisation, line)
 
-    async def form(self, principal: Principal, slug: str, pool_id: int | None) -> PoolForm:
-        """Return what the form of a new pool (``None``) or of ``pool_id`` shows.
-
-        The choices are the skills not archived, and an archived one the pool still guarantees.
+    async def form(self, principal: Principal, slug: str) -> PoolForm:
+        """Return what the form of a new pool shows: the skills not archived.
 
         Raises:
-            DomainError: As ``pool``.
+            DomainError: ``not_permitted`` or ``organisation_not_found``.
         """
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.read() as tx:
             organisation = await organisation_by_slug(tx, slug)
-            skills = await _skills_by_id(tx, scope, organisation.id)
-            line = None
-            if pool_id is not None:
-                pool = await _own_editable_pool(tx, scope, organisation, pool_id)
-                line = await _line(tx, scope, pool, skills)
-            kept = line.pool.guaranteed_skill_ids if line else frozenset[int]()
-            choices = await organisation_skills(tx, scope, organisation.id, held=kept)
-        return PoolForm(organisation, line, tuple(choices))
+            choices = await organisation_skills(tx, scope, organisation.id)
+        return PoolForm(organisation, tuple(choices))
+
+    async def edit(self, principal: Principal, slug: str, pool_id: int) -> PoolEdit:
+        """Return what the form of ``pool_id`` shows.
+
+        The choices are the skills not archived, and an archived one the pool still guarantees.
+
+        Raises:
+            DomainError: As ``page``.
+        """
+        scope = await self._admin.scoped(principal, _PERMISSION, slug)
+        async with self._uow.read() as tx:
+            organisation = await organisation_by_slug(tx, slug)
+            pool = await _own_editable_pool(tx, scope, organisation, pool_id)
+            line = await _line(tx, scope, pool, await _skills_by_id(tx, scope, organisation.id))
+            choices = await organisation_skills(
+                tx, scope, organisation.id, held=pool.guaranteed_skill_ids
+            )
+        return PoolEdit(organisation, line, tuple(choices))
 
     async def create(
         self, principal: Principal, slug: str, name: str, skill_ids: Collection[int]

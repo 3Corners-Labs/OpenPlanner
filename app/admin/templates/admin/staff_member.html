@@ -33,7 +33,7 @@
   {% if section.editable %}
   <form method="post" action="/admin/staff/{{ person.id }}/skills/{{ section.slug }}" novalidate aria-labelledby="skills-{{ section.slug }}-heading">
     <h3 id="skills-{{ section.slug }}-heading">{{ section.name }}</h3>
-    {{ skill_checkboxes(section.choices, "skills-" ~ section.slug, _("admin.staff.skills.legend"), section.error) }}
+    {{ skill_checkboxes(section.choices, "skills-" ~ section.slug, _("admin.staff.skills.legend", organisation=section.name), section.error) }}
     <div class="form-actions">
       <button type="submit" class="button">{{ _("admin.staff.skills.save") }}</button>
     </div>

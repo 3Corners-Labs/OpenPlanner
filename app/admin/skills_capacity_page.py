@@ -14,7 +14,7 @@ from app.admin.authz import capacity_service, skill_service
 from app.admin.capacity_views import CHOICE_FIELD, name_field, pool_choices, pool_row
 from app.admin.forms import FormData, done_message
 from app.admin.pages import archived_requested, org_page, with_manual
-from app.admin.skill_inputs import raise_unknown
+from app.admin.skill_inputs import POOL_LIMIT_NOTICE, SKILL_LIMIT_NOTICE, raise_unknown
 from app.admin.skill_views import code_field, label_fields, skill_row
 from app.domain.authorization import Principal
 from app.domain.errors import DomainError
@@ -76,7 +76,7 @@ async def skills_capacity_page(
         found_skills = await skills.catalogue(principal, org, archived=skills_archived)
         found_pools = await pools.overview(principal, org, archived=pools_archived)
         adding = (
-            await pools.form(principal, org, None)
+            await pools.form(principal, org)
             if found_pools.editable and found_pools.can_add and not pools_archived
             else None
         )
@@ -118,11 +118,15 @@ async def skills_capacity_page(
             ]
             if adding is not None
             else None,
-            "pool_choices": pool_choices(adding, pool_form, locale) if adding is not None else [],
+            "pool_choices": pool_choices(adding.choices, frozenset(), pool_form, locale)
+            if adding is not None
+            else [],
             "choice_field": CHOICE_FIELD,
             "choice_error": pool_form.error_for(CHOICE_FIELD),
             "errors": errors,
             "done": done_message(request, _),
+            "skill_limit_notice": SKILL_LIMIT_NOTICE,
+            "pool_limit_notice": POOL_LIMIT_NOTICE,
             "skills_anchor": SKILLS_ANCHOR,
             "pools_anchor": POOLS_ANCHOR,
         },

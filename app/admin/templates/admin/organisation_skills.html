@@ -21,7 +21,7 @@
         <input type="checkbox" id="skills-archived" name="skills" value="archived"{% if skills_archived %} checked{% endif %}>
         <label for="skills-archived">{{ _("admin.skills.archived_only") }}</label>
       </div>
-      <button type="submit" class="button button--secondary">{{ _("admin.skills_capacity.filter") }}</button>
+      <button type="submit" class="button button--secondary">{{ _("admin.skills_capacity.filter") }}<span class="visually-hidden"> {{ _("admin.skills_capacity.filter_skills") }}</span></button>
     </div>
   </form>
   {% if skill_rows %}
@@ -76,7 +76,7 @@
   </div>
 </form>
 {% elif limit_reached and not skills_archived %}
-<div class="alert alert--warning" role="note"><p>{{ _("admin.skills.limit_reached", count=skills_limit) }}</p></div>
+<div class="alert alert--warning" role="note" id="{{ skill_limit_notice }}"><p>{{ _("admin.skills.limit_reached", count=skills_limit) }}</p></div>
 {% endif %}
 <section class="card" id="{{ pools_anchor }}" aria-labelledby="pools-heading">
   <div class="card__header">
@@ -91,7 +91,7 @@
         <input type="checkbox" id="pools-archived" name="pools" value="archived"{% if pools_archived %} checked{% endif %}>
         <label for="pools-archived">{{ _("admin.capacity.archived_only") }}</label>
       </div>
-      <button type="submit" class="button button--secondary">{{ _("admin.skills_capacity.filter") }}</button>
+      <button type="submit" class="button button--secondary">{{ _("admin.skills_capacity.filter") }}<span class="visually-hidden"> {{ _("admin.skills_capacity.filter_pools") }}</span></button>
     </div>
   </form>
   {% if pool_rows %}
@@ -152,6 +152,6 @@
   </div>
 </form>
 {% elif pools_limit_reached and not pools_archived %}
-<div class="alert alert--warning" role="note"><p>{{ _("admin.capacity.limit_reached", count=pools_limit) }}</p></div>
+<div class="alert alert--warning" role="note" id="{{ pool_limit_notice }}"><p>{{ _("admin.capacity.limit_reached", count=pools_limit) }}</p></div>
 {% endif %}
 {% endblock %}

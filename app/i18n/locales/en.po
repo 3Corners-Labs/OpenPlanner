@@ -12359,6 +12359,12 @@ msgstr "Back to skills and capacity"
 msgid "admin.skills_capacity.filter"
 msgstr "Apply filter"
 
+msgid "admin.skills_capacity.filter_skills"
+msgstr "for skills"
+
+msgid "admin.skills_capacity.filter_pools"
+msgstr "for capacity pools"
+
 msgid "admin.skills_capacity.error_in"
 msgstr "{section}: {message}"
 
@@ -12504,7 +12510,7 @@ msgid "admin.staff.skills.intro"
 msgstr "Rights determine what {name} may see. Skills determine which requests {name} may pick up. A change applies from the next request that is picked up or started."
 
 msgid "admin.staff.skills.legend"
-msgstr "Skills granted"
+msgstr "Skills granted at {organisation}"
 
 msgid "admin.staff.skills.save"
 msgstr "Save skills"

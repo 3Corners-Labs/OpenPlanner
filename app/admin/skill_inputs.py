@@ -5,6 +5,7 @@ calendars). The same helpers show the label of a skill in the admin's language, 
 the ticked boxes into ids and map the domain's refusals of those screens to form errors.
 """
 
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import NoReturn
@@ -19,7 +20,18 @@ from app.web.protection import RejectedRequest
 CHOICE_PREFIX = "skill-"
 """Input name of a skill checkbox is this prefix and the skill's id."""
 
-_MAX_ID_DIGITS = 9
+SKILL_LIMIT_NOTICE = "skills-limit-notice"
+"""Id of the notice that the limit of skills is reached; a refused create links to it (the add
+form is not shown then, so no input can carry the error)."""
+
+POOL_LIMIT_NOTICE = "pools-limit-notice"
+"""Id of the notice that the limit of pools is reached; see ``SKILL_LIMIT_NOTICE``."""
+
+_ID = re.compile(r"[0-9]{1,9}")
+"""A skill id in an input name: ASCII digits only (``str.isdigit`` also accepts ``²``)."""
+
+_ARCHIVED_FACTOR = 2
+"""A form offers the skills not archived and the archived ones still held: twice the limit."""
 
 _UNKNOWN = frozenset(
     {
@@ -75,24 +87,28 @@ def ticked_ids(form: FormData) -> frozenset[int]:
     """Return the ticked skills (inputs named ``skill-<id>``); malformed names are ignored.
 
     Only to show the ticks of a form again; the ids a change acts on come from ``chosen_ids``.
+    An id is one to nine ASCII digits; ``skill-²``, ``skill--1``, an empty or a longer one is
+    ignored like any other name.
     """
     ids = (
         name.removeprefix(CHOICE_PREFIX) for name in form.values if name.startswith(CHOICE_PREFIX)
     )
-    return frozenset(int(i) for i in ids if i.isdigit() and len(i) <= _MAX_ID_DIGITS)
+    return frozenset(int(i) for i in ids if _ID.fullmatch(i))
 
 
-def chosen_ids(form: FormData, maximum: int) -> frozenset[int]:
-    """Return the ticked skills a change acts on: at most ``maximum`` distinct ids.
+def chosen_ids(form: FormData, max_skills: int) -> frozenset[int]:
+    """Return the ticked skills a change acts on: at most twice ``max_skills`` distinct ids.
 
-    More than the organisation can have is no real form (a crafted POST); it is refused before
-    anything is looked up.
+    ``max_skills`` is the limit of skills not archived. A form also offers the archived skills
+    a pool or person still holds, so the cap is twice the limit: it needs no query before the
+    parse and no real form is near it. More is a crafted POST, refused before anything is looked
+    up.
 
     Raises:
-        DomainError: ``invalid_configuration`` on ``skill_ids`` for more than ``maximum`` ids.
+        DomainError: ``invalid_configuration`` on ``skill_ids`` for more ids than the cap.
     """
     ids = ticked_ids(form)
-    if len(ids) > maximum:
+    if len(ids) > _ARCHIVED_FACTOR * max_skills:
         raise DomainError(ErrorCode.INVALID_CONFIGURATION, "skill_ids")
     return ids
 
@@ -124,9 +140,9 @@ def refuse(form: FormData, error: DomainError, locale: RequestLocale, choice_fie
     if error.code is ErrorCode.SLUG_TAKEN and error.field == "skill_code":
         form.errors.append(FormError("skill_code", _("admin.skills.error.code_taken")))
     elif error.field == "skill_limit":
-        form.errors.append(FormError("skill_code", _("admin.skills.error.limit")))
+        form.errors.append(FormError(SKILL_LIMIT_NOTICE, _("admin.skills.error.limit")))
     elif error.field == "pool_limit":
-        form.errors.append(FormError("pool_name", _("admin.capacity.error.limit")))
+        form.errors.append(FormError(POOL_LIMIT_NOTICE, _("admin.capacity.error.limit")))
     elif error.field in ("skill_ids", "guaranteed_skill_ids"):
         form.errors.append(FormError(choice_field, _("admin.skills.error.choice")))
     elif error.code is ErrorCode.CONFIGURATION_OUT_OF_SCOPE and error.field == "organisation_id":

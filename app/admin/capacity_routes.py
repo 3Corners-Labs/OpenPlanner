@@ -31,7 +31,6 @@ from app.admin.pages import Locale, SameOrigin, org_page, with_manual
 from app.admin.skill_inputs import chosen_ids, raise_unknown, refuse
 from app.admin.skills_capacity_page import POOLS_ANCHOR, skills_capacity_page, url
 from app.domain.authorization import Permission
-from app.domain.capacity_service import PoolForm
 from app.domain.errors import DomainError, ErrorCode
 from app.web.errors import FormError
 from app.web.locale import RequestLocale
@@ -51,15 +50,6 @@ Manage = Annotated[
 """The permission of every change of an organisation's capacity pools and of one pool's page."""
 
 
-async def _pool_form(request: Request, context: AdminContext, org: str, pool_id: int) -> PoolForm:
-    """Return the form of one counted pool; anything else is a 404 (``raise_unknown``)."""
-    try:
-        found = await capacity_service(request).form(context.principal, org, pool_id)
-    except DomainError as error:
-        raise_unknown(error)
-    return found
-
-
 async def _edit_page(
     request: Request,
     locale: RequestLocale,
@@ -69,11 +59,11 @@ async def _edit_page(
     form: FormData,
     status: int = 200,
 ) -> HTMLResponse:
-    """Render the form of one counted pool."""
-    found = await _pool_form(request, context, org, pool_id)
-    line = found.line
-    if line is None:  # pragma: no cover - a pool id always gives a line
-        raise_unknown(DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, "pool_id"))
+    """Render the form of one counted pool; anything else is a 404 (``raise_unknown``)."""
+    try:
+        found = await capacity_service(request).edit(context.principal, org, pool_id)
+    except DomainError as error:
+        raise_unknown(error)
     return org_page(
         request,
         locale,
@@ -81,9 +71,11 @@ async def _edit_page(
         found.organisation,
         "admin/organisation_pool.html",
         {
-            "row": pool_row(line, locale),
-            "name_field": with_manual(request, locale, [name_field(form, locale, line)])[0],
-            "choices": pool_choices(found, form, locale),
+            "row": pool_row(found.line, locale),
+            "name_field": with_manual(request, locale, [name_field(form, locale, found.line)])[0],
+            "choices": pool_choices(
+                found.choices, found.line.pool.guaranteed_skill_ids, form, locale
+            ),
             "choice_field": CHOICE_FIELD,
             "choice_error": form.error_for(CHOICE_FIELD),
             "errors": form.errors,
@@ -103,10 +95,10 @@ async def _archive_page(
     status: int = 200,
 ) -> HTMLResponse:
     """Render what archiving a pool does, with the flows that stop it, and the button."""
-    found = await _pool_form(request, context, org, pool_id)
-    line = found.line
-    if line is None:  # pragma: no cover - a pool id always gives a line
-        raise_unknown(DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, "pool_id"))
+    try:
+        found = await capacity_service(request).page(context.principal, org, pool_id)
+    except DomainError as error:
+        raise_unknown(error)
     return org_page(
         request,
         locale,
@@ -114,7 +106,7 @@ async def _archive_page(
         found.organisation,
         "admin/organisation_pool_archive.html",
         {
-            "row": pool_row(line, locale),
+            "row": pool_row(found.line, locale),
             "errors": form.errors,
             "back": f"{url(org)}#{POOLS_ANCHOR}",
         },
@@ -197,8 +189,8 @@ async def archive_pool(
         if error.code is not ErrorCode.CONFIGURATION_OBJECT_IN_USE:
             refuse(form, error, locale, CHOICE_FIELD)
         else:
-            line = await capacity_service(request).pool(context.principal, org, pool_id)
-            row = pool_row(line, locale)
+            found = await capacity_service(request).page(context.principal, org, pool_id)
+            row = pool_row(found.line, locale)
             names = f"{', '.join(row.flows)} {row.hidden}".strip()
             message = locale.gettext("admin.capacity.error.in_use", flows=names)
             form.errors.append(FormError(None, message))

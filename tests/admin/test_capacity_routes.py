@@ -121,7 +121,7 @@ async def test_more_ticks_than_an_organisation_can_have_skills_is_refused_before
 ) -> None:
     await site.login_as(ORG_ADMIN)
     limit(site, skills=2)
-    ids = (1, 2, 3)
+    ids = (1, 2, 3, 4, 5)
 
     created = await create(site, "Loket", ids)
     pool = await add_pool(site)
@@ -299,7 +299,9 @@ async def test_the_limit_counts_counted_pools_only_and_not_archived_ones(site: S
 
     assert refused.status_code == 422
     assert "Uw organisatie heeft het maximale aantal capaciteitspools bereikt." in refused.text
-    assert 'href="#pool_name"' in refused.text
+    assert 'href="#pools-limit-notice"' in refused.text
+    assert 'id="pools-limit-notice"' in refused.text
+    assert "pool_name-error" not in refused.text  # the add form is not there to carry it
     assert "Het maximum van 2 eigen en gedeelde pools is bereikt." in page
     assert ADD_POOL_FORM not in page
     assert accepted.status_code == 303
@@ -323,3 +325,36 @@ async def test_the_pages_of_a_pool_need_the_manage_right_and_the_auditor_only_re
     await site.login_as(SUPER)
     assert (await site.client.get("/admin/organisations/nope/capacity")).status_code == 308
     assert (await site.client.get(LIST)).status_code == 200
+
+
+async def test_a_crafted_checkbox_name_is_ignored_and_never_a_server_error(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    pool = await add_pool(site)
+    crafted = {name: "on" for name in ("skill-\u00b2", "skill-\u0663", "skill--1", "skill-")}
+
+    created = await site.client.post(
+        PAGE, data={"pool_name": "Loket", **crafted}, headers=SAME_ORIGIN
+    )
+    saved = await site.client.post(
+        f"{PAGE}/{pool}", data={"pool_name": "Spreekuur", **crafted}, headers=SAME_ORIGIN
+    )
+
+    assert created.status_code == saved.status_code == 303
+
+
+async def test_an_archived_skill_a_pool_holds_is_saved_unchanged_at_the_skill_limit(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+    old, fresh = (
+        await add_skill(site, "old", "Old", "Old"),
+        await add_skill(site, "fresh", "Fresh", "Fresh"),
+    )
+    pool = await add_pool(site, "Loket", (old, fresh))
+    await archive_skill(site, old)
+    limit(site, skills=1)  # one skill not archived (the limit) beside one archived and held
+
+    saved = await create(site, "Loket", (old, fresh), page=f"{PAGE}/{pool}")
+
+    assert saved.status_code == 303
+    assert "done=unchanged" in saved.headers["location"]

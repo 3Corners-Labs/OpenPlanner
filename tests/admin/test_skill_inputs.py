@@ -13,15 +13,16 @@ def form(*names: str) -> FormData:
 
 
 def test_the_ticked_skills_are_the_well_formed_inputs_only() -> None:
-    ticked = form("skill-1", "skill-22", "skill-x", "skill-", "other", "skill-1234567890")
+    crafted = ("skill-\u00b2", "skill-\u0663", "skill--1", "skill-+1", "skill- 1", "skill-1_0")
+    ticked = form("skill-1", "skill-22", "skill-x", "skill-", "other", "skill-1234567890", *crafted)
 
     assert ticked_ids(ticked) == {1, 22}
 
 
-def test_a_change_acts_on_at_most_as_many_ids_as_an_organisation_can_have_skills() -> None:
-    ticked = form("skill-1", "skill-2", "skill-3")
+def test_a_change_acts_on_at_most_twice_the_skill_limit_in_ids() -> None:
+    ticked = form("skill-1", "skill-2", "skill-3", "skill-4", "skill-5")
 
-    assert chosen_ids(ticked, 3) == {1, 2, 3}
+    assert chosen_ids(ticked, 3) == {1, 2, 3, 4, 5}
     with pytest.raises(DomainError) as refused:
         chosen_ids(ticked, 2)
     assert (refused.value.code, refused.value.field) == (

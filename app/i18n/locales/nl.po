@@ -12372,6 +12372,12 @@ msgstr "Terug naar vaardigheden en capaciteit"
 msgid "admin.skills_capacity.filter"
 msgstr "Filteren"
 
+msgid "admin.skills_capacity.filter_skills"
+msgstr "voor vaardigheden"
+
+msgid "admin.skills_capacity.filter_pools"
+msgstr "voor capaciteitspools"
+
 msgid "admin.skills_capacity.error_in"
 msgstr "{section}: {message}"
 
@@ -12517,7 +12523,7 @@ msgid "admin.staff.skills.intro"
 msgstr "Rechten bepalen wat {name} mag zien. Vaardigheden bepalen welke verzoeken {name} mag oppakken. Een wijziging geldt vanaf het volgende verzoek dat wordt opgepakt of gestart."
 
 msgid "admin.staff.skills.legend"
-msgstr "Toegekende vaardigheden"
+msgstr "Toegekende vaardigheden bij {organisation}"
 
 msgid "admin.staff.skills.save"
 msgstr "Vaardigheden opslaan"

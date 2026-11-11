@@ -1,5 +1,7 @@
 """Skills of a person on the staff page (ADR 0121 step 2c, screen 5): grants, audit, scope."""
 
+import re
+
 import httpx
 
 from tests.admin.conftest import (
@@ -180,7 +182,7 @@ async def test_more_ticks_than_the_organisation_can_have_skills_are_refused(site
     gina, passport = await with_gina_and_a_skill(site)
     limit(site, skills=2)
 
-    response = await grant(site, gina, skills=(passport, passport + 1, passport + 2))
+    response = await grant(site, gina, skills=tuple(range(passport, passport + 5)))
 
     assert response.status_code == 422
     assert 'href="#skills-demo"' in response.text
@@ -188,7 +190,7 @@ async def test_more_ticks_than_the_organisation_can_have_skills_are_refused(site
     assert not [e for e in await audit_log(site) if e.detail.startswith("staff_skills")]
 
 
-async def test_the_organisation_is_named_once_by_the_heading_and_not_by_the_legend(
+async def test_the_legend_names_the_organisation_beside_the_heading(
     site: Site,
 ) -> None:
     gina, _ = await with_gina_and_a_skill(site)
@@ -196,4 +198,36 @@ async def test_the_organisation_is_named_once_by_the_heading_and_not_by_the_lege
     page = (await site.client.get(f"/admin/staff/{gina}")).text
 
     assert '<h3 id="skills-demo-heading">' in page
-    assert "<legend>Toegekende vaardigheden</legend>" in page
+    legend = re.search(r"<legend>(Toegekende vaardigheden bij [^<]+)</legend>", page)
+    heading = re.search(r'<h3 id="skills-demo-heading">([^<]+)</h3>', page)
+    assert legend is not None
+    assert heading is not None
+    assert legend.group(1).endswith(heading.group(1))
+
+
+async def test_a_crafted_checkbox_name_is_ignored_and_never_a_server_error(site: Site) -> None:
+    gina, passport = await with_gina_and_a_skill(site)
+    crafted = {name: "on" for name in ("skill-\u00b2", "skill-\u0663", "skill--1", "skill-")}
+
+    response = await site.client.post(
+        f"/admin/staff/{gina}/skills/demo",
+        data={f"skill-{passport}": "on", **crafted},
+        headers=SAME_ORIGIN,
+    )
+
+    assert response.status_code == 303
+
+
+async def test_an_archived_skill_the_person_still_holds_is_saved_unchanged_at_the_limit(
+    site: Site,
+) -> None:
+    gina, old = await with_gina_and_a_skill(site)
+    fresh = await add_skill(site, "fresh", "Vers", "Fresh")
+    await grant(site, gina, skills=(old, fresh))
+    await archive_skill(site, old)
+    limit(site, skills=1)  # one skill not archived (the limit) beside one archived and held
+
+    saved = await grant(site, gina, skills=(old, fresh))
+
+    assert saved.status_code == 303
+    assert "done=unchanged" in saved.headers["location"]

@@ -326,7 +326,9 @@ async def test_the_limit_refuses_a_new_skill_and_the_page_says_so(site: Site) ->
 
     assert refused.status_code == 422
     assert "Uw organisatie heeft het maximale aantal vaardigheden bereikt." in refused.text
-    assert 'href="#skill_code"' in refused.text
+    assert 'href="#skills-limit-notice"' in refused.text
+    assert 'id="skills-limit-notice"' in refused.text
+    assert "skill_code-error" not in refused.text  # the add form is not there to carry it
     assert "Het maximum van 2 vaardigheden is bereikt." in page
     assert ADD_SKILL_FORM not in page
     assert accepted.status_code == 303
@@ -358,3 +360,12 @@ async def test_an_unknown_filter_value_shows_the_active_rows(site: Site, filter_
     page = (await site.client.get(PAGE, params={filter_name: "yes"})).text
 
     assert "<td><code>intake</code></td>" in page
+
+
+async def test_the_two_filter_buttons_have_names_of_their_own(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    page = (await site.client.get(PAGE)).text
+
+    assert 'Filteren<span class="visually-hidden"> voor vaardigheden</span></button>' in page
+    assert 'Filteren<span class="visually-hidden"> voor capaciteitspools</span></button>' in page
