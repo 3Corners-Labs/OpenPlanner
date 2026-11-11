@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from app.adapters.db.uow import SqlTransaction
 from app.cli import main
 from tests.support.database import migrated_database
 
@@ -45,7 +46,7 @@ def test_the_command_gives_a_group_its_rows_and_says_only_how_many(
     assert main(["ensure-flows"]) == 0
 
     out = capsys.readouterr().out
-    assert out == "ensure-flows: 1 groups received pool or flow rows\n"
+    assert out == "ensure-flows: 1 groups received pool or flow rows, 0 failed\n"
     assert "Geheime" not in out
     assert _counts(path) == (1, 2)  # one pool, the appointment and the direct flow
 
@@ -59,5 +60,39 @@ def test_running_it_again_changes_nothing(
 
     assert main(["ensure-flows"]) == 0
 
-    assert capsys.readouterr().out == "ensure-flows: 0 groups received pool or flow rows\n"
+    assert (
+        capsys.readouterr().out == "ensure-flows: 0 groups received pool or flow rows, 0 failed\n"
+    )
     assert _counts(path) == (1, 2)
+
+
+def test_a_failing_run_prints_one_line_with_the_error_type_and_exits_non_zero(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    migrated_database(tmp_path, monkeypatch, "cli-flows-empty")  # sets the test environment
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path / 'empty.db'}")  # no schema
+
+    assert main(["ensure-flows"]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.startswith("ensure-flows: failed (")
+    assert captured.err.count("\n") == 1
+    assert "Traceback" not in captured.err
+
+
+def test_a_group_that_could_not_be_repaired_exits_non_zero(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _group_without_rows(migrated_database(tmp_path, monkeypatch, "cli-flows-failing"))
+
+    async def refuse(self: object, group_id: int) -> bool:
+        raise RuntimeError("secret detail")
+
+    monkeypatch.setattr(SqlTransaction, "ensure_default_flows", refuse)
+
+    assert main(["ensure-flows"]) == 1
+
+    assert (
+        capsys.readouterr().out == "ensure-flows: 0 groups received pool or flow rows, 1 failed\n"
+    )

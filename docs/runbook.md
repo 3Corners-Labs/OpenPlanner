@@ -2114,7 +2114,11 @@ image from before the flows was used to create has no legacy capacity pool and n
 After going forward again, the worker repairs this by itself once, when it starts; the host can
 see it or repeat it with `docker compose run --rm web python -m app.cli ensure-flows`. The command
 only adds what is missing, never changes or deletes a pool or flow, is safe to run again and
-prints counts only (`ensure-flows: N groups received pool or flow rows`).
+prints counts only (`ensure-flows: N groups received pool or flow rows, M failed`). It takes the
+write lock only for a group that lacks something. On an error it prints one line
+`ensure-flows: failed (<ErrorType>)` to stderr; the exit code is 1 on an error and when `M` is
+above zero, and the log lines `flows.repair_failed` and `flows.repair_incomplete` say the same
+for the worker's own run.
 
 ## Backup and restore
 

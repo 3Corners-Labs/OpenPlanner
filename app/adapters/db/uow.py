@@ -119,6 +119,7 @@ from app.adapters.db.routing_json import (
     subjects_from_column,
 )
 from app.adapters.db.scenarios import ScenarioQueries
+from app.adapters.db.schedule_rules import rule_from_row
 from app.adapters.db.scope import scope_filter
 from app.adapters.db.service_flows import ServiceFlowQueries
 from app.adapters.db.skills import SkillQueries
@@ -327,24 +328,6 @@ def _calendar(row: HolidayCalendarRow) -> HolidayCalendar:
 def _holiday(row: HolidayRow) -> Holiday:
     """Map a holiday row."""
     return Holiday(row.calendar_id, row.day, row.name, id=row.id)
-
-
-def _rule(row: ScheduleRuleRow) -> ScheduleRule:
-    """Map a weekly rule row."""
-    return ScheduleRule(
-        weekday=row.weekday,
-        window=TimeWindow(
-            row.opens,
-            row.closes,
-            row.capacity,
-            row.label,
-            Offer(row.offer),
-            subjects_from_column(row.subjects),
-        ),
-        valid_from=row.valid_from,
-        valid_to=row.valid_to,
-        id=row.id,
-    )
 
 
 def _rule_columns(rule: ScheduleRule) -> dict[str, Any]:
@@ -796,7 +779,7 @@ class SqlTransaction(
                 ScheduleOverrideRow.day.between(first_day, last_day),
             )
         )
-        return [_rule(r) for r in rules], [_override(o) for o in overrides]
+        return [rule_from_row(r) for r in rules], [_override(o) for o in overrides]
 
     async def list_organisations(self, scope: Scope) -> list[Organisation]:
         """Return the organisations inside ``scope`` (organisation scope only), by slug."""
@@ -1181,7 +1164,7 @@ class SqlTransaction(
         overrides = await self._session.scalars(
             query.order_by(ScheduleOverrideRow.day, ScheduleOverrideRow.opens)
         )
-        return [_rule(r) for r in rules], [_override(o) for o in overrides]
+        return [rule_from_row(r) for r in rules], [_override(o) for o in overrides]
 
     async def add_schedule_rule(self, group_id: int, rule: ScheduleRule) -> int:
         """Insert a weekly rule and return its ID; a rule that offers direct calls adds the flow."""

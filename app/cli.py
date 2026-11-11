@@ -677,18 +677,27 @@ async def _usage_backfill(settings: Settings) -> str:
     return f"usage-backfill: {run.bookings} bookings looked at, {run.facts} facts written\n"
 
 
-async def _ensure_flows(settings: Settings) -> str:
-    """Give every group the legacy pool and flows it lacks (ADR 0121 step 2e); one line of counts.
+async def _ensure_flows(settings: Settings) -> tuple[str, int, bool]:
+    """Give every group the legacy pool and flows it lacks (ADR 0121 step 2e).
+
+    Returns the one line to print, the exit code and whether the line goes to stderr.
 
     Safe to run again: it only adds what is missing. The worker runs it once at start too; this
-    is for a host that wants to see it done, for example after a rollback window.
+    is for a host that wants to see it done, for example after a rollback window. An error is one
+    line with its type name, never a traceback; exit code 1 also when a group could not be done.
     """
     engine = create_engine(settings.database_url)
     try:
-        groups = await ensure_all_default_flows(SqlUnitOfWork(engine))
+        counts = await ensure_all_default_flows(SqlUnitOfWork(engine))
+    except Exception as exc:  # one line with the type, not a traceback (no detail: it may hold PII)
+        return f"ensure-flows: failed ({type(exc).__name__})\n", 1, True
     finally:
         await engine.dispose()
-    return f"ensure-flows: {groups} groups received pool or flow rows\n"
+    line = (
+        f"ensure-flows: {counts.repaired} groups received pool or flow rows,"
+        f" {counts.failed} failed\n"
+    )
+    return line, 1 if counts.failed else 0, False
 
 
 REKEY_DETAIL = "secrets.rekey"
@@ -1859,8 +1868,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stdout.write(render_logging_doc())
         return 0
     if args.command == "ensure-flows":
-        sys.stdout.write(asyncio.run(_ensure_flows(Settings())))
-        return 0
+        line, code, is_error = asyncio.run(_ensure_flows(Settings()))
+        (sys.stderr if is_error else sys.stdout).write(line)
+        return code
     if args.command == "usage-backfill":
         sys.stdout.write(asyncio.run(_usage_backfill(Settings())))
         return 0

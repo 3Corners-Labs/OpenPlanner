@@ -1715,6 +1715,14 @@ class Transaction(Protocol):
         """
         ...
 
+    async def groups_missing_default_flows(self) -> list[int]:
+        """Return the ids of the groups that ``ensure_default_flows`` would give a row, by id.
+
+        Archived groups are included. Reads only, so a read transaction is enough (ADR 0121
+        step 2e).
+        """
+        ...
+
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
         """Delete the booking's pending jobs and store ``jobs`` instead (CLAUDE.md)."""
         ...

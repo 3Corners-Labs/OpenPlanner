@@ -15,10 +15,10 @@ from typing import Any
 from app.domain.authorization import Scope
 from app.domain.capacity import CapacityPool, PoolFlows, check_pool_archive, check_pool_save
 from app.domain.default_flows import (
+    DefaultFlowSet,
     bind_pool,
     default_flow_set,
     missing_defaults,
-    offers_direct,
     stored_flow,
 )
 from app.domain.errors import DomainError, ErrorCode, missing_object
@@ -121,30 +121,41 @@ class ServiceFlowStore:
             self.state, scope, organisation_id
         )
 
-    async def ensure_default_flows(self, group_id: int) -> bool:
+    def _missing_defaults(self, group_id: int) -> DefaultFlowSet | None:
+        """Return what the group still lacks, ``None`` for a group that does not exist."""
         group = self.state.groups.get(group_id)
         if group is None:
-            return False
+            return None
         wanted = default_flow_set(
             group_id,
             group.organisation_id,
             group.name,
             group.slot_minutes,
             group.dispatch_kind,
-            offers_direct(self.state.rules.get(group_id, [])),
+            any(rule.window.offers_direct for rule in self.state.rules.get(group_id, [])),
             group.archived_at is not None,
         )
         pool = next((p for p in self.state.pools.values() if p.group_id == group_id), None)
         flows = [f for f in self.state.flows.values() if f.group_id == group_id]
-        missing = missing_defaults(wanted, pool is not None, [stored_flow(f) for f in flows])
-        if missing.empty:
+        return missing_defaults(wanted, pool is not None, [stored_flow(f) for f in flows])
+
+    async def groups_missing_default_flows(self) -> list[int]:
+        return sorted(
+            group_id
+            for group_id in self.state.groups
+            if (missing := self._missing_defaults(group_id)) is not None and not missing.empty
+        )
+
+    async def ensure_default_flows(self, group_id: int) -> bool:
+        missing = self._missing_defaults(group_id)
+        if missing is None or missing.empty:
             return False
         if missing.pool is not None:
-            pool = replace(missing.pool, id=self._new_id())
-            self.state.pools[pool.id] = pool
-        assert pool is not None
-        assert pool.id is not None
-        for flow in bind_pool(missing, pool.id).flows:
+            pool_id = self._new_id()
+            self.state.pools[pool_id] = replace(missing.pool, id=pool_id)
+        else:
+            pool_id = next(i for i, p in self.state.pools.items() if p.group_id == group_id)
+        for flow in bind_pool(missing, pool_id):
             assert flow.current is not None
             flow_id = self._new_id()
             current = replace(flow.current, flow_id=flow_id, published_at=NOW, published_by=None)

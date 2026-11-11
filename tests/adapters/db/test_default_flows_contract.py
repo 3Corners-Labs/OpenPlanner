@@ -12,15 +12,12 @@ from datetime import time
 from typing import Any
 
 import pytest
-from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-from app.adapters.db.engine import create_engine
-from app.adapters.db.models import CapacityPoolRow, FlowRevisionRow, ServiceFlowRow
-from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.db.models import CapacityPoolRow, ServiceFlowRow
 from app.domain.authorization import Scope
 from app.domain.capacity import CapacityPool, PoolMode
-from app.domain.default_flows_service import ensure_all_default_flows
+from app.domain.default_flows_service import RepairCounts, ensure_all_default_flows
 from app.domain.errors import DomainError
 from app.domain.scheduling import DispatchKind, Offer, Organisation, ScheduleRule, TimeWindow
 from app.domain.service_flows import (
@@ -32,8 +29,8 @@ from app.domain.service_flows import (
 from app.domain.service_flows import (
     DispatchKind as FlowDispatch,
 )
-from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.domain import NOW, make_group
+from tests.support.flow_backends import BACKENDS, CountingUow, open_backend
 
 EVERYTHING = Scope(everything=True)
 
@@ -48,31 +45,12 @@ class World:
     """Delete every pool and flow, as a database an older image wrote to looks."""
 
 
-@pytest.fixture(params=["sql", "fake"])
+@pytest.fixture(params=BACKENDS)
 async def world(request: pytest.FixtureRequest, database_url: str) -> AsyncIterator[World]:
-    if request.param == "fake":
-        uow: Any = InMemoryUnitOfWork()
-
-        async def forget_in_fake() -> None:
-            for table in (uow.state.flow_revisions, uow.state.flows, uow.state.pools):
-                table.clear()
-
-        async with uow.locked() as tx:
+    async with open_backend(request.param, database_url) as backend:
+        async with backend.uow.locked() as tx:
             org = await tx.add_organisation(Organisation(0, "Acme", "acme"))
-        yield World(uow, org.id, forget_in_fake)
-        return
-    engine: AsyncEngine = create_engine(database_url, busy_timeout_ms=200)
-    uow = SqlUnitOfWork(engine)
-
-    async def forget_in_sql() -> None:
-        async with AsyncSession(engine) as session, session.begin():
-            for row in (FlowRevisionRow, ServiceFlowRow, CapacityPoolRow):
-                await session.execute(delete(row))
-
-    async with uow.locked() as tx:
-        org = await tx.add_organisation(Organisation(0, "Acme", "acme"))
-    yield World(uow, org.id, forget_in_sql)
-    await engine.dispose()
+        yield World(backend.uow, org.id, backend.forget)
 
 
 async def add_group(world: World, slug: str = "balie", **changes: Any) -> int:
@@ -240,6 +218,37 @@ async def test_a_legacy_revision_cannot_be_saved_as_a_draft(world: World) -> Non
             await tx.save_draft(EVERYTHING, replace(flow, draft=flow.current, current=None))
 
 
+async def test_a_legacy_flow_is_a_snapshot_of_the_service_when_it_was_made(world: World) -> None:
+    """Later changes of the service never change its legacy rows (ADR 0121 point 8)."""
+    group_id = await add_group(world, name="Balie", slot_minutes=20)
+    before_pool = await pools_of(world)
+    before = await flows_of(world, group_id)
+
+    async with world.uow.locked() as tx:
+        group = await tx.get_group_by_id(group_id)
+        await tx.save_group(
+            replace(
+                group,
+                name="Hernoemd",
+                slot_minutes=45,
+                dispatch_kind=DispatchKind.OPENPLANNER_QUEUE,
+                archived_at=NOW,
+            )
+        )
+        await tx.add_schedule_rule(group_id, block(Offer.SCHEDULED))
+        assert not await tx.ensure_default_flows(group_id)
+
+    assert await pools_of(world) == before_pool
+    assert await flows_of(world, group_id) == before
+    current = before["appointment"].current
+    assert current is not None
+    assert (current.labels["nl"], current.duration_minutes) == ("Balie", 20)
+    assert (current.dispatch, before["appointment"].state) == (
+        FlowDispatch.CONTACT_CENTER,
+        FlowState.ACTIVE,
+    )
+
+
 async def test_the_repair_gives_a_group_of_an_older_image_its_rows_once(world: World) -> None:
     first = await add_group(world, slug="een")
     second = await add_group(world, slug="twee", archived_at=NOW)
@@ -247,14 +256,46 @@ async def test_the_repair_gives_a_group_of_an_older_image_its_rows_once(world: W
         await tx.add_schedule_rule(first, block(Offer.BOTH))
     await world.forget()
     assert await pools_of(world) == []
+    async with world.uow.read() as tx:
+        assert await tx.groups_missing_default_flows() == [first, second]
 
-    repaired = await ensure_all_default_flows(world.uow)
+    assert await ensure_all_default_flows(world.uow) == RepairCounts(2, 0)
 
-    assert repaired == 2
     assert list(await flows_of(world, first)) == ["appointment", "direct"]
     assert {f.state for f in (await flows_of(world, second)).values()} == {FlowState.ARCHIVED}
     assert len(await pools_of(world)) == 2  # one legacy pool per group, the archived one included
-    assert await ensure_all_default_flows(world.uow) == 0
+    async with world.uow.read() as tx:
+        assert await tx.groups_missing_default_flows() == []
+    assert await ensure_all_default_flows(world.uow) == RepairCounts(0, 0)
+
+
+async def test_a_group_with_a_pool_but_no_direct_flow_is_found_by_its_rules(world: World) -> None:
+    group_id = await add_group(world)
+    other = await add_group(world, slug="twee")
+    async with world.uow.locked() as tx:
+        await tx.add_schedule_rule(group_id, block(Offer.SCHEDULED))
+        await tx.add_schedule_rule(other, block(Offer.DIRECT, capacity=0))
+    async with world.uow.read() as tx:
+        assert await tx.groups_missing_default_flows() == []
+    async with world.uow.locked() as tx:
+        await tx.add_schedule_rule(group_id, block(Offer.BOTH))
+    await world.forget()
+    async with world.uow.locked() as tx:
+        await tx.ensure_default_flows(other)  # the other group is whole again, group_id is not
+    async with world.uow.read() as tx:
+        assert await tx.groups_missing_default_flows() == [group_id]
+
+
+async def test_a_healthy_installation_takes_no_write_lock(world: World) -> None:
+    await add_group(world)
+    counting = CountingUow(world.uow)
+
+    assert await ensure_all_default_flows(counting) == RepairCounts(0, 0)
+    assert counting.writes == 0
+
+    await world.forget()
+    assert await ensure_all_default_flows(counting) == RepairCounts(1, 0)
+    assert counting.writes == 1  # one short write transaction for the one group that needed it
 
 
 async def test_every_demo_group_has_its_pool_and_appointment_flow(engine: AsyncEngine) -> None:

@@ -9,17 +9,15 @@ from app.domain.capacity import PoolMode
 from app.domain.default_flows import (
     APPOINTMENT_CODE,
     DIRECT_CODE,
-    UNSTORED_POOL,
     DefaultFlowSet,
     StoredFlow,
     bind_pool,
     default_flow_set,
     flow_dispatch,
     missing_defaults,
-    offers_direct,
     stored_flow,
 )
-from app.domain.scheduling import DispatchKind, Offer, ScheduleRule, TimeWindow
+from app.domain.scheduling import DispatchKind, Offer, TimeWindow
 from app.domain.service_flows import DispatchKind as FlowDispatch
 from app.domain.service_flows import FlowState, IntakeMode
 
@@ -33,11 +31,6 @@ def wanted(
 ) -> DefaultFlowSet:
     """Return the defaults of group 7 of organisation 3."""
     return default_flow_set(7, 3, name, 20, dispatch, direct, archived)
-
-
-def rule(offer: Offer, capacity: int) -> ScheduleRule:
-    """Return a Monday rule with ``offer`` and ``capacity``."""
-    return ScheduleRule(0, TimeWindow(time(9), time(10), capacity, None, offer))
 
 
 def test_a_group_has_a_legacy_pool_and_an_appointment_flow() -> None:
@@ -56,11 +49,12 @@ def test_a_group_has_a_legacy_pool_and_an_appointment_flow() -> None:
         FlowState.ACTIVE,
         frozenset({IntakeMode.APPOINTMENT}),
     )
-    assert flow.current is not None
-    assert flow.current.legacy
-    assert flow.current.duration_minutes == 20
-    assert flow.current.capacity_pool_id == UNSTORED_POOL
-    assert flow.current.labels == {"nl": "Balie", "en": "Balie"}
+    assert (flow.intake_mode, flow.duration_minutes) == (IntakeMode.APPOINTMENT, 20)
+    revision = flow.revision(42)  # a revision exists only with a stored pool
+    assert revision.legacy
+    assert revision.capacity_pool_id == 42
+    assert revision.duration_minutes == 20
+    assert revision.labels == {"nl": "Balie", "en": "Balie"}
 
 
 def test_a_group_that_offers_the_direct_call_has_a_direct_flow_too() -> None:
@@ -85,7 +79,7 @@ def test_an_archived_group_gets_archived_flows() -> None:
 )
 def test_the_dispatch_follows_the_group(kind: DispatchKind, dispatch: FlowDispatch) -> None:
     assert flow_dispatch(kind) is dispatch
-    assert {f.current.dispatch for f in wanted(dispatch=kind).flows if f.current} == {dispatch}
+    assert {f.dispatch for f in wanted(dispatch=kind).flows} == {dispatch}
 
 
 def test_a_long_name_is_cut_as_the_migration_cuts_it() -> None:
@@ -95,8 +89,7 @@ def test_a_long_name_is_cut_as_the_migration_cuts_it() -> None:
 
     assert result.pool is not None
     assert result.pool.name == "x" * 79
-    assert result.flows[0].current is not None
-    assert result.flows[0].current.labels["nl"] == "x" * 79
+    assert result.flows[0].label == "x" * 79
 
 
 def test_a_name_of_blanks_after_the_cut_becomes_a_dash() -> None:
@@ -115,14 +108,11 @@ def test_a_name_of_blanks_after_the_cut_becomes_a_dash() -> None:
         (Offer.BOTH, 0, False),
     ],
 )
-def test_the_direct_call_is_offered_by_a_direct_rule_with_agents(
+def test_the_direct_call_is_offered_by_a_direct_window_with_agents(
     offer: Offer, capacity: int, expected: bool
 ) -> None:
-    assert offers_direct([rule(Offer.SCHEDULED, 1), rule(offer, capacity)]) is expected
-
-
-def test_no_rules_offer_no_direct_call() -> None:
-    assert offers_direct([]) is False
+    """The one statement of the rule (the migration's) is ``TimeWindow.offers_direct``."""
+    assert TimeWindow(time(9), time(10), capacity, None, offer).offers_direct is expected
 
 
 def test_a_new_group_lacks_everything() -> None:
@@ -209,13 +199,16 @@ def test_the_flows_of_an_archived_group_keep_their_defaults() -> None:
     assert flow.default_for == frozenset({IntakeMode.APPOINTMENT})  # no index applies to archived
 
 
-def test_binding_names_the_stored_pool_in_every_revision() -> None:
-    bound = bind_pool(wanted(direct=True), 42)
+def test_binding_builds_every_revision_on_the_stored_pool() -> None:
+    flows = bind_pool(wanted(direct=True), 42)
 
-    assert {f.current.capacity_pool_id for f in bound.flows if f.current} == {42}
-    assert bound.pool == wanted(direct=True).pool
+    assert [f.code for f in flows] == [APPOINTMENT_CODE, DIRECT_CODE]
+    assert {f.group_id for f in flows} == {7}
+    assert {f.id for f in flows} == {None}
+    assert {f.current.capacity_pool_id for f in flows if f.current} == {42}
+    assert all(f.current is not None and f.current.legacy for f in flows)
 
 
 def test_an_empty_set_is_empty() -> None:
-    assert DefaultFlowSet(None, ()).empty
-    assert not replace(DefaultFlowSet(None, ()), flows=wanted().flows).empty
+    assert DefaultFlowSet(7, None, ()).empty
+    assert not replace(DefaultFlowSet(7, None, ()), flows=wanted().flows).empty

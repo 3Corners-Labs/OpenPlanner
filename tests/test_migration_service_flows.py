@@ -273,7 +273,7 @@ async def test_the_backfill_and_the_rule_for_new_groups_build_the_same(upgraded:
         assert wanted.pool is not None
         assert pool.id is not None
         assert replace(wanted.pool, id=pool.id) == pool
-        expected = bind_pool(wanted, pool.id).flows
+        expected = bind_pool(wanted, pool.id)
         assert [f.code for f in stored[group_id]] == [f.code for f in expected]
         for found, rule in zip(stored[group_id], expected, strict=True):
             assert rule.current is not None

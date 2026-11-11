@@ -46,6 +46,7 @@ from app.adapters.db.routing_json import (
     subjects_column,
     subjects_from_column,
 )
+from app.adapters.db.schedule_rules import rule_from_row
 from app.adapters.db.service_flows import ensure_default_flows_in
 from app.domain.configuration_changes import Change, ChangeAction
 from app.domain.configuration_tree import Entity
@@ -65,7 +66,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.form_fields import FieldDefinition, FormDefinition
 from app.domain.routing_codec import routing_from_json as strict_routing
 from app.domain.routing_codec import routing_to_json
-from app.domain.scheduling import Offer, ScheduleOverride, ScheduleRule, TimeWindow
+from app.domain.scheduling import Offer, ScheduleOverride, TimeWindow
 
 DESCRIPTORS_BY_VALUE = {kind.value: descriptor for kind, descriptor in DESCRIPTORS.items()}
 """The contact-center platforms a document may name, by the value of their kind."""
@@ -117,19 +118,6 @@ def _list(items: Iterable[Json]) -> list[Json]:
 
 
 # --- reading ------------------------------------------------------------------------------
-
-
-def _rule_of(row: ScheduleRuleRow) -> ScheduleRule:
-    """Map a weekly rule row to the domain."""
-    window = TimeWindow(
-        row.opens,
-        row.closes,
-        row.capacity,
-        row.label,
-        Offer(row.offer),
-        subjects_from_column(row.subjects),
-    )
-    return ScheduleRule(row.weekday, window, row.valid_from, row.valid_to)
 
 
 def _override_of(row: ScheduleOverrideRow) -> ScheduleOverride:
@@ -228,7 +216,7 @@ async def read_groups(session: AsyncSession) -> dict[str, tuple[Entity, ...]]:
         fields["holiday_calendars"] = _list(calendars.get(row.id, []))
         fields["holiday_open_days"] = _list(open_days.get(row.id, []))
         fields["form_fields"] = _list(form_json(f) for f in (*form.fields, *form.retired))
-        fields["schedule_rules"] = _list(rule_json(_rule_of(r)) for r in rules.get(row.id, []))
+        fields["schedule_rules"] = _list(rule_json(rule_from_row(r)) for r in rules.get(row.id, []))
         fields["schedule_overrides"] = _list(
             override_json(_override_of(o)) for o in overrides.get(row.id, [])
         )
