@@ -31,10 +31,13 @@ from app.domain.service_flows import (
     ReadinessReason,
     ServiceFlow,
     can_activate,
+    check_built_choices,
     check_combination,
     check_default_paths,
     check_draft_content,
+    check_draft_identity,
     check_draft_save,
+    check_flow_delete,
     check_flow_references,
     check_publishable,
     check_revision_editable,
@@ -508,7 +511,7 @@ def test_a_default_entry_path_is_taken_by_one_active_flow() -> None:
         (FlowState.DRAFT, FlowState.ACTIVE, True),
         (FlowState.ACTIVE, FlowState.ARCHIVED, True),
         (FlowState.ARCHIVED, FlowState.ACTIVE, True),
-        (FlowState.DRAFT, FlowState.ARCHIVED, True),
+        (FlowState.DRAFT, FlowState.ARCHIVED, False),  # never active: deleted, not archived
         (FlowState.ACTIVE, FlowState.DRAFT, False),
         (FlowState.ARCHIVED, FlowState.DRAFT, False),
         (FlowState.ACTIVE, FlowState.ACTIVE, False),
@@ -793,13 +796,13 @@ def ready_items(ok: bool = True) -> tuple[ReadinessItem, ...]:
 @pytest.mark.parametrize(
     ("the_flow", "items", "expected"),
     [
-        (flow(state=FlowState.DRAFT, current=None, draft=revision()), None, "save publish discard"),
+        (flow(state=FlowState.DRAFT, current=None, draft=revision()), None, "save publish delete"),
         (
             flow(state=FlowState.DRAFT, flow_id=1),
             ready_items(),
-            "prepare activate archive",
+            "prepare activate delete",
         ),
-        (flow(state=FlowState.DRAFT, flow_id=1), ready_items(False), "prepare archive"),
+        (flow(state=FlowState.DRAFT, flow_id=1), ready_items(False), "prepare delete"),
         (
             flow(
                 state=FlowState.DRAFT,
@@ -808,7 +811,7 @@ def ready_items(ok: bool = True) -> tuple[ReadinessItem, ...]:
                 draft=revision(revision=2),
             ),
             ready_items(),
-            "save publish discard activate archive",
+            "save publish discard activate delete",
         ),
         (flow(state=FlowState.ACTIVE, flow_id=1), ready_items(), "prepare archive"),
         (
@@ -939,3 +942,112 @@ def test_each_built_constant_alone_decides_what_a_draft_may_choose(
 
 def test_a_legacy_draft_is_not_held_to_what_is_built() -> None:
     check_draft_content(legacy(published_at=None))
+
+
+@pytest.mark.parametrize("published", [False, True])
+def test_a_flow_that_was_never_active_is_deleted_with_or_without_a_published_revision(
+    published: bool,
+) -> None:
+    never_active = flow(
+        state=FlowState.DRAFT,
+        current=revision(published_at=NOW) if published else None,
+        draft=None if published else revision(),
+    )
+
+    check_flow_delete(never_active, referred_to=False)
+
+
+@pytest.mark.parametrize("state", [FlowState.ACTIVE, FlowState.ARCHIVED])
+def test_a_flow_that_is_or_was_active_is_archived_never_deleted(state: FlowState) -> None:
+    assert refusal(lambda: check_flow_delete(flow(state=state), referred_to=False)) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "state",
+    )
+
+
+def test_a_flow_a_booking_refers_to_is_not_deleted() -> None:
+    assert refusal(lambda: check_flow_delete(flow(state=FlowState.DRAFT), referred_to=True)) == (
+        ErrorCode.CONFIGURATION_OBJECT_IN_USE,
+        "flow_id",
+    )
+
+
+def test_a_legacy_flow_is_never_deleted() -> None:
+    wrapper = flow(state=FlowState.DRAFT, current=legacy(published_at=NOW))
+
+    assert refusal(lambda: check_flow_delete(wrapper, referred_to=False)) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "state",
+    )
+
+
+def test_a_flow_never_published_is_deleted_not_archived_by_the_lifecycle() -> None:
+    unpublished = flow(state=FlowState.DRAFT, current=None, draft=revision())
+
+    assert flow_actions(unpublished, None).archive is False
+    assert flow_actions(unpublished, None).delete is True
+
+
+@pytest.mark.parametrize("own_group", [True, False])
+def test_restoring_is_exempt_from_the_counted_pool_rule_only(own_group: bool) -> None:
+    wrapper = replace(pool(mode=PoolMode.LEGACY_GROUP), group_id=1 if own_group else 2)
+    args = (1, revision(), wrapper, {}, frozenset(), ())
+
+    assert refusal(lambda: check_flow_references(*args, group_id=1)) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "capacity_pool_id",
+    )
+    check_flow_references(*args, group_id=1, restoring=True)
+
+
+def test_restoring_still_refuses_a_pool_of_another_organisation() -> None:
+    elsewhere = replace(pool(), organisation_id=2)
+
+    assert refusal(
+        lambda: check_flow_references(
+            1, revision(), elsewhere, {}, frozenset(), (), group_id=1, restoring=True
+        )
+    ) == (ErrorCode.CONFIGURATION_OUT_OF_SCOPE, "capacity_pool_id")
+
+
+def test_a_draft_is_checked_for_identity_and_for_what_is_built_apart() -> None:
+    unbuilt = flow(
+        state=FlowState.DRAFT,
+        current=None,
+        draft=revision(interaction_kind=InteractionKind.VIDEO, handling_action=None),
+    )
+    draft = unbuilt.draft
+    assert draft is not None
+
+    check_draft_identity(unbuilt, None, False)  # nothing here looks at what the draft chooses
+    assert refusal(lambda: check_built_choices(draft)) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "interaction_kind",
+    )
+    assert refusal(lambda: check_draft_save(unbuilt, None, False)) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "interaction_kind",
+    )
+    check_built_choices(replace(draft, legacy=True))
+
+
+def test_the_identity_of_a_draft_refuses_a_taken_code_and_a_changed_code_of_a_published_flow() -> (
+    None
+):
+    new = flow(state=FlowState.DRAFT, current=None, draft=revision())
+    stored = flow(
+        state=FlowState.DRAFT,
+        flow_id=1,
+        current=revision(published_at=NOW),
+        draft=revision(revision=2),
+    )
+
+    assert refusal(lambda: check_draft_identity(new, None, True)) == (
+        ErrorCode.SLUG_TAKEN,
+        "flow_code",
+    )
+    assert refusal(lambda: check_draft_identity(replace(stored, code="b"), stored, False)) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "code",
+    )
+    check_draft_identity(stored, stored, False)

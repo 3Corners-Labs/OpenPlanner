@@ -67,7 +67,7 @@
     {{ skill_checkboxes(skill_choices, skills_field, _("admin.flows.required_skills"), skills_error, _("admin.flows.required_skills_hint")) }}
     <fieldset class="field choice{% if subjects_error %} field--error{% endif %}" id="subjects" aria-describedby="subjects-hint{% if subjects_error %} subjects-error{% endif %}">
       <legend id="subjects-legend">{{ _("admin.flows.subjects_table") }}</legend>
-      <p class="hint" id="subjects-hint">{{ _("admin.flows.subjects_hint") }}</p>
+      <p class="hint" id="subjects-hint">{{ _("admin.flows.subjects_hint") }} {{ _("admin.flows.subjects_dropped_hint") }}</p>
       {% if subjects %}
       <div class="table-scroll" role="region" aria-labelledby="subjects-legend" tabindex="0">
       <table class="data-table">
@@ -76,7 +76,7 @@
           <tr>
             <th scope="col">{{ _("admin.flows.subject") }}</th>
             <th scope="col">{{ _("admin.flows.offered") }}</th>
-            <th scope="col">{{ _("admin.flows.extra_skills") }}<br><span class="muted">{{ _("admin.flows.subjects_dropped_hint") }}</span></th>
+            <th scope="col">{{ _("admin.flows.extra_skills") }}</th>
           </tr>
         </thead>
         <tbody>
@@ -141,7 +141,7 @@
   </dl>
 </section>
 {% endif %}
-{% if actions and (actions.prepare or actions.publish or actions.discard or actions.archive or activation) %}
+{% if show_actions %}
 <section class="card" aria-labelledby="actions-heading">
   <div class="card__header">
     <h2 id="actions-heading">{{ _("admin.flows.actions_heading") }}</h2>
@@ -174,6 +174,7 @@
   <p>
     {% if actions.discard %}<a href="{{ base }}/{{ code }}/discard">{{ _("admin.flows.discard_link") }}</a>{% endif %}
     {% if actions.archive %}<a href="{{ base }}/{{ code }}/archive">{{ _("admin.flows.archive_link") }}</a>{% endif %}
+    {% if actions.delete %}<a href="{{ base }}/{{ code }}/delete">{{ _("admin.flows.delete_link") }}</a>{% endif %}
   </p>
 </section>
 {% endif %}

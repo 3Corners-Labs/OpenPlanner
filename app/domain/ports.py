@@ -1699,7 +1699,15 @@ class Transaction(Protocol):
         ...
 
     async def discard_draft(self, scope: Scope, flow_id: int) -> None:
-        """Delete the flow's unpublished draft; a flow never published is deleted with it."""
+        """Delete the flow's unpublished draft; a flow never published is refused (delete it)."""
+        ...
+
+    async def delete_service_flow(self, scope: Scope, flow_id: int) -> None:
+        """Delete a flow that was never active, with all its revisions and child rows.
+
+        Refused (``check_flow_delete``) for a flow that is or was active and for one a booking
+        refers to; a flow outside ``scope`` is missing.
+        """
         ...
 
     async def set_flow_state(self, scope: Scope, flow_id: int, state: FlowState) -> ServiceFlow:

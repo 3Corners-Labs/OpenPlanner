@@ -19,8 +19,8 @@ superuser instelt (*Flows per dienst*, standaard 20); gearchiveerde flows en de 
 werkwijze tellen niet mee.
 
 Een dienst die al bestond voordat flows er waren, heeft de **bestaande werkwijze** als flow. Die
-flow staat in de lijst, volgt de instellingen van de dienst zelf en kan hier niet worden gewijzigd
-of gearchiveerd.
+flow staat in de lijst, volgt de instellingen van de dienst zelf en kan hier niet worden gewijzigd,
+gearchiveerd of verwijderd.
 
 ## Concept en revisie
 
@@ -109,8 +109,10 @@ Per onderwerp van de dienst vinkt u aan of de flow het aanbiedt. In de tabel sta
 extra vaardigheden die het onderwerp nu vraagt (*Geen* als er geen zijn). Die kiest u op een eigen
 pagina: na het opslaan van het concept staat achter een aangeboden onderwerp **Extra vaardigheden
 kiezen**. Daar tikt u de extra vaardigheden aan en slaat u ze op in het concept; u komt terug bij
-de onderwerpen. Een onderwerp dat u niet meer aanbiedt, verliest zijn extra vaardigheden; een
-onderwerp dat aangeboden blijft, houdt ze als u het formulier opslaat.
+de onderwerpen. Een onderwerp dat u niet meer aanbiedt, verliest de extra vaardigheden die u ervoor
+koos; een onderwerp dat aangeboden blijft, houdt ze als u het formulier opslaat, ook als u ze
+tussendoor op de eigen pagina hebt gewijzigd. Een onderwerp dat de dienst zelf niet meer heeft, staat
+niet meer in de tabel en verdwijnt uit het concept zodra u het opslaat.
 
 ### Afhandeling
 
@@ -162,13 +164,19 @@ revisie is klaar voor gebruik* of *… is nog niet klaar voor gebruik*.
   in deze versie nog niet worden geactiveerd* zolang het automatisch afsluiten en verwijderen van
   gegevens voor nieuwe flows nog niet bestaat: u kunt de flow wel voorbereiden en publiceren.
   Anders zegt de zin dat activeren kan zodra de gepubliceerde revisie op alle punten in orde is.
-- **Concept weggooien** vraagt eerst om bevestiging. Een flow die nooit is gepubliceerd,
-  verdwijnt daarmee uit de lijst; anders blijft de gepubliceerde revisie staan. Van een
-  gearchiveerde flow kunt u geen concept weggooien.
-- **Flow archiveren** vraagt eerst om bevestiging, en kan op een flow die actief is of al een
-  gepubliceerde revisie heeft. Er komen dan geen nieuwe verzoeken meer binnen via de flow;
-  bestaande verzoeken houden hem. Een concept dat de flow nog heeft, wordt daarbij weggegooid. Een
-  flow die nooit is gepubliceerd haalt u weg door het concept weg te gooien.
+- **Concept weggooien** vraagt eerst om bevestiging en gooit alleen het concept weg van een flow
+  die al een gepubliceerde revisie heeft; die revisie blijft staan. Een flow die nog nooit is
+  gepubliceerd heeft niets om op terug te vallen: die verwijdert u. Van een gearchiveerde flow
+  kunt u geen concept weggooien.
+- **Flow archiveren** vraagt eerst om bevestiging en kan op een flow die actief is. Er komen dan
+  geen nieuwe verzoeken meer binnen via de flow; bestaande verzoeken houden hem. Een concept dat de
+  flow nog heeft, wordt daarbij weggegooid. Een gearchiveerde flow kan in het portaal niet opnieuw
+  worden geactiveerd.
+- **Flow verwijderen** vraagt eerst om bevestiging en kan op een flow die nog nooit actief is
+  geweest, ook als hij al een gepubliceerde revisie heeft. De flow en al zijn revisies verdwijnen;
+  dit kan niet ongedaan worden gemaakt. Zolang een boeking naar de flow verwijst, kan hij niet
+  worden verwijderd. Een flow die actief is of was, archiveert u. Een flow die ruimte innam onder
+  *Flows per dienst* geeft die ruimte weer vrij.
 
 Elke wijziging komt in het [auditlog](audit.md), met de code van de flow en het nummer van de
 revisie, nooit met de naam.

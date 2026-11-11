@@ -21,10 +21,12 @@ its id; a flow of another service, an unknown code and a service's existing (leg
     POST /admin/groups/{slug}/flows/{code}/prepare       start a new revision from the published one
     POST /admin/groups/{slug}/flows/{code}/publish       the draft becomes the current revision
     GET  /admin/groups/{slug}/flows/{code}/discard       confirmation
-    POST /admin/groups/{slug}/flows/{code}/discard       delete the draft
+    POST /admin/groups/{slug}/flows/{code}/discard       throw the draft away
     POST /admin/groups/{slug}/flows/{code}/activate      refused until the checklist is in order
     GET  /admin/groups/{slug}/flows/{code}/archive       confirmation
-    POST /admin/groups/{slug}/flows/{code}/archive       archive a flow (its draft goes with it)
+    POST /admin/groups/{slug}/flows/{code}/archive       archive an active flow
+    GET  /admin/groups/{slug}/flows/{code}/delete        confirmation
+    POST /admin/groups/{slug}/flows/{code}/delete        delete a flow that was never active
 
 No script: what depends on the contact channel follows the saved value. What the lifecycle
 allows is ``FlowPage.actions`` (the domain's ``flow_actions``): this module computes none of it.
@@ -41,6 +43,7 @@ from app.admin.flow_inputs import (
     CHOICE_FIELD,
     FLOW_REFUSALS,
     LIMIT_NOTICE,
+    SUBJECT_REFUSALS,
     SUBJECTS_FIELD,
     empty_draft,
     from_revision,
@@ -49,10 +52,14 @@ from app.admin.flow_inputs import (
 from app.admin.flow_views import (
     STATE_LABELS,
     CheckView,
+    ConfirmKind,
     action_select,
+    actions_visible,
     activation_view,
+    checklist_section,
     code_field,
     completion_select,
+    confirm_view,
     default_checks,
     dispatch_select,
     duration_field,
@@ -61,7 +68,6 @@ from app.admin.flow_views import (
     kind_views,
     name_fields,
     pool_select,
-    readiness_view,
     readout,
     required_choices,
     subject_views,
@@ -128,15 +134,6 @@ async def _list_page(
     )
 
 
-def _basis(page: FlowPage, locale: RequestLocale, refused: bool) -> str:
-    """Return which revision the checklist judges, in words."""
-    _ = locale.gettext
-    if refused or page.flow.draft is None:
-        number = page.flow.current.revision if page.flow.current else page.flow.working.revision
-        return _("admin.flows.basis_published", revision=number)
-    return _("admin.flows.basis_draft", revision=page.flow.working.revision)
-
-
 async def _editor(
     request: Request,
     locale: RequestLocale,
@@ -173,13 +170,14 @@ async def _editor(
     )
     editing = page is None or page.actions.save
     state = flow.state if flow else None
-    items = refused if refused is not None else (page.items if page else None)
     fields = [code_field(form, locale, code), *name_fields(form, shown_values, locale)]
     if flow is None or saved is None:
         heading = _("admin.flows.new_heading")
     else:
         names = saved.labels
         heading = names.get(locale.code) or names.get("nl") or flow.code
+    section = checklist_section(page, refused, locale)
+    activation = activation_view(page, locale) if page else None
     named = with_manual(request, locale, [*fields, duration_field(form, shown_values, locale)])
     base = _url(slug, code)
     return group_page(
@@ -194,7 +192,7 @@ async def _editor(
             "editing": editing,
             "archived": state is FlowState.ARCHIVED,
             "state_word": _(STATE_LABELS[state]) if state else "",
-            "in_progress": bool(flow and flow.draft is not None and flow.current is not None),
+            "in_progress": bool(flow and flow.in_progress),
             "action": _url(slug) if page is None else base,
             "name_fields": named[:-1],
             "duration_field": named[-1],
@@ -223,23 +221,17 @@ async def _editor(
             "default_checks": default_checks(
                 shown_values,
                 saved.intake_modes if saved else None,
-                bool(flow and flow.current),
+                bool(flow and flow.defaults_fixed),
                 locale,
             ),
             "defaults_hint": _(
                 "admin.flows.defaults_fixed"
-                if flow and flow.current
+                if flow and flow.defaults_fixed
                 else "admin.flows.defaults_hint"
             ),
             "defaults_error": form.error_for("default_appointment"),
-            "readiness": (
-                readiness_view(
-                    items, locale, draft=refused is None and bool(flow and flow.draft is not None)
-                )
-                if items is not None
-                else None
-            ),
-            "readiness_basis": _basis(page, locale, refused is not None) if page else "",
+            "readiness": section.view if section else None,
+            "readiness_basis": section.basis if section else "",
             "summary_rows": (
                 summary_rows(
                     page.flow.current,
@@ -254,7 +246,8 @@ async def _editor(
             ),
             "revision_number": page.flow.current.revision if page and page.flow.current else 0,
             "actions": page.actions if page else None,
-            "activation": activation_view(page, locale) if page else None,
+            "activation": activation,
+            "show_actions": bool(page and actions_visible(page.actions, activation)),
             "notice": notice,
             "errors": form.errors,
         },
@@ -318,8 +311,7 @@ async def save_flow(
         form,
         page.choices.subjects,
         skill_service(request).max_skills,
-        fixed=page.flow.current is not None,
-        kept=page.flow.draft.subject_skill_ids if page.flow.draft else None,
+        fixed=page.flow.defaults_fixed,
     )
     if not form.errors:
         try:
@@ -384,64 +376,30 @@ async def _confirm_page(
     context: AdminContext,
     slug: str,
     code: str,
-    what: str,
+    kind: ConfirmKind,
     form: FormData,
     status: int = 200,
 ) -> HTMLResponse:
-    """Render what discarding the draft or archiving the flow does, and ask for confirmation."""
-    _ = locale.gettext
+    """Render what discarding the draft, archiving or deleting the flow does, and ask to confirm."""
     try:
         page = await flow_service(request).page(context.principal, slug, code)
     except DomainError as error:
         raise_unknown(error, FLOW_REFUSALS)
-    flow = page.flow
-    name = flow.working.labels.get(locale.code) or flow.working.labels.get("nl") or flow.code
-    if what == "discard":
-        allowed = page.actions.discard
-        heading = _("admin.flows.discard_title")
-        button = _("admin.flows.discard_button")
-        lead = _("admin.flows.discard_lead" if allowed else "admin.flows.discard_none")
-        effects = (
-            [
-                _("admin.flows.discard_effect_draft"),
-                _(
-                    "admin.flows.discard_effect_published"
-                    if flow.current
-                    else "admin.flows.discard_effect_gone"
-                ),
-            ]
-            if allowed
-            else []
-        )
-    else:
-        allowed = page.actions.archive
-        heading = _("admin.flows.archive_title")
-        button = _("admin.flows.archive_button")
-        lead = _("admin.flows.archive_lead" if allowed else "admin.flows.archive_not_possible")
-        effects = (
-            [
-                _("admin.flows.archive_effect_new"),
-                _("admin.flows.archive_effect_keeps"),
-                _("admin.flows.archive_effect_listed"),
-                *([_("admin.flows.archive_effect_draft")] if flow.draft is not None else []),
-            ]
-            if allowed
-            else []
-        )
+    view = confirm_view(kind, page.flow, page.actions, locale)
     return group_page(
         request,
         locale,
         context,
         "admin/group_flow_confirm.html",
         {
-            "what": what,
+            "what": kind.value,
             "code": code,
-            "name": name,
-            "heading": heading,
-            "lead": lead,
-            "effects": effects,
-            "button": button,
-            "allowed": allowed,
+            "name": view.name,
+            "heading": view.heading,
+            "lead": view.lead,
+            "effects": view.effects,
+            "button": view.button,
+            "allowed": view.allowed,
             "errors": form.errors,
         },
         status,
@@ -454,24 +412,47 @@ async def discard_form(
 ) -> Response:
     """Show what discarding the draft does and ask for the confirmation."""
     return await _confirm_page(
-        request, locale, context, slug, code, "discard", FormData({}, locale.gettext)
+        request, locale, context, slug, code, ConfirmKind.DISCARD, FormData({}, locale.gettext)
     )
+
+
+async def _confirmed(
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    slug: str,
+    code: str,
+    kind: ConfirmKind,
+    run: Callable[[Principal, str, str], Awaitable[object]],
+    done: str,
+    after: str,
+) -> Response:
+    """Run the change ``kind`` confirmed on flow ``code``; redirect to ``after`` or refuse."""
+    form = FormData({}, locale.gettext)
+    try:
+        await run(context.principal, slug, code)
+    except DomainError as error:
+        refuse(form, error, locale, CHOICE_FIELD, FLOW_REFUSALS)
+        return await _confirm_page(request, locale, context, slug, code, kind, form, 422)
+    return redirect_done(after, done)
 
 
 @router.post("/groups/{slug}/flows/{code}/discard", response_class=HTMLResponse)
 async def discard_flow(
     request: Request, locale: Locale, slug: str, code: str, _: SameOrigin, context: Manage
 ) -> Response:
-    """Delete the draft; a flow that was never published disappears with it."""
-    form = FormData({}, locale.gettext)
-    try:
-        gone = await flow_service(request).discard(context.principal, slug, code)
-    except DomainError as error:
-        refuse(form, error, locale, CHOICE_FIELD, FLOW_REFUSALS)
-        return await _confirm_page(request, locale, context, slug, code, "discard", form, 422)
-    if gone:
-        return redirect_done(_url(slug), "flow_discarded_gone")
-    return redirect_done(_url(slug, code), "flow_discarded")
+    """Throw the draft away; the published revision stays."""
+    return await _confirmed(
+        request,
+        locale,
+        context,
+        slug,
+        code,
+        ConfirmKind.DISCARD,
+        flow_service(request).discard,
+        "flow_discarded",
+        _url(slug, code),
+    )
 
 
 @router.post("/groups/{slug}/flows/{code}/activate", response_class=HTMLResponse)
@@ -497,7 +478,7 @@ async def archive_form(
 ) -> Response:
     """Show what archiving a flow does and ask for the confirmation."""
     return await _confirm_page(
-        request, locale, context, slug, code, "archive", FormData({}, locale.gettext)
+        request, locale, context, slug, code, ConfirmKind.ARCHIVE, FormData({}, locale.gettext)
     )
 
 
@@ -506,13 +487,45 @@ async def archive_flow(
     request: Request, locale: Locale, slug: str, code: str, _: SameOrigin, context: Manage
 ) -> Response:
     """Archive an active flow: no new request goes through it; the ones it has keep it."""
-    form = FormData({}, locale.gettext)
-    try:
-        await flow_service(request).archive(context.principal, slug, code)
-    except DomainError as error:
-        refuse(form, error, locale, CHOICE_FIELD, FLOW_REFUSALS)
-        return await _confirm_page(request, locale, context, slug, code, "archive", form, 422)
-    return redirect_done(_url(slug), "flow_archived")
+    return await _confirmed(
+        request,
+        locale,
+        context,
+        slug,
+        code,
+        ConfirmKind.ARCHIVE,
+        flow_service(request).archive,
+        "flow_archived",
+        _url(slug),
+    )
+
+
+@router.get("/groups/{slug}/flows/{code}/delete", response_class=HTMLResponse)
+async def delete_form(
+    request: Request, locale: Locale, slug: str, code: str, context: Manage
+) -> Response:
+    """Show what deleting a flow that was never active does and ask for the confirmation."""
+    return await _confirm_page(
+        request, locale, context, slug, code, ConfirmKind.DELETE, FormData({}, locale.gettext)
+    )
+
+
+@router.post("/groups/{slug}/flows/{code}/delete", response_class=HTMLResponse)
+async def delete_flow(
+    request: Request, locale: Locale, slug: str, code: str, _: SameOrigin, context: Manage
+) -> Response:
+    """Delete a flow that was never active, with all its revisions."""
+    return await _confirmed(
+        request,
+        locale,
+        context,
+        slug,
+        code,
+        ConfirmKind.DELETE,
+        flow_service(request).delete,
+        "flow_deleted",
+        _url(slug),
+    )
 
 
 async def _subject_page(
@@ -530,7 +543,7 @@ async def _subject_page(
     try:
         page = await flow_service(request).subject_page(context.principal, slug, code, subject)
     except DomainError as error:
-        raise_unknown(error, FLOW_REFUSALS)
+        raise_unknown(error, SUBJECT_REFUSALS)
     chosen = ticked_ids(form) if form.values else page.chosen
     return group_page(
         request,
@@ -546,7 +559,7 @@ async def _subject_page(
             "skill_choices": skill_choices(page.skills, chosen, locale.code),
             "skills_field": CHOICE_FIELD,
             "skills_error": form.error_for(CHOICE_FIELD),
-            "back": f"{_url(slug, code)}#subjects",
+            "back": f"{_url(slug, code)}#{SUBJECTS_FIELD}",
             "errors": form.errors,
         },
         status,
@@ -585,7 +598,7 @@ async def save_subject(
                 context.principal, slug, code, subject, ids
             )
         except DomainError as error:
-            refuse(form, error, locale, CHOICE_FIELD, FLOW_REFUSALS)
+            refuse(form, error, locale, CHOICE_FIELD, SUBJECT_REFUSALS)
         else:
             return redirect_done(_url(slug, code), "flow_subject_saved", anchor=SUBJECTS_FIELD)
     return await _subject_page(request, locale, context, slug, code, subject, form, 422)

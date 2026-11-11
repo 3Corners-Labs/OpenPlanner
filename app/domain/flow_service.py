@@ -17,9 +17,10 @@ listed and never changed here: every operation on one answers like an unknown fl
     publish          the draft becomes the current revision (publishing does not activate)
     subject_page     the extra skills of one offered subject of the draft
     save_subject_skills  write them into the draft
-    discard          delete the draft; a flow never published disappears
+    discard          throw the draft away; the published revision stays
     activate         refused unless the checklist of the current revision is all in order
-    archive          a flow takes no new requests; the ones it has keep it; its draft goes too
+    archive          an active flow takes no new requests; the ones it has keep it; its draft goes
+    delete           a flow that was never active goes with all its revisions
 
 What may be done with a flow is ``service_flows.flow_actions``: the use cases guard with it and
 the pages show their buttons from it.
@@ -29,6 +30,7 @@ from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime
+from typing import cast
 
 from app.domain import service_flows as flows
 from app.domain.admin import AdminService
@@ -62,6 +64,7 @@ PUBLISHED = "flow.published"
 DRAFT_DISCARDED = "flow.draft_discarded"
 ACTIVATED = "flow.activated"
 ARCHIVED = "flow.archived"
+DELETED = "flow.deleted"
 """Details of the audit events (action ``group.edit``); the flow's code and a revision follow."""
 RESERVED_CODES = frozenset({"new"})
 """Codes a flow may not have: they are the address of a page (``/flows/new``)."""
@@ -83,7 +86,9 @@ class FlowDraftInput:
         duration_minutes: The appointment length, ``None`` when not chosen yet.
         capacity_pool_id: The counted pool the flow draws on.
         required_skill_ids: Skills every handler needs.
-        subject_skill_ids: The offered subjects with the extra skills each needs.
+        subjects: The codes of the offered subjects. The extra skills of each are not part of the
+            form: ``save`` keeps what the stored draft has for a subject that stays offered, under
+            the lock, so a save of the subject's own page in between is never lost.
         dispatch: Where requests go to staff.
         handling_action: What staff do with a request.
         completion: What marks a request as done.
@@ -97,7 +102,7 @@ class FlowDraftInput:
     duration_minutes: int | None
     capacity_pool_id: int | None
     required_skill_ids: frozenset[int]
-    subject_skill_ids: Mapping[str, frozenset[int]]
+    subjects: frozenset[str]
     dispatch: DispatchKind | None
     handling_action: HandlingAction | None
     completion: CompletionPolicy | None
@@ -195,9 +200,14 @@ class FlowPage:
     actions: FlowActions
 
     @property
-    def shown(self) -> FlowRevision:
-        """The revision the page is about: the draft when there is one, else the current."""
-        return self.flow.working
+    def judges_draft(self) -> bool:
+        """Whether ``items`` judge the draft (there is one), else the published revision."""
+        return self.flow.draft is not None
+
+    @property
+    def activation_revision(self) -> int | None:
+        """The number of the revision activation is judged on, ``None`` before the first."""
+        return self.flow.current.revision if self.flow.current else None
 
 
 @dataclass(frozen=True)
@@ -247,8 +257,17 @@ def _invalid(field: str) -> DomainError:
     return DomainError(ErrorCode.INVALID_CONFIGURATION, field)
 
 
-def _revision(flow_id: int | None, number: int, draft: FlowDraftInput) -> FlowRevision:
-    """Return the unpublished revision ``number`` holding ``draft``."""
+def _revision(
+    flow_id: int | None,
+    number: int,
+    draft: FlowDraftInput,
+    extras: Mapping[str, frozenset[int]],
+) -> FlowRevision:
+    """Return the unpublished revision ``number`` holding ``draft``.
+
+    ``extras`` are the extra skills the revision it replaces has per subject; a subject that is
+    newly offered starts with none, and one that is not offered is not carried.
+    """
     return FlowRevision(
         flow_id=flow_id,
         revision=number,
@@ -258,7 +277,7 @@ def _revision(flow_id: int | None, number: int, draft: FlowDraftInput) -> FlowRe
         duration_minutes=draft.duration_minutes,
         capacity_pool_id=draft.capacity_pool_id,
         required_skill_ids=draft.required_skill_ids,
-        subject_skill_ids={code: frozenset(ids) for code, ids in draft.subject_skill_ids.items()},
+        subject_skill_ids={code: extras.get(code, frozenset()) for code in sorted(draft.subjects)},
         dispatch=draft.dispatch,
         handling_action=draft.handling_action,
         completion=draft.completion,
@@ -386,7 +405,7 @@ class FlowService:
                 FlowState.DRAFT,
                 draft.default_for,
                 None,
-                _revision(None, 1, draft),
+                _revision(None, 1, draft, {}),
             )
             stored = await tx.save_draft(scope, flow)
             await self._record(tx, principal, summary, CREATED, stored, stored.draft)
@@ -409,11 +428,13 @@ class FlowService:
             stored = held.flow
             if stored.draft is None or not flows.flow_actions(stored, None).save:
                 raise _invalid("state")
-            default_for = stored.default_for if stored.current else draft.default_for
+            default_for = stored.default_for if stored.defaults_fixed else draft.default_for
             changed = replace(
                 stored,
                 default_for=default_for,
-                draft=_revision(stored.id, stored.draft.revision, draft),
+                draft=_revision(
+                    stored.id, stored.draft.revision, draft, stored.draft.subject_skill_ids
+                ),
             )
             written = await held.tx.save_draft(held.scope, changed)
             await self._record(
@@ -477,13 +498,15 @@ class FlowService:
             )
         return published
 
-    async def discard(self, principal: Principal, slug: str, code: str) -> bool:
-        """Delete the flow's draft; return whether the flow itself is gone (never published).
+    async def discard(self, principal: Principal, slug: str, code: str) -> None:
+        """Throw away the draft of a flow that has a published revision; that revision stays.
+
+        A flow that was never published has nothing to fall back on: it is deleted (``delete``).
 
         Raises:
             DomainError: ``not_permitted``, ``group_not_found``, ``group_archived``,
                 ``configuration_object_missing`` (``flow_code``, or ``draft`` without one) or
-                ``invalid_configuration`` (``state``) for an archived flow.
+                ``invalid_configuration`` (``state``) for an archived flow or one never published.
         """
         async with self._locked_flow(principal, slug, code) as held:
             stored = held.flow
@@ -493,7 +516,22 @@ class FlowService:
             await self._record(
                 held.tx, principal, held.summary, DRAFT_DISCARDED, stored, stored.draft
             )
-        return stored.current is None
+
+    async def delete(self, principal: Principal, slug: str, code: str) -> None:
+        """Delete a flow that was never active, with all its revisions.
+
+        Raises:
+            DomainError: ``not_permitted``, ``group_not_found``, ``group_archived``,
+                ``configuration_object_missing`` (``flow_code``), ``invalid_configuration``
+                (``state``) for a flow that is or was active, ``configuration_object_in_use``
+                (``flow_id``) for one a booking refers to.
+        """
+        async with self._locked_flow(principal, slug, code) as held:
+            stored = held.flow
+            if not flows.flow_actions(stored, None).delete:
+                raise _invalid("state")
+            await held.tx.delete_service_flow(held.scope, stored.id or 0)
+            await self._record(held.tx, principal, held.summary, DELETED, stored)
 
     async def activate(self, principal: Principal, slug: str, code: str) -> Activation:
         """Activate a flow in state draft, unless its current revision is not ready.
@@ -522,16 +560,16 @@ class FlowService:
         return Activation(True, items)
 
     async def archive(self, principal: Principal, slug: str, code: str) -> ServiceFlow:
-        """Archive a flow that has a published revision: no new request goes through it.
+        """Archive an active flow: no new request goes through it.
 
-        Existing requests keep it. A draft the flow still has is discarded in the same
-        transaction (a second audit event), because an archived flow is history.
+        Existing requests keep it, and the portal cannot activate it again. A draft the flow still
+        has is discarded in the same transaction (a second audit event), because an archived flow
+        is history.
 
         Raises:
             DomainError: ``not_permitted``, ``group_not_found``, ``group_archived``,
                 ``configuration_object_missing`` (``flow_code``) or ``invalid_configuration``
-                (``state``) for a flow that is archived or was never published (that one is
-                removed by discarding its draft).
+                (``state``) for a flow that is not active (one never active is deleted).
         """
         async with self._locked_flow(principal, slug, code) as held:
             tx, stored = held.tx, held.flow
@@ -560,11 +598,11 @@ class FlowService:
         scope = scope_for(principal, _PERMISSION)
         async with self._uow.read() as tx:
             flow = await _own_flow(tx, scope, summary.group, code)
-            chosen = _offered(flow, subject).subject_skill_ids[subject]
+            found = _offered(flow, summary.group, subject)
+            chosen = flow.working.subject_skill_ids[subject]
             skills = await organisation_skills(
                 tx, scope, summary.group.organisation_id, held=chosen
             )
-        found = next(s for s in summary.group.routing.subjects if s.code == subject)
         return SubjectSkillsPage(summary, flow, found, tuple(skills), chosen)
 
     async def save_subject_skills(
@@ -578,7 +616,8 @@ class FlowService:
                 ``invalid_configuration`` for a skill that cannot be chosen.
         """
         async with self._locked_flow(principal, slug, code) as held:
-            draft = _offered(held.flow, subject)
+            _offered(held.flow, held.summary.group, subject)
+            draft = cast(FlowRevision, held.flow.draft)  # _offered found a draft to edit
             extras = {**draft.subject_skill_ids, subject: skill_ids}
             changed = replace(held.flow, draft=replace(draft, subject_skill_ids=extras))
             written = await held.tx.save_draft(held.scope, changed)
@@ -630,21 +669,25 @@ def _guard_error(flow: ServiceFlow) -> DomainError:
     return _invalid("state")
 
 
-def _offered(flow: ServiceFlow, subject: str) -> FlowRevision:
-    """Return the draft of ``flow`` when it can be edited and offers ``subject``.
+def _offered(flow: ServiceFlow, group: Group, subject: str) -> Subject:
+    """Return the service's subject when the flow's draft can be edited and offers it.
+
+    A subject the service no longer has is not offered, whatever the draft still lists.
 
     Raises:
         DomainError: ``configuration_object_missing`` (``subject``) otherwise: there is nothing to
             edit there, and the answer tells nothing more.
     """
     draft = flow.draft
+    found = next((s for s in group.routing.subjects if s.code == subject), None)
     if (
         draft is None
+        or found is None
         or not flows.flow_actions(flow, None).save
-        or subject not in (draft.subject_skill_ids)
+        or subject not in draft.subject_skill_ids
     ):
         raise missing_object("subject")
-    return draft
+    return found
 
 
 def _line(

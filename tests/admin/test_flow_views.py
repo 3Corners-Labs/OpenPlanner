@@ -10,9 +10,16 @@ from typing import Any
 import pytest
 
 from app.admin import flow_views as views
-from app.admin.flow_inputs import empty_draft
+from app.admin.flow_inputs import (
+    CHOICE_FIELD,
+    FLOW_REFUSALS,
+    SUBJECT_REFUSALS,
+    SUBJECTS_FIELD,
+    empty_draft,
+)
 from app.admin.forms import FormData
 from app.domain import service_flows as flows
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.service_flows import (
     CompletionPolicy,
     DispatchKind,
@@ -26,8 +33,10 @@ from app.domain.service_flows import (
     ReadinessReason,
 )
 from app.i18n import CATALOGUE_DIR, load_catalogues
+from tests.support.domain import NOW
 from tests.support.locales import REQUIRED_LOCALES as REQUIRED
 from tests.support.locales import locale_of, nl_locale
+from tests.support.service_flows import flow, revision
 
 TABLES: list[tuple[type[StrEnum], dict[StrEnum, str]]] = [
     (ReadinessCheck, dict(views.CHECK_TITLES)),
@@ -92,7 +101,7 @@ def test_not_built_yet_says_which_part_follows_for_the_checks_that_can_fail_on_i
     sentences = {row.title: row.sentence for row in rows}
     assert sentences["Afronden"] == "Deze manier van afronden volgt in een latere versie."
     assert (
-        "Dit contactkanaal of deze manier van afhandelen"
+        "Afhandeling via het contactcenter volgt in een latere versie."
         in sentences["Contactkanaal en afhandeling"]
     )
     assert sentences["Bewaren en verwijderen"].startswith(
@@ -198,3 +207,74 @@ def test_the_read_out_shows_one_action_never_the_list_of_the_allowed_ones() -> N
     assert nothing is None
     assert " / " not in saved.action
     assert saved.action.count("het verzoek bekijken") == 1
+
+
+def test_every_confirmation_has_its_words_in_both_languages() -> None:
+    catalogues = load_catalogues(CATALOGUE_DIR)
+
+    assert set(views.CONFIRMS) == set(views.ConfirmKind)
+    for locale in REQUIRED:
+        for kind, spec in views.CONFIRMS.items():
+            keys = (spec.heading, spec.button, spec.lead, spec.refused)
+            for key in keys:
+                assert catalogues[locale][key], (locale, kind, key)
+
+
+@pytest.mark.parametrize(
+    ("kind", "state", "has_current", "has_draft", "allowed"),
+    [
+        (views.ConfirmKind.DISCARD, FlowState.DRAFT, False, True, False),
+        (views.ConfirmKind.DISCARD, FlowState.DRAFT, True, True, True),
+        (views.ConfirmKind.ARCHIVE, FlowState.DRAFT, True, False, False),
+        (views.ConfirmKind.ARCHIVE, FlowState.ACTIVE, True, True, True),
+        (views.ConfirmKind.DELETE, FlowState.DRAFT, False, True, True),
+        (views.ConfirmKind.DELETE, FlowState.ACTIVE, True, False, False),
+    ],
+)
+def test_a_confirmation_is_allowed_exactly_when_the_lifecycle_says_so(
+    kind: views.ConfirmKind, state: FlowState, has_current: bool, has_draft: bool, allowed: bool
+) -> None:
+    the_flow = flow(
+        state=state,
+        flow_id=1,
+        current=revision(published_at=NOW) if has_current else None,
+        draft=revision(revision=2) if has_draft else None,
+    )
+
+    view = views.confirm_view(kind, the_flow, flows.flow_actions(the_flow, None), nl_locale())
+
+    assert view.allowed is allowed
+    assert bool(view.effects) is (allowed and kind is not views.ConfirmKind.DELETE)
+
+
+def test_the_confirmations_name_the_flow_as_the_list_shows_it_and_the_draft_by_its_own_name() -> (
+    None
+):
+    published = revision(published_at=NOW, labels={"nl": "Oud", "en": "Old"})
+    the_flow = flow(
+        state=FlowState.DRAFT,
+        flow_id=1,
+        current=published,
+        draft=revision(revision=2, labels={"nl": "Nieuw", "en": "New"}),
+    )
+    actions = flows.flow_actions(the_flow, None)
+    names = {
+        kind: views.confirm_view(kind, the_flow, actions, nl_locale()).name
+        for kind in views.ConfirmKind
+    }
+
+    assert names == {
+        views.ConfirmKind.DISCARD: "Nieuw",
+        views.ConfirmKind.ARCHIVE: "Oud",
+        views.ConfirmKind.DELETE: "Oud",
+    }
+
+
+def test_an_error_about_a_subjects_skills_links_to_the_checkboxes_of_the_subject_page() -> None:
+    error = DomainError(ErrorCode.INVALID_CONFIGURATION, "subject_skill_ids")
+
+    editor = next(r for r in FLOW_REFUSALS.rules if r.matches(error))
+    page = next(r for r in SUBJECT_REFUSALS.rules if r.matches(error))
+
+    assert editor.target == SUBJECTS_FIELD
+    assert page.target == CHOICE_FIELD

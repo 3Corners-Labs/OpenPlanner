@@ -266,6 +266,75 @@ def test_a_revision_names_one_pool_not_two() -> None:
     ]
 
 
+# --- what a draft may choose and what a restore keeps -----------------------------------------
+
+UNBUILT = [
+    ({"interaction_kind": "video", "handling_action": "open_video"}, "interaction_kind"),
+    ({"dispatch": "contact_center"}, "dispatch"),
+    ({"completion": "provider_event"}, "completion"),
+    ({"interaction_kind": "in_person", "handling_action": "assign_workstation"}, "handling_action"),
+]
+"""A choice ADR 0121 has not built, with the field the screens' own rule blames."""
+
+
+def _legacy_pool(found: dict[str, Any]) -> None:
+    """Make a revision of the document draw on the legacy pool of its service."""
+    found["capacity_pool"] = None
+    found["legacy_pool_of"] = "balie"
+
+
+@pytest.mark.parametrize(("choice", "field"), UNBUILT)
+def test_a_draft_of_a_document_chooses_only_what_is_built_and_is_refused_once(
+    choice: dict[str, Any], field: str
+) -> None:
+    for current in (empty_flows(), full()):
+        data = document_json()
+        draft(data).update(choice)
+
+        assert refusals(plan(data, current)) == [
+            (f"{FLOW}.revisions[3]", ErrorCode.INVALID_CONFIGURATION, field)
+        ]
+
+
+@pytest.mark.parametrize(("choice", "field"), UNBUILT)
+def test_a_published_revision_that_is_restored_may_hold_what_is_not_built(
+    choice: dict[str, Any], field: str
+) -> None:
+    data = document_json()
+    advies(data)["revisions"][0].update(choice)  # published, as recorded
+
+    assert plan(data, empty_flows()).ok
+
+
+def test_a_draft_of_a_document_on_a_legacy_pool_is_refused_once() -> None:
+    for current in (empty_flows(), full()):
+        data = document_json()
+        _legacy_pool(draft(data))
+
+        assert refusals(plan(data, current)) == [
+            (f"{FLOW}.revisions[3]", ErrorCode.INVALID_CONFIGURATION, "capacity_pool_id")
+        ]
+
+
+def test_a_published_revision_that_is_restored_may_draw_on_a_legacy_pool() -> None:
+    data = document_json()
+    _legacy_pool(advies(data)["revisions"][0])
+
+    assert plan(data, empty_flows()).ok
+
+
+def test_a_revision_a_document_newly_publishes_may_not_draw_on_a_legacy_pool() -> None:
+    stored = flow("advies", "archived", 1, None, [], revision(1, required_skills=["passport"]))
+    data = document_json()
+    advies(data)["draft_revision"], advies(data)["current_revision"] = None, 2
+    advies(data)["revisions"].pop()
+    _legacy_pool(advies(data)["revisions"][1])
+
+    assert refusals(plan(data, full(stored))) == [
+        (f"{FLOW}.revisions[2]", ErrorCode.INVALID_CONFIGURATION, "capacity_pool_id")
+    ]
+
+
 # --- flows ------------------------------------------------------------------------------
 
 
@@ -719,19 +788,15 @@ def test_a_history_restored_in_ascending_order_is_checked_revision_by_revision()
     )
 
 
-# --- a flow with history is archived, never deleted ------------------------------------------
+# --- a flow that was never active is deleted, one that was is archived ---------------------
 
 KEPT = Usage(
     kept={
-        "service_flow": frozenset(
-            {
-                ("acme", "balie", "advies"),
-                ("acme", "balie", "appointment"),
-                ("acme", "kantoor", "telefoon"),
-            }
-        )
+        "service_flow": frozenset({("acme", "balie", "advies"), ("acme", "balie", "appointment")})
     }
 )
+"""What the adapter reports for ``full()``: the flows that are or were active (``advies`` is
+archived, ``appointment`` active). ``telefoon`` is in state draft and no booking refers to it."""
 
 
 def omitting(*codes: str) -> dict[str, Any]:
@@ -743,19 +808,40 @@ def omitting(*codes: str) -> dict[str, Any]:
     return data
 
 
-def test_a_replace_document_archives_a_flow_that_has_a_published_revision() -> None:
+def test_a_replace_document_deletes_a_flow_never_active_even_with_a_published_revision() -> None:
     result = plan(omitting("advies", "telefoon"), full(), usage=KEPT)
 
     actions = {(c.kind, "/".join(c.address)): c.action for c in result.changes}
     assert result.ok
-    # ``advies`` is archived already, so omitting it changes nothing; ``telefoon`` is archived.
-    assert actions == {("service_flow", "acme/kantoor/telefoon"): ChangeAction.ARCHIVE}
+    # ``advies`` is archived already, so omitting it changes nothing; ``telefoon`` never was active.
+    assert actions == {("service_flow", "acme/kantoor/telefoon"): ChangeAction.DELETE}
 
 
-def test_an_explicit_delete_of_a_flow_with_history_is_an_archive_shown_in_the_plan() -> None:
+def test_a_replace_document_archives_a_flow_that_is_active() -> None:
+    result = plan(omitting("appointment"), full(), usage=KEPT)
+
+    actions = {(c.kind, "/".join(c.address)): c.action for c in result.changes}
+    assert actions == {("service_flow", "acme/balie/appointment"): ChangeAction.ARCHIVE}
+    assert ("service_flow", "acme/kantoor/telefoon") not in actions
+
+
+def test_an_explicit_delete_of_a_flow_never_active_is_a_delete_shown_in_the_plan() -> None:
     data = document_json()
     flows_of(data, 0, 1)[0].clear()
     flows_of(data, 0, 1)[0].update({"code": "telefoon", "action": "delete"})
+
+    result = plan(data, full(), usage=KEPT)
+
+    assert result.ok
+    (change,) = result.changes
+    assert (change.kind, change.action) == ("service_flow", ChangeAction.DELETE)
+    assert "delete service_flow acme/kantoor/telefoon" in result.lines()
+
+
+def test_an_explicit_delete_of_a_flow_that_was_active_is_an_archive_shown_in_the_plan() -> None:
+    data = document_json()
+    flows_of(data, 0, 0)[0].clear()
+    flows_of(data, 0, 0)[0].update({"code": "appointment", "action": "delete"})
 
     result = plan(data, full(), usage=KEPT)
 
@@ -766,7 +852,20 @@ def test_an_explicit_delete_of_a_flow_with_history_is_an_archive_shown_in_the_pl
         ChangeAction.ARCHIVE,
         ("state",),
     )
-    assert "archive service_flow acme/kantoor/telefoon: state" in result.lines()
+    assert "archive service_flow acme/balie/appointment: state" in result.lines()
+
+
+def test_a_document_cannot_move_a_flow_from_draft_to_archived() -> None:
+    data = document_json()
+    flows_of(data, 0, 1)[0]["state"] = "archived"
+
+    result = plan(data, full())
+
+    assert (
+        "organisations[acme].groups[kantoor].flows[telefoon]",
+        ErrorCode.INVALID_CONFIGURATION,
+        "state",
+    ) in refusals(result)
 
 
 def test_a_flow_with_nothing_but_a_draft_is_deleted() -> None:
@@ -796,7 +895,7 @@ def test_a_flow_with_nothing_but_a_draft_is_deleted() -> None:
     assert [(c.kind, c.action) for c in result.changes] == [("service_flow", ChangeAction.DELETE)]
 
 
-def test_a_flow_that_was_never_published_and_is_still_referred_to_is_not_archived() -> None:
+def test_a_flow_that_was_never_active_and_is_still_referred_to_is_not_archived() -> None:
     referred = installation(
         organisation(
             "acme",
@@ -826,7 +925,7 @@ def test_a_flow_that_was_never_published_and_is_still_referred_to_is_not_archive
         (
             "organisations[acme].groups[balie].flows[nieuw]",
             ErrorCode.CONFIGURATION_DRAFT_FLOW_IN_USE,
-            "draft_revision",
+            "state",
         )
     ]
 

@@ -34,7 +34,7 @@ def draft(pool_id: int | None = None, **changes: Any) -> FlowDraftInput:
         30,
         pool_id,
         frozenset(),
-        {},
+        frozenset(),
         DispatchKind.OWN_QUEUE,
         HandlingAction.VIEW_REQUEST,
         CompletionPolicy.OPERATOR,

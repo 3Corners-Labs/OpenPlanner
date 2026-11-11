@@ -8972,7 +8972,7 @@ msgid "admin.form.error.configuration_revision_published"
 msgstr "A published revision is history and cannot be changed or removed. Add a new revision instead."
 
 msgid "admin.form.error.configuration_draft_flow_in_use"
-msgstr "A flow that was never published cannot be archived while something still refers to it. Discard its draft in the portal first, then leave the flow out again."
+msgstr "A flow that has never been active cannot be archived. A booking still refers to it, so it cannot be deleted either."
 
 msgid "admin.form.error.configuration_pool_without_code"
 msgstr "A capacity pool has no code, so it cannot be addressed in a document. Archive it and add it again in the portal, which gives it a code."
@@ -12749,6 +12749,9 @@ msgstr "Participants see this name. The name does not determine how the flow wor
 msgid "admin.flows.intake"
 msgstr "How does a request come in?"
 
+msgid "admin.flows.summary.intake"
+msgstr "Intake"
+
 msgid "admin.flows.intake.appointment"
 msgstr "By appointment"
 
@@ -12873,7 +12876,7 @@ msgid "admin.flows.extra_skills_for"
 msgstr "Extra skills for {subject}"
 
 msgid "admin.flows.subjects_dropped_hint"
-msgstr "A subject you no longer offer loses its extra skills here."
+msgstr "A subject you no longer offer loses the extra skills you chose for it."
 
 msgid "admin.flows.choose_extra_skills"
 msgstr "Choose extra skills"
@@ -12882,7 +12885,7 @@ msgid "admin.flows.extra_skills_save_first"
 msgstr "Save the draft first to choose extra skills."
 
 msgid "admin.flows.subject_lead"
-msgstr "An operator who picks up a request about this subject has these skills as well as those of the flow. The capacity pool must guarantee them. They are saved in the flow's draft."
+msgstr "An operator who picks up a request about this subject needs these skills as well as those of the flow. The capacity pool must guarantee them. They are saved in the flow's draft."
 
 msgid "admin.flows.subject_save"
 msgstr "Save extra skills"
@@ -13044,7 +13047,7 @@ msgid "admin.flows.reason.not_built_yet"
 msgstr "This part of OpenPlanner follows in a later version."
 
 msgid "admin.flows.reason.not_built_yet.dispatch"
-msgstr "This contact channel or way of handling follows in a later version."
+msgstr "Handling through the contact center follows in a later version."
 
 msgid "admin.flows.reason.not_built_yet.completion"
 msgstr "This way of completing follows in a later version."
@@ -13112,6 +13115,9 @@ msgstr "Activate flow"
 msgid "admin.flows.discard_link"
 msgstr "Discard the draft"
 
+msgid "admin.flows.delete_link"
+msgstr "Delete the flow"
+
 msgid "admin.flows.archive_link"
 msgstr "Archive the flow"
 
@@ -13125,16 +13131,13 @@ msgid "admin.flows.discard_lead"
 msgstr "You are discarding this flow's draft."
 
 msgid "admin.flows.discard_none"
-msgstr "This flow has no draft to discard."
+msgstr "Only the draft of a flow that has a published revision can be discarded. A flow that has never been active is deleted."
 
 msgid "admin.flows.discard_effect_draft"
 msgstr "What you set in the draft is lost."
 
 msgid "admin.flows.discard_effect_published"
 msgstr "The published revision stays as it is."
-
-msgid "admin.flows.discard_effect_gone"
-msgstr "The flow was never published and disappears from the list."
 
 msgid "admin.flows.archive_title"
 msgstr "Archive the flow"
@@ -13146,7 +13149,19 @@ msgid "admin.flows.archive_lead"
 msgstr "You are archiving this flow."
 
 msgid "admin.flows.archive_not_possible"
-msgstr "Only a flow that is active or has a published revision can be archived. A flow without a published revision is removed by discarding its draft."
+msgstr "Only an active flow can be archived. A flow that has never been active is deleted."
+
+msgid "admin.flows.delete_title"
+msgstr "Delete the flow"
+
+msgid "admin.flows.delete_button"
+msgstr "Delete the flow"
+
+msgid "admin.flows.delete_lead"
+msgstr "This flow has never been active. Deleting removes the flow and all its revisions. This cannot be undone."
+
+msgid "admin.flows.delete_not_possible"
+msgstr "Only a flow that has never been active can be deleted. Archive a flow that is or was active."
 
 msgid "admin.flows.archive_effect_new"
 msgstr "No new requests come in through this flow."
@@ -13156,6 +13171,9 @@ msgstr "Existing requests keep the flow they were made with."
 
 msgid "admin.flows.archive_effect_listed"
 msgstr "The flow stays visible under the archived flows."
+
+msgid "admin.flows.archive_effect_final"
+msgstr "An archived flow cannot be activated again in the portal."
 
 msgid "admin.flows.archive_effect_draft"
 msgstr "A draft of the flow is discarded."
@@ -13174,6 +13192,9 @@ msgstr "This flow has no draft."
 
 msgid "admin.flows.error.state"
 msgstr "That is not possible in this flow's current state."
+
+msgid "admin.flows.error.delete_in_use"
+msgstr "A booking still refers to this flow, so it cannot be deleted."
 
 msgid "admin.flows.error.default_taken"
 msgstr "Another active flow of this service is already the default for this entry path."
@@ -13220,8 +13241,8 @@ msgstr "The draft has been published. This does not activate the flow."
 msgid "admin.done.flow_discarded"
 msgstr "The draft has been discarded."
 
-msgid "admin.done.flow_discarded_gone"
-msgstr "The draft has been discarded and the flow is gone."
+msgid "admin.done.flow_deleted"
+msgstr "The flow has been deleted."
 
 msgid "admin.done.flow_activated"
 msgstr "The flow has been activated."

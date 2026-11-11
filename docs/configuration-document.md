@@ -96,7 +96,8 @@ subject (`subjects`); no id appears anywhere, and neither does `published_by` (a
   its revisions, published or draft, is imported as recorded, because an export of valid data must
   import into an empty installation (archiving keeps what existing revisions require, so a revision
   may name a skill or pool that was archived since, or a subject its service no longer offers; a
-  pool may still guarantee a skill archived since). A restore **checks**: every skill and pool a
+  pool may still guarantee a skill archived since, and a published revision may draw on a
+  service's own staffing pool where it did then). A restore **checks**: every skill and pool a
   revision names is in the document and belongs to the service's organisation, a legacy pool is
   named only by its own service's flows, the legacy shape (below), revision numbers without a gap
   from 1, a `published_at` that is later than that of every revision before it and not in the
@@ -109,9 +110,13 @@ subject (`subjects`); no id appears anywhere, and neither does `published_by` (a
   archived skill or pool, or a subject its service no longer offers, is accepted only where that
   revision already had it), with a `published_at` that is not in the future and later than that of
   every revision before it, no gap in the numbers, and, as the current one, the entry paths the
-  flow is the default of. A draft is checked as saving a draft in the portal: the flow's code and
-  defaults against the stored flow, and what it names against the stored draft (else the current
-  revision).
+  flow is the default of; a published revision draws on a counted pool only. A draft is checked as
+  saving a draft in the portal, also in a flow that is restored: the flow's code and defaults
+  against the stored flow, what it chooses (only what ADR 0121 has built: contact channel,
+  dispatch, completion and first action, by the same function as the editor), that it draws on a
+  counted pool, and what it names against the stored draft (else the current revision). The
+  schema of the document has checked the labels, the length and the channel's closed table
+  already, so a problem is refused once, never by the schema and again by a rule.
 - **An unpublished revision that is not the flow's draft is refused**
   (`invalid_configuration`, field `published_at`): applying would delete it when the draft moves
   on, and a plan shows only what apply does.
@@ -126,11 +131,15 @@ subject (`subjects`); no id appears anywhere, and neither does `published_by` (a
   `replace` document means none.
 - **Archive, not delete.** What a document would delete but that holds history is archived, and
   the plan shows it as `archive`: a skill a person holds or any revision requires, a counted pool
-  any revision draws on, a flow with a published revision or a booking. So an **explicit** delete
-  of such an object is an archive too, and a `replace` document that leaves it out likewise. Only
-  a flow with nothing but a draft, and no booking, is deleted. A flow that was never published
-  and that something still refers to is refused with `configuration_draft_flow_in_use`: discard
-  its draft in the portal first. An archive needs the reviewed plan hash exactly as a delete does.
+  any revision draws on, a flow that is or was active (state `active` or `archived`) or that a
+  booking refers to. So an **explicit** delete of such an object is an archive too, and a
+  `replace` document that leaves it out likewise. A flow in state `draft` has never been active
+  (a flow reaches `active` only by activation and never returns to `draft`), so it is **deleted**
+  with all its revisions, published ones included, when no booking refers to it (the plan shows
+  `delete`); a flow in that state that a booking refers to cannot be deleted and cannot be
+  archived either (a document never moves a flow from `draft` to `archived`) and is refused with
+  `configuration_draft_flow_in_use`. An archive and a delete need the reviewed plan hash exactly
+  as any other delete does.
   Who holds which skill is not in a document and is never changed by one.
 - **Same rules as the screens.** A flow cannot use another organisation's pool or skill, a pool
   cannot stop guaranteeing a skill that a flow not archived still requires from it, two active

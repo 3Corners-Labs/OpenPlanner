@@ -8985,7 +8985,7 @@ msgid "admin.form.error.configuration_revision_published"
 msgstr "Een gepubliceerde revisie is historie en kan niet worden gewijzigd of verwijderd. Voeg een nieuwe revisie toe."
 
 msgid "admin.form.error.configuration_draft_flow_in_use"
-msgstr "Een flow die nooit is gepubliceerd kan niet worden gearchiveerd zolang er nog iets naar verwijst. Verwijder eerst het concept in het portaal en laat de flow daarna opnieuw weg."
+msgstr "Een flow die nog nooit actief is geweest kan niet worden gearchiveerd. Een boeking verwijst er nog naar, dus hij kan ook niet worden verwijderd."
 
 msgid "admin.form.error.configuration_pool_without_code"
 msgstr "Een capaciteitspool heeft geen code en kan daarom niet in een document worden benoemd. Archiveer de pool en voeg hem opnieuw toe in het portaal, dat hem een code geeft."
@@ -12762,6 +12762,9 @@ msgstr "Deelnemers zien deze naam. De naam bepaalt niet hoe de flow werkt."
 msgid "admin.flows.intake"
 msgstr "Hoe komt een verzoek binnen?"
 
+msgid "admin.flows.summary.intake"
+msgstr "Aanmelding"
+
 msgid "admin.flows.intake.appointment"
 msgstr "Met een afspraak"
 
@@ -12886,7 +12889,7 @@ msgid "admin.flows.extra_skills_for"
 msgstr "Extra vaardigheden voor {subject}"
 
 msgid "admin.flows.subjects_dropped_hint"
-msgstr "Een onderwerp dat u niet meer aanbiedt, verliest hier zijn extra vaardigheden."
+msgstr "Een onderwerp dat u niet meer aanbiedt, verliest de extra vaardigheden die u ervoor koos."
 
 msgid "admin.flows.choose_extra_skills"
 msgstr "Extra vaardigheden kiezen"
@@ -12895,7 +12898,7 @@ msgid "admin.flows.extra_skills_save_first"
 msgstr "Sla het concept eerst op om extra vaardigheden te kiezen."
 
 msgid "admin.flows.subject_lead"
-msgstr "Een medewerker die een verzoek over dit onderwerp oppakt, heeft naast de vaardigheden van de flow ook deze vaardigheden. De capaciteitspool moet ze garanderen. Ze worden in het concept van de flow opgeslagen."
+msgstr "Een medewerker die een verzoek over dit onderwerp oppakt, moet naast de vaardigheden van de flow ook deze vaardigheden beheersen. De capaciteitspool moet ze garanderen. Ze worden in het concept van de flow opgeslagen."
 
 msgid "admin.flows.subject_save"
 msgstr "Extra vaardigheden opslaan"
@@ -13057,7 +13060,7 @@ msgid "admin.flows.reason.not_built_yet"
 msgstr "Dit onderdeel van OpenPlanner volgt in een latere versie."
 
 msgid "admin.flows.reason.not_built_yet.dispatch"
-msgstr "Dit contactkanaal of deze manier van afhandelen volgt in een latere versie."
+msgstr "Afhandeling via het contactcenter volgt in een latere versie."
 
 msgid "admin.flows.reason.not_built_yet.completion"
 msgstr "Deze manier van afronden volgt in een latere versie."
@@ -13125,6 +13128,9 @@ msgstr "Flow activeren"
 msgid "admin.flows.discard_link"
 msgstr "Concept weggooien"
 
+msgid "admin.flows.delete_link"
+msgstr "Flow verwijderen"
+
 msgid "admin.flows.archive_link"
 msgstr "Flow archiveren"
 
@@ -13138,16 +13144,13 @@ msgid "admin.flows.discard_lead"
 msgstr "U gooit het concept van deze flow weg."
 
 msgid "admin.flows.discard_none"
-msgstr "Deze flow heeft geen concept om weg te gooien."
+msgstr "Alleen het concept van een flow met een gepubliceerde revisie kan worden weggegooid. Een flow die nog nooit actief is geweest, verwijdert u."
 
 msgid "admin.flows.discard_effect_draft"
 msgstr "Wat u in het concept heeft ingesteld, gaat verloren."
 
 msgid "admin.flows.discard_effect_published"
 msgstr "De gepubliceerde revisie blijft zoals ze is."
-
-msgid "admin.flows.discard_effect_gone"
-msgstr "De flow is nog nooit gepubliceerd en verdwijnt uit de lijst."
 
 msgid "admin.flows.archive_title"
 msgstr "Flow archiveren"
@@ -13159,7 +13162,19 @@ msgid "admin.flows.archive_lead"
 msgstr "U archiveert deze flow."
 
 msgid "admin.flows.archive_not_possible"
-msgstr "Alleen een flow die actief is of al een gepubliceerde revisie heeft, kan worden gearchiveerd. Een flow zonder gepubliceerde revisie haalt u weg door het concept weg te gooien."
+msgstr "Alleen een flow die actief is kan worden gearchiveerd. Een flow die nog nooit actief is geweest, verwijdert u."
+
+msgid "admin.flows.delete_title"
+msgstr "Flow verwijderen"
+
+msgid "admin.flows.delete_button"
+msgstr "Flow verwijderen"
+
+msgid "admin.flows.delete_lead"
+msgstr "Deze flow is nog nooit actief geweest. Verwijderen haalt de flow en alle revisies weg. Dit kan niet ongedaan worden gemaakt."
+
+msgid "admin.flows.delete_not_possible"
+msgstr "Alleen een flow die nog nooit actief is geweest kan worden verwijderd. Een flow die actief is of was, archiveert u."
 
 msgid "admin.flows.archive_effect_new"
 msgstr "Er komen geen nieuwe verzoeken meer binnen via deze flow."
@@ -13169,6 +13184,9 @@ msgstr "Bestaande verzoeken houden de flow waarmee ze zijn gemaakt."
 
 msgid "admin.flows.archive_effect_listed"
 msgstr "De flow blijft zichtbaar onder de gearchiveerde flows."
+
+msgid "admin.flows.archive_effect_final"
+msgstr "Een gearchiveerde flow kan in het portaal niet opnieuw worden geactiveerd."
 
 msgid "admin.flows.archive_effect_draft"
 msgstr "Een concept van de flow wordt weggegooid."
@@ -13187,6 +13205,9 @@ msgstr "Deze flow heeft geen concept."
 
 msgid "admin.flows.error.state"
 msgstr "Dat kan niet in de huidige status van deze flow."
+
+msgid "admin.flows.error.delete_in_use"
+msgstr "Een boeking verwijst nog naar deze flow, dus hij kan niet worden verwijderd."
 
 msgid "admin.flows.error.default_taken"
 msgstr "Een andere actieve flow van deze dienst is al de standaard voor deze aanmeldweg."
@@ -13233,8 +13254,8 @@ msgstr "Het concept is gepubliceerd. De flow is daarmee niet geactiveerd."
 msgid "admin.done.flow_discarded"
 msgstr "Het concept is weggegooid."
 
-msgid "admin.done.flow_discarded_gone"
-msgstr "Het concept is weggegooid en de flow is verdwenen."
+msgid "admin.done.flow_deleted"
+msgstr "De flow is verwijderd."
 
 msgid "admin.done.flow_activated"
 msgstr "De flow is geactiveerd."

@@ -10,13 +10,12 @@ to nine ASCII digits, a malformed name is ignored like any other name, and the i
 capped before anything is looked up (``chosen_ids``).
 """
 
-import re
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from app.admin.forms import FormData
-from app.admin.skill_inputs import RefusalTable, Rule, chosen_ids
+from app.admin.skill_inputs import ID_PATTERN, RefusalTable, Rule, chosen_ids
 from app.domain import service_flows as flows
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.flow_service import LIMIT_FIELD, FlowDraftInput
@@ -43,8 +42,6 @@ SUBJECTS_FIELD = "subjects"
 DEFAULT_FIELD = "default_appointment"
 """Id of the first default-path checkbox, where an error about the defaults links to."""
 
-_ID = re.compile(r"[0-9]{1,9}")
-
 
 def offer_name(code: str) -> str:
     """Return the name of the checkbox that offers subject ``code`` in the flow."""
@@ -60,7 +57,7 @@ def from_revision(revision: FlowRevision, default_for: frozenset[IntakeMode]) ->
         revision.duration_minutes,
         revision.capacity_pool_id,
         revision.required_skill_ids,
-        revision.subject_skill_ids,
+        frozenset(revision.subject_skill_ids),
         revision.dispatch,
         revision.handling_action,
         revision.completion,
@@ -78,7 +75,7 @@ def empty_draft() -> FlowDraftInput:
         None,
         None,
         frozenset(),
-        {},
+        frozenset(),
         DispatchKind.OWN_QUEUE,
         None,
         CompletionPolicy.OPERATOR,
@@ -104,25 +101,20 @@ def _pool(form: FormData) -> int | None:
     raw = form.text("capacity_pool_id")
     if not raw:
         return None
-    if _ID.fullmatch(raw):
+    if ID_PATTERN.fullmatch(raw):
         return int(raw)
     form.errors.append(FormError("capacity_pool_id", form._("admin.form.error.flow_choice")))
     return None
 
 
-def _offered_subjects(
-    form: FormData, subjects: Sequence[Subject], kept: Mapping[str, frozenset[int]]
-) -> dict[str, frozenset[int]]:
-    """Return the offered subjects, each with the extra skills the draft has for it already.
+def _offered_subjects(form: FormData, subjects: Sequence[Subject]) -> frozenset[str]:
+    """Return the codes of the subjects the form offers; only the service's own subjects count.
 
-    A subject newly offered starts without extra skills, and one that is no longer offered is
-    gone with its extra skills. The extra skills themselves are chosen on the subject's page.
+    The extra skills of a subject are chosen on the subject's page and kept by the use case under
+    the lock; a subject the service no longer has is not in the form and so drops out of the
+    draft when it is saved.
     """
-    return {
-        subject.code: kept.get(subject.code, frozenset())
-        for subject in subjects
-        if form.checked(offer_name(subject.code))
-    }
+    return frozenset(s.code for s in subjects if form.checked(offer_name(s.code)))
 
 
 @dataclass(frozen=True)
@@ -131,8 +123,8 @@ class ParsedDraft:
 
     Attributes:
         values: The draft it describes; what is malformed is a blank value and an error of the form.
-        adjusted: Whether the posted first action did not fit the posted contact channel and
-            was replaced by the channel's default: the page says so.
+        adjusted: Whether a contact channel was chosen and the posted first action did not fit it,
+            so it was replaced by the channel's default: the page says so.
     """
 
     values: FlowDraftInput
@@ -145,14 +137,12 @@ def parse_draft(
     max_skills: int,
     *,
     fixed: bool = False,
-    kept: Mapping[str, frozenset[int]] | None = None,
 ) -> ParsedDraft:
     """Read the editor's form; what is malformed becomes an error of ``form`` and a blank value.
 
     ``subjects`` are the service's subjects, ``max_skills`` the organisation's limit of skills
     (the cap of a set of ticked ids), ``fixed`` whether the flow's default entry paths are fixed
-    already (it has a published revision), in which case the form does not send them, and
-    ``kept`` the extra skills per subject the draft has now.
+    already (it has a published revision), in which case the form does not send them.
     """
     kind = _member(form, "interaction_kind", InteractionKind)
     action = _member(form, "handling_action", HandlingAction)
@@ -185,14 +175,14 @@ def parse_draft(
         form.optional_integer("duration_minutes"),
         _pool(form),
         required,
-        _offered_subjects(form, subjects, kept or {}),
+        _offered_subjects(form, subjects),
         _member(form, "dispatch", DispatchKind),
         fitting,
         _member(form, "completion", CompletionPolicy),
         form.checked("collects_email"),
         frozenset() if fixed else defaults,
     )
-    return ParsedDraft(values, action is not None and fitting != action)
+    return ParsedDraft(values, kind is not None and action is not None and fitting != action)
 
 
 FLOW_REFUSALS = RefusalTable(
@@ -201,6 +191,12 @@ FLOW_REFUSALS = RefusalTable(
         Rule(LIMIT_FIELD, "admin.flows.error.limit", None),
         Rule("draft", "admin.flows.error.no_draft", None),
         Rule("state", "admin.flows.error.state", None),
+        Rule(
+            "flow_id",
+            "admin.flows.error.delete_in_use",
+            None,
+            ErrorCode.CONFIGURATION_OBJECT_IN_USE,
+        ),
         Rule("revision", "admin.flows.error.state", None),
         Rule("readiness", "admin.flows.error.not_ready_publish", None),
         Rule("capacity_pool_id", "admin.form.error.flow_choice", "capacity_pool_id"),
@@ -224,3 +220,14 @@ FLOW_REFUSALS = RefusalTable(
 """The refusals of the flow screens. A pool or skill that cannot be used (missing, of another
 organisation, a legacy pool, archived) is an error of its input in the same words for each, so an
 id tells nothing; an unknown flow, service or subject and a legacy flow answer 404."""
+
+
+SUBJECT_REFUSALS = RefusalTable(
+    tuple(
+        replace(rule, target=CHOICE_FIELD) if rule.field == "subject_skill_ids" else rule
+        for rule in FLOW_REFUSALS.rules
+    ),
+    FLOW_REFUSALS.unknown,
+)
+"""The refusals of the page of one subject's extra skills: an error about the subject's skills
+links to the group of checkboxes of that page, not to the table of the editor."""

@@ -19,7 +19,7 @@ sets (*Flows per service*, 20 by default); archived flows and the existing way o
 count.
 
 A service that existed before flows did has its **existing way of working** as a flow. That flow
-is in the list, follows the settings of the service itself and cannot be changed or archived here.
+is in the list, follows the settings of the service itself and cannot be changed, archived or deleted here.
 
 ## Draft and revision
 
@@ -108,8 +108,10 @@ For each subject of the service you tick whether the flow offers it. The table a
 skills the subject asks for now (*None* when there are none). You choose those on a page of their
 own: after saving the draft, an offered subject has **Choose extra skills** next to it. There you
 tick the extra skills and save them in the draft; you return to the subjects. A subject you no
-longer offer loses its extra skills; a subject that stays offered keeps them when you save the
-form.
+longer offer loses the extra skills you chose for it; a subject that stays offered keeps them when
+you save the form, even if you changed them on their own page in the meantime. A subject the
+service itself no longer has is not in the table any more and disappears from the draft when you
+save it.
 
 ### Handling
 
@@ -159,13 +161,16 @@ revision is ready to use* or *… is not ready to use yet*.
   flows cannot be activated in this version yet* as long as closing and deleting data
   automatically for new flows does not exist: you can prepare and publish the flow. Otherwise the
   sentence says activation is possible once the published revision is in order on every point.
-- **Discard the draft** asks for confirmation first. A flow that was never published disappears
-  from the list with it; otherwise the published revision stays. You cannot discard a draft of an
-  archived flow.
-- **Archive the flow** asks for confirmation first, and works on a flow that is active or already
-  has a published revision. No new requests come in through the flow then; existing requests keep
-  it. A draft the flow still has is discarded with it. You remove a flow that was never published
-  by discarding its draft.
+- **Discard the draft** asks for confirmation first and throws away only the draft of a flow that
+  already has a published revision; that revision stays. A flow that was never published has
+  nothing to fall back on: you delete that one. You cannot discard a draft of an archived flow.
+- **Archive the flow** asks for confirmation first and works on a flow that is active. No new
+  requests come in through the flow then; existing requests keep it. A draft the flow still has is
+  discarded with it. An archived flow cannot be activated again in the portal.
+- **Delete the flow** asks for confirmation first and works on a flow that has never been active,
+  even if it already has a published revision. The flow and all its revisions go; this cannot be
+  undone. While a booking refers to the flow it cannot be deleted. A flow that is or was active
+  you archive. A flow that took up room under *Flows per service* gives that room back.
 
 Every change goes into the [audit log](audit.md), with the code of the flow and the number of the
 revision, never the name.

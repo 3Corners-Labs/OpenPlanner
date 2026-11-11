@@ -19,6 +19,7 @@ pages that edit one skill, are ``skills.manage``.
 
 from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
+from datetime import datetime
 
 from app.domain.admin import AdminService
 from app.domain.authorization import Permission, Principal, Scope, scope_for
@@ -148,6 +149,19 @@ class SkillService:
         """The platform's limit of skills not archived per organisation."""
         return value_of(self._max)
 
+    async def _record(
+        self,
+        tx: Transaction,
+        principal: Principal,
+        slug: str,
+        detail: str,
+        at: datetime | None = None,
+    ) -> None:
+        """Audit a change of the organisation in the transaction that made it."""
+        await self._admin.record_change(
+            tx, at or self._clock.now(), principal, _PERMISSION, slug, None, detail
+        )
+
     async def catalogue(
         self, principal: Principal, slug: str, *, archived: bool = False
     ) -> SkillCatalogue:
@@ -208,15 +222,7 @@ class SkillService:
             if len(await tx.list_skills(scope, organisation.id)) >= self.max_skills:
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, LIMIT_FIELD)
             stored = await tx.save_skill(scope, skill)
-            await self._admin.record_change(
-                tx,
-                self._clock.now(),
-                principal,
-                _PERMISSION,
-                slug,
-                None,
-                f"{CREATED},skill:{stored.code}",
-            )
+            await self._record(tx, principal, slug, f"{CREATED},skill:{stored.code}")
         return stored
 
     async def relabel(
@@ -243,15 +249,7 @@ class SkillService:
             if changed.labels == current.labels:
                 return False
             await tx.save_skill(scope, changed)
-            await self._admin.record_change(
-                tx,
-                self._clock.now(),
-                principal,
-                _PERMISSION,
-                slug,
-                None,
-                f"{CHANGED},skill:{current.code}",
-            )
+            await self._record(tx, principal, slug, f"{CHANGED},skill:{current.code}")
         return True
 
     async def archive(self, principal: Principal, slug: str, skill_id: int) -> None:
@@ -269,9 +267,7 @@ class SkillService:
                 return
             now = self._clock.now()
             await tx.archive_skill(scope, skill_id, now)
-            await self._admin.record_change(
-                tx, now, principal, _PERMISSION, slug, None, f"{ARCHIVED},skill:{skill.code}"
-            )
+            await self._record(tx, principal, slug, f"{ARCHIVED},skill:{skill.code}", now)
 
     async def staff_skills(self, principal: Principal, member_id: int) -> list[PersonSkills]:
         """Return the skills of a person per organisation they belong to inside the viewer's reach.
@@ -340,7 +336,7 @@ class SkillService:
             changes = [f"skill.add:{codes[i]}" for i in sorted(added)]
             changes += [f"skill.remove:{codes[i]}" for i in sorted(removed)]
             detail = ",".join([GRANTS_CHANGED, f"staff:{member_id}", *changes])
-            await self._admin.record_change(tx, now, principal, _PERMISSION, slug, None, detail)
+            await self._record(tx, principal, slug, detail, now)
         return True
 
 

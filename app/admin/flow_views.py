@@ -7,8 +7,9 @@ and a test fails for a member of an enum without text. Nothing here decides anyt
 readiness checklist and the table of combinations are the domain's, the views only say them.
 """
 
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 
 from app.admin.flow_inputs import offer_name
 from app.admin.forms import Field, FormData
@@ -20,6 +21,7 @@ from app.domain.scheduling import MAX_SLOT_MINUTES, MIN_SLOT_MINUTES, SLOT_STEP_
 from app.domain.service_flows import (
     CompletionPolicy,
     DispatchKind,
+    FlowActions,
     FlowRevision,
     FlowState,
     HandlingAction,
@@ -29,6 +31,7 @@ from app.domain.service_flows import (
     ReadinessItem,
     ReadinessPolicy,
     ReadinessReason,
+    ServiceFlow,
 )
 from app.domain.skills import Skill
 from app.web.locale import RequestLocale
@@ -294,7 +297,7 @@ def flow_row(line: FlowLine, locale: RequestLocale) -> FlowRowView:
         pool_name(line.pool, locale),
         tuple(skill_label(s, locale.code) for s in line.skills),
         _(STATE_LABELS[flow.state]),
-        flow.draft is not None and flow.current is not None,
+        flow.in_progress,
         flow.legacy,
         flow.state is FlowState.ARCHIVED,
     )
@@ -362,6 +365,156 @@ def activation_view(page: FlowPage, locale: RequestLocale) -> ActivationView | N
     return ActivationView(
         False,
         _("admin.flows.activate_not_built" if follows else "admin.flows.activate_not_ready"),
+    )
+
+
+def actions_visible(actions: FlowActions, activation: ActivationView | None) -> bool:
+    """Return whether the page has an actions section: something to do, or why activation waits."""
+    return actions.any or activation is not None
+
+
+@dataclass(frozen=True)
+class ChecklistSection:
+    """The readiness checklist of a page and what it judges.
+
+    Attributes:
+        view: The checklist as the aside shows it.
+        basis: The sentence that says which revision it judges.
+    """
+
+    view: ReadinessView
+    basis: str
+
+
+def checklist_section(
+    page: FlowPage | None, refused: Sequence[ReadinessItem] | None, locale: RequestLocale
+) -> ChecklistSection | None:
+    """Return the checklist section of a flow's page, none for a new flow.
+
+    ``refused`` is the checklist of an activation that was refused: it is judged on the published
+    revision, otherwise the page judges the draft when there is one.
+    """
+    _ = locale.gettext
+    if page is None:
+        return None
+    judges_draft = refused is None and page.judges_draft
+    items = page.items if refused is None else refused
+    if judges_draft:
+        basis = _("admin.flows.basis_draft", revision=page.flow.working.revision)
+    else:
+        shown = page.flow.current or page.flow.working
+        basis = _("admin.flows.basis_published", revision=shown.revision)
+    return ChecklistSection(readiness_view(items, locale, draft=judges_draft), basis)
+
+
+class ConfirmKind(StrEnum):
+    """The three changes of a flow that ask for a confirmation first."""
+
+    DISCARD = "discard"
+    ARCHIVE = "archive"
+    DELETE = "delete"
+
+
+@dataclass(frozen=True)
+class ConfirmSpec:
+    """The words and rules of one confirmation page, all as catalogue keys.
+
+    Attributes:
+        heading: The title.
+        button: The button's text.
+        lead: What the change does, shown when the lifecycle allows it.
+        refused: What is said instead when the lifecycle does not allow it.
+        effects: The list of what happens, from the flow.
+        allowed: Whether the lifecycle allows the change: a field of ``FlowActions``.
+        named: The revision whose name the page uses: what the list shows, or the draft.
+    """
+
+    heading: str
+    button: str
+    lead: str
+    refused: str
+    effects: Callable[[ServiceFlow], tuple[str, ...]]
+    allowed: Callable[[FlowActions], bool]
+    named: Callable[[ServiceFlow], FlowRevision]
+
+
+def _archive_effects(flow: ServiceFlow) -> tuple[str, ...]:
+    """Return what archiving does to ``flow``, a draft included only when there is one."""
+    return (
+        "admin.flows.archive_effect_new",
+        "admin.flows.archive_effect_keeps",
+        "admin.flows.archive_effect_listed",
+        "admin.flows.archive_effect_final",
+        *(("admin.flows.archive_effect_draft",) if flow.draft is not None else ()),
+    )
+
+
+CONFIRMS: Mapping[ConfirmKind, ConfirmSpec] = {
+    ConfirmKind.DISCARD: ConfirmSpec(
+        "admin.flows.discard_title",
+        "admin.flows.discard_button",
+        "admin.flows.discard_lead",
+        "admin.flows.discard_none",
+        lambda flow: (
+            "admin.flows.discard_effect_draft",
+            "admin.flows.discard_effect_published",
+        ),
+        lambda actions: actions.discard,
+        lambda flow: flow.working,
+    ),
+    ConfirmKind.ARCHIVE: ConfirmSpec(
+        "admin.flows.archive_title",
+        "admin.flows.archive_button",
+        "admin.flows.archive_lead",
+        "admin.flows.archive_not_possible",
+        _archive_effects,
+        lambda actions: actions.archive,
+        lambda flow: flow.listed,
+    ),
+    ConfirmKind.DELETE: ConfirmSpec(
+        "admin.flows.delete_title",
+        "admin.flows.delete_button",
+        "admin.flows.delete_lead",
+        "admin.flows.delete_not_possible",
+        lambda flow: (),
+        lambda actions: actions.delete,
+        lambda flow: flow.listed,
+    ),
+}
+"""One entry per confirmation: the table is the only place that knows which words go with which."""
+
+
+@dataclass(frozen=True)
+class ConfirmView:
+    """A confirmation page as the template shows it."""
+
+    heading: str
+    lead: str
+    effects: tuple[str, ...]
+    button: str
+    allowed: bool
+    name: str
+
+
+def confirm_view(
+    kind: ConfirmKind, flow: ServiceFlow, actions: FlowActions, locale: RequestLocale
+) -> ConfirmView:
+    """Return the confirmation page of ``kind`` for ``flow``: words, effects and permission.
+
+    The archive and delete pages name the flow by the name the list shows; the discard page by the
+    name of the draft that goes.
+    """
+    _ = locale.gettext
+    spec = CONFIRMS[kind]
+    allowed = spec.allowed(actions)
+    name = _label(spec.named(flow).labels, locale.code) or flow.code
+    return ConfirmView(
+        _(spec.heading),
+        _(spec.lead if allowed else spec.refused),
+        tuple(_(key) for key in spec.effects(flow)) if allowed else (),
+        _(spec.button),
+        allowed,
+        name,
     )
 
 
@@ -648,7 +801,7 @@ def subject_views(
                 subject.code,
                 subject.label(locale.code),
                 offer_name(subject.code),
-                subject.code in values.subject_skill_ids,
+                subject.code in values.subjects,
                 tuple(extras),
                 f"{base}/subjects/{subject.code}" if subject.code in saved else None,
             )
@@ -677,7 +830,7 @@ def summary_rows(
         (_("admin.flows.label_nl"), revision.labels.get("nl", "")),
         (_("admin.flows.label_en"), revision.labels.get("en", "")),
         (
-            _("admin.flows.intake"),
+            _("admin.flows.summary.intake"),
             ", ".join(_(INTAKE_LABELS[m]) for m in sorted(revision.intake_modes)) or none,
         ),
         (_("admin.flows.contact_channel"), _(KIND_LABELS[kind]) if kind else none),

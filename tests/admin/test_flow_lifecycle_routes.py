@@ -4,13 +4,20 @@ import re
 from urllib.parse import parse_qsl, urlencode
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.db.models import CapacityPoolRow
+from app.adapters.db.models import (
+    BookingRow,
+    CapacityPoolRow,
+    GroupRow,
+    ServiceFlowRow,
+    SlotRow,
+)
 from app.admin import flow_views as views
 from app.admin.forms import MAX_FORM_BYTES
 from app.domain import service_flows
+from app.domain.authorization import Scope
 from app.domain.routing import GroupRouting, Subject
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.support.admin_site import audit_log, site_app, site_uow
@@ -19,6 +26,8 @@ from tests.support.flow_pages import BASE, act, create, form_data, save
 from tests.support.flow_seed import add_subjects
 from tests.support.locales import nl_locale
 from tests.support.skill_seed import add_pool, add_skill
+
+SUPER_SCOPE = Scope(everything=True)
 
 
 async def test_the_page_speaks_english_with_the_names_of_both_languages(site: Site) -> None:
@@ -157,7 +166,8 @@ async def test_the_subjects_are_offered_and_their_extra_skills_are_chosen_on_a_p
     assert f'href="{BASE}/advies/subjects/contract"' in page
     assert f'href="{BASE}/advies/subjects/aanvraag"' not in page  # not offered
     assert "Extra vaardigheden kiezen" in page
-    assert "verliest hier zijn extra vaardigheden" in page
+    assert "verliest de extra vaardigheden die u ervoor koos" in page
+    assert "verliest" not in page.split("<thead>")[1].split("</thead>")[0]  # not in a header cell
     form = await site.client.get(f"{BASE}/advies/subjects/contract")
     assert form.status_code == 200
     assert f'id="skill-{english}" name="skill-{english}" value="on">' in form.text
@@ -268,9 +278,7 @@ async def test_the_checklist_says_every_state_in_words_and_which_part_follows(
     assert checklist.count("<span>Volgt</span>") == 2  # the dispatch and retention are not built
     assert checklist.count("<span>Ontbreekt</span>") == 2  # no pool: capacity and skills
     assert checklist.count("<span>In orde</span>") == 2
-    assert (
-        "Dit contactkanaal of deze manier van afhandelen volgt in een latere versie." in checklist
-    )
+    assert "Afhandeling via het contactcenter volgt in een latere versie." in checklist
     assert "Het automatisch afsluiten en verwijderen van gegevens" in checklist
     assert "Dit onderdeel van OpenPlanner volgt" not in checklist
     assert "Kies een capaciteitspool." in checklist
@@ -347,20 +355,116 @@ async def test_a_flow_that_is_ready_is_activated_with_the_constants_patched(
     assert details[-1] == "flow.activated,flow:advies,revision:1"
 
 
-async def test_discarding_asks_for_confirmation_and_a_new_flow_disappears(site: Site) -> None:
+async def test_a_flow_never_active_is_deleted_after_a_confirmation(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
     await create(site)
 
-    confirm = await site.client.get(f"{BASE}/advies/discard")
-    gone = await act(site, "discard")
+    editor = (await site.client.get(f"{BASE}/advies")).text
+    confirm = await site.client.get(f"{BASE}/advies/delete")
+    gone = await act(site, "delete")
 
+    assert f'href="{BASE}/advies/delete"' in editor
+    assert f'href="{BASE}/advies/discard"' not in editor  # a flow never published: only delete
+    assert f'href="{BASE}/advies/archive"' not in editor
     assert confirm.status_code == 200
-    assert "De flow is nog nooit gepubliceerd en verdwijnt uit de lijst." in confirm.text
-    assert f'action="{BASE}/advies/discard"' in confirm.text
+    assert (
+        "Deze flow is nog nooit actief geweest. Verwijderen haalt de flow en alle revisies weg."
+        in (confirm.text)
+    )
+    assert "Dit kan niet ongedaan worden gemaakt." in confirm.text
+    assert "Samen bespreken (advies)" in confirm.text
+    assert f'action="{BASE}/advies/delete"' in confirm.text
+    assert "Flow verwijderen</button>" in confirm.text
     assert gone.status_code == 303
-    assert gone.headers["location"] == f"{BASE}?done=flow_discarded_gone"
+    assert gone.headers["location"] == f"{BASE}?done=flow_deleted"
+    assert "De flow is verwijderd." in (await site.client.get(gone.headers["location"])).text
     assert "<code>advies</code>" not in (await site.client.get(BASE)).text
     assert (await site.client.get(f"{BASE}/advies")).status_code == 404
+    details = [e.detail for e in await audit_log(site) if e.action == "group.edit"]
+    assert details[-1] == "flow.deleted,flow:advies"
+
+
+async def test_a_published_flow_never_active_offers_delete_and_discard_of_its_draft(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+    await create(site)
+    await act(site, "publish")
+    await act(site, "prepare")
+    await save(site, label_nl="Nieuwe naam")
+
+    editor = (await site.client.get(f"{BASE}/advies")).text
+    delete = (await site.client.get(f"{BASE}/advies/delete")).text
+    discard = (await site.client.get(f"{BASE}/advies/discard")).text
+
+    assert f'href="{BASE}/advies/delete"' in editor
+    assert f'href="{BASE}/advies/discard"' in editor
+    assert f'href="{BASE}/advies/archive"' not in editor
+    assert "Samen bespreken (advies)" in delete  # the name the list shows: the published one
+    assert "Nieuwe naam (advies)" in discard  # the draft's name, the draft that goes
+
+
+async def test_discarding_a_flow_never_published_is_refused_and_the_page_says_delete(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+    await create(site)
+
+    page = await site.client.get(f"{BASE}/advies/discard")
+    refused = await act(site, "discard")
+
+    assert "Concept weggooien</button>" not in page.text
+    assert "verwijdert u" in page.text
+    assert refused.status_code == 422
+    assert (await site.client.get(f"{BASE}/advies")).status_code == 200  # the flow is still there
+
+
+async def test_an_active_flow_is_not_deleted_and_the_page_says_archive(
+    site: Site, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await activated(site, monkeypatch)
+
+    page = await site.client.get(f"{BASE}/advies/delete")
+    refused = await act(site, "delete")
+    editor = (await site.client.get(f"{BASE}/advies")).text
+
+    assert "Flow verwijderen</button>" not in page.text
+    assert "archiveert u" in page.text
+    assert refused.status_code == 422
+    assert f'href="{BASE}/advies/delete"' not in editor
+    assert f'href="{BASE}/advies/archive"' in editor
+
+
+async def test_a_flow_a_booking_refers_to_is_not_deleted(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    await create(site)
+    async with AsyncSession(site_app(site).state.engine) as session, session.begin():
+        flow = await session.scalar(select(ServiceFlowRow).where(ServiceFlowRow.code == "advies"))
+        group = await session.scalar(select(GroupRow).where(GroupRow.slug == "demo"))
+        assert flow is not None
+        assert group is not None
+        slot = SlotRow(group_id=group.id, start=NOW, end=NOW, capacity_snapshot=1)
+        session.add(slot)
+        await session.flush()
+        session.add(
+            BookingRow(
+                slot_id=slot.id,
+                group_id=group.id,
+                status="cancelled",
+                locale="nl",
+                management_token_hash="c" * 64,
+                public_ref="ref-c",
+                created_at=NOW,
+                flow_id=flow.id,
+                flow_revision=1,
+            )
+        )
+
+    refused = await act(site, "delete")
+
+    assert refused.status_code == 422
+    assert "Een boeking verwijst nog naar deze flow" in refused.text
+    assert (await site.client.get(f"{BASE}/advies")).status_code == 200
 
 
 async def test_discarding_the_draft_of_a_published_flow_keeps_the_published_revision(
@@ -381,12 +485,21 @@ async def test_discarding_the_draft_of_a_published_flow_keeps_the_published_revi
     assert "Concept in bewerking" not in page
 
 
-async def test_a_published_flow_that_is_not_active_yet_is_archived_with_its_draft(
-    site: Site,
-) -> None:
+async def activated(site: Site, monkeypatch: pytest.MonkeyPatch) -> int:
+    """Log in, store the flow ``advies``, publish and activate it; return its pool."""
+    monkeypatch.setattr(service_flows, "RETENTION_BUILT", True)
     await site.login_as(ORG_ADMIN)
-    await create(site)
+    pool = await add_pool(site, "Advies")
+    await create(site, capacity_pool_id=str(pool))
     await act(site, "publish")
+    await act(site, "activate")
+    return pool
+
+
+async def test_an_active_flow_is_archived_with_its_draft(
+    site: Site, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await activated(site, monkeypatch)
     await act(site, "prepare")
 
     before = (await site.client.get(f"{BASE}/advies")).text
@@ -394,8 +507,10 @@ async def test_a_published_flow_that_is_not_active_yet_is_archived_with_its_draf
     done = await act(site, "archive")
 
     assert page.status_code == 200
-    assert "Nog niet actief" in before
+    assert "Concept in bewerking" in before
     assert "Een concept van de flow wordt weggegooid." in page.text
+    assert "Een gearchiveerde flow kan in het portaal niet opnieuw worden geactiveerd." in page.text
+    assert "Samen bespreken (advies)" in page.text
     assert "Flow archiveren</button>" in page.text
     assert done.headers["location"] == f"{BASE}?done=flow_archived"
     details = [e.detail for e in await audit_log(site) if e.action == "group.edit"]
@@ -408,35 +523,34 @@ async def test_a_published_flow_that_is_not_active_yet_is_archived_with_its_draf
     assert "Concept weggooien" not in archived
 
 
-async def test_a_flow_never_published_cannot_be_archived_and_the_page_says_discard(
+async def test_a_flow_never_active_cannot_be_archived_and_the_page_says_delete(
     site: Site,
 ) -> None:
     await site.login_as(ORG_ADMIN)
     await create(site)
+    await act(site, "publish")
 
     page = await site.client.get(f"{BASE}/advies/archive")
     refused = await act(site, "archive")
 
     assert page.status_code == 200
-    assert "zonder gepubliceerde revisie haalt u weg door het concept weg te gooien" in page.text
+    assert "Een flow die nog nooit actief is geweest, verwijdert u." in page.text
     assert "Flow archiveren</button>" not in page.text
     assert refused.status_code == 422
     assert "Dat kan niet in de huidige status van deze flow." in refused.text
 
 
 async def test_the_draft_of_an_archived_flow_is_not_discarded_and_the_page_says_so(
-    site: Site,
+    site: Site, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    await site.login_as(ORG_ADMIN)
-    await create(site)
-    await act(site, "publish")
+    await activated(site, monkeypatch)
     await act(site, "archive")
 
     page = await site.client.get(f"{BASE}/advies/discard")
     refused = await act(site, "discard")
 
     assert page.status_code == 200
-    assert "Deze flow heeft geen concept om weg te gooien." in page.text
+    assert "Alleen het concept van een flow met een gepubliceerde revisie" in page.text
     assert "Concept weggooien</button>" not in page.text
     assert refused.status_code == 422
 
@@ -509,6 +623,8 @@ async def test_every_edit_publish_discard_activate_and_archive_of_a_legacy_flow_
         ("POST", f"{BASE}/appointment/activate"),
         ("GET", f"{BASE}/appointment/archive"),
         ("POST", f"{BASE}/appointment/archive"),
+        ("GET", f"{BASE}/appointment/delete"),
+        ("POST", f"{BASE}/appointment/delete"),
         ("GET", f"{BASE}/nope"),
     ):
         response = await site.client.request(method, path, data=form_data(), headers=SAME_ORIGIN)
@@ -622,6 +738,7 @@ async def test_the_new_pages_have_no_script_and_no_inline_style(site: Site) -> N
         f"{BASE}/advies/subjects/contract",
         f"{BASE}/advies/discard",
         f"{BASE}/advies/archive",
+        f"{BASE}/advies/delete",
     ]
 
     for path in pages:
@@ -716,3 +833,105 @@ async def test_the_main_form_with_the_most_subjects_stays_far_below_the_size_lim
     assert len(body) < MAX_FORM_BYTES // 2, len(body)
     saved = await save(site, capacity_pool_id=str(pool), **dict(parse_qsl(body)))
     assert saved.status_code == 303
+
+
+async def remove_subject(site: Site, code: str) -> None:
+    """Remove the subject ``code`` from the service ``demo`` through the routing service."""
+    await site_app(site).state.routing_service.remove_subject(SUPER, "demo", code)
+
+
+async def test_a_subject_the_service_dropped_is_not_found_not_listed_and_dropped_on_save(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+    await add_subjects(site, {"contract": "Contract", "aanvraag": "Aanvraag"})
+    skill = await add_skill(site, "general", "Algemeen", "General")
+    pool = await add_pool(site, "Advies", (skill,))
+    await create(site, capacity_pool_id=str(pool), offer_contract="yes", offer_aanvraag="yes")
+    await site.client.post(
+        f"{BASE}/advies/subjects/contract", data={f"skill-{skill}": "on"}, headers=SAME_ORIGIN
+    )
+    await remove_subject(site, "contract")
+
+    page_get = await site.client.get(f"{BASE}/advies/subjects/contract")
+    page_post = await site.client.post(
+        f"{BASE}/advies/subjects/contract", data={f"skill-{skill}": "on"}, headers=SAME_ORIGIN
+    )
+    editor = await site.client.get(f"{BASE}/advies")
+    saved = await save(site, capacity_pool_id=str(pool), offer_aanvraag="yes")
+    after = (await site.client.get(f"{BASE}/advies")).text
+
+    assert page_get.status_code == page_post.status_code == 404
+    assert editor.status_code == 200
+    assert 'id="offer_contract"' not in editor.text  # not a row of the table
+    assert 'id="offer_aanvraag"' in editor.text
+    assert saved.status_code == 303
+    assert f'href="{BASE}/advies/subjects/contract"' not in after
+    async with site_uow(site).read() as tx:
+        (stored,) = [f for f in await tx.list_service_flows(SUPER_SCOPE, 1) if f.code == "advies"]
+    assert stored.draft is not None
+    assert set(stored.draft.subject_skill_ids) == {"aanvraag"}
+
+
+async def test_the_main_form_keeps_what_the_page_of_a_subject_saved_in_between(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    await add_subjects(site, {"contract": "Contract"})
+    skill = await add_skill(site, "general", "Algemeen", "General")
+    pool = await add_pool(site, "Advies", (skill,))
+    await create(site, capacity_pool_id=str(pool), offer_contract="yes")
+    rendered = await site.client.get(f"{BASE}/advies")  # the main form is open ...
+
+    await site.client.post(  # ... while the subject page saves its skills ...
+        f"{BASE}/advies/subjects/contract", data={f"skill-{skill}": "on"}, headers=SAME_ORIGIN
+    )
+    saved = await save(
+        site, capacity_pool_id=str(pool), offer_contract="yes"
+    )  # ... and then it posts
+
+    assert rendered.status_code == 200
+    assert saved.status_code == 303
+    page = (await site.client.get(f"{BASE}/advies")).text
+    assert "Algemeen" in page.split('id="subjects"')[1].split("</table>")[0]
+
+
+async def test_an_error_of_the_subject_page_links_to_an_element_of_that_page(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    await add_subjects(site, {"contract": "Contract"})
+    await create(site, offer_contract="yes")
+    other = await add_skill(site, "theirs", "Hun", "Theirs", organisation="andere")
+
+    response = await site.client.post(
+        f"{BASE}/advies/subjects/contract", data={f"skill-{other}": "on"}, headers=SAME_ORIGIN
+    )
+
+    assert response.status_code == 422
+    targets = re.findall(r'href="#([^"]+)"', response.text.split('role="alert"')[1])
+    assert targets
+    for target in targets:
+        assert f'id="{target}"' in response.text
+
+
+async def test_the_adjusted_notice_needs_a_chosen_channel(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    await create(site)
+
+    without_channel = await save(site, interaction_kind="", handling_action="call", label_en="")
+    with_channel = await save(
+        site, interaction_kind="telephone", handling_action="view_request", label_en=""
+    )
+
+    assert "De eerste actie is aangepast" not in without_channel.text
+    assert "De eerste actie is aangepast" in with_channel.text
+
+
+async def test_the_read_only_summary_says_intake_with_the_noun(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    await create(site)
+    await act(site, "publish")
+
+    summary = (await site.client.get(f"{BASE}/advies")).text.split('<dl class="facts">')[1]
+
+    assert "<dt>Aanmelding</dt>" in summary
+    assert "Hoe komt een verzoek binnen?" not in summary
+    english = (await site.client.get(f"{BASE}/advies", params={"lang": "en"})).text
+    assert "<dt>Intake</dt>" in english.split('<dl class="facts">')[1]

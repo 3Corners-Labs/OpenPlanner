@@ -266,6 +266,16 @@ class ServiceFlow:
         return self.current is not None and self.current.legacy
 
     @property
+    def in_progress(self) -> bool:
+        """Whether a published flow has a draft next to its current revision."""
+        return self.current is not None and self.draft is not None
+
+    @property
+    def defaults_fixed(self) -> bool:
+        """Whether code and default entry paths are fixed: the flow has a published revision."""
+        return self.current is not None
+
+    @property
     def listed(self) -> FlowRevision:
         """The revision a list shows: the published one, else the draft (never ``None``)."""
         return cast(FlowRevision, self.current or self.draft)  # the constructor refuses neither
@@ -534,6 +544,7 @@ def check_flow_references(
     *,
     group_id: int,
     already_pool_id: int | None = None,
+    restoring: bool = False,
 ) -> None:
     """Refuse a revision that refers to what its group's organisation does not offer.
 
@@ -545,7 +556,10 @@ def check_flow_references(
     that is not the legacy wrapper draws on a counted pool only: a legacy pool, the group's own
     or another's, answers like one that does not exist. An archived pool or skill may stay where
     it is but is not newly chosen (A28). The location is a plain number until locations are
-    built, so a revision names none.
+    built, so a revision names none. A revision that a configuration document *restores* (a
+    published one of a flow the installation lacks, recorded as it was) is exempt from the
+    counted-pool rule only: what was published then stays as recorded. ``restoring`` says so;
+    drafts and newly published revisions never pass it.
 
     Raises:
         DomainError: ``configuration_object_missing`` or ``configuration_out_of_scope`` (fields
@@ -561,7 +575,7 @@ def check_flow_references(
         if revision.legacy:
             if pool.mode is PoolMode.LEGACY_GROUP and pool.group_id != group_id:
                 raise _invalid("capacity_pool_id")
-        elif pool.mode is not PoolMode.COUNTED:
+        elif pool.mode is not PoolMode.COUNTED and not restoring:
             raise _invalid("capacity_pool_id")  # a new flow never draws on a service's own staffing
         if pool.archived_at is not None and revision.capacity_pool_id != already_pool_id:
             raise _invalid("capacity_pool_id")
@@ -589,9 +603,11 @@ class FlowActions:
         prepare: Start a new revision as a copy of the published one.
         save: Save the draft revision.
         publish: Publish the draft (an active flow also needs a draft that is in order).
-        discard: Throw the draft away; a flow never published goes with it.
+        discard: Throw away the draft of a flow that has a published revision; a flow never
+            published is deleted instead.
         activate: Activate the flow: only when the revision activation judges is in order.
-        archive: Archive the flow; its draft, if any, goes with it.
+        archive: Archive an active flow; its draft, if any, goes with it.
+        delete: Delete a flow that was never active, with all its revisions.
     """
 
     prepare: bool = False
@@ -600,6 +616,19 @@ class FlowActions:
     discard: bool = False
     activate: bool = False
     archive: bool = False
+    delete: bool = False
+
+    @property
+    def any(self) -> bool:
+        """Whether there is anything to do with the flow now."""
+        return (
+            self.prepare
+            or self.publish
+            or self.discard
+            or self.activate
+            or self.archive
+            or self.delete
+        )
 
 
 def flow_actions(flow: ServiceFlow, activation: Sequence[ReadinessItem] | None) -> FlowActions:
@@ -607,21 +636,22 @@ def flow_actions(flow: ServiceFlow, activation: Sequence[ReadinessItem] | None) 
 
     ``activation`` is the readiness of the revision activation judges (the published one),
     ``None`` when the flow has none. A legacy flow follows its service's settings and an archived
-    flow is history: nothing is allowed for either.
+    flow is history: nothing is allowed for either. A flow reaches ``active`` only by activation
+    and never returns to ``draft``, so a flow in state draft was never active and may be deleted;
+    one that was active is archived.
     """
     if flow.legacy or flow.state is FlowState.ARCHIVED:
         return FlowActions()
     draft = flow.draft is not None
-    published = flow.current is not None
+    never_active = flow.state is FlowState.DRAFT
     return FlowActions(
-        prepare=published and not draft,
+        prepare=flow.current is not None and not draft,
         save=draft,
         publish=draft,
-        discard=draft,
-        activate=(
-            flow.state is FlowState.DRAFT and activation is not None and can_activate(activation)
-        ),
-        archive=flow.state is FlowState.ACTIVE or (flow.state is FlowState.DRAFT and published),
+        discard=draft and flow.current is not None,
+        activate=(never_active and activation is not None and can_activate(activation)),
+        archive=flow.state is FlowState.ACTIVE,
+        delete=never_active,
     )
 
 
@@ -641,7 +671,6 @@ def check_default_paths(flow: ServiceFlow, other_active_defaults: Collection[Int
 _TRANSITIONS: frozenset[tuple[FlowState, FlowState]] = frozenset(
     {
         (FlowState.DRAFT, FlowState.ACTIVE),
-        (FlowState.DRAFT, FlowState.ARCHIVED),
         (FlowState.ACTIVE, FlowState.ARCHIVED),
         (FlowState.ARCHIVED, FlowState.ACTIVE),
     }
@@ -651,9 +680,9 @@ _TRANSITIONS: frozenset[tuple[FlowState, FlowState]] = frozenset(
 def check_state_change(flow: ServiceFlow, new_state: FlowState) -> None:
     """Refuse a change of state the lifecycle does not have.
 
-    Draft to active, draft to archived and archived to active need a published revision (a
-    flow that was never published is removed by discarding its draft); active to archived is
-    always allowed, a legacy flow included. Whether the readiness checklist is green is the
+    Draft to active and archived to active need a published revision; active to archived is
+    always allowed, a legacy flow included. A flow that was never active is never archived: it is
+    deleted (``check_flow_delete``). Whether the readiness checklist is green is the
     caller's check (``readiness``), and whether a default path is free is ``check_default_paths``.
 
     Raises:
@@ -661,8 +690,26 @@ def check_state_change(flow: ServiceFlow, new_state: FlowState) -> None:
     """
     if (flow.state, new_state) not in _TRANSITIONS:
         raise _invalid("state")
-    if flow.current is None and (new_state is FlowState.ACTIVE or flow.state is FlowState.DRAFT):
+    if flow.current is None and new_state is FlowState.ACTIVE:
         raise _invalid("state")
+
+
+def check_flow_delete(flow: ServiceFlow, referred_to: bool) -> None:
+    """Refuse deleting a flow that was ever active or that a booking refers to.
+
+    A flow reaches ``active`` only by activation and never returns to ``draft``, so a flow in
+    state draft was never active, whether or not it has a published revision. ``referred_to`` is
+    whether a booking refers to the flow; the adapter loads that fact.
+
+    Raises:
+        DomainError: ``invalid_configuration`` (field ``state``) for a flow that is or was active
+            (and a legacy flow), ``configuration_object_in_use`` (field ``flow_id``) for one a
+            booking refers to.
+    """
+    if flow.state is not FlowState.DRAFT or flow.legacy:
+        raise _invalid("state")
+    if referred_to:
+        raise DomainError(ErrorCode.CONFIGURATION_OBJECT_IN_USE, "flow_id")
 
 
 def check_publishable(flow: ServiceFlow) -> FlowRevision:
@@ -682,14 +729,37 @@ def check_publishable(flow: ServiceFlow) -> FlowRevision:
     return flow.draft
 
 
+def check_built_choices(draft: FlowRevision) -> None:
+    """Refuse a draft that chooses what ADR 0121 has not built yet.
+
+    A draft that is not the legacy wrapper may choose only the ``BUILT_*`` constants (read when
+    called): the interaction kind, the dispatch, the completion and the handling action. A choice
+    not made yet is no error, and the legacy wrapper skips the test.
+
+    Raises:
+        DomainError: ``invalid_configuration`` with field ``interaction_kind``, ``dispatch``,
+            ``completion`` or ``handling_action``.
+    """
+    if draft.legacy:
+        return
+    for name, value, built in (
+        ("interaction_kind", draft.interaction_kind, BUILT_KINDS),
+        ("dispatch", draft.dispatch, BUILT_DISPATCH),
+        ("completion", draft.completion, BUILT_COMPLETION),
+        ("handling_action", draft.handling_action, BUILT_ACTIONS),
+    ):
+        if value is not None and value not in built:
+            raise _invalid(name)
+
+
 def check_draft_content(draft: FlowRevision) -> None:
     """Refuse a draft that is wrong in itself; one that is only incomplete passes.
 
-    The labels need both locales and the duration is an allowed appointment length. A draft that
-    is not the legacy wrapper may choose only what ADR 0121 has built so far (the ``BUILT_*``
-    constants, read when called): the interaction kind, the dispatch, the completion and the
-    handling action, each of them, and the action must be one the kind's row of the closed table
-    allows. A choice not made yet is no error.
+    The labels need both locales, the duration is an allowed appointment length, a draft that is
+    not the legacy wrapper chooses only what is built (``check_built_choices``) and the action
+    is one the interaction kind's row of the closed table allows. A choice not made yet is no
+    error. A configuration document's schema checks the labels, the duration and the
+    combination itself and calls ``check_built_choices`` only.
 
     Raises:
         DomainError: ``invalid_configuration`` with field ``labels``, ``duration_minutes``,
@@ -700,37 +770,17 @@ def check_draft_content(draft: FlowRevision) -> None:
         raise _invalid("duration_minutes")
     if draft.legacy:
         return
+    check_built_choices(draft)
     kind, action = draft.interaction_kind, draft.handling_action
-    for name, value, built in (
-        ("interaction_kind", kind, BUILT_KINDS),
-        ("dispatch", draft.dispatch, BUILT_DISPATCH),
-        ("completion", draft.completion, BUILT_COMPLETION),
-        ("handling_action", action, BUILT_ACTIONS),
-    ):
-        if value is not None and value not in built:
-            raise _invalid(name)
     if action is not None and (kind is None or action not in COMBINATIONS[kind].actions):
         raise _invalid("handling_action")
 
 
-def check_draft_save(
-    flow: ServiceFlow, stored: ServiceFlow | None, code_taken: bool
-) -> FlowRevision:
-    """Refuse saving ``flow``'s draft given what is stored; the adapter loads the facts.
-
-    ``stored`` is the flow with ``flow.id`` inside the caller's scope (``None`` for a new flow
-    or an id that is missing or outside it), ``code_taken`` whether another flow of the group
-    has the code. A draft is never legacy: the wrapper of a pre-flow group skips the readiness
-    tests of what is built, so only the migration and ADR 0121 step 2e write one. Returns the
-    draft to write. A new flow is a draft with no current revision. Once a flow has a published
-    revision its code and defaults stay as they are; only the draft revision changes.
+def _unpublished_draft(flow: ServiceFlow) -> FlowRevision:
+    """Return ``flow``'s draft when it is one a save may write.
 
     Raises:
-        DomainError: ``invalid_configuration`` (fields ``draft``, ``published_at``, ``legacy``,
-            ``state``, ``revision``, ``flow_code``, ``code``, ``default_for``),
-            ``configuration_object_missing`` (field ``flow_id``), ``configuration_out_of_scope``
-            (field ``group_id``) or ``slug_taken`` (field ``flow_code``), and what
-            ``check_draft_content`` refuses.
+        DomainError: ``invalid_configuration`` (fields ``draft``, ``published_at``, ``legacy``).
     """
     draft = flow.draft
     if draft is None:
@@ -739,7 +789,31 @@ def check_draft_save(
         raise _invalid("published_at")
     if draft.legacy:
         raise _invalid("legacy")
-    check_draft_content(draft)
+    return draft
+
+
+def check_draft_identity(
+    flow: ServiceFlow, stored: ServiceFlow | None, code_taken: bool
+) -> FlowRevision:
+    """Refuse saving ``flow``'s draft when the flow itself does not fit what is stored.
+
+    The identity part of a save: whose draft it is, the state, the code and the default entry
+    paths. ``stored`` is the flow with ``flow.id`` inside the caller's scope (``None`` for a new
+    flow or an id that is missing or outside it), ``code_taken`` whether another flow of the
+    group has the code. A draft is never legacy: the wrapper of a pre-flow group skips the
+    readiness tests of what is built, so only the migration and ADR 0121 step 2e write one. A
+    new flow is a draft with no current revision. Once a flow has a published revision its code
+    and defaults stay as they are; only the draft revision changes. What the draft chooses is
+    ``check_draft_content`` (the portal) or ``check_built_choices`` (a configuration document).
+    Returns the draft to write.
+
+    Raises:
+        DomainError: ``invalid_configuration`` (fields ``draft``, ``published_at``, ``legacy``,
+            ``state``, ``revision``, ``code``, ``default_for``), ``configuration_object_missing``
+            (field ``flow_id``), ``configuration_out_of_scope`` (field ``group_id``) or
+            ``slug_taken`` (field ``flow_code``).
+    """
+    draft = _unpublished_draft(flow)
     if flow.id is None:
         if flow.state is not FlowState.DRAFT:
             raise _invalid("state")
@@ -750,10 +824,25 @@ def check_draft_save(
     else:
         if stored.group_id != flow.group_id:
             raise outside_organisation("group_id")
-        if stored.current is not None and (
+        if stored.defaults_fixed and (
             (stored.code, stored.default_for) != (flow.code, flow.default_for)
         ):
             raise _invalid("code" if stored.code != flow.code else "default_for")
     if code_taken:
         raise DomainError(ErrorCode.SLUG_TAKEN, "flow_code")
     return draft
+
+
+def check_draft_save(
+    flow: ServiceFlow, stored: ServiceFlow | None, code_taken: bool
+) -> FlowRevision:
+    """Refuse saving ``flow``'s draft in the portal: its content, then its identity.
+
+    The portal's whole check (``check_draft_content`` then ``check_draft_identity``); the
+    adapter loads the facts. Returns the draft to write.
+
+    Raises:
+        DomainError: What the two refuse.
+    """
+    check_draft_content(_unpublished_draft(flow))
+    return check_draft_identity(flow, stored, code_taken)

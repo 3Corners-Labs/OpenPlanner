@@ -1,4 +1,4 @@
-{#- What discarding a draft or archiving a flow does, and the button (ADR 0121 step 2d). ``what`` is "discard" or "archive"; there is no delete of a published flow. -#}
+{#- What discarding a draft or archiving a flow does, and the button (ADR 0121 step 2d). ``what`` is "discard", "archive" or "delete" (ADR 0121 step 2d): the words come from the page model. -#}
 {% extends "admin/layout.html" %}
 {% block title %}{{ heading }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
@@ -11,10 +11,12 @@
     <h2 id="confirm-what-heading">{{ heading }}: {{ name }} ({{ code }})</h2>
     <p class="card__lead">{{ lead }}</p>
   </div>
+  {% if effects %}
   <h3>{{ _("admin.archive.what_happens") }}</h3>
   <ul>
     {% for effect in effects %}<li>{{ effect }}</li>{% endfor %}
   </ul>
+  {% endif %}
 </section>
 {% if allowed %}
 <form class="card" method="post" action="{{ base }}/{{ code }}/{{ what }}" novalidate aria-labelledby="confirm-heading">

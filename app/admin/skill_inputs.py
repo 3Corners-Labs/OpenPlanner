@@ -27,7 +27,7 @@ form is not shown then, so no input can carry the error)."""
 POOL_LIMIT_NOTICE = "pools-limit-notice"
 """Id of the notice that the limit of pools is reached; see ``SKILL_LIMIT_NOTICE``."""
 
-_ID = re.compile(r"[0-9]{1,9}")
+ID_PATTERN = re.compile(r"[0-9]{1,9}")
 """A skill id in an input name: ASCII digits only (``str.isdigit`` also accepts ``²``)."""
 
 _ARCHIVED_FACTOR = 2
@@ -93,7 +93,7 @@ def ticked_ids(form: FormData) -> frozenset[int]:
     ids = (
         name.removeprefix(CHOICE_PREFIX) for name in form.values if name.startswith(CHOICE_PREFIX)
     )
-    return frozenset(int(i) for i in ids if _ID.fullmatch(i))
+    return frozenset(int(i) for i in ids if ID_PATTERN.fullmatch(i))
 
 
 def chosen_ids(form: FormData, max_skills: int) -> frozenset[int]:

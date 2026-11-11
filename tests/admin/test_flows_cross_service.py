@@ -21,7 +21,16 @@ from tests.support.skill_seed import add_pool, add_skill
 DEMO, OTHER = "/admin/groups/demo/flows", "/admin/groups/andere-team/flows"
 MANAGES_DEMO = {"superuser", "org_admin (demo)"}
 MANAGES_ANDERE = {"superuser", "org_admin (andere)"}
-SUFFIXES = ("", "/prepare", "/publish", "/discard", "/activate", "/archive", "/subjects/x")
+SUFFIXES = (
+    "",
+    "/prepare",
+    "/publish",
+    "/discard",
+    "/activate",
+    "/archive",
+    "/subjects/x",
+    "/delete",
+)
 
 
 @pytest.mark.matrix
@@ -47,7 +56,13 @@ async def test_a_flow_code_of_another_service_is_not_found_for_every_role(
 
     for suffix in SUFFIXES:
         for method in ("GET", "POST"):
-            if method == "GET" and suffix not in ("", "/discard", "/archive", "/subjects/x"):
+            if method == "GET" and suffix not in (
+                "",
+                "/discard",
+                "/archive",
+                "/subjects/x",
+                "/delete",
+            ):
                 continue
             # Through demo's address: the code belongs to another organisation's service.
             expected = 404 if role in MANAGES_DEMO else 403
@@ -105,9 +120,7 @@ async def test_a_pool_and_a_skill_of_another_organisation_are_form_errors_never_
         response = await site.client.post(DEMO, data={**base, **extra}, headers=SAME_ORIGIN)
         assert response.status_code == 422, extra
         assert "<code>advies</code>" not in (await site.client.get(DEMO)).text
-    await add_flow(
-        site, "advies", await add_pool(site, "Mine"), subject_skill_ids={"contract": frozenset()}
-    )
+    await add_flow(site, "advies", await add_pool(site, "Mine"), subjects=frozenset({"contract"}))
     response = await site.client.post(
         f"{DEMO}/advies/subjects/contract", data={f"skill-{their_skill}": "on"}, headers=SAME_ORIGIN
     )

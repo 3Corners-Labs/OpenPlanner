@@ -176,7 +176,7 @@ DONE_MESSAGES: dict[str, str] = {
     "flow_prepared": "admin.done.flow_prepared",
     "flow_published": "admin.done.flow_published",
     "flow_discarded": "admin.done.flow_discarded",
-    "flow_discarded_gone": "admin.done.flow_discarded_gone",
+    "flow_deleted": "admin.done.flow_deleted",
     "flow_activated": "admin.done.flow_activated",
     "flow_archived": "admin.done.flow_archived",
 }
