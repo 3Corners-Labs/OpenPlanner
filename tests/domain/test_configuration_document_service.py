@@ -208,6 +208,18 @@ async def test_more_changes_than_the_limit_are_refused_unwritten() -> None:
     assert unit.state.applied_configuration == []
 
 
+async def test_the_preview_of_more_changes_than_the_limit_refuses_and_offers_no_apply() -> None:
+    data = {
+        "format": "openplanner.config/v1",
+        "organisations": [{"slug": f"o{n}", "name": "O"} for n in range(3)],
+    }
+
+    result = await build(uow(), changes=2).plan(HOST, encoded(data), None)
+
+    assert not result.ok
+    assert [r.code for r in result.refusals] == [ErrorCode.CONFIGURATION_TOO_MANY_CHANGES]
+
+
 async def test_a_document_of_another_scope_than_the_route_allows_is_refused() -> None:
     unit = uow()
 
@@ -590,3 +602,33 @@ async def test_an_export_names_a_counted_pool_that_has_no_code_and_writes_nothin
         "acme/17",
     )
     assert unit.state.audit == []
+
+
+async def test_an_organisations_export_is_not_stopped_by_another_organisations_pool() -> None:
+    unit = uow(organisation(), usage=Usage(unaddressable=frozenset({"beta/17"})))
+
+    document = await build(unit).export(HOST, Scope("acme"), None, secrets=False)
+
+    assert b"acme" in document
+
+
+async def test_an_organisations_export_names_only_its_own_pool_without_a_code() -> None:
+    unit = uow(organisation(), usage=Usage(unaddressable=frozenset({"beta/17", "acme/9"})))
+
+    with pytest.raises(DomainError) as refused:
+        await build(unit).export(HOST, Scope("acme"), None, secrets=False)
+
+    assert (refused.value.code, refused.value.field) == (
+        ErrorCode.CONFIGURATION_POOL_WITHOUT_CODE,
+        "acme/9",
+    )
+
+
+async def test_the_plan_of_an_organisation_counts_only_its_own_pools_left_out() -> None:
+    unit = uow(organisation(), usage=Usage(unaddressable=frozenset({"beta/17", "acme/9"})))
+    data = {"format": "openplanner.config/v1", "scope": {"organisation": "acme"}}
+
+    scoped = await build(unit).plan(HOST, encoded(data), None)
+    platform = await build(unit).plan(HOST, encoded({"format": "openplanner.config/v1"}), None)
+
+    assert (scoped.left_out, platform.left_out) == (1, 2)

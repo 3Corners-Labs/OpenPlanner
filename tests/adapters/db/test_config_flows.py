@@ -334,6 +334,192 @@ async def test_the_database_ids_differ_but_every_reference_still_resolves(
     assert await count(target, StaffSkillRow) == 0  # who holds a skill is state
 
 
+# --- restoring: an export of valid stored data imports into an empty installation ------------
+
+
+async def archive_skill_directly(engine: AsyncEngine, code: str) -> None:
+    """Archive a skill behind the port, as time passes: the revisions that require it stay."""
+    async with AsyncSession(engine) as session, session.begin():
+        row = await session.scalar(select(SkillRow).where(SkillRow.code == code))
+        assert row is not None
+        row.archived_at = NOW
+
+
+async def archive_pool_directly(engine: AsyncEngine, code: str) -> None:
+    """Set the pool row archived: the portal refuses archiving a pool that flows draw on."""
+    async with AsyncSession(engine) as session, session.begin():
+        row = await session.scalar(select(CapacityPoolRow).where(CapacityPoolRow.code == code))
+        assert row is not None
+        row.archived_at = NOW
+
+
+async def remove_subjects(engine: AsyncEngine) -> None:
+    """Let every service stop offering its subjects; the revisions that name them stay."""
+    async with AsyncSession(engine) as session, session.begin():
+        for group in await session.scalars(select(GroupRow)):
+            group.routing = json.dumps({"subjects": []})
+
+
+async def draft_of_advies(engine: AsyncEngine) -> tuple[int, int]:
+    """Return the id of the flow ``advies`` and the id of the organisation ``acme``."""
+    async with AsyncSession(engine) as session:
+        flow = await session.scalar(select(ServiceFlowRow).where(ServiceFlowRow.code == "advies"))
+        acme = await session.scalar(select(OrganisationRow).where(OrganisationRow.slug == "acme"))
+        assert flow is not None
+        assert acme is not None
+        return flow.id, acme.id
+
+
+async def draft_requires_archived_skill(engine: AsyncEngine) -> None:
+    flow_id, _ = await draft_of_advies(engine)
+    async with AsyncSession(engine) as session, session.begin():
+        old = await session.scalar(select(SkillRow).where(SkillRow.code == "old"))
+        assert old is not None
+        session.add(FlowRevisionSkillRow(flow_id=flow_id, revision=3, skill_id=old.id))
+
+
+async def draft_draws_on_archived_pool(engine: AsyncEngine) -> None:
+    flow_id, acme = await draft_of_advies(engine)
+    async with AsyncSession(engine) as session, session.begin():
+        pool = CapacityPoolRow(
+            organisation_id=acme, name="Oud", mode="counted", code="oud", archived_at=NOW
+        )
+        session.add(pool)
+        await session.flush()
+        draft = await session.get(FlowRevisionRow, (flow_id, 3))
+        assert draft is not None
+        draft.capacity_pool_id = pool.id
+
+
+async def draft_names_a_removed_subject(engine: AsyncEngine) -> None:
+    flow_id, _ = await draft_of_advies(engine)
+    await remove_subjects(engine)
+    async with AsyncSession(engine) as session, session.begin():
+        session.add(SubjectFlowRow(flow_id=flow_id, revision=3, subject_code="gone"))
+
+
+async def several_changes_at_once(engine: AsyncEngine) -> None:
+    await archive_skill_directly(engine, "passport")
+    await archive_pool_directly(engine, "kantoor")
+    await draft_requires_archived_skill(engine)
+    await draft_names_a_removed_subject(engine)
+
+
+@pytest.mark.parametrize(
+    "history",
+    [
+        pytest.param(lambda e: archive_skill_directly(e, "passport"), id="skill-archived-since"),
+        pytest.param(lambda e: archive_pool_directly(e, "kantoor"), id="pool-archived-since"),
+        pytest.param(remove_subjects, id="subject-removed-since"),
+        pytest.param(draft_requires_archived_skill, id="draft-on-archived-skill"),
+        pytest.param(draft_draws_on_archived_pool, id="draft-on-archived-pool"),
+        pytest.param(draft_names_a_removed_subject, id="draft-with-removed-subject"),
+        pytest.param(several_changes_at_once, id="all-of-them"),
+    ],
+)
+async def test_what_time_left_behind_still_exports_and_imports_again(
+    source: AsyncEngine, target: AsyncEngine, history: Any
+) -> None:
+    await history(source)
+    exported = await export(source)
+
+    applied = await transfer(source, target)
+
+    assert applied.plan.refusals == (), applied.plan.refusals
+    assert applied.applied
+    assert await export(target) == exported
+
+
+async def test_a_restored_archive_carries_the_time_of_the_apply(
+    source: AsyncEngine, target: AsyncEngine
+) -> None:
+    await archive_skill_directly(source, "passport")
+
+    await transfer(source, target)
+
+    async with AsyncSession(target) as session:
+        stamped = await session.scalar(
+            select(SkillRow.archived_at).where(SkillRow.code == "passport")
+        )
+    assert stamped is not None
+    assert stamped.replace(tzinfo=UTC) == CLOCK
+
+
+# --- a counted pool without a code is hidden: scope and names ---------------------------------
+
+
+async def forget_pool_code(engine: AsyncEngine, organisation: str, name: str) -> None:
+    """Store a counted pool without a code, as an image from before migration 0110 does."""
+    async with AsyncSession(engine) as session, session.begin():
+        owner = await session.scalar(
+            select(OrganisationRow).where(OrganisationRow.slug == organisation)
+        )
+        assert owner is not None
+        session.add(CapacityPoolRow(organisation_id=owner.id, name=name, mode="counted"))
+
+
+async def test_an_organisations_export_is_not_stopped_by_another_organisations_pool(
+    source: AsyncEngine,
+) -> None:
+    await forget_pool_code(source, "beta", "Verborgen")
+
+    exported = await service(source).export(HOST, Scope("acme"), None, secrets=False)
+
+    assert b"acme" in exported
+    with pytest.raises(DomainError) as everything:
+        await service(source).export(HOST, Scope(), None, secrets=False)
+    with pytest.raises(DomainError) as beta:
+        await service(source).export(HOST, Scope("beta"), None, secrets=False)
+    assert everything.value.code is ErrorCode.CONFIGURATION_POOL_WITHOUT_CODE
+    assert (beta.value.code, str(beta.value.field).split("/")[0]) == (
+        ErrorCode.CONFIGURATION_POOL_WITHOUT_CODE,
+        "beta",
+    )
+
+
+async def test_the_error_of_an_organisations_export_names_only_its_own_pool(
+    source: AsyncEngine,
+) -> None:
+    await forget_pool_code(source, "beta", "Verborgen")
+    await forget_pool_code(source, "acme", "Ook verborgen")
+
+    with pytest.raises(DomainError) as refused:
+        await service(source).export(HOST, Scope("acme"), None, secrets=False)
+
+    assert str(refused.value.field).startswith("acme/")
+
+
+async def test_a_new_pool_cannot_take_the_name_of_a_pool_hidden_for_lack_of_a_code(
+    source: AsyncEngine,
+) -> None:
+    await forget_pool_code(source, "acme", "Verborgen")
+    data = organisation_document(
+        "acme", capacity_pools=[{"code": "nieuw", "name": " VERBORGEN ", "guaranteed_skills": []}]
+    )
+
+    plan = await service(source).plan(HOST, encode(data), None)
+
+    assert [(r.code, r.field) for r in plan.refusals] == [(ErrorCode.SLUG_TAKEN, "pool_name")]
+    assert plan.left_out == 1  # the preview warns that one pool is left out
+
+
+async def test_the_name_of_an_archived_hidden_pool_is_free(source: AsyncEngine) -> None:
+    await forget_pool_code(source, "acme", "Verborgen")
+    async with AsyncSession(source) as session, session.begin():
+        hidden = await session.scalar(
+            select(CapacityPoolRow).where(CapacityPoolRow.name == "Verborgen")
+        )
+        assert hidden is not None
+        hidden.archived_at = NOW
+    data = organisation_document(
+        "acme", capacity_pools=[{"code": "nieuw", "name": "Verborgen", "guaranteed_skills": []}]
+    )
+
+    plan = await service(source).plan(HOST, encode(data), None)
+
+    assert plan.refusals == ()
+
+
 # --- staff and grants are state ---------------------------------------------------------
 
 

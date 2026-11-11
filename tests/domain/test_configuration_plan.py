@@ -960,3 +960,6 @@ def test_a_plan_with_more_changes_than_the_limit_is_not_given_to_the_rules() -> 
 
     assert len(over.changes) == 3
     assert (len(seen), within.ok) == (1, True)  # only the plan within the limit was checked
+    # The plan says it is not applicable, so a preview refuses it and offers no apply.
+    assert not over.ok
+    assert [r.code for r in over.refusals] == [ErrorCode.CONFIGURATION_TOO_MANY_CHANGES]

@@ -161,9 +161,12 @@ def installation(*organisations: Entity) -> Entity:
     return entity("installation", (), organisations=organisations)
 
 
-def full() -> Entity:
-    """Return the installation of the round-trip tests (see the module docstring)."""
-    advies = flow(
+def full(advies: Entity | None = None) -> Entity:
+    """Return the installation of the round-trip tests (see the module docstring).
+
+    ``advies`` replaces the flow ``advies`` (published revisions 1 and 2, draft 3) with another.
+    """
+    advies = advies or flow(
         "advies",
         "archived",
         2,

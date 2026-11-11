@@ -80,21 +80,41 @@ subject (`subjects`); no id appears anywhere, and neither does `published_by` (a
 
 - **A pool is found by its code.** The code of a counted pool never changes (migration 0110 gave
   every pool one), so a rename is an ordinary change of `name`. A counted pool whose stored code is
-  missing (a row an older image wrote) cannot be addressed: the export is refused with
-  `configuration_pool_without_code` naming the pool as `organisation/id`, and a plan or an apply
-  leaves that pool alone. Archive it and add it again in the portal, which gives the new one a code.
+  missing (a row an older image wrote) cannot be addressed, so it is left out of every document.
+  An **export** is refused with `configuration_pool_without_code` naming the pool as
+  `organisation/id`, but only for the organisations the export covers: an organisation's export is
+  neither stopped by another organisation's pool nor names it. A **plan** leaves such a pool alone
+  and says so: the preview warns how many pools without a code of its scope were left out, and the
+  name of a pool the document creates is also checked against theirs (`slug_taken`, field
+  `pool_name`), so a second pool with the same name cannot appear next to one nobody can see
+  here. Archive such a pool and add it again in the portal, which gives the new one a code.
 - **Revisions are history.** An export carries every revision with `published_at` (empty for the
   draft). A document never changes or removes a stored published revision
   (`configuration_revision_published`); a draft may be replaced, and a `replace` document never
   trims the revisions it leaves out.
-- **Publishing through a document** is publishing in the portal. A revision that the document
-  publishes (a new revision with `published_at`, or a draft that gains one) must be based on the
-  revision before it (a skill, pool or subject it names that the one before did not have must be
-  there and not archived), have a `published_at` that is not in the future and later than that of
-  every revision before it, follow the last revision without a gap, and, as the current one, keep
-  the entry paths the flow is the default of. An installation that does not have the flow yet is
-  filled in ascending order: each revision is checked against the one before it, and the first one
-  may keep what it names although it was archived or removed since.
+- **Restoring and changing differ.** A flow the target does not have is *restored*: every one of
+  its revisions, published or draft, is imported as recorded, because an export of valid data must
+  import into an empty installation (archiving keeps what existing revisions require, so a revision
+  may name a skill or pool that was archived since, or a subject its service no longer offers; a
+  pool may still guarantee a skill archived since). A restore **checks**: every skill and pool a
+  revision names is in the document and belongs to the service's organisation, a legacy pool is
+  named only by its own service's flows, the legacy shape (below), revision numbers without a gap
+  from 1, a `published_at` that is later than that of every revision before it and not in the
+  future, the invariants of the objects (labels, closed value tables, a subject code of the code
+  grammar), and that an `active` flow's current revision passes the readiness checklist. A restore
+  does **not** check that a skill or pool is archived since or that a subject is still offered.
+- **Changing a flow the target has** checks what the document brings that is new, as the portal
+  does. A stored published revision is skipped (and refused when changed). A revision the document
+  *publishes* is checked as publishing in the portal: against the stored current revision (an
+  archived skill or pool, or a subject its service no longer offers, is accepted only where that
+  revision already had it), with a `published_at` that is not in the future and later than that of
+  every revision before it, no gap in the numbers, and, as the current one, the entry paths the
+  flow is the default of. A draft is checked as saving a draft in the portal: the flow's code and
+  defaults against the stored flow, and what it names against the stored draft (else the current
+  revision).
+- **An unpublished revision that is not the flow's draft is refused**
+  (`invalid_configuration`, field `published_at`): applying would delete it when the draft moves
+  on, and a plan shows only what apply does.
 - **`legacy` is the wrapper and nothing else.** A revision with `legacy: true` is accepted only as
   revision 1 of the flow `appointment` or `direct` of a service, published, opening video and
   completed by `legacy_video_observation`, with no skills, the entry path of its code, drawing on
@@ -114,8 +134,8 @@ subject (`subjects`); no id appears anywhere, and neither does `published_by` (a
   Who holds which skill is not in a document and is never changed by one.
 - **Same rules as the screens.** A flow cannot use another organisation's pool or skill, a pool
   cannot stop guaranteeing a skill that a flow not archived still requires from it, two active
-  flows cannot be the default of one entry path, a draft cannot name a subject its service does not
-  offer, a document cannot set a location, and a flow becomes active only when the readiness
+  flows cannot be the default of one entry path, a draft of a flow the target has cannot name a
+  subject its service does not offer, a document cannot set a location, and a flow becomes active only when the readiness
   checklist passes. A default that moves from one flow to another is written releasing before
   gaining, whatever order the document lists the flows in.
 
@@ -147,7 +167,8 @@ python -m app.cli config apply config.json --passphrase-file pass.txt --plan-has
 value, then any refusal, then the plan hash. `apply` plans again inside the write lock and
 writes all or nothing; a plan with deletions needs the hash of the plan you reviewed
 (`configuration_plan_stale` if the configuration moved on), and a plan above
-`CONFIGURATION_APPLY_MAX_CHANGES` is refused. Every applied change is an audit event with its
+`CONFIGURATION_APPLY_MAX_CHANGES` is refused by the plan itself (`configuration_too_many_changes`),
+so the preview shows the refusal and offers no apply. Every applied change is an audit event with its
 action, kind and natural key, never a value.
 
 ## Setting up a new installation from a file

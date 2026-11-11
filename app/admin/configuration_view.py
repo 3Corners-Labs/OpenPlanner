@@ -8,7 +8,8 @@ working). Texts come from the catalogue; the kinds and fields are the document's
 which the admin edits in their file.
 """
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 
 from app.admin.forms import CODE_MESSAGES
 from app.config import Settings
@@ -26,6 +27,9 @@ PLATFORM_HOME = "/admin/settings/package"
 """The platform's page of the block: the package tab of Advanced settings."""
 PLATFORM_PREFIX = "/admin/settings/configuration"
 """Where the platform's export, plan and apply are posted."""
+
+POOLS_WITHOUT_CODE_WARNING = "admin.configuration.warning.pools_without_code"
+"""The warning that capacity pools without a code are left out of the document (ADR 0121 2f)."""
 
 CLAIM_FIELDS = frozenset({"idp_key", "claim_value"})
 """The fields that decide who matches an entitlement: a change locks people out until the
@@ -70,6 +74,7 @@ class PlanView:
         deletes: How many objects are deleted.
         plan_hash: The hash the apply must carry.
         can_apply: Whether there is something to apply and nothing refuses it.
+        counts: The number each warning names, by its key (the deletes unless it says otherwise).
     """
 
     changes: tuple[ChangeRow, ...]
@@ -78,6 +83,7 @@ class PlanView:
     deletes: int
     plan_hash: str
     can_apply: bool
+    counts: Mapping[str, int] = field(default_factory=dict)
 
 
 def plan_view(plan: Plan, _: BoundGettext) -> PlanView:
@@ -108,8 +114,12 @@ def plan_view(plan: Plan, _: BoundGettext) -> PlanView:
         warnings.append("admin.configuration.warning.claims")
     if any(c.kind == PLATFORM_SECRET_KIND and c.key == (WEBEX_SERVICE_APP,) for c in plan.changes):
         warnings.append("admin.configuration.warning.webex")
+    counts: dict[str, int] = {}
+    if plan.left_out:
+        warnings.append(POOLS_WITHOUT_CODE_WARNING)
+        counts[POOLS_WITHOUT_CODE_WARNING] = plan.left_out
     return PlanView(
-        changes, refusals, tuple(warnings), deletes, plan.digest, bool(changes) and plan.ok
+        changes, refusals, tuple(warnings), deletes, plan.digest, bool(changes) and plan.ok, counts
     )
 
 
