@@ -95,31 +95,23 @@ test('the widget speaks English when the host page does', async ({ page }) => {
   await expect(widget.getByRole('list', { name: /steps/i })).toBeVisible();
 });
 
-test('the flow attribute travels with the booking request (ADR 0121)', async ({ page }) => {
-  let sent: Record<string, unknown> | null = null;
-  await page.route('**/api/v1/widget/*/*/bookings', async (route) => {
-    if (route.request().method() !== 'POST') return route.continue();
-    sent = route.request().postDataJSON();
-    return route.fulfill({
-      status: 422,
-      contentType: 'application/json',
-      headers: { 'access-control-allow-origin': '*' },
-      body: JSON.stringify({ error: 'flow_not_available' }),
-    });
-  });
+test('the flow attribute travels with the group request (ADR 0121)', async ({ page }) => {
+  const asked = page.waitForRequest(
+    (request) => request.method() === 'GET' && new URL(request.url()).searchParams.get('flow') === 'appointment',
+  );
   await page.goto(`${HOST}?flow=appointment`);
+  await asked;
+
+  // The default flow of the demo group resolves: the widget starts as usual.
   const widget = page.locator('openplanner-booking');
   await expect(widget.getByRole('heading', { level: 2, name: 'Demo: videogesprek' })).toBeVisible();
-  await widget.locator('.calendar__day--free').first().click();
-  await widget.locator('.time').first().click();
-  await widget.getByLabel('Voornaam').fill('Ada');
-  await widget.getByLabel('Achternaam').fill('Lovelace');
-  await widget.getByLabel('E-mailadres').fill('ada@voorbeeld.nl');
-  await widget.getByRole('button', { name: 'Afspraak maken' }).click();
+});
 
-  // The refusal is shown as a general error; the request carried the attribute's code.
-  await expect(widget.getByRole('alert')).toBeFocused();
-  expect(sent).toMatchObject({ flow: 'appointment' });
+test('a flow that does not resolve says the group is not available (ADR 0121)', async ({ page }) => {
+  await page.goto(`${HOST}?flow=no-such-flow`);
+
+  await expect(page.locator('openplanner-booking')).toContainText('niet beschikbaar');
+  await expectNoAxeViolations(page);
 });
 
 test('a group that is not embedded here says so', async ({ page }) => {
