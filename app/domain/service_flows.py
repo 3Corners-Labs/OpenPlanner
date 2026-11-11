@@ -20,7 +20,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import cast
 
-from app.domain.capacity import CapacityPool, PoolMode, guarantees
+from app.domain.capacity import CapacityPool, PoolMode, guarantees, unguaranteed
 from app.domain.errors import DomainError, ErrorCode, missing_object, outside_organisation
 from app.domain.routing import SUBJECT_CODE, validate_labels
 from app.domain.scheduling import valid_slot_minutes
@@ -443,6 +443,20 @@ def _skills_reason(
     return None
 
 
+def missing_guarantees(revision: FlowRevision, pool: CapacityPool | None) -> frozenset[int]:
+    """Return the skills ``revision`` needs, for the flow or a subject, that ``pool`` lacks.
+
+    The same requirements the skills check judges (the flow's own skills, and the flow's plus each
+    subject's extra ones); a revision without a pool lacks none that it could name.
+    """
+    if pool is None:
+        return frozenset()
+    lacking = unguaranteed(pool, revision.required_skill_ids)
+    for extra in revision.subject_skill_ids.values():
+        lacking |= unguaranteed(pool, effective_requirements(revision.required_skill_ids, extra))
+    return lacking
+
+
 def _dispatch_reason(revision: FlowRevision) -> ReadinessReason | None:
     """Return why the dispatch check fails, if it does."""
     kind = revision.interaction_kind
@@ -506,6 +520,52 @@ def readiness(
 def can_activate(items: Sequence[ReadinessItem]) -> bool:
     """Return whether every checklist item is ok."""
     return all(item.ok for item in items)
+
+
+class ReadinessState(StrEnum):
+    """Where a checklist stands as a whole; a stable code, never user-facing text."""
+
+    COMPLETE = "complete"
+    """Every point is in order."""
+
+    COMPLETE_EXCEPT_FOLLOWING = "complete_except_following"
+    """Every point is in order except points that wait on a part not built yet."""
+
+    INCOMPLETE = "incomplete"
+    """At least one point is open for a reason the administrator can fix."""
+
+
+def readiness_state(items: Sequence[ReadinessItem]) -> ReadinessState:
+    """Return where the checklist stands: complete, complete but for parts that follow, or not.
+
+    A point that fails with ``not_built_yet`` cannot be fixed by an administrator; it does not
+    make the checklist incomplete, but it keeps it from being complete.
+    """
+    open_items = [item for item in items if not item.ok]
+    if not open_items:
+        return ReadinessState.COMPLETE
+    if all(item.reason is ReadinessReason.NOT_BUILT_YET for item in open_items):
+        return ReadinessState.COMPLETE_EXCEPT_FOLLOWING
+    return ReadinessState.INCOMPLETE
+
+
+def can_publish(items: Sequence[ReadinessItem]) -> bool:
+    """Return whether a draft with this checklist may be published.
+
+    Every point must be in order except the points that follow (``not_built_yet``): publishing
+    does not activate, and activation stays refused until those are built.
+    """
+    return readiness_state(items) is not ReadinessState.INCOMPLETE
+
+
+def check_publish_ready(items: Sequence[ReadinessItem]) -> None:
+    """Refuse publishing a draft whose checklist has a point the administrator can still fix.
+
+    Raises:
+        DomainError: ``invalid_configuration`` (field ``readiness``).
+    """
+    if not can_publish(items):
+        raise _invalid("readiness")
 
 
 def legacy_revision(
@@ -602,7 +662,7 @@ class FlowActions:
     Attributes:
         prepare: Start a new revision as a copy of the published one.
         save: Save the draft revision.
-        publish: Publish the draft (an active flow also needs a draft that is in order).
+        publish: Publish the draft: every point of its checklist in order but the ones that follow.
         discard: Throw away the draft of a flow that has a published revision; a flow never
             published is deleted instead.
         activate: Activate the flow: only when the revision activation judges is in order.
@@ -631,8 +691,15 @@ class FlowActions:
         )
 
 
-def flow_actions(flow: ServiceFlow, activation: Sequence[ReadinessItem] | None) -> FlowActions:
+def flow_actions(
+    flow: ServiceFlow,
+    activation: Sequence[ReadinessItem] | None,
+    draft_readiness: Sequence[ReadinessItem] | None = None,
+) -> FlowActions:
     """Return what may be done with ``flow``; ``activation`` is the checklist of its published one.
+
+    ``draft_readiness`` is the checklist of the draft; publishing is allowed only when it is given
+    and ``can_publish`` accepts it (a caller that does not judge the draft never publishes).
 
     ``activation`` is the readiness of the revision activation judges (the published one),
     ``None`` when the flow has none. A legacy flow follows its service's settings and an archived
@@ -647,7 +714,7 @@ def flow_actions(flow: ServiceFlow, activation: Sequence[ReadinessItem] | None) 
     return FlowActions(
         prepare=flow.current is not None and not draft,
         save=draft,
-        publish=draft,
+        publish=draft and draft_readiness is not None and can_publish(draft_readiness),
         discard=draft and flow.current is not None,
         activate=(never_active and activation is not None and can_activate(activation)),
         archive=flow.state is FlowState.ACTIVE,

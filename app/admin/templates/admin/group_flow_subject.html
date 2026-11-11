@@ -6,11 +6,10 @@
 {% set base = "/admin/groups/" ~ summary.group.slug ~ "/flows" %}
 {% include "admin/_group_header.html" %}
 <p><a href="{{ back }}">{{ _("admin.flows.back_to_flow") }}</a></p>
-<h2 class="section-title">{{ heading }}</h2>
+<h2 class="section-title" id="subject-form-heading">{{ heading }}</h2>
 <p><code>{{ code }}</code> {{ name }}</p>
 {% include "_error_summary.html" %}
 <form class="card" method="post" action="{{ base }}/{{ code }}/subjects/{{ subject_code }}" novalidate aria-labelledby="subject-form-heading">
-  <h2 id="subject-form-heading" class="visually-hidden">{{ heading }}</h2>
   <p class="card__lead">{{ _("admin.flows.subject_lead") }}</p>
   {{ skill_checkboxes(skill_choices, skills_field, _("admin.flows.extra_skills"), skills_error) }}
   <div class="form-actions">

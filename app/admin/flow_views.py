@@ -13,7 +13,7 @@ from enum import StrEnum
 
 from app.admin.flow_inputs import offer_name
 from app.admin.forms import Field, FormData
-from app.admin.skill_inputs import SkillChoice, choices, skill_label
+from app.admin.skill_inputs import SkillChoice, choices, skill_name
 from app.domain import service_flows as flows
 from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.flow_service import FlowChoices, FlowDraftInput, FlowLine, FlowPage
@@ -31,6 +31,7 @@ from app.domain.service_flows import (
     ReadinessItem,
     ReadinessPolicy,
     ReadinessReason,
+    ReadinessState,
     ServiceFlow,
 )
 from app.domain.skills import Skill
@@ -106,13 +107,17 @@ CHECK_TITLES: Mapping[ReadinessCheck, str] = {
 }
 """The title of each readiness check."""
 
-HEADINGS: Mapping[tuple[bool, bool], str] = {
-    (True, True): "admin.flows.ready_heading.draft_ready",
-    (True, False): "admin.flows.ready_heading.draft_not_ready",
-    (False, True): "admin.flows.ready_heading.published_ready",
-    (False, False): "admin.flows.ready_heading.published_not_ready",
+HEADINGS: Mapping[tuple[bool, ReadinessState], str] = {
+    (True, ReadinessState.COMPLETE): "admin.flows.ready_heading.draft_ready",
+    (True, ReadinessState.COMPLETE_EXCEPT_FOLLOWING): "admin.flows.ready_heading.draft_follows",
+    (True, ReadinessState.INCOMPLETE): "admin.flows.ready_heading.draft_not_ready",
+    (False, ReadinessState.COMPLETE): "admin.flows.ready_heading.published_ready",
+    (False, ReadinessState.COMPLETE_EXCEPT_FOLLOWING): (
+        "admin.flows.ready_heading.published_follows"
+    ),
+    (False, ReadinessState.INCOMPLETE): "admin.flows.ready_heading.published_not_ready",
 }
-"""The heading of the checklist by what it judges (the draft, or not) and whether it is in order."""
+"""The heading of the checklist by what it judges (the draft, or not) and where it stands."""
 
 NOT_BUILT_TEXTS: Mapping[ReadinessCheck, str] = {
     ReadinessCheck.DISPATCH: "admin.flows.reason.not_built_yet.dispatch",
@@ -252,6 +257,7 @@ class ReadinessRow:
     word: str
     missing: bool
     sentence: str
+    skills: str = ""
 
 
 @dataclass(frozen=True)
@@ -261,6 +267,7 @@ class ReadinessView:
     heading: str
     summary: str
     ready: bool
+    follows_note: str
     rows: tuple[ReadinessRow, ...]
 
 
@@ -295,7 +302,7 @@ def flow_row(line: FlowLine, locale: RequestLocale) -> FlowRowView:
         ", ".join(_(INTAKE_LABELS[m]) for m in modes),
         _(KIND_LABELS[kind]) if kind is not None else "",
         pool_name(line.pool, locale),
-        tuple(skill_label(s, locale.code) for s in line.skills),
+        tuple(skill_name(s, locale.code) for s in line.skills),
         _(STATE_LABELS[flow.state]),
         flow.in_progress,
         flow.legacy,
@@ -304,12 +311,17 @@ def flow_row(line: FlowLine, locale: RequestLocale) -> FlowRowView:
 
 
 def readiness_view(
-    items: Sequence[ReadinessItem], locale: RequestLocale, *, draft: bool
+    items: Sequence[ReadinessItem],
+    locale: RequestLocale,
+    *,
+    draft: bool,
+    missing_skills: Sequence[str] = (),
 ) -> ReadinessView:
     """Translate the readiness checklist: a title, a state as a word and a sentence per item.
 
     ``draft`` says what the checklist judges: the draft, or the published revision. The heading
-    names it, and a point that cannot be met yet says which part follows.
+    names it, and a point that cannot be met yet says which part follows. ``missing_skills`` are
+    the names of the skills the pool does not guarantee, listed under the skills point.
     """
     _ = locale.gettext
     rows = []
@@ -324,13 +336,21 @@ def readiness_view(
             )
             key = REASON_TEXTS[reason]
             sentence, missing = _(NOT_BUILT_TEXTS.get(item.code, key) if follows else key), True
-        rows.append(ReadinessRow(_(CHECK_TITLES[item.code]), word, missing, sentence))
+        lacking = (
+            _("admin.flows.reason.missing_skills", skills=", ".join(missing_skills))
+            if reason is ReadinessReason.POOL_DOES_NOT_GUARANTEE and missing_skills
+            else ""
+        )
+        rows.append(ReadinessRow(_(CHECK_TITLES[item.code]), word, missing, sentence, lacking))
     done = sum(1 for item in items if item.ok)
-    ready = flows.can_activate(items)
+    state = flows.readiness_state(items)
     return ReadinessView(
-        _(HEADINGS[draft, ready]),
+        _(HEADINGS[draft, state]),
         _("admin.flows.ready_count", done=done, total=len(items)),
-        ready,
+        state is ReadinessState.COMPLETE,
+        _("admin.flows.ready_follows_note")
+        if state is ReadinessState.COMPLETE_EXCEPT_FOLLOWING
+        else "",
         tuple(rows),
     )
 
@@ -368,9 +388,14 @@ def activation_view(page: FlowPage, locale: RequestLocale) -> ActivationView | N
     )
 
 
+def publish_blocked(actions: FlowActions) -> bool:
+    """Return whether there is a draft that cannot be published yet: the page says why."""
+    return actions.save and not actions.publish
+
+
 def actions_visible(actions: FlowActions, activation: ActivationView | None) -> bool:
-    """Return whether the page has an actions section: something to do, or why activation waits."""
-    return actions.any or activation is not None
+    """Return whether the page has an actions section: something to do, or why something waits."""
+    return actions.any or activation is not None or publish_blocked(actions)
 
 
 @dataclass(frozen=True)
@@ -399,12 +424,16 @@ def checklist_section(
         return None
     judges_draft = refused is None and page.judges_draft
     items = page.items if refused is None else refused
+    lacking = page.missing if refused is None else page.activation_missing
+    names = sorted(skill_name(page.skills[i], locale.code) for i in lacking if i in page.skills)
     if judges_draft:
         basis = _("admin.flows.basis_draft", revision=page.flow.working.revision)
     else:
         shown = page.flow.current or page.flow.working
         basis = _("admin.flows.basis_published", revision=shown.revision)
-    return ChecklistSection(readiness_view(items, locale, draft=judges_draft), basis)
+    return ChecklistSection(
+        readiness_view(items, locale, draft=judges_draft, missing_skills=names), basis
+    )
 
 
 class ConfirmKind(StrEnum):
@@ -794,7 +823,7 @@ def subject_views(
     views = []
     for subject in choices_.subjects:
         extras = sorted(
-            skill_label(named[i], locale.code) for i in saved.get(subject.code, ()) if i in named
+            skill_name(named[i], locale.code) for i in saved.get(subject.code, ()) if i in named
         )
         views.append(
             SubjectView(
@@ -822,7 +851,7 @@ def summary_rows(
     none = _("admin.flows.summary.none")
 
     def names(ids: frozenset[int]) -> str:
-        found = sorted(skill_label(skills[i], locale.code) for i in ids if i in skills)
+        found = sorted(skill_name(skills[i], locale.code) for i in ids if i in skills)
         return ", ".join(found) or none
 
     kind = revision.interaction_kind

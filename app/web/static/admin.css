@@ -562,6 +562,7 @@ html {
 
 .admin-main {
   grid-area: main;
+  min-width: 0;
   width: 100%;
   max-width: var(--adm-width-standard);
   margin: 0;
@@ -1222,6 +1223,46 @@ fieldset.card {
   align-items: center;
   gap: 0.5rem;
   min-height: 24px;
+  overflow-wrap: anywhere;
+}
+
+/* The editor of a flow (ADR 0121 step 2d): the checklist stays in view beside the form where the
+   room allows. The room is the container's, not the window's, because the menu takes a share of
+   it. The DOM order stays checklist, then form, so a screen reader meets the checklist first;
+   on a narrow container the two stack in that order. */
+.flow-editor {
+  container-type: inline-size;
+}
+
+.flow-editor__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem;
+}
+
+.flow-editor__grid > .flow-editor__main,
+.flow-editor__grid > .flow-editor__aside {
+  min-width: 0;
+  margin-top: 0;
+}
+
+@container (min-width: 56rem) {
+  .flow-editor__grid {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+    align-items: start;
+  }
+
+  .flow-editor__main {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .flow-editor__aside {
+    grid-column: 2;
+    grid-row: 1;
+    position: sticky;
+    top: 4.5rem;
+  }
 }
 
 /* The layout pages of the overview (ADR 0096): one row per widget, its buttons beside it. */
@@ -1890,6 +1931,7 @@ fieldset.card {
 
 /* --- Tables -------------------------------------------------------------------------------- */
 .admin .table-scroll {
+  max-width: 100%;
   border: 1px solid var(--adm-border);
   border-radius: var(--adm-radius);
   background: var(--adm-surface);
@@ -1898,6 +1940,12 @@ fieldset.card {
 
 .admin .data-table {
   font-size: 0.95rem;
+}
+
+/* A table in its scroll region keeps room for its columns instead of squeezing a word to a
+   letter per line: on a narrow screen it scrolls inside its region (WCAG 1.4.10). */
+.admin .table-scroll > .data-table {
+  min-width: 34rem;
 }
 
 .admin .data-table th,
@@ -2133,6 +2181,7 @@ fieldset.card {
 }
 
 .admin .hint {
+  overflow-wrap: anywhere;
   margin: 0.25rem 0 0;
   color: var(--adm-text-muted);
   font-size: 0.875rem;
@@ -2156,9 +2205,20 @@ fieldset.card {
 }
 
 .choice {
+  min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
+}
+
+/* Any fieldset may shrink below the width of its longest word or hint. */
+.admin fieldset {
+  min-width: 0;
+}
+
+.admin legend {
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .choice__option {

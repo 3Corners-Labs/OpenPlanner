@@ -22,7 +22,7 @@ from app.domain.routing import GroupRouting, Subject
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.support.admin_site import audit_log, site_app, site_uow
 from tests.support.domain import NOW
-from tests.support.flow_pages import BASE, act, create, form_data, save
+from tests.support.flow_pages import BASE, act, create, create_ready, form_data, save
 from tests.support.flow_seed import add_subjects
 from tests.support.locales import nl_locale
 from tests.support.skill_seed import add_pool, add_skill
@@ -55,7 +55,7 @@ async def test_the_page_speaks_english_with_the_names_of_both_languages(site: Si
 
 async def test_the_list_marks_a_published_flow_with_a_draft_in_progress(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
-    await create(site)
+    await create_ready(site)
     await act(site, "publish")
 
     before = (await site.client.get(BASE)).text
@@ -218,7 +218,7 @@ async def test_the_page_of_a_subject_is_missing_without_a_draft_or_for_a_subject
 ) -> None:
     await site.login_as(ORG_ADMIN)
     await add_subjects(site, {"contract": "Contract"})
-    await create(site, offer_contract="yes")
+    await create_ready(site, offer_contract="yes")
     await act(site, "publish")
 
     for method in ("GET", "POST"):
@@ -285,20 +285,27 @@ async def test_the_checklist_says_every_state_in_words_and_which_part_follows(
     assert "Het concept is nog niet volledig" in page
 
 
-async def test_the_checklist_names_what_it_judges_in_its_heading(site: Site) -> None:
+async def test_the_checklist_names_what_it_judges_and_where_it_stands_in_its_heading(
+    site: Site,
+) -> None:
     await site.login_as(ORG_ADMIN)
     pool = await add_pool(site, "Advies")
     await create(site, capacity_pool_id=str(pool))
+    await create(site, "leeg")
 
     draft = (await site.client.get(f"{BASE}/advies")).text
+    empty = (await site.client.get(f"{BASE}/leeg")).text
     await act(site, "publish")
     published = (await site.client.get(f"{BASE}/advies")).text
     await act(site, "prepare")
     both = (await site.client.get(f"{BASE}/advies")).text
 
-    assert "Het concept is nog niet volledig" in draft
-    assert "De gepubliceerde revisie is nog niet klaar voor gebruik" in published
-    assert "Het concept is nog niet volledig" in both
+    assert "Het concept is volledig, op onderdelen na die nog volgen" in draft
+    assert "Punten die ‘Volgt’ tonen, kunt u zelf niet oplossen." in draft
+    assert "Het concept is nog niet volledig" in empty
+    assert "kunt u zelf niet oplossen" not in empty
+    assert "De gepubliceerde revisie is volledig, op onderdelen na die nog volgen" in published
+    assert "Het concept is volledig, op onderdelen na die nog volgen" in both
     assert "Beoordeeld op het opgeslagen concept (revisie 2)." in both
 
 
@@ -308,14 +315,20 @@ async def test_activation_has_no_disabled_button_but_says_why_not_and_a_refusal_
     await site.login_as(ORG_ADMIN)
     pool = await add_pool(site, "Advies")
     await create(site, capacity_pool_id=str(pool))
-    await create(site, "leeg")
+    await create_ready(site, "leeg")
 
     unpublished = (await site.client.get(f"{BASE}/advies")).text
     await act(site, "publish")
     await act(site, "publish", "leeg")
+    async with AsyncSession(site_app(site).state.engine) as session, session.begin():
+        await session.execute(
+            update(CapacityPoolRow)
+            .where(CapacityPoolRow.code == "pool-leeg")
+            .values(archived_at=NOW)
+        )
     page = (await site.client.get(f"{BASE}/advies")).text
     refused = await act(site, "activate")
-    monkeypatch.setattr(service_flows, "RETENTION_BUILT", True)  # only the missing pool is left
+    monkeypatch.setattr(service_flows, "RETENTION_BUILT", True)  # only the archived pool is left
     other = (await site.client.get(f"{BASE}/leeg")).text
 
     assert "Publiceer eerst het concept." in unpublished
@@ -388,7 +401,7 @@ async def test_a_published_flow_never_active_offers_delete_and_discard_of_its_dr
     site: Site,
 ) -> None:
     await site.login_as(ORG_ADMIN)
-    await create(site)
+    await create_ready(site)
     await act(site, "publish")
     await act(site, "prepare")
     await save(site, label_nl="Nieuwe naam")
@@ -471,7 +484,7 @@ async def test_discarding_the_draft_of_a_published_flow_keeps_the_published_revi
     site: Site,
 ) -> None:
     await site.login_as(ORG_ADMIN)
-    await create(site)
+    await create_ready(site)
     await act(site, "publish")
     await act(site, "prepare")
 
@@ -527,7 +540,7 @@ async def test_a_flow_never_active_cannot_be_archived_and_the_page_says_delete(
     site: Site,
 ) -> None:
     await site.login_as(ORG_ADMIN)
-    await create(site)
+    await create_ready(site)
     await act(site, "publish")
 
     page = await site.client.get(f"{BASE}/advies/archive")
@@ -578,7 +591,7 @@ async def test_archiving_an_active_flow_says_what_happens(
 
 async def test_a_published_revision_is_read_only_until_a_new_one_is_prepared(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
-    await create(site, default_appointment="yes")
+    await create_ready(site, default_appointment="yes")
     await act(site, "publish")
 
     read_only = (await site.client.get(f"{BASE}/advies")).text
@@ -728,7 +741,7 @@ async def test_too_many_ticked_skills_are_refused_before_anything_is_looked_up(
 async def test_the_new_pages_have_no_script_and_no_inline_style(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
     await add_subjects(site, {"contract": "Contract"})
-    await create(site, offer_contract="yes")
+    await create_ready(site, offer_contract="yes")
     await act(site, "publish")
     await act(site, "prepare")
     pages = [
@@ -926,7 +939,7 @@ async def test_the_adjusted_notice_needs_a_chosen_channel(site: Site) -> None:
 
 async def test_the_read_only_summary_says_intake_with_the_noun(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
-    await create(site)
+    await create_ready(site)
     await act(site, "publish")
 
     summary = (await site.client.get(f"{BASE}/advies")).text.split('<dl class="facts">')[1]

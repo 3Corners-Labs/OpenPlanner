@@ -3,7 +3,6 @@
 {% block title %}{{ _("admin.flows.title") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% include "admin/_group_header.html" %}
-{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 {% include "_error_summary.html" %}
 <section class="card" id="flows" aria-labelledby="flows-heading">
   <div class="card__header">

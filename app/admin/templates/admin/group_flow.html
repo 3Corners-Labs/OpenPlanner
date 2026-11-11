@@ -10,7 +10,6 @@
 {% include "admin/_group_header.html" %}
 <p><a href="{{ base }}">{{ _("admin.flows.back") }}</a></p>
 <h2 class="section-title">{{ heading }}</h2>
-{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 {% include "_error_summary.html" %}
 {% if notice %}<div class="alert alert--warning" role="status"><p>{{ notice }}</p></div>{% endif %}
 {% if not new %}
@@ -20,9 +19,11 @@
   <code>{{ code }}</code>
 </p>
 {% endif %}
+<div class="flow-editor">
+<div class="flow-editor__grid">
 {% if readiness %}{% include "admin/_flow_readiness.html" %}{% endif %}
 {% if editing %}
-<form method="post" action="{{ action }}" novalidate aria-labelledby="flow-form-heading">
+<form class="flow-editor__main" method="post" action="{{ action }}" novalidate aria-labelledby="flow-form-heading">
   <h2 id="flow-form-heading" class="visually-hidden">{{ _("admin.flows.form_heading") }}</h2>
   <fieldset class="card" id="section-name">
     <legend class="card__legend">{{ _("admin.flows.section.name") }}</legend>
@@ -129,7 +130,7 @@
   </div>
 </form>
 {% elif summary_rows %}
-<section class="card" aria-labelledby="published-heading">
+<section class="card flow-editor__main" aria-labelledby="published-heading">
   <div class="card__header">
     <h2 id="published-heading">{{ _("admin.flows.published_heading", revision=revision_number) }}</h2>
     <p class="card__lead">{{ _("admin.flows.published_lead") }}</p>
@@ -141,6 +142,8 @@
   </dl>
 </section>
 {% endif %}
+</div>
+</div>
 {% if show_actions %}
 <section class="card" aria-labelledby="actions-heading">
   <div class="card__header">
@@ -159,6 +162,9 @@
     <p class="hint" id="publish-hint">{{ _("admin.flows.publish_hint") }}</p>
     <div class="form-actions"><button type="submit" class="button" aria-describedby="publish-hint">{{ _("admin.flows.publish") }}</button></div>
   </form>
+  {% elif publish_blocked %}
+  <h3 id="publish-heading">{{ _("admin.flows.publish_heading") }}</h3>
+  <p id="publish-hint">{{ _("admin.flows.error.not_ready_publish") }}</p>
   {% endif %}
   {% if activation %}
   <h3 id="activate-heading">{{ _("admin.flows.activate_heading") }}</h3>

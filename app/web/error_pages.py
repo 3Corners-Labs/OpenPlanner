@@ -5,6 +5,8 @@ and a way back. Rate-limit hits, refused attempts and unknown management links a
 security events (ADR 0053).
 """
 
+from http import HTTPStatus
+
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
@@ -95,10 +97,15 @@ async def domain_error_page(request: Request, exc: Exception) -> Response:
 
 
 async def rejected_request_page(request: Request, exc: Exception) -> Response:
-    """Render a refused request (cross-site POST, honeypot, malformed input)."""
+    """Render a refused request (cross-site POST, honeypot, malformed input, an unknown object).
+
+    A 404 is the house's not-found page, the same as a domain error for a missing object.
+    """
     status = exc.status if isinstance(exc, RejectedRequest) else 400
     if isinstance(exc, RejectedRequest) and exc.reason:
         await report(request, REQUEST_REJECTED, exc.reason)
+    if status == HTTPStatus.NOT_FOUND:
+        return _page(request, status, "error.not_found.title", "error.not_found.text")
     return _page(request, status, "error.title", "error.invalid_request")
 
 

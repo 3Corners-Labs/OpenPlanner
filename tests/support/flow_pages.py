@@ -3,6 +3,7 @@
 import httpx
 
 from tests.admin.conftest import SAME_ORIGIN, Site
+from tests.support.skill_seed import add_pool
 
 BASE = "/admin/groups/demo/flows"
 
@@ -26,6 +27,16 @@ async def create(site: Site, code: str = "advies", **changes: str) -> httpx.Resp
     """Post the form that creates a flow."""
     data = form_data(flow_code=code, **changes)
     return await site.client.post(BASE, data=data, headers=SAME_ORIGIN)
+
+
+async def create_ready(site: Site, code: str = "advies", **changes: str) -> httpx.Response:
+    """Create a flow on a pool of its own, so that its draft may be published.
+
+    Publishing needs every point of the checklist in order but the ones that follow; the pool is
+    the point a bare form leaves open.
+    """
+    pool = await add_pool(site, f"Pool {code}")
+    return await create(site, code, capacity_pool_id=str(pool), **changes)
 
 
 async def save(site: Site, code: str = "advies", **changes: str) -> httpx.Response:

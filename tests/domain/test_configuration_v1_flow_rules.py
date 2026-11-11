@@ -710,6 +710,24 @@ def test_a_stored_draft_may_gain_a_publication_time_and_become_the_current_revis
     ]
 
 
+def test_a_revision_a_document_newly_publishes_needs_a_checklist_in_order() -> None:
+    data = document_json()
+    advies(data)["revisions"][2]["published_at"] = published(3)
+    advies(data)["revisions"][2]["capacity_pool"] = None  # no pool: the portal refuses publishing
+    advies(data)["current_revision"], advies(data)["draft_revision"] = 3, None
+
+    assert (f"{FLOW}.revisions[3]", ErrorCode.INVALID_CONFIGURATION, "readiness") in refusals(
+        plan(data, full())
+    )
+
+
+def test_a_restored_revision_is_history_and_needs_no_checklist_in_order() -> None:
+    data = document_json()
+    advies(data)["revisions"][1]["capacity_pool"] = None  # the current revision, as recorded
+
+    assert plan(data, empty_flows()).ok
+
+
 def test_a_publication_time_cannot_lie_in_the_future() -> None:
     data = document_json()
     advies(data)["revisions"][2]["published_at"] = "2027-01-01T10:00:00+00:00"

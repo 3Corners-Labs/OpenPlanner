@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.admin.forms import Field, FormData
-from app.admin.skill_inputs import SkillChoice, choices, skill_label, ticked_ids
+from app.admin.skill_inputs import SkillChoice, choices, skill_name, ticked_ids
 from app.domain.capacity import PoolMode
 from app.domain.capacity_service import FlowRef, PoolLine
 from app.domain.skills import Skill
@@ -33,10 +33,24 @@ class PoolRowView:
     archived: bool
 
 
-def flow_name(flow: FlowRef, locale: str) -> str:
-    """Return a flow as ``label · service`` in the admin's language (Dutch when it has none)."""
+def flow_name(flow: FlowRef, locale: str, *, with_service: bool = False) -> str:
+    """Return a flow as ``label`` or ``label (service)`` in the admin's language.
+
+    The service is added only on request: a pool of one service names its flows alone, a counted
+    pool several services use names whose flow each one is.
+    """
     label = flow.labels.get(locale) or flow.labels.get("nl") or next(iter(flow.labels.values()))
-    return f"{label} · {flow.service}" if flow.service else label
+    return f"{label} ({flow.service})" if with_service and flow.service else label
+
+
+def _names_services(line: PoolLine) -> bool:
+    """Whether the flows of ``line`` are named with their service: a counted pool of several.
+
+    A legacy pool belongs to one service, so its flows never repeat it.
+    """
+    if line.pool.mode is PoolMode.LEGACY_GROUP:
+        return False
+    return line.hidden > 0 or len({f.service for f in line.flows}) > 1
 
 
 def hidden_flows(count: int, locale: RequestLocale) -> str:
@@ -64,8 +78,8 @@ def pool_row(line: PoolLine, locale: RequestLocale) -> PoolRowView:
         line.pool.code or "",
         line.pool.mode is PoolMode.LEGACY_GROUP,
         _tag(line, locale),
-        tuple(skill_label(s, locale.code) for s in line.skills),
-        tuple(flow_name(f, locale.code) for f in line.flows),
+        tuple(skill_name(s, locale.code) for s in line.skills),
+        tuple(flow_name(f, locale.code, with_service=_names_services(line)) for f in line.flows),
         hidden_flows(line.hidden, locale),
         line.pool.archived_at is not None,
     )

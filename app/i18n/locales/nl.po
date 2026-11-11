@@ -12316,7 +12316,7 @@ msgid "admin.skills.col.used_by"
 msgstr "Gebruikt door"
 
 msgid "admin.skills.used_by"
-msgstr "Pools: {pools}, flows: {flows}"
+msgstr "Capaciteitspools: {pools}, flows: {flows}"
 
 msgid "admin.skills.staff_count"
 msgstr "Medewerkers met deze vaardigheid: {count}"
@@ -12367,7 +12367,7 @@ msgid "admin.skills.archive_effect_keeps"
 msgstr "Bestaande verzoeken, eisen en toekenningen houden de vaardigheid; er verandert niets aan werk dat al is aangenomen."
 
 msgid "admin.skills.archive_effect_listed"
-msgstr "U vindt de vaardigheid terug onder Toon gearchiveerde vaardigheden. Verwijderen kan niet."
+msgstr "U vindt de vaardigheid terug onder {filter_label}. Verwijderen kan niet."
 
 msgid "admin.skills.archive_button"
 msgstr "Vaardigheid archiveren"
@@ -12424,7 +12424,7 @@ msgid "admin.skills.error.limit"
 msgstr "Uw organisatie heeft het maximale aantal vaardigheden bereikt. Archiveer eerst een vaardigheid die u niet meer gebruikt."
 
 msgid "admin.capacity.error.limit"
-msgstr "Uw organisatie heeft het maximale aantal capaciteitspools bereikt. Archiveer eerst een pool die u niet meer gebruikt."
+msgstr "Uw organisatie heeft het maximale aantal capaciteitspools bereikt. Archiveer eerst een capaciteitspool die u niet meer gebruikt."
 
 msgid "admin.capacity.error.code_taken"
 msgstr "Deze code is al in gebruik bij een pool van uw organisatie. Kies een andere."
@@ -12439,7 +12439,7 @@ msgid "admin.skills.limit_reached"
 msgstr "Het maximum van {count} vaardigheden is bereikt. Archiveer een vaardigheid die u niet meer gebruikt om een nieuwe toe te voegen."
 
 msgid "admin.capacity.limit_reached"
-msgstr "Het maximum van {count} eigen en gedeelde pools is bereikt. Archiveer een pool die u niet meer gebruikt om een nieuwe toe te voegen."
+msgstr "Het maximum van {count} eigen en gedeelde capaciteitspools is bereikt. Archiveer een capaciteitspool die u niet meer gebruikt om een nieuwe toe te voegen."
 
 msgid "admin.capacity.title"
 msgstr "Capaciteitspools"
@@ -12787,16 +12787,16 @@ msgid "admin.flows.kind.none"
 msgstr "Geen gesprek"
 
 msgid "admin.flows.kind.video_hint"
-msgstr "De deelnemer en de medewerker spreken elkaar in een videogesprek."
+msgstr "De deelnemer en een {agent} spreken elkaar in een videogesprek."
 
 msgid "admin.flows.kind.telephone_hint"
-msgstr "De medewerker belt de deelnemer."
+msgstr "Een {agent} belt de deelnemer."
 
 msgid "admin.flows.kind.in_person_hint"
 msgstr "De deelnemer komt langs en wordt ontvangen."
 
 msgid "admin.flows.kind.none_hint"
-msgstr "Er is geen gesprek: de medewerker handelt het verzoek af."
+msgstr "Er is geen gesprek: een {agent} handelt het verzoek af."
 
 msgid "admin.flows.kind_follows"
 msgstr "Deze gegevens volgen het opgeslagen contactkanaal. Sla het concept op na een wijziging."
@@ -12805,10 +12805,10 @@ msgid "admin.flows.readout.ready"
 msgstr "Gereed voor afhandeling: {policy}"
 
 msgid "admin.flows.readout.action"
-msgstr "Eerste actie van de medewerker: {action}"
+msgstr "Eerste actie voor een {agent}: {action}"
 
 msgid "admin.flows.readout.none"
-msgstr "Kies een contactkanaal en sla het concept op om te zien wanneer een verzoek gereed is en wat de medewerker als eerste doet."
+msgstr "Kies een contactkanaal en sla het concept op om te zien wanneer een verzoek gereed is en wat een {agent} als eerste doet."
 
 msgid "admin.flows.ready.explicit_check_in"
 msgstr "wanneer de deelnemer zich meldt"
@@ -12868,7 +12868,7 @@ msgid "admin.flows.required_skills"
 msgstr "Vereiste vaardigheden"
 
 msgid "admin.flows.required_skills_hint"
-msgstr "Iedere medewerker die een verzoek van deze flow oppakt, heeft al deze vaardigheden. De pool moet ze garanderen."
+msgstr "Iedere {agent} die een verzoek van deze flow oppakt, heeft al deze vaardigheden. De pool moet ze garanderen."
 
 msgid "admin.flows.subjects_table"
 msgstr "Onderwerpen in deze flow"
@@ -12898,7 +12898,7 @@ msgid "admin.flows.extra_skills_save_first"
 msgstr "Sla het concept eerst op om extra vaardigheden te kiezen."
 
 msgid "admin.flows.subject_lead"
-msgstr "Een medewerker die een verzoek over dit onderwerp oppakt, moet naast de vaardigheden van de flow ook deze vaardigheden beheersen. De capaciteitspool moet ze garanderen. Ze worden in het concept van de flow opgeslagen."
+msgstr "Een {agent} die een verzoek over dit onderwerp oppakt, moet naast de vaardigheden van de flow ook deze vaardigheden beheersen. De capaciteitspool moet ze garanderen. Ze worden in het concept van de flow opgeslagen."
 
 msgid "admin.flows.subject_save"
 msgstr "Extra vaardigheden opslaan"
@@ -12922,7 +12922,7 @@ msgid "admin.flows.completion"
 msgstr "Afronding"
 
 msgid "admin.flows.completion.operator"
-msgstr "De medewerker rondt het af"
+msgstr "Een {agent} rondt het af"
 
 msgid "admin.flows.completion.provider_event"
 msgstr "Een gebeurtenis van de aanbieder"
@@ -12987,6 +12987,9 @@ msgstr "Volgt"
 msgid "admin.flows.ready_count"
 msgstr "{done} van {total} punten in orde."
 
+msgid "admin.flows.ready_follows_note"
+msgstr "Punten die ‘Volgt’ tonen, kunt u zelf niet oplossen."
+
 msgid "admin.flows.basis_draft"
 msgstr "Beoordeeld op het opgeslagen concept (revisie {revision})."
 
@@ -12999,11 +13002,17 @@ msgstr "Het concept is volledig"
 msgid "admin.flows.ready_heading.draft_not_ready"
 msgstr "Het concept is nog niet volledig"
 
+msgid "admin.flows.ready_heading.draft_follows"
+msgstr "Het concept is volledig, op onderdelen na die nog volgen"
+
 msgid "admin.flows.ready_heading.published_ready"
 msgstr "De gepubliceerde revisie is klaar voor gebruik"
 
 msgid "admin.flows.ready_heading.published_not_ready"
 msgstr "De gepubliceerde revisie is nog niet klaar voor gebruik"
+
+msgid "admin.flows.ready_heading.published_follows"
+msgstr "De gepubliceerde revisie is volledig, op onderdelen na die nog volgen"
 
 msgid "admin.flows.check.data"
 msgstr "Naam en aanmelding"
@@ -13041,6 +13050,9 @@ msgstr "Vul een geldige verwachte duur in."
 msgid "admin.flows.reason.pool_does_not_guarantee"
 msgstr "De capaciteitspool garandeert niet alle vaardigheden die deze flow of een van de onderwerpen vraagt."
 
+msgid "admin.flows.reason.missing_skills"
+msgstr "Ontbreekt in de pool: {skills}"
+
 msgid "admin.flows.reason.subject_unknown"
 msgstr "Een onderwerp van deze flow bestaat niet meer bij de dienst."
 
@@ -13051,7 +13063,7 @@ msgid "admin.flows.reason.dispatch_missing"
 msgstr "Kies waar verzoeken naartoe gaan."
 
 msgid "admin.flows.reason.action_not_allowed"
-msgstr "De eerste actie van de medewerker past niet bij het contactkanaal."
+msgstr "De eerste actie voor een {agent} past niet bij het contactkanaal."
 
 msgid "admin.flows.reason.location_missing"
 msgstr "Voor deze manier van afhandelen zijn locaties nodig. Die volgen in een latere versie."
@@ -13197,6 +13209,9 @@ msgstr "Een gekozen vaardigheid is niet langer beschikbaar of er zijn er te veel
 msgid "admin.flows.error.code_taken"
 msgstr "Deze code wordt al gebruikt door een flow van deze dienst. Kies een andere."
 
+msgid "admin.flows.error.code_required"
+msgstr "Vul een code in."
+
 msgid "admin.flows.error.limit"
 msgstr "Deze dienst heeft het maximale aantal flows. Archiveer eerst een flow die u niet meer gebruikt."
 
@@ -13216,7 +13231,7 @@ msgid "admin.flows.error.not_ready"
 msgstr "De flow is niet geactiveerd: niet alle punten van de gepubliceerde revisie zijn in orde."
 
 msgid "admin.flows.error.not_ready_publish"
-msgstr "Het concept is nog niet volledig. Een actieve flow krijgt alleen een volledig concept als nieuwe revisie."
+msgstr "Publiceren kan pas als alle punten in orde zijn, behalve de punten die nog volgen."
 
 msgid "admin.flows.notice.action_adjusted"
 msgstr "De eerste actie is aangepast aan het gekozen contactkanaal."

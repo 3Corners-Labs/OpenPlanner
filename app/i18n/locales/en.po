@@ -12303,7 +12303,7 @@ msgid "admin.skills.col.used_by"
 msgstr "Used by"
 
 msgid "admin.skills.used_by"
-msgstr "Pools: {pools}, flows: {flows}"
+msgstr "Capacity pools: {pools}, flows: {flows}"
 
 msgid "admin.skills.staff_count"
 msgstr "Staff with this skill: {count}"
@@ -12354,7 +12354,7 @@ msgid "admin.skills.archive_effect_keeps"
 msgstr "Existing requests, requirements and grants keep the skill; nothing changes for work that was already accepted."
 
 msgid "admin.skills.archive_effect_listed"
-msgstr "You find the skill under Show archived skills. It cannot be deleted."
+msgstr "You find the skill under {filter_label}. It cannot be deleted."
 
 msgid "admin.skills.archive_button"
 msgstr "Archive skill"
@@ -12426,7 +12426,7 @@ msgid "admin.skills.limit_reached"
 msgstr "The maximum of {count} skills is reached. Archive a skill you no longer use to add a new one."
 
 msgid "admin.capacity.limit_reached"
-msgstr "The maximum of {count} own and shared pools is reached. Archive a pool you no longer use to add a new one."
+msgstr "The maximum of {count} own and shared capacity pools is reached. Archive a capacity pool you no longer use to add a new one."
 
 msgid "admin.capacity.title"
 msgstr "Capacity pools"
@@ -12774,16 +12774,16 @@ msgid "admin.flows.kind.none"
 msgstr "No conversation"
 
 msgid "admin.flows.kind.video_hint"
-msgstr "The participant and the operator speak in a video call."
+msgstr "The participant and the {agent} speak in a video call."
 
 msgid "admin.flows.kind.telephone_hint"
-msgstr "The operator calls the participant."
+msgstr "The {agent} calls the participant."
 
 msgid "admin.flows.kind.in_person_hint"
 msgstr "The participant comes by and is received."
 
 msgid "admin.flows.kind.none_hint"
-msgstr "There is no conversation: the operator handles the request."
+msgstr "There is no conversation: the {agent} handles the request."
 
 msgid "admin.flows.kind_follows"
 msgstr "These follow the saved contact channel. Save the draft after a change."
@@ -12792,10 +12792,10 @@ msgid "admin.flows.readout.ready"
 msgstr "Ready for handling: {policy}"
 
 msgid "admin.flows.readout.action"
-msgstr "First action of the operator: {action}"
+msgstr "First action of the {agent}: {action}"
 
 msgid "admin.flows.readout.none"
-msgstr "Choose a contact channel and save the draft to see when a request is ready and what the operator does first."
+msgstr "Choose a contact channel and save the draft to see when a request is ready and what the {agent} does first."
 
 msgid "admin.flows.ready.explicit_check_in"
 msgstr "when the participant checks in"
@@ -12855,7 +12855,7 @@ msgid "admin.flows.required_skills"
 msgstr "Required skills"
 
 msgid "admin.flows.required_skills_hint"
-msgstr "Every operator who picks up a request of this flow has all of these skills. The pool must guarantee them."
+msgstr "Every {agent} who picks up a request of this flow has all of these skills. The pool must guarantee them."
 
 msgid "admin.flows.subjects_table"
 msgstr "Subjects in this flow"
@@ -12885,7 +12885,7 @@ msgid "admin.flows.extra_skills_save_first"
 msgstr "Save the draft first to choose extra skills."
 
 msgid "admin.flows.subject_lead"
-msgstr "An operator who picks up a request about this subject needs these skills as well as those of the flow. The capacity pool must guarantee them. They are saved in the flow's draft."
+msgstr "Each {agent} who picks up a request about this subject needs these skills as well as those of the flow. The capacity pool must guarantee them. They are saved in the flow's draft."
 
 msgid "admin.flows.subject_save"
 msgstr "Save extra skills"
@@ -12909,7 +12909,7 @@ msgid "admin.flows.completion"
 msgstr "Completion"
 
 msgid "admin.flows.completion.operator"
-msgstr "The operator completes it"
+msgstr "The {agent} completes it"
 
 msgid "admin.flows.completion.provider_event"
 msgstr "An event from the provider"
@@ -12974,6 +12974,9 @@ msgstr "To follow"
 msgid "admin.flows.ready_count"
 msgstr "{done} of {total} points in order."
 
+msgid "admin.flows.ready_follows_note"
+msgstr "Points marked ‘To follow’ cannot be fixed by you."
+
 msgid "admin.flows.basis_draft"
 msgstr "Judged on the saved draft (revision {revision})."
 
@@ -12986,11 +12989,17 @@ msgstr "The draft is complete"
 msgid "admin.flows.ready_heading.draft_not_ready"
 msgstr "The draft is not complete yet"
 
+msgid "admin.flows.ready_heading.draft_follows"
+msgstr "The draft is complete, except for parts that are still to follow"
+
 msgid "admin.flows.ready_heading.published_ready"
 msgstr "The published revision is ready to use"
 
 msgid "admin.flows.ready_heading.published_not_ready"
 msgstr "The published revision is not ready to use yet"
+
+msgid "admin.flows.ready_heading.published_follows"
+msgstr "The published revision is complete, except for parts that are still to follow"
 
 msgid "admin.flows.check.data"
 msgstr "Name and intake"
@@ -13028,6 +13037,9 @@ msgstr "Enter a valid expected duration."
 msgid "admin.flows.reason.pool_does_not_guarantee"
 msgstr "The capacity pool does not guarantee every skill that this flow or one of its subjects requires."
 
+msgid "admin.flows.reason.missing_skills"
+msgstr "Missing in the pool: {skills}"
+
 msgid "admin.flows.reason.subject_unknown"
 msgstr "A subject of this flow no longer exists in the service."
 
@@ -13038,7 +13050,7 @@ msgid "admin.flows.reason.dispatch_missing"
 msgstr "Choose where requests go."
 
 msgid "admin.flows.reason.action_not_allowed"
-msgstr "The first action of the operator does not fit the contact channel."
+msgstr "The first action of the {agent} does not fit the contact channel."
 
 msgid "admin.flows.reason.location_missing"
 msgstr "This way of handling needs locations. They follow in a later version."
@@ -13184,6 +13196,9 @@ msgstr "A chosen skill is no longer available or too many are chosen. Reload the
 msgid "admin.flows.error.code_taken"
 msgstr "This code is already used by a flow of this service. Choose another."
 
+msgid "admin.flows.error.code_required"
+msgstr "Enter a code."
+
 msgid "admin.flows.error.limit"
 msgstr "This service has reached the maximum number of flows. Archive a flow you no longer use first."
 
@@ -13203,7 +13218,7 @@ msgid "admin.flows.error.not_ready"
 msgstr "The flow was not activated: not every point of the published revision is in order."
 
 msgid "admin.flows.error.not_ready_publish"
-msgstr "The draft is not complete yet. An active flow only gets a complete draft as its new revision."
+msgstr "You can only publish once every point is in order, except the points that are still to follow."
 
 msgid "admin.flows.notice.action_adjusted"
 msgstr "The first action was adjusted to the chosen contact channel."

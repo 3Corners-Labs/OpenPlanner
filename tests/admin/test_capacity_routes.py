@@ -8,10 +8,10 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import CapacityPoolRow
-from app.admin.capacity_views import flow_name, hidden_flows
+from app.admin.capacity_views import flow_name, hidden_flows, pool_row
 from app.domain.authorization import Scope
-from app.domain.capacity import PoolMode
-from app.domain.capacity_service import FlowRef
+from app.domain.capacity import CapacityPool, PoolMode
+from app.domain.capacity_service import FlowRef, PoolLine
 from app.domain.service_flows import FlowState
 from app.i18n import Translator, load_catalogues
 from app.web.locale import RequestLocale
@@ -292,8 +292,9 @@ def test_the_flows_of_other_services_are_counted_not_named() -> None:
     )
     ref = FlowRef({"nl": "Intake", "en": "Intake (en)"}, "Balie")
 
-    assert flow_name(ref, "nl") == "Intake · Balie"
-    assert flow_name(ref, "en") == "Intake (en) · Balie"
+    assert flow_name(ref, "nl") == "Intake"
+    assert flow_name(ref, "nl", with_service=True) == "Intake (Balie)"
+    assert flow_name(ref, "en", with_service=True) == "Intake (en) (Balie)"
     assert flow_name(FlowRef({"nl": "Intake"}, ""), "en") == "Intake"
     assert hidden_flows(0, nl) == ""
     assert hidden_flows(1, nl) == "en 1 flow van een andere dienst"
@@ -344,7 +345,7 @@ async def test_the_limit_counts_counted_pools_only_and_not_archived_ones(site: S
     assert 'href="#pools-limit-notice"' in refused.text
     assert 'id="pools-limit-notice"' in refused.text
     assert "pool_name-error" not in refused.text  # the add form is not there to carry it
-    assert "Het maximum van 2 eigen en gedeelde pools is bereikt." in page
+    assert "Het maximum van 2 eigen en gedeelde capaciteitspools is bereikt." in page
     assert ADD_POOL_FORM not in page
     assert accepted.status_code == 303
 
@@ -487,3 +488,31 @@ async def test_a_pool_stored_without_a_code_shows_a_dash_and_is_edited_with_none
     assert [e.detail for e in await audit_log(site) if e.action == "capacity.manage"][-1] == (
         f"capacity_pool.changed,pool:{pool}"
     )
+
+
+async def test_a_legacy_pool_shows_a_dash_for_its_missing_code_and_its_flow_once(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    page = (await site.client.get(LIST)).text
+    row = page.split("Bezetting van de dienst zelf, ongewijzigd")[1].split("</tr>")[0]
+
+    assert "Deze pool heeft geen code." in row
+    assert "&ndash;" in row
+    assert " · " not in row
+    assert "(Demo" not in row
+
+
+def test_a_counted_pool_of_several_services_names_the_service_of_each_flow() -> None:
+    translator = Translator(load_catalogues())
+    nl = RequestLocale(translator.bind("nl"), remember=False, translator=translator)
+    counted = CapacityPool(1, 1, "Gedeeld", PoolMode.COUNTED, frozenset(), code="gedeeld")
+    two = (FlowRef({"nl": "Intake"}, "Balie"), FlowRef({"nl": "Advies"}, "Loket"))
+    one = (FlowRef({"nl": "Intake"}, "Balie"),)
+
+    assert pool_row(PoolLine(counted, (), two, 0), nl).flows == ("Intake (Balie)", "Advies (Loket)")
+    assert pool_row(PoolLine(counted, (), one, 0), nl).flows == ("Intake",)
+    assert pool_row(PoolLine(counted, (), one, 2), nl).flows == ("Intake (Balie)",)
+    legacy = CapacityPool(2, 1, "Balie", PoolMode.LEGACY_GROUP, frozenset(), group_id=3)
+    assert pool_row(PoolLine(legacy, (), two, 0), nl).flows == ("Intake", "Advies")

@@ -29,8 +29,10 @@ from app.domain.service_flows import (
     ReadinessItem,
     ReadinessPolicy,
     ReadinessReason,
+    ReadinessState,
     ServiceFlow,
     can_activate,
+    can_publish,
     check_built_choices,
     check_combination,
     check_default_paths,
@@ -39,6 +41,7 @@ from app.domain.service_flows import (
     check_draft_save,
     check_flow_delete,
     check_flow_references,
+    check_publish_ready,
     check_publishable,
     check_revision_editable,
     check_state_change,
@@ -47,7 +50,9 @@ from app.domain.service_flows import (
     draws_on_pool,
     flow_actions,
     legacy_revision,
+    missing_guarantees,
     readiness,
+    readiness_state,
     revisions_in_effect,
     skills_required_on_pool,
 )
@@ -845,7 +850,7 @@ def ready_items(ok: bool = True) -> tuple[ReadinessItem, ...]:
 def test_the_actions_the_lifecycle_allows(
     the_flow: ServiceFlow, items: tuple[ReadinessItem, ...] | None, expected: str
 ) -> None:
-    allowed = flow_actions(the_flow, items)
+    allowed = flow_actions(the_flow, items, ready_items())
 
     assert {name for name, on in vars(allowed).items() if on} == set(expected.split())
 
@@ -1051,3 +1056,48 @@ def test_the_identity_of_a_draft_refuses_a_taken_code_and_a_changed_code_of_a_pu
         "code",
     )
     check_draft_identity(stored, stored, False)
+
+
+def following_items(*, fixable: bool = False) -> tuple[ReadinessItem, ...]:
+    """Return a checklist whose open point is one that follows, plus a fixable one on request."""
+    open_reasons = {ReadinessCheck.RETENTION: R.NOT_BUILT_YET}
+    if fixable:
+        open_reasons[ReadinessCheck.DATA] = R.LABELS_INVALID
+    return tuple(
+        ReadinessItem(check, check not in open_reasons, open_reasons.get(check))
+        for check in ReadinessCheck
+    )
+
+
+def test_the_checklist_is_complete_complete_except_following_or_incomplete() -> None:
+    assert readiness_state(ready_items()) is ReadinessState.COMPLETE
+    assert readiness_state(following_items()) is ReadinessState.COMPLETE_EXCEPT_FOLLOWING
+    assert readiness_state(ready_items(False)) is ReadinessState.INCOMPLETE
+    assert readiness_state(following_items(fixable=True)) is ReadinessState.INCOMPLETE
+
+
+def test_a_draft_is_published_when_only_points_that_follow_are_open() -> None:
+    assert can_publish(ready_items())
+    assert can_publish(following_items())
+    assert not can_publish(ready_items(False))
+    check_publish_ready(following_items())
+    assert refused_field(lambda: check_publish_ready(following_items(fixable=True))) == "readiness"
+
+
+def test_the_actions_publish_only_with_a_draft_checklist_that_allows_it() -> None:
+    drafted = flow(state=FlowState.DRAFT, current=None, draft=revision())
+
+    assert flow_actions(drafted, None).publish is False
+    assert flow_actions(drafted, None, ready_items(False)).publish is False
+    assert flow_actions(drafted, None, following_items()).publish is True
+
+
+def test_the_skills_a_pool_does_not_guarantee_are_named_for_the_flow_and_each_subject() -> None:
+    the_pool = pool(guaranteed=frozenset({1}))
+    rev = revision(
+        required_skill_ids=frozenset({1, 2}),
+        subject_skill_ids={"a": frozenset({3}), "b": frozenset()},
+    )
+
+    assert missing_guarantees(rev, the_pool) == frozenset({2, 3})
+    assert missing_guarantees(rev, None) == frozenset()

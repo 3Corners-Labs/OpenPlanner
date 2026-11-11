@@ -439,7 +439,7 @@ async def test_the_draft_of_an_active_flow_is_published_only_when_it_is_in_order
     assert published.current.revision == 2
 
 
-async def test_the_draft_of_a_flow_that_is_not_active_is_published_even_when_incomplete(
+async def test_an_incomplete_draft_is_refused_whether_or_not_the_flow_is_active(
     service: FlowService, uow: InMemoryUnitOfWork
 ) -> None:
     await person(uow, ORG_ADMIN.subject)
@@ -447,9 +447,59 @@ async def test_the_draft_of_a_flow_that_is_not_active_is_published_even_when_inc
         ORG_ADMIN, "demo", "advies", draft(None, interaction_kind=None, handling_action=None)
     )
 
+    with pytest.raises(DomainError) as error:
+        await service.publish(ORG_ADMIN, "demo", "advies")
+
+    assert (error.value.code, error.value.field) == (ErrorCode.INVALID_CONFIGURATION, "readiness")
+    (stored,) = uow.state.flows.values()
+    assert stored.current is None
+    assert stored.draft is not None
+
+
+async def test_a_draft_with_only_the_point_that_follows_open_is_published(
+    service: FlowService, uow: InMemoryUnitOfWork
+) -> None:
+    await person(uow, ORG_ADMIN.subject)
+    _, pool = await seed(uow)
+    await service.create(ORG_ADMIN, "demo", "advies", draft(pool))
+
+    page = await service.page(ORG_ADMIN, "demo", "advies")
     published = await service.publish(ORG_ADMIN, "demo", "advies")
 
+    assert page.actions.publish
+    assert flows.readiness_state(page.items) is flows.ReadinessState.COMPLETE_EXCEPT_FOLLOWING
     assert published.current is not None
+
+
+async def test_a_draft_without_a_pool_or_channel_is_refused_and_the_page_hides_publish(
+    service: FlowService, uow: InMemoryUnitOfWork
+) -> None:
+    await person(uow, ORG_ADMIN.subject)
+    await service.create(
+        ORG_ADMIN, "demo", "leeg", draft(None, interaction_kind=None, handling_action=None)
+    )
+
+    page = await service.page(ORG_ADMIN, "demo", "leeg")
+
+    assert not page.actions.publish
+    assert page.actions.save
+
+
+async def test_the_page_names_the_skills_the_pool_does_not_guarantee(
+    service: FlowService, uow: InMemoryUnitOfWork
+) -> None:
+    await person(uow, ORG_ADMIN.subject)
+    _, pool = await seed(uow)
+    async with uow.locked() as tx:
+        first = await tx.save_skill(EVERYTHING, Skill(None, 1, "eerste", {"nl": "A", "en": "A"}))
+        second = await tx.save_skill(EVERYTHING, Skill(None, 1, "tweede", {"nl": "B", "en": "B"}))
+    ids = frozenset({first.id or 0, second.id or 0})
+    await service.create(ORG_ADMIN, "demo", "advies", draft(pool, required_skill_ids=ids))
+
+    page = await service.page(ORG_ADMIN, "demo", "advies")
+
+    assert page.missing == ids
+    assert page.activation_missing == frozenset()
 
 
 async def test_a_second_active_default_is_refused_when_the_flow_is_activated(

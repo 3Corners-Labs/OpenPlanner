@@ -188,6 +188,8 @@ class FlowPage:
             ``None`` while the flow has no published revision.
         skills: Every skill of the organisation by id, archived ones too, for the read-only view.
         actions: What the lifecycle allows to do with the flow now.
+        missing: The skills the revision ``items`` judge needs that its pool does not guarantee.
+        activation_missing: The same for the revision ``activation`` judges.
     """
 
     summary: GroupSummary
@@ -198,6 +200,8 @@ class FlowPage:
     activation: tuple[ReadinessItem, ...] | None
     skills: Mapping[int, Skill]
     actions: FlowActions
+    missing: frozenset[int] = frozenset()
+    activation_missing: frozenset[int] = frozenset()
 
     @property
     def judges_draft(self) -> bool:
@@ -468,26 +472,24 @@ class FlowService:
     async def publish(self, principal: Principal, slug: str, code: str) -> ServiceFlow:
         """Publish the flow's draft: it becomes the current revision. The flow is not activated.
 
-        The draft of an active flow replaces a revision that is in use, so it is judged by the
-        readiness checklist first and refused unless every point is in order.
+        The draft is judged by the readiness checklist first and refused unless every point is in
+        order, except the points that follow (``service_flows.can_publish``).
 
         Raises:
             DomainError: ``not_permitted``, ``group_not_found``, ``group_archived``,
                 ``staff_not_found`` (the administrator has no staff record),
                 ``configuration_object_missing`` (``flow_code``, or ``draft`` without one),
                 ``invalid_configuration`` (``default_for``, ``state`` for an archived flow,
-                ``readiness`` for the draft of an active flow that is not in order, and what
+                ``readiness`` for a draft whose checklist is not in order, and what
                 ``check_flow_references`` names).
         """
         async with self._locked_flow(principal, slug, code) as held:
             tx, stored = held.tx, held.flow
             draft = stored.draft
-            if draft is None or not flows.flow_actions(stored, None).publish:
+            if draft is None or not flows.flow_actions(stored, None).save:
                 raise _guard_error(stored)
-            if stored.state is FlowState.ACTIVE:
-                items = await _readiness_of(tx, held.scope, held.summary.group, draft)
-                if not flows.can_activate(items):
-                    raise _invalid("readiness")
+            items = await _readiness_of(tx, held.scope, held.summary.group, draft)
+            flows.check_publish_ready(items)
             actor = await tx.get_staff(principal.subject)
             if actor is None or actor.id is None:
                 raise DomainError(ErrorCode.STAFF_NOT_FOUND)
@@ -767,13 +769,20 @@ async def _page(
     activation = (
         None if flow.current is None else await _readiness_of(tx, scope, group, flow.current)
     )
+    items = await _readiness_of(tx, scope, group, shown)
+    pool = await _pool_of(tx, scope, shown)
+    current_pool = pool if flow.current is shown else None
+    if flow.current is not None and current_pool is None:
+        current_pool = await _pool_of(tx, scope, flow.current)
     return FlowPage(
         summary,
         flow,
-        await _pool_of(tx, scope, shown),
+        pool,
         await _choices(tx, scope, group, shown),
-        await _readiness_of(tx, scope, group, shown),
+        items,
         activation,
         {s.id: s for s in await all_skills(tx, scope, group.organisation_id) if s.id is not None},
-        flows.flow_actions(flow, activation),
+        flows.flow_actions(flow, activation, items if flow.draft is not None else None),
+        flows.missing_guarantees(shown, pool),
+        flows.missing_guarantees(flow.current, current_pool) if flow.current else frozenset(),
     )

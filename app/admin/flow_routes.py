@@ -68,6 +68,7 @@ from app.admin.flow_views import (
     kind_views,
     name_fields,
     pool_select,
+    publish_blocked,
     readout,
     required_choices,
     subject_views,
@@ -247,6 +248,7 @@ async def _editor(
             "revision_number": page.flow.current.revision if page and page.flow.current else 0,
             "actions": page.actions if page else None,
             "activation": activation,
+            "publish_blocked": bool(page and publish_blocked(page.actions)),
             "show_actions": bool(page and actions_visible(page.actions, activation)),
             "notice": notice,
             "errors": form.errors,
@@ -279,6 +281,10 @@ async def create_flow(
         raise_unknown(error, FLOW_REFUSALS)
     parsed = parse_draft(form, subjects, skill_service(request).max_skills)
     code = form.text("flow_code")
+    if not code:
+        form.errors.append(
+            FormError("flow_code", locale.gettext("admin.flows.error.code_required"))
+        )
     if not form.errors:
         try:
             await flow_service(request).create(context.principal, slug, code, parsed.values)

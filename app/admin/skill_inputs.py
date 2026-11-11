@@ -68,6 +68,15 @@ def skill_label(skill: Skill, locale: str) -> str:
     return skill.labels.get(locale) or skill.labels["nl"]
 
 
+def skill_name(skill: Skill, locale: str) -> str:
+    """Return how every list names a skill: its label in ``locale`` and its code in parentheses.
+
+    The one home of the form (the checkbox lists show the same two parts): two skills may share
+    a label, and the code tells them apart.
+    """
+    return f"{skill_label(skill, locale)} ({skill.code})"
+
+
 def other_label(skill: Skill, locale: str) -> str:
     """Return the label in the other required language: English beside Dutch, else Dutch."""
     return skill.labels["nl" if locale == "en" else "en"]

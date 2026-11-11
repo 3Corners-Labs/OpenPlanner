@@ -202,7 +202,7 @@ def test_the_read_out_shows_one_action_never_the_list_of_the_allowed_ones() -> N
 
     assert saved is not None
     assert saved.ready == "Gereed voor afhandeling: wanneer de deelnemer zich meldt"
-    assert saved.action == "Eerste actie van de medewerker: het verzoek bekijken"
+    assert saved.action == "Eerste actie voor een medewerker: het verzoek bekijken"
     assert fallback == saved
     assert nothing is None
     assert " / " not in saved.action

@@ -34,7 +34,7 @@ async def test_a_flow_is_created_edited_published_and_audited_with_codes_only(si
     editor = (await site.client.get(f"{BASE}/advies")).text
     assert 'value="Samen bespreken"' in editor
     assert "Concept opslaan" in editor
-    assert "Het concept is nog niet volledig" in editor
+    assert "Het concept is volledig, op onderdelen na die nog volgen" in editor
     assert (await save(site, label_nl="Nieuwe naam", capacity_pool_id=str(pool))).status_code == 303
     assert (await act(site, "publish")).status_code == 303
     after = (await site.client.get(f"{BASE}/advies")).text
@@ -66,7 +66,7 @@ async def test_the_read_outs_follow_the_saved_contact_channel(site: Site, kind: 
         assert text in page
     readout = page.split('<div id="kind-readout">')[1].split("</div>")[0]
     assert "Gereed voor afhandeling:" in readout
-    assert readout.count("Eerste actie van de medewerker:") == 1
+    assert readout.count("Eerste actie voor een medewerker:") == 1
     assert " / " not in readout  # one action, never the list of the allowed ones
     assert ("handling_action" in page) is (kind == "in_person")
     if kind == "in_person":

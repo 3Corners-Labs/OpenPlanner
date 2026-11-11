@@ -34,7 +34,8 @@ How a document may bring a revision into being. A flow the installation does not
   skipped. A revision the document *publishes* is checked as publishing in the portal is:
   ``check_flow_references`` against the stored current revision (an archived skill or pool, or a
   subject no longer offered, is accepted only where that revision already had it),
-  ``check_publishable`` for the one that becomes current, a ``published_at`` that is not in the
+  ``check_publishable`` and ``check_publish_ready`` (every checklist point in order but the ones
+  that follow) for the one that becomes current, a ``published_at`` that is not in the
   future (``RuleContext.now``) and later than that of every revision before it, and numbers
   without a gap. A *draft* is checked as a save in the portal is (``check_draft_identity`` against
   the stored flow, ``check_built_choices`` for what ADR 0121 has not built, and
@@ -97,6 +98,7 @@ from app.domain.service_flows import (
     check_default_paths,
     check_draft_identity,
     check_flow_references,
+    check_publish_ready,
     check_publishable,
     check_revision_editable,
     check_state_change,
@@ -701,6 +703,13 @@ def _check_publication(run: _Run, address: Address, number: int, built: FlowRevi
     _check_references(
         run, address, built, built if stored is None else stored.current, restoring=stored is None
     )
+    if stored is not None and number == int_of(flow.fields, "current_revision"):
+        # A flow the installation has: the revision that newly becomes current is held to the
+        # portal's rule for publishing. A restored revision is history as it was recorded.
+        pool = run.world.pool_by_id.get(built.capacity_pool_id or 0)
+        check_publish_ready(
+            readiness(built, pool, offered_subjects=run.world.subjects.get(address[1], ()))
+        )
 
 
 def _check_state(run: _Run, address: Address, built: ServiceFlow) -> Iterator[Refusal]:
