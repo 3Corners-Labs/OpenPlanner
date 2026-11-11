@@ -18,6 +18,7 @@ from app.domain.service_flows import (
     legacy_revision,
 )
 from app.domain.skills import Skill
+from tests.support.domain import NOW
 
 LABELS = {"nl": "Balie", "en": "Desk"}
 
@@ -84,8 +85,13 @@ def flow(
     flow_id: int | None = None,
     default_for: frozenset[IntakeMode] = frozenset(),
     current: FlowRevision | None = None,
+    draft: FlowRevision | None = None,
 ) -> ServiceFlow:
-    """Return a flow of group 1."""
-    return ServiceFlow(
-        flow_id, 1, code, state, default_for, revision() if current is None else current
-    )
+    """Return a flow of group 1; with neither ``current`` nor ``draft`` it has a current one.
+
+    A stored flow (``flow_id`` set) needs a published current revision, so the default one is
+    published then.
+    """
+    if current is None and draft is None:
+        current = revision(published_at=NOW if flow_id is not None else None)
+    return ServiceFlow(flow_id, 1, code, state, default_for, current, draft)

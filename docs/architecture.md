@@ -522,7 +522,8 @@ erDiagram
         string state "draft | active | archived"
         bool default_appointment
         bool default_on_demand
-        int current_revision
+        int current_revision "NULL until first published"
+        int draft_revision "NULL when nobody is editing"
     }
     FLOW_REVISION {
         int revision

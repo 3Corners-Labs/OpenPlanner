@@ -23,11 +23,13 @@ from sqlalchemy import (
     not_,
     select,
     true,
+    update,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import SQLCoreOperations
 
 from app.adapters.db.models import (
+    FlowRevisionRow,
     GroupRow,
     OrganisationRow,
     OverviewLayoutRow,
@@ -243,6 +245,15 @@ class StaffQueries:
         )
         # ADR 0121: the skills the person holds are data about them and go with them.
         await self._session.execute(delete(StaffSkillRow).where(StaffSkillRow.staff_id == row.id))
+        # Who granted a skill, or published a flow revision, is a staff id: emptied for them too.
+        await self._session.execute(
+            update(StaffSkillRow).where(StaffSkillRow.granted_by == row.id).values(granted_by=None)
+        )
+        await self._session.execute(
+            update(FlowRevisionRow)
+            .where(FlowRevisionRow.published_by == row.id)
+            .values(published_by=None)
+        )
         # ADR 0096: the own overview layout goes with the person (keys only, but theirs).
         await self._session.execute(
             delete(OverviewLayoutRow).where(OverviewLayoutRow.staff_id == row.id)

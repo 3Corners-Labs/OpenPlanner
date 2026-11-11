@@ -3,12 +3,14 @@
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 
 from app.domain.capacity import CapacityPool
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.service_flows import (
+    BUILT_ACTIONS,
     BUILT_COMPLETION,
     BUILT_DISPATCH,
     BUILT_KINDS,
@@ -17,6 +19,7 @@ from app.domain.service_flows import (
     CompletionPolicy,
     DispatchKind,
     FlowRevision,
+    FlowState,
     HandlingAction,
     IntakeMode,
     InteractionKind,
@@ -24,10 +27,18 @@ from app.domain.service_flows import (
     ReadinessItem,
     ReadinessPolicy,
     ReadinessReason,
+    ServiceFlow,
     can_activate,
+    check_default_paths,
+    check_draft_save,
+    check_flow_references,
+    check_publishable,
+    check_state_change,
     legacy_revision,
     readiness,
 )
+from app.domain.skills import Skill
+from tests.support.domain import NOW
 from tests.support.service_flows import LABELS, flow, legacy, pool, revision
 
 ORDER = tuple(ReadinessCheck)
@@ -75,6 +86,11 @@ def test_what_is_built_is_exactly_what_the_steps_before_5_and_6_allow() -> None:
     }
     assert BUILT_DISPATCH == {DispatchKind.OWN_QUEUE}
     assert BUILT_COMPLETION == {CompletionPolicy.OPERATOR}
+    assert BUILT_ACTIONS == {
+        HandlingAction.OPEN_VIDEO,
+        HandlingAction.VIEW_REQUEST,
+        HandlingAction.CALL,
+    }
     assert RETENTION_BUILT is False
 
 
@@ -102,10 +118,69 @@ def test_a_flow_cannot_be_the_default_of_an_entry_path_it_does_not_offer() -> No
 
 
 def test_the_revision_must_belong_to_the_flow_when_both_are_stored() -> None:
-    assert refused_field(lambda: flow(flow_id=2, current=revision(flow_id=1))) == "flow_id"
-    assert flow(flow_id=1, current=revision(flow_id=1)).id == 1
+    published = {"published_at": NOW}
+    assert refused_field(lambda: flow(flow_id=2, current=revision(flow_id=1, **published))) == (
+        "flow_id"
+    )
+    assert (
+        refused_field(
+            lambda: flow(flow_id=2, state=FlowState.DRAFT, current=None, draft=revision(flow_id=1))
+        )
+        == "flow_id"
+    )
+    assert flow(flow_id=1, current=revision(flow_id=1, **published)).id == 1
     assert flow(flow_id=None, current=revision(flow_id=1)).id is None
-    assert flow(flow_id=1, current=revision(flow_id=None)).id == 1
+    assert flow(flow_id=1, current=revision(flow_id=None, **published)).id == 1
+
+
+def test_a_flow_has_a_current_revision_a_draft_or_both() -> None:
+    def build(**changes: Any) -> ServiceFlow:
+        return replace(flow(current=revision()), **changes)
+
+    assert refused_field(lambda: build(current=None, draft=None)) == "revision"
+    assert build(current=None, draft=revision(), state=FlowState.DRAFT).current is None
+    assert build(draft=revision(revision=2)).draft is not None
+
+
+def test_an_active_flow_has_a_current_revision() -> None:
+    def build(state: FlowState) -> ServiceFlow:
+        return flow(state=state, current=None, draft=revision())
+
+    assert refused_field(lambda: build(FlowState.ACTIVE)) == "state"
+    assert build(FlowState.DRAFT).state is FlowState.DRAFT
+    assert build(FlowState.ARCHIVED).state is FlowState.ARCHIVED
+
+
+def test_default_for_follows_the_current_revision_else_the_draft() -> None:
+    both = revision(intake_modes=frozenset(IntakeMode))
+    only = revision(intake_modes=frozenset({IntakeMode.APPOINTMENT}))
+    on_demand = frozenset({IntakeMode.ON_DEMAND})
+    assert flow(default_for=on_demand, current=both, draft=only).default_for == on_demand
+    assert refused_field(lambda: flow(default_for=on_demand, current=only, draft=both)) == (
+        "default_for"
+    )
+    assert (
+        flow(state=FlowState.DRAFT, default_for=on_demand, current=None, draft=both).default_for
+        == on_demand
+    )
+
+
+def test_a_stored_flow_has_a_published_current_and_an_unpublished_draft() -> None:
+    published = revision(flow_id=1, published_at=NOW)
+    unpublished = revision(flow_id=1, revision=2)
+    assert flow(flow_id=1, current=published, draft=unpublished).draft == unpublished
+    assert (
+        refused_field(lambda: flow(flow_id=1, current=revision(flow_id=1), draft=unpublished))
+        == "published_at"
+    )
+    assert (
+        refused_field(
+            lambda: flow(flow_id=1, current=published, draft=replace(unpublished, published_at=NOW))
+        )
+        == "published_at"
+    )
+    # An unsaved flow is not checked: its revisions are stamped when they are stored.
+    assert flow(flow_id=None, current=revision(published_at=None)).id is None
 
 
 def test_the_legacy_wrapper_is_ready_everywhere() -> None:
@@ -231,10 +306,22 @@ def test_a_workstation_needs_a_location() -> None:
         interaction_kind=InteractionKind.IN_PERSON,
         handling_action=HandlingAction.ASSIGN_WORKSTATION,
     )
-    assert reasons(desk, pool())[dp] is R.LOCATION_MISSING
-    assert reasons(replace(desk, location_id=4), pool())[dp] is None
+    old = replace(desk, legacy=True)  # a legacy revision skips the "built" tests
+    assert reasons(old, pool())[dp] is R.LOCATION_MISSING
+    assert reasons(replace(old, location_id=4), pool())[dp] is None
     view = replace(desk, handling_action=HandlingAction.VIEW_REQUEST)
     assert reasons(view, pool())[dp] is None
+
+
+def test_assigning_a_workstation_is_not_built_yet() -> None:
+    desk = revision(
+        interaction_kind=InteractionKind.IN_PERSON,
+        handling_action=HandlingAction.ASSIGN_WORKSTATION,
+    )
+    assert reasons(desk, pool())[ReadinessCheck.DISPATCH] is R.NOT_BUILT_YET
+    assert reasons(replace(desk, location_id=4), pool())[ReadinessCheck.DISPATCH] is (
+        R.NOT_BUILT_YET
+    )
 
 
 def test_video_and_contact_center_wait_for_their_steps_unless_legacy() -> None:
@@ -272,3 +359,250 @@ def test_no_behaviour_depends_on_a_label() -> None:
     plain = revision()
     odd = revision(labels={"nl": "zzz", "en": "Balie 7"})
     assert reasons(plain, pool()) == reasons(odd, pool())
+
+
+# --- the rules the storage adapters and the fake share ----------------------------------------
+
+ORGANISATION = 1
+
+
+def refusal(call: Callable[[], object]) -> tuple[ErrorCode, str | None]:
+    """Call ``call`` and return the code and field of the domain error it raises."""
+    with pytest.raises(DomainError) as caught:
+        call()
+    return caught.value.code, caught.value.field
+
+
+def references(
+    changes: Mapping[str, Any] | None = None,
+    *,
+    the_pool: CapacityPool | None = None,
+    skills: Mapping[int, Skill] | None = None,
+    already: frozenset[int] = frozenset(),
+    subjects: tuple[str, ...] = (),
+    already_pool_id: int | None = None,
+) -> None:
+    """Run ``check_flow_references`` for Acme's group (organisation 1)."""
+    check_flow_references(
+        ORGANISATION,
+        revision(**(changes or {})),
+        the_pool,
+        skills or {},
+        already,
+        subjects,
+        already_pool_id=already_pool_id,
+    )
+
+
+def stored_skill(skill_id: int, organisation: int = 1, archived: bool = False) -> Skill:
+    """Return a loaded skill."""
+    return Skill(
+        skill_id,
+        organisation,
+        f"s{skill_id}",
+        {"nl": "S", "en": "S"},
+        NOW if archived else None,
+    )
+
+
+def test_a_revision_without_references_passes_the_reference_check() -> None:
+    references({"capacity_pool_id": None})
+
+
+def test_the_pool_must_exist_and_belong_to_the_organisation() -> None:
+    assert refusal(lambda: references(the_pool=None)) == (
+        ErrorCode.CONFIGURATION_OBJECT_MISSING,
+        "capacity_pool_id",
+    )
+    other = replace(pool(), organisation_id=2)
+    assert refusal(lambda: references(the_pool=other)) == (
+        ErrorCode.CONFIGURATION_OUT_OF_SCOPE,
+        "capacity_pool_id",
+    )
+    references(the_pool=pool())
+
+
+def test_an_archived_pool_may_stay_but_is_not_newly_chosen() -> None:
+    archived = pool(archived_at=NOW)
+    assert refusal(lambda: references(the_pool=archived)) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "capacity_pool_id",
+    )
+    assert refusal(lambda: references(the_pool=archived, already_pool_id=2)) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "capacity_pool_id",
+    )
+    references(the_pool=archived, already_pool_id=1)
+
+
+def test_every_subject_key_is_one_of_the_groups_subjects() -> None:
+    extra = {"subject_skill_ids": {"id": frozenset()}}
+    assert refusal(lambda: references(extra, the_pool=pool(), subjects=("visa",))) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "subject_skill_ids",
+    )
+    references(extra, the_pool=pool(), subjects=("id", "visa"))
+
+
+def test_the_skills_of_a_revision_follow_the_catalogue_rules() -> None:
+    needs = {"required_skill_ids": frozenset({1}), "subject_skill_ids": {"id": frozenset({2})}}
+
+    def check(skills: dict[int, Skill], already: frozenset[int] = frozenset()) -> None:
+        references(needs, the_pool=pool(), skills=skills, already=already, subjects=("id",))
+
+    assert refusal(lambda: check({1: stored_skill(1)})) == (
+        ErrorCode.CONFIGURATION_OBJECT_MISSING,
+        "required_skill_ids",
+    )
+    assert refusal(lambda: check({1: stored_skill(1), 2: stored_skill(2, 2)})) == (
+        ErrorCode.CONFIGURATION_OUT_OF_SCOPE,
+        "required_skill_ids",
+    )
+    old = {1: stored_skill(1), 2: stored_skill(2, archived=True)}
+    assert refusal(lambda: check(old)) == (ErrorCode.INVALID_CONFIGURATION, "required_skill_ids")
+    check(old, frozenset({2}))
+
+
+def test_a_revision_names_no_location_until_locations_are_built() -> None:
+    assert refusal(lambda: references({"location_id": 7}, the_pool=pool())) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "location_id",
+    )
+
+
+def test_a_default_entry_path_is_taken_by_one_active_flow() -> None:
+    mine = flow(default_for=frozenset({IntakeMode.APPOINTMENT}))
+    assert refusal(lambda: check_default_paths(mine, [IntakeMode.APPOINTMENT])) == (
+        ErrorCode.CONFIGURATION_OBJECT_EXISTS,
+        "default_for",
+    )
+    check_default_paths(mine, [IntakeMode.ON_DEMAND])
+    check_default_paths(mine, [])
+    check_default_paths(flow(), [IntakeMode.APPOINTMENT])
+
+
+@pytest.mark.parametrize(
+    ("current", "new", "allowed"),
+    [
+        (FlowState.DRAFT, FlowState.ACTIVE, True),
+        (FlowState.ACTIVE, FlowState.ARCHIVED, True),
+        (FlowState.ARCHIVED, FlowState.ACTIVE, True),
+        (FlowState.DRAFT, FlowState.ARCHIVED, False),
+        (FlowState.ACTIVE, FlowState.DRAFT, False),
+        (FlowState.ARCHIVED, FlowState.DRAFT, False),
+        (FlowState.ACTIVE, FlowState.ACTIVE, False),
+        (FlowState.DRAFT, FlowState.DRAFT, False),
+    ],
+)
+def test_the_lifecycle_has_three_changes(current: FlowState, new: FlowState, allowed: bool) -> None:
+    flow_in_state = flow(state=current, current=revision(published_at=NOW))
+    if allowed:
+        check_state_change(flow_in_state, new)
+    else:
+        assert refusal(lambda: check_state_change(flow_in_state, new)) == (
+            ErrorCode.INVALID_CONFIGURATION,
+            "state",
+        )
+
+
+def test_activating_needs_a_published_revision() -> None:
+    unpublished = flow(state=FlowState.DRAFT, current=None, draft=revision())
+    assert refusal(lambda: check_state_change(unpublished, FlowState.ACTIVE)) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "state",
+    )
+    archived_old = flow(state=FlowState.ARCHIVED, current=legacy(published_at=NOW))
+    check_state_change(archived_old, FlowState.ACTIVE)
+    check_state_change(replace(archived_old, state=FlowState.ACTIVE), FlowState.ARCHIVED)
+
+
+def test_publishing_needs_a_draft_that_keeps_the_default_paths() -> None:
+    assert refusal(lambda: check_publishable(flow())) == (
+        ErrorCode.CONFIGURATION_OBJECT_MISSING,
+        "draft",
+    )
+    both = revision(intake_modes=frozenset(IntakeMode))
+    mine = frozenset({IntakeMode.ON_DEMAND})
+    shrunk = revision(revision=2)  # appointment only
+    assert refusal(
+        lambda: check_publishable(flow(default_for=mine, current=both, draft=shrunk))
+    ) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "default_for",
+    )
+    check_publishable(flow(default_for=mine, current=both, draft=replace(both, revision=2)))
+
+
+def draft_flow(**changes: Any) -> ServiceFlow:
+    """Return a new unsaved flow with a draft; ``changes`` override the flow's fields."""
+    return replace(flow(state=FlowState.DRAFT, current=None, draft=revision()), **changes)
+
+
+def stored_flow(**changes: Any) -> ServiceFlow:
+    """Return a stored flow with a published current revision (and no draft)."""
+    return replace(
+        flow(state=FlowState.ACTIVE, flow_id=1, current=revision(flow_id=1, published_at=NOW)),
+        **changes,
+    )
+
+
+def test_a_new_flow_is_a_draft_without_a_current_revision() -> None:
+    assert check_draft_save(draft_flow(), None, False) == revision()
+    assert refusal(lambda: check_draft_save(stored_flow(), stored_flow(), False)) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "draft",
+    )
+    published = revision(published_at=NOW)
+    assert refusal(lambda: check_draft_save(draft_flow(draft=published), None, False)) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "published_at",
+    )
+    assert refusal(lambda: check_draft_save(draft_flow(draft=legacy()), None, False)) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "legacy",
+    )
+    assert refusal(lambda: check_draft_save(draft_flow(state=FlowState.ARCHIVED), None, False)) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "state",
+    )
+    assert refusal(lambda: check_draft_save(draft_flow(current=revision()), None, False)) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "revision",
+    )
+
+
+def test_a_code_taken_in_the_group_is_refused() -> None:
+    assert refusal(lambda: check_draft_save(draft_flow(), None, True)) == (
+        ErrorCode.SLUG_TAKEN,
+        "flow_code",
+    )
+
+
+def test_an_existing_flow_must_be_found_in_the_callers_scope_and_group() -> None:
+    mine = replace(stored_flow(), draft=revision(flow_id=1, revision=2))
+    assert refusal(lambda: check_draft_save(mine, None, False)) == (
+        ErrorCode.CONFIGURATION_OBJECT_MISSING,
+        "flow_id",
+    )
+    elsewhere = replace(stored_flow(), group_id=2)
+    assert refusal(lambda: check_draft_save(mine, elsewhere, False)) == (
+        ErrorCode.CONFIGURATION_OUT_OF_SCOPE,
+        "group_id",
+    )
+    assert check_draft_save(mine, stored_flow(), False).revision == 2
+
+
+def test_a_published_flow_keeps_its_code_and_defaults_a_never_published_one_may_change() -> None:
+    mine = replace(stored_flow(), draft=revision(flow_id=1, revision=2))
+    assert refusal(lambda: check_draft_save(replace(mine, code="b"), stored_flow(), False)) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "code",
+    )
+    defaults = frozenset({IntakeMode.APPOINTMENT})
+    assert refusal(
+        lambda: check_draft_save(replace(mine, default_for=defaults), stored_flow(), False)
+    ) == (ErrorCode.INVALID_CONFIGURATION, "default_for")
+    never = replace(
+        flow(state=FlowState.DRAFT, flow_id=1, current=None, draft=revision(flow_id=1)),
+    )
+    check_draft_save(replace(never, code="b", default_for=defaults), never, False)

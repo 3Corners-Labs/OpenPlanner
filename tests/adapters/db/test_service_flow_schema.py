@@ -1,7 +1,7 @@
 """What the schema of skills, pools and flows enforces itself (ADR 0121 step 2b)."""
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
@@ -105,7 +105,7 @@ async def test_deleting_a_group_removes_its_pool_and_flows_with_everything_under
         session.add(
             SubjectFlowSkillRow(flow_id=flow.id, revision=1, subject_code="id", skill_id=skill.id)
         )
-        flow.current_revision = 1
+        flow.current_revision = 1  # a flow never published has NULL here and a draft revision
         revision = await session.get(FlowRevisionRow, (flow.id, 1))
         assert revision is not None
         revision.capacity_pool_id = pool.id
@@ -133,3 +133,40 @@ async def test_a_revision_skill_must_name_an_existing_revision(engine: AsyncEngi
     with pytest.raises(IntegrityError):
         async with AsyncSession(engine) as session, session.begin():
             session.add(FlowRevisionSkillRow(flow_id=flow_id, revision=9, skill_id=skill_id))
+
+
+async def test_a_flow_may_have_no_current_revision_and_a_draft_revision(
+    engine: AsyncEngine,
+) -> None:
+    group_id, _ = await _group_and_organisation(engine)
+    async with AsyncSession(engine) as session, session.begin():
+        flow = _flow(group_id, "new", state="draft", draft_revision=1)
+        session.add(flow)
+    async with AsyncSession(engine) as session:
+        stored = await session.scalar(select(ServiceFlowRow).where(ServiceFlowRow.code == "new"))
+    assert stored is not None
+    assert (stored.current_revision, stored.draft_revision) == (None, 1)
+
+
+async def test_a_pool_that_a_revision_draws_on_cannot_be_deleted(engine: AsyncEngine) -> None:
+    """Pools are archived, never deleted, and a published revision must not change."""
+    group_id, organisation = await _group_and_organisation(engine)
+    async with AsyncSession(engine) as session, session.begin():
+        pool = CapacityPoolRow(organisation_id=organisation, name="P", mode="counted")
+        flow = _flow(group_id, "a")
+        session.add_all([pool, flow])
+        await session.flush()
+        session.add(
+            FlowRevisionRow(
+                flow_id=flow.id,
+                revision=1,
+                labels="{}",
+                intake_modes="x",
+                capacity_pool_id=pool.id,
+            )
+        )
+        pool_id = pool.id
+
+    with pytest.raises(IntegrityError):
+        async with AsyncSession(engine) as session, session.begin():
+            await session.execute(delete(CapacityPoolRow).where(CapacityPoolRow.id == pool_id))

@@ -39,7 +39,7 @@ RULES = [
     (2, "both", 2, None),
     (3, "direct", 1, None),
     (4, "direct", 0, None),  # a block without agents offers nothing
-    (5, "direct", 1, "2020-01-01"),  # ended long ago
+    (5, "direct", 1, "2020-01-01"),  # ended long ago: still configuration
     (6, "both", 1, "2999-01-01"),
     (7, "direct", 3, None),
 ]
@@ -127,7 +127,7 @@ def test_every_group_gets_a_legacy_pool_and_its_default_flows(
         2: [appointment, direct],
         3: archived,
         4: [appointment],  # a block without agents offers no direct call
-        5: [appointment],  # a block that ended offers none either
+        5: [appointment, direct],  # the flow is configuration: validity dates play no part
         6: [appointment, direct],
         7: [appointment, direct],  # a direct-only block still gets the appointment flow
     }
@@ -155,6 +155,9 @@ def test_the_revision_is_built_from_the_groups_present_settings(
     assert found[1][:6] == (2, "appointment", "appointment", 20, "own_queue", 1)
     assert found[2][:6] == (2, "direct", "on_demand", 20, "own_queue", 1)
     assert all(row[9] == row[0] for row in found)  # each flow draws on its own group's pool
+    assert rows(
+        old_database, "SELECT DISTINCT current_revision, draft_revision FROM service_flows"
+    ) == [(1, None)]  # every backfilled revision is the published one; nobody is editing
 
 
 def test_a_long_group_name_is_cut_to_what_a_label_may_hold(

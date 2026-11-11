@@ -1878,9 +1878,11 @@ class CapacityPoolSkillRow(Base):
 
 
 class ServiceFlowRow(Base):
-    """A flow of a group (ADR 0121 point 3); ``current_revision`` names its current revision.
+    """A flow of a group (ADR 0121 point 3).
 
-    At most one active flow per group is the default of each entry path (partial unique indexes).
+    ``current_revision`` names the published revision in effect, NULL for a flow never published;
+    ``draft_revision`` the unpublished revision being edited, NULL when there is none. At most one
+    active flow per group is the default of each entry path (partial unique indexes).
     """
 
     __tablename__ = "service_flows"
@@ -1891,7 +1893,8 @@ class ServiceFlowRow(Base):
     state: Mapped[str] = mapped_column(String(16))
     default_appointment: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     default_on_demand: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
-    current_revision: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+    current_revision: Mapped[int | None] = mapped_column(Integer)
+    draft_revision: Mapped[int | None] = mapped_column(Integer)
 
     __table_args__ = (
         UniqueConstraint("group_id", "code"),
@@ -1928,8 +1931,9 @@ class FlowRevisionRow(Base):
     intake_modes: Mapped[str] = mapped_column(String(32))
     interaction_kind: Mapped[str | None] = mapped_column(String(16))
     duration_minutes: Mapped[int | None] = mapped_column(Integer)
+    # RESTRICT: pools are archived, never deleted, and a published revision must not change.
     capacity_pool_id: Mapped[int | None] = mapped_column(
-        ForeignKey("capacity_pools.id", ondelete="SET NULL")
+        ForeignKey("capacity_pools.id", ondelete="RESTRICT")
     )
     dispatch: Mapped[str | None] = mapped_column(String(16))
     handling_action: Mapped[str | None] = mapped_column(String(24))

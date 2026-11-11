@@ -1,9 +1,10 @@
 """In-memory skills, staff grants, capacity pools and service flows (ADR 0121 step 2b).
 
-A mixin of ``InMemoryTransaction``; it behaves like ``app.adapters.db.skills``,
-``capacity_pools`` and ``service_flows`` for the cases the domain tests need, including the same
-domain errors. Its data lives in the fake's ``State`` (``skills``, ``skill_grants``, ``pools``,
-``flows``, ``flow_revisions``).
+A mixin of ``InMemoryTransaction``. It only *stores*: every rule is the pure function of
+``app.domain.skills``, ``capacity`` and ``service_flows`` that the SQL adapters call too, so the
+fake cannot disagree with them about a rule; what it keeps in common with the adapters is storage
+and scope, pinned by the contract tests. Its data lives in the fake's ``State`` (``skills``,
+``skill_grants``, ``pools``, ``flows``, ``flow_revisions``).
 """
 
 from collections.abc import Collection
@@ -12,11 +13,21 @@ from datetime import datetime
 from typing import Any
 
 from app.domain.authorization import Scope
-from app.domain.capacity import CapacityPool, PoolMode
-from app.domain.errors import DomainError, ErrorCode
+from app.domain.capacity import CapacityPool, check_pool_archive, check_pool_save
+from app.domain.errors import DomainError, ErrorCode, missing_object
 from app.domain.scheduling import Group
-from app.domain.service_flows import FlowRevision, FlowState, ServiceFlow
-from app.domain.skills import Skill, SkillUsage
+from app.domain.service_flows import (
+    FlowRevision,
+    FlowState,
+    IntakeMode,
+    ServiceFlow,
+    check_default_paths,
+    check_draft_save,
+    check_flow_references,
+    check_publishable,
+    check_state_change,
+)
+from app.domain.skills import Skill, SkillUsage, check_skill_save, check_staff_grant
 from app.domain.staff import StaffMember, StaffStatus
 
 
@@ -26,6 +37,13 @@ def _visible(state: Any, scope: Scope, organisation_id: int) -> bool:
     return (
         scope.everything or slug in scope.organisations or any(o == slug for o, _ in scope.groups)
     )
+
+
+def _skills_of(revision: FlowRevision | None) -> frozenset[int]:
+    """Return every skill a revision requires, for the flow or for a subject."""
+    if revision is None:
+        return frozenset()
+    return revision.required_skill_ids.union(*revision.subject_skill_ids.values())
 
 
 class ServiceFlowStore:
@@ -40,6 +58,44 @@ class ServiceFlowStore:
     def _staff(self, staff_id: int) -> StaffMember | None:
         """Return the staff member with row id ``staff_id``."""
         return next((m for m in self.state.staff.values() if m.id == staff_id), None)
+
+    def _put_flow(self, flow: ServiceFlow) -> None:
+        """Store a flow and index its revisions."""
+        assert flow.id is not None
+        self.state.flows[flow.id] = flow
+        for revision in (flow.current, flow.draft):
+            if revision is not None:
+                self.state.flow_revisions[(flow.id, revision.revision)] = revision
+
+    def forget_staff(self, staff_id: int) -> None:
+        """Erase a person's skills and every trace of their id (what ``erase_staff`` does)."""
+        for grant in [g for g in self.state.skill_grants if g[0] == staff_id]:
+            del self.state.skill_grants[grant]
+        for key, (by, at) in list(self.state.skill_grants.items()):
+            if by == staff_id:
+                self.state.skill_grants[key] = (None, at)
+        for flow in list(self.state.flows.values()):
+            revisions = [
+                replace(r, published_by=None) if r and r.published_by == staff_id else r
+                for r in (flow.current, flow.draft)
+            ]
+            self._put_flow(replace(flow, current=revisions[0], draft=revisions[1]))
+        for key, revision in list(self.state.flow_revisions.items()):
+            if revision.published_by == staff_id:
+                self.state.flow_revisions[key] = replace(revision, published_by=None)
+
+    def _scoped_flow(self, scope: Scope, flow_id: int) -> ServiceFlow | None:
+        """Return the flow when its group is inside ``scope``."""
+        flow = self.state.flows.get(flow_id)
+        group = self.state.groups.get(flow.group_id) if flow else None
+        slug = self.state.organisation_slugs.get(group.organisation_id, "org") if group else None
+        return flow if group and scope.contains(slug, group.slug) else None
+
+    def _visible_organisation(self, scope: Scope, organisation_id: int) -> bool:
+        """Return whether the organisation exists and is visible in ``scope``."""
+        return organisation_id in self.state.organisation_slugs and _visible(
+            self.state, scope, organisation_id
+        )
 
     async def list_skills(
         self, scope: Scope, organisation_id: int, *, archived: bool = False
@@ -57,79 +113,83 @@ class ServiceFlowStore:
         skill = self.state.skills.get(skill_id)
         return skill if skill and _visible(self.state, scope, skill.organisation_id) else None
 
-    async def save_skill(self, skill: Skill) -> Skill:
-        if skill.id is None:
-            if skill.organisation_id not in self.state.organisation_slugs:
-                raise DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, "organisation_id")
-        else:
-            stored = self.state.skills.get(skill.id)
-            if stored is None:
-                raise DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, "skill_id")
-            if stored.organisation_id != skill.organisation_id:
-                raise DomainError(ErrorCode.CONFIGURATION_OUT_OF_SCOPE, "organisation_id")
-        for other in self.state.skills.values():
-            if (other.organisation_id, other.code) == (skill.organisation_id, skill.code) and (
-                other.id != skill.id
-            ):
-                raise DomainError(ErrorCode.SLUG_TAKEN, "skill_code")
-        kept = replace(skill, id=skill.id or self._new_id())
-        kept = replace(
-            kept,
-            archived_at=self.state.skills[kept.id].archived_at
-            if kept.id in self.state.skills
-            else None,
+    async def save_skill(self, scope: Scope, skill: Skill) -> Skill:
+        if not self._visible_organisation(scope, skill.organisation_id):
+            raise missing_object("organisation_id")
+        stored = None if skill.id is None else await self.get_skill(scope, skill.id)
+        taken = any(
+            (o.organisation_id, o.code) == (skill.organisation_id, skill.code) and o.id != skill.id
+            for o in self.state.skills.values()
         )
+        check_skill_save(skill, stored, taken)
+        kept = replace(skill, id=skill.id or self._new_id(), archived_at=None)
+        if stored is not None:
+            kept = replace(kept, archived_at=stored.archived_at)
         self.state.skills[kept.id] = kept
         return kept
 
-    async def archive_skill(self, skill_id: int, at: datetime) -> None:
-        skill = self.state.skills.get(skill_id)
+    async def archive_skill(self, scope: Scope, skill_id: int, at: datetime) -> None:
+        skill = await self.get_skill(scope, skill_id)
         if skill is None:
-            raise DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, "skill_id")
+            raise missing_object("skill_id")
         if skill.archived_at is None:
             self.state.skills[skill_id] = replace(skill, archived_at=at)
 
-    async def skill_usage(self, skill_id: int) -> SkillUsage:
+    async def skill_usage(self, scope: Scope, skill_id: int) -> SkillUsage:
+        if await self.get_skill(scope, skill_id) is None:
+            return SkillUsage()
         staff = sum(1 for _, skill in self.state.skill_grants if skill == skill_id)
         pools = sum(1 for p in self.state.pools.values() if skill_id in p.guaranteed_skill_ids)
-        flows = 0
-        for flow in self.state.flows.values():
-            current = flow.current
-            subject_skills = set().union(*current.subject_skill_ids.values())
-            flows += skill_id in current.required_skill_ids or skill_id in subject_skills
+        flows = sum(
+            skill_id in _skills_of(flow.current) | _skills_of(flow.draft)
+            for flow in self.state.flows.values()
+            if flow.state is not FlowState.ARCHIVED
+        )
         return SkillUsage(staff, pools, flows)
 
     async def list_staff_skills(self, scope: Scope, staff_id: int) -> frozenset[int]:
+        member = self._staff(staff_id)
+        member_of = {m.organisation for m in member.memberships} if member else set()
         return frozenset(
             skill
             for staff, skill in self.state.skill_grants
             if staff == staff_id
             and _visible(self.state, scope, self.state.skills[skill].organisation_id)
+            and self.state.organisation_slugs.get(self.state.skills[skill].organisation_id)
+            in member_of
         )
 
-    async def staff_with_skill(self, scope: Scope, skill_id: int) -> list[int]:
-        skill = self.state.skills.get(skill_id)
-        if skill is None or not _visible(self.state, scope, skill.organisation_id):
-            return []
-        return sorted(staff for staff, held in self.state.skill_grants if held == skill_id)
-
     async def set_staff_skills(
-        self, staff_id: int, skill_ids: Collection[int], *, granted_by: int | None, at: datetime
+        self,
+        scope: Scope,
+        staff_id: int,
+        organisation_id: int,
+        skill_ids: Collection[int],
+        *,
+        granted_by: int | None,
+        at: datetime,
     ) -> None:
+        if not self._visible_organisation(scope, organisation_id):
+            raise missing_object("organisation_id")
         member = self._staff(staff_id)
         if member is None or member.status is StaffStatus.ERASED:
             raise DomainError(ErrorCode.STAFF_NOT_FOUND)
-        wanted = set(skill_ids)
-        held = {skill for staff, skill in self.state.skill_grants if staff == staff_id}
-        for skill_id in wanted - held:
-            skill = self.state.skills.get(skill_id)
-            if skill is None:
-                raise DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, "skill_ids")
-            slug = self.state.organisation_slugs.get(skill.organisation_id)
-            if slug not in {m.organisation for m in member.memberships}:
-                raise DomainError(ErrorCode.CONFIGURATION_OUT_OF_SCOPE, "skill_ids")
-            if skill.archived:
-                raise DomainError(ErrorCode.INVALID_CONFIGURATION, "skill_ids")
+        slugs = self.state.organisation_slugs
+        places = {m.organisation for m in member.memberships}
+        member_of = {o for o, slug in slugs.items() if slug in places}
+        held = {
+            skill
+            for staff, skill in self.state.skill_grants
+            if staff == staff_id and self.state.skills[skill].organisation_id == organisation_id
+        }
+        wanted = frozenset(skill_ids)
+        check_staff_grant(
+            organisation_id,
+            member_of,
+            {s: self.state.skills[s] for s in wanted if s in self.state.skills},
+            wanted,
+            held,
+        )
         for skill_id in held - wanted:
             del self.state.skill_grants[(staff_id, skill_id)]
         for skill_id in wanted - held:
@@ -151,140 +211,143 @@ class ServiceFlowStore:
         pool = self.state.pools.get(pool_id)
         return pool if pool and _visible(self.state, scope, pool.organisation_id) else None
 
-    async def save_capacity_pool(self, pool: CapacityPool) -> CapacityPool:
-        if (pool.mode is PoolMode.LEGACY_GROUP) != (pool.group_id is not None):
-            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "group_id")
+    async def save_capacity_pool(self, scope: Scope, pool: CapacityPool) -> CapacityPool:
+        if not self._visible_organisation(scope, pool.organisation_id):
+            raise missing_object("organisation_id")
+        stored = None if pool.id is None else await self.get_capacity_pool(scope, pool.id)
         group: Group | None = self.state.groups.get(pool.group_id) if pool.group_id else None
-        if pool.group_id is not None:
-            if group is None:
-                raise DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, "group_id")
-            if group.organisation_id != pool.organisation_id:
-                raise DomainError(ErrorCode.CONFIGURATION_OUT_OF_SCOPE, "group_id")
-            if any(
-                p.group_id == pool.group_id and p.id != pool.id for p in self.state.pools.values()
-            ):
-                raise DomainError(ErrorCode.CONFIGURATION_OBJECT_EXISTS, "group_id")
-        stored = self.state.pools.get(pool.id) if pool.id is not None else None
-        if pool.id is None:
-            if pool.organisation_id not in self.state.organisation_slugs:
-                raise DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, "organisation_id")
-        elif stored is None:
-            raise DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, "pool_id")
-        elif stored.organisation_id != pool.organisation_id:
-            raise DomainError(ErrorCode.CONFIGURATION_OUT_OF_SCOPE, "organisation_id")
-        elif (stored.mode, stored.group_id) != (pool.mode, pool.group_id):
-            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "mode")
-        held = stored.guaranteed_skill_ids if stored else frozenset()
-        for skill_id in pool.guaranteed_skill_ids:
-            skill = self.state.skills.get(skill_id)
-            if skill is None:
-                raise DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, "guaranteed_skill_ids")
-            if skill.organisation_id != pool.organisation_id:
-                raise DomainError(ErrorCode.CONFIGURATION_OUT_OF_SCOPE, "guaranteed_skill_ids")
-            if skill.archived and skill_id not in held:
-                raise DomainError(ErrorCode.INVALID_CONFIGURATION, "guaranteed_skill_ids")
-        kept = replace(
+        taken = any(
+            p.group_id == pool.group_id and p.id != pool.id
+            for p in self.state.pools.values()
+            if pool.group_id is not None
+        )
+        held = stored.guaranteed_skill_ids if stored else frozenset[int]()
+        check_pool_save(
             pool,
-            id=pool.id or self._new_id(),
-            archived_at=stored.archived_at if stored else None,
+            stored,
+            group.organisation_id if group else None,
+            {s: self.state.skills[s] for s in pool.guaranteed_skill_ids if s in self.state.skills},
+            held,
+            group_taken=taken,
+        )
+        kept = replace(
+            pool, id=pool.id or self._new_id(), archived_at=stored.archived_at if stored else None
         )
         self.state.pools[kept.id] = kept
         return kept
 
-    async def flows_on_pool(self, pool_id: int) -> list[int]:
+    async def flows_on_pool(self, scope: Scope, pool_id: int) -> list[int]:
+        if await self.get_capacity_pool(scope, pool_id) is None:
+            return []
         return sorted(
             f.id or 0
             for f in self.state.flows.values()
-            if f.current.capacity_pool_id == pool_id and f.state is not FlowState.ARCHIVED
+            if f.state is not FlowState.ARCHIVED
+            and pool_id in {r.capacity_pool_id for r in (f.current, f.draft) if r}
         )
 
-    async def archive_capacity_pool(self, pool_id: int, at: datetime) -> None:
-        pool = self.state.pools.get(pool_id)
+    async def archive_capacity_pool(self, scope: Scope, pool_id: int, at: datetime) -> None:
+        pool = await self.get_capacity_pool(scope, pool_id)
         if pool is None:
-            raise DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, "pool_id")
+            raise missing_object("pool_id")
         if pool.archived_at is not None:
             return
-        if any(
-            f.state is FlowState.ACTIVE and f.current.capacity_pool_id == pool_id
-            for f in self.state.flows.values()
-        ):
-            raise DomainError(ErrorCode.CONFIGURATION_OBJECT_IN_USE, "capacity_pool")
+        check_pool_archive(
+            [
+                f.code
+                for f in self.state.flows.values()
+                if f.state is FlowState.ACTIVE
+                and f.current is not None
+                and f.current.capacity_pool_id == pool_id
+            ]
+        )
         self.state.pools[pool_id] = replace(pool, archived_at=at)
 
     async def list_service_flows(self, scope: Scope, group_id: int) -> list[ServiceFlow]:
-        group = self.state.groups.get(group_id)
-        slug = self.state.organisation_slugs.get(group.organisation_id, "org") if group else None
-        if group is None or not scope.contains(slug, group.slug):
-            return []
         found = [f for f in self.state.flows.values() if f.group_id == group_id]
-        return sorted(found, key=lambda f: f.id or 0)
+        return sorted(
+            (f for f in found if self._scoped_flow(scope, f.id or 0)), key=lambda f: f.id or 0
+        )
 
     async def get_service_flow(self, scope: Scope, flow_id: int) -> ServiceFlow | None:
-        flow = self.state.flows.get(flow_id)
-        if flow is None:
-            return None
-        return flow if await self.list_service_flows(scope, flow.group_id) else None
+        return self._scoped_flow(scope, flow_id)
 
     async def flow_revision(self, flow_id: int, revision: int) -> FlowRevision | None:
         return self.state.flow_revisions.get((flow_id, revision))
 
-    def _check_flow(self, organisation_id: int, flow: ServiceFlow, already: set[int]) -> None:
-        """Refuse a pool or skill of another organisation, or a skill added while archived."""
-        revision = flow.current
-        if revision.capacity_pool_id is not None:
-            pool = self.state.pools.get(revision.capacity_pool_id)
-            if pool is None:
-                raise DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, "capacity_pool_id")
-            if pool.organisation_id != organisation_id:
-                raise DomainError(ErrorCode.CONFIGURATION_OUT_OF_SCOPE, "capacity_pool_id")
-        for skill_id in set(revision.required_skill_ids).union(
-            *revision.subject_skill_ids.values()
-        ):
-            skill = self.state.skills.get(skill_id)
-            if skill is None:
-                raise DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, "required_skill_ids")
-            if skill.organisation_id != organisation_id:
-                raise DomainError(ErrorCode.CONFIGURATION_OUT_OF_SCOPE, "required_skill_ids")
-            if skill.archived and skill_id not in already:
-                raise DomainError(ErrorCode.INVALID_CONFIGURATION, "required_skill_ids")
-
-    async def save_draft(self, flow: ServiceFlow) -> ServiceFlow:
+    async def save_draft(self, scope: Scope, flow: ServiceFlow) -> ServiceFlow:
         group = self.state.groups.get(flow.group_id)
-        if group is None:
+        slug = self.state.organisation_slugs.get(group.organisation_id, "org") if group else None
+        if group is None or not scope.contains(slug, group.slug):
             raise DomainError(ErrorCode.GROUP_NOT_FOUND)
-        revision = flow.current
-        if flow.state is not FlowState.DRAFT:
-            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "state")
-        if revision.published_at is not None:
-            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "published_at")
-        already: set[int] = set()
-        if flow.id is None:
-            if revision.revision != 1:
-                raise DomainError(ErrorCode.INVALID_CONFIGURATION, "revision")
-        else:
-            stored = self.state.flows.get(flow.id)
-            if stored is None:
-                raise DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, "flow_id")
-            if stored.group_id != flow.group_id:
-                raise DomainError(ErrorCode.CONFIGURATION_OUT_OF_SCOPE, "group_id")
-            if stored.state is not FlowState.DRAFT:
-                raise DomainError(ErrorCode.INVALID_CONFIGURATION, "state")
-            if revision.revision != stored.current.revision:
-                raise DomainError(ErrorCode.INVALID_CONFIGURATION, "revision")
-            if stored.current.published_at is not None:
-                raise DomainError(ErrorCode.INVALID_CONFIGURATION, "revision_published")
-            already = set(stored.current.required_skill_ids).union(
-                *stored.current.subject_skill_ids.values()
-            )
-        if any(
+        stored = None if flow.id is None else self._scoped_flow(scope, flow.id)
+        taken = any(
             f.group_id == flow.group_id and f.code == flow.code and f.id != flow.id
             for f in self.state.flows.values()
-        ):
-            raise DomainError(ErrorCode.SLUG_TAKEN, "flow_code")
-        self._check_flow(group.organisation_id, flow, already)
+        )
+        draft = check_draft_save(flow, stored, taken)
+        based_on = (stored.draft or stored.current) if stored else None
+        pool = self.state.pools.get(draft.capacity_pool_id) if draft.capacity_pool_id else None
+        check_flow_references(
+            group.organisation_id,
+            draft,
+            pool,
+            {s: self.state.skills[s] for s in _skills_of(draft) if s in self.state.skills},
+            _skills_of(based_on),
+            [subject.code for subject in group.routing.subjects],
+            already_pool_id=based_on.capacity_pool_id if based_on else None,
+        )
         flow_id = flow.id or self._new_id()
-        saved_revision = replace(revision, flow_id=flow_id)
-        saved = replace(flow, id=flow_id, current=saved_revision)
+        if stored is not None and stored.draft is not None:
+            number = stored.draft.revision
+        else:
+            number = (stored.current.revision if stored and stored.current else 0) + 1
+        draft = replace(draft, flow_id=flow_id, revision=number, published_at=None)
+        if stored is not None and stored.current is not None:
+            saved = replace(stored, draft=draft)
+        else:
+            saved = replace(flow, id=flow_id, current=None, draft=draft)
+        self._put_flow(saved)
+        return saved
+
+    async def publish_draft(
+        self, scope: Scope, flow_id: int, *, by: int, at: datetime
+    ) -> ServiceFlow:
+        flow = self._scoped_flow(scope, flow_id)
+        if flow is None:
+            raise missing_object("flow_id")
+        check_publishable(flow)
+        assert flow.draft is not None
+        published = replace(flow.draft, published_at=at, published_by=by)
+        saved = replace(flow, current=published, draft=None)
+        self._put_flow(saved)
+        return saved
+
+    async def discard_draft(self, scope: Scope, flow_id: int) -> None:
+        flow = self._scoped_flow(scope, flow_id)
+        if flow is None:
+            raise missing_object("flow_id")
+        if flow.draft is None:
+            raise missing_object("draft")
+        self.state.flow_revisions.pop((flow_id, flow.draft.revision), None)
+        if flow.current is None:
+            del self.state.flows[flow_id]
+        else:
+            self.state.flows[flow_id] = replace(flow, draft=None)
+
+    async def set_flow_state(self, scope: Scope, flow_id: int, state: FlowState) -> ServiceFlow:
+        flow = self._scoped_flow(scope, flow_id)
+        if flow is None:
+            raise missing_object("flow_id")
+        check_state_change(flow, state)
+        if state is FlowState.ACTIVE:
+            others = [
+                mode
+                for f in self.state.flows.values()
+                if f.group_id == flow.group_id and f.id != flow_id and f.state is FlowState.ACTIVE
+                for mode in f.default_for
+            ]
+            check_default_paths(flow, frozenset[IntakeMode](others))
+        saved = replace(flow, state=state)
         self.state.flows[flow_id] = saved
-        self.state.flow_revisions[(flow_id, saved_revision.revision)] = saved_revision
         return saved

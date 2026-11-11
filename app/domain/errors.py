@@ -172,3 +172,16 @@ class DomainError(Exception):
         super().__init__(code.value if field is None else f"{code.value}: {field}")
         self.code = code
         self.field = field
+
+
+def missing_object(field: str) -> DomainError:
+    """Return the refusal for an object that does not exist, or is outside the caller's scope.
+
+    The two look the same on purpose: a caller learns nothing about another organisation's ids.
+    """
+    return DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, field)
+
+
+def outside_organisation(field: str) -> DomainError:
+    """Return the refusal for a reference to an object of another organisation."""
+    return DomainError(ErrorCode.CONFIGURATION_OUT_OF_SCOPE, field)

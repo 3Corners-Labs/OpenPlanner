@@ -12,8 +12,12 @@ image neither reads nor writes any of them, and no existing column changes meani
 
 Backfill, for every group (archived ones too): a ``legacy_group`` pool; a flow ``appointment``
 (the default of the appointment path) and, when a weekly staffing block of the group offers
-direct calls, a flow ``direct`` (the default of the on-demand path). Revision 1 of each is the
-wrapper of ``app.domain.service_flows.legacy_revision``; the literal values are written here
+direct calls (``offer`` direct or both, capacity above zero, whatever its validity dates: the
+flow is configuration, and today's date plays no part), a flow ``direct`` (the default of the
+on-demand path). Revision 1 of each is the
+wrapper of ``app.domain.service_flows.legacy_revision`` and is the current revision
+(``current_revision`` 1, no draft; a flow never published has ``current_revision`` NULL); the
+literal values are written here
 because a migration imports no application code, and a test compares the two.
 
 Revision ID: 0109
@@ -125,7 +129,8 @@ def _create_flows() -> None:
         sa.Column("state", sa.String(length=16), nullable=False),
         sa.Column("default_appointment", sa.Boolean(), server_default=sa.text("0"), nullable=False),
         sa.Column("default_on_demand", sa.Boolean(), server_default=sa.text("0"), nullable=False),
-        sa.Column("current_revision", sa.Integer(), server_default=sa.text("1"), nullable=False),
+        sa.Column("current_revision", sa.Integer(), nullable=True),
+        sa.Column("draft_revision", sa.Integer(), nullable=True),
         sa.CheckConstraint(
             "state IN ('draft', 'active', 'archived')", name=op.f("ck_service_flows_state")
         ),
@@ -165,7 +170,7 @@ def _create_flows() -> None:
         sa.Column("published_at", UTCDateTime(), nullable=True),
         sa.Column("published_by", sa.Integer(), nullable=True),
         _fk("flow_id", "service_flows.id", "flow_revisions", "CASCADE"),
-        _fk("capacity_pool_id", "capacity_pools.id", "flow_revisions", "SET NULL"),
+        _fk("capacity_pool_id", "capacity_pools.id", "flow_revisions", "RESTRICT"),
         _fk("published_by", "staff.id", "flow_revisions", "SET NULL"),
         sa.PrimaryKeyConstraint("flow_id", "revision", name=op.f("pk_flow_revisions")),
     )
@@ -231,7 +236,6 @@ def _backfill() -> None:
         sa.column("group_id"),
         sa.column("offer"),
         sa.column("capacity"),
-        sa.column("valid_to", sa.Date()),
     )
     meta = sa.MetaData()
     pools = sa.Table(
@@ -253,6 +257,7 @@ def _backfill() -> None:
         sa.Column("default_appointment", sa.Boolean()),
         sa.Column("default_on_demand", sa.Boolean()),
         sa.Column("current_revision", sa.Integer()),
+        sa.Column("draft_revision", sa.Integer()),
     )
     revisions = sa.table(
         "flow_revisions",
@@ -271,13 +276,12 @@ def _backfill() -> None:
         sa.column("published_at", UTCDateTime()),
     )
     now = datetime.now(UTC)
-    today = now.date()
+    # The flow is configuration: whether a direct page is open today stays decided by the rules,
+    # so the validity dates of a rule do not matter here, and the result never depends on the day.
     direct = set(
         bind.execute(
             sa.select(rules.c.group_id).where(
-                rules.c.offer.in_(("direct", "both")),
-                rules.c.capacity > 0,
-                sa.or_(rules.c.valid_to.is_(None), rules.c.valid_to >= today),
+                rules.c.offer.in_(("direct", "both")), rules.c.capacity > 0
             )
         ).scalars()
     )
@@ -304,6 +308,7 @@ def _backfill() -> None:
                     default_appointment=default == "default_appointment",
                     default_on_demand=default == "default_on_demand",
                     current_revision=1,
+                    draft_revision=None,
                 )
             ).inserted_primary_key[0]
             bind.execute(

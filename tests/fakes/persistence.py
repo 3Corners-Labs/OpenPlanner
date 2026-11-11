@@ -344,8 +344,7 @@ class InMemoryTransaction(ServiceFlowStore):
         if member is not None and member.status is not StaffStatus.ERASED:
             self.state.staff[subject] = member.erased(at)
             self.state.overview_layouts.pop(subject, None)
-            for grant in [g for g in self.state.skill_grants if g[0] == member.id]:
-                del self.state.skill_grants[grant]
+            self.forget_staff(member.id)
 
     async def set_staff_seen(self, subject: str, at: datetime) -> None:
         if subject in self.state.staff:
