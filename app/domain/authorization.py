@@ -136,6 +136,10 @@ class Permission(StrEnum):
     STAFF_ERASE = "staff.erase"
     """ADR 0046 point 9: erase a suspended person's record; superuser only, locked."""
     EMBEDDING_MANAGE = "embedding.manage"
+    SKILLS_MANAGE = "skills.manage"
+    """ADR 0121 point 11: keep the organisation's skill catalogue and grant skills to staff."""
+    CAPACITY_MANAGE = "capacity.manage"
+    """ADR 0121 point 11: keep the organisation's capacity pools and what they guarantee."""
     QUEUE_WORK = "queue.work"
     SETTINGS_PLATFORM_VIEW = "settings.platform.view"
     SETTINGS_PLATFORM_MANAGE = "settings.platform.manage"
@@ -207,6 +211,9 @@ LEVELS: dict[Permission, Level] = {
     Permission.STAFF_ERASE: Level.GLOBAL,
     # ADR 0035: on which websites the organisation's groups may be embedded.
     Permission.EMBEDDING_MANAGE: Level.ORGANISATION,
+    # ADR 0121 point 11: skills and capacity pools belong to the organisation.
+    Permission.SKILLS_MANAGE: Level.ORGANISATION,
+    Permission.CAPACITY_MANAGE: Level.ORGANISATION,
     # ADR 0043: see and claim the bookings in a group's own queue.
     Permission.QUEUE_WORK: Level.GROUP,
     # ADR 0042 §5, §11: System status and Advanced settings, read-only.
@@ -375,6 +382,9 @@ MATRIX: dict[Role, frozenset[Permission]] = {
         Permission.STAFF_RESET_PASSWORD,
         # ADR 0035: the host websites allowed to embed the organisation's groups.
         Permission.EMBEDDING_MANAGE,
+        # ADR 0121 point 11: the organisation's skills and capacity pools.
+        Permission.SKILLS_MANAGE,
+        Permission.CAPACITY_MANAGE,
         # ADR 0043: can step in as an agent in the own queue.
         Permission.QUEUE_WORK,
         # ADR 0042 §5: the settings of the own organisation (class D).

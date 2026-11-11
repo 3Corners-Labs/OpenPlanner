@@ -180,9 +180,9 @@ One nullable column on an existing table: `bookings.flow_id` and `bookings.flow_
 
 | Layer | Module | Responsibility |
 |---|---|---|
-| Domain | `app/domain/service_offerings.py` | `ServiceOffering` as a read-only view of `Group`; the one place that says they are the same thing |
+| Domain | `app/domain/scheduling.py` (`Group`) | The service offering *is* the group; a `ServiceOffering` name in code arrives with its first caller (step 3 at the earliest), never as a second identity |
 | Domain | `app/domain/skills.py` | `Skill`, code validation, `required ⊆ held`, archive rules |
-| Domain | `app/domain/service_flows.py` | `ServiceFlow`, `FlowRevision`, the closed combination table, publish-time validation, the readiness checklist as data |
+| Domain | `app/domain/service_flows.py` | `ServiceFlow`, `FlowRevision`, the closed combination table, the readiness checklist as data, and the four constants of what a new flow may use so far; the flow resolver arrives in step 3 |
 | Domain | `app/domain/capacity.py` | `CapacityPool`, the guarantee rule (never a union); interval accounting arrives in step 3 |
 | Domain | `app/domain/ports.py` | new methods on the `Transaction` Protocol; no new port |
 | Domain | `app/domain/authorization.py` | `skills.manage`, `capacity.manage` (D2); flows are edited under the existing `group.edit` |

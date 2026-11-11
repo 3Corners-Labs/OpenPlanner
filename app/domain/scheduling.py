@@ -34,6 +34,12 @@ _NOT_SLUG = re.compile(r"[^a-z0-9]+")
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 _LINE_BREAKS = re.compile(r"[\x85\u2028\u2029]")
 MAX_NAME_LENGTH = 200
+MIN_SLOT_MINUTES = 5
+"""The shortest appointment length, for a group's slots and a flow's duration."""
+MAX_SLOT_MINUTES = 480
+"""The longest appointment length."""
+SLOT_STEP_MINUTES = 5
+"""An appointment length is a multiple of this."""
 MAX_SLUG_LENGTH = 64
 RESERVED_SLUGS = frozenset({"new"})
 """Slugs that are admin paths (``/admin/groups/new``, ``/admin/organisations/new``)."""
@@ -77,6 +83,11 @@ MAX_RESCHEDULE_AUTO_DELAY_MINUTES = 120
 DEFAULT_RESCHEDULE_AUTO_MAX_BOOKINGS = 10
 """ADR 0057 point 6: above this many bookings automatic mode waits for a planner's review."""
 MAX_RESCHEDULE_AUTO_MAX_BOOKINGS = 100
+
+
+def valid_slot_minutes(minutes: int) -> bool:
+    """Return whether ``minutes`` is an allowed appointment length (the one home of the rule)."""
+    return MIN_SLOT_MINUTES <= minutes <= MAX_SLOT_MINUTES and minutes % SLOT_STEP_MINUTES == 0
 
 
 def _invalid(field: str) -> DomainError:
@@ -338,7 +349,7 @@ class Group:
             ZoneInfo(self.timezone)
         except (ZoneInfoNotFoundError, ValueError) as exc:
             raise _invalid("timezone") from exc
-        if not 5 <= self.slot_minutes <= 480 or self.slot_minutes % 5:
+        if not valid_slot_minutes(self.slot_minutes):
             raise _invalid("slot_minutes")
         if self.min_notice_minutes < 0:
             raise _invalid("min_notice_minutes")

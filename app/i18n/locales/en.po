@@ -4979,6 +4979,12 @@ msgstr "View retention"
 msgid "authz.permission.embedding_manage"
 msgstr "Manage embedding on websites"
 
+msgid "authz.permission.skills_manage"
+msgstr "Manage and grant skills"
+
+msgid "authz.permission.capacity_manage"
+msgstr "Manage capacity pools"
+
 msgid "authz.permission.queue_work"
 msgstr "Pick up appointments in the own queue"
 

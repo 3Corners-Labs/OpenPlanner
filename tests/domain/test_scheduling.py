@@ -9,6 +9,7 @@ from app.domain.scheduling import (
     ScheduleRule,
     TimeWindow,
     slug_from,
+    valid_slot_minutes,
     validate_schedule,
     windows_on,
 )
@@ -404,3 +405,11 @@ def test_the_planner_lead_lies_between_the_dispatch_lead_and_a_day(minutes: int)
 
 def test_the_planner_lead_defaults_to_an_hour() -> None:
     assert make_group().planner_lead == timedelta(hours=1)
+
+
+@pytest.mark.parametrize(
+    ("minutes", "valid"),
+    [(0, False), (4, False), (5, True), (7, False), (30, True), (480, True), (485, False)],
+)
+def test_a_slot_length_is_a_multiple_of_5_from_5_to_480(minutes: int, valid: bool) -> None:
+    assert valid_slot_minutes(minutes) is valid

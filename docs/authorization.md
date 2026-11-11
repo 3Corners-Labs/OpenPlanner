@@ -51,6 +51,8 @@ stays open to every role as usual.
 | Manage staff (`staff.manage`) | Organisation | needs `staff.view` | yes | yes | – | – | – |
 | Send a password reset or invitation (`staff.reset_password`) | Organisation | needs `staff.view` | yes | yes | – | – | – |
 | Manage embedding on websites (`embedding.manage`) | Organisation | – | yes | yes | – | – | – |
+| Manage and grant skills (`skills.manage`) | Organisation | – | yes | yes | – | – | – |
+| Manage capacity pools (`capacity.manage`) | Organisation | – | yes | yes | – | – | – |
 | Change the organisation's settings (`settings.organisation.manage`) | Organisation | – | yes | yes | – | – | – |
 | Change the organisation's texts (`texts.organisation.manage`) | Organisation | – | yes | yes | – | – | – |
 | View the identity provider mapping (`idp_mapping.view`) | Organisation | – | yes | yes | – | yes | – |
@@ -84,7 +86,7 @@ Held back from custom roles for now: `branding.manage` (ADR 0039 B3, until O5).
 
 | Template | Reach | Delegable permissions |
 |---|---|---|
-| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `embedding.manage`, `group.create`, `group.delete`, `group.edit`, `group.view`, `holidays.assign`, `identity_providers.view`, `idp_mapping.manage`, `idp_mapping.view`, `logging.view`, `matrix.view`, `organisation.closure`, `organisation.view`, `queue.work`, `reminders.manage`, `reports.digest.manage`, `reports.export`, `reports.staff.view`, `reports.view`, `reports.wallboard.link.manage`, `reports.wallboard.view`, `retention.view`, `rights.view`, `schedule.manage`, `settings.organisation.manage`, `settings.platform.view`, `staff.manage`, `staff.reset_password`, `staff.view`, `texts.manage`, `texts.organisation.manage` |
+| Organisation admin | organisations | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `capacity.manage`, `closure.manage`, `dashboard.view`, `embedding.manage`, `group.create`, `group.delete`, `group.edit`, `group.view`, `holidays.assign`, `identity_providers.view`, `idp_mapping.manage`, `idp_mapping.view`, `logging.view`, `matrix.view`, `organisation.closure`, `organisation.view`, `queue.work`, `reminders.manage`, `reports.digest.manage`, `reports.export`, `reports.staff.view`, `reports.view`, `reports.wallboard.link.manage`, `reports.wallboard.view`, `retention.view`, `rights.view`, `schedule.manage`, `settings.organisation.manage`, `settings.platform.view`, `skills.manage`, `staff.manage`, `staff.reset_password`, `staff.view`, `texts.manage`, `texts.organisation.manage` |
 | Service admin | groups | `audit.export`, `audit.view`, `bookings.manage`, `bookings.view`, `closure.manage`, `dashboard.view`, `group.edit`, `group.view`, `logging.view`, `matrix.view`, `queue.work`, `reminders.manage`, `reports.export`, `reports.view`, `reports.wallboard.view`, `rights.view`, `schedule.manage`, `settings.platform.view`, `staff.view`, `texts.manage` |
 | Compliance and privacy (read-only) | organisations | `audit.export`, `audit.view`, `dashboard.view`, `group.view`, `identity_providers.view`, `idp_mapping.view`, `logging.view`, `matrix.view`, `organisation.view`, `reports.export`, `reports.view`, `reports.wallboard.view`, `retention.view`, `rights.view`, `settings.platform.view`, `staff.view` |
 

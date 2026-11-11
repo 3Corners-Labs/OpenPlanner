@@ -78,6 +78,29 @@ def _check_label(text: str, name: str) -> str:
     return stripped
 
 
+def validate_label(text: str, field: str) -> None:
+    """Refuse a label that is blank, longer than 80 characters or holds a control character.
+
+    Surrounding spaces do not count towards the length. The text is not changed.
+
+    Raises:
+        DomainError: ``invalid_configuration`` with ``field``.
+    """
+    _check_label(text, field)
+
+
+def validate_labels(labels: Mapping[str, str], field: str) -> None:
+    """Require a valid label in every required locale and validate every other one.
+
+    Raises:
+        DomainError: ``invalid_configuration`` with ``field``.
+    """
+    if any(locale not in labels for locale in REQUIRED_LOCALES):
+        raise _invalid(field)
+    for text in labels.values():
+        _check_label(text, field)
+
+
 @dataclass(frozen=True)
 class Subject:
     """One subject a participant may choose (ADR 0081 point 2).
