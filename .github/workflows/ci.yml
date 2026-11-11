@@ -297,7 +297,11 @@ jobs:
       || contains(github.event.pull_request.labels.*.name, 'ci:full')
       || startsWith(github.base_ref, 'release/')
     runs-on: ubuntu-26.04
-    timeout-minutes: 30
+    # The suite grows with every admin page: pages x 3 widths x 3 browsers x 2 locales. It took 20
+    # minutes in early November and 28 to 30 with the skills, pools and flows pages of ADR 0121, which
+    # cancelled a merge-queue run at the old limit of 30 while the Lighthouse step was still running.
+    # 45 leaves room for the pages of the next steps; sharding the suite is the lasting answer.
+    timeout-minutes: 45
     env:
       # Official image with browsers and their system packages preinstalled, so the job does not
       # depend on apt mirrors (`playwright install --with-deps` timed out on them). The tag must
