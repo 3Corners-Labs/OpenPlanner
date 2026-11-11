@@ -6,7 +6,7 @@ go through ``message``. Route modules (``routes`` for login, overview and report
 ``group_routes`` for groups and planning) import from here.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
@@ -30,7 +30,7 @@ from app.admin.session import (
 )
 from app.admin.top_bar import top_links
 from app.domain.authorization import Permission, Principal, Role, Scope, scope_for
-from app.domain.scheduling import GroupSummary
+from app.domain.scheduling import GroupSummary, Organisation
 from app.i18n import BoundGettext
 from app.web.authz_labels import ROLE_LABELS
 from app.web.help import HelpTopic, shipped_manual, topic_for_path
@@ -235,6 +235,49 @@ def organisation_redirect(
         (slug,) = scope.organisations
         return RedirectResponse(f"{ORGANISATIONS_PATH}/{slug}/{tab}", status_code=308)
     return RedirectResponse(ORGANISATIONS_PATH, status_code=308)
+
+
+def org_page(
+    request: Request,
+    locale: RequestLocale,
+    principal: Principal,
+    organisation: Organisation,
+    template: str,
+    extra: Mapping[str, object],
+    *,
+    status: int = 200,
+) -> HTMLResponse:
+    """Render an organisation's page: its header with the tabs the matrix allows, then ``extra``.
+
+    The one home of what every organisation page of a list or a form needs: ``organisation`` and
+    ``org_header`` reach the template next to the page's own values in ``extra`` (a form's
+    ``errors``, a confirmation's ``done``, ...), and the response gets ``status`` (422 for a
+    refused form).
+    """
+    response = page(
+        request,
+        locale,
+        template,
+        principal,
+        {
+            "organisation": organisation,
+            "org_header": organisation_header(
+                request, locale, principal, organisation.name, organisation.slug
+            ),
+            **extra,
+        },
+    )
+    response.status_code = status
+    return response
+
+
+ARCHIVED_VALUE = "archived"
+"""The value of an archived filter (``?skills=archived``) in a list that has more than one."""
+
+
+def archived_requested(request: Request, name: str) -> bool:
+    """Return whether the list asks for its archived rows (``?<name>=archived``)."""
+    return request.query_params.get(name) == ARCHIVED_VALUE
 
 
 THEME_LABELS = {

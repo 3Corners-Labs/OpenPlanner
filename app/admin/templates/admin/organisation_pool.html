@@ -1,0 +1,27 @@
+{#- Name and guaranteed skills of one counted capacity pool (ADR 0121). -#}
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% from "admin/_skill_checkboxes.html" import skill_checkboxes with context %}
+{% block title %}{{ _("admin.capacity.edit_title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_organisation_header.html" %}
+<p><a href="{{ back }}">{{ _("admin.skills_capacity.back") }}</a></p>
+<h2 class="section-title">{{ _("admin.capacity.edit_title") }}</h2>
+<div class="alert alert--warning" role="note"><p>{{ _("admin.capacity.count_warning") }}</p></div>
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/capacity/{{ row.id }}" novalidate aria-labelledby="edit-heading">
+  <div class="card__header">
+    <h2 id="edit-heading">{{ row.name }}</h2>
+    <p class="card__lead">{{ _("admin.capacity.staffing_later") }}</p>
+  </div>
+  <div class="form-grid">
+    {{ field(name_field) }}
+  </div>
+  {{ skill_checkboxes(choices, choice_field, _("admin.capacity.guaranteed"), choice_error, _("admin.capacity.guaranteed_hint")) }}
+  <p>{% if row.flows or row.hidden %}{{ _("admin.capacity.col.flows") }}: {{ row.flows | join(", ") }}{% if row.hidden %} {{ row.hidden }}{% endif %}{% else %}{{ _("admin.capacity.no_flows") }}{% endif %}</p>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.save") }}</button>
+    <a href="{{ back }}">{{ _("admin.cancel") }}</a>
+  </div>
+</form>
+{% endblock %}

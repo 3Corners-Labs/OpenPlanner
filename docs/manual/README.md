@@ -52,6 +52,7 @@ handleiding niet nodig: hun pagina's leggen zichzelf uit.
 | Holidays of an organisation / feestdagen van een organisatie | [Feestdagen van een organisatie](nl/organisation-holidays.md) | [Holidays of an organisation](en/organisation-holidays.md) |
 | My rights / mijn rechten | [Mijn rechten](nl/rights.md) | [My rights](en/rights.md) |
 | Setting up the contact center / contactcenter inrichten (ADR 0082) | [Contactcenter inrichten](nl/contact-center-setup.md) | [Setting up the contact center](en/contact-center-setup.md) |
+| Skills and capacity of an organisation / vaardigheden en capaciteit van een organisatie (ADR 0121) | [Vaardigheden en capaciteit](nl/organisation-skills-capacity.md) | [Skills and capacity](en/organisation-skills-capacity.md) |
 
 ## Writing a topic
 

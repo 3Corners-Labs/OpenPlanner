@@ -180,6 +180,18 @@ class AdminService:
             group = await self._load_group(permission, group_slug)
         return await self._decide(principal, permission, group, organisation_slug)
 
+    async def scoped(self, principal: Principal, permission: Permission, slug: str) -> Scope:
+        """Authorise an organisation-level ``permission`` on ``slug`` and return its ``Scope``.
+
+        ``authorize`` and ``require`` in one, for a use case that then queries with the scope the
+        matrix gives: the one way an organisation-level use case starts.
+
+        Raises:
+            DomainError: ``not_permitted`` (audited).
+        """
+        require(await self.authorize(principal, permission, organisation_slug=slug))
+        return scope_for(principal, permission)
+
     async def authorize_group(
         self, principal: Principal, permission: Permission, slug: str
     ) -> GroupSummary:

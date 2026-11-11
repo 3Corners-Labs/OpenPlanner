@@ -1265,3 +1265,67 @@ async def test_the_state_and_defaults_of_a_flow_never_published_follow_the_store
     assert await get_flow(world, stored.id) == saved
     new = await save_draft(world, replace(blank(world, "n"), state=FlowState.DRAFT))
     assert new.state is FlowState.DRAFT
+
+
+async def test_replacing_skills_returns_what_was_granted_and_taken_away_stale_grants_too(
+    world: World,
+) -> None:
+    kept = await add_skill(world, "kept")
+    dropped = await add_skill(world, "dropped")
+    added = await add_skill(world, "added")
+    assert kept.id
+    assert dropped.id
+    assert added.id
+    await grant(world, world.both_staff, {kept.id, dropped.id})
+    async with world.uow.locked() as tx:  # the person leaves Acme; the grants stay as rows
+        await tx.save_staff(person("sub-ab", ["beta"]))
+
+    async with world.uow.locked() as tx:
+        result = await tx.set_staff_skills(
+            EVERYTHING, world.both_staff, world.acme, set(), granted_by=None, at=NOW
+        )
+    assert result == (frozenset(), frozenset({kept.id, dropped.id}))  # the stale rows go, audited
+    async with world.uow.locked() as tx:
+        await tx.save_staff(person("sub-ab", ["acme", "beta"]))
+        result = await tx.set_staff_skills(
+            EVERYTHING, world.both_staff, world.acme, {kept.id, added.id}, granted_by=None, at=NOW
+        )
+    assert result == (frozenset({kept.id, added.id}), frozenset())
+    async with world.uow.locked() as tx:
+        result = await tx.set_staff_skills(
+            EVERYTHING, world.both_staff, world.acme, {kept.id}, granted_by=None, at=NOW
+        )
+    assert result == (frozenset(), frozenset({added.id}))
+
+
+async def test_a_legacy_pool_is_visible_only_to_a_scope_that_reaches_its_group(
+    world: World,
+) -> None:
+    counted = await add_pool(world, "Counted")
+    async with world.uow.locked() as tx:
+        legacy = await tx.save_capacity_pool(
+            EVERYTHING,
+            CapacityPool(
+                None, world.acme, "Balie", PoolMode.LEGACY_GROUP, group_id=world.acme_group
+            ),
+        )
+    assert counted.id
+    assert legacy.id
+    other_group = Scope(groups=frozenset({("acme", "elders")}))
+
+    async def names(scope: Scope) -> list[str]:
+        async with world.uow.read() as tx:
+            return [p.name for p in await tx.list_capacity_pools(scope, world.acme)]
+
+    async def found(scope: Scope, pool_id: int) -> bool:
+        async with world.uow.read() as tx:
+            return await tx.get_capacity_pool(scope, pool_id) is not None
+
+    assert await names(EVERYTHING) == ["Balie", "Counted"]
+    assert await names(ACME) == ["Balie", "Counted"]
+    assert await names(ACME_GROUP) == ["Balie", "Counted"]
+    assert await names(other_group) == ["Counted"]  # the counted pool, not another service's
+    assert await found(ACME_GROUP, legacy.id)
+    assert not await found(other_group, legacy.id)
+    assert await found(other_group, counted.id)
+    assert not await found(NOBODY, counted.id)

@@ -1,0 +1,28 @@
+{#- What archiving a skill does, and the button (ADR 0121 point 5). There is no delete. -#}
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.skills.archive_title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_organisation_header.html" %}
+<p><a href="{{ back }}">{{ _("admin.skills_capacity.back") }}</a></p>
+{% include "_error_summary.html" %}
+<section class="card" aria-labelledby="archive-heading">
+  <div class="card__header">
+    <h2 id="archive-heading">{{ _("admin.skills.archive_title") }}: {{ row.label }} ({{ row.code }})</h2>
+    <p class="card__lead">{{ _("admin.skills.archive_lead") }}</p>
+  </div>
+  <h3>{{ _("admin.archive.what_happens") }}</h3>
+  <ul>
+    <li>{{ _("admin.skills.archive_effect_new") }}</li>
+    <li>{{ _("admin.skills.archive_effect_keeps") }}</li>
+    <li>{{ _("admin.skills.archive_effect_listed") }}</li>
+  </ul>
+  <p>{{ _("admin.skills.used_by", pools=row.pools, flows=row.flows) }} · {{ _("admin.skills.staff_count", count=row.staff) }}</p>
+</section>
+<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/skills/{{ row.id }}/archive" novalidate aria-labelledby="confirm-heading">
+  <h2 id="confirm-heading">{{ _("admin.archive.confirm") }}</h2>
+  <div class="form-actions">
+    <button type="submit" class="button button--danger">{{ _("admin.skills.archive_button") }}</button>
+    <a href="{{ back }}">{{ _("admin.cancel") }}</a>
+  </div>
+</form>
+{% endblock %}

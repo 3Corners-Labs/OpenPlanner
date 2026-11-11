@@ -2151,6 +2151,28 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=100,
     ),
     S(
+        "max_skills_per_organisation",
+        K.INT,
+        100,
+        _C,
+        T.STAFF,
+        "Skills an organisation may keep in its catalogue at most, archived ones not counted "
+        "(ADR 0121).",
+        minimum=10,
+        maximum=500,
+    ),
+    S(
+        "max_capacity_pools_per_organisation",
+        K.INT,
+        50,
+        _C,
+        T.STAFF,
+        "Counted capacity pools an organisation may keep at most, archived ones and the pools "
+        "of existing services not counted (ADR 0121).",
+        minimum=5,
+        maximum=200,
+    ),
+    S(
         "phone_default_region",
         K.ENUM,
         "NL",

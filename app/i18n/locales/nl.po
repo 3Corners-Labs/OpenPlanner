@@ -10102,6 +10102,12 @@ msgstr "Niets aangevinkt: het blok biedt alle onderwerpen. Een deelnemer die een
 msgid "settings.field.max_subjects_per_group.label"
 msgstr "Onderwerpen per dienst (maximaal)"
 
+msgid "settings.field.max_skills_per_organisation.label"
+msgstr "Vaardigheden per organisatie (maximaal)"
+
+msgid "settings.field.max_capacity_pools_per_organisation.label"
+msgstr "Capaciteitspools per organisatie (maximaal)"
+
 msgid "admin.tab.planning"
 msgstr "Planning"
 
@@ -12257,3 +12263,336 @@ msgstr "Download als PNG"
 
 msgid "reports.chart.hint"
 msgstr "Met scripts: pijltjestoetsen gaan door de grafiek, Enter opent die dag, Escape sluit de tip. Dezelfde cijfers staan in de tabel eronder."
+
+msgid "admin.skills.title"
+msgstr "Vaardigheden"
+
+msgid "admin.skills.lead"
+msgstr "Vaardigheden bepalen welke deskundigheid nodig is om een verzoek af te handelen. Een vaardigheid geeft geen rechten en geen inzage."
+
+msgid "admin.skills.count"
+msgstr "Vaardigheden ({count})"
+
+msgid "admin.skills.list_lead"
+msgstr "Wat een vaardigheid betekent, bepaalt u zelf. De code ligt vast zodra u de vaardigheid heeft aangemaakt; de namen kunt u wijzigen."
+
+msgid "admin.skills.archived_heading"
+msgstr "Gearchiveerde vaardigheden"
+
+msgid "admin.skills.archived_lead"
+msgstr "Een gearchiveerde vaardigheid is nergens nieuw te kiezen. Verzoeken, eisen en toekenningen die haar al hebben, houden haar."
+
+msgid "admin.skills.col.name"
+msgstr "Naam"
+
+msgid "admin.skills.col.code"
+msgstr "Code"
+
+msgid "admin.skills.col.staff"
+msgstr "Medewerkers"
+
+msgid "admin.skills.col.used_by"
+msgstr "Gebruikt door"
+
+msgid "admin.skills.used_by"
+msgstr "Pools: {pools}, flows: {flows}"
+
+msgid "admin.skills.staff_count"
+msgstr "Medewerkers met deze vaardigheid: {count}"
+
+msgid "admin.skills.none"
+msgstr "Nog geen vaardigheden."
+
+msgid "admin.skills.none_archived"
+msgstr "Er zijn geen gearchiveerde vaardigheden."
+
+msgid "admin.skills.add"
+msgstr "Vaardigheid toevoegen"
+
+msgid "admin.skills.add_button"
+msgstr "Vaardigheid toevoegen"
+
+msgid "admin.skills.edit_title"
+msgstr "Vaardigheid wijzigen"
+
+msgid "admin.skills.label_nl"
+msgstr "Naam in het Nederlands"
+
+msgid "admin.skills.label_en"
+msgstr "Naam in het Engels"
+
+msgid "admin.skills.code"
+msgstr "Code"
+
+msgid "admin.skills.code_hint"
+msgstr "Kleine letters, cijfers en streepjes, bijvoorbeeld intake of juridisch-advies (hoogstens 40 tekens). De code kunt u later niet meer wijzigen."
+
+msgid "admin.skills.code_fixed"
+msgstr "De code ligt vast."
+
+msgid "admin.skills.none_to_choose"
+msgstr "Er zijn nog geen vaardigheden om uit te kiezen. Maak ze eerst aan bij Vaardigheden."
+
+msgid "admin.skills.archive_title"
+msgstr "Vaardigheid archiveren"
+
+msgid "admin.skills.archive_lead"
+msgstr "Archiveren is geen verwijderen: wat de vaardigheid al heeft, houdt haar."
+
+msgid "admin.skills.archive_effect_new"
+msgstr "Geen nieuwe eis en geen nieuwe toekenning kan de vaardigheid nog gebruiken."
+
+msgid "admin.skills.archive_effect_keeps"
+msgstr "Bestaande verzoeken, eisen en toekenningen houden de vaardigheid; er verandert niets aan werk dat al is aangenomen."
+
+msgid "admin.skills.archive_effect_listed"
+msgstr "U vindt de vaardigheid terug onder Toon gearchiveerde vaardigheden. Verwijderen kan niet."
+
+msgid "admin.skills.archive_button"
+msgstr "Vaardigheid archiveren"
+
+msgid "admin.skills.error.code_taken"
+msgstr "Deze code is al in gebruik in uw organisatie. Kies een andere."
+
+msgid "admin.skills.error.choice"
+msgstr "Een gekozen vaardigheid bestaat niet meer of kan niet meer nieuw worden gekozen. Laad de pagina opnieuw en kies opnieuw."
+
+msgid "admin.skills.error.no_membership"
+msgstr "Deze persoon is geen lid van deze organisatie, dus u kunt hier geen vaardigheden aan toekennen."
+
+msgid "admin.tab.skills_capacity"
+msgstr "Vaardigheden en capaciteit"
+
+msgid "admin.skills_capacity.lead"
+msgstr "Vaardigheden bepalen wie een verzoek mag oppakken; capaciteitspools bepalen waaruit de tijd komt. Beide beheert u hier."
+
+msgid "admin.skills_capacity.back"
+msgstr "Terug naar vaardigheden en capaciteit"
+
+msgid "admin.skills_capacity.filter"
+msgstr "Filteren"
+
+msgid "admin.skills_capacity.filter_skills"
+msgstr "voor vaardigheden"
+
+msgid "admin.skills_capacity.filter_pools"
+msgstr "voor capaciteitspools"
+
+msgid "admin.skills_capacity.error_in"
+msgstr "{section}: {message}"
+
+msgid "admin.action.archive"
+msgstr "Archiveer"
+
+msgid "admin.status.archived"
+msgstr "Gearchiveerd"
+
+msgid "admin.archive.what_happens"
+msgstr "Wat er gebeurt"
+
+msgid "admin.archive.confirm"
+msgstr "Bevestigen"
+
+msgid "admin.skills.archived_only"
+msgstr "Alleen gearchiveerde vaardigheden"
+
+msgid "admin.capacity.archived_only"
+msgstr "Alleen gearchiveerde capaciteitspools"
+
+msgid "admin.skills.error.limit"
+msgstr "Uw organisatie heeft het maximale aantal vaardigheden bereikt. Archiveer eerst een vaardigheid die u niet meer gebruikt."
+
+msgid "admin.capacity.error.limit"
+msgstr "Uw organisatie heeft het maximale aantal capaciteitspools bereikt. Archiveer eerst een pool die u niet meer gebruikt."
+
+msgid "admin.skills.limit_reached"
+msgstr "Het maximum van {count} vaardigheden is bereikt. Archiveer een vaardigheid die u niet meer gebruikt om een nieuwe toe te voegen."
+
+msgid "admin.capacity.limit_reached"
+msgstr "Het maximum van {count} eigen en gedeelde pools is bereikt. Archiveer een pool die u niet meer gebruikt om een nieuwe toe te voegen."
+
+msgid "admin.capacity.title"
+msgstr "Capaciteitspools"
+
+msgid "admin.capacity.lead"
+msgstr "Een capaciteitspool is de tijd waaruit flows putten, met de vaardigheden die iedere getelde medewerker van de pool heeft."
+
+msgid "admin.capacity.count_warning"
+msgstr "Let op bij het tellen. Een pool belooft dat iedere getelde medewerker alle vaardigheden van de pool heeft. Tel dezelfde persoon niet in twee pools op hetzelfde moment: het portaal kan dat nog niet voor u controleren."
+
+msgid "admin.capacity.staffing_later"
+msgstr "Hoeveel medewerkers per tijdblok in een pool werken, stelt u in zodra flows de pool gebruiken (volgt)."
+
+msgid "admin.capacity.count"
+msgstr "Capaciteitspools ({count})"
+
+msgid "admin.capacity.list_lead"
+msgstr "Bestaande pools zijn de bezetting van een dienst zelf en staan hier alleen ter inzage. Eigen en gedeelde pools beheert u hier."
+
+msgid "admin.capacity.archived_heading"
+msgstr "Gearchiveerde capaciteitspools"
+
+msgid "admin.capacity.archived_lead"
+msgstr "Een gearchiveerde pool is door geen flow nieuw te kiezen."
+
+msgid "admin.capacity.col.name"
+msgstr "Naam"
+
+msgid "admin.capacity.col.mode"
+msgstr "Soort"
+
+msgid "admin.capacity.col.skills"
+msgstr "Vaardigheden van iedere medewerker"
+
+msgid "admin.capacity.col.flows"
+msgstr "Flows die de pool gebruiken"
+
+msgid "admin.capacity.mode.legacy"
+msgstr "Bestaand"
+
+msgid "admin.capacity.mode.own"
+msgstr "Eigen pool"
+
+msgid "admin.capacity.mode.shared"
+msgstr "Gedeelde pool"
+
+msgid "admin.capacity.legacy_note"
+msgstr "Bezetting van de dienst zelf, ongewijzigd"
+
+msgid "admin.capacity.read_only"
+msgstr "Alleen ter inzage"
+
+msgid "admin.capacity.no_skills"
+msgstr "Geen"
+
+msgid "admin.capacity.no_flows"
+msgstr "Nog geen flow gebruikt deze pool."
+
+msgid "admin.capacity.flows_hidden"
+msgstr "en {count} flows van andere diensten"
+
+msgid "admin.capacity.flows_hidden_one"
+msgstr "en 1 flow van een andere dienst"
+
+msgid "admin.capacity.none"
+msgstr "Nog geen capaciteitspools."
+
+msgid "admin.capacity.none_archived"
+msgstr "Er zijn geen gearchiveerde capaciteitspools."
+
+msgid "admin.capacity.add"
+msgstr "Capaciteitspool toevoegen"
+
+msgid "admin.capacity.add_button"
+msgstr "Pool toevoegen"
+
+msgid "admin.capacity.name"
+msgstr "Naam van de pool"
+
+msgid "admin.capacity.guaranteed"
+msgstr "Vaardigheden die iedere getelde medewerker heeft"
+
+msgid "admin.capacity.guaranteed_hint"
+msgstr "Een flow die deze pool gebruikt, mag alleen vaardigheden eisen die hier zijn aangevinkt."
+
+msgid "admin.capacity.edit_title"
+msgstr "Capaciteitspool wijzigen"
+
+msgid "admin.capacity.archive_title"
+msgstr "Capaciteitspool archiveren"
+
+msgid "admin.capacity.archive_lead"
+msgstr "Een pool die nog door een flow wordt gebruikt, kunt u niet archiveren."
+
+msgid "admin.capacity.archive_effect_new"
+msgstr "Geen flow kan de pool nog nieuw kiezen."
+
+msgid "admin.capacity.archive_effect_flows"
+msgstr "Flows die de pool met een concept of een gepubliceerde versie gebruiken, houden de archivering tegen; haal de pool eerst uit die flows."
+
+msgid "admin.capacity.archive_button"
+msgstr "Pool archiveren"
+
+msgid "admin.capacity.error.in_use"
+msgstr "De pool wordt nog gebruikt door: {flows}. Haal de pool eerst uit die flows."
+
+msgid "admin.staff.skills.heading"
+msgstr "Vaardigheden"
+
+msgid "admin.staff.skills.intro"
+msgstr "Rechten bepalen wat {name} mag zien. Vaardigheden bepalen welke verzoeken {name} mag oppakken. Een wijziging geldt vanaf het volgende verzoek dat wordt opgepakt of gestart."
+
+msgid "admin.staff.skills.legend"
+msgstr "Toegekende vaardigheden bij {organisation}"
+
+msgid "admin.staff.skills.save"
+msgstr "Vaardigheden opslaan"
+
+msgid "admin.staff.skills.none"
+msgstr "Geen vaardigheden."
+
+msgid "admin.done.skill_created"
+msgstr "De vaardigheid is toegevoegd."
+
+msgid "admin.done.skill_saved"
+msgstr "De vaardigheid is opgeslagen."
+
+msgid "admin.done.skill_archived"
+msgstr "De vaardigheid is gearchiveerd."
+
+msgid "admin.done.pool_created"
+msgstr "De capaciteitspool is toegevoegd."
+
+msgid "admin.done.pool_saved"
+msgstr "De capaciteitspool is opgeslagen."
+
+msgid "admin.done.pool_archived"
+msgstr "De capaciteitspool is gearchiveerd."
+
+msgid "admin.done.staff_skills_saved"
+msgstr "De vaardigheden zijn opgeslagen. Ze gelden vanaf het volgende verzoek dat wordt opgepakt of gestart."
+
+msgid "admin.form.error.skill_code"
+msgstr "Gebruik alleen kleine letters, cijfers en streepjes, beginnend met een letter of cijfer (hoogstens 40 tekens)."
+
+msgid "admin.form.error.skill_label"
+msgstr "Vul de naam in het Nederlands en in het Engels in (elk hoogstens 80 tekens, zonder stuurtekens)."
+
+msgid "admin.form.error.pool_name"
+msgstr "Vul een naam in van hoogstens 80 tekens, zonder stuurtekens."
+
+msgid "admin.audit.detail.skill_created"
+msgstr "Vaardigheid toegevoegd"
+
+msgid "admin.audit.detail.skill_changed"
+msgstr "Vaardigheid gewijzigd"
+
+msgid "admin.audit.detail.skill_archived"
+msgstr "Vaardigheid gearchiveerd"
+
+msgid "admin.audit.detail.capacity_pool_created"
+msgstr "Capaciteitspool toegevoegd"
+
+msgid "admin.audit.detail.capacity_pool_changed"
+msgstr "Capaciteitspool gewijzigd"
+
+msgid "admin.audit.detail.capacity_pool_archived"
+msgstr "Capaciteitspool gearchiveerd"
+
+msgid "admin.audit.detail.staff_skills_changed"
+msgstr "Vaardigheden van een medewerker gewijzigd"
+
+msgid "admin.audit.detail.skill"
+msgstr "vaardigheid {value}"
+
+msgid "admin.audit.detail.pool"
+msgstr "pool {value}"
+
+msgid "admin.audit.detail.staff"
+msgstr "medewerker nummer {value}"
+
+msgid "admin.audit.detail.skill_add"
+msgstr "vaardigheid {value} toegekend"
+
+msgid "admin.audit.detail.skill_remove"
+msgstr "vaardigheid {value} ingetrokken"

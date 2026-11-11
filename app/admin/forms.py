@@ -10,7 +10,7 @@ input (``aria-describedby``, error summary with anchors) and never repeats the v
 """
 
 import re
-from collections.abc import Iterable, Mapping, Sequence, Set
+from collections.abc import Collection, Iterable, Mapping, Sequence, Set
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, tzinfo
 from urllib.parse import parse_qsl, urlencode
@@ -160,6 +160,14 @@ DONE_MESSAGES: dict[str, str] = {
     "staff_suspended": "admin.done.staff_suspended",
     "staff_reinstated": "admin.done.staff_reinstated",
     "staff_erased": "admin.done.staff_erased",
+    # ADR 0121: skills, capacity pools and the skills of a person.
+    "skill_created": "admin.done.skill_created",
+    "skill_saved": "admin.done.skill_saved",
+    "skill_archived": "admin.done.skill_archived",
+    "pool_created": "admin.done.pool_created",
+    "pool_saved": "admin.done.pool_saved",
+    "pool_archived": "admin.done.pool_archived",
+    "staff_skills_saved": "admin.done.staff_skills_saved",
 }
 """Confirmations after a change; only these keys are read from ``?done=``."""
 
@@ -279,6 +287,10 @@ FIELD_MESSAGES: dict[str, str] = {
     "mfa_policy": "admin.form.error.choice",
     "mfa_amr_values": "admin.form.error.mfa_values",
     "mfa_acr_values": "admin.form.error.mfa_values",
+    # ADR 0121: the code and labels of a skill, the name of a capacity pool.
+    "skill_code": "admin.form.error.skill_code",
+    "skill_label": "admin.form.error.skill_label",
+    "pool_name": "admin.form.error.pool_name",
 }
 """Message per field for ``invalid_configuration``; the key is also the input's id."""
 
@@ -286,6 +298,7 @@ FIELD_TARGET: dict[str, str] = {
     "window": "closes",
     "schedule_rules": "opens",
     "schedule_overrides": "day",
+    "skill_label": "label_nl",
     **ROUTING_TARGETS,
     **CONNECTION_TARGETS,
 }
@@ -597,16 +610,20 @@ def _day_text(value: str) -> str:
     return f"{day}-{month}-{year}"
 
 
-def done_message(request: Request, _: BoundGettext) -> str | None:
+def done_message(
+    request: Request, _: BoundGettext, only: Collection[str] | None = None
+) -> str | None:
     """Return the confirmation named by ``?done=``, if it is a known one.
 
     ``?count=`` (digits only) fills a ``{count}`` in the confirmation, e.g. how many
-    bookings an emergency closure suspended.
+    bookings an emergency closure suspended. ``only`` limits it to those keys, for a page whose
+    sections each show their own confirmation.
     """
     key = request.query_params.get("done", "")
     raw = request.query_params.get("count", "")
     count = int(raw) if raw.isdigit() and len(raw) <= 6 else 0
-    return _(DONE_MESSAGES[key], count=count) if key in DONE_MESSAGES else None
+    known = key in DONE_MESSAGES and (only is None or key in only)
+    return _(DONE_MESSAGES[key], count=count) if known else None
 
 
 def redirect_done(
