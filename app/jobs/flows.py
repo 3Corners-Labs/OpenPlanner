@@ -23,4 +23,4 @@ async def repair_default_flows(uow: UnitOfWork) -> None:
     if counts.repaired:
         log.info("flows.repaired", groups=counts.repaired)
     if counts.failed:
-        log.warning("flows.repair_incomplete", groups=counts.failed)
+        log.warning("flows.repair_incomplete", groups=counts.failed, error=counts.first_error)

@@ -29,8 +29,9 @@ from app.domain.service_flows import (
 from app.domain.service_flows import (
     DispatchKind as FlowDispatch,
 )
+from tests.fakes.counting_uow import CountingUow
 from tests.support.domain import NOW, make_group
-from tests.support.flow_backends import BACKENDS, CountingUow, open_backend
+from tests.support.flow_backends import BACKENDS, open_backend
 
 EVERYTHING = Scope(everything=True)
 
@@ -284,6 +285,20 @@ async def test_a_group_with_a_pool_but_no_direct_flow_is_found_by_its_rules(worl
         await tx.ensure_default_flows(other)  # the other group is whole again, group_id is not
     async with world.uow.read() as tx:
         assert await tx.groups_missing_default_flows() == [group_id]
+
+
+async def test_a_whole_group_is_not_listed_even_when_its_flows_are_archived(world: World) -> None:
+    whole = await add_group(world, slug="heel")
+    archived = await add_group(world, slug="gearchiveerd")
+    async with world.uow.locked() as tx:
+        await tx.add_schedule_rule(whole, block(Offer.BOTH))  # pool, appointment and direct flow
+        (flow, *_) = await tx.list_service_flows(EVERYTHING, archived)
+        assert flow.id is not None
+        await tx.set_flow_state(EVERYTHING, flow.id, FlowState.ARCHIVED)
+    assert list(await flows_of(world, whole)) == ["appointment", "direct"]
+
+    async with world.uow.read() as tx:
+        assert await tx.groups_missing_default_flows() == []
 
 
 async def test_a_healthy_installation_takes_no_write_lock(world: World) -> None:

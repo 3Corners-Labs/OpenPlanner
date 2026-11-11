@@ -18,10 +18,13 @@ class RepairCounts(NamedTuple):
     Attributes:
         repaired: Groups that received at least one pool or flow row.
         failed: Groups whose repair raised; they are left for the next run.
+        first_error: The type name of the first such failure and nothing else (the detail may
+            hold personal data), ``None`` when no group failed.
     """
 
     repaired: int
     failed: int
+    first_error: str | None = None
 
 
 async def ensure_all_default_flows(uow: UnitOfWork) -> RepairCounts:
@@ -33,12 +36,14 @@ async def ensure_all_default_flows(uow: UnitOfWork) -> RepairCounts:
     async with uow.read() as tx:
         group_ids = await tx.groups_missing_default_flows()
     repaired = failed = 0
+    first_error: str | None = None
     for group_id in group_ids:
         try:
             async with uow.locked() as tx:
                 created = await tx.ensure_default_flows(group_id)
-        except Exception:  # one group must not stop the others; the count says it happened
+        except Exception as exc:  # one group must not stop the others; the count says it happened
             failed += 1
+            first_error = first_error or type(exc).__name__
             continue
         repaired += created
-    return RepairCounts(repaired, failed)
+    return RepairCounts(repaired, failed, first_error)

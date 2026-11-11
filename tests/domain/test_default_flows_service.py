@@ -3,9 +3,9 @@
 import pytest
 
 from app.domain.default_flows_service import RepairCounts, ensure_all_default_flows
+from tests.fakes.counting_uow import CountingUow
 from tests.fakes.persistence import InMemoryTransaction, InMemoryUnitOfWork
 from tests.support.admin import two_organisations
-from tests.support.flow_backends import CountingUow
 
 
 async def test_one_group_that_fails_does_not_stop_the_next(
@@ -23,7 +23,7 @@ async def test_one_group_that_fails_does_not_stop_the_next(
 
     monkeypatch.setattr(InMemoryTransaction, "ensure_default_flows", refuse_the_first)
 
-    assert await ensure_all_default_flows(uow) == RepairCounts(1, 1)
+    assert await ensure_all_default_flows(uow) == RepairCounts(1, 1, "RuntimeError")
 
     async with uow.read() as tx:
         assert await tx.groups_missing_default_flows() == [first]  # left for the next run

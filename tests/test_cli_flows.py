@@ -94,5 +94,6 @@ def test_a_group_that_could_not_be_repaired_exits_non_zero(
     assert main(["ensure-flows"]) == 1
 
     assert (
-        capsys.readouterr().out == "ensure-flows: 0 groups received pool or flow rows, 1 failed\n"
+        capsys.readouterr().out == "ensure-flows: 0 groups received pool or flow rows, 1 failed"
+        " (first error: RuntimeError)\n"
     )

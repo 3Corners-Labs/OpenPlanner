@@ -16,7 +16,6 @@ from app.domain.authorization import Scope
 from app.domain.capacity import CapacityPool, PoolFlows, check_pool_archive, check_pool_save
 from app.domain.default_flows import (
     DefaultFlowSet,
-    bind_pool,
     default_flow_set,
     missing_defaults,
     stored_flow,
@@ -155,11 +154,16 @@ class ServiceFlowStore:
             self.state.pools[pool_id] = replace(missing.pool, id=pool_id)
         else:
             pool_id = next(i for i, p in self.state.pools.items() if p.group_id == group_id)
-        for flow in bind_pool(missing, pool_id):
-            assert flow.current is not None
+        for template in missing.flows:
             flow_id = self._new_id()
-            current = replace(flow.current, flow_id=flow_id, published_at=NOW, published_by=None)
-            self._put_flow(replace(flow, id=flow_id, current=current))
+            current = replace(
+                template.revision(pool_id), flow_id=flow_id, published_at=NOW, published_by=None
+            )
+            self._put_flow(
+                ServiceFlow(
+                    flow_id, group_id, template.code, template.state, template.default_for, current
+                )
+            )
         return True
 
     async def list_skills(

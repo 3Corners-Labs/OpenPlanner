@@ -11,7 +11,6 @@ from app.domain.default_flows import (
     DIRECT_CODE,
     DefaultFlowSet,
     StoredFlow,
-    bind_pool,
     default_flow_set,
     flow_dispatch,
     missing_defaults,
@@ -199,14 +198,14 @@ def test_the_flows_of_an_archived_group_keep_their_defaults() -> None:
     assert flow.default_for == frozenset({IntakeMode.APPOINTMENT})  # no index applies to archived
 
 
-def test_binding_builds_every_revision_on_the_stored_pool() -> None:
-    flows = bind_pool(wanted(direct=True), 42)
+def test_a_revision_is_built_on_the_stored_pool() -> None:
+    templates = wanted(direct=True).flows
 
-    assert [f.code for f in flows] == [APPOINTMENT_CODE, DIRECT_CODE]
-    assert {f.group_id for f in flows} == {7}
-    assert {f.id for f in flows} == {None}
-    assert {f.current.capacity_pool_id for f in flows if f.current} == {42}
-    assert all(f.current is not None and f.current.legacy for f in flows)
+    revisions = [template.revision(42) for template in templates]
+
+    assert [t.code for t in templates] == [APPOINTMENT_CODE, DIRECT_CODE]
+    assert {r.capacity_pool_id for r in revisions} == {42}
+    assert all(r.legacy for r in revisions)
 
 
 def test_an_empty_set_is_empty() -> None:

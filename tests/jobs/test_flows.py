@@ -56,5 +56,10 @@ async def test_a_group_that_cannot_be_repaired_is_counted_and_the_others_are_don
 
     assert logs == [
         {"event": "flows.repaired", "log_level": "info", "groups": 1},
-        {"event": "flows.repair_incomplete", "log_level": "warning", "groups": 1},
+        {
+            "event": "flows.repair_incomplete",
+            "log_level": "warning",
+            "groups": 1,
+            "error": "RuntimeError",
+        },
     ]

@@ -22,7 +22,7 @@ from collections import defaultdict
 from collections.abc import Collection, Iterable
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import delete, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -155,9 +155,10 @@ async def ensure_default_flows_in(session: AsyncSession, group_id: int) -> bool:
         any(rule_from_row(rule).window.offers_direct for rule in rules),
         group.archived_at is not None,
     )
-    pool_exists = (
-        await session.scalar(select(CapacityPoolRow.id).where(CapacityPoolRow.group_id == group_id))
-    ) is not None
+    existing_pool_id = await session.scalar(
+        select(CapacityPoolRow.id).where(CapacityPoolRow.group_id == group_id)
+    )
+    pool_exists = existing_pool_id is not None
     flow_rows = (
         await session.execute(select(ServiceFlowRow).where(ServiceFlowRow.group_id == group_id))
     ).scalars()
@@ -179,11 +180,7 @@ async def ensure_default_flows_in(session: AsyncSession, group_id: int) -> bool:
         await session.flush()
         pool_id: int = pool_row.id
     else:
-        pool_id = (
-            await session.execute(
-                select(CapacityPoolRow.id).where(CapacityPoolRow.group_id == group_id)
-            )
-        ).scalar_one()
+        pool_id = cast(int, existing_pool_id)  # missing.pool is None only when the pool exists
     now = datetime.now(UTC)
     for template in missing.flows:
         row = ServiceFlowRow(
@@ -348,6 +345,7 @@ class ServiceFlowQueries:
                 select(GroupRow.id).where(GroupRow.id.not_in(pooled) | GroupRow.id.not_in(flowed))
             )
         )
+        # Evaluated in Python: pre-filtering in SQL would restate the offer and capacity rule.
         rules = await session.scalars(
             select(ScheduleRuleRow).where(ScheduleRuleRow.group_id.not_in(direct))
         )

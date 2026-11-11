@@ -14,7 +14,8 @@ created (the service's name, appointment length, dispatch and archived state of 
 never follow a later change of any of these. While a flow's current revision is ``legacy``, the
 service's own settings and its archived state stay the source of truth for behaviour; the resolver
 of step 3 reads the group first and uses a legacy flow only as the identity a booking is recorded
-under. A legacy revision comes into existence only through ``bind_pool``, with a stored pool.
+under. A legacy revision comes into existence only through ``FlowTemplate.revision``, with a
+stored pool.
 """
 
 from collections.abc import Iterable
@@ -70,17 +71,6 @@ class FlowTemplate:
             dispatch=self.dispatch,
         )
 
-    def build(self, group_id: int, pool_id: int) -> ServiceFlow:
-        """Return the flow, not yet stored, with its revision on the stored pool ``pool_id``."""
-        return ServiceFlow(
-            id=None,
-            group_id=group_id,
-            code=self.code,
-            state=self.state,
-            default_for=self.default_for,
-            current=self.revision(pool_id),
-        )
-
 
 @dataclass(frozen=True)
 class DefaultFlowSet:
@@ -90,7 +80,8 @@ class DefaultFlowSet:
         group_id: The group.
         pool: The legacy group pool, ``None`` when it exists already (in a ``missing_defaults``
             result).
-        flows: The templates of the legacy flows; no revision exists until ``bind_pool``.
+        flows: The templates of the legacy flows; a revision exists only through
+            ``FlowTemplate.revision``.
     """
 
     group_id: int
@@ -193,11 +184,3 @@ def missing_defaults(
             flow = replace(flow, default_for=flow.default_for - held)
         created.append(flow)
     return DefaultFlowSet(wanted.group_id, None if pool_exists else wanted.pool, tuple(created))
-
-
-def bind_pool(defaults: DefaultFlowSet, pool_id: int) -> tuple[ServiceFlow, ...]:
-    """Return the flows of ``defaults`` with revision 1 drawing on the stored pool ``pool_id``.
-
-    The one place a legacy revision is built: no revision exists without a real pool id.
-    """
-    return tuple(template.build(defaults.group_id, pool_id) for template in defaults.flows)

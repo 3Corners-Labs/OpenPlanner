@@ -350,8 +350,9 @@ _OPERATIONS = (
         "flows.repair_incomplete",
         _OPS,
         "warning",
-        "groups",
-        "{groups} services could not be given their legacy capacity pool or flow.",
+        "error groups",
+        "{groups} services could not be given their legacy capacity pool or flow; the first "
+        "error was {error}.",
         "The start-up repair of ADR 0121 step 2e skipped services whose repair failed; the "
         "others were done.",
         _CHECK_HOST,

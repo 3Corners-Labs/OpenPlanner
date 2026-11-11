@@ -18,7 +18,7 @@ from alembic.config import Config
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
-from app.domain.default_flows import bind_pool, default_flow_set
+from app.domain.default_flows import default_flow_set
 from app.domain.scheduling import DispatchKind as GroupDispatchKind
 from app.domain.service_flows import DispatchKind, IntakeMode, legacy_revision
 
@@ -273,12 +273,11 @@ async def test_the_backfill_and_the_rule_for_new_groups_build_the_same(upgraded:
         assert wanted.pool is not None
         assert pool.id is not None
         assert replace(wanted.pool, id=pool.id) == pool
-        expected = bind_pool(wanted, pool.id)
+        expected = wanted.flows
         assert [f.code for f in stored[group_id]] == [f.code for f in expected]
         for found, rule in zip(stored[group_id], expected, strict=True):
-            assert rule.current is not None
             assert found.current is not None
             assert (found.state, found.default_for) == (rule.state, rule.default_for)
             assert found.current == replace(
-                rule.current, flow_id=found.id, published_at=found.current.published_at
+                rule.revision(pool.id), flow_id=found.id, published_at=found.current.published_at
             )

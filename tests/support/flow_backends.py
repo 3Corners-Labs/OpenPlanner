@@ -32,23 +32,6 @@ class Backend:
     """Delete every pool and flow."""
 
 
-class CountingUow:
-    """A unit of work that counts its write (``locked``) transactions and delegates the rest."""
-
-    def __init__(self, inner: Any) -> None:
-        self.inner = inner
-        self.writes = 0
-
-    def read(self) -> Any:
-        """Open a read transaction."""
-        return self.inner.read()
-
-    def locked(self) -> Any:
-        """Open a write transaction and count it."""
-        self.writes += 1
-        return self.inner.locked()
-
-
 @asynccontextmanager
 async def open_backend(kind: str, database_url: str) -> AsyncIterator[Backend]:
     """Open the ``sql`` or ``fake`` backend; the engine is disposed on exit."""

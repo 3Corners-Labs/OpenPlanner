@@ -695,7 +695,9 @@ async def _ensure_flows(settings: Settings) -> tuple[str, int, bool]:
         await engine.dispose()
     line = (
         f"ensure-flows: {counts.repaired} groups received pool or flow rows,"
-        f" {counts.failed} failed\n"
+        f" {counts.failed} failed"
+        + (f" (first error: {counts.first_error})" if counts.failed else "")
+        + "\n"
     )
     return line, 1 if counts.failed else 0, False
 
