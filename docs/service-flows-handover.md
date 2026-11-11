@@ -211,6 +211,8 @@ No new section, top-level entry or seventh tab.
 3. Existing bookings keep `flow_id` NULL; a reader treats NULL as the group's default for its entry path.
 4. Downgrade drops the new tables and the two columns.
 
+A legacy pool and legacy flows are a snapshot taken when they are created: they never follow a later change of the service's name, appointment length, dispatch or archived state. While a flow's current revision is `legacy`, the service's own settings and its archived state stay the source of truth for behaviour: the step-3 resolver reads the group first and uses a legacy flow only as the identity a booking is recorded under. A new service gets the same pool and flows when it is created (step 2e), by the rule in `app/domain/default_flows.py`, which a test keeps equal to this backfill.
+
 ### What step 2 proves, and what it does not
 
 Proves: A01, A02, A03, A05 (configuration side), A28, A29, and that no skill or shared pool is guessed. Does not prove, and therefore does not activate: skill enforcement (step 4), interval accounting (step 3), a flow without video (step 5). A new flow can be drafted and validated; the readiness checklist refuses activation of anything but the legacy wrappers until those steps are built.

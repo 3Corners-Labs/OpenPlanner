@@ -20,9 +20,9 @@ transaction, which takes no lock; the unit of work does not stop it.
 import json
 from collections import defaultdict
 from collections.abc import Collection, Iterable
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import delete, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,15 +35,25 @@ from app.adapters.db.models import (
     FlowRevisionSkillRow,
     GroupRow,
     OrganisationRow,
+    ScheduleRuleRow,
     ServiceFlowRow,
     SubjectFlowRow,
     SubjectFlowSkillRow,
 )
 from app.adapters.db.routing_json import routing_from_json
+from app.adapters.db.schedule_rules import rule_from_row
 from app.adapters.db.scope import scope_filter
 from app.adapters.db.skills import load_skills
 from app.domain.authorization import Scope
+from app.domain.default_flows import (
+    APPOINTMENT_CODE,
+    DIRECT_CODE,
+    StoredFlow,
+    default_flow_set,
+    missing_defaults,
+)
 from app.domain.errors import DomainError, ErrorCode, missing_object
+from app.domain.scheduling import DispatchKind as GroupDispatchKind
 from app.domain.service_flows import (
     CompletionPolicy,
     DispatchKind,
@@ -120,6 +130,75 @@ def _defaults(row: ServiceFlowRow) -> frozenset[IntakeMode]:
         IntakeMode.ON_DEMAND: row.default_on_demand,
     }
     return frozenset(mode for mode, default in modes.items() if default)
+
+
+async def ensure_default_flows_in(session: AsyncSession, group_id: int) -> bool:
+    """Create the legacy pool and flows the group lacks, in ``session``'s transaction.
+
+    The one place a legacy revision is written (``save_draft`` refuses ``legacy``): the facts
+    come from the group's row and weekly rules, the rule is ``app.domain.default_flows``, and
+    only what is missing is inserted (never an update or delete), published now by nobody.
+    Returns whether a row was created; a group that does not exist gives ``False``.
+    """
+    group = await session.get(GroupRow, group_id)
+    if group is None:
+        return False
+    rules = (
+        await session.scalars(select(ScheduleRuleRow).where(ScheduleRuleRow.group_id == group_id))
+    ).all()
+    wanted = default_flow_set(
+        group_id,
+        group.organisation_id,
+        group.name,
+        group.slot_minutes,
+        GroupDispatchKind(group.dispatch_kind),
+        any(rule_from_row(rule).window.offers_direct for rule in rules),
+        group.archived_at is not None,
+    )
+    existing_pool_id = await session.scalar(
+        select(CapacityPoolRow.id).where(CapacityPoolRow.group_id == group_id)
+    )
+    pool_exists = existing_pool_id is not None
+    flow_rows = (
+        await session.execute(select(ServiceFlowRow).where(ServiceFlowRow.group_id == group_id))
+    ).scalars()
+    missing = missing_defaults(
+        wanted,
+        pool_exists,
+        [StoredFlow(row.code, FlowState(row.state), _defaults(row)) for row in flow_rows],
+    )
+    if missing.empty:
+        return False
+    if missing.pool is not None:
+        pool_row = CapacityPoolRow(
+            organisation_id=missing.pool.organisation_id,
+            name=missing.pool.name,
+            mode=missing.pool.mode.value,
+            group_id=group_id,
+        )
+        session.add(pool_row)
+        await session.flush()
+        pool_id: int = pool_row.id
+    else:
+        pool_id = cast(int, existing_pool_id)  # missing.pool is None only when the pool exists
+    now = datetime.now(UTC)
+    for template in missing.flows:
+        row = ServiceFlowRow(
+            group_id=group_id,
+            code=template.code,
+            state=template.state.value,
+            default_appointment=IntakeMode.APPOINTMENT in template.default_for,
+            default_on_demand=IntakeMode.ON_DEMAND in template.default_for,
+            current_revision=1,
+            draft_revision=None,
+        )
+        session.add(row)
+        await session.flush()
+        revision = FlowRevisionRow(flow_id=row.id, revision=1, published_at=now, published_by=None)
+        _to_row(revision, template.revision(pool_id))
+        session.add(revision)
+        await session.flush()
+    return True
 
 
 class ServiceFlowQueries:
@@ -238,6 +317,40 @@ class ServiceFlowQueries:
         what. A caller that gets a flow id from a person uses ``get_service_flow`` instead.
         """
         return (await self._revisions([(flow_id, revision)])).get((flow_id, revision))
+
+    async def ensure_default_flows(self, group_id: int) -> bool:
+        """Create the legacy pool and default flows the group lacks; ``True`` when one was made.
+
+        Additive and idempotent (``app.domain.default_flows``); the writers of a group and of its
+        weekly rules call it in their own transaction. Needs a write transaction.
+        """
+        return await ensure_default_flows_in(self._session, group_id)
+
+    async def groups_missing_default_flows(self) -> list[int]:
+        """Return the ids of the groups for which ``ensure_default_flows`` would create a row.
+
+        Three reads, no write lock: the groups without a pool of their own, the groups without an
+        ``appointment`` flow (anti-joins on the unique ``group_id`` and ``(group_id, code)``
+        keys), and, of the groups without a ``direct`` flow, those whose weekly rules offer the
+        direct call (``TimeWindow.offers_direct`` in Python, so the rule stays stated once). The
+        last read costs one pass over the weekly rules of the groups that have no direct flow:
+        a few rows per group, and nothing is written.
+        """
+        session = self._session
+        pooled = select(CapacityPoolRow.group_id).where(CapacityPoolRow.group_id.is_not(None))
+        flowed = select(ServiceFlowRow.group_id).where(ServiceFlowRow.code == APPOINTMENT_CODE)
+        direct = select(ServiceFlowRow.group_id).where(ServiceFlowRow.code == DIRECT_CODE)
+        missing = set(
+            await session.scalars(
+                select(GroupRow.id).where(GroupRow.id.not_in(pooled) | GroupRow.id.not_in(flowed))
+            )
+        )
+        # Evaluated in Python: pre-filtering in SQL would restate the offer and capacity rule.
+        rules = await session.scalars(
+            select(ScheduleRuleRow).where(ScheduleRuleRow.group_id.not_in(direct))
+        )
+        missing |= {rule.group_id for rule in rules if rule_from_row(rule).window.offers_direct}
+        return sorted(missing)
 
     async def _check_references(
         self, group: GroupRow, revision: FlowRevision, based_on: FlowRevision | None
