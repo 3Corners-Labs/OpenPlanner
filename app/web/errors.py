@@ -27,6 +27,8 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.INVALID_CONTACT: "error.invalid_request",
     ErrorCode.INVALID_RANGE: "error.invalid_request",
     ErrorCode.INVALID_CONFIGURATION: "error.invalid_request",
+    ErrorCode.FLOW_NOT_AVAILABLE: "error.invalid_request",
+    ErrorCode.FLOW_DEFAULT_AMBIGUOUS: "error.invalid_request",  # a server fault, like the above
     ErrorCode.GROUP_NOT_FOUND: "error.not_found.text",
     ErrorCode.BOOKING_NOT_FOUND: "error.not_found.text",
     ErrorCode.LINK_REQUIRED: "error.link_required",
@@ -137,9 +139,6 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.ALERT_TARGET_TAKEN: "admin.form.error.alert_target_taken",
     ErrorCode.CONFIGURATION_PLAN_STALE: "admin.form.error.configuration_plan_stale",
     ErrorCode.CONFIGURATION_TOO_MANY_CHANGES: "admin.form.error.configuration_too_many_changes",
-    ErrorCode.FLOW_NOT_AVAILABLE: "error.invalid_request",
-    ErrorCode.FLOW_DEFAULT_MISSING: "error.invalid_request",
-    ErrorCode.FLOW_DEFAULT_AMBIGUOUS: "error.invalid_request",
     ErrorCode.CONFIGURATION_OBJECT_IN_USE: "admin.form.error.configuration_object_in_use",
     ErrorCode.CONFIGURATION_CAPACITY_BELOW_BOOKED: (
         "admin.form.error.configuration_capacity_below_booked"
@@ -160,7 +159,6 @@ HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.FORM_FIELD_FORBIDDEN: 422,
     ErrorCode.INVALID_RANGE: 400,
     ErrorCode.FLOW_NOT_AVAILABLE: 422,
-    ErrorCode.FLOW_DEFAULT_MISSING: 500,
     ErrorCode.FLOW_DEFAULT_AMBIGUOUS: 500,
     ErrorCode.GROUP_NOT_FOUND: 404,
     ErrorCode.BOOKING_NOT_FOUND: 404,

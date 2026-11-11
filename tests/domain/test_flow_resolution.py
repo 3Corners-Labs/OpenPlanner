@@ -5,7 +5,7 @@ from dataclasses import replace
 import pytest
 
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.flow_resolution import FlowRef, resolve_default, resolve_explicit
+from app.domain.flow_resolution import FlowRef, ResolvedFlow, resolve_default, resolve_explicit
 from app.domain.service_flows import FlowState, IntakeMode, InteractionKind, ServiceFlow
 from tests.support.domain import NOW
 from tests.support.service_flows import flow, legacy, revision
@@ -26,6 +26,13 @@ def stored(
     return flow(code, state, flow_id, default_for, current)
 
 
+def the_default(flows: list[ServiceFlow], mode: IntakeMode) -> ResolvedFlow:
+    """Return the default of ``mode``, which the test expects to exist."""
+    resolved = resolve_default(flows, mode)
+    assert resolved is not None
+    return resolved
+
+
 def refused(call: object) -> DomainError:
     """Run ``call`` and return the domain error it raises."""
     assert callable(call)
@@ -37,7 +44,7 @@ def refused(call: object) -> DomainError:
 def test_the_default_is_the_active_flow_of_the_path() -> None:
     flows = [stored("other", 1, default_for=frozenset()), stored("main", 2)]
 
-    resolved = resolve_default(flows, IntakeMode.APPOINTMENT)
+    resolved = the_default(flows, IntakeMode.APPOINTMENT)
 
     assert (resolved.flow_id, resolved.code, resolved.revision) == (2, "main", 1)
     assert resolved.interaction_kind is InteractionKind.TELEPHONE
@@ -49,7 +56,7 @@ def test_the_revision_in_effect_is_the_current_one_not_the_draft() -> None:
     draft = revision(flow_id=2, revision=4)
     flows = [flow("main", flow_id=2, default_for=APPOINTMENT, current=current, draft=draft)]
 
-    assert resolve_default(flows, IntakeMode.APPOINTMENT).revision == 3
+    assert the_default(flows, IntakeMode.APPOINTMENT).revision == 3
 
 
 def test_the_default_of_each_path_is_its_own() -> None:
@@ -58,22 +65,19 @@ def test_the_default_of_each_path_is_its_own() -> None:
         stored("direct", 2, default_for=ON_DEMAND, modes=ON_DEMAND),
     ]
 
-    assert resolve_default(flows, IntakeMode.ON_DEMAND).code == "direct"
-    assert resolve_default(flows, IntakeMode.APPOINTMENT).code == "appointment"
+    assert the_default(flows, IntakeMode.ON_DEMAND).code == "direct"
+    assert the_default(flows, IntakeMode.APPOINTMENT).code == "appointment"
 
 
 def test_an_archived_flow_is_never_the_default() -> None:
-    error = refused(
-        lambda: resolve_default([stored("main", 1, FlowState.ARCHIVED)], IntakeMode.APPOINTMENT)
-    )
+    flows = [stored("main", 1, FlowState.ARCHIVED)]
 
-    assert error.code is ErrorCode.FLOW_DEFAULT_MISSING
+    assert resolve_default(flows, IntakeMode.APPOINTMENT) is None
 
 
-def test_no_default_for_the_path_is_an_error() -> None:
-    error = refused(lambda: resolve_default([stored("main", 1)], IntakeMode.ON_DEMAND))
-
-    assert (error.code, error.field) == (ErrorCode.FLOW_DEFAULT_MISSING, "on_demand")
+def test_no_default_for_the_path_is_none_not_an_error() -> None:
+    assert resolve_default([stored("main", 1)], IntakeMode.ON_DEMAND) is None
+    assert resolve_default([], IntakeMode.APPOINTMENT) is None
 
 
 def test_two_defaults_for_one_path_are_an_error() -> None:
@@ -90,7 +94,7 @@ def test_the_labels_of_a_flow_change_nothing() -> None:
     named = replace(named, published_at=NOW)
     flows = [flow("main", flow_id=1, default_for=APPOINTMENT, current=named)]
 
-    assert resolve_default(flows, IntakeMode.APPOINTMENT).code == "main"
+    assert the_default(flows, IntakeMode.APPOINTMENT).code == "main"
     assert resolve_explicit(flows, "main", IntakeMode.APPOINTMENT).flow_id == 1
 
 
@@ -106,7 +110,7 @@ def test_an_explicit_code_resolves_to_that_flow_default_or_not() -> None:
 def test_an_unknown_code_is_refused_without_a_fallback(code: str) -> None:
     """A04: an explicit flow that does not resolve is never replaced by the default."""
     flows = [stored("main", 1)]
-    assert resolve_default(flows, IntakeMode.APPOINTMENT).code == "main"
+    assert the_default(flows, IntakeMode.APPOINTMENT).code == "main"
 
     error = refused(lambda: resolve_explicit(flows, code, IntakeMode.APPOINTMENT))
 

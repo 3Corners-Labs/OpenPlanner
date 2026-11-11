@@ -158,8 +158,6 @@ class ErrorCode(StrEnum):
     FLOW_NOT_AVAILABLE = "flow_not_available"
     """ADR 0121 step 3a: the flow a request named does not exist for this service, is not active
     or does not offer this entry path; there is no fallback to the default."""
-    FLOW_DEFAULT_MISSING = "flow_default_missing"
-    """ADR 0121 step 3a: no active flow is the default of the entry path."""
     FLOW_DEFAULT_AMBIGUOUS = "flow_default_ambiguous"
     """ADR 0121 step 3a: more than one active flow is the default of the entry path."""
     CHANGE_REQUEST_NOT_FOUND = "change_request_not_found"

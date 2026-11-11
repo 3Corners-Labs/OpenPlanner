@@ -36,6 +36,7 @@ The cookie rule is in ``app.api.link_session``; the join, trial and waiting page
 from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Annotated
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
@@ -49,7 +50,7 @@ from app.api.contact_form import (
     load_contact_form,
     read_contact,
 )
-from app.api.flow_choice import flow_param
+from app.api.flow_choice import checked_flow
 from app.api.labels import slot_label
 from app.api.link_session import authorise, exchange, start
 from app.api.participant import participant_page
@@ -154,8 +155,6 @@ async def group_page(
     """
     service = _service(request)
     group = await service.get_group(slug)
-    chosen_flow = flow_param(flow)
-    await service.flow_for(slug, IntakeMode.APPOINTMENT, chosen_flow)
     now = _clock(request).now()
     closure = await service.closure_notice(group)
     banner = closure_view(closure, group, locale, now) if closure else None
@@ -163,6 +162,7 @@ async def group_page(
         deleted_by = await service.closure_delete_by(group, closure)
         banner = closure_view(closure, group, locale, now, deleted_by)
         return await participant_page(request, locale, "closure.html", group, {"closure": banner})
+    chosen_flow = await checked_flow(service, slug, IntakeMode.APPOINTMENT, flow)
     slot_filter = replace(
         parse_filter(request.query_params.multi_items(), group.routing), flow=chosen_flow
     )
@@ -276,17 +276,14 @@ async def booking_form(
     """
     service = _service(request)
     group = await service.get_group(slug)
-    chosen_flow = flow_param(flow)
-    await service.flow_for(slug, IntakeMode.APPOINTMENT, chosen_flow)
+    chosen_flow = await checked_flow(service, slug, IntakeMode.APPOINTMENT, flow)
     parsed = parse_start(start)
     chosen = group.routing.subject(subject)
     code = chosen.code if chosen else None
     slot = await _available(service, group, parsed, code) if parsed else None
     if parsed is None or slot is None:
-        again = f"/g/{group.slug}?status=unavailable"
-        if chosen_flow:
-            again += f"&flow={chosen_flow}"
-        return RedirectResponse(again, status_code=303)
+        again = [("status", "unavailable")] + ([("flow", chosen_flow)] if chosen_flow else [])
+        return RedirectResponse(f"/g/{group.slug}?{urlencode(again)}", status_code=303)
     contact = await load_contact_form(service, group, _clock(request).now())
     values = {SUBJECT_INPUT: chosen.code} if chosen else {}
     context = _book_context(contact, parsed, slot, locale, [], values, chosen_flow)
@@ -304,7 +301,7 @@ async def book(request: Request, slug: str, locale: Locale, _: SameOrigin) -> Re
     start = parse_start(str(form.get("start", "")))
     if start is None:
         raise RejectedRequest(400)
-    chosen_flow = flow_param(form.get("flow"))
+    chosen_flow = await checked_flow(service, slug, IntakeMode.APPOINTMENT, form.get("flow"))
     try:
         receipt = await service.book(
             group_slug=group.slug,
@@ -314,8 +311,6 @@ async def book(request: Request, slug: str, locale: Locale, _: SameOrigin) -> Re
             flow=chosen_flow,
         )
     except DomainError as error:
-        if error.code is ErrorCode.FLOW_NOT_AVAILABLE:
-            raise  # the form cannot fix it: the generic refusal, never the default flow
         slot = await _available(service, group, start)
         contact = await load_contact_form(service, group, _clock(request).now())
         context = _book_context(

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_steps.html" import steps with context %}
+{% from "_carried_inputs.html" import carried_inputs %}
 {% block title %}{{ group.name }} – {{ brand.name }}{% endblock %}
 {% block content %}
 {% include "_error_summary.html" %}
@@ -21,7 +22,7 @@
 {% endif %}
 {% if subjects %}
 <form method="get" action="/g/{{ group.slug }}" class="subject-choice">
-  {% if picker.filter.flow %}<input type="hidden" name="flow" value="{{ picker.filter.flow }}">{% endif %}
+  {{ carried_inputs(picker.filter, false) }}
   <div class="field">
     <fieldset class="choices" aria-describedby="subject-hint">
       <legend>{{ _("booking.routing.subject.label") }}</legend>

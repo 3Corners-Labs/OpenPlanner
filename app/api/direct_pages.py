@@ -38,7 +38,7 @@ from app.api.contact_form import (
     load_contact_form,
     read_contact,
 )
-from app.api.flow_choice import flow_param
+from app.api.flow_choice import checked_flow
 from app.api.link_session import authorise, start
 from app.api.participant import participant_page, templates
 from app.api.trace import bind_group_from_path
@@ -46,7 +46,7 @@ from app.domain.booking import BookingKind
 from app.domain.call_service import CallService
 from app.domain.calls import JoinState, join_state
 from app.domain.direct_queue import DirectAvailability, QueueInfo, WaitState, wait_state
-from app.domain.errors import DomainError, ErrorCode
+from app.domain.errors import DomainError
 from app.domain.event_context import bind_booking
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock, IntegrationError
@@ -174,8 +174,7 @@ async def direct_form(
     """
     service = _bookings(request)
     group = await service.get_group(slug)
-    chosen = flow_param(flow)
-    await service.flow_for(slug, IntakeMode.ON_DEMAND, chosen)
+    chosen = await checked_flow(service, slug, IntakeMode.ON_DEMAND, flow)
     return await _form_page(
         request,
         locale,
@@ -193,7 +192,7 @@ async def start_direct(request: Request, slug: str, locale: Locale, _: SameOrigi
     group = await service.get_group(slug)
     form = await request.form()
     values = read_contact(form)
-    chosen = flow_param(form.get("flow"))
+    chosen = await checked_flow(service, slug, IntakeMode.ON_DEMAND, form.get("flow"))
     try:
         receipt = await service.start_direct(
             group_slug=slug,
@@ -202,8 +201,6 @@ async def start_direct(request: Request, slug: str, locale: Locale, _: SameOrigi
             flow=chosen,
         )
     except DomainError as error:
-        if error.code is ErrorCode.FLOW_NOT_AVAILABLE:
-            raise  # the form cannot fix it: the generic refusal, never the default flow
         return await _form_page(
             request,
             locale,

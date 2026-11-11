@@ -57,38 +57,43 @@ class ResolvedFlow:
         return FlowRef(self.flow_id, self.revision)
 
 
-def _live(flow: ServiceFlow) -> FlowRevision | None:
-    """Return the revision in effect of an active flow, else ``None`` (draft, archived)."""
+def _live(flow: ServiceFlow) -> tuple[int, FlowRevision] | None:
+    """Return the id and revision in effect of an active stored flow, else ``None``.
+
+    A draft, an archived flow and one that was never stored (no id) have none.
+    """
     if flow.state is not FlowState.ACTIVE or flow.current is None or flow.id is None:
         return None
-    return flow.current
+    return flow.id, flow.current
 
 
-def _resolved(flow: ServiceFlow, revision: FlowRevision) -> ResolvedFlow:
-    """Return ``flow`` at ``revision`` as a resolved flow (``flow.id`` is set, see ``_live``)."""
-    assert flow.id is not None  # noqa: S101 - narrowed for the type checker; _live checked it
+def _resolved(flow: ServiceFlow, live: tuple[int, FlowRevision]) -> ResolvedFlow:
+    """Return ``flow`` at its revision in effect (``live``, from ``_live``) as a resolved flow."""
+    flow_id, revision = live
     return ResolvedFlow(
-        flow.id, flow.code, revision.revision, revision.interaction_kind, revision.legacy
+        flow_id, flow.code, revision.revision, revision.interaction_kind, revision.legacy
     )
 
 
-def resolve_default(flows: Iterable[ServiceFlow], mode: IntakeMode) -> ResolvedFlow:
-    """Return the active flow that is the default of the entry path ``mode``.
+def resolve_default(flows: Iterable[ServiceFlow], mode: IntakeMode) -> ResolvedFlow | None:
+    """Return the active flow that is the default of the entry path ``mode``, else ``None``.
+
+    ``None`` means no active flow is the default (none exists, or an administrator archived
+    it): the caller records the booking without a flow.
 
     Raises:
-        DomainError: ``flow_default_missing`` when no active flow is the default of ``mode``,
-            ``flow_default_ambiguous`` when more than one is (the schema's unique index makes
-            that impossible; the check is the second line).
+        DomainError: ``flow_default_ambiguous`` when more than one is the default (the schema's
+            unique index makes that impossible; the check is the second line).
     """
     found = [
-        (flow, revision)
+        (flow, live)
         for flow in flows
-        if (revision := _live(flow)) is not None
+        if (live := _live(flow)) is not None
         and mode in flow.default_for
-        and mode in revision.intake_modes
+        and mode in live[1].intake_modes
     ]
     if not found:
-        raise DomainError(ErrorCode.FLOW_DEFAULT_MISSING, mode.value)
+        return None
     if len(found) > 1:
         raise DomainError(ErrorCode.FLOW_DEFAULT_AMBIGUOUS, mode.value)
     return _resolved(*found[0])
@@ -105,7 +110,7 @@ def resolve_explicit(flows: Iterable[ServiceFlow], code: str, mode: IntakeMode) 
         DomainError: ``flow_not_available`` (field ``flow``).
     """
     for flow in flows:
-        revision = _live(flow)
-        if revision is not None and flow.code == code and mode in revision.intake_modes:
-            return _resolved(flow, revision)
+        live = _live(flow)
+        if live is not None and flow.code == code and mode in live[1].intake_modes:
+            return _resolved(flow, live)
     raise DomainError(ErrorCode.FLOW_NOT_AVAILABLE, "flow")

@@ -68,7 +68,7 @@ from app.domain.direct_queue import (
 )
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.flow_resolution import FlowRef, ResolvedFlow
-from app.domain.flow_resolver import resolve_flow
+from app.domain.flow_resolver import flow_for, resolve_flow
 from app.domain.form_fields import FormDefinition, Purpose, validate_answers
 from app.domain.holiday_service import effective_schedule
 from app.domain.images import ImageFile
@@ -386,9 +386,7 @@ class BookingService:
         Raises:
             DomainError: ``group_not_found`` or ``flow_not_available``.
         """
-        async with self._uow.read() as tx:
-            group = await self._group(tx, group_slug)
-            return await resolve_flow(tx, group.id, mode, flow)
+        return await flow_for(self._uow, group_slug, mode, flow)
 
     async def direct_call_availability(self, group_slug: str) -> DirectAvailability:
         """Return whether a direct call can be started now: a block offers it, and room.

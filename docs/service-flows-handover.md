@@ -73,7 +73,7 @@ Watchdog, expiry, recovery and the deletion deadlines: ADR 0121 point 7. All der
 
 ## Compatibility and rollback
 
-What stays as it is: ADR 0121 point 8. Backfill: one Group, one ServiceOffering with the same identity; explicit legacy flow wrappers for the appointment and direct paths; no inferred skills, no shared pools from equal queue names; legacy direct and scheduled capacity stay apart; converting a service to the shared model is a reviewable operation listing affected future reservations. An omitted flow resolves to the configured default; an explicit unknown, foreign or archived flow is refused. Follow ADR 0116: additive schema and readers first, then backfill, then activation, contraction later, nothing in a patch. Test the previous image on the expanded database after the new image wrote records and jobs, including a booking and a claim after rollback.
+What stays as it is: ADR 0121 point 8. Backfill: one Group, one ServiceOffering with the same identity; explicit legacy flow wrappers for the appointment and direct paths; no inferred skills, no shared pools from equal queue names; legacy direct and scheduled capacity stay apart; converting a service to the shared model is a reviewable operation listing affected future reservations. An omitted flow resolves to the configured default; an explicit unknown, foreign or archived flow is refused. A booking made by the implicit path while a service has no active default flow for that path (no flow rows at all, for example during a rollback window, or its default was archived) records NULL for `flow_id` and `flow_revision`: a booking is never refused for missing flow rows, and NULL does not tell the two cases apart. Follow ADR 0116: additive schema and readers first, then backfill, then activation, contraction later, nothing in a patch. Test the previous image on the expanded database after the new image wrote records and jobs, including a booking and a claim after rollback.
 
 ## Fixture
 
@@ -208,7 +208,7 @@ No new section, top-level entry or seventh tab.
 
 1. Per group, one `capacity_pools` row of mode `legacy_group`.
 2. Per group, one flow `appointment` (default for `/g/{slug}`, widget and API) and, where the direct call is offered, one flow `direct` (default for the direct page); both `interaction_kind = video`, completion `legacy_video_observation`, no skills, state `active`, revision 1 from the group's present settings.
-3. Existing bookings keep `flow_id` NULL; a reader treats NULL as the group's default for its entry path.
+3. Existing bookings keep `flow_id` NULL; a reader treats NULL as the group's default for its entry path. Since step 3a a new booking also records NULL when no active default flow exists for its path (no rows, or the default archived).
 4. Downgrade drops the new tables and the two columns.
 
 A legacy pool and legacy flows are a snapshot taken when they are created: they never follow a later change of the service's name, appointment length, dispatch or archived state. While a flow's current revision is `legacy`, the service's own settings and its archived state stay the source of truth for behaviour: the step-3 resolver reads the group first and uses a legacy flow only as the identity a booking is recorded under. A new service gets the same pool and flows when it is created (step 2e), by the rule in `app/domain/default_flows.py`, which a test keeps equal to this backfill.

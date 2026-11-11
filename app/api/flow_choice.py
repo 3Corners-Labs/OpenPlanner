@@ -2,12 +2,14 @@
 
 A flow code is a stable, non-personal code (the grammar of a subject code), so it may appear in
 a URL, a form and a request body. The pages read it from the query or the form, the widget API
-from its JSON body; the domain resolves it (``BookingService.flow_for``, ``book``,
+from its JSON body; the domain resolves it (``checked_flow``, ``book``,
 ``start_direct``) and refuses one that does not resolve, never falling back to the default.
 """
 
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.routing import SUBJECT_CODE
+from app.domain.service_flows import IntakeMode
+from app.domain.services import BookingService
 
 
 def flow_param(value: object) -> str | None:
@@ -24,3 +26,21 @@ def flow_param(value: object) -> str | None:
     if not isinstance(value, str) or not SUBJECT_CODE.fullmatch(value):
         raise DomainError(ErrorCode.FLOW_NOT_AVAILABLE, "flow")
     return value
+
+
+async def checked_flow(
+    service: BookingService, slug: str, mode: IntakeMode, raw: object
+) -> str | None:
+    """Return the flow code a request carries after checking it resolves, else ``None``.
+
+    Without a flow nothing is read: the implicit path resolves its default when the booking is
+    made. An explicit code is checked against the service's flows for the entry path ``mode``
+    before a page shows its form.
+
+    Raises:
+        DomainError: ``group_not_found`` or ``flow_not_available``.
+    """
+    code = flow_param(raw)
+    if code is not None:
+        await service.flow_for(slug, mode, code)
+    return code

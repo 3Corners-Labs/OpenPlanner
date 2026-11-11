@@ -827,6 +827,10 @@ class Scope:
         )
 
 
+PUBLIC_READ = Scope(everything=True)
+"""The scope of a read for the public: the caller already resolved the group (from a public
+slug), and the query filters by its id; it is not a right of any person."""
+
 _BUILT_IN = {role.value: role for role in Role}
 
 

@@ -116,7 +116,7 @@ class OpenplannerBooking extends HTMLElement {
       this.basic = basic;
       this.region.setAttribute('aria-label', this.t('widget.region'));
       this.body.replaceChildren(h('p', {}, this.t('widget.loading')));
-      const found = await this.api.group();
+      const found = await this.api.group(this.getAttribute('flow'));
       if (run !== this.run) return;
       this.group = found;
       await this.calendar();
