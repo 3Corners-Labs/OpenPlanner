@@ -25,7 +25,7 @@
     </div>
   </form>
   {% if skill_rows %}
-  <div class="table-scroll">
+  <div class="table-scroll" role="region" aria-labelledby="skills-heading" tabindex="0">
   <table class="data-table">
     <caption class="visually-hidden">{{ _("admin.skills.title") }}</caption>
     <thead>
@@ -95,7 +95,7 @@
     </div>
   </form>
   {% if pool_rows %}
-  <div class="table-scroll">
+  <div class="table-scroll" role="region" aria-labelledby="pools-heading" tabindex="0">
   <table class="data-table">
     <caption class="visually-hidden">{{ _("admin.capacity.title") }}</caption>
     <thead>
