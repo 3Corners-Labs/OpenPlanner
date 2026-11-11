@@ -42,7 +42,9 @@ from app.adapters.db.models import (
 from app.adapters.db.seed_usage import usage_example_cells
 from app.adapters.db.service_flows import ensure_default_flows_in
 from app.adapters.db.uow import SqlUnitOfWork
+from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingStatus, ChangeReason, Contact, Slot
+from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.form_fields import Classification, FieldDefinition, FieldType, FormDefinition
@@ -50,6 +52,17 @@ from app.domain.images import ImageFile, ImageText
 from app.domain.ports import Transaction
 from app.domain.reschedule_proposal import HeldProposal
 from app.domain.scheduling import Group, PhoneMode
+from app.domain.service_flows import (
+    CompletionPolicy,
+    DispatchKind,
+    FlowRevision,
+    FlowState,
+    HandlingAction,
+    IntakeMode,
+    InteractionKind,
+    ServiceFlow,
+)
+from app.domain.skills import Skill
 from app.domain.tokens import derive_token, hash_token, new_token_salt
 
 DEMO_SLUG = "demo"
@@ -160,6 +173,10 @@ class ClosureExamples:
         journeys: The participant's journey per e2e browser (``BROWSERS``), new each run.
         demo_agenda: The demo group's agenda on the day of the bookings awaiting
             confirmation (the next weekday): a day with slots and rows, for the page checks.
+        skill_edit: The edit page of the seeded skill ``general-advice`` (ADR 0121 step 2c).
+        skill_archive: Its archive page.
+        pool_edit: The edit page of the seeded counted pool ``advice``.
+        pool_archive: Its archive page.
     """
 
     closed_group: str
@@ -174,6 +191,10 @@ class ClosureExamples:
     trial_page: str
     journeys: dict[str, JourneyExample]
     demo_agenda: str
+    skill_edit: str
+    skill_archive: str
+    pool_edit: str
+    pool_archive: str
 
 
 async def seed_demo(engine: AsyncEngine) -> bool:
@@ -293,6 +314,7 @@ async def seed_closure_examples(
         journeys = {
             browser: await _journey(tx, journey_group, now, token_key) for browser in BROWSERS
         }
+        skill_id, pool_id = await _flow_examples(tx, demo)
     return ClosureExamples(
         closed_group=f"/g/{CLOSED_GROUP_SLUG}",
         planned_closure=f"/g/{PLANNED_GROUP_SLUG}/closure",
@@ -306,7 +328,76 @@ async def seed_closure_examples(
         trial_page=f"/b/{token}/test",
         journeys=journeys,
         demo_agenda=_agenda_path(demo, demo_day),
+        skill_edit=f"/admin/organisations/{DEMO_SLUG}/skills/{skill_id}",
+        skill_archive=f"/admin/organisations/{DEMO_SLUG}/skills/{skill_id}/archive",
+        pool_edit=f"/admin/organisations/{DEMO_SLUG}/capacity/{pool_id}",
+        pool_archive=f"/admin/organisations/{DEMO_SLUG}/capacity/{pool_id}/archive",
     )
+
+
+FLOW_EXAMPLE_SKILLS = (
+    ("general-advice", "Algemeen advies", "General advice"),
+    ("language-en", "Engels", "English"),
+)
+"""The two skills of the demo organisation (ADR 0121 step 2d), the first guaranteed by the pool."""
+FLOW_EXAMPLE_POOL = "advice"
+"""Code of the demo organisation's counted pool."""
+FLOW_EXAMPLE_FLOW = "document-review"
+"""Code of the demo service's draft flow: no conversation, on that pool."""
+
+
+async def _flow_examples(tx: Transaction, demo: Group) -> tuple[int, int]:
+    """Add the demo organisation's skills, counted pool and draft flow once; return two ids.
+
+    The ids of ``general-advice`` and of the pool ``advice``, for the stable pages of the e2e
+    list (they are numbers, so they are read back here instead of being assumed). Idempotent:
+    what exists is kept.
+    """
+    everything = Scope(everything=True)
+    skills = {s.code: s for s in await tx.list_skills(everything, demo.organisation_id)}
+    for code, nl, en in FLOW_EXAMPLE_SKILLS:
+        if code not in skills:
+            skills[code] = await tx.save_skill(
+                everything, Skill(None, demo.organisation_id, code, {"nl": nl, "en": en})
+            )
+    general = skills[FLOW_EXAMPLE_SKILLS[0][0]]
+    pools = {
+        p.code: p for p in await tx.list_capacity_pools(everything, demo.organisation_id) if p.code
+    }
+    if FLOW_EXAMPLE_POOL not in pools:
+        pools[FLOW_EXAMPLE_POOL] = await tx.save_capacity_pool(
+            everything,
+            CapacityPool(
+                None,
+                demo.organisation_id,
+                "Advies",
+                PoolMode.COUNTED,
+                frozenset({general.id or 0}),
+                code=FLOW_EXAMPLE_POOL,
+            ),
+        )
+    pool = pools[FLOW_EXAMPLE_POOL]
+    existing = {f.code for f in await tx.list_service_flows(everything, demo.id)}
+    if FLOW_EXAMPLE_FLOW not in existing:
+        revision = FlowRevision(
+            flow_id=None,
+            revision=1,
+            labels={"nl": "Documentcontrole", "en": "Document review"},
+            intake_modes=frozenset({IntakeMode.APPOINTMENT}),
+            interaction_kind=InteractionKind.NONE,
+            duration_minutes=30,
+            capacity_pool_id=pool.id,
+            required_skill_ids=frozenset(),
+            subject_skill_ids={},
+            dispatch=DispatchKind.OWN_QUEUE,
+            handling_action=HandlingAction.VIEW_REQUEST,
+            completion=CompletionPolicy.OPERATOR,
+        )
+        flow = ServiceFlow(
+            None, demo.id, FLOW_EXAMPLE_FLOW, FlowState.DRAFT, frozenset(), None, revision
+        )
+        await tx.save_draft(everything, flow)
+    return general.id or 0, pool.id or 0
 
 
 def _example_png(size: int = 96) -> bytes:

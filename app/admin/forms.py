@@ -168,6 +168,15 @@ DONE_MESSAGES: dict[str, str] = {
     "pool_saved": "admin.done.pool_saved",
     "pool_archived": "admin.done.pool_archived",
     "staff_skills_saved": "admin.done.staff_skills_saved",
+    # ADR 0121 step 2d: the flows of a service.
+    "flow_created": "admin.done.flow_created",
+    "flow_saved": "admin.done.flow_saved",
+    "flow_prepared": "admin.done.flow_prepared",
+    "flow_published": "admin.done.flow_published",
+    "flow_discarded": "admin.done.flow_discarded",
+    "flow_discarded_gone": "admin.done.flow_discarded_gone",
+    "flow_activated": "admin.done.flow_activated",
+    "flow_archived": "admin.done.flow_archived",
 }
 """Confirmations after a change; only these keys are read from ``?done=``."""
 
@@ -292,6 +301,18 @@ FIELD_MESSAGES: dict[str, str] = {
     "skill_label": "admin.form.error.skill_label",
     "pool_name": "admin.form.error.pool_name",
     "pool_code": "admin.form.error.pool_code",
+    # ADR 0121 step 2d: the code, the name, the length and the choices of a flow.
+    "flow_code": "admin.form.error.flow_code",
+    "labels": "admin.form.error.flow_labels",
+    "duration_minutes": "admin.form.error.slot_minutes",
+    "interaction_kind": "admin.form.error.choice",
+    "handling_action": "admin.form.error.choice",
+    "dispatch": "admin.form.error.choice",
+    "completion": "admin.form.error.choice",
+    "capacity_pool_id": "admin.form.error.flow_choice",
+    "required_skill_ids": "admin.form.error.flow_choice",
+    "subject_skill_ids": "admin.form.error.flow_choice",
+    "default_for": "admin.form.error.flow_default_for",
 }
 """Message per field for ``invalid_configuration``; the key is also the input's id."""
 
@@ -300,6 +321,10 @@ FIELD_TARGET: dict[str, str] = {
     "schedule_rules": "opens",
     "schedule_overrides": "day",
     "skill_label": "label_nl",
+    "labels": "label_nl",
+    "default_for": "default_appointment",
+    "required_skill_ids": "required_skills",
+    "subject_skill_ids": "subjects",
     **ROUTING_TARGETS,
     **CONNECTION_TARGETS,
 }
@@ -494,7 +519,7 @@ class FormData:
     def integer(self, name: str) -> int | None:
         """Return a whole number, or ``None`` with an error for ``name``."""
         raw = self.text(name)
-        if raw.isdigit() and len(raw) <= 6:
+        if raw.isascii() and raw.isdigit() and len(raw) <= 6:
             return int(raw)
         self._fail(name)
         return None

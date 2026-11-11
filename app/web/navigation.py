@@ -686,6 +686,25 @@ OBJECTS = (
                     f"{_GROUP}/settings/routing/subjects/{{code}}",
                     f"{_GROUP}/settings/archive",
                 ),
+                subtabs=(
+                    # ADR 0121 step 2d: the flows of the service (scope → object → tab →
+                    # sub-tab), read and changed under group.edit. A flow is addressed by its
+                    # code; the pages with a form are its sub-pages, the POST-only actions
+                    # (prepare, publish, activate) have no page of their own.
+                    Screen(
+                        "group.flows",
+                        "admin.tab.flows",
+                        f"{_GROUP}/flows",
+                        Permission.GROUP_EDIT,
+                        "tasks",
+                        (
+                            f"{_GROUP}/flows/new",
+                            f"{_GROUP}/flows/{{code}}",
+                            f"{_GROUP}/flows/{{code}}/discard",
+                            f"{_GROUP}/flows/{{code}}/archive",
+                        ),
+                    ),
+                ),
             ),
             Screen(
                 "group.closure",

@@ -1,0 +1,28 @@
+{#- What discarding a draft or archiving a flow does, and the button (ADR 0121 step 2d). ``what`` is "discard" or "archive"; there is no delete of a published flow. -#}
+{% extends "admin/layout.html" %}
+{% block title %}{{ heading }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% set base = "/admin/groups/" ~ summary.group.slug ~ "/flows" %}
+{% include "admin/_group_header.html" %}
+<p><a href="{{ base }}/{{ code }}">{{ _("admin.flows.back_to_flow") }}</a></p>
+{% include "_error_summary.html" %}
+<section class="card" aria-labelledby="confirm-what-heading">
+  <div class="card__header">
+    <h2 id="confirm-what-heading">{{ heading }}: {{ name }} ({{ code }})</h2>
+    <p class="card__lead">{{ lead }}</p>
+  </div>
+  <h3>{{ _("admin.archive.what_happens") }}</h3>
+  <ul>
+    {% for effect in effects %}<li>{{ effect }}</li>{% endfor %}
+  </ul>
+</section>
+{% if allowed %}
+<form class="card" method="post" action="{{ base }}/{{ code }}/{{ what }}" novalidate aria-labelledby="confirm-heading">
+  <h2 id="confirm-heading">{{ _("admin.archive.confirm") }}</h2>
+  <div class="form-actions">
+    <button type="submit" class="button button--danger">{{ button }}</button>
+    <a href="{{ base }}/{{ code }}">{{ _("admin.cancel") }}</a>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

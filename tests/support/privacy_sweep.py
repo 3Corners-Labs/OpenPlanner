@@ -25,6 +25,7 @@ from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.form_fields import FieldDefinition, FieldType, FormDefinition
 from app.domain.planning import PlanningService
 from app.domain.scheduling import DispatchKind, ScheduleOverride, TimeWindow
+from app.domain.service_flows import FlowState, ServiceFlow
 from app.domain.services import BookingService, ContactInput
 from app.domain.skills import Skill
 from app.domain.staff_directory import DirectoryUser
@@ -35,6 +36,7 @@ from tests.fakes.staff_directory import FakeStaffDirectory
 from tests.support.admin_site import post_form, site_app, site_uow
 from tests.support.domain import FRIDAY_0900, NOW, TEST_TOKEN_KEY, book_confirmed
 from tests.support.organisation_providers import NEW_PROVIDER, organisation_claims
+from tests.support.service_flows import revision
 
 # The demo group is open on weekdays; the clock starts on Thursday 1 January 2026.
 NEXT_WEEK_0900 = datetime(2026, 1, 9, 8, 0, tzinfo=UTC)  # the planner's pages
@@ -296,6 +298,20 @@ async def mark(site: Site, monkeypatch: pytest.MonkeyPatch) -> Fixture:
             ),
         )
         found.skill_id, found.pool_id = skill.id or 0, pool.id or 0
+        group = await tx.get_group("demo")  # ADR 0121 step 2d: a draft flow for the flow pages
+        assert group is not None
+        await tx.save_draft(
+            Scope(everything=True),
+            ServiceFlow(
+                None,
+                group.id,
+                "sweep",
+                FlowState.DRAFT,
+                frozenset(),
+                None,
+                revision(flow_id=None, capacity_pool_id=pool.id),
+            ),
+        )
     closed = await post_form(site, "/admin/groups/demo/closure", CLOSURE)
     assert closed.status_code == 303, closed.text
     secret_page = await post_form(site, "/admin/api/clients", CLIENT)  # renders api_secret.html

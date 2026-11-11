@@ -2173,6 +2173,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=200,
     ),
     S(
+        "max_flows_per_service",
+        K.INT,
+        20,
+        _C,
+        T.STAFF,
+        "Flows a service may keep at most, archived ones and the existing flows of a service "
+        "not counted (ADR 0121).",
+        minimum=3,
+        maximum=100,
+    ),
+    S(
         "phone_default_region",
         K.ENUM,
         "NL",

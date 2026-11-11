@@ -395,6 +395,69 @@
       "locales": [
         "nl"
       ]
+    },
+    {
+      "name": "service: flows",
+      "path": "/admin/groups/demo/flows",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "service: flow editor",
+      "path": "/admin/groups/demo/flows/document-review",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "service: new flow",
+      "path": "/admin/groups/demo/flows/new",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "organisation: edit skill",
+      "path": "{skill_edit}",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "organisation: archive skill",
+      "path": "{skill_archive}",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "organisation: edit capacity pool",
+      "path": "{pool_edit}",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "organisation: archive capacity pool",
+      "path": "{pool_archive}",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
     }
   ]
 }

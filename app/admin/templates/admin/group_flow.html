@@ -1,0 +1,178 @@
+{#- One flow of a service (ADR 0121 step 2d): a new flow, the editor of a draft revision, or a published revision shown read-only. One form with four sections and one save button, the readiness checklist beside it, and the actions of the lifecycle as forms of their own. No script: what depends on the contact channel follows the saved value. -#}
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% from "admin/_flow_inputs.html" import select_input, checkbox %}
+{% from "admin/_skill_checkboxes.html" import skill_checkboxes with context %}
+{% from "_error_message.html" import error_message %}
+{% block title %}{{ heading }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% set base = "/admin/groups/" ~ summary.group.slug ~ "/flows" %}
+{% include "admin/_group_header.html" %}
+<p><a href="{{ base }}">{{ _("admin.flows.back") }}</a></p>
+<h2 class="section-title">{{ heading }}</h2>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% include "_error_summary.html" %}
+{% if not new %}
+<p>
+  <span class="chip">{{ state_word }}</span>
+  {% if in_progress %}<span class="chip chip--accent chip--wrap">{{ _("admin.flows.in_progress") }}</span>{% endif %}
+  <code>{{ code }}</code>
+</p>
+{% endif %}
+{% if readiness %}{% include "admin/_flow_readiness.html" %}{% endif %}
+{% if editing %}
+<form method="post" action="{{ action }}" novalidate aria-labelledby="flow-form-heading">
+  <h2 id="flow-form-heading" class="visually-hidden">{{ _("admin.flows.form_heading") }}</h2>
+  <fieldset class="card" id="section-name">
+    <legend class="card__legend">{{ _("admin.flows.section.name") }}</legend>
+    <div class="form-grid form-grid--single">
+      {% for f in name_fields %}{{ field(f) }}{% endfor %}
+    </div>
+  </fieldset>
+  <fieldset class="card" id="section-intake">
+    <legend class="card__legend">{{ _("admin.flows.section.intake") }}</legend>
+    <fieldset class="field choice" id="intake">
+      <legend>{{ _("admin.flows.intake") }}</legend>
+      {% for c in intake_checks %}{{ checkbox(c) }}{% endfor %}
+    </fieldset>
+    <fieldset class="field choice{% if kind_error %} field--error{% endif %}" id="interaction_kind" aria-describedby="kind-follows{% if kind_error %} interaction_kind-error{% endif %}">
+      <legend>{{ _("admin.flows.contact_channel") }}</legend>
+      {% for k in kinds %}
+      <div class="choice__option"><input type="radio" id="kind-{{ k.value }}" name="interaction_kind" value="{{ k.value }}"{% if k.checked %} checked{% endif %} aria-describedby="kind-{{ k.value }}-hint"><label for="kind-{{ k.value }}">{{ k.label }}</label></div>
+      <p class="hint" id="kind-{{ k.value }}-hint">{{ k.hint }}</p>
+      {% endfor %}
+      <p class="hint" id="kind-follows">{{ _("admin.flows.kind_follows") }}</p>
+      {{ error_message(kind_error, "interaction_kind-error") }}
+    </fieldset>
+    <div id="kind-readout">
+      {% if readout %}
+      <p>{{ readout.ready }}</p>
+      <p>{{ readout.action }}</p>
+      {% else %}
+      <p class="hint">{{ _("admin.flows.readout.none") }}</p>
+      {% endif %}
+    </div>
+    {% if action_select %}<div class="form-grid form-grid--single">{{ select_input(action_select) }}</div>{% endif %}
+    <div class="form-grid form-grid--single">
+      {{ field(duration_field) }}
+    </div>
+  </fieldset>
+  <fieldset class="card" id="section-capacity">
+    <legend class="card__legend">{{ _("admin.flows.section.capacity") }}</legend>
+    <div class="form-grid form-grid--single">
+      {{ select_input(pool_select) }}
+    </div>
+    <p class="hint">{{ _("admin.flows.pool_managed") }}{% if can("organisation.view") %} <a href="/admin/organisations/{{ summary.organisation_slug }}/skills">{{ _("admin.flows.pool_managed_link") }}</a>{% endif %}</p>
+    {{ skill_checkboxes(skill_choices, skills_field, _("admin.flows.required_skills"), skills_error, _("admin.flows.required_skills_hint")) }}
+    <fieldset class="field choice{% if subjects_error %} field--error{% endif %}" id="subjects" aria-describedby="subjects-hint{% if subjects_error %} subjects-error{% endif %}">
+      <legend id="subjects-legend">{{ _("admin.flows.subjects_table") }}</legend>
+      <p class="hint" id="subjects-hint">{{ _("admin.flows.subjects_hint") }}</p>
+      {% if subjects %}
+      <div class="table-scroll" role="region" aria-labelledby="subjects-legend" tabindex="0">
+      <table class="data-table">
+        <caption class="visually-hidden">{{ _("admin.flows.subjects_table") }}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{{ _("admin.flows.subject") }}</th>
+            <th scope="col">{{ _("admin.flows.offered") }}</th>
+            <th scope="col">{{ _("admin.flows.extra_skills") }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in subjects %}
+          <tr>
+            <th scope="row">{{ s.label }} <span class="muted">({{ s.code }})</span></th>
+            <td><div class="choice__option"><input type="checkbox" id="{{ s.offer_name }}" name="{{ s.offer_name }}" value="yes"{% if s.offered %} checked{% endif %}><label for="{{ s.offer_name }}">{{ _("admin.flows.offered") }}<span class="visually-hidden"> {{ s.label }}</span></label></div></td>
+            <td>
+              <fieldset class="choice">
+                <legend class="visually-hidden">{{ _("admin.flows.extra_skills_for", subject=s.label) }}</legend>
+                {% for e in s.skills %}
+                <div class="choice__option"><input type="checkbox" id="{{ e.name }}" name="{{ e.name }}" value="on"{% if e.checked %} checked{% endif %}><label for="{{ e.name }}">{{ e.label }}{% if e.archived %} <span class="chip">{{ _("admin.status.archived") }}</span>{% endif %}</label></div>
+                {% else %}
+                <p class="muted">{{ _("admin.skills.none_to_choose") }}</p>
+                {% endfor %}
+              </fieldset>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% else %}
+      <p class="empty-state">{{ _("admin.flows.no_subjects") }} <a href="/admin/groups/{{ summary.group.slug }}/settings/routing">{{ _("admin.flows.no_subjects_link") }}</a></p>
+      {% endif %}
+      {{ error_message(subjects_error, "subjects-error") }}
+    </fieldset>
+  </fieldset>
+  <fieldset class="card" id="section-handling">
+    <legend class="card__legend">{{ _("admin.flows.section.handling") }}</legend>
+    <div class="form-grid form-grid--single">
+      {{ select_input(dispatch_select) }}
+      {{ select_input(completion_select) }}
+    </div>
+    <fieldset class="field choice" id="data">
+      <legend>{{ _("admin.flows.data_legend") }}</legend>
+      <p class="hint" id="data-hint">{{ _("admin.flows.data_hint") }}</p>
+      {{ checkbox(collects_email, "data-hint") }}
+    </fieldset>
+    <fieldset class="field choice{% if defaults_error %} field--error{% endif %}" id="defaults"{% if defaults_error %} aria-describedby="default_appointment-error"{% endif %}>
+      <legend>{{ _("admin.flows.defaults_legend") }}</legend>
+      <p class="hint">{{ defaults_hint }}</p>
+      {% for c in default_checks %}{{ checkbox(c) }}{% endfor %}
+      {{ error_message(defaults_error, "default_appointment-error") }}
+    </fieldset>
+  </fieldset>
+  <div class="card">
+    <p class="hint">{{ _("admin.flows.save_hint") }}</p>
+    <div class="form-actions">
+      <button type="submit" class="button">{{ _("admin.flows.save") }}</button>
+      <a href="{{ base }}">{{ _("admin.cancel") }}</a>
+    </div>
+  </div>
+</form>
+{% elif summary_rows %}
+<section class="card" aria-labelledby="published-heading">
+  <div class="card__header">
+    <h2 id="published-heading">{{ _("admin.flows.published_heading", revision=revision_number) }}</h2>
+    <p class="card__lead">{{ _("admin.flows.published_lead") }}</p>
+  </div>
+  <dl class="facts">
+    {% for term, value in summary_rows %}
+    <div><dt>{{ term }}</dt><dd>{{ value }}</dd></div>
+    {% endfor %}
+  </dl>
+</section>
+{% endif %}
+{% if not new and not archived %}
+<section class="card" aria-labelledby="actions-heading">
+  <div class="card__header">
+    <h2 id="actions-heading">{{ _("admin.flows.actions_heading") }}</h2>
+  </div>
+  {% if can_prepare %}
+  <form method="post" action="{{ base }}/{{ code }}/prepare" novalidate aria-labelledby="prepare-heading">
+    <h3 id="prepare-heading">{{ _("admin.flows.prepare_heading") }}</h3>
+    <p class="hint" id="prepare-hint">{{ _("admin.flows.prepare_hint") }}</p>
+    <div class="form-actions"><button type="submit" class="button" aria-describedby="prepare-hint">{{ _("admin.flows.prepare") }}</button></div>
+  </form>
+  {% endif %}
+  {% if can_publish %}
+  <form method="post" action="{{ base }}/{{ code }}/publish" novalidate aria-labelledby="publish-heading">
+    <h3 id="publish-heading">{{ _("admin.flows.publish_heading") }}</h3>
+    <p class="hint" id="publish-hint">{{ _("admin.flows.publish_hint") }}</p>
+    <div class="form-actions"><button type="submit" class="button" aria-describedby="publish-hint">{{ _("admin.flows.publish") }}</button></div>
+  </form>
+  {% endif %}
+  {% if show_activate %}
+  <form method="post" action="{{ base }}/{{ code }}/activate" novalidate aria-labelledby="activate-heading">
+    <h3 id="activate-heading">{{ _("admin.flows.activate_heading") }}</h3>
+    <p class="hint" id="activate-hint">{{ activate_hint }}</p>
+    <div class="form-actions"><button type="submit" class="button"{% if not can_activate %} disabled{% endif %} aria-describedby="activate-hint">{{ _("admin.flows.activate") }}</button></div>
+  </form>
+  {% endif %}
+  <p>
+    {% if can_discard %}<a href="{{ base }}/{{ code }}/discard">{{ _("admin.flows.discard_link") }}</a>{% endif %}
+    {% if can_archive %}<a href="{{ base }}/{{ code }}/archive">{{ _("admin.flows.archive_link") }}</a>{% endif %}
+  </p>
+</section>
+{% endif %}
+{% endblock %}

@@ -10108,6 +10108,9 @@ msgstr "Vaardigheden per organisatie (maximaal)"
 msgid "settings.field.max_capacity_pools_per_organisation.label"
 msgstr "Capaciteitspools per organisatie (maximaal)"
 
+msgid "settings.field.max_flows_per_service.label"
+msgstr "Flows per dienst (maximaal)"
+
 msgid "admin.tab.planning"
 msgstr "Planning"
 
@@ -12620,3 +12623,582 @@ msgstr "vaardigheid {value} toegekend"
 
 msgid "admin.audit.detail.skill_remove"
 msgstr "vaardigheid {value} ingetrokken"
+
+msgid "admin.tab.flows"
+msgstr "Flows"
+
+msgid "admin.flows.title"
+msgstr "Flows van deze dienst"
+
+msgid "admin.flows.count"
+msgstr "Flows ({count})"
+
+msgid "admin.flows.archived_heading"
+msgstr "Gearchiveerde flows"
+
+msgid "admin.flows.lead"
+msgstr "Een flow bepaalt hoe een verzoek wordt afgehandeld: aanmelden, contactkanaal, capaciteit en vaardigheden. De naam kiest u zelf; die bepaalt niets."
+
+msgid "admin.flows.archived_only"
+msgstr "Alleen gearchiveerde flows"
+
+msgid "admin.flows.filter_flows"
+msgstr "voor flows"
+
+msgid "admin.flows.col.name"
+msgstr "Naam"
+
+msgid "admin.flows.col.code"
+msgstr "Code"
+
+msgid "admin.flows.col.intake"
+msgstr "Aanmelden"
+
+msgid "admin.flows.col.channel"
+msgstr "Contactkanaal"
+
+msgid "admin.flows.col.pool"
+msgstr "Capaciteitspool"
+
+msgid "admin.flows.col.skills"
+msgstr "Vereiste vaardigheden"
+
+msgid "admin.flows.col.state"
+msgstr "Status"
+
+msgid "admin.flows.legacy_note"
+msgstr "Bestaande werkwijze van deze dienst. Deze flow volgt de instellingen van de dienst en kan hier niet worden gewijzigd."
+
+msgid "admin.flows.read_only"
+msgstr "Alleen lezen"
+
+msgid "admin.flows.not_chosen"
+msgstr "Nog niet gekozen"
+
+msgid "admin.flows.no_skills"
+msgstr "Geen"
+
+msgid "admin.flows.in_progress"
+msgstr "Concept in bewerking"
+
+msgid "admin.flows.view"
+msgstr "Bekijken"
+
+msgid "admin.flows.none"
+msgstr "Deze dienst heeft nog geen flows."
+
+msgid "admin.flows.none_archived"
+msgstr "Deze dienst heeft geen gearchiveerde flows."
+
+msgid "admin.flows.new"
+msgstr "Nieuwe flow"
+
+msgid "admin.flows.limit_reached"
+msgstr "Deze dienst heeft het maximale aantal flows ({count}). Archiveer eerst een flow die u niet meer gebruikt."
+
+msgid "admin.flows.new_heading"
+msgstr "Nieuwe flow"
+
+msgid "admin.flows.back"
+msgstr "Terug naar de flows"
+
+msgid "admin.flows.back_to_flow"
+msgstr "Terug naar de flow"
+
+msgid "admin.flows.form_heading"
+msgstr "Gegevens van de flow"
+
+msgid "admin.flows.section.name"
+msgstr "Naam"
+
+msgid "admin.flows.section.intake"
+msgstr "Aanmelden en contact"
+
+msgid "admin.flows.section.capacity"
+msgstr "Capaciteit en vaardigheden"
+
+msgid "admin.flows.section.handling"
+msgstr "Afhandeling"
+
+msgid "admin.flows.code"
+msgstr "Code"
+
+msgid "admin.flows.code_hint"
+msgstr "Kleine letters, cijfers en streepjes, hoogstens 40 tekens. De code is het adres van de flow en kan achteraf niet meer worden gewijzigd."
+
+msgid "admin.flows.code_fixed"
+msgstr "De code staat vast."
+
+msgid "admin.flows.label_nl"
+msgstr "Naam in het Nederlands"
+
+msgid "admin.flows.label_en"
+msgstr "Naam in het Engels"
+
+msgid "admin.flows.name_hint"
+msgstr "Deelnemers zien deze naam. De naam bepaalt niet hoe de flow werkt."
+
+msgid "admin.flows.intake"
+msgstr "Aanmelden"
+
+msgid "admin.flows.intake.appointment"
+msgstr "Op afspraak"
+
+msgid "admin.flows.intake.on_demand"
+msgstr "Direct"
+
+msgid "admin.flows.contact_channel"
+msgstr "Contactkanaal"
+
+msgid "admin.flows.kind.video"
+msgstr "Videogesprek"
+
+msgid "admin.flows.kind.telephone"
+msgstr "Telefoon"
+
+msgid "admin.flows.kind.in_person"
+msgstr "Op locatie"
+
+msgid "admin.flows.kind.none"
+msgstr "Geen gesprek"
+
+msgid "admin.flows.kind.video_hint"
+msgstr "De deelnemer en de medewerker spreken elkaar in een videogesprek."
+
+msgid "admin.flows.kind.telephone_hint"
+msgstr "De medewerker belt de deelnemer."
+
+msgid "admin.flows.kind.in_person_hint"
+msgstr "De deelnemer komt langs en wordt ontvangen."
+
+msgid "admin.flows.kind.none_hint"
+msgstr "Er is geen gesprek: de medewerker handelt het verzoek af."
+
+msgid "admin.flows.kind_follows"
+msgstr "Deze gegevens volgen het opgeslagen contactkanaal. Sla het concept op na een wijziging."
+
+msgid "admin.flows.readout.ready"
+msgstr "Gereed voor behandeling: {policy}"
+
+msgid "admin.flows.readout.action"
+msgstr "Eerste actie van de medewerker: {action}"
+
+msgid "admin.flows.readout.none"
+msgstr "Kies een contactkanaal en sla het concept op om te zien wanneer een verzoek gereed is en wat de medewerker als eerste doet."
+
+msgid "admin.flows.ready.explicit_check_in"
+msgstr "wanneer de deelnemer zich meldt"
+
+msgid "admin.flows.ready.media_presence"
+msgstr "zodra de deelnemer in de videoruimte is"
+
+msgid "admin.flows.ready.automatic"
+msgstr "direct, zonder aparte melding"
+
+msgid "admin.flows.action.open_video"
+msgstr "de videoruimte openen"
+
+msgid "admin.flows.action.view_request"
+msgstr "het verzoek bekijken"
+
+msgid "admin.flows.action.call"
+msgstr "de deelnemer bellen"
+
+msgid "admin.flows.action.assign_workstation"
+msgstr "een werkplek toewijzen"
+
+msgid "admin.flows.first_action"
+msgstr "Eerste actie van de medewerker"
+
+msgid "admin.flows.to_follow"
+msgstr "{label} (volgt)"
+
+msgid "admin.flows.duration"
+msgstr "Verwachte duur (minuten)"
+
+msgid "admin.flows.duration_hint"
+msgstr "Een duur van {minimum} tot {maximum} minuten, in stappen van {step}."
+
+msgid "admin.flows.pool"
+msgstr "Capaciteitspool"
+
+msgid "admin.flows.pool.none"
+msgstr "Kies een capaciteitspool"
+
+msgid "admin.flows.pool.archived"
+msgstr "{name} (gearchiveerd)"
+
+msgid "admin.flows.pool.legacy"
+msgstr "Eigen bezetting (bestaand)"
+
+msgid "admin.flows.pool_hint"
+msgstr "Een nieuwe flow put uit een capaciteitspool van de organisatie, niet uit de eigen bezetting van de dienst."
+
+msgid "admin.flows.pool_managed"
+msgstr "Capaciteitspools beheert de organisatiebeheerder."
+
+msgid "admin.flows.pool_managed_link"
+msgstr "Naar vaardigheden en capaciteit"
+
+msgid "admin.flows.required_skills"
+msgstr "Vereiste vaardigheden"
+
+msgid "admin.flows.required_skills_hint"
+msgstr "Iedere medewerker die een verzoek van deze flow oppakt, heeft al deze vaardigheden. De pool moet ze garanderen."
+
+msgid "admin.flows.subjects_table"
+msgstr "Onderwerpen in deze flow"
+
+msgid "admin.flows.subjects_hint"
+msgstr "Vink aan welke onderwerpen van de dienst deze flow aanbiedt en welke extra vaardigheden een onderwerp vraagt."
+
+msgid "admin.flows.subject"
+msgstr "Onderwerp"
+
+msgid "admin.flows.offered"
+msgstr "Aangeboden"
+
+msgid "admin.flows.extra_skills"
+msgstr "Extra vaardigheden"
+
+msgid "admin.flows.extra_skills_for"
+msgstr "Extra vaardigheden voor {subject}"
+
+msgid "admin.flows.no_subjects"
+msgstr "Deze dienst heeft nog geen onderwerpen."
+
+msgid "admin.flows.no_subjects_link"
+msgstr "Onderwerpen beheert u bij de instellingen."
+
+msgid "admin.flows.dispatch"
+msgstr "Waar gaan verzoeken naartoe?"
+
+msgid "admin.flows.dispatch.own_queue"
+msgstr "Eigen wachtrij"
+
+msgid "admin.flows.dispatch.contact_center"
+msgstr "Contactcenter"
+
+msgid "admin.flows.completion"
+msgstr "Wat rondt een verzoek af?"
+
+msgid "admin.flows.completion.operator"
+msgstr "De medewerker rondt het af"
+
+msgid "admin.flows.completion.provider_event"
+msgstr "Een gebeurtenis van de aanbieder"
+
+msgid "admin.flows.completion.legacy_video_observation"
+msgstr "Waarneming van het videogesprek (bestaand)"
+
+msgid "admin.flows.data_legend"
+msgstr "Welke gegevens vraagt u?"
+
+msgid "admin.flows.data_hint"
+msgstr "De naam wordt altijd gevraagd."
+
+msgid "admin.flows.collects_email"
+msgstr "E-mailadres (nodig voor een bevestiging per e-mail)"
+
+msgid "admin.flows.collects"
+msgstr "Gevraagde gegevens"
+
+msgid "admin.flows.collects_name_only"
+msgstr "Alleen de naam"
+
+msgid "admin.flows.defaults_legend"
+msgstr "Standaardflow"
+
+msgid "admin.flows.defaults_hint"
+msgstr "Een dienst heeft per aanmeldweg hoogstens één standaardflow. De opties staan open voor de aanmeldwegen die de flow aanbiedt; sla het concept op na een wijziging van het aanmelden."
+
+msgid "admin.flows.defaults_fixed"
+msgstr "Zodra een flow een gepubliceerde revisie heeft, staan de standaardwegen vast."
+
+msgid "admin.flows.default_appointment"
+msgstr "Standaard voor afspraken"
+
+msgid "admin.flows.default_on_demand"
+msgstr "Standaard voor direct"
+
+msgid "admin.flows.save_hint"
+msgstr "Een concept mag onvolledig zijn. Het controlelijstje laat zien wat nog ontbreekt."
+
+msgid "admin.flows.save"
+msgstr "Concept opslaan"
+
+msgid "admin.flows.state.draft"
+msgstr "Concept"
+
+msgid "admin.flows.state.active"
+msgstr "Actief"
+
+msgid "admin.flows.state.archived"
+msgstr "Gearchiveerd"
+
+msgid "admin.flows.ready_word.ok"
+msgstr "In orde"
+
+msgid "admin.flows.ready_word.missing"
+msgstr "Ontbreekt"
+
+msgid "admin.flows.ready_word.follows"
+msgstr "Volgt"
+
+msgid "admin.flows.ready_heading.ready"
+msgstr "Deze flow is klaar voor gebruik"
+
+msgid "admin.flows.ready_heading.not_ready"
+msgstr "Deze flow is nog niet klaar voor gebruik"
+
+msgid "admin.flows.ready_count"
+msgstr "{done} van {total} punten in orde."
+
+msgid "admin.flows.basis_draft"
+msgstr "Beoordeeld op het opgeslagen concept (revisie {revision})."
+
+msgid "admin.flows.basis_published"
+msgstr "Beoordeeld op de gepubliceerde revisie ({revision})."
+
+msgid "admin.flows.check.data"
+msgstr "Naam en aanmelden"
+
+msgid "admin.flows.check.capacity"
+msgstr "Capaciteit"
+
+msgid "admin.flows.check.skills"
+msgstr "Vaardigheden"
+
+msgid "admin.flows.check.dispatch"
+msgstr "Contactkanaal en afhandeling"
+
+msgid "admin.flows.check.completion"
+msgstr "Afronden"
+
+msgid "admin.flows.check.retention"
+msgstr "Bewaren en verwijderen"
+
+msgid "admin.flows.reason.labels_invalid"
+msgstr "De naam ontbreekt in het Nederlands of het Engels, of is ongeldig."
+
+msgid "admin.flows.reason.intake_missing"
+msgstr "Kies minstens één manier van aanmelden."
+
+msgid "admin.flows.reason.pool_missing"
+msgstr "Kies een capaciteitspool."
+
+msgid "admin.flows.reason.pool_archived"
+msgstr "De gekozen capaciteitspool is gearchiveerd. Kies een andere."
+
+msgid "admin.flows.reason.duration"
+msgstr "Vul een geldige verwachte duur in."
+
+msgid "admin.flows.reason.pool_does_not_guarantee"
+msgstr "De capaciteitspool garandeert niet alle vaardigheden die deze flow of een van de onderwerpen vraagt."
+
+msgid "admin.flows.reason.subject_unknown"
+msgstr "Een onderwerp van deze flow bestaat niet meer bij de dienst."
+
+msgid "admin.flows.reason.kind_missing"
+msgstr "Kies een contactkanaal."
+
+msgid "admin.flows.reason.dispatch_missing"
+msgstr "Kies waar verzoeken naartoe gaan."
+
+msgid "admin.flows.reason.action_not_allowed"
+msgstr "De eerste actie van de medewerker past niet bij het contactkanaal."
+
+msgid "admin.flows.reason.location_missing"
+msgstr "Voor deze actie is een locatie nodig."
+
+msgid "admin.flows.reason.not_built_yet"
+msgstr "Dit onderdeel van OpenPlanner volgt in een latere versie."
+
+msgid "admin.flows.reason.completion_missing"
+msgstr "Kies wat een verzoek afrondt."
+
+msgid "admin.flows.reason.completion_legacy_only"
+msgstr "Deze afronding is alleen voor bestaande diensten en kan niet worden gekozen."
+
+msgid "admin.flows.summary.none"
+msgstr "Niet ingesteld"
+
+msgid "admin.flows.summary.minutes"
+msgstr "{minutes} minuten"
+
+msgid "admin.flows.published_heading"
+msgstr "Gepubliceerde revisie {revision}"
+
+msgid "admin.flows.published_lead"
+msgstr "Een gepubliceerde revisie verandert niet meer. Wilt u iets wijzigen, bereid dan een nieuwe revisie voor."
+
+msgid "admin.flows.actions_heading"
+msgstr "Wat u met deze flow kunt doen"
+
+msgid "admin.flows.prepare_heading"
+msgstr "Nieuwe revisie voorbereiden"
+
+msgid "admin.flows.prepare_hint"
+msgstr "Maakt een concept als kopie van de gepubliceerde revisie. De gepubliceerde revisie blijft ongewijzigd tot u het concept publiceert."
+
+msgid "admin.flows.prepare"
+msgstr "Nieuwe revisie voorbereiden"
+
+msgid "admin.flows.publish_heading"
+msgstr "Concept publiceren"
+
+msgid "admin.flows.publish_hint"
+msgstr "Publiceert het opgeslagen concept als nieuwe revisie. Publiceren activeert de flow niet. Sla eerst op wat u in het formulier wijzigde."
+
+msgid "admin.flows.publish"
+msgstr "Concept publiceren"
+
+msgid "admin.flows.activate_heading"
+msgstr "Flow activeren"
+
+msgid "admin.flows.activate_not_ready"
+msgstr "Activeren kan zodra alle punten in orde zijn."
+
+msgid "admin.flows.activate_ready"
+msgstr "Alle punten van de gepubliceerde revisie zijn in orde. Na het activeren gaan verzoeken door deze flow."
+
+msgid "admin.flows.activate_publish_first"
+msgstr "Activeren kan zodra alle punten in orde zijn. Publiceer daarvoor eerst een revisie."
+
+msgid "admin.flows.activate"
+msgstr "Flow activeren"
+
+msgid "admin.flows.discard_link"
+msgstr "Concept weggooien"
+
+msgid "admin.flows.archive_link"
+msgstr "Flow archiveren"
+
+msgid "admin.flows.discard_title"
+msgstr "Concept weggooien"
+
+msgid "admin.flows.discard_button"
+msgstr "Concept weggooien"
+
+msgid "admin.flows.discard_lead"
+msgstr "U gooit het concept van deze flow weg."
+
+msgid "admin.flows.discard_none"
+msgstr "Deze flow heeft geen concept om weg te gooien."
+
+msgid "admin.flows.discard_effect_draft"
+msgstr "Wat u in het concept heeft ingesteld, gaat verloren."
+
+msgid "admin.flows.discard_effect_published"
+msgstr "De gepubliceerde revisie blijft zoals ze is."
+
+msgid "admin.flows.discard_effect_gone"
+msgstr "De flow is nog nooit gepubliceerd en verdwijnt uit de lijst."
+
+msgid "admin.flows.archive_title"
+msgstr "Flow archiveren"
+
+msgid "admin.flows.archive_button"
+msgstr "Flow archiveren"
+
+msgid "admin.flows.archive_lead"
+msgstr "U archiveert een actieve flow."
+
+msgid "admin.flows.archive_not_active"
+msgstr "Alleen een actieve flow kan worden gearchiveerd. Een flow in concept haalt u weg door het concept weg te gooien."
+
+msgid "admin.flows.archive_effect_new"
+msgstr "Er komen geen nieuwe verzoeken meer binnen via deze flow."
+
+msgid "admin.flows.archive_effect_keeps"
+msgstr "Bestaande verzoeken houden de flow waarmee ze zijn gemaakt."
+
+msgid "admin.flows.archive_effect_listed"
+msgstr "De flow blijft zichtbaar onder de gearchiveerde flows."
+
+msgid "admin.flows.error.choice"
+msgstr "Een gekozen vaardigheid is niet langer beschikbaar of er zijn er te veel gekozen. Laad de pagina opnieuw en kies opnieuw."
+
+msgid "admin.flows.error.code_taken"
+msgstr "Deze code wordt al gebruikt door een flow van deze dienst. Kies een andere."
+
+msgid "admin.flows.error.limit"
+msgstr "Deze dienst heeft het maximale aantal flows. Archiveer eerst een flow die u niet meer gebruikt."
+
+msgid "admin.flows.error.no_draft"
+msgstr "Deze flow heeft geen concept."
+
+msgid "admin.flows.error.state"
+msgstr "Dat kan niet in de huidige status van deze flow."
+
+msgid "admin.flows.error.default_taken"
+msgstr "Een andere actieve flow van deze dienst is al de standaard voor deze aanmeldweg."
+
+msgid "admin.flows.error.not_ready"
+msgstr "De flow is niet geactiveerd: niet alle punten van de gepubliceerde revisie zijn in orde."
+
+msgid "admin.form.error.flow_code"
+msgstr "Gebruik alleen kleine letters, cijfers en streepjes, beginnend met een letter of cijfer (hoogstens 40 tekens). De code “new” is gereserveerd."
+
+msgid "admin.form.error.flow_labels"
+msgstr "Vul de naam in het Nederlands en in het Engels in (elk hoogstens 80 tekens, zonder stuurtekens)."
+
+msgid "admin.form.error.flow_choice"
+msgstr "Deze keuze bestaat niet meer of kan niet worden gekozen. Laad de pagina opnieuw en kies opnieuw."
+
+msgid "admin.form.error.flow_default_for"
+msgstr "Een flow kan alleen de standaard zijn voor een aanmeldweg die hij zelf aanbiedt."
+
+msgid "admin.done.flow_created"
+msgstr "De flow is aangemaakt als concept."
+
+msgid "admin.done.flow_saved"
+msgstr "Het concept is opgeslagen."
+
+msgid "admin.done.flow_prepared"
+msgstr "Er is een concept van een nieuwe revisie voorbereid."
+
+msgid "admin.done.flow_published"
+msgstr "Het concept is gepubliceerd. De flow is daarmee niet geactiveerd."
+
+msgid "admin.done.flow_discarded"
+msgstr "Het concept is weggegooid."
+
+msgid "admin.done.flow_discarded_gone"
+msgstr "Het concept is weggegooid en de flow is verdwenen."
+
+msgid "admin.done.flow_activated"
+msgstr "De flow is geactiveerd."
+
+msgid "admin.done.flow_archived"
+msgstr "De flow is gearchiveerd."
+
+msgid "admin.audit.detail.flow_created"
+msgstr "Flow aangemaakt"
+
+msgid "admin.audit.detail.flow_draft_saved"
+msgstr "Concept van een flow opgeslagen"
+
+msgid "admin.audit.detail.flow_published"
+msgstr "Flow gepubliceerd"
+
+msgid "admin.audit.detail.flow_draft_discarded"
+msgstr "Concept van een flow weggegooid"
+
+msgid "admin.audit.detail.flow_activated"
+msgstr "Flow geactiveerd"
+
+msgid "admin.audit.detail.flow_archived"
+msgstr "Flow gearchiveerd"
+
+msgid "admin.audit.detail.flow"
+msgstr "flow {value}"
+
+msgid "admin.audit.detail.revision"
+msgstr "revisie {value}"
+
+msgid "admin.flows.defaults"
+msgstr "Standaard voor"
+
+msgid "admin.flows.subjects"
+msgstr "Onderwerpen"

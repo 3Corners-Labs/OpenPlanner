@@ -1,0 +1,73 @@
+{#- The flows of a service (ADR 0121 step 2d): the list under Settings, sub-tab Flows. A flow's name decides nothing; the table says what each flow does. A service's existing way of working is listed read-only. -#}
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.flows.title") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% include "_error_summary.html" %}
+<section class="card" id="flows" aria-labelledby="flows-heading">
+  <div class="card__header">
+    <h2 id="flows-heading">{% if archived %}{{ _("admin.flows.archived_heading") }}{% else %}{{ _("admin.flows.count", count=rows | length) }}{% endif %}</h2>
+    <p class="card__lead">{{ _("admin.flows.lead") }}</p>
+  </div>
+  <form method="get" action="/admin/groups/{{ summary.group.slug }}/flows#flows" aria-labelledby="flows-heading">
+    <div class="inline-forms">
+      <div class="choice__option">
+        <input type="checkbox" id="flows-archived" name="flows" value="archived"{% if archived %} checked{% endif %}>
+        <label for="flows-archived">{{ _("admin.flows.archived_only") }}</label>
+      </div>
+      <button type="submit" class="button button--secondary">{{ _("admin.skills_capacity.filter") }}<span class="visually-hidden"> {{ _("admin.flows.filter_flows") }}</span></button>
+    </div>
+  </form>
+  {% if rows %}
+  <div class="table-scroll" role="region" aria-labelledby="flows-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.flows.title") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.flows.col.name") }}</th>
+        <th scope="col">{{ _("admin.flows.col.code") }}</th>
+        <th scope="col">{{ _("admin.flows.col.intake") }}</th>
+        <th scope="col">{{ _("admin.flows.col.channel") }}</th>
+        <th scope="col">{{ _("admin.flows.col.pool") }}</th>
+        <th scope="col">{{ _("admin.flows.col.skills") }}</th>
+        <th scope="col">{{ _("admin.flows.col.state") }}</th>
+        <th scope="col">{{ _("admin.actions") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <th scope="row">{{ row.name }}{% if row.other_name %}<br><span class="muted">{{ row.other_name }}</span>{% endif %}{% if row.legacy %}<br><span class="muted">{{ _("admin.flows.legacy_note") }}</span>{% endif %}</th>
+        <td><code>{{ row.code }}</code></td>
+        <td>{{ row.intake }}</td>
+        <td>{% if row.channel %}{{ row.channel }}{% else %}<span class="muted">{{ _("admin.flows.not_chosen") }}</span>{% endif %}</td>
+        <td>{% if row.pool %}{{ row.pool }}{% else %}<span class="muted">{{ _("admin.flows.not_chosen") }}</span>{% endif %}</td>
+        <td>{% if row.skills %}{{ row.skills | join(", ") }}{% else %}<span class="muted">{{ _("admin.flows.no_skills") }}</span>{% endif %}</td>
+        <td>
+          <span class="chip">{{ row.state }}</span>
+          {% if row.in_progress %}<span class="chip chip--accent chip--wrap">{{ _("admin.flows.in_progress") }}</span>{% endif %}
+        </td>
+        <td>
+          {% if row.legacy %}<span class="muted">{{ _("admin.flows.read_only") }}</span>
+          {% else %}
+          <ul class="row-actions">
+            <li><a href="/admin/groups/{{ summary.group.slug }}/flows/{{ row.code }}">{% if row.archived %}{{ _("admin.flows.view") }}{% else %}{{ _("admin.edit") }}{% endif %}<span class="visually-hidden"> {{ row.name }}</span></a></li>
+          </ul>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{% if archived %}{{ _("admin.flows.none_archived") }}{% else %}{{ _("admin.flows.none") }}{% endif %}</p>
+  {% endif %}
+  {% if can_add %}
+  <p><a class="button" href="/admin/groups/{{ summary.group.slug }}/flows/new">{{ _("admin.flows.new") }}</a></p>
+  {% elif not archived %}
+  <div class="alert alert--warning" role="note" id="{{ limit_notice }}"><p>{{ _("admin.flows.limit_reached", count=limit) }}</p></div>
+  {% endif %}
+</section>
+{% endblock %}
