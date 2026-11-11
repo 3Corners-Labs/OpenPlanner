@@ -287,7 +287,12 @@ async def mark(site: Site, monkeypatch: pytest.MonkeyPatch) -> Fixture:
         pool = await tx.save_capacity_pool(
             Scope(everything=True),
             CapacityPool(
-                None, organisation.id, "Loket", PoolMode.COUNTED, frozenset({skill.id or 0})
+                None,
+                organisation.id,
+                "Loket",
+                PoolMode.COUNTED,
+                frozenset({skill.id or 0}),
+                code="loket",
             ),
         )
         found.skill_id, found.pool_id = skill.id or 0, pool.id or 0

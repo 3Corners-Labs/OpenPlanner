@@ -35,6 +35,7 @@ from app.domain.capacity import (
     PoolMode,
     check_pool_archive,
     check_pool_save,
+    same_name,
 )
 from app.domain.errors import missing_object
 from app.domain.service_flows import FlowState
@@ -63,6 +64,7 @@ async def pools_from_rows(
             frozenset(guaranteed[row.id]),
             row.archived_at,
             row.group_id,
+            row.code,
         )
         for row in rows
     ]
@@ -128,7 +130,8 @@ class CapacityPoolQueries:
     async def save_capacity_pool(self, scope: Scope, pool: CapacityPool) -> CapacityPool:
         """Insert the pool (no id) or update its name and guaranteed skills; return it stored.
 
-        A pool's mode and group never change.
+        A pool's mode, group and code never change; a counted pool stored without a code (a row
+        from before migration 0110) keeps none.
 
         Raises:
             DomainError: ``configuration_object_missing`` for an organisation or pool that does
@@ -154,6 +157,27 @@ class CapacityPoolQueries:
             is not None
         )
         held = stored.guaranteed_skill_ids if stored else frozenset[int]()
+        same_code = pool.code is not None and (
+            await self._session.scalar(
+                select(CapacityPoolRow.id).where(
+                    CapacityPoolRow.organisation_id == pool.organisation_id,
+                    CapacityPoolRow.code == pool.code,
+                    CapacityPoolRow.id != (pool.id or 0),
+                )
+            )
+            is not None
+        )
+        same_name_exists = pool.mode is PoolMode.COUNTED and any(
+            same_name(name) == same_name(pool.name)
+            for name in await self._session.scalars(
+                select(CapacityPoolRow.name).where(
+                    CapacityPoolRow.organisation_id == pool.organisation_id,
+                    CapacityPoolRow.mode == PoolMode.COUNTED.value,
+                    CapacityPoolRow.archived_at.is_(None),
+                    CapacityPoolRow.id != (pool.id or 0),
+                )
+            )
+        )
         check_pool_save(
             pool,
             stored,
@@ -161,10 +185,15 @@ class CapacityPoolQueries:
             await load_skills(self._session, pool.guaranteed_skill_ids),
             held,
             group_taken=group_taken,
+            same_code_exists=same_code,
+            same_name_exists=same_name_exists,
         )
         if row is None:
             row = CapacityPoolRow(
-                organisation_id=pool.organisation_id, mode=pool.mode.value, group_id=pool.group_id
+                organisation_id=pool.organisation_id,
+                mode=pool.mode.value,
+                group_id=pool.group_id,
+                code=pool.code,
             )
         row.name = pool.name
         self._session.add(row)

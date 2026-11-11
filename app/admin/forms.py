@@ -291,6 +291,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "skill_code": "admin.form.error.skill_code",
     "skill_label": "admin.form.error.skill_label",
     "pool_name": "admin.form.error.pool_name",
+    "pool_code": "admin.form.error.pool_code",
 }
 """Message per field for ``invalid_configuration``; the key is also the input's id."""
 

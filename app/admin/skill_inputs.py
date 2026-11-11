@@ -139,6 +139,10 @@ def refuse(form: FormData, error: DomainError, locale: RequestLocale, choice_fie
     _ = locale.gettext
     if error.code is ErrorCode.SLUG_TAKEN and error.field == "skill_code":
         form.errors.append(FormError("skill_code", _("admin.skills.error.code_taken")))
+    elif error.code is ErrorCode.SLUG_TAKEN and error.field == "pool_code":
+        form.errors.append(FormError("pool_code", _("admin.capacity.error.code_taken")))
+    elif error.code is ErrorCode.SLUG_TAKEN and error.field == "pool_name":
+        form.errors.append(FormError("pool_name", _("admin.capacity.error.name_taken")))
     elif error.field == "skill_limit":
         form.errors.append(FormError(SKILL_LIMIT_NOTICE, _("admin.skills.error.limit")))
     elif error.field == "pool_limit":

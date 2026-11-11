@@ -167,3 +167,85 @@ def test_a_pool_that_a_flow_draws_on_cannot_be_archived() -> None:
 def test_a_pool_flow_list_defaults_to_no_flows_and_none_hidden() -> None:
     assert PoolFlows() == PoolFlows((), 0)
     assert PoolFlows((1, 2), 3).hidden == 3
+
+
+# --- the stable code of a counted pool (ADR 0121 step 2f) -------------------------------------
+
+
+@pytest.mark.parametrize("code", ["", "Loket", "-loket", "lo ket", "x" * 41, "lo_ket"])
+def test_a_counted_pool_needs_a_code_in_the_grammar_of_a_skill_code(code: str) -> None:
+    with pytest.raises(DomainError) as caught:
+        pool(code=code)
+    assert (caught.value.code, caught.value.field) == (ErrorCode.INVALID_CONFIGURATION, "pool_code")
+
+
+def test_a_legacy_pool_has_no_code() -> None:
+    assert legacy_pool().code is None
+    with pytest.raises(DomainError) as caught:
+        replace(legacy_pool(), code="balie")
+    assert (caught.value.code, caught.value.field) == (ErrorCode.INVALID_CONFIGURATION, "pool_code")
+    assert pool(code="x" * 40).code == "x" * 40
+    assert pool(code="0-a").code == "0-a"
+
+
+def test_a_taken_code_or_name_is_refused_with_the_duplicate_error() -> None:
+    new = replace(pool(), id=None)
+    assert refusal(
+        lambda: check_pool_save(new, None, None, {}, frozenset(), same_code_exists=True)
+    ) == (
+        ErrorCode.SLUG_TAKEN,
+        "pool_code",
+    )
+    assert refusal(
+        lambda: check_pool_save(new, None, None, {}, frozenset(), same_name_exists=True)
+    ) == (
+        ErrorCode.SLUG_TAKEN,
+        "pool_name",
+    )
+
+
+def test_a_name_clash_is_only_asked_of_a_new_pool_or_a_changed_name() -> None:
+    stored = pool(name="Loket")
+    check_pool_save(stored, stored, None, {}, frozenset(), same_name_exists=True)  # unchanged
+    check_pool_save(  # only case and spaces differ: still the same name
+        replace(stored, name=" LOKET "), stored, None, {}, frozenset(), same_name_exists=True
+    )
+    renamed = replace(stored, name="Kantoor")
+    assert refusal(
+        lambda: check_pool_save(renamed, stored, None, {}, frozenset(), same_name_exists=True)
+    ) == (ErrorCode.SLUG_TAKEN, "pool_name")
+    # a legacy pool takes the name of its service and is never compared
+    check_pool_save(legacy_pool(), None, 1, {}, frozenset(), same_name_exists=True)
+
+
+def test_the_code_is_fixed_after_creation() -> None:
+    stored = pool(code="loket")
+    check_pool_save(stored, stored, None, {}, frozenset())
+    assert refusal(
+        lambda: check_pool_save(replace(stored, code="ander"), stored, None, {}, frozenset())
+    ) == (ErrorCode.INVALID_CONFIGURATION, "pool_code")
+
+
+def test_a_new_counted_pool_needs_a_code_but_a_stored_one_may_lack_it() -> None:
+    with pytest.raises(DomainError) as caught:
+        replace(pool(code=None), id=None)
+    assert (caught.value.code, caught.value.field) == (ErrorCode.INVALID_CONFIGURATION, "pool_code")
+    assert pool(code=None).code is None  # a row from before the column existed
+
+
+def test_a_stored_pool_without_a_code_saves_without_one_and_blocks_nothing() -> None:
+    stored = pool(code=None)
+    check_pool_save(stored, stored, None, {}, frozenset())
+    check_pool_save(replace(stored, name="Ander"), stored, None, {}, frozenset())
+    # Nothing is compared or looked up for a pool that has no code.
+    check_pool_save(
+        replace(stored, code="nieuw"), stored, None, {}, frozenset(), same_code_exists=True
+    )
+    # A pool with a code is still fixed and still unique.
+    coded = pool(code="loket")
+    assert refusal(
+        lambda: check_pool_save(replace(coded, code=None), coded, None, {}, frozenset())
+    ) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "pool_code",
+    )

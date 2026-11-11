@@ -512,7 +512,8 @@ erDiagram
         int granted_by
     }
     CAPACITY_POOL {
-        string name
+        string name "unique among counted pools not archived"
+        string code "counted only, unique per organisation, fixed"
         string mode "legacy_group | counted"
         int group_id "set only for legacy_group"
         datetime archived_at
