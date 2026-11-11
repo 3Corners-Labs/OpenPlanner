@@ -12988,7 +12988,7 @@ msgid "admin.flows.ready_count"
 msgstr "{done} van {total} punten in orde."
 
 msgid "admin.flows.ready_follows_note"
-msgstr "Punten die ‘Volgt’ tonen, kunt u zelf niet oplossen."
+msgstr "Punten die ‘{word}’ tonen, kunt u zelf niet oplossen."
 
 msgid "admin.flows.basis_draft"
 msgstr "Beoordeeld op het opgeslagen concept (revisie {revision})."
@@ -13209,6 +13209,12 @@ msgstr "Een gekozen vaardigheid is niet langer beschikbaar of er zijn er te veel
 msgid "admin.flows.error.code_taken"
 msgstr "Deze code wordt al gebruikt door een flow van deze dienst. Kies een andere."
 
+msgid "admin.flows.error.code_reserved"
+msgstr "De code “new” is gereserveerd en kan niet worden gebruikt. Kies een andere."
+
+msgid "admin.flows.publish_blocked_hint"
+msgstr "Publiceren kan pas als alle punten in orde zijn, behalve de punten die nog volgen."
+
 msgid "admin.flows.error.code_required"
 msgstr "Vul een code in."
 
@@ -13237,7 +13243,7 @@ msgid "admin.flows.notice.action_adjusted"
 msgstr "De eerste actie is aangepast aan het gekozen contactkanaal."
 
 msgid "admin.form.error.flow_code"
-msgstr "Gebruik alleen kleine letters, cijfers en streepjes, beginnend met een letter of cijfer (hoogstens 40 tekens). De code “new” is gereserveerd."
+msgstr "Gebruik alleen kleine letters, cijfers en streepjes, beginnend met een letter of cijfer (hoogstens 40 tekens)."
 
 msgid "admin.form.error.flow_labels"
 msgstr "Vul de naam in het Nederlands en in het Engels in (elk hoogstens 80 tekens, zonder stuurtekens)."

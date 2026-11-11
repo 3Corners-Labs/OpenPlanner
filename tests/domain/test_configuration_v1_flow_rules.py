@@ -967,3 +967,30 @@ def test_the_world_of_a_resolution_is_read_once_whatever_the_number_of_rules(
 
     assert result.ok
     assert reads == [1]
+
+
+def test_every_revision_a_document_newly_publishes_in_an_existing_flow_needs_its_checklist() -> (
+    None
+):
+    data = document_json()
+    next_revision(data)
+    advies(data)["revisions"][2]["capacity_pool"] = None  # revision 3: published, not ready
+
+    assert refusals(plan(data, full())) == [
+        (f"{FLOW}.revisions[3]", ErrorCode.INVALID_CONFIGURATION, "readiness")
+    ]
+
+
+def test_two_new_publications_in_order_are_accepted() -> None:
+    data = document_json()
+    next_revision(data)
+
+    assert plan(data, full()).ok
+
+
+def test_a_restored_flow_may_hold_an_unready_published_revision_that_is_not_current() -> None:
+    data = document_json()
+    next_revision(data)
+    advies(data)["revisions"][1]["capacity_pool"] = None
+
+    assert plan(data, empty_flows()).ok

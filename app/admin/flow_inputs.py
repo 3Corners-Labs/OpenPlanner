@@ -188,6 +188,7 @@ def parse_draft(
 FLOW_REFUSALS = RefusalTable(
     (
         Rule("flow_code", "admin.flows.error.code_taken", "flow_code", ErrorCode.SLUG_TAKEN),
+        Rule("flow_code_reserved", "admin.flows.error.code_reserved", "flow_code"),
         Rule(LIMIT_FIELD, "admin.flows.error.limit", None),
         Rule("draft", "admin.flows.error.no_draft", None),
         Rule("state", "admin.flows.error.state", None),

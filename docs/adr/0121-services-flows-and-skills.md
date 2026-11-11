@@ -70,6 +70,8 @@ None in step 1: it changes labels only. The later steps add the following, each 
 | 20 | Ticket printing and management of intake devices | | follow-up |
 | 21 | A further contact-center platform adapter on the channel-independent task contract | | follow-up |
 | 22 | The role-name rule of ADR 0077 also refuses the previous shipped names (*Groepsbeheerder*, *Group admin*) and checks stored names after a catalogue change | | follow-up |
+| 23 | The built-in service admin may manage the flows of its own service (a change of the authorisation matrix: `group.edit` today belongs only to the organisation admin and the superuser; a decision PR) | | follow-up |
+| 24 | Split the accessibility suite over several runners (the job needs 28 to 30 minutes and grows with every admin page) | | follow-up |
 
 ## Consequences
 

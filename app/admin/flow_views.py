@@ -348,7 +348,7 @@ def readiness_view(
         _(HEADINGS[draft, state]),
         _("admin.flows.ready_count", done=done, total=len(items)),
         state is ReadinessState.COMPLETE,
-        _("admin.flows.ready_follows_note")
+        _("admin.flows.ready_follows_note", word=_("admin.flows.ready_word.follows"))
         if state is ReadinessState.COMPLETE_EXCEPT_FOLLOWING
         else "",
         tuple(rows),

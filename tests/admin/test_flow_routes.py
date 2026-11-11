@@ -1,10 +1,12 @@
 """The flows of a service (ADR 0121 step 2d): list, editor, checklist and the lifecycle actions."""
 
+import re
+
 import pytest
 
-from tests.admin.conftest import ORG_ADMIN, Site
+from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, Site
 from tests.support.admin_site import audit_log
-from tests.support.flow_pages import BASE, act, create, save
+from tests.support.flow_pages import BASE, act, create, form_data, save
 from tests.support.skill_seed import add_pool
 
 
@@ -113,3 +115,47 @@ async def test_an_action_that_does_not_fit_the_posted_channel_is_replaced_and_th
     assert "De eerste actie is aangepast aan het gekozen contactkanaal." in after.text
     quiet = await save(site, interaction_kind="telephone", handling_action="call")
     assert quiet.headers["location"] == f"{BASE}/advies?done=flow_saved"
+
+
+@pytest.mark.parametrize(
+    ("code", "message"),
+    [
+        ("", "Vul een code in."),
+        ("   ", "Vul een code in."),
+        ("New", "Gebruik alleen kleine letters, cijfers en streepjes"),
+        ("new", "De code “new” is gereserveerd en kan niet worden gebruikt."),
+        ("a b", "Gebruik alleen kleine letters, cijfers en streepjes"),
+        ("ABC", "Gebruik alleen kleine letters, cijfers en streepjes"),
+        ("-abc", "Gebruik alleen kleine letters, cijfers en streepjes"),
+        ("a" * 41, "hoogstens 40 tekens"),
+        ("appointment", "Deze code wordt al gebruikt"),
+        ("a.b", "Gebruik alleen kleine letters, cijfers en streepjes"),
+    ],
+)
+async def test_every_refused_flow_code_is_a_linked_field_error_with_its_own_message(
+    site: Site, code: str, message: str
+) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    response = await create(site, code)
+
+    assert response.status_code == 422
+    shown = re.search(r'id="flow_code-error"[^>]*>(.*?)</p>', response.text, re.DOTALL)
+    assert shown is not None
+    assert message in shown.group(1)
+    assert ("gereserveerd" in shown.group(1)) is (code == "new")
+    assert 'href="#flow_code"' in response.text
+
+
+async def test_the_refused_flow_codes_answer_in_english_too(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    data = {"": "Enter a code.", "new": "reserved", "a b": "Use only lower-case letters"}
+    for code, message in data.items():
+        response = await site.client.post(
+            f"{BASE}?lang=en", data=form_data(flow_code=code), headers=SAME_ORIGIN
+        )
+        shown = re.search(r'id="flow_code-error"[^>]*>(.*?)</p>', response.text, re.DOTALL)
+        assert response.status_code == 422
+        assert shown is not None
+        assert message in shown.group(1)
+        assert ("reserved" in shown.group(1)) is (code == "new")

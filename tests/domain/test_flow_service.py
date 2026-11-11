@@ -595,7 +595,7 @@ async def test_code_rules_the_reserved_new_and_taken_codes(
     assert taken.value.code is ErrorCode.SLUG_TAKEN
     assert (reserved.value.code, reserved.value.field) == (
         ErrorCode.INVALID_CONFIGURATION,
-        "flow_code",
+        "flow_code_reserved",
     )
     assert (bad.value.code, bad.value.field) == (ErrorCode.INVALID_CONFIGURATION, "flow_code")
 

@@ -302,6 +302,8 @@ async def test_the_checklist_names_what_it_judges_and_where_it_stands_in_its_hea
 
     assert "Het concept is volledig, op onderdelen na die nog volgen" in draft
     assert "Punten die ‘Volgt’ tonen, kunt u zelf niet oplossen." in draft
+    english = (await site.client.get(f"{BASE}/advies", params={"lang": "en"})).text
+    assert "Points marked ‘To follow’ cannot be fixed by you." in english
     assert "Het concept is nog niet volledig" in empty
     assert "kunt u zelf niet oplossen" not in empty
     assert "De gepubliceerde revisie is volledig, op onderdelen na die nog volgen" in published

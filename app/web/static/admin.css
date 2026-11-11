@@ -1260,8 +1260,17 @@ fieldset.card {
   .flow-editor__aside {
     grid-column: 2;
     grid-row: 1;
-    position: sticky;
-    top: 4.5rem;
+  }
+}
+
+/* The checklist stays in view beside the form only where the window is tall enough to show it
+   whole; on a short window it scrolls with the page, so its lower rows stay reachable. */
+@container (min-width: 56rem) {
+  @media (min-height: 40rem) {
+    .flow-editor__aside {
+      position: sticky;
+      top: 4.5rem;
+    }
   }
 }
 

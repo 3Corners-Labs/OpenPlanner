@@ -164,7 +164,7 @@
   </form>
   {% elif publish_blocked %}
   <h3 id="publish-heading">{{ _("admin.flows.publish_heading") }}</h3>
-  <p id="publish-hint">{{ _("admin.flows.error.not_ready_publish") }}</p>
+  <p class="hint" id="publish-hint">{{ _("admin.flows.publish_blocked_hint") }}</p>
   {% endif %}
   {% if activation %}
   <h3 id="activate-heading">{{ _("admin.flows.activate_heading") }}</h3>

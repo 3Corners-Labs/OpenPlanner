@@ -703,9 +703,10 @@ def _check_publication(run: _Run, address: Address, number: int, built: FlowRevi
     _check_references(
         run, address, built, built if stored is None else stored.current, restoring=stored is None
     )
-    if stored is not None and number == int_of(flow.fields, "current_revision"):
-        # A flow the installation has: the revision that newly becomes current is held to the
-        # portal's rule for publishing. A restored revision is history as it was recorded.
+    if stored is not None:
+        # A flow the installation has: every revision this document newly publishes is held to
+        # the portal's rule for publishing, as the portal gates each publish. A restored
+        # revision is history as it was recorded.
         pool = run.world.pool_by_id.get(built.capacity_pool_id or 0)
         check_publish_ready(
             readiness(built, pool, offered_subjects=run.world.subjects.get(address[1], ()))

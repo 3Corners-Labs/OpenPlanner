@@ -253,3 +253,12 @@ def test_a_long_system_status_state_takes_the_line_under_its_label() -> None:
     assert "white-space: normal" in _rule(".chip--wrap")
     assert "widget-list--status" in template
     assert "chip--wrap" in template
+
+
+def test_the_flow_checklist_sticks_only_in_a_window_tall_enough_to_show_it() -> None:
+    sheet = CSS_COMMENT.sub("", (STATIC / "admin.css").read_text())
+    tall = re.search(r"@media \(min-height: 40rem\) \{\s*\.flow-editor__aside \{([^}]*)\}", sheet)
+
+    assert tall is not None
+    assert "position: sticky" in tall.group(1)
+    assert "position: sticky" not in _rule(".flow-editor__aside")

@@ -50,12 +50,13 @@ async def test_a_draft_that_is_not_in_order_has_no_publish_button_but_the_reason
     assert (
         "Publiceren kan pas als alle punten in orde zijn, behalve de punten die nog volgen." in page
     )
+    assert '<p class="hint" id="publish-hint">Publiceren kan pas' in page
     assert refused.status_code == 422
     assert "Publiceren kan pas als alle punten in orde zijn" in refused.text
     assert 'id="readiness-heading"' in refused.text
     assert "Gepubliceerde revisie" not in (await site.client.get(f"{BASE}/advies")).text
     english = (await site.client.get(f"{BASE}/advies", params={"lang": "en"})).text
-    assert "You can only publish once every point is in order" in english
+    assert '<p class="hint" id="publish-hint">Publishing is possible once' in english
 
 
 async def test_a_draft_with_only_the_point_that_follows_open_offers_publish(site: Site) -> None:

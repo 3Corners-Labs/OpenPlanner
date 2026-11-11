@@ -172,3 +172,22 @@ async def test_a_legacy_pool_of_any_service_reads_as_a_pool_that_does_not_exist(
     assert await message(own) == unknown
     assert await message(other) == unknown
     assert "<code>advies</code>" not in (await site.client.get(DEMO)).text
+
+
+async def test_a_missing_and_a_foreign_skill_pool_and_flow_answer_alike(site: Site) -> None:
+    await site.login_as(ROLES["org_admin (andere)"])
+    their_pool = await add_pool(site, "Theirs", organisation="andere")
+    their_skill = await add_skill(site, "theirs", "Hun", "Theirs", organisation="andere")
+    await add_flow(site, "geheim", their_pool, group="andere-team", by=ROLES["org_admin (andere)"])
+    await site.login_as(ROLES["org_admin (demo)"])
+    org = "/admin/organisations/demo"
+    pairs = [
+        (f"{org}/skills/{their_skill}", f"{org}/skills/999999"),
+        (f"{org}/capacity/{their_pool}", f"{org}/capacity/999999"),
+        (f"{DEMO}/geheim", f"{DEMO}/bestaat-niet"),
+    ]
+
+    for foreign, missing in pairs:
+        theirs, nothing = await site.client.get(foreign), await site.client.get(missing)
+        assert theirs.status_code == nothing.status_code == 404, foreign
+        assert theirs.text == nothing.text, foreign

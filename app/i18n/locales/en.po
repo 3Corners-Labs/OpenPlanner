@@ -12975,7 +12975,7 @@ msgid "admin.flows.ready_count"
 msgstr "{done} of {total} points in order."
 
 msgid "admin.flows.ready_follows_note"
-msgstr "Points marked ‘To follow’ cannot be fixed by you."
+msgstr "Points marked ‘{word}’ cannot be fixed by you."
 
 msgid "admin.flows.basis_draft"
 msgstr "Judged on the saved draft (revision {revision})."
@@ -13196,6 +13196,12 @@ msgstr "A chosen skill is no longer available or too many are chosen. Reload the
 msgid "admin.flows.error.code_taken"
 msgstr "This code is already used by a flow of this service. Choose another."
 
+msgid "admin.flows.error.code_reserved"
+msgstr "The code “new” is reserved and cannot be used. Choose another."
+
+msgid "admin.flows.publish_blocked_hint"
+msgstr "Publishing is possible once every point is in order, except the points that are still to follow."
+
 msgid "admin.flows.error.code_required"
 msgstr "Enter a code."
 
@@ -13224,7 +13230,7 @@ msgid "admin.flows.notice.action_adjusted"
 msgstr "The first action was adjusted to the chosen contact channel."
 
 msgid "admin.form.error.flow_code"
-msgstr "Use only lower-case letters, digits and hyphens, starting with a letter or digit (at most 40 characters). The code “new” is reserved."
+msgstr "Use only lower-case letters, digits and hyphens, starting with a letter or digit (at most 40 characters)."
 
 msgid "admin.form.error.flow_labels"
 msgstr "Enter the name in Dutch and in English (each at most 80 characters, without control characters)."

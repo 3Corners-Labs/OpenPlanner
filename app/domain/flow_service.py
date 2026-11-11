@@ -68,6 +68,8 @@ DELETED = "flow.deleted"
 """Details of the audit events (action ``group.edit``); the flow's code and a revision follow."""
 RESERVED_CODES = frozenset({"new"})
 """Codes a flow may not have: they are the address of a page (``/flows/new``)."""
+RESERVED_CODE_FIELD = "flow_code_reserved"
+"""The field of the refusal of a reserved code, apart from ``flow_code`` (a wrong form)."""
 LIMIT_FIELD = "flow_limit"
 """The field of the refusal when the service has as many flows as the platform allows."""
 
@@ -388,8 +390,8 @@ class FlowService:
 
         Raises:
             DomainError: ``not_permitted``, ``group_not_found``, ``group_archived``,
-                ``invalid_configuration`` (``flow_code``, ``flow_limit``, what
-                ``check_draft_content`` and ``check_flow_references`` name), ``slug_taken``
+                ``invalid_configuration`` (``flow_code``, ``flow_code_reserved``, ``flow_limit``,
+                what ``check_draft_content`` and ``check_flow_references`` name), ``slug_taken``
                 (``flow_code``) or, for ``capacity_pool_id`` and ``required_skill_ids``,
                 ``configuration_object_missing`` and ``configuration_out_of_scope``.
         """
@@ -401,7 +403,7 @@ class FlowService:
             if _counted_flows(await tx.list_service_flows(scope, group.id)) >= self.max_flows:
                 raise _invalid(LIMIT_FIELD)
             if code.strip() in RESERVED_CODES:
-                raise _invalid("flow_code")
+                raise _invalid(RESERVED_CODE_FIELD)
             flow = ServiceFlow(
                 None,
                 group.id,
