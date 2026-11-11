@@ -10,10 +10,7 @@ from dataclasses import replace
 
 from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.errors import ErrorCode
-from tests.adapters.db import test_service_flow_contract as contract
-from tests.adapters.db.test_service_flow_contract import EVERYTHING, LATER, World, add_pool, refused
-
-world = contract.world  # the fixture of the shared cases: SQL adapter and fake
+from tests.support.flow_world import EVERYTHING, LATER, World, add_pool, refused
 
 
 async def codeless(world: World, name: str = "Loket") -> CapacityPool:

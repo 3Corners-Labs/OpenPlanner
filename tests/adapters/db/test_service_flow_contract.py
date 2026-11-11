@@ -8,142 +8,28 @@ functions of ``app.domain`` and are tested there; these tests pin what the two b
 and the scope every method filters by (an id outside the scope is a missing id).
 """
 
-from collections.abc import AsyncIterator, Awaitable, Callable
-from dataclasses import dataclass, replace
-from datetime import UTC, datetime
+from collections.abc import Awaitable, Callable
+from dataclasses import replace
+from datetime import datetime
 from typing import Any
 
 import pytest
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-from app.adapters.db.engine import create_engine
-from app.adapters.db.models import CapacityPoolRow, StaffSkillRow
-from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
 from app.domain.capacity import CapacityPool, PoolFlows, PoolMode
-from app.domain.errors import DomainError, ErrorCode
-from app.domain.routing import GroupRouting, Subject
-from app.domain.scheduling import Organisation
+from app.domain.errors import ErrorCode
 from app.domain.service_flows import FlowState, IntakeMode, ServiceFlow
 from app.domain.skills import Skill, SkillUsage
-from app.domain.staff import Membership, StaffMember, StaffStatus
-from tests.fakes.persistence import InMemoryUnitOfWork
+from app.domain.staff import StaffStatus
 from tests.support.domain import NOW, make_group
+from tests.support.flow_world import EVERYTHING, LATER, World, add_pool, person, refused
 from tests.support.service_flows import flow as make_flow
 from tests.support.service_flows import revision
 
-EVERYTHING = Scope(everything=True)
 ACME = Scope(organisations=frozenset({"acme"}))
 BETA = Scope(organisations=frozenset({"beta"}))
 ACME_GROUP = Scope(groups=frozenset({("acme", "balie")}))
 NOBODY = Scope()
-LATER = datetime(2026, 2, 1, 9, 0, tzinfo=UTC)
-
-
-@dataclass
-class World:
-    """Two organisations with a group and a staff member each, on either backend."""
-
-    uow: Any
-    acme: int
-    beta: int
-    acme_group: int
-    beta_group: int
-    acme_staff: int
-    beta_staff: int
-    both_staff: int
-    granted_by: Callable[[int, int], Awaitable[int | None]] | None
-    """Who granted a skill; only the SQL variant can read it (the port does not return it)."""
-    archive_pool_directly: Callable[[int], Awaitable[None]]
-    """Archive a pool behind the port's back, for a state the port refuses to produce."""
-    forget_pool_code: Callable[[int], Awaitable[None]]
-    """Clear a pool's code behind the port's back: a row written before migration 0110."""
-
-
-async def _seed(uow: Any) -> tuple[int, ...]:
-    """Seed through the port; return the ids of the organisations, groups and staff."""
-    async with uow.locked() as tx:
-        acme = await tx.add_organisation(Organisation(0, "Acme", "acme"))
-        beta = await tx.add_organisation(Organisation(0, "Beta", "beta"))
-        a_group = await tx.add_group(make_group(id=0, organisation_id=acme.id, slug="balie"))
-        b_group = await tx.add_group(make_group(id=0, organisation_id=beta.id, slug="loket"))
-        await tx.save_group_routing(
-            a_group.id,
-            GroupRouting(
-                subjects=(
-                    Subject.create("id", {"nl": "Id", "en": "Id"}),
-                    Subject.create("visa", {"nl": "Visum", "en": "Visa"}),
-                )
-            ),
-        )
-        for subject, slugs in (
-            ("sub-a", ["acme"]),
-            ("sub-b", ["beta"]),
-            ("sub-ab", ["acme", "beta"]),
-        ):
-            await tx.save_staff(person(subject, slugs))
-        ids = []
-        for subject in ("sub-a", "sub-b", "sub-ab"):
-            member = await tx.get_staff(subject)
-            assert member is not None
-            ids.append(member.id)
-    return acme.id, beta.id, a_group.id, b_group.id, *ids
-
-
-def person(subject: str, organisations: list[str]) -> StaffMember:
-    """Return a staff member with an organisation admin membership in each organisation."""
-    return StaffMember(
-        subject,
-        "Staff",
-        frozenset(),
-        frozenset({Membership("org_admin", slug) for slug in organisations}),
-        NOW,
-        NOW,
-        NOW,
-    )
-
-
-@pytest.fixture(params=["sql", "fake"])
-async def world(request: pytest.FixtureRequest, database_url: str) -> AsyncIterator[World]:
-    if request.param == "fake":
-        uow: Any = InMemoryUnitOfWork()
-
-        async def archive_in_fake(pool_id: int) -> None:
-            uow.state.pools[pool_id] = replace(uow.state.pools[pool_id], archived_at=NOW)
-
-        async def forget_in_fake(pool_id: int) -> None:
-            uow.state.pools[pool_id] = replace(uow.state.pools[pool_id], code=None)
-
-        ids = await _seed(uow)
-        yield World(uow, *ids, None, archive_in_fake, forget_in_fake)
-        return
-    engine: AsyncEngine = create_engine(database_url, busy_timeout_ms=200)
-    uow = SqlUnitOfWork(engine)
-
-    async def granted_by_sql(staff_id: int, skill_id: int) -> int | None:
-        async with AsyncSession(engine) as session:
-            return await session.scalar(
-                select(StaffSkillRow.granted_by).where(
-                    StaffSkillRow.staff_id == staff_id, StaffSkillRow.skill_id == skill_id
-                )
-            )
-
-    async def archive_in_sql(pool_id: int) -> None:
-        async with AsyncSession(engine) as session, session.begin():
-            await session.execute(
-                update(CapacityPoolRow).where(CapacityPoolRow.id == pool_id).values(archived_at=NOW)
-            )
-
-    async def forget_in_sql(pool_id: int) -> None:
-        async with AsyncSession(engine) as session, session.begin():
-            await session.execute(
-                update(CapacityPoolRow).where(CapacityPoolRow.id == pool_id).values(code=None)
-            )
-
-    ids = await _seed(uow)
-    yield World(uow, *ids, granted_by_sql, archive_in_sql, forget_in_sql)
-    await engine.dispose()
 
 
 def who_granted(world: World) -> Callable[[int, int], Awaitable[int | None]]:
@@ -153,41 +39,12 @@ def who_granted(world: World) -> Callable[[int, int], Awaitable[int | None]]:
     return world.granted_by
 
 
-def refused(code: ErrorCode, field: str | None = None) -> Any:
-    """Return a ``pytest.raises`` for a domain error with this code and field."""
-    return _Refusal(code, field)
-
-
-class _Refusal:
-    """Context manager asserting a ``DomainError`` of a given code and field."""
-
-    def __init__(self, code: ErrorCode, field: str | None) -> None:
-        self.code, self.field = code, field
-
-    def __enter__(self) -> None:
-        return None
-
-    def __exit__(self, kind: Any, error: Any, trace: Any) -> bool:
-        assert isinstance(error, DomainError), f"no DomainError, got {error!r}"
-        assert (error.code, error.field) == (self.code, self.field)
-        return True
-
-
 async def add_skill(world: World, code: str = "passport", organisation: str = "acme") -> Skill:
     """Store a skill of ``organisation`` and return it."""
     organisation_id = world.acme if organisation == "acme" else world.beta
     async with world.uow.locked() as tx:
         return await tx.save_skill(
             EVERYTHING, Skill(None, organisation_id, code, {"nl": code.title(), "en": code.title()})
-        )
-
-
-async def add_pool(world: World, name: str = "Loket", skills: frozenset[int] = frozenset()) -> Any:
-    """Store a counted pool of Acme and return it."""
-    async with world.uow.locked() as tx:
-        return await tx.save_capacity_pool(
-            EVERYTHING,
-            CapacityPool(None, world.acme, name, PoolMode.COUNTED, skills, code=name.lower()),
         )
 
 

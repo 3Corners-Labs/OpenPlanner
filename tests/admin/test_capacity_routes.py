@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.db.models import CapacityPoolRow
 from app.admin.capacity_views import flow_name, hidden_flows
 from app.domain.authorization import Scope
-from app.domain.capacity import CapacityPool, PoolMode
+from app.domain.capacity import PoolMode
 from app.domain.capacity_service import FlowRef
 from app.domain.service_flows import FlowState
 from app.i18n import Translator, load_catalogues
@@ -55,18 +55,19 @@ async def draw_on(site: Site, pool: int, code: str = "draft-one") -> None:
 
 
 async def legacy_pool(site: Site) -> int:
-    """Store a legacy pool of the demo group, as the migration's backfill does."""
+    """Return the legacy pool of the demo group, which every group has since ADR 0121 step 2e."""
     async with site_uow(site).locked() as tx:
         group = await tx.get_group("demo")
         organisation = await tx.get_organisation("demo")
         assert group is not None
         assert organisation is not None
-        stored = await tx.save_capacity_pool(
-            EVERYTHING,
-            CapacityPool(None, organisation.id, "Demo", PoolMode.LEGACY_GROUP, group_id=group.id),
-        )
-    assert stored.id is not None
-    return stored.id
+        await tx.ensure_default_flows(group.id)
+        pools = await tx.list_capacity_pools(EVERYTHING, organisation.id)
+    found = [pool for pool in pools if pool.group_id == group.id]
+    assert len(found) == 1
+    assert found[0].mode is PoolMode.LEGACY_GROUP
+    assert found[0].id is not None
+    return found[0].id
 
 
 async def test_a_counted_pool_is_added_with_its_skills_listed_and_audited(site: Site) -> None:

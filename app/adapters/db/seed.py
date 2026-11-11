@@ -40,6 +40,7 @@ from app.adapters.db.models import (
     ScheduleRuleRow,
 )
 from app.adapters.db.seed_usage import usage_example_cells
+from app.adapters.db.service_flows import ensure_default_flows_in
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.booking import Booking, BookingStatus, ChangeReason, Contact, Slot
 from app.domain.closure import Closure
@@ -562,6 +563,8 @@ async def _seed_group(
                         capacity=DEMO_CAPACITY,
                     )
                 )
+        await session.flush()
+        await ensure_default_flows_in(session, group.id)  # ADR 0121: the legacy pool and flows
         session.add(
             ReminderRuleRow(
                 group_id=group.id, channel="email", minutes_before=24 * 60, enabled=True
