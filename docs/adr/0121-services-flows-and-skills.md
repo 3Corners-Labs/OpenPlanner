@@ -43,7 +43,10 @@ None in step 1: it changes labels only. The later steps add the following, each 
 |---|---|---|---|
 | 0 | ADR and handover document | #712 | merged |
 | 1 | P1: *Group* is shown as *Dienst / Service* in both catalogues; technical identities unchanged | #712 | merged |
-| 2 | P2: ServiceFlow and revisions, SubjectFlow, Skill and StaffSkill, capacity pool records, legacy wrappers, configuration package | | planned |
+| 2a | Domain rules (skills, capacity pools, service flows and the readiness checklist, ServiceOffering) and the permissions `skills.manage` and `capacity.manage` | #PRNUM | merged |
+| 2b | Tables, migration and backfill of legacy pools and flows; configuration package | | planned |
+| 2c | Screens: skill catalogue, capacity pools, skill grants on staff | | planned |
+| 2d | Screens: flows tab and flow editor (draft and validate) | | planned |
 | 3 | P3: one flow resolver for page, widget, API and admin; interval accounting; new-pool admission | | planned |
 | 4 | P4: skill enforcement in the locked claim; pool guarantees; external skill mapping | | planned |
 | 5 | P5: generic request execution without video, optional contact data, watchdog and deletion | | planned |

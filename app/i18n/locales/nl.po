@@ -4979,6 +4979,12 @@ msgstr "Bewaartermijnen bekijken"
 msgid "authz.permission.embedding_manage"
 msgstr "Insluiten op websites beheren"
 
+msgid "authz.permission.skills_manage"
+msgstr "Vaardigheden beheren en toekennen"
+
+msgid "authz.permission.capacity_manage"
+msgstr "Capaciteitspools beheren"
+
 msgid "authz.permission.queue_work"
 msgstr "Afspraken oppakken in de eigen wachtrij"
 

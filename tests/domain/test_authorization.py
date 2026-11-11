@@ -94,6 +94,8 @@ def test_matrix_follows_handover_section_6() -> None:
         Permission.STAFF_MANAGE,  # ADR 0095
         Permission.STAFF_RESET_PASSWORD,  # ADR 0095
         Permission.EMBEDDING_MANAGE,  # ADR 0035
+        Permission.SKILLS_MANAGE,  # ADR 0121 point 11
+        Permission.CAPACITY_MANAGE,  # ADR 0121 point 11
         Permission.QUEUE_WORK,  # ADR 0043
         Permission.SETTINGS_ORGANISATION_MANAGE,  # ADR 0042: the own organisation's settings
         Permission.TEXTS_ORGANISATION_MANAGE,  # ADR 0004: the organisation's own wording
@@ -260,6 +262,15 @@ def test_every_permission_has_a_level() -> None:
         (ORG, Permission.EMBEDDING_MANAGE, OTHER_ORG, Decision(False, Reason.OUT_OF_SCOPE)),
         (GROUP, Permission.EMBEDDING_MANAGE, OWN_ORG, Decision(False, Reason.NOT_PERMITTED)),
         (AUDITOR, Permission.EMBEDDING_MANAGE, OWN_ORG, Decision(False, Reason.NOT_PERMITTED)),
+        # ADR 0121 point 11: skills and capacity pools, the organisation admin's alone.
+        (ORG, Permission.SKILLS_MANAGE, OWN_ORG, Decision(True, Reason.ORGANISATION)),
+        (ORG, Permission.SKILLS_MANAGE, OTHER_ORG, Decision(False, Reason.OUT_OF_SCOPE)),
+        (GROUP, Permission.SKILLS_MANAGE, OWN_ORG, Decision(False, Reason.NOT_PERMITTED)),
+        (AUDITOR, Permission.SKILLS_MANAGE, OWN_ORG, Decision(False, Reason.NOT_PERMITTED)),
+        (ORG, Permission.CAPACITY_MANAGE, OWN_ORG, Decision(True, Reason.ORGANISATION)),
+        (ORG, Permission.CAPACITY_MANAGE, OTHER_ORG, Decision(False, Reason.OUT_OF_SCOPE)),
+        (GROUP, Permission.CAPACITY_MANAGE, OWN_ORG, Decision(False, Reason.NOT_PERMITTED)),
+        (AUDITOR, Permission.CAPACITY_MANAGE, OWN_ORG, Decision(False, Reason.NOT_PERMITTED)),
         # ADR 0042 §5: settings of the platform and of the own organisation.
         (
             AUDITOR,
