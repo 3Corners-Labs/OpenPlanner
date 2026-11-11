@@ -95,6 +95,33 @@ test('the widget speaks English when the host page does', async ({ page }) => {
   await expect(widget.getByRole('list', { name: /steps/i })).toBeVisible();
 });
 
+test('the flow attribute travels with the booking request (ADR 0121)', async ({ page }) => {
+  let sent: Record<string, unknown> | null = null;
+  await page.route('**/api/v1/widget/*/*/bookings', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    sent = route.request().postDataJSON();
+    return route.fulfill({
+      status: 422,
+      contentType: 'application/json',
+      headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify({ error: 'flow_not_available' }),
+    });
+  });
+  await page.goto(`${HOST}?flow=appointment`);
+  const widget = page.locator('openplanner-booking');
+  await expect(widget.getByRole('heading', { level: 2, name: 'Demo: videogesprek' })).toBeVisible();
+  await widget.locator('.calendar__day--free').first().click();
+  await widget.locator('.time').first().click();
+  await widget.getByLabel('Voornaam').fill('Ada');
+  await widget.getByLabel('Achternaam').fill('Lovelace');
+  await widget.getByLabel('E-mailadres').fill('ada@voorbeeld.nl');
+  await widget.getByRole('button', { name: 'Afspraak maken' }).click();
+
+  // The refusal is shown as a general error; the request carried the attribute's code.
+  await expect(widget.getByRole('alert')).toBeFocused();
+  expect(sent).toMatchObject({ flow: 'appointment' });
+});
+
 test('a group that is not embedded here says so', async ({ page }) => {
   await page.goto(`${HOST}?organisation=andere&group=andere-team`);
 

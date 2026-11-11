@@ -59,6 +59,8 @@ class SlotFilter:
         subject: The subject the participant chose before the calendar (ADR 0081 point 4);
             only slots whose staffing blocks offer it are shown. Not a time condition, so it
             leaves ``active`` alone and survives clearing the filter.
+        flow: The flow the page was opened with (ADR 0121 step 3a), already checked by the
+            route; carried through every link and form like the subject, never a condition.
     """
 
     days: frozenset[int] = frozenset()
@@ -66,6 +68,7 @@ class SlotFilter:
     end_hour: int | None = None
     invalid_range: bool = False
     subject: str | None = None
+    flow: str | None = None
 
     @property
     def active(self) -> bool:
@@ -91,11 +94,12 @@ class SlotFilter:
             params.append(("from", str(self.start_hour)))
         if self.end_hour is not None:
             params.append(("until", str(self.end_hour)))
-        return params + self.subject_query()
+        return params + self.carried_query()
 
-    def subject_query(self) -> list[tuple[str, str]]:
-        """Return the chosen subject as a query parameter, or nothing."""
-        return [("subject", self.subject)] if self.subject else []
+    def carried_query(self) -> list[tuple[str, str]]:
+        """Return the chosen subject and flow as query parameters: what clearing keeps."""
+        chosen = [("subject", self.subject)] if self.subject else []
+        return chosen + ([("flow", self.flow)] if self.flow else [])
 
 
 def _hour(value: str, low: int, high: int) -> int | None:
@@ -151,6 +155,7 @@ class FilterView:
     clear_href: str
     action: str
     subject: str | None = None
+    flow: str | None = None
 
 
 @dataclass(frozen=True)
@@ -374,17 +379,17 @@ def _filter_view(
             hours.append(chosen)
             hours.sort()
     names = weekday_names(locale.code)
+    carried = slot_filter.carried_query()
     return FilterView(
         active=slot_filter.active,
         days=[Option(str(i), names[i], i in slot_filter.days) for i in range(7)],
         starts=[Option(str(h), f"{h:02d}:00", h == slot_filter.start_hour) for h in starts],
         ends=[Option(str(h), f"{h:02d}:00", h == slot_filter.end_hour) for h in ends],
         invalid_range=slot_filter.invalid_range,
-        clear_href=f"{base}?{urlencode(slot_filter.subject_query())}"
-        if slot_filter.subject
-        else base,
+        clear_href=f"{base}?{urlencode(carried)}" if carried else base,
         action=base,
         subject=slot_filter.subject,
+        flow=slot_filter.flow,
     )
 
 

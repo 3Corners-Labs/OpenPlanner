@@ -7,6 +7,7 @@
   <summary>{{ _("picker.filter.title") }}</summary>
   <form method="get" action="{{ f.action }}" class="filter__form">
     {% if f.subject %}<input type="hidden" name="subject" value="{{ f.subject }}">{% endif %}
+    {% if f.flow %}<input type="hidden" name="flow" value="{{ f.flow }}">{% endif %}
     <fieldset class="filter__days">
       <legend>{{ _("picker.filter.days") }}</legend>
       <div class="filter__options">
@@ -43,6 +44,7 @@
   <p><strong>{% if f.active %}{{ _("picker.first_fitting") }}{% else %}{{ _("picker.first") }}{% endif %}</strong> {{ picker.first.label }}</p>
   <form method="{{ method }}" action="{{ action }}">
     {% if f.subject %}<input type="hidden" name="subject" value="{{ f.subject }}">{% endif %}
+    {% if f.flow %}<input type="hidden" name="flow" value="{{ f.flow }}">{% endif %}
     <button type="submit" class="button" name="start" value="{{ picker.first.value }}">{{ _("picker.first_choose") }}</button>
   </form>
 </div>
@@ -92,6 +94,7 @@
     <p class="times__count">{{ picker.times.count }}</p>
     <form method="{{ method }}" action="{{ action }}">
       {% if f.subject %}<input type="hidden" name="subject" value="{{ f.subject }}">{% endif %}
+    {% if f.flow %}<input type="hidden" name="flow" value="{{ f.flow }}">{% endif %}
       {% for part in picker.times.groups %}
       <fieldset>
         <legend>{{ part.heading }}</legend>

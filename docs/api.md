@@ -26,8 +26,15 @@ with an `Origin` must come from the organisation's allowed origins, else
 | GET | `/api/v1/widget/texts` | `200` the texts for loading and "not available" (any origin, `Access-Control-Allow-Origin: *`) |
 | GET | `/api/v1/widget/{org}/{group}/` | `200` name, intro, standalone page URL, closure notice, contact fields, honeypot name, texts |
 | GET | `/api/v1/widget/{org}/{group}/availability?month=YYYY-MM&day=YYYY-MM-DD` | `200` month grid, free times of the day, first free moment |
-| POST | `/api/v1/widget/{org}/{group}/bookings` | `201 {"status": "booked", "start", "end", "label", "message"}`; `400` honeypot, `409` slot taken or group closed, `413`, `422 invalid_request` or `invalid_contact` with `field`, `429 rate_limited` |
+| POST | `/api/v1/widget/{org}/{group}/bookings` | `201 {"status": "booked", "start", "end", "label", "message"}`; `400` honeypot, `409` slot taken or group closed, `413`, `422 invalid_request` or `invalid_contact` with `field` or `flow_not_available`, `429 rate_limited` |
 | OPTIONS | `/api/v1/widget/{org}/{group}/bookings` | `204` CORS preflight for allowed origins (not in the spec) |
+
+The booking body may carry an optional `flow`, the code of a service flow of the group (ADR 0121
+step 3a; the `flow` attribute of the widget). Omitted, the group's default flow of the appointment
+path is used, as before. A value that is not a flow code (`^[a-z0-9][a-z0-9-]{0,39}$`) is
+`422 invalid_request`; a code that does not resolve (unknown, another group's, not active, or not
+offered for appointments) is `422 flow_not_available`. There is no fallback to the default flow.
+Every new booking records the flow and revision it was made under; moving it keeps them.
 
 While maintenance mode is on (ADR 0038), the group, availability and booking routes answer
 `503 {"error": "maintenance"}` with `Retry-After`, readable by an allowed origin; `/texts` and

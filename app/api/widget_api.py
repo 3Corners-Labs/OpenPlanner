@@ -469,7 +469,10 @@ def _read_booking(raw: bytes) -> WidgetBookingRequest:
         400: {"model": WidgetError, "description": "`invalid_request`: honeypot filled in."},
         409: {"model": WidgetError, "description": "`slot_unavailable`, `slot_full`, …"},
         413: {"model": WidgetError, "description": "`invalid_request`: body too large."},
-        422: {"model": WidgetError, "description": "`invalid_request` or `invalid_contact`."},
+        422: {
+            "model": WidgetError,
+            "description": "`invalid_request`, `invalid_contact` or `flow_not_available`.",
+        },
     },
     summary="Book",
     openapi_extra={
@@ -496,6 +499,7 @@ async def book(request: Request, org: str, group: str, locale: Locale) -> JSONRe
         start=start,
         contact=ContactInput(*body.names(), body.email, body.phone or None, body.answers),
         locale=locale.code,
+        flow=body.flow,
     )
     booking = receipt.booking
     answer = WidgetBooking(

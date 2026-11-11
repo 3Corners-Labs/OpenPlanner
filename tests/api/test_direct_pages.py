@@ -8,8 +8,11 @@ from datetime import timedelta
 import httpx
 import pytest
 import structlog.testing
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.engine import create_engine
+from app.adapters.db.models import BookingRow, ServiceFlowRow
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.integrations import Integrations
 from app.config import Settings
@@ -608,3 +611,56 @@ async def test_the_direct_page_says_what_the_organisation_and_the_group_call_the
     assert "een behandelaar laat u binnen" in organisation
     assert "een agent laat u binnen" in group
     assert "one of our agents lets you in" in english  # the words are per locale
+
+
+async def _flow_columns(site: Site) -> list[tuple[int | None, int | None]]:
+    """Return the flow and revision recorded on every booking, oldest first."""
+    engine = create_engine(site.database_url)
+    async with AsyncSession(engine) as session:
+        rows = await session.execute(
+            select(BookingRow.flow_id, BookingRow.flow_revision).order_by(BookingRow.id)
+        )
+        found = [(flow_id, revision) for flow_id, revision in rows.all()]
+    await engine.dispose()
+    return found
+
+
+async def _direct_flow_id(site: Site) -> int:
+    engine = create_engine(site.database_url)
+    async with AsyncSession(engine) as session:
+        flow_id = await session.scalar(
+            select(ServiceFlowRow.id).where(ServiceFlowRow.code == "direct")
+        )
+    await engine.dispose()
+    assert flow_id is not None
+    return flow_id
+
+
+async def test_a_direct_call_records_the_default_on_demand_flow(site: Site) -> None:
+    assert (await site.start()).status_code == 303
+
+    assert await _flow_columns(site) == [(await _direct_flow_id(site), 1)]
+
+
+async def test_a_direct_call_may_name_the_flow(site: Site) -> None:
+    page = (await site.client.get("/g/demo/direct", params={"flow": "direct"})).text
+    response = await site.client.post(
+        "/g/demo/direct", data={**ADA, "flow": "direct"}, headers=SAME_ORIGIN
+    )
+
+    assert 'name="flow" value="direct"' in page
+    assert response.status_code == 303
+    assert await _flow_columns(site) == [(await _direct_flow_id(site), 1)]
+
+
+@pytest.mark.parametrize("code", ["appointment", "unknown", "Direct", "a b"])
+async def test_a_direct_flow_that_does_not_resolve_is_refused_and_starts_no_call(
+    site: Site, code: str
+) -> None:
+    page = await site.client.get("/g/demo/direct", params={"flow": code})
+    response = await site.client.post(
+        "/g/demo/direct", data={**ADA, "flow": code}, headers=SAME_ORIGIN
+    )
+
+    assert (page.status_code, response.status_code) == (422, 422)  # no fallback to the default
+    assert await _flow_columns(site) == []
