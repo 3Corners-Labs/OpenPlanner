@@ -13,11 +13,11 @@ from app.admin.forms import MAX_FORM_BYTES
 from app.domain import service_flows
 from app.domain.routing import GroupRouting, Subject
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
-from tests.admin.test_flow_routes import BASE, act, create, form_data, save
-from tests.admin.test_flow_views import nl_locale
 from tests.support.admin_site import audit_log, site_app, site_uow
 from tests.support.domain import NOW
+from tests.support.flow_pages import BASE, act, create, form_data, save
 from tests.support.flow_seed import add_subjects
+from tests.support.locales import nl_locale
 from tests.support.skill_seed import add_pool, add_skill
 
 

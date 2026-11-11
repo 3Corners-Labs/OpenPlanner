@@ -25,21 +25,9 @@ from app.domain.service_flows import (
     ReadinessPolicy,
     ReadinessReason,
 )
-from app.i18n import CATALOGUE_DIR, Translator, load_catalogues
-from app.web.locale import RequestLocale
-from tests.i18n.test_catalogues import REQUIRED
-
-
-def locale_of(code: str) -> RequestLocale:
-    """Return the locale ``code`` as a request has it."""
-    translator = Translator(load_catalogues(CATALOGUE_DIR))
-    return RequestLocale(translator.bind(code), remember=False, translator=translator)
-
-
-def nl_locale() -> RequestLocale:
-    """Return the Dutch locale."""
-    return locale_of("nl")
-
+from app.i18n import CATALOGUE_DIR, load_catalogues
+from tests.support.locales import REQUIRED_LOCALES as REQUIRED
+from tests.support.locales import locale_of, nl_locale
 
 TABLES: list[tuple[type[StrEnum], dict[StrEnum, str]]] = [
     (ReadinessCheck, dict(views.CHECK_TITLES)),

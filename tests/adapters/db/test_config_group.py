@@ -9,11 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from app.adapters.db.config_group import WRITERS
 from app.adapters.db.models import (
     BookingRow,
+    CapacityPoolRow,
     GroupContactsRow,
     GroupFormFieldRow,
     GroupRow,
     GroupTextRow,
     ReminderRuleRow,
+    ServiceFlowRow,
     SlotRow,
 )
 from app.domain.configuration_changes import ChangeAction, RuleContext, Usage
