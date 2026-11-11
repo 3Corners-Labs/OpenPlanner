@@ -86,6 +86,7 @@ from app.domain.usage_rollup_service import UsageRollup
 from app.domain.worker_check import WorkerHeartbeat, heartbeat_due
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
+from app.jobs.flows import repair_default_flows
 from app.jobs.housekeeping import Housekeeping
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
@@ -431,6 +432,7 @@ async def run_worker(
         dispatch_enabled=wired.dispatch_configured,
         release_check=settings.update_repository is not None,
     )
+    await repair_default_flows(uow)  # ADR 0121 step 2e: groups an older image created
     try:
         while not stop.is_set():
             if await is_reachable(engine):

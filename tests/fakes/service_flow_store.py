@@ -14,6 +14,13 @@ from typing import Any
 
 from app.domain.authorization import Scope
 from app.domain.capacity import CapacityPool, PoolFlows, check_pool_archive, check_pool_save
+from app.domain.default_flows import (
+    bind_pool,
+    default_flow_set,
+    missing_defaults,
+    offers_direct,
+    stored_flow,
+)
 from app.domain.errors import DomainError, ErrorCode, missing_object
 from app.domain.scheduling import Group
 from app.domain.service_flows import (
@@ -29,6 +36,7 @@ from app.domain.service_flows import (
 )
 from app.domain.skills import Skill, SkillUsage, check_skill_save, check_staff_grant
 from app.domain.staff import StaffMember, StaffStatus
+from tests.support.domain import NOW
 
 
 def _visible(state: Any, scope: Scope, organisation_id: int) -> bool:
@@ -112,6 +120,36 @@ class ServiceFlowStore:
         return organisation_id in self.state.organisation_slugs and _visible(
             self.state, scope, organisation_id
         )
+
+    async def ensure_default_flows(self, group_id: int) -> bool:
+        group = self.state.groups.get(group_id)
+        if group is None:
+            return False
+        wanted = default_flow_set(
+            group_id,
+            group.organisation_id,
+            group.name,
+            group.slot_minutes,
+            group.dispatch_kind,
+            offers_direct(self.state.rules.get(group_id, [])),
+            group.archived_at is not None,
+        )
+        pool = next((p for p in self.state.pools.values() if p.group_id == group_id), None)
+        flows = [f for f in self.state.flows.values() if f.group_id == group_id]
+        missing = missing_defaults(wanted, pool is not None, [stored_flow(f) for f in flows])
+        if missing.empty:
+            return False
+        if missing.pool is not None:
+            pool = replace(missing.pool, id=self._new_id())
+            self.state.pools[pool.id] = pool
+        assert pool is not None
+        assert pool.id is not None
+        for flow in bind_pool(missing, pool.id).flows:
+            assert flow.current is not None
+            flow_id = self._new_id()
+            current = replace(flow.current, flow_id=flow_id, published_at=NOW, published_by=None)
+            self._put_flow(replace(flow, id=flow_id, current=current))
+        return True
 
     async def list_skills(
         self, scope: Scope, organisation_id: int, *, archived: bool = False

@@ -18,6 +18,8 @@ from alembic.config import Config
 from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
+from app.domain.default_flows import bind_pool, default_flow_set
+from app.domain.scheduling import DispatchKind as GroupDispatchKind
 from app.domain.service_flows import DispatchKind, IntakeMode, legacy_revision
 
 EVERYTHING = Scope(everything=True)
@@ -242,3 +244,41 @@ async def test_the_backfilled_revision_is_what_the_domain_builds(
         expected, flow_id=stored.id, published_at=stored.current.published_at
     )
     assert stored.default_for == {intake}
+
+
+async def test_the_backfill_and_the_rule_for_new_groups_build_the_same(upgraded: Path) -> None:
+    """For every fixture group ``default_flow_set`` gives the pool and revisions 0109 wrote.
+
+    Migration 0109 and ``app.domain.default_flows`` are two statements of one rule (ADR 0121
+    step 2e); this is the test that fails when one of them changes without the other.
+    """
+    direct = {g for g, offer, capacity, _ in RULES if offer in ("direct", "both") and capacity > 0}
+    engine = create_engine(f"sqlite+aiosqlite:///{upgraded}", busy_timeout_ms=200)
+    async with SqlUnitOfWork(engine).read() as tx:
+        pools = {p.group_id: p for p in await tx.list_capacity_pools(EVERYTHING, 1)}
+        stored = {g: await tx.list_service_flows(EVERYTHING, g) for g, *_ in GROUPS}
+    await engine.dispose()
+
+    for group_id, name, minutes, dispatch, archived in GROUPS:
+        wanted = default_flow_set(
+            group_id,
+            1,
+            name,
+            minutes,
+            GroupDispatchKind(dispatch),
+            group_id in direct,
+            archived is not None,
+        )
+        pool = pools[group_id]
+        assert wanted.pool is not None
+        assert pool.id is not None
+        assert replace(wanted.pool, id=pool.id) == pool
+        expected = bind_pool(wanted, pool.id).flows
+        assert [f.code for f in stored[group_id]] == [f.code for f in expected]
+        for found, rule in zip(stored[group_id], expected, strict=True):
+            assert rule.current is not None
+            assert found.current is not None
+            assert (found.state, found.default_for) == (rule.state, rule.default_for)
+            assert found.current == replace(
+                rule.current, flow_id=found.id, published_at=found.current.published_at
+            )

@@ -194,6 +194,7 @@ from app.domain.configuration_package import (
 from app.domain.configuration_package import (
     PERMISSION as PLATFORM_MANAGE,
 )
+from app.domain.default_flows_service import ensure_all_default_flows
 from app.domain.entitlements import ClaimMode, resolve
 from app.domain.errors import DomainError
 from app.domain.evidence import Report, Row, Section, render_json
@@ -674,6 +675,20 @@ async def _usage_backfill(settings: Settings) -> str:
     if run.skipped:
         return "usage-backfill: reporting is switched off (REPORTING_ENABLED); nothing done\n"
     return f"usage-backfill: {run.bookings} bookings looked at, {run.facts} facts written\n"
+
+
+async def _ensure_flows(settings: Settings) -> str:
+    """Give every group the legacy pool and flows it lacks (ADR 0121 step 2e); one line of counts.
+
+    Safe to run again: it only adds what is missing. The worker runs it once at start too; this
+    is for a host that wants to see it done, for example after a rollback window.
+    """
+    engine = create_engine(settings.database_url)
+    try:
+        groups = await ensure_all_default_flows(SqlUnitOfWork(engine))
+    finally:
+        await engine.dispose()
+    return f"ensure-flows: {groups} groups received pool or flow rows\n"
 
 
 REKEY_DETAIL = "secrets.rekey"
@@ -1780,6 +1795,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "reporting-api-doc",
         help="print the usage API reference as Markdown (docs/reporting-api.md)",
     )
+    commands.add_parser(
+        "ensure-flows", help="give every group its legacy capacity pool and flows (ADR 0121)"
+    )
     commands.add_parser("usage-backfill", help="turn existing bookings into usage facts (ADR 0117)")
     init_cmd = commands.add_parser("init", help="generate the bootstrap keys (first install)")
     init_cmd.add_argument("--out", type=Path, default=DEFAULT_PATH, metavar="PATH")
@@ -1839,6 +1857,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "logging-doc":
         sys.stdout.write(render_logging_doc())
+        return 0
+    if args.command == "ensure-flows":
+        sys.stdout.write(asyncio.run(_ensure_flows(Settings())))
         return 0
     if args.command == "usage-backfill":
         sys.stdout.write(asyncio.run(_usage_backfill(Settings())))

@@ -14,11 +14,16 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.db.engine import create_engine
-from app.adapters.db.models import CapacityPoolRow, StaffSkillRow
+from app.adapters.db.models import (
+    CapacityPoolRow,
+    FlowRevisionRow,
+    ServiceFlowRow,
+    StaffSkillRow,
+)
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
 from app.domain.capacity import CapacityPool, PoolFlows, PoolMode
@@ -111,6 +116,8 @@ async def world(request: pytest.FixtureRequest, database_url: str) -> AsyncItera
             uow.state.pools[pool_id] = replace(uow.state.pools[pool_id], archived_at=NOW)
 
         ids = await _seed(uow)
+        for table in (uow.state.flow_revisions, uow.state.flows, uow.state.pools):
+            table.clear()  # the legacy rows of the seeded groups: step 2e has its own tests
         yield World(uow, *ids, None, archive_in_fake)
         return
     engine: AsyncEngine = create_engine(database_url, busy_timeout_ms=200)
@@ -131,6 +138,9 @@ async def world(request: pytest.FixtureRequest, database_url: str) -> AsyncItera
             )
 
     ids = await _seed(uow)
+    async with AsyncSession(engine) as session, session.begin():
+        for row in (FlowRevisionRow, ServiceFlowRow, CapacityPoolRow):  # step 2e has own tests
+            await session.execute(delete(row))
     yield World(uow, *ids, granted_by_sql, archive_in_sql)
     await engine.dispose()
 

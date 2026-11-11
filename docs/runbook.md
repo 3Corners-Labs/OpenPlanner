@@ -2109,6 +2109,13 @@ version, verified. If the release contained a migration, first run
 `docker compose run --rm web alembic downgrade <previous-revision>` with the *new* image, then
 deploy the old images. Every migration is reversible (enforced in CI).
 
+**Services created while an older image ran (ADR 0121 step 2e).** A service (group) that an
+image from before the flows was used to create has no legacy capacity pool and no default flows.
+After going forward again, the worker repairs this by itself once, when it starts; the host can
+see it or repeat it with `docker compose run --rm web python -m app.cli ensure-flows`. The command
+only adds what is missing, never changes or deletes a pool or flow, is safe to run again and
+prints counts only (`ensure-flows: N groups received pool or flow rows`).
+
 ## Backup and restore
 
 OpenPlanner has two kinds of copies of the database, with different purposes (ADR 0102,

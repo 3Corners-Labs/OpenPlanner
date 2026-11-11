@@ -1705,6 +1705,16 @@ class Transaction(Protocol):
         """Return one revision of a flow, published or not; no scope, for a resolved flow only."""
         ...
 
+    async def ensure_default_flows(self, group_id: int) -> bool:
+        """Create the legacy pool and default flows the group lacks; ``True`` when one was made.
+
+        The rule is ``app.domain.default_flows`` (ADR 0121 step 2e): additive and idempotent, it
+        never changes or deletes an existing pool or flow. The writers of a group and of its
+        weekly rules call it in their own transaction; it is the only way a legacy revision is
+        written. A group that does not exist gives ``False``. Needs a write transaction.
+        """
+        ...
+
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
         """Delete the booking's pending jobs and store ``jobs`` instead (CLAUDE.md)."""
         ...

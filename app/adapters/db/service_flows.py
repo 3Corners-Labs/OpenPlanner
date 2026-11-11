@@ -20,7 +20,7 @@ transaction, which takes no lock; the unit of work does not stop it.
 import json
 from collections import defaultdict
 from collections.abc import Collection, Iterable
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -35,6 +35,7 @@ from app.adapters.db.models import (
     FlowRevisionSkillRow,
     GroupRow,
     OrganisationRow,
+    ScheduleRuleRow,
     ServiceFlowRow,
     SubjectFlowRow,
     SubjectFlowSkillRow,
@@ -43,7 +44,14 @@ from app.adapters.db.routing_json import routing_from_json
 from app.adapters.db.scope import scope_filter
 from app.adapters.db.skills import load_skills
 from app.domain.authorization import Scope
+from app.domain.default_flows import (
+    StoredFlow,
+    bind_pool,
+    default_flow_set,
+    missing_defaults,
+)
 from app.domain.errors import DomainError, ErrorCode, missing_object
+from app.domain.scheduling import DispatchKind as GroupDispatchKind
 from app.domain.service_flows import (
     CompletionPolicy,
     DispatchKind,
@@ -120,6 +128,82 @@ def _defaults(row: ServiceFlowRow) -> frozenset[IntakeMode]:
         IntakeMode.ON_DEMAND: row.default_on_demand,
     }
     return frozenset(mode for mode, default in modes.items() if default)
+
+
+async def ensure_default_flows_in(session: AsyncSession, group_id: int) -> bool:
+    """Create the legacy pool and flows the group lacks, in ``session``'s transaction.
+
+    The one place a legacy revision is written (``save_draft`` refuses ``legacy``): the facts
+    come from the group's row and weekly rules, the rule is ``app.domain.default_flows``, and
+    only what is missing is inserted (never an update or delete), published now by nobody.
+    Returns whether a row was created; a group that does not exist gives ``False``.
+    """
+    group = await session.get(GroupRow, group_id)
+    if group is None:
+        return False
+    direct = await session.scalar(
+        select(ScheduleRuleRow.id)
+        .where(
+            ScheduleRuleRow.group_id == group_id,
+            ScheduleRuleRow.offer.in_(("direct", "both")),
+            ScheduleRuleRow.capacity > 0,
+        )
+        .limit(1)
+    )
+    wanted = default_flow_set(
+        group_id,
+        group.organisation_id,
+        group.name,
+        group.slot_minutes,
+        GroupDispatchKind(group.dispatch_kind),
+        direct is not None,
+        group.archived_at is not None,
+    )
+    pool_id = await session.scalar(
+        select(CapacityPoolRow.id).where(CapacityPoolRow.group_id == group_id)
+    )
+    flow_rows = (
+        await session.execute(select(ServiceFlowRow).where(ServiceFlowRow.group_id == group_id))
+    ).scalars()
+    missing = missing_defaults(
+        wanted,
+        pool_id is not None,
+        [StoredFlow(row.code, FlowState(row.state), _defaults(row)) for row in flow_rows],
+    )
+    if missing.empty:
+        return False
+    if missing.pool is not None:
+        pool_row = CapacityPoolRow(
+            organisation_id=missing.pool.organisation_id,
+            name=missing.pool.name,
+            mode=missing.pool.mode.value,
+            group_id=group_id,
+        )
+        session.add(pool_row)
+        await session.flush()
+        pool_id = pool_row.id
+    if pool_id is None:  # unreachable: the pool exists or was just made
+        return missing.pool is not None
+    now = datetime.now(UTC)
+    for flow in bind_pool(missing, pool_id).flows:
+        if flow.current is None:
+            continue
+        row = ServiceFlowRow(
+            group_id=group_id,
+            code=flow.code,
+            state=flow.state.value,
+            default_appointment=IntakeMode.APPOINTMENT in flow.default_for,
+            default_on_demand=IntakeMode.ON_DEMAND in flow.default_for,
+            current_revision=1,
+            draft_revision=None,
+        )
+        session.add(row)
+        await session.flush()
+        revision = FlowRevisionRow(flow_id=row.id, revision=1, published_at=now, published_by=None)
+        _to_row(revision, flow.current)
+        session.add(revision)
+        await session.flush()
+    return True
 
 
 class ServiceFlowQueries:
@@ -238,6 +322,14 @@ class ServiceFlowQueries:
         what. A caller that gets a flow id from a person uses ``get_service_flow`` instead.
         """
         return (await self._revisions([(flow_id, revision)])).get((flow_id, revision))
+
+    async def ensure_default_flows(self, group_id: int) -> bool:
+        """Create the legacy pool and default flows the group lacks; ``True`` when one was made.
+
+        Additive and idempotent (``app.domain.default_flows``); the writers of a group and of its
+        weekly rules call it in their own transaction. Needs a write transaction.
+        """
+        return await ensure_default_flows_in(self._session, group_id)
 
     async def _check_references(
         self, group: GroupRow, revision: FlowRevision, based_on: FlowRevision | None
