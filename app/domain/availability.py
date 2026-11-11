@@ -26,7 +26,7 @@ agents too, so at the busiest moment of a new slot they take places in it.
 from bisect import bisect_left, bisect_right
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta, tzinfo
 
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.routing import offers
@@ -81,8 +81,31 @@ def staffed_runs(windows: Sequence[TimeWindow]) -> list[list[TimeWindow]]:
 
 def slots_on(group: Group, day: date, windows: Sequence[TimeWindow]) -> list[SlotTime]:
     """Return every slot of ``day`` that fits completely inside one run of staffed windows."""
-    tz = group.tz
-    length = timedelta(minutes=group.slot_minutes)
+    return grid_on(group.tz, timedelta(minutes=group.slot_minutes), day, windows)
+
+
+def grid_on(
+    tz: tzinfo, length: timedelta, day: date, windows: Sequence[TimeWindow]
+) -> list[SlotTime]:
+    """Return the start times of ``day``, one after another from the start of each run.
+
+    The grid starts at the opening of every run of touching staffed windows and goes on in
+    steps of ``length`` while a whole step still fits before the run closes (the step is also
+    the slot's length). A group passes its slot length; a flow on a counted pool passes its
+    appointment length plus the wrap-up, so two back-to-back appointments never overlap in the
+    buffer (ADR 0122, decision P6). Each slot gets the lowest capacity of the windows it
+    covers and their common subjects.
+
+    Example:
+        A window 09:00–10:30 with ``length`` 35 minutes gives 09:00 and 09:35; 10:10 does not
+        fit.
+
+    Args:
+        tz: Time zone the windows are expressed in.
+        length: Step and slot length.
+        day: Local date.
+        windows: The windows of ``day`` (see ``windows_on``).
+    """
     slots: list[SlotTime] = []
     for run in staffed_runs(windows):
         local = datetime.combine(day, run[0].opens)

@@ -31,7 +31,7 @@ None in step 1: it changes labels only. The later steps add the following, each 
 
 | Key | Class | Default | Bounds | Permission | Note |
 |---|---|---|---|---|---|
-| `treatment_buffer_minutes` | D organisation | 0 | 0–120 | `capacity.manage` (point 11) | per pool or flow policy |
+| `treatment_buffer_minutes` | D organisation | 0 | 0–120 | `capacity.manage` (point 11) | one value per organisation (ADR 0122, settings); a per-flow value is a follow-up if one organisation needs different wrap-up times |
 | `assignment_start_lease_minutes` | D organisation | 5 | 1–30 | `capacity.manage` (point 11) | expiry only before treatment starts |
 | `request_unresolved_hours` | D organisation | 24 | 1–168 | `capacity.manage` (point 11) | the watchdog |
 
