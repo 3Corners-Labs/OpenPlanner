@@ -14,6 +14,12 @@ from typing import Any
 
 from app.domain.authorization import Scope
 from app.domain.capacity import CapacityPool, PoolFlows, check_pool_archive, check_pool_save
+from app.domain.default_flows import (
+    DefaultFlowSet,
+    default_flow_set,
+    missing_defaults,
+    stored_flow,
+)
 from app.domain.errors import DomainError, ErrorCode, missing_object
 from app.domain.scheduling import Group
 from app.domain.service_flows import (
@@ -29,6 +35,7 @@ from app.domain.service_flows import (
 )
 from app.domain.skills import Skill, SkillUsage, check_skill_save, check_staff_grant
 from app.domain.staff import StaffMember, StaffStatus
+from tests.support.domain import NOW
 
 
 def _visible(state: Any, scope: Scope, organisation_id: int) -> bool:
@@ -112,6 +119,52 @@ class ServiceFlowStore:
         return organisation_id in self.state.organisation_slugs and _visible(
             self.state, scope, organisation_id
         )
+
+    def _missing_defaults(self, group_id: int) -> DefaultFlowSet | None:
+        """Return what the group still lacks, ``None`` for a group that does not exist."""
+        group = self.state.groups.get(group_id)
+        if group is None:
+            return None
+        wanted = default_flow_set(
+            group_id,
+            group.organisation_id,
+            group.name,
+            group.slot_minutes,
+            group.dispatch_kind,
+            any(rule.window.offers_direct for rule in self.state.rules.get(group_id, [])),
+            group.archived_at is not None,
+        )
+        pool = next((p for p in self.state.pools.values() if p.group_id == group_id), None)
+        flows = [f for f in self.state.flows.values() if f.group_id == group_id]
+        return missing_defaults(wanted, pool is not None, [stored_flow(f) for f in flows])
+
+    async def groups_missing_default_flows(self) -> list[int]:
+        return sorted(
+            group_id
+            for group_id in self.state.groups
+            if (missing := self._missing_defaults(group_id)) is not None and not missing.empty
+        )
+
+    async def ensure_default_flows(self, group_id: int) -> bool:
+        missing = self._missing_defaults(group_id)
+        if missing is None or missing.empty:
+            return False
+        if missing.pool is not None:
+            pool_id = self._new_id()
+            self.state.pools[pool_id] = replace(missing.pool, id=pool_id)
+        else:
+            pool_id = next(i for i, p in self.state.pools.items() if p.group_id == group_id)
+        for template in missing.flows:
+            flow_id = self._new_id()
+            current = replace(
+                template.revision(pool_id), flow_id=flow_id, published_at=NOW, published_by=None
+            )
+            self._put_flow(
+                ServiceFlow(
+                    flow_id, group_id, template.code, template.state, template.default_for, current
+                )
+            )
+        return True
 
     async def list_skills(
         self, scope: Scope, organisation_id: int, *, archived: bool = False

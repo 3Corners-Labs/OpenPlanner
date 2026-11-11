@@ -633,6 +633,7 @@ class InMemoryTransaction(ServiceFlowStore):
     async def add_group(self, group: Group) -> Group:
         stored = replace(group, id=self._new_id(), idp_key=group.slug)
         self.state.groups[stored.id] = stored
+        await self.ensure_default_flows(stored.id)
         return stored
 
     async def save_group(self, group: Group) -> None:
@@ -665,6 +666,12 @@ class InMemoryTransaction(ServiceFlowStore):
             del self.state.slots[key]
         for table in (self.state.rules, self.state.overrides, self.state.reminder_rules):
             table.pop(group_id, None)
+        for flow_id in [i for i, f in self.state.flows.items() if f.group_id == group_id]:
+            del self.state.flows[flow_id]
+            for key in [k for k in self.state.flow_revisions if k[0] == flow_id]:
+                del self.state.flow_revisions[key]
+        for pool_id in [i for i, p in self.state.pools.items() if p.group_id == group_id]:
+            del self.state.pools[pool_id]
 
     async def count_future_bookings(self, group_id: int, now: datetime) -> int:
         return sum(
@@ -686,6 +693,7 @@ class InMemoryTransaction(ServiceFlowStore):
     async def add_schedule_rule(self, group_id: int, rule: ScheduleRule) -> int:
         stored = replace(rule, id=self._new_id())
         self.state.rules.setdefault(group_id, []).append(stored)
+        await self.ensure_default_flows(group_id)
         return stored.id or 0
 
     async def update_schedule_rule(self, group_id: int, rule_id: int, rule: ScheduleRule) -> bool:
@@ -694,6 +702,8 @@ class InMemoryTransaction(ServiceFlowStore):
         self.state.rules[group_id] = [
             replace(rule, id=rule_id) if r.id == rule_id else r for r in rules
         ]
+        if found:
+            await self.ensure_default_flows(group_id)
         return found
 
     async def delete_schedule_rule(self, group_id: int, rule_id: int) -> bool:

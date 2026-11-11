@@ -328,6 +328,36 @@ _OPERATIONS = (
         "Housekeeping removed back-ups older than the retention.",
     ),
     _e(
+        "flows.repaired",
+        _OPS,
+        "info",
+        "groups",
+        "{groups} services received a legacy capacity pool or flow.",
+        "The worker's start-up repair gave services that an older image created their legacy "
+        "pool and default flows (ADR 0121 step 2e); counts only.",
+    ),
+    _e(
+        "flows.repair_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The repair of the legacy pools and flows failed: {error}.",
+        "The start-up repair of ADR 0121 step 2e did not run; the next worker start tries "
+        "again, or run `python -m app.cli ensure-flows`.",
+        _CHECK_HOST,
+    ),
+    _e(
+        "flows.repair_incomplete",
+        _OPS,
+        "warning",
+        "error groups",
+        "{groups} services could not be given their legacy capacity pool or flow; the first "
+        "error was {error}.",
+        "The start-up repair of ADR 0121 step 2e skipped services whose repair failed; the "
+        "others were done.",
+        _CHECK_HOST,
+    ),
+    _e(
         "usage.rollup_failed",
         _OPS,
         "error",

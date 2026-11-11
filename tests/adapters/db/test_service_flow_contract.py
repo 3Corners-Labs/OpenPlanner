@@ -15,11 +15,12 @@ from typing import Any
 
 import pytest
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.db.engine import create_engine
-from app.adapters.db.models import CapacityPoolRow, StaffSkillRow
-from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.db.models import (
+    CapacityPoolRow,
+    StaffSkillRow,
+)
 from app.domain.authorization import Scope
 from app.domain.capacity import CapacityPool, PoolFlows, PoolMode
 from app.domain.errors import DomainError, ErrorCode
@@ -28,8 +29,8 @@ from app.domain.scheduling import Organisation
 from app.domain.service_flows import FlowState, IntakeMode, ServiceFlow
 from app.domain.skills import Skill, SkillUsage
 from app.domain.staff import Membership, StaffMember, StaffStatus
-from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.domain import NOW, make_group
+from tests.support.flow_backends import BACKENDS, open_backend
 from tests.support.service_flows import flow as make_flow
 from tests.support.service_flows import revision
 
@@ -102,37 +103,38 @@ def person(subject: str, organisations: list[str]) -> StaffMember:
     )
 
 
-@pytest.fixture(params=["sql", "fake"])
+@pytest.fixture(params=BACKENDS)
 async def world(request: pytest.FixtureRequest, database_url: str) -> AsyncIterator[World]:
-    if request.param == "fake":
-        uow: Any = InMemoryUnitOfWork()
-
-        async def archive_in_fake(pool_id: int) -> None:
-            uow.state.pools[pool_id] = replace(uow.state.pools[pool_id], archived_at=NOW)
-
+    async with open_backend(request.param, database_url) as backend:
+        uow = backend.uow
         ids = await _seed(uow)
-        yield World(uow, *ids, None, archive_in_fake)
-        return
-    engine: AsyncEngine = create_engine(database_url, busy_timeout_ms=200)
-    uow = SqlUnitOfWork(engine)
+        await backend.forget()  # the legacy rows of the seeded groups: step 2e has its own tests
+        if backend.engine is None:
 
-    async def granted_by_sql(staff_id: int, skill_id: int) -> int | None:
-        async with AsyncSession(engine) as session:
-            return await session.scalar(
-                select(StaffSkillRow.granted_by).where(
-                    StaffSkillRow.staff_id == staff_id, StaffSkillRow.skill_id == skill_id
+            async def archive_in_fake(pool_id: int) -> None:
+                uow.state.pools[pool_id] = replace(uow.state.pools[pool_id], archived_at=NOW)
+
+            yield World(uow, *ids, None, archive_in_fake)
+            return
+        engine = backend.engine
+
+        async def granted_by_sql(staff_id: int, skill_id: int) -> int | None:
+            async with AsyncSession(engine) as session:
+                return await session.scalar(
+                    select(StaffSkillRow.granted_by).where(
+                        StaffSkillRow.staff_id == staff_id, StaffSkillRow.skill_id == skill_id
+                    )
                 )
-            )
 
-    async def archive_in_sql(pool_id: int) -> None:
-        async with AsyncSession(engine) as session, session.begin():
-            await session.execute(
-                update(CapacityPoolRow).where(CapacityPoolRow.id == pool_id).values(archived_at=NOW)
-            )
+        async def archive_in_sql(pool_id: int) -> None:
+            async with AsyncSession(engine) as session, session.begin():
+                await session.execute(
+                    update(CapacityPoolRow)
+                    .where(CapacityPoolRow.id == pool_id)
+                    .values(archived_at=NOW)
+                )
 
-    ids = await _seed(uow)
-    yield World(uow, *ids, granted_by_sql, archive_in_sql)
-    await engine.dispose()
+        yield World(uow, *ids, granted_by_sql, archive_in_sql)
 
 
 def who_granted(world: World) -> Callable[[int, int], Awaitable[int | None]]:

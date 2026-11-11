@@ -119,6 +119,7 @@ from app.adapters.db.routing_json import (
     subjects_from_column,
 )
 from app.adapters.db.scenarios import ScenarioQueries
+from app.adapters.db.schedule_rules import rule_from_row
 from app.adapters.db.scope import scope_filter
 from app.adapters.db.service_flows import ServiceFlowQueries
 from app.adapters.db.skills import SkillQueries
@@ -327,24 +328,6 @@ def _calendar(row: HolidayCalendarRow) -> HolidayCalendar:
 def _holiday(row: HolidayRow) -> Holiday:
     """Map a holiday row."""
     return Holiday(row.calendar_id, row.day, row.name, id=row.id)
-
-
-def _rule(row: ScheduleRuleRow) -> ScheduleRule:
-    """Map a weekly rule row."""
-    return ScheduleRule(
-        weekday=row.weekday,
-        window=TimeWindow(
-            row.opens,
-            row.closes,
-            row.capacity,
-            row.label,
-            Offer(row.offer),
-            subjects_from_column(row.subjects),
-        ),
-        valid_from=row.valid_from,
-        valid_to=row.valid_to,
-        id=row.id,
-    )
 
 
 def _rule_columns(rule: ScheduleRule) -> dict[str, Any]:
@@ -796,7 +779,7 @@ class SqlTransaction(
                 ScheduleOverrideRow.day.between(first_day, last_day),
             )
         )
-        return [_rule(r) for r in rules], [_override(o) for o in overrides]
+        return [rule_from_row(r) for r in rules], [_override(o) for o in overrides]
 
     async def list_organisations(self, scope: Scope) -> list[Organisation]:
         """Return the organisations inside ``scope`` (organisation scope only), by slug."""
@@ -1094,7 +1077,10 @@ class SqlTransaction(
         )
 
     async def add_group(self, group: Group) -> Group:
-        """Insert a group and return it with its ID; its IdP value starts as its slug."""
+        """Insert a group and return it with its ID; its IdP value starts as its slug.
+
+        The group gets its legacy pool and default flows in the same transaction (ADR 0121).
+        """
         row = GroupRow(
             organisation_id=group.organisation_id,
             slug=group.slug,
@@ -1103,6 +1089,7 @@ class SqlTransaction(
         self._session.add(row)
         await self._session.flush()
         await save_routing(self._session, row.id, group.contact_center)
+        await self.ensure_default_flows(row.id)
         return replace(_group(row, None), contact_center=group.contact_center)
 
     async def save_group(self, group: Group) -> None:
@@ -1177,23 +1164,30 @@ class SqlTransaction(
         overrides = await self._session.scalars(
             query.order_by(ScheduleOverrideRow.day, ScheduleOverrideRow.opens)
         )
-        return [_rule(r) for r in rules], [_override(o) for o in overrides]
+        return [rule_from_row(r) for r in rules], [_override(o) for o in overrides]
 
     async def add_schedule_rule(self, group_id: int, rule: ScheduleRule) -> int:
-        """Insert a weekly rule and return its ID."""
+        """Insert a weekly rule and return its ID; a rule that offers direct calls adds the flow."""
         row = ScheduleRuleRow(group_id=group_id, **_rule_columns(rule))
         self._session.add(row)
         await self._session.flush()
+        await self.ensure_default_flows(group_id)
         return row.id
 
     async def update_schedule_rule(self, group_id: int, rule_id: int, rule: ScheduleRule) -> bool:
-        """Replace the group's rule; the group condition keeps other groups' rules out of reach."""
+        """Replace the group's rule; the group condition keeps other groups' rules out of reach.
+
+        A rule that now offers direct calls adds the group's direct flow (ADR 0121).
+        """
         result = await self._session.execute(
             update(ScheduleRuleRow)
             .where(ScheduleRuleRow.id == rule_id, ScheduleRuleRow.group_id == group_id)
             .values(**_rule_columns(rule))
         )
-        return bool(getattr(result, "rowcount", 0))
+        changed = bool(getattr(result, "rowcount", 0))
+        if changed:
+            await self.ensure_default_flows(group_id)
+        return changed
 
     async def delete_schedule_rule(self, group_id: int, rule_id: int) -> bool:
         """Delete the group's rule; the group condition keeps other groups' rules out of reach."""

@@ -10,7 +10,7 @@ from app.domain.authorization import Principal
 from app.domain.booking import Booking, BookingStatus, Slot
 from app.domain.errors import DomainError
 from app.domain.planning import NewGroup, PlanningService, settings_of
-from app.domain.scheduling import PhoneMode, ScheduleOverride, ScheduleRule, TimeWindow
+from app.domain.scheduling import Offer, PhoneMode, ScheduleOverride, ScheduleRule, TimeWindow
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import (
@@ -57,6 +57,50 @@ async def test_org_admin_creates_a_group_in_their_organisation(
         ("o-1", "group.create", Outcome.SUCCESS, "", "klantenservice"),
     ]
     assert uow.state.audit[0].organisation == "demo"
+
+
+def _flow_codes(uow: InMemoryUnitOfWork, group_id: int) -> list[str]:
+    return sorted(f.code for f in uow.state.flows.values() if f.group_id == group_id)
+
+
+async def test_a_new_group_has_its_legacy_pool_and_appointment_flow(
+    planning: PlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    group = await planning.create_group(
+        ORG_ADMIN, NewGroup("demo", "Klantenservice", "klantenservice", "Europe/Amsterdam", 20)
+    )
+
+    assert [(p.group_id, p.name) for p in uow.state.pools.values()] == [
+        (group.id, "Klantenservice")
+    ]
+    assert _flow_codes(uow, group.id) == ["appointment"]
+
+
+async def test_a_staffing_block_that_offers_the_direct_call_adds_the_direct_flow(
+    planning: PlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    group_id = next(g.id for g in uow.state.groups.values() if g.slug == "demo")
+
+    rule_id = await planning.add_rule(SUPER, "demo", ScheduleRule(0, window(offer=Offer.SCHEDULED)))
+    assert _flow_codes(uow, group_id) == ["appointment"]  # slots only: no direct flow
+
+    await planning.update_rule(SUPER, "demo", rule_id, ScheduleRule(0, window(offer=Offer.BOTH)))
+
+    assert _flow_codes(uow, group_id) == ["appointment", "direct"]
+
+
+async def test_splitting_a_direct_block_keeps_one_pool_and_one_direct_flow(
+    planning: PlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    group_id = next(g.id for g in uow.state.groups.values() if g.slug == "demo")
+    rule_id = await planning.add_rule(
+        SUPER, "demo", ScheduleRule(0, window("09:00", "12:00", offer=Offer.DIRECT))
+    )
+
+    await planning.split_rule(SUPER, "demo", rule_id, time(10, 30), 1)
+
+    assert _flow_codes(uow, group_id) == ["appointment", "direct"]
+    assert len([p for p in uow.state.pools.values() if p.group_id == group_id]) == 1
 
 
 async def test_organisations_offered_for_a_new_group_follow_the_matrix(
