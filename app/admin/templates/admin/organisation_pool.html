@@ -5,7 +5,7 @@
 {% block title %}{{ _("admin.capacity.edit_title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% include "admin/_organisation_header.html" %}
-<p><a href="/admin/organisations/{{ organisation.slug }}/capacity">{{ _("admin.capacity.back") }}</a></p>
+<p><a href="{{ back }}">{{ _("admin.skills_capacity.back") }}</a></p>
 <h2 class="section-title">{{ _("admin.capacity.edit_title") }}</h2>
 <div class="alert alert--warning" role="note"><p>{{ _("admin.capacity.count_warning") }}</p></div>
 {% include "_error_summary.html" %}
@@ -21,7 +21,7 @@
   <p>{% if row.flows or row.hidden %}{{ _("admin.capacity.col.flows") }}: {{ row.flows | join(", ") }}{% if row.hidden %} {{ row.hidden }}{% endif %}{% else %}{{ _("admin.capacity.no_flows") }}{% endif %}</p>
   <div class="form-actions">
     <button type="submit" class="button">{{ _("admin.save") }}</button>
-    <a href="/admin/organisations/{{ organisation.slug }}/capacity">{{ _("admin.cancel") }}</a>
+    <a href="{{ back }}">{{ _("admin.cancel") }}</a>
   </div>
 </form>
 {% endblock %}

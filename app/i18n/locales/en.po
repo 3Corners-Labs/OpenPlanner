@@ -10089,6 +10089,12 @@ msgstr "Nothing ticked: the block offers every subject. A participant who choose
 msgid "settings.field.max_subjects_per_group.label"
 msgstr "Subjects per service (at most)"
 
+msgid "settings.field.max_skills_per_organisation.label"
+msgstr "Skills per organisation (at most)"
+
+msgid "settings.field.max_capacity_pools_per_organisation.label"
+msgstr "Capacity pools per organisation (at most)"
+
 msgid "admin.tab.planning"
 msgstr "Planning"
 
@@ -12245,12 +12251,6 @@ msgstr "Download as PNG"
 msgid "reports.chart.hint"
 msgstr "With scripts: arrow keys move through the chart, Enter opens that day, Escape closes the tip. The same numbers are in the table below."
 
-msgid "admin.tab.skills"
-msgstr "Skills"
-
-msgid "admin.tab.capacity"
-msgstr "Capacity"
-
 msgid "admin.skills.title"
 msgstr "Skills"
 
@@ -12281,35 +12281,17 @@ msgstr "Staff"
 msgid "admin.skills.col.used_by"
 msgstr "Used by"
 
-msgid "admin.skills.col.actions"
-msgstr "Actions"
-
 msgid "admin.skills.used_by"
 msgstr "Pools: {pools}, flows: {flows}"
 
 msgid "admin.skills.staff_count"
 msgstr "Staff with this skill: {count}"
 
-msgid "admin.skills.edit"
-msgstr "Edit"
-
-msgid "admin.skills.archive"
-msgstr "Archive"
-
-msgid "admin.skills.archived_chip"
-msgstr "Archived"
-
 msgid "admin.skills.none"
-msgstr "No skills yet. Add one below."
+msgstr "No skills yet."
 
 msgid "admin.skills.none_archived"
 msgstr "There are no archived skills."
-
-msgid "admin.skills.show_active"
-msgstr "Show the skills in use"
-
-msgid "admin.skills.show_archived"
-msgstr "Show archived skills"
 
 msgid "admin.skills.add"
 msgstr "Add a skill"
@@ -12319,9 +12301,6 @@ msgstr "Add skill"
 
 msgid "admin.skills.edit_title"
 msgstr "Change a skill"
-
-msgid "admin.skills.back"
-msgstr "Back to the skills"
 
 msgid "admin.skills.label_nl"
 msgstr "Name in Dutch"
@@ -12347,9 +12326,6 @@ msgstr "Archive a skill"
 msgid "admin.skills.archive_lead"
 msgstr "Archiving is not deleting: whatever already has the skill keeps it."
 
-msgid "admin.skills.archive_what_happens"
-msgstr "What happens"
-
 msgid "admin.skills.archive_effect_new"
 msgstr "No new requirement and no new grant can use the skill any more."
 
@@ -12358,9 +12334,6 @@ msgstr "Existing requests, requirements and grants keep the skill; nothing chang
 
 msgid "admin.skills.archive_effect_listed"
 msgstr "You find the skill under Show archived skills. It cannot be deleted."
-
-msgid "admin.skills.archive_confirm_heading"
-msgstr "Confirm"
 
 msgid "admin.skills.archive_button"
 msgstr "Archive skill"
@@ -12374,8 +12347,53 @@ msgstr "A chosen skill no longer exists or can no longer be newly chosen. Reload
 msgid "admin.skills.error.no_membership"
 msgstr "This person is not a member of this organisation, so you cannot grant skills here."
 
+msgid "admin.tab.skills_capacity"
+msgstr "Skills and capacity"
+
+msgid "admin.skills_capacity.lead"
+msgstr "Skills decide who may pick up a request; capacity pools decide where the time comes from. You manage both here."
+
+msgid "admin.skills_capacity.back"
+msgstr "Back to skills and capacity"
+
+msgid "admin.skills_capacity.filter"
+msgstr "Apply filter"
+
+msgid "admin.skills_capacity.error_in"
+msgstr "{section}: {message}"
+
+msgid "admin.action.archive"
+msgstr "Archive"
+
+msgid "admin.status.archived"
+msgstr "Archived"
+
+msgid "admin.archive.what_happens"
+msgstr "What happens"
+
+msgid "admin.archive.confirm"
+msgstr "Confirm"
+
+msgid "admin.skills.archived_only"
+msgstr "Archived skills only"
+
+msgid "admin.capacity.archived_only"
+msgstr "Archived capacity pools only"
+
+msgid "admin.skills.error.limit"
+msgstr "Your organisation has reached the maximum number of skills. Archive a skill you no longer use first."
+
+msgid "admin.capacity.error.limit"
+msgstr "Your organisation has reached the maximum number of capacity pools. Archive a pool you no longer use first."
+
+msgid "admin.skills.limit_reached"
+msgstr "The maximum of {count} skills is reached. Archive a skill you no longer use to add a new one."
+
+msgid "admin.capacity.limit_reached"
+msgstr "The maximum of {count} own and shared pools is reached. Archive a pool you no longer use to add a new one."
+
 msgid "admin.capacity.title"
-msgstr "Capacity"
+msgstr "Capacity pools"
 
 msgid "admin.capacity.lead"
 msgstr "A capacity pool is the time that flows draw on, with the skills every counted member of staff of the pool holds."
@@ -12410,17 +12428,14 @@ msgstr "Skills of every member of staff"
 msgid "admin.capacity.col.flows"
 msgstr "Flows that draw on the pool"
 
-msgid "admin.capacity.col.actions"
-msgstr "Actions"
-
 msgid "admin.capacity.mode.legacy"
 msgstr "Existing"
 
 msgid "admin.capacity.mode.own"
-msgstr "Own"
+msgstr "Own pool"
 
 msgid "admin.capacity.mode.shared"
-msgstr "Shared"
+msgstr "Shared pool"
 
 msgid "admin.capacity.legacy_note"
 msgstr "The service's own staffing, unchanged"
@@ -12446,14 +12461,8 @@ msgstr "No capacity pools yet."
 msgid "admin.capacity.none_archived"
 msgstr "There are no archived capacity pools."
 
-msgid "admin.capacity.show_active"
-msgstr "Show the pools in use"
-
-msgid "admin.capacity.show_archived"
-msgstr "Show archived pools"
-
 msgid "admin.capacity.add"
-msgstr "Add a pool"
+msgstr "Add a capacity pool"
 
 msgid "admin.capacity.add_button"
 msgstr "Add pool"
@@ -12470,9 +12479,6 @@ msgstr "A flow that draws on this pool may only require skills ticked here."
 msgid "admin.capacity.edit_title"
 msgstr "Change a capacity pool"
 
-msgid "admin.capacity.back"
-msgstr "Back to the capacity pools"
-
 msgid "admin.capacity.archive_title"
 msgstr "Archive a capacity pool"
 
@@ -12484,9 +12490,6 @@ msgstr "No flow can newly choose the pool any more."
 
 msgid "admin.capacity.archive_effect_flows"
 msgstr "Flows that use the pool in a draft or a published revision stop the archiving; take the pool out of those flows first."
-
-msgid "admin.capacity.archive_confirm_heading"
-msgstr "Confirm"
 
 msgid "admin.capacity.archive_button"
 msgstr "Archive pool"
@@ -12501,7 +12504,7 @@ msgid "admin.staff.skills.intro"
 msgstr "Rights determine what {name} may see. Skills determine which requests {name} may pick up. A change applies from the next request that is picked up or started."
 
 msgid "admin.staff.skills.legend"
-msgstr "Skills in {organisation}"
+msgstr "Skills granted"
 
 msgid "admin.staff.skills.save"
 msgstr "Save skills"

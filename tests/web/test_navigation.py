@@ -162,8 +162,7 @@ def test_the_organisation_is_an_object_page_with_five_tabs() -> None:
     assert [sub.key for sub in organisation.tabs[0].subtabs] == [
         "organisation.settings",
         "organisation.embedding",
-        "organisation.skills",
-        "organisation.capacity",
+        "organisation.skills_capacity",
         "organisation.login",
         "organisation.configuration",
         "organisation.usage",

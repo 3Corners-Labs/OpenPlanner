@@ -71,37 +71,68 @@ def choices(skills: Iterable[Skill], checked: Iterable[int], locale: str) -> lis
     ]
 
 
-def chosen_ids(form: FormData) -> frozenset[int]:
-    """Return the ticked skills (inputs named ``skill-<id>``); malformed names are ignored."""
+def ticked_ids(form: FormData) -> frozenset[int]:
+    """Return the ticked skills (inputs named ``skill-<id>``); malformed names are ignored.
+
+    Only to show the ticks of a form again; the ids a change acts on come from ``chosen_ids``.
+    """
     ids = (
         name.removeprefix(CHOICE_PREFIX) for name in form.values if name.startswith(CHOICE_PREFIX)
     )
     return frozenset(int(i) for i in ids if i.isdigit() and len(i) <= _MAX_ID_DIGITS)
 
 
+def chosen_ids(form: FormData, maximum: int) -> frozenset[int]:
+    """Return the ticked skills a change acts on: at most ``maximum`` distinct ids.
+
+    More than the organisation can have is no real form (a crafted POST); it is refused before
+    anything is looked up.
+
+    Raises:
+        DomainError: ``invalid_configuration`` on ``skill_ids`` for more than ``maximum`` ids.
+    """
+    ids = ticked_ids(form)
+    if len(ids) > maximum:
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "skill_ids")
+    return ids
+
+
+def is_unknown(error: DomainError) -> bool:
+    """Return whether a refusal means "no such thing for you" (answered 404).
+
+    That is an unknown or another organisation's object, organisation or person, and a legacy
+    pool, which has no page and no change here.
+    """
+    return error.code in _UNKNOWN or (
+        error.code is ErrorCode.INVALID_CONFIGURATION and error.field == "mode"
+    )
+
+
 def refuse(form: FormData, error: DomainError, locale: RequestLocale, choice_field: str) -> None:
     """Add the form error for a refusal of these screens; raise the page-level ones.
 
     A refused permission is an ``AccessDenied``; an object that is missing or another
-    organisation's, and a person the viewer may not see, answer 404 like an unknown address.
-    ``choice_field`` is the id of the group of checkboxes an error about the choice links to.
+    organisation's, a legacy pool and a person the viewer may not see answer 404 like an unknown
+    address. ``choice_field`` is the id of the group of checkboxes an error about the choice
+    links to.
 
     Raises:
         AccessDenied: For ``not_permitted``.
-        RejectedRequest: 404 for an unknown object, 409 for a legacy pool.
+        RejectedRequest: 404 for an unknown object.
     """
-    raise_refusal(error)
     _ = locale.gettext
-    if error.field == "mode":
-        raise RejectedRequest(409)
     if error.code is ErrorCode.SLUG_TAKEN and error.field == "skill_code":
         form.errors.append(FormError("skill_code", _("admin.skills.error.code_taken")))
+    elif error.field == "skill_limit":
+        form.errors.append(FormError("skill_code", _("admin.skills.error.limit")))
+    elif error.field == "pool_limit":
+        form.errors.append(FormError("pool_name", _("admin.capacity.error.limit")))
     elif error.field in ("skill_ids", "guaranteed_skill_ids"):
         form.errors.append(FormError(choice_field, _("admin.skills.error.choice")))
     elif error.code is ErrorCode.CONFIGURATION_OUT_OF_SCOPE and error.field == "organisation_id":
         form.errors.append(FormError(choice_field, _("admin.skills.error.no_membership")))
-    elif error.code in _UNKNOWN:
-        raise RejectedRequest(404)
+    elif error.code is ErrorCode.NOT_PERMITTED or is_unknown(error):
+        raise_unknown(error)
     else:
         form.refusal(error)
 
@@ -111,10 +142,10 @@ def raise_unknown(error: DomainError) -> NoReturn:
 
     Raises:
         AccessDenied: For ``not_permitted``.
-        RejectedRequest: 404 for an unknown object, organisation or person.
+        RejectedRequest: 404 for an unknown object, organisation or person, and a legacy pool.
         DomainError: ``error`` itself for anything else (the portal answers it).
     """
     raise_refusal(error)
-    if error.code in _UNKNOWN:
+    if is_unknown(error):
         raise RejectedRequest(404)
     raise error

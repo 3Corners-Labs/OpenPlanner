@@ -10,7 +10,7 @@ input (``aria-describedby``, error summary with anchors) and never repeats the v
 """
 
 import re
-from collections.abc import Iterable, Mapping, Sequence, Set
+from collections.abc import Collection, Iterable, Mapping, Sequence, Set
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, tzinfo
 from urllib.parse import parse_qsl, urlencode
@@ -610,16 +610,20 @@ def _day_text(value: str) -> str:
     return f"{day}-{month}-{year}"
 
 
-def done_message(request: Request, _: BoundGettext) -> str | None:
+def done_message(
+    request: Request, _: BoundGettext, only: Collection[str] | None = None
+) -> str | None:
     """Return the confirmation named by ``?done=``, if it is a known one.
 
     ``?count=`` (digits only) fills a ``{count}`` in the confirmation, e.g. how many
-    bookings an emergency closure suspended.
+    bookings an emergency closure suspended. ``only`` limits it to those keys, for a page whose
+    sections each show their own confirmation.
     """
     key = request.query_params.get("done", "")
     raw = request.query_params.get("count", "")
     count = int(raw) if raw.isdigit() and len(raw) <= 6 else 0
-    return _(DONE_MESSAGES[key], count=count) if key in DONE_MESSAGES else None
+    known = key in DONE_MESSAGES and (only is None or key in only)
+    return _(DONE_MESSAGES[key], count=count) if known else None
 
 
 def redirect_done(

@@ -3,14 +3,14 @@
 {% block title %}{{ _("admin.capacity.archive_title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% include "admin/_organisation_header.html" %}
-<p><a href="/admin/organisations/{{ organisation.slug }}/capacity">{{ _("admin.capacity.back") }}</a></p>
+<p><a href="{{ back }}">{{ _("admin.skills_capacity.back") }}</a></p>
 {% include "_error_summary.html" %}
 <section class="card" aria-labelledby="archive-heading">
   <div class="card__header">
     <h2 id="archive-heading">{{ _("admin.capacity.archive_title") }}: {{ row.name }}</h2>
     <p class="card__lead">{{ _("admin.capacity.archive_lead") }}</p>
   </div>
-  <h3>{{ _("admin.skills.archive_what_happens") }}</h3>
+  <h3>{{ _("admin.archive.what_happens") }}</h3>
   <ul>
     <li>{{ _("admin.capacity.archive_effect_new") }}</li>
     <li>{{ _("admin.capacity.archive_effect_flows") }}</li>
@@ -18,10 +18,10 @@
   <p>{% if row.flows or row.hidden %}{{ _("admin.capacity.col.flows") }}: {{ row.flows | join(", ") }}{% if row.hidden %} {{ row.hidden }}{% endif %}{% else %}{{ _("admin.capacity.no_flows") }}{% endif %}</p>
 </section>
 <form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/capacity/{{ row.id }}/archive" novalidate aria-labelledby="confirm-heading">
-  <h2 id="confirm-heading">{{ _("admin.capacity.archive_confirm_heading") }}</h2>
+  <h2 id="confirm-heading">{{ _("admin.archive.confirm") }}</h2>
   <div class="form-actions">
     <button type="submit" class="button button--danger">{{ _("admin.capacity.archive_button") }}</button>
-    <a href="/admin/organisations/{{ organisation.slug }}/capacity">{{ _("admin.cancel") }}</a>
+    <a href="{{ back }}">{{ _("admin.cancel") }}</a>
   </div>
 </form>
 {% endblock %}

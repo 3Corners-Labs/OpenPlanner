@@ -1,19 +1,30 @@
-{#- The skill catalogue of an organisation (ADR 0121): the list with where each skill is used, the archived ones behind a filter, and the form that adds one. -#}
+{#- Skills and capacity of an organisation (ADR 0121, decision S2): the skill catalogue and the capacity pools on one page, each with its own archived filter and, for a viewer who may change them, its own add form and the links to edit and archive. Both sections have an id of their own (skills, capacity) and every input a distinct id. -#}
 {% extends "admin/layout.html" %}
 {% from "admin/_fields.html" import field with context %}
-{% block title %}{{ _("admin.skills.title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
+{% from "admin/_skill_checkboxes.html" import skill_checkboxes with context %}
+{% block title %}{{ _("admin.tab.skills_capacity") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% include "admin/_organisation_header.html" %}
-<h2 class="section-title">{{ _("admin.skills.title") }}</h2>
-<p>{{ _("admin.skills.lead") }}</p>
+<h2 class="section-title">{{ _("admin.tab.skills_capacity") }}</h2>
+<p>{{ _("admin.skills_capacity.lead") }}</p>
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 {% include "_error_summary.html" %}
-<section class="card" aria-labelledby="skills-heading">
+<section class="card" id="{{ skills_anchor }}" aria-labelledby="skills-heading">
   <div class="card__header">
-    <h2 id="skills-heading">{% if archived %}{{ _("admin.skills.archived_heading") }}{% else %}{{ _("admin.skills.count", count=rows | length) }}{% endif %}</h2>
-    <p class="card__lead">{% if archived %}{{ _("admin.skills.archived_lead") }}{% else %}{{ _("admin.skills.list_lead") }}{% endif %}</p>
+    <h2 id="skills-heading">{% if skills_archived %}{{ _("admin.skills.archived_heading") }}{% else %}{{ _("admin.skills.count", count=skill_rows | length) }}{% endif %}</h2>
+    <p class="card__lead">{% if skills_archived %}{{ _("admin.skills.archived_lead") }}{% else %}{{ _("admin.skills.lead") }} {{ _("admin.skills.list_lead") }}{% endif %}</p>
   </div>
-  {% if rows %}
+  <form method="get" action="/admin/organisations/{{ organisation.slug }}/skills#{{ skills_anchor }}" aria-labelledby="skills-heading">
+    {% if pools_archived %}<input type="hidden" name="pools" value="archived">{% endif %}
+    <div class="inline-forms">
+      <div class="choice__option">
+        <input type="checkbox" id="skills-archived" name="skills" value="archived"{% if skills_archived %} checked{% endif %}>
+        <label for="skills-archived">{{ _("admin.skills.archived_only") }}</label>
+      </div>
+      <button type="submit" class="button button--secondary">{{ _("admin.skills_capacity.filter") }}</button>
+    </div>
+  </form>
+  {% if skill_rows %}
   <div class="table-scroll">
   <table class="data-table">
     <caption class="visually-hidden">{{ _("admin.skills.title") }}</caption>
@@ -23,43 +34,124 @@
         <th scope="col">{{ _("admin.skills.col.code") }}</th>
         <th scope="col">{{ _("admin.skills.col.staff") }}</th>
         <th scope="col">{{ _("admin.skills.col.used_by") }}</th>
-        <th scope="col">{{ _("admin.skills.col.actions") }}</th>
+        {% if skills_editable %}<th scope="col">{{ _("admin.actions") }}</th>{% endif %}
       </tr>
     </thead>
     <tbody>
-      {% for row in rows %}
+      {% for row in skill_rows %}
       <tr>
         <th scope="row">{{ row.label }}<br><span class="muted">{{ row.other_label }}</span></th>
         <td><code>{{ row.code }}</code></td>
         <td>{{ row.staff }}</td>
         <td>{{ _("admin.skills.used_by", pools=row.pools, flows=row.flows) }}</td>
+        {% if skills_editable %}
         <td>
           {% if not row.archived %}
-          <a href="/admin/organisations/{{ organisation.slug }}/skills/{{ row.id }}">{{ _("admin.skills.edit") }}<span class="visually-hidden"> {{ row.label }}</span></a>
-          · <a href="/admin/organisations/{{ organisation.slug }}/skills/{{ row.id }}/archive">{{ _("admin.skills.archive") }}<span class="visually-hidden"> {{ row.label }}</span></a>
-          {% else %}<span class="chip">{{ _("admin.skills.archived_chip") }}</span>{% endif %}
+          <ul class="row-actions">
+            <li><a href="/admin/organisations/{{ organisation.slug }}/skills/{{ row.id }}">{{ _("admin.edit") }}<span class="visually-hidden"> {{ row.label }}</span></a></li>
+            <li><a href="/admin/organisations/{{ organisation.slug }}/skills/{{ row.id }}/archive">{{ _("admin.action.archive") }}<span class="visually-hidden"> {{ row.label }}</span></a></li>
+          </ul>
+          {% else %}<span class="chip">{{ _("admin.status.archived") }}</span>{% endif %}
         </td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>
   </table>
   </div>
   {% else %}
-  <p class="empty-state">{% if archived %}{{ _("admin.skills.none_archived") }}{% else %}{{ _("admin.skills.none") }}{% endif %}</p>
+  <p class="empty-state">{% if skills_archived %}{{ _("admin.skills.none_archived") }}{% else %}{{ _("admin.skills.none") }}{% endif %}</p>
   {% endif %}
-  <p>{% if archived %}<a href="/admin/organisations/{{ organisation.slug }}/skills">{{ _("admin.skills.show_active") }}</a>{% else %}<a href="/admin/organisations/{{ organisation.slug }}/skills?archived=1">{{ _("admin.skills.show_archived") }}</a>{% endif %}</p>
 </section>
-{% if not archived %}
-<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/skills" novalidate aria-labelledby="add-heading">
+{% if skills_can_add %}
+<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/skills" novalidate aria-labelledby="add-skill-heading">
   <div class="card__header">
-    <h2 id="add-heading">{{ _("admin.skills.add") }}</h2>
+    <h2 id="add-skill-heading">{{ _("admin.skills.add") }}</h2>
   </div>
   <div class="form-grid">
-    {% for f in fields %}{{ field(f) }}{% endfor %}
+    {% for f in skill_fields %}{{ field(f) }}{% endfor %}
   </div>
   <div class="form-actions">
     <button type="submit" class="button">{{ _("admin.skills.add_button") }}</button>
   </div>
 </form>
+{% elif limit_reached and not skills_archived %}
+<div class="alert alert--warning" role="note"><p>{{ _("admin.skills.limit_reached", count=skills_limit) }}</p></div>
+{% endif %}
+<section class="card" id="{{ pools_anchor }}" aria-labelledby="pools-heading">
+  <div class="card__header">
+    <h2 id="pools-heading">{% if pools_archived %}{{ _("admin.capacity.archived_heading") }}{% else %}{{ _("admin.capacity.count", count=pool_rows | length) }}{% endif %}</h2>
+    <p class="card__lead">{% if pools_archived %}{{ _("admin.capacity.archived_lead") }}{% else %}{{ _("admin.capacity.lead") }} {{ _("admin.capacity.list_lead") }}{% endif %}</p>
+  </div>
+  <div class="alert alert--warning" role="note"><p>{{ _("admin.capacity.count_warning") }}</p></div>
+  <form method="get" action="/admin/organisations/{{ organisation.slug }}/skills#{{ pools_anchor }}" aria-labelledby="pools-heading">
+    {% if skills_archived %}<input type="hidden" name="skills" value="archived">{% endif %}
+    <div class="inline-forms">
+      <div class="choice__option">
+        <input type="checkbox" id="pools-archived" name="pools" value="archived"{% if pools_archived %} checked{% endif %}>
+        <label for="pools-archived">{{ _("admin.capacity.archived_only") }}</label>
+      </div>
+      <button type="submit" class="button button--secondary">{{ _("admin.skills_capacity.filter") }}</button>
+    </div>
+  </form>
+  {% if pool_rows %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.capacity.title") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.capacity.col.name") }}</th>
+        <th scope="col">{{ _("admin.capacity.col.mode") }}</th>
+        <th scope="col">{{ _("admin.capacity.col.skills") }}</th>
+        <th scope="col">{{ _("admin.capacity.col.flows") }}</th>
+        {% if pools_editable %}<th scope="col">{{ _("admin.actions") }}</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in pool_rows %}
+      <tr>
+        <th scope="row">{{ row.name }}{% if row.legacy %}<br><span class="muted">{{ _("admin.capacity.legacy_note") }}</span>{% endif %}</th>
+        <td><span class="chip">{{ row.tag }}</span></td>
+        <td>{% if row.skills %}{{ row.skills | join(", ") }}{% else %}<span class="muted">{{ _("admin.capacity.no_skills") }}</span>{% endif %}</td>
+        <td>
+          {% if row.flows or row.hidden %}{{ row.flows | join(", ") }}{% if row.hidden %} {{ row.hidden }}{% endif %}{% else %}<span class="muted">{{ _("admin.capacity.no_flows") }}</span>{% endif %}
+        </td>
+        {% if pools_editable %}
+        <td>
+          {% if row.legacy %}<span class="muted">{{ _("admin.capacity.read_only") }}</span>
+          {% elif row.archived %}<span class="chip">{{ _("admin.status.archived") }}</span>
+          {% else %}
+          <ul class="row-actions">
+            <li><a href="/admin/organisations/{{ organisation.slug }}/capacity/{{ row.id }}">{{ _("admin.edit") }}<span class="visually-hidden"> {{ row.name }}</span></a></li>
+            <li><a href="/admin/organisations/{{ organisation.slug }}/capacity/{{ row.id }}/archive">{{ _("admin.action.archive") }}<span class="visually-hidden"> {{ row.name }}</span></a></li>
+          </ul>
+          {% endif %}
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{% if pools_archived %}{{ _("admin.capacity.none_archived") }}{% else %}{{ _("admin.capacity.none") }}{% endif %}</p>
+  {% endif %}
+</section>
+{% if pools_can_add %}
+<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/capacity" novalidate aria-labelledby="add-pool-heading">
+  <div class="card__header">
+    <h2 id="add-pool-heading">{{ _("admin.capacity.add") }}</h2>
+    <p class="card__lead">{{ _("admin.capacity.staffing_later") }}</p>
+  </div>
+  <div class="form-grid">
+    {{ field(pool_name_field) }}
+  </div>
+  {{ skill_checkboxes(pool_choices, choice_field, _("admin.capacity.guaranteed"), choice_error, _("admin.capacity.guaranteed_hint")) }}
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.capacity.add_button") }}</button>
+  </div>
+</form>
+{% elif pools_limit_reached and not pools_archived %}
+<div class="alert alert--warning" role="note"><p>{{ _("admin.capacity.limit_reached", count=pools_limit) }}</p></div>
 {% endif %}
 {% endblock %}

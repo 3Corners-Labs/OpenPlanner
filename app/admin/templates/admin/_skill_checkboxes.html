@@ -7,7 +7,7 @@
   <p class="hint" id="{{ id }}-hint">{{ hint }}</p>
   {%- endif %}
   {%- for choice in choices %}
-  <div class="choice__option"><input type="checkbox" id="skill-{{ choice.id }}" name="skill-{{ choice.id }}" value="on"{% if choice.checked %} checked{% endif %}><label for="skill-{{ choice.id }}">{{ choice.label }} <span class="muted">({{ choice.code }})</span>{% if choice.archived %} <span class="chip">{{ _("admin.skills.archived_chip") }}</span>{% endif %}</label></div>
+  <div class="choice__option"><input type="checkbox" id="skill-{{ choice.id }}" name="skill-{{ choice.id }}" value="on"{% if choice.checked %} checked{% endif %}><label for="skill-{{ choice.id }}">{{ choice.label }} <span class="muted">({{ choice.code }})</span>{% if choice.archived %} <span class="chip">{{ _("admin.status.archived") }}</span>{% endif %}</label></div>
   {%- else %}
   <p class="empty-state">{{ _("admin.skills.none_to_choose") }}</p>
   {%- endfor %}

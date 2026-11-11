@@ -236,6 +236,8 @@ Seven screens were drawn as mockups and the product owner left four choices to t
 | 6 Own queue | Work in treatment with the flow's action and *Complete*; waiting rows with required skills; a notice when a start would run into reserved appointments | Claim needs right and skill; completion is explicit; immediate work never consumes a reservation |
 | 7 Participant | Subject, then flow by the administrator's names with one line of difference | No internal terms on the participant side |
 
+As built in step 2c: skills and capacity pools are one sub-tab, *Skills and capacity*, under the organisation's Overview (choice S2 as one page; the sub-tab is `organisation.skills_capacity`, and the old address `/capacity` moves to its section). It is read under `organisation.view`; the add forms and the edit and archive links appear only for a viewer who holds `skills.manage` respectively `capacity.manage`, and every write route and every edit or archive page declares exactly one of those two permissions. The organisation's skills and counted pools have two platform limits (class C, `max_skills_per_organisation`, `max_capacity_pools_per_organisation`; archived ones, and existing pools, do not count). Existing (legacy) pools are shown read-only and only to a reader who reaches their service; they have no page and answer 404 to a change. A counted pool has no staffing numbers until step 3.
+
 ## Design review (phase 3, 2026-11-10)
 
 Each screen was checked on paper against the admin structure, the matrix, the accessibility rules and the acceptance matrix. Findings are requirements for the step that builds the screen.

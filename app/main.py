@@ -707,8 +707,15 @@ def create_app(
             allow_local=settings.environment != "prod",
         )
         app.state.holiday_service = HolidayService(uow, clock, app.state.admin_service)
-        app.state.skill_service = SkillService(uow, clock, app.state.admin_service)
-        app.state.capacity_service = CapacityService(uow, clock, app.state.admin_service)
+        app.state.skill_service = SkillService(
+            uow, clock, app.state.admin_service, lambda: live().max_skills_per_organisation
+        )
+        app.state.capacity_service = CapacityService(
+            uow,
+            clock,
+            app.state.admin_service,
+            lambda: live().max_capacity_pools_per_organisation,
+        )
         app.state.agenda_service = AgendaService(
             uow,
             clock,

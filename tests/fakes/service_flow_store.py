@@ -13,7 +13,13 @@ from datetime import datetime
 from typing import Any
 
 from app.domain.authorization import Scope
-from app.domain.capacity import CapacityPool, PoolFlows, check_pool_archive, check_pool_save
+from app.domain.capacity import (
+    CapacityPool,
+    PoolFlows,
+    PoolMode,
+    check_pool_archive,
+    check_pool_save,
+)
 from app.domain.errors import DomainError, ErrorCode, missing_object
 from app.domain.scheduling import Group
 from app.domain.service_flows import (
@@ -29,6 +35,17 @@ from app.domain.service_flows import (
 )
 from app.domain.skills import Skill, SkillUsage, check_skill_save, check_staff_grant
 from app.domain.staff import StaffMember, StaffStatus
+
+
+def _pool_visible(state: Any, scope: Scope, pool: CapacityPool) -> bool:
+    """Return whether a pool is visible: like its organisation, a legacy one only with its group."""
+    if not _visible(state, scope, pool.organisation_id):
+        return False
+    if pool.mode is not PoolMode.LEGACY_GROUP:
+        return True
+    group = state.groups.get(pool.group_id)
+    slug = state.organisation_slugs.get(pool.organisation_id, "org")
+    return group is not None and scope.contains(slug, group.slug)
 
 
 def _visible(state: Any, scope: Scope, organisation_id: int) -> bool:
@@ -185,7 +202,7 @@ class ServiceFlowStore:
         *,
         granted_by: int | None,
         at: datetime,
-    ) -> None:
+    ) -> tuple[frozenset[int], frozenset[int]]:
         if not self._visible_organisation(scope, organisation_id):
             raise missing_object("organisation_id")
         member = self._staff(staff_id)
@@ -211,6 +228,7 @@ class ServiceFlowStore:
             del self.state.skill_grants[(staff_id, skill_id)]
         for skill_id in wanted - held:
             self.state.skill_grants[(staff_id, skill_id)] = (granted_by, at)
+        return frozenset(wanted - held), frozenset(held - wanted)
 
     async def list_capacity_pools(
         self, scope: Scope, organisation_id: int, *, archived: bool = False
@@ -220,13 +238,13 @@ class ServiceFlowStore:
             for p in self.state.pools.values()
             if p.organisation_id == organisation_id
             and (p.archived_at is not None) == archived
-            and _visible(self.state, scope, p.organisation_id)
+            and _pool_visible(self.state, scope, p)
         ]
         return sorted(found, key=lambda p: (p.name, p.id or 0))
 
     async def get_capacity_pool(self, scope: Scope, pool_id: int) -> CapacityPool | None:
         pool = self.state.pools.get(pool_id)
-        return pool if pool and _visible(self.state, scope, pool.organisation_id) else None
+        return pool if pool and _pool_visible(self.state, scope, pool) else None
 
     async def save_capacity_pool(self, scope: Scope, pool: CapacityPool) -> CapacityPool:
         if not self._visible_organisation(scope, pool.organisation_id):

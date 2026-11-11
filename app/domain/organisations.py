@@ -18,12 +18,13 @@ data has its own retention rules (CLAUDE.md, privacy rules).
 
 from collections.abc import Sequence
 from dataclasses import dataclass, fields, replace
+from typing import Protocol
 
 from app.domain.admin import AdminService, record_change, require
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.authorization import Permission, Principal, Scope, scope_for
 from app.domain.entitlements import is_idp_key
-from app.domain.errors import DomainError, ErrorCode
+from app.domain.errors import DomainError, ErrorCode, missing_object
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import RESERVED_SLUGS, Organisation
 
@@ -296,3 +297,26 @@ async def organisation_by_slug(tx: Transaction, slug: str) -> Organisation:
     if organisation is None:
         raise DomainError(ErrorCode.ORGANISATION_NOT_FOUND)
     return organisation
+
+
+class OrganisationOwned(Protocol):
+    """An object that belongs to one organisation (a skill, a capacity pool)."""
+
+    @property
+    def organisation_id(self) -> int:
+        """The organisation the object belongs to."""
+        ...
+
+
+def own_object[T: OrganisationOwned](found: T | None, organisation: Organisation, field: str) -> T:
+    """Return ``found`` if it exists and is the organisation's own.
+
+    A missing object (also one outside the caller's scope) and another organisation's answer
+    the same, so ids tell nothing (A05).
+
+    Raises:
+        DomainError: ``configuration_object_missing`` naming ``field``.
+    """
+    if found is None or found.organisation_id != organisation.id:
+        raise missing_object(field)
+    return found

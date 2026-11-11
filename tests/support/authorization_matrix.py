@@ -1220,8 +1220,10 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     # ADR 0121 point 11: the skill catalogue and the capacity pools (skills.manage and
     # capacity.manage, organisation level). An allowed POST with an empty form is refused (422);
     # an id that does not exist, or is another organisation's, answers 404 to whoever may ask.
+    # The page is read under organisation.view (the auditor reads it, without the forms); the
+    # old address of the pools moves to its section.
     "GET /admin/organisations/{org}/skills": {
-        "/admin/organisations/demo/skills": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/skills": statuses(200, 200, 403, 403, 200, 403, 403),
         "/admin/organisations/andere/skills": statuses(200, 403, 403, 200, 403, 403, 403),
         "/admin/organisations/nope/skills": statuses(404, 403, 403, 403, 403, 403, 403),
     },
@@ -1254,9 +1256,9 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         ),
     },
     "GET /admin/organisations/{org}/capacity": {
-        "/admin/organisations/demo/capacity": statuses(200, 200, 403, 403, 403, 403, 403),
-        "/admin/organisations/andere/capacity": statuses(200, 403, 403, 200, 403, 403, 403),
-        "/admin/organisations/nope/capacity": statuses(404, 403, 403, 403, 403, 403, 403),
+        "/admin/organisations/demo/capacity": statuses(308, 308, 403, 403, 308, 403, 403),
+        "/admin/organisations/andere/capacity": statuses(308, 403, 403, 308, 403, 403, 403),
+        "/admin/organisations/nope/capacity": statuses(308, 403, 403, 403, 403, 403, 403),
     },
     "POST /admin/organisations/{org}/capacity": {
         "/admin/organisations/demo/capacity": statuses(422, 422, 403, 403, 403, 403, 403),

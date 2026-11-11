@@ -14,7 +14,7 @@ transaction, which takes no lock; the unit of work does not stop it.
 from collections.abc import Collection
 from datetime import datetime
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import ColumnElement, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.flow_usage import REVISION_IN_EFFECT
@@ -68,6 +68,19 @@ async def pools_from_rows(
     ]
 
 
+def pool_visible(scope: Scope) -> ColumnElement[bool]:
+    """Return the condition that a pool is visible in ``scope``.
+
+    Needs the query to join ``OrganisationRow`` and to left-join ``GroupRow`` on the pool's group.
+    A counted pool is visible like its organisation's skills (``visible_organisation``); a legacy
+    pool wraps one service's staffing and only a scope that reaches that service sees it.
+    """
+    return visible_organisation(scope, OrganisationRow.slug) & or_(
+        CapacityPoolRow.mode != PoolMode.LEGACY_GROUP.value,
+        scope_filter(scope, OrganisationRow.slug, GroupRow.slug),
+    )
+
+
 class CapacityPoolQueries:
     """The capacity pools' part of ``SqlTransaction``; needs ``self._session``."""
 
@@ -78,19 +91,24 @@ class CapacityPoolQueries:
         return await self._session.scalar(
             select(CapacityPoolRow)
             .join(OrganisationRow, OrganisationRow.id == CapacityPoolRow.organisation_id)
-            .where(CapacityPoolRow.id == pool_id, visible_organisation(scope, OrganisationRow.slug))
+            .outerjoin(GroupRow, GroupRow.id == CapacityPoolRow.group_id)
+            .where(CapacityPoolRow.id == pool_id, pool_visible(scope))
         )
 
     async def list_capacity_pools(
         self, scope: Scope, organisation_id: int, *, archived: bool = False
     ) -> list[CapacityPool]:
-        """Return the organisation's pools inside ``scope``, by name; archived ones on request."""
+        """Return the organisation's pools inside ``scope``, by name; archived ones on request.
+
+        A legacy pool is listed only when its service lies inside ``scope``.
+        """
         rows = await self._session.scalars(
             select(CapacityPoolRow)
             .join(OrganisationRow, OrganisationRow.id == CapacityPoolRow.organisation_id)
+            .outerjoin(GroupRow, GroupRow.id == CapacityPoolRow.group_id)
             .where(
                 CapacityPoolRow.organisation_id == organisation_id,
-                visible_organisation(scope, OrganisationRow.slug),
+                pool_visible(scope),
                 CapacityPoolRow.archived_at.is_not(None)
                 if archived
                 else CapacityPoolRow.archived_at.is_(None),
@@ -100,7 +118,10 @@ class CapacityPoolQueries:
         return await pools_from_rows(self._session, list(rows))
 
     async def get_capacity_pool(self, scope: Scope, pool_id: int) -> CapacityPool | None:
-        """Return one pool, or ``None`` when it does not exist or lies outside ``scope``."""
+        """Return one pool, or ``None`` when it does not exist or lies outside ``scope``.
+
+        A legacy pool lies outside a scope that does not reach its service.
+        """
         row = await self._pool_row(scope, pool_id)
         return (await pools_from_rows(self._session, [row]))[0] if row is not None else None
 

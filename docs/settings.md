@@ -205,6 +205,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `MEETING_STATUS_REFRESH_SECONDS` | int | `30` | 10–300 | `settings.platform.manage` | Seconds a meeting status on the agenda may be old before the video provider is asked (webhooks come first), and between two refreshes of the agenda's status columns (ADR 0010). |
 | `BOOKING_FORM_MAX_CUSTOM_FIELDS` | int | `5` | 0–15 | `settings.platform.manage` | Custom fields a group's booking form may have at most; 0 switches them off (ADR 0055). |
 | `MAX_SUBJECTS_PER_GROUP` | int | `20` | 1–100 | `settings.platform.manage` | Subjects a group may give participants to choose from at most (ADR 0081). |
+| `MAX_SKILLS_PER_ORGANISATION` | int | `100` | 10–500 | `settings.platform.manage` | Skills an organisation may keep in its catalogue at most, archived ones not counted (ADR 0121). |
+| `MAX_CAPACITY_POOLS_PER_ORGANISATION` | int | `50` | 5–200 | `settings.platform.manage` | Counted capacity pools an organisation may keep at most, archived ones and the pools of existing services not counted (ADR 0121). |
 | `BOOKING_CONFIRM_MIN_MINUTES` | int | `15` | 5–120 | `settings.platform.manage` | Less time to confirm than this: confirm until the change deadline, no reminder. |
 | `PARTICIPANT_LINK_SESSION_HOURS` | int | `24` | 20–168 | `settings.platform.manage` | Hours after its last use that a participant's browser may still use a booking it opened from the emailed link (ADR 0093); the email link always works again. |
 

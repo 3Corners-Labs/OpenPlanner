@@ -11,18 +11,10 @@ from tests.admin.conftest import (
     SUPER,
     Site,
 )
-from tests.admin.test_skill_routes import create as create_skill
-from tests.admin.test_skill_routes import id_of as skill_id_of
 from tests.support.admin_site import audit_log
+from tests.support.skill_seed import add_skill, archive_skill, limit, staff_id
 
 SKILLS = "/admin/organisations/demo/skills"
-
-
-async def person_id(site: Site, name: str) -> int:
-    """Return the number of the person called ``name`` in the staff list (as the superuser)."""
-    await site.login_as(SUPER)
-    text = (await site.client.get("/admin/staff")).text
-    return int(text.split(f'">{name}</a>')[0].rsplit('href="/admin/staff/', 1)[1])
 
 
 async def grant(
@@ -40,10 +32,9 @@ async def with_gina_and_a_skill(site: Site) -> tuple[int, int]:
     """Log everyone in, add the skill ``passport`` and return Gina's number and its id."""
     for principal in (GROUP_ADMIN, OUTSIDER, AUDITOR):
         await site.login_as(principal)
-    gina = await person_id(site, "Gina Group")
+    gina = await staff_id(site, GROUP_ADMIN.subject)
     await site.login_as(ORG_ADMIN)
-    await create_skill(site, "passport", "Paspoort", "Passport")
-    return gina, await skill_id_of(site, "passport")
+    return gina, await add_skill(site, "passport", "Paspoort", "Passport")
 
 
 async def test_an_organisation_admin_grants_and_takes_away_a_skill_with_an_audit_trail(
@@ -66,6 +57,7 @@ async def test_an_organisation_admin_grants_and_takes_away_a_skill_with_an_audit
     assert "De vaardigheden zijn opgeslagen." in shown
     assert f'id="skill-{passport}" name="skill-{passport}" value="on" checked' in shown
     assert unchanged.headers["location"] == f"/admin/staff/{gina}?done=unchanged#skills"
+    assert "Er was niets gewijzigd." in (await site.client.get(unchanged.headers["location"])).text
     assert removed.headers["location"].endswith("done=staff_skills_saved#skills")
     events = [e for e in await audit_log(site) if e.action == "skills.manage"]
     assert [e.detail for e in events][1:] == [
@@ -108,7 +100,7 @@ async def test_an_archived_skill_a_person_holds_stays_shown_and_can_be_taken_awa
 ) -> None:
     gina, passport = await with_gina_and_a_skill(site)
     await grant(site, gina, skills=(passport,))
-    await site.client.post(f"{SKILLS}/{passport}/archive", headers=SAME_ORIGIN)
+    await archive_skill(site, passport)
 
     page = (await site.client.get(f"/admin/staff/{gina}")).text
     kept = await grant(site, gina, skills=(passport,))
@@ -127,7 +119,7 @@ async def test_an_archived_skill_a_person_holds_stays_shown_and_can_be_taken_awa
 async def test_a_person_outside_the_scope_does_not_exist_for_the_grant(site: Site) -> None:
     await site.login_as(OUTSIDER)
     await site.login_as(ORG_ADMIN)
-    otto = await person_id(site, "Otto Other")
+    otto = await staff_id(site, OUTSIDER.subject)
     await site.login_as(ORG_ADMIN)
 
     assert (await site.client.get(f"/admin/staff/{otto}")).status_code == 404
@@ -137,7 +129,7 @@ async def test_a_person_outside_the_scope_does_not_exist_for_the_grant(site: Sit
 
 async def test_a_skill_needs_a_membership_in_the_organisation_it_belongs_to(site: Site) -> None:
     gina, passport = await with_gina_and_a_skill(site)
-    otto = await person_id(site, "Otto Other")
+    otto = await staff_id(site, OUTSIDER.subject)
     await site.login_as(SUPER)
 
     page = (await site.client.get(f"/admin/staff/{otto}")).text
@@ -154,8 +146,7 @@ async def test_a_skill_needs_a_membership_in_the_organisation_it_belongs_to(site
 async def test_a_skill_of_another_organisation_cannot_be_granted(site: Site) -> None:
     gina, _ = await with_gina_and_a_skill(site)
     await site.login_as(SUPER)
-    await create_skill(site, "theirs", "Theirs", "Theirs", "/admin/organisations/andere/skills")
-    theirs = await skill_id_of(site, "theirs", "/admin/organisations/andere/skills")
+    theirs = await add_skill(site, "theirs", "Theirs", "Theirs", organisation="andere")
 
     response = await grant(site, gina, skills=(theirs,))
 
@@ -183,3 +174,26 @@ async def test_cross_site_grants_are_refused(site: Site) -> None:
     )
 
     assert response.status_code == 403
+
+
+async def test_more_ticks_than_the_organisation_can_have_skills_are_refused(site: Site) -> None:
+    gina, passport = await with_gina_and_a_skill(site)
+    limit(site, skills=2)
+
+    response = await grant(site, gina, skills=(passport, passport + 1, passport + 2))
+
+    assert response.status_code == 422
+    assert 'href="#skills-demo"' in response.text
+    assert "Een gekozen vaardigheid bestaat niet meer" in response.text
+    assert not [e for e in await audit_log(site) if e.detail.startswith("staff_skills")]
+
+
+async def test_the_organisation_is_named_once_by_the_heading_and_not_by_the_legend(
+    site: Site,
+) -> None:
+    gina, _ = await with_gina_and_a_skill(site)
+
+    page = (await site.client.get(f"/admin/staff/{gina}")).text
+
+    assert '<h3 id="skills-demo-heading">' in page
+    assert "<legend>Toegekende vaardigheden</legend>" in page

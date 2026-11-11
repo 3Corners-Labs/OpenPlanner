@@ -312,17 +312,8 @@
       ]
     },
     {
-      "name": "organisation: skills",
+      "name": "organisation: skills and capacity",
       "path": "/admin/organisations/demo/skills",
-      "user": "super",
-      "locales": [
-        "nl",
-        "en"
-      ]
-    },
-    {
-      "name": "organisation: capacity pools",
-      "path": "/admin/organisations/demo/capacity",
       "user": "super",
       "locales": [
         "nl",

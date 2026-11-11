@@ -19,7 +19,17 @@ in ``app.admin.staff_status_routes``.
 
 A person's page also shows the skills they hold, per organisation they belong to (ADR 0121):
 as a list under ``staff.view``, as checkboxes for an administrator with ``skills.manage`` in
-that organisation (the save is ``app.admin.staff_skill_routes``).
+that organisation:
+
+    POST /admin/staff/{member_id}/skills/{org}                 skills.manage, fresh login
+
+The save replaces the skills the person holds in that one organisation (their skills elsewhere
+stay). The route depends on ``skills.manage`` in the organisation; ``SkillService`` checks the
+matrix again, that the viewer may see the person (``staff.view``), that the person belongs to
+the organisation for every skill that is added, and audits the change with skill codes and the
+person's number, never a name. A person the viewer may not see, or an organisation they have no
+right in, answers like an unknown address. A change applies from the next request that is picked
+up or started.
 
 A person's page also lists the entitlement values of their last login that this installation
 did not recognise, with the reason (ADR 0049 point 8), within the viewer's scope.
@@ -30,16 +40,22 @@ from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
-from starlette.responses import HTMLResponse
+from starlette.responses import HTMLResponse, Response
 
 from app.admin.audit_routes import audit_views
-from app.admin.authz import AdminContext, RequirePermission, admin_service
-from app.admin.forms import FormData, Option
+from app.admin.authz import AdminContext, RequirePermission, admin_service, skill_service
+from app.admin.forms import FormData, Option, done_message, read_form, redirect_done
 from app.admin.idp_mapping_routes import reason_label
-from app.admin.pages import Locale, admin_moment
+from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
-from app.admin.skill_inputs import SkillChoice, choices, chosen_ids, raise_unknown
-from app.admin.skill_routes import skill_service
+from app.admin.skill_inputs import (
+    SkillChoice,
+    choices,
+    chosen_ids,
+    raise_unknown,
+    refuse,
+    ticked_ids,
+)
 from app.admin.staff_directory_routes import (
     add_fields,
     directory_service,
@@ -297,6 +313,16 @@ async def staff_list(
     )
 
 
+SKILLS_DONE = ("staff_skills_saved", "unchanged")
+"""The confirmations of a save of the skills, shown in that section of the page."""
+
+SkillsManage = Annotated[
+    AdminContext,
+    Depends(RequirePermission(Permission.SKILLS_MANAGE, organisation_param="org", fresh=True)),
+]
+"""The permission of the skills of a person in one organisation."""
+
+
 @dataclass(frozen=True)
 class SkillSection:
     """One organisation's skills of a person, as the staff page shows them.
@@ -339,7 +365,7 @@ async def skill_sections(
     for person in found:
         slug = person.organisation.slug
         refused = form is not None and slug == error_org
-        ticked = chosen_ids(form) if form is not None and refused else person.held
+        ticked = ticked_ids(form) if form is not None and refused else person.held
         message = form.error_for(f"skills-{slug}") if form is not None and refused else None
         shown = choices(person.choices, ticked, locale.code)
         sections.append(
@@ -405,6 +431,7 @@ async def member_page(
             ),
             "activity_limit": ACTIVITY_LIMIT,
             "skill_sections": sections,
+            "skills_done": done_message(request, locale.gettext, only=SKILLS_DONE),
             "errors": form.errors if form is not None else [],
         },
     )
@@ -421,3 +448,31 @@ async def staff_member(
 ) -> HTMLResponse:
     """Show one person and their recent activity; outside the scope it does not exist (404)."""
     return await member_page(request, locale, context, member_id)
+
+
+@router.post("/staff/{member_id}/skills/{org}", response_model=None)
+async def save_staff_skills(
+    request: Request,
+    locale: Locale,
+    member_id: int,
+    org: str,
+    _: SameOrigin,
+    context: SkillsManage,
+) -> Response:
+    """Replace the skills the person holds in ``org``; their skills elsewhere stay."""
+    form = await read_form(request, locale)
+    service = skill_service(request)
+    try:
+        changed = await service.grant(
+            context.principal, org, member_id, chosen_ids(form, service.max_skills)
+        )
+    except DomainError as error:
+        refuse(form, error, locale, f"skills-{org}")
+        return await member_page(
+            request, locale, context, member_id, form=form, error_org=org, status=422
+        )
+    return redirect_done(
+        f"/admin/staff/{member_id}",
+        "staff_skills_saved" if changed else "unchanged",
+        anchor="skills",
+    )
