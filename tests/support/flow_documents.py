@@ -8,7 +8,9 @@ everything.
 """
 
 import copy
+import json
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from typing import Any
 
 from app.domain.configuration_changes import RuleContext, Usage
@@ -17,10 +19,21 @@ from app.domain.configuration_plan import Plan, plan_document
 from app.domain.configuration_tree import Entity
 from app.domain.configuration_v1 import FORMATS
 from app.domain.configuration_values import Value
+from app.domain.errors import ErrorCode
 from tests.support.config_roundtrip import document_of
 from tests.support.configuration import allow
 
 PUBLISHED = "2026-11-01T10:00:00+00:00"
+LATER = "2026-11-02T10:00:00+00:00"
+
+
+def published(number: int) -> str:
+    """Return when revision ``number`` was published: every revision a minute after the last."""
+    return f"2026-11-01T10:{number - 1:02d}:00+00:00"
+
+
+CLOCK = datetime(2026, 12, 1, 12, 0, tzinfo=UTC)
+"""What the rules take for now: after every time a fixture was published."""
 LABELS = {"nl": "Balie", "en": "Desk"}
 ROUTING = {
     "subjects": [{"code": "paspoort", "labels": {"nl": "Paspoort", "en": "Passport"}}],
@@ -45,12 +58,12 @@ def skill(code: str, *, archived: bool = False) -> Entity:
     return entity("skill", (code,), {"labels": labels, "archived": archived})
 
 
-def pool(name: str, *skills: str, archived: bool = False) -> Entity:
-    """Return a counted pool guaranteeing ``skills``."""
+def pool(code: str, *skills: str, archived: bool = False, name: str | None = None) -> Entity:
+    """Return a counted pool with ``code`` guaranteeing ``skills``; its name is the code title."""
     return entity(
         "capacity_pool",
-        (name,),
-        {"guaranteed_skills": sorted(skills), "archived": archived},
+        (code,),
+        {"name": name or code.title(), "guaranteed_skills": sorted(skills), "archived": archived},
     )
 
 
@@ -77,7 +90,7 @@ def revision(number: int, **fields: Value) -> Entity:
         "completion": "operator",
         "collects_email": True,
         "legacy": False,
-        "published_at": PUBLISHED,
+        "published_at": published(number),
     }
     values.update(fields)
     return entity("flow_revision", (str(number),), values)
@@ -187,7 +200,8 @@ def empty_flows() -> Entity:
 
 def document_json(current: Entity | None = None) -> dict[str, Any]:
     """Return the document an export of ``current`` writes, as the JSON a file holds."""
-    return copy.deepcopy(to_json(document_of(current or full(), secrets=False)))  # type: ignore[arg-type]
+    exported: dict[str, Any] = to_json(document_of(current or full(), secrets=False))
+    return copy.deepcopy(exported)
 
 
 def parse(data: Mapping[str, Any]) -> Document:
@@ -208,11 +222,98 @@ def plan(
         current,
         usage=usage or Usage(),
         may_change=may_change,
-        context=RuleContext(),
+        context=RuleContext(now=CLOCK),
         settings_version=1,
     )
 
 
 def flows_of(data: dict[str, Any], organisation: int = 0, group: int = 0) -> list[dict[str, Any]]:
     """Return the ``flows`` list of a group of an exported document."""
-    return data["organisations"][organisation]["groups"][group]["flows"]  # type: ignore[no-any-return]
+    found: list[dict[str, Any]] = data["organisations"][organisation]["groups"][group]["flows"]
+    return found
+
+
+def refusals(result: Any) -> list[tuple[str, ErrorCode, str | None]]:
+    """Return what stops a plan as ``(path, code, field)`` triples."""
+    return [(r.path, r.code, r.field) for r in result.refusals]
+
+
+def advies(data: dict[str, Any]) -> dict[str, Any]:
+    """Return the flow ``advies`` of the first group of an exported document."""
+    return next(f for f in flows_of(data) if f["code"] == "advies")
+
+
+def draft(data: dict[str, Any]) -> dict[str, Any]:
+    """Return the draft revision (number 3) of the flow ``advies``."""
+    found: dict[str, Any] = advies(data)["revisions"][2]
+    return found
+
+
+def acme(data: dict[str, Any]) -> dict[str, Any]:
+    """Return the organisation ``acme`` of an exported document."""
+    found: dict[str, Any] = data["organisations"][0]
+    return found
+
+
+# --- documents written as JSON, for the tests that go through the service --------------------
+
+
+def encode(data: Mapping[str, Any]) -> bytes:
+    """Return a document as the bytes of a file."""
+    return json.dumps(data).encode()
+
+
+def revision_json(number: int = 1, **changes: Any) -> dict[str, Any]:
+    """Return a complete telephone revision as a document holds it (a draft unless published)."""
+    values: dict[str, Any] = {
+        "revision": number,
+        "labels": dict(LABELS),
+        "intake_modes": ["appointment"],
+        "interaction_kind": "telephone",
+        "duration_minutes": 20,
+        "capacity_pool": None,
+        "legacy_pool_of": None,
+        "required_skills": [],
+        "subjects": {},
+        "dispatch": "own_queue",
+        "handling_action": "call",
+        "completion": "operator",
+        "collects_email": True,
+        "legacy": False,
+        "published_at": None,
+    }
+    values.update(changes)
+    return values
+
+
+def flow_json(code: str, *revisions: dict[str, Any], **changes: Any) -> dict[str, Any]:
+    """Return a flow as a document holds it: a draft that points at its last revision."""
+    values: dict[str, Any] = {
+        "code": code,
+        "state": "draft",
+        "default_for": [],
+        "current_revision": None,
+        "draft_revision": revisions[-1]["revision"] if revisions else None,
+        "revisions": list(revisions),
+    }
+    values.update(changes)
+    return values
+
+
+def organisation_document(slug: str, *groups: dict[str, Any], **sections: Any) -> dict[str, Any]:
+    """Return a document of one organisation with new services (``groups``) and sections."""
+    return {
+        "format": "openplanner.config/v1",
+        "organisations": [{"slug": slug, "name": slug.title(), **sections, "groups": list(groups)}],
+    }
+
+
+def group_json(slug: str, **sections: Any) -> dict[str, Any]:
+    """Return a new service as a document holds it, with the given sections."""
+    return {
+        "slug": slug,
+        "name": slug.title(),
+        "timezone": "Europe/Amsterdam",
+        "slot_minutes": 30,
+        **sections,
+    }

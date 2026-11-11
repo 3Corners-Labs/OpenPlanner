@@ -315,6 +315,11 @@ CODE_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CONFIGURATION_PACKAGE_INVALID: "admin.form.error.configuration_package_invalid",
     ErrorCode.CONFIGURATION_PACKAGE_VERSION: "admin.form.error.configuration_package_version",
     ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE: "admin.form.error.configuration_package_too_large",
+    ErrorCode.CONFIGURATION_REVISION_PUBLISHED: (
+        "admin.form.error.configuration_revision_published"
+    ),
+    ErrorCode.CONFIGURATION_DRAFT_FLOW_IN_USE: "admin.form.error.configuration_draft_flow_in_use",
+    ErrorCode.CONFIGURATION_POOL_WITHOUT_CODE: "admin.form.error.configuration_pool_without_code",
     ErrorCode.SLUG_TAKEN: "admin.form.error.slug_taken",
     ErrorCode.SCENARIO_NAME_TAKEN: "admin.form.error.scenario_name_taken",
     ErrorCode.ALERT_TARGET_TAKEN: "admin.form.error.alert_target_taken",

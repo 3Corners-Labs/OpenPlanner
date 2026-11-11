@@ -10,16 +10,20 @@ import pytest
 from app.domain.authorization import Permission, Target
 from app.domain.configuration_changes import (
     ChangeAction,
+    IntegrityRule,
     Refusal,
     Resolution,
     RuleContext,
     Usage,
 )
+from app.domain.configuration_plan import permissions_of
+from app.domain.configuration_schema import Collection, Shape
 from app.domain.configuration_tree import walk
 from app.domain.configuration_values import Binary, Secret, Value
 from app.domain.errors import DomainError, ErrorCode
 from tests.support.configuration import (
     BOX,
+    LABEL,
     Recorder,
     box,
     build_format,
@@ -815,3 +819,144 @@ def test_the_plan_hash_follows_what_the_plan_does() -> None:
     elsewhere = plan(data, installation(shop("s", box("b", name="Other")), shop("t")))
 
     assert one.digest != elsewhere.digest
+
+
+# --- archive instead of delete, history that is kept, ADR 0121 step 2b-ii -------------------
+
+ARCHIVING = replace(BOX, archive=("colour", "blue"))
+DELETE_B = {"shops": [{"slug": "s", "boxes": [{"slug": "b", "action": "delete"}]}]}
+IN_USE = Usage(in_use={"box": frozenset({B})})
+
+
+def recording(seen: list[Resolution]) -> IntegrityRule:
+    """Return a rule that records the resolutions it is given and refuses nothing."""
+
+    def rule(resolution: Resolution) -> list[Refusal]:
+        seen.append(resolution)
+        return []
+
+    return rule
+
+
+def test_an_object_in_use_is_archived_when_its_kind_says_so_and_deleted_when_it_is_not() -> None:
+    fmt = format_with_box(ARCHIVING)
+
+    archived = plan(DELETE_B, usage=IN_USE, fmt=fmt)
+    deleted = plan(DELETE_B, fmt=fmt)
+
+    assert archived.ok
+    (change,) = archived.changes
+    assert (change.action, change.fields, change.values["colour"]) == (
+        ChangeAction.ARCHIVE,
+        ("colour",),
+        "blue",
+    )
+    assert change.permissions == {Permission.GROUP_DELETE}
+    assert kinds(deleted) == [("box", B, ChangeAction.DELETE)]
+
+
+def test_archiving_an_object_that_is_archived_already_is_no_change() -> None:
+    fmt = format_with_box(ARCHIVING)
+    current = installation(shop("s", box("b", colour="blue")))
+
+    result = plan(DELETE_B, current, usage=IN_USE, fmt=fmt)
+
+    assert result.ok
+    assert result.changes == ()
+
+
+def test_what_a_kind_keeps_as_history_is_archived_without_making_its_parent_in_use() -> None:
+    fmt = format_with_box(ARCHIVING)
+    kept = Usage(kept={"box": frozenset({B})})
+
+    box_gone = plan(DELETE_B, usage=kept, fmt=fmt)
+    shop_gone = plan({"shops": [{"slug": "s", "action": "delete"}]}, usage=kept, fmt=fmt)
+
+    assert [c.action for c in box_gone.changes] == [ChangeAction.ARCHIVE]
+    assert kinds(shop_gone) == [("shop", ("s",), ChangeAction.DELETE)]
+
+
+def test_a_replace_document_archives_what_it_leaves_out_and_keeps_it_in_the_resulting_tree() -> (
+    None
+):
+    seen: list[Resolution] = []
+    fmt = format_with_box(ARCHIVING, recording(seen))
+    current = installation(shop("s", box("b"), box("c")))
+
+    result = plan(
+        {"mode": "replace", "shops": [{"slug": "s", "boxes": [{"slug": "c"}]}]},
+        current,
+        usage=IN_USE,
+        fmt=fmt,
+    )
+
+    assert [(c.action, c.key) for c in result.changes] == [(ChangeAction.ARCHIVE, ("b",))]
+    kept = {e.key: e.fields["colour"] for _, e in walk(seen[0].resulting, "box")}
+    assert kept == {("b",): "blue", ("c",): "red"}
+
+
+def test_a_delete_that_is_refused_leaves_the_object_in_the_resulting_tree() -> None:
+    seen: list[Resolution] = []
+    fmt = format_with_box(BOX, recording(seen))
+
+    result = plan(DELETE_B, usage=IN_USE, fmt=fmt)
+
+    assert refusals(result) == [("shops[s].boxes[b]", ErrorCode.CONFIGURATION_OBJECT_IN_USE, None)]
+    assert [e.key for _, e in walk(seen[0].resulting, "box")] == [("b",)]
+
+
+def test_an_archive_needs_the_permission_of_a_delete() -> None:
+    assert permissions_of(BOX, Permission.GROUP_EDIT, ChangeAction.ARCHIVE, ("colour",)) == {
+        Permission.GROUP_DELETE
+    }
+    assert permissions_of(BOX, Permission.GROUP_EDIT, ChangeAction.DELETE, ()) == {
+        Permission.GROUP_DELETE
+    }
+    result = plan(
+        DELETE_B,
+        usage=IN_USE,
+        fmt=format_with_box(ARCHIVING),
+        may_change=Recorder(Permission.GROUP_DELETE),
+    )
+    assert refusals(result) == [("shops[s].boxes[b]", ErrorCode.NOT_PERMITTED, None)]
+
+
+def test_a_kind_omitted_from_a_replace_document_may_keep_its_history() -> None:
+    labels = Collection("labels", replace(LABEL, retain_omitted=True), Shape.ENTITIES)
+    fmt = format_with_box(replace(BOX, collections=(labels, *BOX.collections[1:])))
+    current = installation(
+        shop("s", box("b", _children={"labels": (entity("label", ("x",), {"weight": 1}),)}))
+    )
+
+    result = plan(
+        {"mode": "replace", "shops": [{"slug": "s", "boxes": [{"slug": "b", "labels": []}]}]},
+        current,
+        fmt=fmt,
+    )
+
+    assert result.ok
+    assert result.changes == ()
+
+
+def test_a_kind_must_archive_by_a_value_its_field_can_hold() -> None:
+    with pytest.raises(ValueError, match="does not fit"):
+        replace(BOX, archive=("colour", "green"))  # not one of the choices
+    with pytest.raises(ValueError, match="does not fit"):
+        replace(BOX, archive=("size", "big"))  # a number field
+    with pytest.raises(ValueError, match="does not fit"):
+        replace(BOX, archive=("name", 3))  # a text field
+    with pytest.raises(ValueError, match="not a field"):
+        replace(BOX, archive=("missing", True))
+    assert replace(BOX, archive=("size", 9)).archive == ("size", 9)
+
+
+def test_a_plan_with_more_changes_than_the_limit_is_not_given_to_the_rules() -> None:
+    seen: list[Resolution] = []
+    fmt = format_with_box(BOX, recording(seen))
+    data = {"shops": [{"slug": "s", "boxes": [{"slug": f"n{n}", "name": "N"} for n in range(3)]}]}
+
+    over = plan(data, fmt=fmt, max_changes=2)
+    within = plan(data, fmt=fmt, max_changes=3)
+
+    assert len(over.changes) == 3
+    assert (len(seen), within.ok) == (1, True)  # only the plan within the limit was checked

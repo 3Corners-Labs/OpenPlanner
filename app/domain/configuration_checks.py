@@ -47,6 +47,34 @@ def strings_of(values: Mapping[str, Value], name: str) -> list[str]:
     return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
 
 
+def int_of(values: Mapping[str, Value], name: str) -> int | None:
+    """Return a whole-number field of ``values``, ``None`` when it is absent, null or no number."""
+    value = values.get(name)
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def flag_of(values: Mapping[str, Value], name: str, default: bool) -> bool:
+    """Return a true-or-false field of ``values``, ``default`` when it is absent or no flag."""
+    value = values.get(name)
+    return value if isinstance(value, bool) else default
+
+
+def object_of(values: Mapping[str, Value], name: str) -> dict[str, Value]:
+    """Return an object field of ``values`` (empty when it is absent or no object)."""
+    value = values.get(name)
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def json_list(items: Iterable[str]) -> Json:
+    """Return texts as the JSON list a field holds."""
+    return list[Json](items)
+
+
+def json_texts(texts: Mapping[str, str]) -> Json:
+    """Return a map of texts as the JSON object a field holds."""
+    return dict[str, Json](texts)
+
+
 def utc_moment(value: Value, field: str) -> str:
     """Read an ISO date and time with an offset and return it as UTC ISO text.
 

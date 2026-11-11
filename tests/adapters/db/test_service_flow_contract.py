@@ -636,6 +636,42 @@ async def test_a_pool_keeps_its_guaranteed_skills_and_replaces_them_on_update(wo
     assert (found.name, found.guaranteed_skill_ids) == ("Kantoor", frozenset({two.id}))
 
 
+async def test_a_pool_cannot_stop_guaranteeing_a_skill_a_flow_on_it_still_requires(
+    world: World,
+) -> None:
+    one, two = await add_skill(world, "one"), await add_skill(world, "two")
+    assert one.id
+    assert two.id
+    pool = await add_pool(world, skills=frozenset({one.id, two.id}))
+    assert pool.id is not None
+    flow = await add_flow(world, capacity_pool_id=pool.id, required_skill_ids=frozenset({one.id}))
+    assert flow.id is not None
+    subject = await add_flow(
+        world,
+        "b",
+        capacity_pool_id=pool.id,
+        subject_skill_ids={"id": frozenset({two.id})},
+    )
+    assert subject.id is not None
+
+    with refused(ErrorCode.CONFIGURATION_OBJECT_IN_USE, "guaranteed_skill_ids"):
+        async with world.uow.locked() as tx:  # the flow requires it
+            await tx.save_capacity_pool(ACME, replace(pool, guaranteed_skill_ids={two.id}))
+    with refused(ErrorCode.CONFIGURATION_OBJECT_IN_USE, "guaranteed_skill_ids"):
+        async with world.uow.locked() as tx:  # a subject of the other flow requires it
+            await tx.save_capacity_pool(ACME, replace(pool, guaranteed_skill_ids={one.id}))
+    async with world.uow.locked() as tx:  # adding is always fine
+        await tx.save_capacity_pool(ACME, replace(pool, name="More"))
+    async with world.uow.locked() as tx:
+        await tx.discard_draft(ACME, flow.id)
+        await tx.discard_draft(ACME, subject.id)
+        await tx.save_capacity_pool(ACME, replace(pool, guaranteed_skill_ids=frozenset()))
+    async with world.uow.read() as tx:
+        found = await tx.get_capacity_pool(ACME, pool.id)
+    assert found is not None
+    assert found.guaranteed_skill_ids == frozenset()
+
+
 async def test_a_counted_pool_has_a_code_that_is_unique_per_organisation_and_fixed(
     world: World,
 ) -> None:

@@ -17,7 +17,11 @@ from datetime import datetime
 from sqlalchemy import ColumnElement, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.db.flow_usage import REVISION_IN_EFFECT
+from app.adapters.db.flow_usage import (
+    REVISION_IN_EFFECT,
+    drawn_on_by_flows,
+    skills_required_on_pool,
+)
 from app.adapters.db.models import (
     CapacityPoolRow,
     CapacityPoolSkillRow,
@@ -38,7 +42,6 @@ from app.domain.capacity import (
     same_name,
 )
 from app.domain.errors import missing_object
-from app.domain.service_flows import FlowState
 
 
 async def pools_from_rows(
@@ -81,6 +84,55 @@ def pool_visible(scope: Scope) -> ColumnElement[bool]:
         CapacityPoolRow.mode != PoolMode.LEGACY_GROUP.value,
         scope_filter(scope, OrganisationRow.slug, GroupRow.slug),
     )
+
+
+async def replace_guaranteed(session: AsyncSession, pool_id: int, wanted: Collection[int]) -> None:
+    """Make the skills a pool guarantees exactly ``wanted``: add the new ones, drop the others.
+
+    The one writer of ``capacity_pool_skills``; the portal's save and a configuration document
+    both call it, after the rules of ``check_pool_save``.
+    """
+    held = set(
+        await session.scalars(
+            select(CapacityPoolSkillRow.skill_id).where(CapacityPoolSkillRow.pool_id == pool_id)
+        )
+    )
+    keep = set(wanted)
+    if held - keep:
+        await session.execute(
+            delete(CapacityPoolSkillRow).where(
+                CapacityPoolSkillRow.pool_id == pool_id,
+                CapacityPoolSkillRow.skill_id.in_(held - keep),
+            )
+        )
+    session.add_all(
+        CapacityPoolSkillRow(pool_id=pool_id, skill_id=skill_id) for skill_id in sorted(keep - held)
+    )
+    await session.flush()
+
+
+async def write_pool(
+    session: AsyncSession, pool: CapacityPool, row: CapacityPoolRow | None
+) -> CapacityPoolRow:
+    """Write a pool's own columns and the skills it guarantees; return its row.
+
+    ``row`` is the stored row of ``pool.id`` (``None`` for a new pool). The mode, group and code
+    of a stored pool never change, and neither does its archive time: archiving is its own
+    step. The one row mapping of a pool: the portal's save and a configuration document both
+    call it, after the rules of ``check_pool_save``.
+    """
+    if row is None:
+        row = CapacityPoolRow(
+            organisation_id=pool.organisation_id,
+            mode=pool.mode.value,
+            group_id=pool.group_id,
+            code=pool.code,
+        )
+    row.name = pool.name
+    session.add(row)
+    await session.flush()
+    await replace_guaranteed(session, row.id, pool.guaranteed_skill_ids)
+    return row
 
 
 class CapacityPoolQueries:
@@ -135,7 +187,8 @@ class CapacityPoolQueries:
 
         Raises:
             DomainError: ``configuration_object_missing`` for an organisation or pool that does
-                not exist or lies outside ``scope``, and what ``check_pool_save`` refuses.
+                not exist or lies outside ``scope``, and what ``check_pool_save`` refuses
+                (``configuration_object_in_use`` for a skill a flow still requires from it).
         """
         if not await organisation_is_visible(self._session, scope, pool.organisation_id):
             raise missing_object("organisation_id")
@@ -187,29 +240,13 @@ class CapacityPoolQueries:
             group_taken=group_taken,
             same_code_exists=same_code,
             same_name_exists=same_name_exists,
+            still_required=(
+                await skills_required_on_pool(self._session, stored.id)
+                if stored is not None and stored.id is not None
+                else frozenset()
+            ),
         )
-        if row is None:
-            row = CapacityPoolRow(
-                organisation_id=pool.organisation_id,
-                mode=pool.mode.value,
-                group_id=pool.group_id,
-                code=pool.code,
-            )
-        row.name = pool.name
-        self._session.add(row)
-        await self._session.flush()
-        if held - pool.guaranteed_skill_ids:
-            await self._session.execute(
-                delete(CapacityPoolSkillRow).where(
-                    CapacityPoolSkillRow.pool_id == row.id,
-                    CapacityPoolSkillRow.skill_id.in_(held - pool.guaranteed_skill_ids),
-                )
-            )
-        self._session.add_all(
-            CapacityPoolSkillRow(pool_id=row.id, skill_id=skill_id)
-            for skill_id in sorted(pool.guaranteed_skill_ids - held)
-        )
-        await self._session.flush()
+        row = await write_pool(self._session, pool, row)
         return (await pools_from_rows(self._session, [row]))[0]
 
     async def flows_on_pool(self, scope: Scope, pool_id: int) -> PoolFlows:
@@ -217,14 +254,12 @@ class CapacityPoolQueries:
 
         A flow draws on the pool by its current or its draft revision. Flows of groups outside
         ``scope`` are not listed but counted in ``hidden``. A pool that does not exist or lies
-        outside ``scope`` has no flows.
+        outside ``scope`` has no flows. The definition is ``drawn_on_by_flows``, the twin of
+        ``app.domain.service_flows.draws_on_pool``.
         """
         if await self._pool_row(scope, pool_id) is None:
             return PoolFlows()
-        drawing = (
-            FlowRevisionRow.capacity_pool_id == pool_id,
-            ServiceFlowRow.state != FlowState.ARCHIVED.value,
-        )
+        drawing = drawn_on_by_flows(pool_id)
         found = await self._session.scalars(
             select(ServiceFlowRow.id)
             .join(FlowRevisionRow, REVISION_IN_EFFECT)
@@ -261,10 +296,7 @@ class CapacityPoolQueries:
         drawing = await self._session.scalars(
             select(ServiceFlowRow.code)
             .join(FlowRevisionRow, REVISION_IN_EFFECT)
-            .where(
-                FlowRevisionRow.capacity_pool_id == pool_id,
-                ServiceFlowRow.state != FlowState.ARCHIVED.value,
-            )
+            .where(*drawn_on_by_flows(pool_id))
             .distinct()
         )
         check_pool_archive(list(drawing))

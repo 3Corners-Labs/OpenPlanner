@@ -67,6 +67,7 @@ from app.domain.service_flows import (
     check_draft_save,
     check_flow_references,
     check_publishable,
+    check_revision_editable,
     check_state_change,
 )
 
@@ -83,7 +84,7 @@ def _text(member: StrEnum | None) -> str | None:
     return member.value if member else None
 
 
-def _from_row(
+def revision_from_row(
     row: FlowRevisionRow, skills: Iterable[int], subjects: dict[str, set[int]]
 ) -> FlowRevision:
     """Map a revision row with its skill sets."""
@@ -108,7 +109,7 @@ def _from_row(
     )
 
 
-def _to_row(row: FlowRevisionRow, revision: FlowRevision) -> None:
+def revision_to_row(row: FlowRevisionRow, revision: FlowRevision) -> None:
     """Copy a revision's own columns onto ``row``; publishing is not part of a save."""
     row.labels = json.dumps(dict(revision.labels), sort_keys=True)
     row.intake_modes = ",".join(sorted(mode.value for mode in revision.intake_modes))
@@ -123,13 +124,64 @@ def _to_row(row: FlowRevisionRow, revision: FlowRevision) -> None:
     row.legacy = revision.legacy
 
 
-def _defaults(row: ServiceFlowRow) -> frozenset[IntakeMode]:
+def flow_defaults(row: ServiceFlowRow) -> frozenset[IntakeMode]:
     """Return the entry paths the flow is the default of."""
     modes = {
         IntakeMode.APPOINTMENT: row.default_appointment,
         IntakeMode.ON_DEMAND: row.default_on_demand,
     }
     return frozenset(mode for mode, default in modes.items() if default)
+
+
+def set_flow_defaults(row: ServiceFlowRow, modes: Collection[IntakeMode]) -> None:
+    """Store the entry paths the flow is the default of; the one mapping of ``flow_defaults``."""
+    row.default_appointment = IntakeMode.APPOINTMENT in modes
+    row.default_on_demand = IntakeMode.ON_DEMAND in modes
+
+
+async def write_revision(
+    session: AsyncSession, flow_id: int, number: int, revision: FlowRevision
+) -> None:
+    """Write the revision row and its skill and subject rows, in place when it exists.
+
+    The one writer of a revision: the portal's save and a configuration document both call it,
+    after the rules of ``check_draft_save`` and ``check_flow_references``. A revision that
+    carries ``published_at`` is written as published (a document that publishes it); a draft
+    carries none. Never touches a published revision that is stored.
+
+    Raises:
+        DomainError: ``configuration_revision_published`` for a stored revision that is
+            published: it is history (``check_revision_editable``).
+    """
+    row = await session.get(FlowRevisionRow, (flow_id, number))
+    check_revision_editable(None if row is None else row.published_at)
+    if row is None:
+        row = FlowRevisionRow(flow_id=flow_id, revision=number)
+        session.add(row)
+    else:
+        for child in (SubjectFlowSkillRow, SubjectFlowRow, FlowRevisionSkillRow):
+            await session.execute(
+                delete(child).where(child.flow_id == flow_id, child.revision == number)
+            )
+    revision_to_row(row, revision)
+    row.published_at = revision.published_at
+    row.published_by = revision.published_by
+    await session.flush()
+    session.add_all(
+        FlowRevisionSkillRow(flow_id=flow_id, revision=number, skill_id=skill_id)
+        for skill_id in sorted(revision.required_skill_ids)
+    )
+    session.add_all(
+        SubjectFlowRow(flow_id=flow_id, revision=number, subject_code=code)
+        for code in sorted(revision.subject_skill_ids)
+    )
+    await session.flush()
+    session.add_all(
+        SubjectFlowSkillRow(flow_id=flow_id, revision=number, subject_code=code, skill_id=skill_id)
+        for code, skill_ids in sorted(revision.subject_skill_ids.items())
+        for skill_id in sorted(skill_ids)
+    )
+    await session.flush()
 
 
 async def ensure_default_flows_in(session: AsyncSession, group_id: int) -> bool:
@@ -165,7 +217,7 @@ async def ensure_default_flows_in(session: AsyncSession, group_id: int) -> bool:
     missing = missing_defaults(
         wanted,
         pool_exists,
-        [StoredFlow(row.code, FlowState(row.state), _defaults(row)) for row in flow_rows],
+        [StoredFlow(row.code, FlowState(row.state), flow_defaults(row)) for row in flow_rows],
     )
     if missing.empty:
         return False
@@ -187,15 +239,14 @@ async def ensure_default_flows_in(session: AsyncSession, group_id: int) -> bool:
             group_id=group_id,
             code=template.code,
             state=template.state.value,
-            default_appointment=IntakeMode.APPOINTMENT in template.default_for,
-            default_on_demand=IntakeMode.ON_DEMAND in template.default_for,
             current_revision=1,
             draft_revision=None,
         )
+        set_flow_defaults(row, template.default_for)
         session.add(row)
         await session.flush()
         revision = FlowRevisionRow(flow_id=row.id, revision=1, published_at=now, published_by=None)
-        _to_row(revision, template.revision(pool_id))
+        revision_to_row(revision, template.revision(pool_id))
         session.add(revision)
         await session.flush()
     return True
@@ -250,7 +301,7 @@ class ServiceFlowQueries:
         ).all():
             subjects[(flow_id, revision)][code].add(skill_id)
         return {
-            (row.flow_id, row.revision): _from_row(
+            (row.flow_id, row.revision): revision_from_row(
                 row, skills[(row.flow_id, row.revision)], subjects[(row.flow_id, row.revision)]
             )
             for row in rows
@@ -271,7 +322,7 @@ class ServiceFlowQueries:
                 row.group_id,
                 row.code,
                 FlowState(row.state),
-                _defaults(row),
+                flow_defaults(row),
                 found[(row.id, row.current_revision)] if row.current_revision else None,
                 found[(row.id, row.draft_revision)] if row.draft_revision else None,
             )
@@ -371,42 +422,9 @@ class ServiceFlowQueries:
             await load_skills(self._session, revision.all_skill_ids),
             based_on.all_skill_ids if based_on else frozenset(),
             [subject.code for subject in routing_from_json(group.routing).subjects],
+            group_id=group.id,
             already_pool_id=based_on.capacity_pool_id if based_on else None,
         )
-
-    async def _write_revision(self, flow_id: int, number: int, revision: FlowRevision) -> None:
-        """Write the revision row and its skill and subject rows, in place when it exists.
-
-        Only ever called for a revision that is not published.
-        """
-        row = await self._session.get(FlowRevisionRow, (flow_id, number))
-        if row is None:
-            row = FlowRevisionRow(flow_id=flow_id, revision=number)
-            self._session.add(row)
-        else:
-            for child in (SubjectFlowSkillRow, SubjectFlowRow, FlowRevisionSkillRow):
-                await self._session.execute(
-                    delete(child).where(child.flow_id == flow_id, child.revision == number)
-                )
-        _to_row(row, revision)
-        await self._session.flush()
-        self._session.add_all(
-            FlowRevisionSkillRow(flow_id=flow_id, revision=number, skill_id=skill_id)
-            for skill_id in sorted(revision.required_skill_ids)
-        )
-        self._session.add_all(
-            SubjectFlowRow(flow_id=flow_id, revision=number, subject_code=code)
-            for code in sorted(revision.subject_skill_ids)
-        )
-        await self._session.flush()
-        self._session.add_all(
-            SubjectFlowSkillRow(
-                flow_id=flow_id, revision=number, subject_code=code, skill_id=skill_id
-            )
-            for code, skill_ids in sorted(revision.subject_skill_ids.items())
-            for skill_id in sorted(skill_ids)
-        )
-        await self._session.flush()
 
     async def save_draft(self, scope: Scope, flow: ServiceFlow) -> ServiceFlow:
         """Create a draft flow (no id) or write the draft revision of an existing flow.
@@ -448,15 +466,14 @@ class ServiceFlowQueries:
             self._session.add(row)
         if stored is None or stored.current is None:
             row.code = flow.code
-            row.default_appointment = IntakeMode.APPOINTMENT in flow.default_for
-            row.default_on_demand = IntakeMode.ON_DEMAND in flow.default_for
+            set_flow_defaults(row, flow.default_for)
         if stored is not None and stored.draft is not None:
             number = stored.draft.revision
         else:
             number = (stored.current.revision if stored and stored.current else 0) + 1
         row.draft_revision = number
         await self._session.flush()
-        await self._write_revision(row.id, number, revision)
+        await write_revision(self._session, row.id, number, revision)
         return (await self._flows([row]))[0]
 
     async def publish_draft(
@@ -540,7 +557,9 @@ class ServiceFlowQueries:
                     ServiceFlowRow.id != flow_id,
                 )
             )
-            check_default_paths(flow, frozenset().union(*(_defaults(other) for other in others)))
+            check_default_paths(
+                flow, frozenset().union(*(flow_defaults(other) for other in others))
+            )
         row.state = state.value
         await self._session.flush()
         return (await self._flows([row]))[0]

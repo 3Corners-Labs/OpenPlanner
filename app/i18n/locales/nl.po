@@ -8984,6 +8984,12 @@ msgstr "De capaciteit is lager dan het aantal plaatsen dat al is geboekt."
 msgid "admin.form.error.configuration_revision_published"
 msgstr "Een gepubliceerde revisie is historie en kan niet worden gewijzigd of verwijderd. Voeg een nieuwe revisie toe."
 
+msgid "admin.form.error.configuration_draft_flow_in_use"
+msgstr "Een flow die nooit is gepubliceerd kan niet worden gearchiveerd zolang er nog iets naar verwijst. Verwijder eerst het concept in het portaal en laat de flow daarna opnieuw weg."
+
+msgid "admin.form.error.configuration_pool_without_code"
+msgstr "Een capaciteitspool heeft geen code en kan daarom niet in een document worden benoemd. Archiveer de pool en voeg hem opnieuw toe in het portaal, dat hem een code geeft."
+
 msgid "admin.settings.package.title"
 msgstr "SQLite-pakket (oud formaat)"
 
@@ -12419,6 +12425,9 @@ msgstr "Deze code is al in gebruik bij een pool van uw organisatie. Kies een and
 
 msgid "admin.capacity.error.name_taken"
 msgstr "Een andere pool van uw organisatie heeft al deze naam. Kies een andere naam."
+
+msgid "admin.capacity.error.skill_in_use"
+msgstr "Een flow die niet is gearchiveerd vereist nog een van de vaardigheden die u hebt verwijderd, dus de pool moet die blijven garanderen. Wijzig of archiveer eerst die flow."
 
 msgid "admin.skills.limit_reached"
 msgstr "Het maximum van {count} vaardigheden is bereikt. Archiveer een vaardigheid die u niet meer gebruikt om een nieuwe toe te voegen."

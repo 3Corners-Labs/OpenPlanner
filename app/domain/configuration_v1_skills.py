@@ -1,25 +1,34 @@
 """Skills and counted capacity pools in a configuration document (ADR 0121 step 2b-ii).
 
-A skill belongs to an organisation and is addressed by its ``code``; a counted pool is addressed
-by its ``name`` within the organisation (the table has no code, so the name is the natural key
-and a document with two pools of one name is refused when it is read). Both are archived, never
-deleted, while anything still refers to them: a skill a person holds or a revision requires, a
-pool a revision draws on. Which person holds which skill is *state* and never in a document
-(``staff`` and ``staff_memberships`` are state tables), so archiving keeps every grant.
+A skill and a counted pool belong to an organisation and are addressed by their ``code``, which
+never changes (migration 0110 gave a pool one, the screen of ADR 0121 step 2c asks for it); the
+name of a pool is an ordinary field and a rename is an ordinary change. A counted pool whose
+stored code is missing (a row an older image wrote) has no address, so an export refuses it.
+Both are archived, never deleted, while anything still refers to them: a skill a person holds or
+any revision requires, a pool any revision draws on. Which person holds which skill is *state*
+and never in a document (``staff`` and ``staff_memberships`` are state tables), so archiving
+keeps every grant.
 
 The rules are the ones of the screens: ``Skill`` and ``CapacityPool`` validate code, labels and
-name when they are built. The rules across objects (a pool guarantees only the organisation's own
+name when they are built, and ``check_skill_save`` and ``check_pool_save`` run on what the
+document leaves behind. The rules across objects (a pool guarantees only the organisation's own
 skills, a pool is not archived under a flow that draws on it) are in
 ``app.domain.configuration_v1_flow_rules``.
 """
 
 from collections.abc import Mapping
-from typing import cast
 
 from app.domain.authorization import Permission
 from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.configuration_changes import RuleContext
-from app.domain.configuration_checks import invalid, strings_of, text_map, text_of
+from app.domain.configuration_checks import (
+    invalid,
+    json_list,
+    json_texts,
+    strings_of,
+    text_map,
+    text_of,
+)
 from app.domain.configuration_schema import (
     Collection,
     Kind,
@@ -30,7 +39,7 @@ from app.domain.configuration_schema import (
     text,
 )
 from app.domain.configuration_v1_names import CAPACITY_POOL_KIND, SKILL_KIND
-from app.domain.configuration_values import Json, Value
+from app.domain.configuration_values import Value
 from app.domain.routing import MAX_LABEL_LENGTH, SUBJECT_CODE
 from app.domain.skills import Skill
 
@@ -60,7 +69,7 @@ def _skill_check(
     """
     labels = text_map(merged.get("labels"), "skill_label")
     Skill(None, 0, text_of(merged, "code"), labels)
-    return {**merged, "labels": cast("Json", labels)}
+    return {**merged, "labels": json_texts(labels)}
 
 
 def _pool_check(
@@ -69,10 +78,11 @@ def _pool_check(
     """Check a counted pool as ``CapacityPool`` does; return it normalised.
 
     Raises:
-        DomainError: ``invalid_configuration`` with ``pool_name`` or ``guaranteed_skills``.
+        DomainError: ``invalid_configuration`` with ``pool_code``, ``pool_name`` or
+            ``guaranteed_skills``.
     """
-    CapacityPool(None, 0, text_of(merged, "name"), PoolMode.COUNTED)
-    return {**merged, "guaranteed_skills": cast("Json", skill_codes(merged, "guaranteed_skills"))}
+    CapacityPool(None, 0, text_of(merged, "name"), PoolMode.COUNTED, code=text_of(merged, "code"))
+    return {**merged, "guaranteed_skills": json_list(skill_codes(merged, "guaranteed_skills"))}
 
 
 SKILL = Kind(
@@ -97,10 +107,11 @@ SKILL = Kind(
 
 CAPACITY_POOL = Kind(
     CAPACITY_POOL_KIND,
-    key=("name",),
+    key=("code",),
     permission=Permission.CAPACITY_MANAGE,
     tables=frozenset({"capacity_pools", "capacity_pool_skills"}),
     fields=(
+        text("code", required=True, max_length=MAX_CODE_LENGTH),
         text("name", required=True, max_length=MAX_LABEL_LENGTH),
         strings(
             "guaranteed_skills",
@@ -113,7 +124,7 @@ CAPACITY_POOL = Kind(
     check=_pool_check,
     archive=("archived", True),
     derived=frozenset({"capacity_pools.mode"}),
-    description="A counted capacity pool, addressed by its name within the organisation.",
+    description="A counted capacity pool, addressed by its code within the organisation.",
 )
 
 SKILLS = Collection("skills", SKILL, Shape.ENTITIES, "The organisation's skill catalogue.")

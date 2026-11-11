@@ -2,6 +2,7 @@
 
 import sqlite3
 from contextlib import closing
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -70,7 +71,9 @@ def _package(database: Path, tmp_path: Path, **overrides: object) -> bytes:
 
 
 def _documents(engine: AsyncEngine) -> ConfigurationDocumentService:
-    clock = FixedClock(NOW)
+    # The demo seed gives every service its default flows, published at the real time of the run;
+    # a document may not publish in the future, so the clock is a little after that.
+    clock = FixedClock(datetime.now(UTC) + timedelta(hours=1))
     uow = SqlUnitOfWork(engine, TARGET_BOX)
     return document_service(
         uow,

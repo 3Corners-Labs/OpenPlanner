@@ -201,6 +201,10 @@
         "archived": {
           "type": "boolean"
         },
+        "code": {
+          "type": "string",
+          "maxLength": 40
+        },
         "guaranteed_skills": {
           "allOf": [
             {
@@ -219,9 +223,9 @@
       },
       "additionalProperties": false,
       "required": [
-        "name"
+        "code"
       ],
-      "description": "A counted capacity pool, addressed by its name within the organisation."
+      "description": "A counted capacity pool, addressed by its code within the organisation."
     },
     "email_channel": {
       "type": "object",
@@ -332,7 +336,7 @@
               "oneOf": [
                 {
                   "type": "string",
-                  "maxLength": 80
+                  "maxLength": 40
                 },
                 {
                   "type": "null"
@@ -340,7 +344,7 @@
               ]
             }
           ],
-          "description": "The name of the counted pool the revision draws on."
+          "description": "The code of the counted pool the revision draws on."
         },
         "collects_email": {
           "type": "boolean"

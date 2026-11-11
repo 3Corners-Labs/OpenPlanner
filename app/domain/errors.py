@@ -153,6 +153,12 @@ class ErrorCode(StrEnum):
     """ADR 0099 point 7: a capacity lower than the places already booked in that window."""
     CONFIGURATION_REVISION_PUBLISHED = "configuration_revision_published"
     """ADR 0121 point 3: a published flow revision is history and a document never changes it."""
+    CONFIGURATION_DRAFT_FLOW_IN_USE = "configuration_draft_flow_in_use"
+    """ADR 0121 point 3: a flow that was never published cannot be archived, and a booking or
+    another record still refers to it; its draft must be discarded in the portal first."""
+    CONFIGURATION_POOL_WITHOUT_CODE = "configuration_pool_without_code"
+    """ADR 0121 step 2f: a counted capacity pool has no code (a row an older image wrote), so a
+    document cannot address it and an export refuses it."""
     CHANGE_REQUESTS_DISABLED = "change_requests_disabled"
     """ADR 0023 step 2: the organisation has not switched on change requests by a bot."""
     INVALID_APPOINTMENT_CODE = "invalid_appointment_code"

@@ -132,16 +132,27 @@ class Usage:
     Attributes:
         in_use: Per kind, the objects (by address) that something outside the configuration
             refers to: a booking, a closure or a shortfall acceptance. They are not deleted.
+        kept: Per kind, the objects (by address) that a document archives instead of deleting
+            when it removes them, because they hold history or grants (a skill a person holds
+            or a revision requires, a pool a revision draws on, a flow with a published
+            revision). Unlike ``in_use`` it does not make what holds them in use: a group is
+            deleted with its flows, which are history inside it. Only a kind that declares
+            ``Kind.archive`` is kept; for any other kind this is ignored.
         future_bookings: The groups (by address) with a future booking that holds a place;
             their time grid is frozen.
         slot_loads: Per group (by address), its future slots and what is booked on them.
         locked_settings: The settings the environment locks (ADR 0042), by registry key.
+        unaddressable: Objects of the installation that a document cannot address and so cannot
+            carry, named ``organisation/id`` (a counted capacity pool whose code is missing); an
+            export refuses while there is one.
     """
 
     in_use: Mapping[str, frozenset[Address]] = field(default_factory=dict)
+    kept: Mapping[str, frozenset[Address]] = field(default_factory=dict)
     future_bookings: frozenset[Address] = frozenset()
     slot_loads: Mapping[Address, tuple[SlotLoad, ...]] = field(default_factory=dict)
     locked_settings: frozenset[str] = frozenset()
+    unaddressable: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)

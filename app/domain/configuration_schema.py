@@ -403,6 +403,17 @@ class Collection:
     description: str = ""
 
 
+def _fits(spec: FieldSpec, value: Json) -> bool:
+    """Whether ``value`` is a value the field ``spec`` can hold (the type, and the choices)."""
+    if spec.type is FieldType.BOOLEAN:
+        return isinstance(value, bool)
+    if spec.type is FieldType.INTEGER:
+        return isinstance(value, int) and not isinstance(value, bool)
+    if spec.type is FieldType.STRING:
+        return isinstance(value, str) and (not spec.choices or value in spec.choices)
+    return False
+
+
 @dataclass(frozen=True)
 class Kind:
     """A kind of object in a configuration document.
@@ -455,8 +466,12 @@ class Kind:
         missing = [name for name in self.key if name not in names]
         if missing:
             raise ValueError(f"{self.name}: key fields {missing} are not fields of the kind")
-        if self.archive is not None and self.archive[0] not in names:
-            raise ValueError(f"{self.name}: the archive field {self.archive[0]} is not a field")
+        if self.archive is not None:
+            if self.archive[0] not in names:
+                raise ValueError(f"{self.name}: the archive field {self.archive[0]} is not a field")
+            spec = next(field for field in self.fields if field.name == self.archive[0])
+            if not _fits(spec, self.archive[1]):
+                raise ValueError(f"{self.name}: the archive value does not fit {spec.name}")
 
     def field(self, name: str) -> FieldSpec:
         """Return the field called ``name``.

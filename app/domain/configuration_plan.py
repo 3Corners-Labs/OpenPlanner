@@ -41,7 +41,7 @@ from app.domain.configuration_schema import (
     Shape,
 )
 from app.domain.configuration_tree import Action, Address, Entity, path_of
-from app.domain.configuration_values import Value, canonical_json
+from app.domain.configuration_values import Json, Value, canonical_json
 from app.domain.errors import DomainError, ErrorCode
 
 _MISSING = object()
@@ -105,6 +105,7 @@ def plan_document(
     may_change: MayChange,
     context: RuleContext,
     settings_version: int,
+    max_changes: int | None = None,
 ) -> Plan:
     """Plan ``document`` against ``current`` without writing anything.
 
@@ -115,11 +116,16 @@ def plan_document(
         may_change: Whether the actor holds a permission on a target (the matrix).
         context: What the rules need from outside the document.
         settings_version: The configuration's version the plan is computed against.
+        max_changes: The most changes one apply may hold. A plan with more is never applied, so
+            the rules across objects, which read everything the plan touches, are not run on it
+            (the caller refuses it with ``configuration_too_many_changes``).
 
     Returns:
         The plan: changes, refusals and the plan hash.
     """
-    return _Planner(document, current, usage, may_change, context).run(settings_version)
+    return _Planner(document, current, usage, may_change, context, max_changes).run(
+        settings_version
+    )
 
 
 class _Planner:
@@ -132,8 +138,10 @@ class _Planner:
         usage: Usage,
         may_change: MayChange,
         context: RuleContext,
+        max_changes: int | None = None,
     ) -> None:
         """Keep the inputs of the run."""
+        self._max_changes = max_changes
         self._document = document
         self._current = current
         self._usage = usage
@@ -162,9 +170,10 @@ class _Planner:
             self._usage,
             self._context,
         )
-        for rule in self._document.schema.integrity:
-            self._refusals.extend(rule(resolution))
         changes = tuple(self._writes) + tuple(self._deletes)
+        if self._max_changes is None or len(changes) <= self._max_changes:
+            for rule in self._document.schema.integrity:
+                self._refusals.extend(rule(resolution))
         effect = "\n".join(
             f"{c.action.value} {c.kind} {'/'.join(c.address)} {','.join(c.fields)}" for c in changes
         )
@@ -407,7 +416,8 @@ class _Planner:
         """Remove an object with what it holds; return what is left of it, ``None`` when gone.
 
         An object something refers to is refused, or archived instead when its kind says so
-        (``Kind.archive``); an object that is archived already stays as it is, without a change.
+        (``Kind.archive``); an object that only holds history (``Usage.kept``) is archived
+        instead of deleted; an object that is archived already stays as it is, without a change.
         """
         kind = coll.kind
         if not kind.deletable:
@@ -417,16 +427,21 @@ class _Planner:
             if kind.archive is None:
                 self._refuse(path, ErrorCode.CONFIGURATION_OBJECT_IN_USE)
                 return entity
-            return self._archive(kind, entity, path, above)
+            return self._archive(kind, kind.archive, entity, path, above)
+        if kind.archive is not None and above.address + entity.key in self._usage.kept.get(
+            kind.name, frozenset()
+        ):
+            return self._archive(kind, kind.archive, entity, path, above)
         wanted = Entity(kind.name, entity.key, Action.DELETE, {}, {}, path)
         here = self._place(kind, wanted, dict(entity.fields), above)
         self._emit(kind, wanted, here, ChangeAction.DELETE, (), {})
         return None
 
-    def _archive(self, kind: Kind, entity: Entity, path: str, above: _Place) -> Entity:
+    def _archive(
+        self, kind: Kind, archive: tuple[str, Json], entity: Entity, path: str, above: _Place
+    ) -> Entity:
         """Mark an object archived instead of deleting it; return it as it is afterwards."""
-        assert kind.archive is not None  # noqa: S101  # nosec B101 - the caller checked it
-        name, value = kind.archive
+        name, value = archive
         if entity.fields.get(name) == value:
             return entity
         fields = {**entity.fields, name: value}

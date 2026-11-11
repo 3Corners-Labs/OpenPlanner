@@ -144,6 +144,8 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.CONFIGURATION_REVISION_PUBLISHED: (
         "admin.form.error.configuration_revision_published"
     ),
+    ErrorCode.CONFIGURATION_DRAFT_FLOW_IN_USE: ("admin.form.error.configuration_draft_flow_in_use"),
+    ErrorCode.CONFIGURATION_POOL_WITHOUT_CODE: ("admin.form.error.configuration_pool_without_code"),
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {

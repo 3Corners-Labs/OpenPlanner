@@ -1,23 +1,37 @@
 """The rules across the skills, pools and flows of a configuration document (ADR 0121 2b-ii).
 
-A document names everything by natural key, so a rule here first reads the tree a document would
-leave behind into a small *world*: the skills, pools and groups of every organisation with ids
-that are only there for one run. Then it calls the very functions the admin screens call
-(``check_pool_save``, ``check_pool_archive``, ``check_flow_references``, ``check_default_paths``,
-``check_state_change``, ``readiness``, the ``ServiceFlow`` and ``FlowRevision`` constructors), so
-a document cannot make a flow use another organisation's pool or skill, activate two defaults for
-one entry path, name an unknown subject or set a location.
+A document names everything by natural key, so the rules first read the tree a document would
+leave behind into one *run*: the skills, pools, groups and flows of every organisation as the
+domain objects of the admin screens (``Skill``, ``CapacityPool``, ``ServiceFlow``,
+``FlowRevision``), with ids that are only there for this run. Then they call the very functions
+the screens call (``check_skill_save``, ``check_pool_save``, ``check_pool_archive``,
+``check_draft_save``, ``check_publishable``, ``check_flow_references``, ``check_default_paths``,
+``check_state_change``, ``check_revision_editable``, ``readiness``), and the constructors of the
+domain objects run their own invariants, so no rule of the screens is written out a second time
+here. The run is built once per resolution and shared by every rule below.
 
 Only what the plan creates or changes is checked, as the portal checks what an admin changes:
-what is stored and left alone stays valid. History is read leniently on purpose: a published
-revision may name a skill or pool that was archived afterwards or a subject that is gone, so an
-export always imports again; a *draft* is checked as strictly as a save in the portal.
+what is stored and left alone stays valid.
 
-Two rules keep the new sections from being a way around the screens. A document activates a
-flow only when the readiness checklist passes, so it cannot bring a flow live that the checklist
-refuses today (every value outside the ``BUILT_*`` constants of ``service_flows``). A revision
-marked ``legacy`` must be exactly the wrapper the backfill writes (``legacy_revision``), on the
-group's own legacy pool, so the flag cannot skip those tests either.
+How a document may bring a revision into being:
+
+* A *draft* is checked as a save in the portal is, against the revision it is based on.
+* A revision that the document *publishes* (a new revision with ``published_at``, or a draft that
+  gains one) is checked as publishing in the portal is: ``check_flow_references`` against the
+  revision before it, ``check_publishable`` for the one that becomes current, a ``published_at``
+  that is not in the future (``RuleContext.now``) and later than that of every revision before
+  it, and numbers without a gap. The revision before it is the stored one; an installation that
+  does not have the flow yet is filled in ascending order, each revision checked against the one
+  before it in the document, and the first one (nothing to be based on) may keep a skill or
+  subject that was archived or removed since: that is history being restored, and an export
+  always imports again.
+* A published revision that is stored is never changed or removed (``check_revision_editable``).
+
+Two rules keep the new sections from being a way around the screens. A document activates a flow
+only when the readiness checklist passes, so it cannot bring a flow live that the checklist
+refuses today (every value outside the ``BUILT_*`` constants of ``service_flows``). The flag
+``legacy`` skips those tests, so it is accepted only as the exact wrapper the backfill writes
+(``check_legacy_shape``), on a group's own legacy pool, which no other group's flow may use.
 """
 
 from collections.abc import Iterator, Mapping
@@ -25,7 +39,13 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from itertools import count
 
-from app.domain.capacity import CapacityPool, PoolMode, check_pool_archive, check_pool_save
+from app.domain.capacity import (
+    CapacityPool,
+    PoolMode,
+    check_pool_archive,
+    check_pool_save,
+    same_name,
+)
 from app.domain.configuration_changes import (
     Change,
     ChangeAction,
@@ -33,8 +53,9 @@ from app.domain.configuration_changes import (
     Refusal,
     Resolution,
 )
-from app.domain.configuration_checks import strings_of, text_of
+from app.domain.configuration_checks import flag_of, int_of, strings_of, text_map, text_of
 from app.domain.configuration_tree import Address, Entity, path_of, walk
+from app.domain.configuration_v1_flows import revision_of
 from app.domain.configuration_v1_names import (
     CAPACITY_POOL_KIND,
     FLOW_REVISION_KIND,
@@ -45,30 +66,71 @@ from app.domain.configuration_v1_names import (
     SKILL_KIND,
 )
 from app.domain.configuration_values import Value
+from app.domain.default_flows import check_legacy_shape
 from app.domain.errors import DomainError, ErrorCode, missing_object
 from app.domain.routing_codec import routing_from_json
 from app.domain.service_flows import (
-    CompletionPolicy,
-    DispatchKind,
     FlowRevision,
     FlowState,
-    HandlingAction,
     IntakeMode,
-    InteractionKind,
     ServiceFlow,
     can_activate,
     check_default_paths,
+    check_draft_save,
     check_flow_references,
+    check_publishable,
+    check_revision_editable,
     check_state_change,
-    legacy_revision,
+    draws_on_pool,
     readiness,
+    skills_required_on_pool,
 )
-from app.domain.skills import Skill
+from app.domain.skills import Skill, check_skill_save
 
 _ARCHIVED = datetime(1970, 1, 1, tzinfo=UTC)
 """Stands for "archived at some time" in the objects of a run; the time itself never matters."""
 _POOLS = (CAPACITY_POOL_KIND, LEGACY_POOL_KIND)
 _WRITES = (ChangeAction.CREATE, ChangeAction.UPDATE, ChangeAction.ARCHIVE)
+
+
+def _refusal(path: str, error: DomainError) -> Refusal:
+    """Return the refusal a domain error makes at ``path``."""
+    return Refusal(path, error.code, error.field)
+
+
+def _flow_path(address: Address) -> str:
+    """Return the path of a flow in a document."""
+    group = path_of(path_of("", "organisations", address[:1]), "groups", address[1:2])
+    return path_of(group, "flows", address[2:3])
+
+
+def _revisions_of(flow: Entity) -> dict[int, Entity]:
+    """Return the revisions a flow object holds by number."""
+    return {int(revision.key[0]): revision for revision in flow.children.get("revisions", ())}
+
+
+def _published_at(revision: Entity | None) -> datetime | None:
+    """Return when a revision object was published, ``None`` for a draft or no revision."""
+    value = None if revision is None else revision.fields.get("published_at")
+    try:
+        moment = None if value is None else datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+    return moment if moment is not None and moment.tzinfo is not None else None
+
+
+def _in_effect(flow: Entity) -> dict[int, Entity]:
+    """Return the revisions of a flow that stay: the published ones and the draft.
+
+    An unpublished revision that is not the draft is dropped by the writer when the flow's draft
+    moves on, so it is not part of what the document leaves behind.
+    """
+    draft = int_of(flow.fields, "draft_revision")
+    return {
+        number: revision
+        for number, revision in _revisions_of(flow).items()
+        if revision.fields.get("published_at") is not None or number == draft
+    }
 
 
 @dataclass(frozen=True)
@@ -80,8 +142,9 @@ class _World:
         groups: Id of every group, by slug (slugs are unique across the installation).
         group_organisation: The organisation slug of every group.
         skills: Every skill by ``(organisation, code)``.
-        pools: Every counted pool by ``(organisation, name)``.
+        pools: Every counted pool by ``(organisation, code)``.
         legacy: Every group's legacy pool, by the group's slug.
+        pool_by_id: Every pool, counted or legacy, by its id of this run.
         subjects: The subject codes every group offers, by slug.
     """
 
@@ -91,6 +154,7 @@ class _World:
     skills: Mapping[tuple[str, str], Skill]
     pools: Mapping[tuple[str, str], CapacityPool]
     legacy: Mapping[str, CapacityPool]
+    pool_by_id: Mapping[int, CapacityPool]
     subjects: Mapping[str, frozenset[str]]
 
     @property
@@ -98,90 +162,28 @@ class _World:
         """Every skill by its id."""
         return {skill.id: skill for skill in self.skills.values() if skill.id is not None}
 
-    def skill_id(self, organisation: str, code: str, field: str) -> int:
-        """Return the id of the organisation's skill ``code``.
-
-        Raises:
-            DomainError: ``configuration_object_missing`` naming ``field``.
-        """
-        skill = self.skills.get((organisation, code))
-        if skill is None or skill.id is None:
-            raise missing_object(field)
-        return skill.id
-
-    def pool_of(self, organisation: str, fields: Mapping[str, Value]) -> CapacityPool | None:
-        """Return the pool a revision's fields name, ``None`` when it names none.
-
-        Raises:
-            DomainError: ``configuration_object_missing`` for a pool that is not in the tree.
-        """
-        name, legacy_of = fields.get("capacity_pool"), fields.get("legacy_pool_of")
-        if name is None and legacy_of is None:
-            return None
-        found = (
-            self.pools.get((organisation, str(name)))
-            if name is not None
-            else self.legacy.get(str(legacy_of))
+    def skill_ids(self, organisation: str, codes: list[str]) -> frozenset[int]:
+        """Return the ids of the skills with these codes; a code without a skill is left out."""
+        return frozenset(
+            skill.id
+            for code in codes
+            if (skill := self.skills.get((organisation, code))) is not None and skill.id is not None
         )
-        if found is None:
-            raise missing_object("capacity_pool_id")
-        return found
 
 
-def _index(root: Entity, kind: str) -> dict[Address, Entity]:
-    """Return every object of ``kind`` below ``root`` by address."""
-    return dict(walk(root, kind))
-
-
-def _ids(
-    world: Mapping[tuple[str, str], Skill], organisation: str, codes: list[str]
-) -> frozenset[int]:
-    """Return the ids of the skills with these codes; a code without a skill is left out."""
-    return frozenset(
-        skill.id
-        for code in codes
-        if (skill := world.get((organisation, code))) is not None and skill.id is not None
-    )
-
-
-def _pool(
-    entity: Entity,
-    pool_id: int,
-    organisation_id: int,
-    name: str,
-    skills: Mapping[tuple[str, str], Skill],
-    address: Address,
-    group_id: int | None,
-) -> CapacityPool | None:
-    """Build the pool an object describes; ``None`` when it cannot be built."""
-    try:
-        return CapacityPool(
-            pool_id,
-            organisation_id,
-            name,
-            PoolMode.COUNTED if group_id is None else PoolMode.LEGACY_GROUP,
-            _ids(skills, address[0], strings_of(entity.fields, "guaranteed_skills")),
-            _ARCHIVED if entity.fields.get("archived") else None,
-            group_id,
-        )
-    except DomainError:
-        return None
-
-
-def _world(root: Entity) -> _World:
+def _read_world(root: Entity) -> _World:
     """Read the skills, pools and groups of a tree; an object that cannot be built is left out."""
     ids = count(1)
     organisations = {address[0]: next(ids) for address, _ in walk(root, ORGANISATION_KIND)}
     skills: dict[tuple[str, str], Skill] = {}
     for address, entity in walk(root, SKILL_KIND):
-        labels = entity.fields.get("labels")
         try:
             skills[(address[0], address[1])] = Skill(
                 next(ids),
                 organisations[address[0]],
                 address[1],
-                labels if isinstance(labels, dict) else {},  # type: ignore[arg-type]
-                _ARCHIVED if entity.fields.get("archived") else None,
+                text_map(entity.fields.get("labels"), "skill_label"),
+                _ARCHIVED if flag_of(entity.fields, "archived", False) else None,
             )
         except DomainError:
             continue
@@ -196,351 +198,494 @@ def _world(root: Entity) -> _World:
         except DomainError:
             offered = ()
         subjects[address[1]] = frozenset(subject.code for subject in offered)
+    world = _World(organisations, groups, group_organisation, skills, {}, {}, {}, subjects)
     pools: dict[tuple[str, str], CapacityPool] = {}
     legacy: dict[str, CapacityPool] = {}
-    for address, pool in walk(root, CAPACITY_POOL_KIND):
-        built = _pool(pool, next(ids), organisations[address[0]], address[1], skills, address, None)
+    for address, entity in walk(root, CAPACITY_POOL_KIND):
+        built = _pool(world, entity, next(ids), address, address[1], None)
         if built is not None:
             pools[(address[0], address[1])] = built
-    for address, pool in walk(root, LEGACY_POOL_KIND):
-        name = text_of(pool.fields, "name")
-        built = _pool(
-            pool,
-            next(ids),
-            organisations[address[0]],
-            name,
-            skills,
-            address,
-            groups.get(address[1]),
-        )
+    for address, entity in walk(root, LEGACY_POOL_KIND):
+        if address[1] not in groups:
+            continue
+        built = _pool(world, entity, next(ids), address, None, groups[address[1]])
         if built is not None:
             legacy[address[1]] = built
-    return _World(organisations, groups, group_organisation, skills, pools, legacy, subjects)
+    by_id = {pool.id: pool for pool in (*pools.values(), *legacy.values()) if pool.id is not None}
+    return replace(world, pools=pools, legacy=legacy, pool_by_id=by_id)
 
 
-def _refusal(path: str, error: DomainError) -> Refusal:
-    """Return the refusal a domain error makes at ``path``."""
-    return Refusal(path, error.code, error.field)
+def _pool(
+    world: _World,
+    entity: Entity,
+    pool_id: int,
+    address: Address,
+    code: str | None,
+    group_id: int | None,
+) -> CapacityPool | None:
+    """Build the pool an object describes (counted with ``code``, legacy with ``group_id``)."""
+    try:
+        return CapacityPool(
+            pool_id,
+            world.organisations[address[0]],
+            text_of(entity.fields, "name"),
+            PoolMode.COUNTED if group_id is None else PoolMode.LEGACY_GROUP,
+            world.skill_ids(address[0], strings_of(entity.fields, "guaranteed_skills")),
+            _ARCHIVED if flag_of(entity.fields, "archived", False) else None,
+            group_id,
+            code,
+        )
+    except DomainError:
+        return None
+
+
+class _Run:
+    """What the rules share: the world, the flows as domain objects and the writes of the plan."""
+
+    def __init__(self, resolution: Resolution) -> None:
+        """Read the resolution once: the world, the flows before and after, the changes."""
+        self.resolution = resolution
+        self.world = _read_world(resolution.resulting)
+        self.flows = dict(walk(resolution.resulting, SERVICE_FLOW_KIND))
+        self.before = dict(walk(resolution.current, SERVICE_FLOW_KIND))
+        self.pools_before = {kind: dict(walk(resolution.current, kind)) for kind in _POOLS}
+        self.pools_after = {kind: dict(walk(resolution.resulting, kind)) for kind in _POOLS}
+        base = max((*self.world.organisations.values(), *self.world.groups.values()), default=0)
+        self.flow_ids = {address: base + 1 + n for n, address in enumerate(sorted(self.flows))}
+        self.archived = {
+            change.address
+            for change in resolution.changes
+            if change.kind == SERVICE_FLOW_KIND and change.action is ChangeAction.ARCHIVE
+        }
+        self._revisions: dict[int, FlowRevision] = {}
+        self._objects: dict[Address, ServiceFlow | DomainError] = {}
+        self._stored: dict[Address, ServiceFlow | None] = {}
+
+    def pool_for(self, address: Address, fields: Mapping[str, Value]) -> CapacityPool | None:
+        """Return the pool a revision's fields name, ``None`` when it names none.
+
+        A group's legacy pool is named by the group's slug and only by the group's own flows.
+
+        Raises:
+            DomainError: ``invalid_configuration`` (``legacy_pool_of``) for the legacy pool of
+                another group, ``configuration_object_missing`` for a pool not in the tree.
+        """
+        code, legacy_of = fields.get("capacity_pool"), fields.get("legacy_pool_of")
+        if code is None and legacy_of is None:
+            return None
+        if legacy_of is not None:
+            if legacy_of != address[1]:
+                raise DomainError(ErrorCode.INVALID_CONFIGURATION, "legacy_pool_of")
+            found = self.world.legacy.get(address[1])
+        else:
+            found = self.world.pools.get((address[0], str(code)))
+        if found is None:
+            raise missing_object("capacity_pool_id")
+        return found
+
+    def revision(self, address: Address, number: int, entity: Entity) -> FlowRevision:
+        """Return the revision an object describes, with the ids of this run.
+
+        Raises:
+            DomainError: ``configuration_object_missing`` for a skill or pool the tree does not
+                hold, what ``pool_for`` refuses and what ``FlowRevision`` refuses.
+        """
+        found = self._revisions.get(id(entity))
+        if found is None:
+            pool = self.pool_for(address, entity.fields)
+
+            def skill_id(code: str, field: str) -> int:
+                skill = self.world.skills.get((address[0], code))
+                if skill is None or skill.id is None:
+                    raise missing_object(field)
+                return skill.id
+
+            found = revision_of(
+                entity.fields,
+                number,
+                flow_id=self.flow_ids[address],
+                pool_id=None if pool is None else pool.id,
+                skill_id=skill_id,
+            )
+            self._revisions[id(entity)] = found
+        return found
+
+    def _flow_from(self, address: Address, flow: Entity) -> ServiceFlow:
+        """Build the flow an object describes from the revisions that stay."""
+        held = _in_effect(flow)
+        current = int_of(flow.fields, "current_revision")
+        draft = int_of(flow.fields, "draft_revision")
+        try:
+            return ServiceFlow(
+                self.flow_ids[address],
+                self.world.groups[address[1]],
+                address[2],
+                FlowState(text_of(flow.fields, "state")),
+                frozenset(IntakeMode(mode) for mode in strings_of(flow.fields, "default_for")),
+                self.revision(address, current, held[current]) if current in held else None,
+                self.revision(address, draft, held[draft]) if draft in held else None,
+            )
+        except ValueError:
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "state") from None
+
+    def flow(self, address: Address) -> ServiceFlow:
+        """Return the flow of the tree the document leaves behind.
+
+        Raises:
+            DomainError: What building a revision or the ``ServiceFlow`` refuses.
+        """
+        if address not in self._objects:
+            try:
+                self._objects[address] = self._flow_from(address, self.flows[address])
+            except DomainError as error:
+                self._objects[address] = error
+        found = self._objects[address]
+        if isinstance(found, DomainError):
+            raise found
+        return found
+
+    def stored(self, address: Address) -> ServiceFlow | None:
+        """Return the flow as the installation has it now, ``None`` when it has none."""
+        if address not in self._stored:
+            entity = self.before.get(address)
+            try:
+                self._stored[address] = None if entity is None else self._flow_from(address, entity)
+            except DomainError:
+                self._stored[address] = None
+        return self._stored[address]
+
+    def built_flows(self) -> dict[Address, ServiceFlow]:
+        """Return every flow of the tree that can be built, by address."""
+        found: dict[Address, ServiceFlow] = {}
+        for address in sorted(self.flows):
+            try:
+                found[address] = self.flow(address)
+            except DomainError:
+                continue
+        return found
+
+
+# --- skills ------------------------------------------------------------------------------
+
+
+def _skill_rules(run: _Run) -> Iterator[Refusal]:
+    """A skill is checked as the screen saves it."""
+    for change in run.resolution.changes:
+        if change.kind != SKILL_KIND or change.action not in _WRITES:
+            continue
+        skill = run.world.skills.get((change.address[0], change.address[1]))
+        if skill is None:
+            continue
+        created = change.action is ChangeAction.CREATE
+        try:
+            check_skill_save(
+                replace(skill, id=None) if created else skill, None if created else skill, False
+            )
+        except DomainError as error:
+            yield _refusal(change.path, error)
 
 
 # --- pools -------------------------------------------------------------------------------
 
 
-def _pool_rules(resolution: Resolution) -> Iterator[Refusal]:
+def _pool_rules(run: _Run) -> Iterator[Refusal]:
     """A pool guarantees only its organisation's own skills, and is not archived under a flow."""
-    world = _world(resolution.resulting)
-    before = {kind: _index(resolution.current, kind) for kind in _POOLS}
-    for change in resolution.changes:
+    flows = run.built_flows()
+    for change in run.resolution.changes:
         if change.kind not in _POOLS or change.action not in _WRITES:
             continue
-        entity = _index(resolution.resulting, change.kind).get(change.address)
         pool = (
-            world.pools.get((change.address[0], change.address[1]))
+            run.world.pools.get((change.address[0], change.address[1]))
             if change.kind == CAPACITY_POOL_KIND
-            else world.legacy.get(change.address[1])
+            else run.world.legacy.get(change.address[1])
         )
-        if entity is None or pool is None:
+        entity = run.pools_after[change.kind].get(change.address)
+        if pool is None or entity is None:
             continue
-        organisation = change.address[0]
         codes = strings_of(entity.fields, "guaranteed_skills")
-        if any((organisation, code) not in world.skills for code in codes):
+        if any((change.address[0], code) not in run.world.skills for code in codes):
             yield Refusal(
                 change.path, ErrorCode.CONFIGURATION_OBJECT_MISSING, "guaranteed_skill_ids"
             )
             continue
-        old = before[change.kind].get(change.address)
-        already = (
-            _ids(world.skills, organisation, strings_of(old.fields, "guaranteed_skills"))
-            if old
-            else frozenset()
+        yield from _save_pool(run, change, pool, flows)
+
+
+def _save_pool(
+    run: _Run, change: Change, pool: CapacityPool, flows: Mapping[Address, ServiceFlow]
+) -> Iterator[Refusal]:
+    """Run ``check_pool_save`` (and for an archive ``check_pool_archive``) on one written pool."""
+    created = change.action is ChangeAction.CREATE
+    old = run.pools_before[change.kind].get(change.address)
+    stored = (
+        None
+        if created or old is None
+        else replace(
+            pool,
+            name=text_of(old.fields, "name"),
+            guaranteed_skill_ids=run.world.skill_ids(
+                change.address[0], strings_of(old.fields, "guaranteed_skills")
+            ),
+            archived_at=_ARCHIVED if flag_of(old.fields, "archived", False) else None,
         )
-        try:
-            check_pool_save(
-                replace(pool, id=None), None, pool.organisation_id, world.skills_by_id, already
-            )
-        except DomainError as error:
-            yield _refusal(change.path, error)
-            continue
+    )
+    group_organisation = (
+        None
+        if pool.group_id is None
+        else run.world.organisations.get(run.world.group_organisation[change.address[1]])
+    )
+    try:
+        check_pool_save(
+            replace(pool, id=None) if created else pool,
+            stored,
+            group_organisation,
+            run.world.skills_by_id,
+            frozenset() if stored is None else stored.guaranteed_skill_ids,
+            same_name_exists=_same_name_elsewhere(run, pool),
+            still_required=skills_required_on_pool(flows.values(), pool.id or 0),
+        )
         if pool.archived_at is not None and (
             change.action is ChangeAction.ARCHIVE or "archived" in change.fields
         ):
-            try:
-                check_pool_archive(_drawing(resolution.resulting, change))
-            except DomainError as error:
-                yield _refusal(change.path, error)
-
-
-def _drawing(root: Entity, change: Change) -> list[str]:
-    """Return the codes of the flows, not archived, whose current or draft revision uses a pool."""
-    organisation = change.address[0]
-    codes: set[str] = set()
-    for address, flow in walk(root, SERVICE_FLOW_KIND):
-        if address[0] != organisation or flow.fields.get("state") == FlowState.ARCHIVED.value:
-            continue
-        in_effect = {flow.fields.get("current_revision"), flow.fields.get("draft_revision")}
-        for revision in flow.children.get("revisions", ()):
-            if int(revision.key[0]) not in in_effect:
-                continue
-            uses = (
-                revision.fields.get("capacity_pool") == change.address[1]
-                if change.kind == CAPACITY_POOL_KIND
-                else revision.fields.get("legacy_pool_of") == change.address[1]
+            check_pool_archive(
+                [flow.code for flow in flows.values() if draws_on_pool(flow, pool.id or 0)]
             )
-            if uses:
-                codes.add(address[2])
-    return sorted(codes)
+    except DomainError as error:
+        yield _refusal(change.path, error)
+
+
+def _same_name_elsewhere(run: _Run, pool: CapacityPool) -> bool:
+    """Whether another counted pool of the organisation, not archived, has the pool's name."""
+    return pool.mode is PoolMode.COUNTED and any(
+        other.id != pool.id
+        and other.organisation_id == pool.organisation_id
+        and other.archived_at is None
+        and same_name(other.name) == same_name(pool.name)
+        for other in run.world.pools.values()
+    )
 
 
 # --- flows -------------------------------------------------------------------------------
 
 
-def _subjects(fields: Mapping[str, Value]) -> dict[str, Value]:
-    """Return a revision's subjects as the object holds them (code to a list of skill codes)."""
-    subjects = fields.get("subjects")
-    return dict(subjects) if isinstance(subjects, dict) else {}
-
-
-def _codes(value: Value) -> list[str]:
-    """Return the texts of a list value."""
-    return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
-
-
-def _revision_of(world: _World, address: Address, revision: Entity) -> FlowRevision:
-    """Build the revision an object describes, with the ids of this run.
-
-    Raises:
-        DomainError: ``configuration_object_missing`` for a skill or pool the tree does not hold,
-            and what the ``FlowRevision`` constructor refuses.
-    """
-    organisation, fields = address[0], revision.fields
-    pool = world.pool_of(organisation, fields)
-    required = frozenset(
-        world.skill_id(organisation, code, "required_skill_ids")
-        for code in strings_of(fields, "required_skills")
-    )
-    extra = {
-        code: frozenset(
-            world.skill_id(organisation, c, "subject_skill_ids") for c in _codes(skills)
-        )
-        for code, skills in _subjects(fields).items()
-    }
-    labels = fields.get("labels")
-    published = fields.get("published_at")
-    kind, action = fields.get("interaction_kind"), fields.get("handling_action")
-    dispatch, completion = fields.get("dispatch"), fields.get("completion")
-    duration = fields.get("duration_minutes")
-    return FlowRevision(
-        flow_id=None,
-        revision=int(revision.key[0]),
-        labels=labels if isinstance(labels, dict) else {},  # type: ignore[arg-type]
-        intake_modes=frozenset(IntakeMode(m) for m in strings_of(fields, "intake_modes")),
-        interaction_kind=InteractionKind(str(kind)) if kind is not None else None,
-        duration_minutes=duration if isinstance(duration, int) else None,
-        capacity_pool_id=pool.id if pool is not None else None,
-        required_skill_ids=required,
-        subject_skill_ids=extra,
-        dispatch=DispatchKind(str(dispatch)) if dispatch is not None else None,
-        handling_action=HandlingAction(str(action)) if action is not None else None,
-        completion=CompletionPolicy(str(completion)) if completion is not None else None,
-        collects_email=fields.get("collects_email") is not False,
-        legacy=fields.get("legacy") is True,
-        published_at=datetime.fromisoformat(str(published)) if published is not None else None,
-    )
-
-
-def _revisions_of(flow: Entity) -> dict[int, Entity]:
-    """Return the revisions a flow object holds by number."""
-    return {int(revision.key[0]): revision for revision in flow.children.get("revisions", ())}
-
-
-def _number(value: Value) -> int | None:
-    """Return a revision number a flow field holds, ``None`` when it holds none."""
-    return value if isinstance(value, int) and not isinstance(value, bool) else None
-
-
-def _flow_object(world: _World, address: Address, flow: Entity) -> ServiceFlow:
-    """Build the flow an object describes from its current and draft revision.
-
-    Raises:
-        DomainError: What building a revision or the ``ServiceFlow`` refuses.
-    """
-    revisions = _revisions_of(flow)
-    current, draft = (
-        _number(flow.fields.get("current_revision")),
-        _number(flow.fields.get("draft_revision")),
-    )
-    return ServiceFlow(
-        None,
-        world.groups[address[1]],
-        address[2],
-        FlowState(str(flow.fields.get("state"))),
-        frozenset(IntakeMode(m) for m in strings_of(flow.fields, "default_for")),
-        _revision_of(world, address, revisions[current]) if current in revisions else None,
-        _revision_of(world, address, revisions[draft]) if draft in revisions else None,
-    )
-
-
-def _legacy_shape(world: _World, address: Address, revision: FlowRevision) -> None:
-    """Refuse a revision marked legacy that is not exactly the wrapper the backfill writes.
-
-    Raises:
-        DomainError: ``invalid_configuration`` naming ``legacy``.
-    """
-    own = world.legacy.get(address[1])
-    if (
-        len(revision.intake_modes) != 1
-        or revision.duration_minutes is None
-        or revision.dispatch is None
-        or revision.published_at is None
-        or own is None
-        or revision.capacity_pool_id != own.id
-    ):
-        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "legacy")
-    expected = replace(
-        legacy_revision(
-            labels=revision.labels,
-            intake_mode=next(iter(revision.intake_modes)),
-            duration_minutes=revision.duration_minutes,
-            capacity_pool_id=own.id or 0,
-            dispatch=revision.dispatch,
-        ),
-        revision=revision.revision,
-        published_at=revision.published_at,
-    )
-    if expected != revision:
-        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "legacy")
-
-
-def _already(
-    world: _World, address: Address, old: Entity | None
-) -> tuple[frozenset[int], frozenset[int]]:
-    """Return the skill ids and pool ids the flow's revisions in effect hold in the current tree."""
-    skills: set[int] = set()
-    pools: set[int] = set()
-    if old is None:
-        return frozenset(), frozenset()
-    in_effect = {
-        _number(old.fields.get("current_revision")),
-        _number(old.fields.get("draft_revision")),
-    }
-    for number, revision in _revisions_of(old).items():
-        if number not in in_effect:
-            continue
-        fields = revision.fields
-        skills |= _ids(world.skills, address[0], strings_of(fields, "required_skills"))
-        for extra in _subjects(fields).values():
-            skills |= _ids(world.skills, address[0], _codes(extra))
-        try:
-            pool = world.pool_of(address[0], fields)
-        except DomainError:
-            pool = None
-        if pool is not None and pool.id is not None:
-            pools.add(pool.id)
-    return frozenset(skills), frozenset(pools)
-
-
-def _flow_path(address: Address) -> str:
-    """Return the path of a flow in a document."""
-    group = path_of(path_of("", "organisations", address[:1]), "groups", address[1:2])
-    return path_of(group, "flows", address[2:3])
-
-
-def _check_revision(
-    world: _World,
-    address: Address,
-    flow: Entity,
-    number: int,
-    old: Entity | None,
-) -> Iterator[Refusal]:
-    """Check one revision the plan writes: its place in the flow, references, legacy shape."""
-    revision = _revisions_of(flow)[number]
-    path = path_of(_flow_path(address), "revisions", (str(number),))
-    published = revision.fields.get("published_at") is not None
-    if not published and number != _number(flow.fields.get("draft_revision")):
-        yield Refusal(path, ErrorCode.INVALID_CONFIGURATION, "published_at")
-        return
-    if published and number == _number(flow.fields.get("draft_revision")):
-        yield Refusal(path, ErrorCode.INVALID_CONFIGURATION, "published_at")
-        return
-    try:
-        built = _revision_of(world, address, revision)
-        if built.legacy:
-            _legacy_shape(world, address, built)
-        organisation = world.organisations[address[0]]
-        pool = world.pool_of(address[0], revision.fields)
-        offered = world.subjects.get(address[1], frozenset())
-        if published:
-            required, already_pool = built.all_skill_ids, built.capacity_pool_id
-            offered = offered | frozenset(built.subject_skill_ids)
-        else:
-            required, pools = _already(world, address, old)
-            already_pool = built.capacity_pool_id if built.capacity_pool_id in pools else None
-        check_flow_references(
-            organisation,
-            built,
-            pool,
-            world.skills_by_id,
-            required,
-            offered,
-            already_pool_id=already_pool,
-        )
-    except DomainError as error:
-        yield _refusal(path, error)
-
-
-def _flow_rules(resolution: Resolution) -> Iterator[Refusal]:
-    """Check every flow the plan writes: its revisions, its state and the checklist."""
-    world = _world(resolution.resulting)
-    flows = _index(resolution.resulting, SERVICE_FLOW_KIND)
-    before = _index(resolution.current, SERVICE_FLOW_KIND)
+def _touched(run: _Run) -> dict[Address, set[int]]:
+    """Return the flows the plan writes, with the revision numbers it writes of each."""
     touched: dict[Address, set[int]] = {}
-    for change in resolution.changes:
+    for change in run.resolution.changes:
         if change.kind == SERVICE_FLOW_KIND and change.action in _WRITES:
             touched.setdefault(change.address, set())
         if change.kind == FLOW_REVISION_KIND and change.action in _WRITES[:2]:
             touched.setdefault(change.address[:3], set()).add(int(change.key[0]))
-    for address in sorted(touched):
-        flow = flows.get(address)
-        if flow is None:
-            continue
-        yield from _check_flow(world, address, flow, before.get(address), touched[address])
+    return touched
 
 
-def _check_flow(
-    world: _World, address: Address, flow: Entity, old: Entity | None, written: set[int]
-) -> Iterator[Refusal]:
-    """Check one flow: the revisions it names, the ones written, its state and readiness."""
+def _flow_rules(run: _Run) -> Iterator[Refusal]:
+    """Check every flow the plan writes: its revisions, its state and the checklist."""
+    for address, written in sorted(_touched(run).items()):
+        if address in run.flows:
+            yield from _check_flow(run, address, written)
+
+
+def _check_flow(run: _Run, address: Address, written: set[int]) -> Iterator[Refusal]:
+    """Check one flow: the pointers and numbers, the revisions written, its state, readiness.
+
+    In this order, so a refusal is blamed on the object that causes it: the pointers and the
+    numbers, then each revision written on its own, then the flow built from them, then what a
+    revision written must satisfy within the flow, then the state the flow ends in.
+    """
     path = _flow_path(address)
-    revisions = _revisions_of(flow)
-    current, draft = (_number(flow.fields.get(n)) for n in ("current_revision", "draft_revision"))
-    for name, number in (("current_revision", current), ("draft_revision", draft)):
-        if number is not None and number not in revisions:
+    entity = run.flows[address]
+    held = _in_effect(entity)
+    for name in ("current_revision", "draft_revision"):
+        number = int_of(entity.fields, name)
+        if number is not None and number not in held:
             yield Refusal(path, ErrorCode.CONFIGURATION_OBJECT_MISSING, name)
-    if current in revisions and revisions[current].fields.get("published_at") is None:
-        yield Refusal(path, ErrorCode.INVALID_CONFIGURATION, "published_at")
+            return
+    if sorted(held) != list(range(1, len(held) + 1)):
+        yield Refusal(path, ErrorCode.INVALID_CONFIGURATION, "revision")
+        return
+    stored = _revisions_of(run.before[address]) if address in run.before else {}
+    numbers = sorted(
+        number
+        for number in written & set(_revisions_of(entity))
+        if _published_at(stored.get(number)) is None  # a stored published one is immutable
+    )
     refused = [
-        r
-        for number in sorted(written & set(revisions))
-        for r in _check_revision(world, address, flow, number, old)
+        refusal
+        for number in numbers
+        for refusal in _build_revision(run, address, number, _revisions_of(entity)[number])
     ]
     yield from refused
     if refused:
         return
     try:
-        built = _flow_object(world, address, flow)
+        built = run.flow(address)
     except DomainError as error:
         yield _refusal(path, error)
         return
-    if old is not None and old.fields.get("state") != flow.fields.get("state"):
+    refused = [
+        refusal
+        for number in numbers
+        for refusal in _check_revision(run, address, number, _revisions_of(entity)[number], built)
+    ]
+    yield from refused
+    if not refused:
+        yield from _check_state(run, address, built)
+
+
+def _revision_path(address: Address, number: int) -> str:
+    """Return the path of a revision in a document."""
+    return path_of(_flow_path(address), "revisions", (str(number),))
+
+
+def _build_revision(run: _Run, address: Address, number: int, entity: Entity) -> Iterator[Refusal]:
+    """Build the revision a document writes on its own; refuse what it cannot be built from.
+
+    An unpublished revision that is not the flow's draft is refused here too: the writer would
+    leave it behind when the draft moves on.
+    """
+    path = _revision_path(address, number)
+    if _published_at(entity) is None and number != int_of(
+        run.flows[address].fields, "draft_revision"
+    ):
+        yield Refusal(path, ErrorCode.INVALID_CONFIGURATION, "published_at")
+        return
+    try:
+        run.revision(address, number, entity)
+    except DomainError as error:
+        yield _refusal(path, error)
+
+
+def _check_revision(
+    run: _Run, address: Address, number: int, entity: Entity, flow: ServiceFlow
+) -> Iterator[Refusal]:
+    """Check one revision the plan writes: a draft as a save, a published one as a publication."""
+    try:
+        built = run.revision(address, number, entity)
+        if built.legacy:
+            check_legacy_shape(
+                address[2], built, run.pool_for(address, entity.fields), flow.group_id
+            )
+        if _published_at(entity) is not None:
+            _check_publication(run, address, number, built)
+        else:
+            _check_draft(run, address, built, flow)
+    except DomainError as error:
+        yield _refusal(_revision_path(address, number), error)
+
+
+def _based_on(run: _Run, address: Address, number: int) -> FlowRevision | None:
+    """Return the published revision the one numbered ``number`` follows, ``None`` for the first."""
+    earlier = [
+        (found, revision)
+        for found, revision in _in_effect(run.flows[address]).items()
+        if found < number and _published_at(revision) is not None
+    ]
+    if not earlier:
+        return None
+    latest, revision = max(earlier, key=lambda item: item[0])
+    return run.revision(address, latest, revision)
+
+
+def _check_references(
+    run: _Run,
+    address: Address,
+    built: FlowRevision,
+    based_on: FlowRevision | None,
+    *,
+    restoring: bool = False,
+) -> None:
+    """Run ``check_flow_references`` for a revision against the world of this run.
+
+    ``restoring`` is the first revision of a flow the installation does not have: nothing to be
+    based on, so what it names stays as it is (history being restored).
+    """
+    pool = run.world.pool_by_id.get(built.capacity_pool_id or 0)
+    offered = run.world.subjects.get(address[1], frozenset())
+    kept = based_on if based_on is not None else (built if restoring else None)
+    check_flow_references(
+        run.world.organisations[address[0]],
+        built,
+        pool,
+        run.world.skills_by_id,
+        kept.all_skill_ids if kept else frozenset(),
+        offered | frozenset(kept.subject_skill_ids if kept else ()),
+        group_id=run.world.groups[address[1]],
+        already_pool_id=kept.capacity_pool_id if kept else None,
+    )
+
+
+def _check_draft(run: _Run, address: Address, built: FlowRevision, flow: ServiceFlow) -> None:
+    """Check a draft the document writes as the portal checks saving one.
+
+    Raises:
+        DomainError: What ``check_draft_save`` and ``check_flow_references`` refuse.
+    """
+    stored = run.stored(address)
+    stored_draft = None if stored is None else stored.draft
+    if flow.current is None:
+        check_draft_save(replace(flow, id=None), None, False)
+    else:
+        check_draft_save(flow, replace(flow, draft=stored_draft), False)
+    kept = stored_draft or (stored.current if stored else None) or flow.current
+    _check_references(run, address, built, kept)
+
+
+def _check_publication(run: _Run, address: Address, number: int, built: FlowRevision) -> None:
+    """Check a revision this document publishes as the portal checks publishing a draft.
+
+    Raises:
+        DomainError: ``invalid_configuration`` (``published_at``) for a time in the future or not
+            later than an earlier revision's, and what ``check_publishable`` and
+            ``check_flow_references`` refuse.
+    """
+    moment = built.published_at
+    flow = run.flows[address]
+    earlier = [
+        _published_at(revision)
+        for found, revision in _in_effect(flow).items()
+        if found < number and _published_at(revision) is not None
+    ]
+    if (
+        moment is None
+        or moment > run.resolution.context.now
+        or any(other is not None and moment <= other for other in earlier)
+    ):
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "published_at")
+    if number == int_of(flow.fields, "current_revision"):
+        check_publishable(
+            replace(
+                run.flow(address),
+                state=FlowState.DRAFT,
+                current=None,
+                draft=replace(built, published_at=None),
+            )
+        )
+    _check_references(
+        run, address, built, _based_on(run, address, number), restoring=address not in run.before
+    )
+
+
+def _check_state(run: _Run, address: Address, built: ServiceFlow) -> Iterator[Refusal]:
+    """Check the state a flow ends in: the lifecycle, an archive, and readiness when active."""
+    path = _flow_path(address)
+    old = run.before.get(address)
+    if address in run.archived:
+        if built.current is None:
+            yield Refusal(path, ErrorCode.CONFIGURATION_DRAFT_FLOW_IN_USE, "draft_revision")
+        return
+    if old is not None and old.fields.get("state") != built.state.value:
         try:
             check_state_change(
-                replace(built, state=FlowState(str(old.fields.get("state")))), built.state
+                replace(built, state=FlowState(text_of(old.fields, "state"))), built.state
             )
         except DomainError as error:
             yield _refusal(path, error)
     if built.state is FlowState.ACTIVE and built.current is not None:
-        pool = _pool_of(world, address, built.current)
-        items = readiness(built.current, pool, offered_subjects=world.subjects.get(address[1], ()))
+        pool = run.world.pool_by_id.get(built.current.capacity_pool_id or 0)
+        items = readiness(
+            built.current, pool, offered_subjects=run.world.subjects.get(address[1], ())
+        )
         if not can_activate(items):
             for item in items:
                 if not item.ok:
@@ -549,27 +694,21 @@ def _check_flow(
                     )
 
 
-def _pool_of(world: _World, address: Address, revision: FlowRevision) -> CapacityPool | None:
-    """Return the pool of this run a built revision draws on."""
-    candidates = (*world.pools.values(), *world.legacy.values())
-    return next((p for p in candidates if p.id == revision.capacity_pool_id), None)
+# --- defaults ----------------------------------------------------------------------------
 
 
-def _default_rules(resolution: Resolution) -> Iterator[Refusal]:
+def _default_rules(run: _Run) -> Iterator[Refusal]:
     """No two active flows of a group are the default of the same entry path."""
-    world = _world(resolution.resulting)
     groups = {
         c.address[:2]
-        for c in resolution.changes
+        for c in run.resolution.changes
         if c.kind in (SERVICE_FLOW_KIND, FLOW_REVISION_KIND)
     }
-    active: dict[Address, ServiceFlow] = {}
-    for address, entity in walk(resolution.resulting, SERVICE_FLOW_KIND):
-        if address[:2] in groups and entity.fields.get("state") == FlowState.ACTIVE.value:
-            try:
-                active[address] = _flow_object(world, address, entity)
-            except DomainError:
-                continue
+    active = {
+        address: flow
+        for address, flow in run.built_flows().items()
+        if address[:2] in groups and flow.state is FlowState.ACTIVE
+    }
     for address, flow in sorted(active.items()):
         others = [
             mode
@@ -583,25 +722,38 @@ def _default_rules(resolution: Resolution) -> Iterator[Refusal]:
             yield _refusal(_flow_path(address), error)
 
 
-def _immutable_rules(resolution: Resolution) -> Iterator[Refusal]:
+# --- history -----------------------------------------------------------------------------
+
+
+def _immutable_rules(run: _Run) -> Iterator[Refusal]:
     """A published revision is history: a document never changes or removes it."""
     published = {
         address: revision
-        for address, revision in walk(resolution.current, FLOW_REVISION_KIND)
-        if revision.fields.get("published_at") is not None
+        for address, revision in walk(run.resolution.current, FLOW_REVISION_KIND)
+        if _published_at(revision) is not None
     }
-    for change in (*resolution.changes, *resolution.deletions):
+    for change in (*run.resolution.changes, *run.resolution.deletions):
         if change.kind != FLOW_REVISION_KIND or change.address not in published:
             continue
         if change.action in (ChangeAction.UPDATE, ChangeAction.DELETE):
-            field = change.fields[0] if change.fields else "published_at"
-            yield Refusal(change.path, ErrorCode.CONFIGURATION_REVISION_PUBLISHED, field)
+            try:
+                check_revision_editable(
+                    _published_at(published[change.address]),
+                    change.fields[0] if change.fields else "published_at",
+                )
+            except DomainError as error:
+                yield _refusal(change.path, error)
 
 
-INTEGRITY: tuple[IntegrityRule, ...] = (
-    _pool_rules,
-    _flow_rules,
-    _default_rules,
-    _immutable_rules,
-)
+def _rules(resolution: Resolution) -> Iterator[Refusal]:
+    """Run every rule on one run of the resolution (the world is read once)."""
+    run = _Run(resolution)
+    yield from _skill_rules(run)
+    yield from _pool_rules(run)
+    yield from _flow_rules(run)
+    yield from _default_rules(run)
+    yield from _immutable_rules(run)
+
+
+INTEGRITY: tuple[IntegrityRule, ...] = (_rules,)
 """The rules across objects that concern skills, pools and flows."""

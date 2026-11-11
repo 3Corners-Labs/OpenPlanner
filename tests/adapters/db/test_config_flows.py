@@ -1,7 +1,8 @@
 """Skills, pools and flows in a configuration document on SQLite (ADR 0121 step 2b-ii, A29)."""
 
 import json
-from datetime import UTC, datetime
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from app.adapters.configuration_json import JsonCodec
 from app.adapters.configuration_seal import PassphraseSealing
 from app.adapters.crypto import SecretBox
-from app.adapters.db.config_flows import read_catalogue, write_flow_revision
+from app.adapters.db.config_flows import order_flow_changes, write_flow_revision
 from app.adapters.db.config_usage import read_usage
 from app.adapters.db.engine import create_engine
 from app.adapters.db.models import (
@@ -39,10 +40,19 @@ from app.domain.configuration_document_service import Actor, ConfigurationDocume
 from app.domain.errors import DomainError, ErrorCode
 from tests.fakes.clock import FixedClock
 from tests.support.config_changes import planned
-from tests.support.config_seed import seed
+from tests.support.config_seed import give_default_flows, seed
 from tests.support.database import migrated_database
+from tests.support.flow_documents import (
+    encode,
+    flow_json,
+    group_json,
+    organisation_document,
+    revision_json,
+)
 
 NOW = datetime(2026, 11, 8, 12, 0, tzinfo=UTC)
+CLOCK = NOW + timedelta(days=1)
+"""What the service takes for now: after every revision that the seed publishes."""
 HOST = Actor.host()
 PASSPHRASE = "a long enough passphrase"
 LABELS = json.dumps({"nl": "Balie", "en": "Desk"})
@@ -50,7 +60,7 @@ STAFF_NAME, STAFF_MAIL = "Jan Jansen", "jan@voorbeeld.nl"
 
 
 def service(engine: AsyncEngine, key: bytes = b"a") -> ConfigurationDocumentService:
-    clock = FixedClock(NOW)
+    clock = FixedClock(CLOCK)
     uow = SqlUnitOfWork(engine, SecretBox(key * 32))
     return ConfigurationDocumentService(
         uow,
@@ -69,17 +79,16 @@ def service(engine: AsyncEngine, key: bytes = b"a") -> ConfigurationDocumentServ
 
 
 async def export(engine: AsyncEngine) -> dict[str, Any]:
-    return json.loads(await service(engine).export(HOST, Scope(), None, secrets=False))  # type: ignore[no-any-return]
+    exported: dict[str, Any] = json.loads(
+        await service(engine).export(HOST, Scope(), None, secrets=False)
+    )
+    return exported
 
 
 async def transfer(source: AsyncEngine, target: AsyncEngine) -> Any:
     """Export the source with its secrets sealed and apply it to the target (another key)."""
     sealed = await service(source).export(HOST, Scope(), PASSPHRASE, secrets=True)
     return await service(target, b"b").apply(HOST, sealed, PASSPHRASE, None)
-
-
-def encode(data: dict[str, Any]) -> bytes:
-    return json.dumps(data).encode()
 
 
 async def seed_flows(engine: AsyncEngine) -> None:
@@ -116,7 +125,9 @@ async def seed_flows(engine: AsyncEngine) -> None:
         passport = SkillRow(organisation_id=acme.id, code="passport", labels=LABELS)
         old = SkillRow(organisation_id=acme.id, code="old", labels=LABELS, archived_at=NOW)
         id_card = SkillRow(organisation_id=beta.id, code="id-card", labels=LABELS)
-        shared = CapacityPoolRow(organisation_id=acme.id, name="Kantoor", mode="counted")
+        shared = CapacityPoolRow(
+            organisation_id=acme.id, name="Kantoor", mode="counted", code="kantoor"
+        )
         session.add_all([vestiging, staff, passport, old, id_card, shared])
         await session.flush()
         pools = {
@@ -183,7 +194,7 @@ async def seed_flows(engine: AsyncEngine) -> None:
                     dispatch="own_queue",
                     handling_action="call",
                     completion="operator",
-                    published_at=NOW if published else None,
+                    published_at=NOW + timedelta(minutes=number) if published else None,
                     published_by=staff.id if published else None,
                 )
             )
@@ -214,20 +225,21 @@ async def seed_flows(engine: AsyncEngine) -> None:
                 SubjectFlowRow(flow_id=telefoon.id, revision=1, subject_code="billing"),
             ]
         )
+    await give_default_flows(engine, NOW)  # what step 2e gives a service, as for any
 
 
 @pytest.fixture
-async def source(database_url: str) -> AsyncEngine:
+async def source(database_url: str) -> AsyncIterator[AsyncEngine]:
     engine = create_engine(database_url, busy_timeout_ms=200)
     await seed_flows(engine)
-    yield engine  # type: ignore[misc]
+    yield engine
     await engine.dispose()
 
 
 @pytest.fixture
-async def target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AsyncEngine:
+async def target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[AsyncEngine]:
     engine = create_engine(migrated_database(tmp_path, monkeypatch, "target"), busy_timeout_ms=200)
-    yield engine  # type: ignore[misc]
+    yield engine
     await engine.dispose()
 
 
@@ -263,7 +275,7 @@ async def test_the_document_holds_the_history_of_a_flow(source: AsyncEngine) -> 
     assert (advies["current_revision"], advies["draft_revision"]) == (2, 3)
     assert advies["revisions"][2]["published_at"] is None
     assert advies["revisions"][1]["subjects"] == {"billing": ["passport"]}
-    assert advies["revisions"][1]["capacity_pool"] == "Kantoor"
+    assert advies["revisions"][1]["capacity_pool"] == "kantoor"
     legacy = next(f for f in helpdesk["flows"] if f["code"] == "appointment")["revisions"][0]
     assert (legacy["legacy"], legacy["legacy_pool_of"], legacy["capacity_pool"]) == (
         True,
@@ -306,7 +318,7 @@ async def test_the_database_ids_differ_but_every_reference_still_resolves(
         assert revision is not None
         pool = await session.get(CapacityPoolRow, revision.capacity_pool_id)
         assert pool is not None
-        assert (pool.name, pool.mode) == ("Kantoor", "counted")
+        assert (pool.name, pool.code, pool.mode) == ("Kantoor", "kantoor", "counted")
         skills = list(
             await session.scalars(
                 select(SkillRow.code)
@@ -355,7 +367,7 @@ async def test_a_document_without_the_sections_leaves_what_the_installation_has(
     assert result.plan.refusals == ()
     assert result.plan.changes == ()
     assert await count(source, SkillRow) == 3
-    assert await count(source, ServiceFlowRow) == 3
+    assert await count(source, ServiceFlowRow) == 5
     assert await count(source, CapacityPoolRow) == 4
 
 
@@ -395,7 +407,7 @@ async def test_what_a_replace_document_leaves_out_is_archived_when_it_is_in_use(
     exported["mode"] = "replace"
     acme = exported["organisations"][0]
     acme["skills"] = []
-    acme["capacity_pools"] = [p for p in acme["capacity_pools"] if p["name"] != "Kantoor"]
+    acme["capacity_pools"] = [p for p in acme["capacity_pools"] if p["code"] != "kantoor"]
     for group in acme["groups"]:
         group["flows"] = [f for f in group.get("flows", []) if f["code"] == "advies"]
 
@@ -404,10 +416,10 @@ async def test_what_a_replace_document_leaves_out_is_archived_when_it_is_in_use(
     lines = plan.lines()
     assert plan.refusals == ()
     assert "archive service_flow acme/helpdesk/appointment: state" in lines  # booked
-    assert "delete service_flow acme/loket/telefoon" in lines  # nothing refers to it
+    assert "archive service_flow acme/loket/telefoon: state" in lines  # it has a published revision
     assert "archive skill acme/passport: archived" in lines  # a person holds it
     assert "delete skill acme/old" in lines  # archived and unused
-    assert "archive capacity_pool acme/Kantoor: archived" in lines
+    assert "archive capacity_pool acme/kantoor: archived" in lines
 
     result = await service(source).apply(HOST, encode(exported), None, plan.digest)
 
@@ -419,16 +431,17 @@ async def test_what_a_replace_document_leaves_out_is_archived_when_it_is_in_use(
         assert appointment is not None
         assert appointment.state == "archived"
         assert await session.get(FlowRevisionRow, (appointment.id, 1)) is not None
-        assert (
-            await session.scalar(select(ServiceFlowRow).where(ServiceFlowRow.code == "telefoon"))
-            is None
+        telefoon = await session.scalar(
+            select(ServiceFlowRow).where(ServiceFlowRow.code == "telefoon")
         )
+        assert telefoon is not None
+        assert telefoon.state == "archived"  # a flow with a published revision is never deleted
         passport = await session.scalar(select(SkillRow).where(SkillRow.code == "passport"))
         assert passport is not None
         assert passport.archived_at is not None
         assert await session.scalar(select(SkillRow).where(SkillRow.code == "old")) is None
         kantoor = await session.scalar(
-            select(CapacityPoolRow).where(CapacityPoolRow.name == "Kantoor")
+            select(CapacityPoolRow).where(CapacityPoolRow.code == "kantoor")
         )
         assert kantoor is not None
         assert kantoor.archived_at is not None
@@ -473,63 +486,125 @@ async def test_the_writer_refuses_a_published_revision_a_second_time(source: Asy
     assert refused.value.code is ErrorCode.CONFIGURATION_REVISION_PUBLISHED
 
 
-async def test_a_draft_is_replaced_and_a_new_revision_added_without_renumbering(
-    source: AsyncEngine,
-) -> None:
+async def test_a_draft_is_published_and_the_next_one_added_in_order(source: AsyncEngine) -> None:
     exported = await export(source)
     helpdesk = exported["organisations"][0]["groups"][0]
     advies = next(f for f in helpdesk["flows"] if f["code"] == "advies")
-    fresh = {**advies["revisions"][2], "revision": 4, "labels": {"nl": "Vier", "en": "Four"}}
-    advies["revisions"] = advies["revisions"][:2] + [fresh]
-    advies["draft_revision"] = 4
+    published = advies["revisions"][2]
+    published["published_at"] = "2026-11-08T13:00:00+00:00"
+    fresh = {
+        **published,
+        "revision": 4,
+        "published_at": None,
+        "labels": {"nl": "Vier", "en": "Four"},
+    }
+    advies["revisions"].append(fresh)
+    advies["current_revision"], advies["draft_revision"] = 3, 4
+
+    plan = await service(source).plan(HOST, encode(exported), None)
+    result = await service(source).apply(HOST, encode(exported), None, plan.digest)
+
+    assert plan.refusals == ()
+    assert result.applied
+    async with AsyncSession(source) as session:
+        flow = await session.scalar(select(ServiceFlowRow).where(ServiceFlowRow.code == "advies"))
+        assert flow is not None
+        rows = {
+            row.revision: row
+            for row in await session.scalars(
+                select(FlowRevisionRow).where(FlowRevisionRow.flow_id == flow.id)
+            )
+        }
+        assert sorted(rows) == [1, 2, 3, 4]  # 1 and 2 are untouched
+        assert rows[3].published_at is not None
+        assert rows[3].published_by is None
+        assert rows[4].published_at is None
+        assert (flow.current_revision, flow.draft_revision) == (3, 4)
+
+
+async def test_a_draft_is_replaced_in_place(source: AsyncEngine) -> None:
+    exported = await export(source)
+    helpdesk = exported["organisations"][0]["groups"][0]
+    advies = next(f for f in helpdesk["flows"] if f["code"] == "advies")
+    advies["revisions"][2]["labels"] = {"nl": "Drie", "en": "Three"}
 
     result = await service(source).apply(HOST, encode(exported), None, None)
 
     assert result.applied
     async with AsyncSession(source) as session:
-        flow = await session.scalar(select(ServiceFlowRow).where(ServiceFlowRow.code == "advies"))
-        assert flow is not None
-        numbers = sorted(
-            await session.scalars(
-                select(FlowRevisionRow.revision).where(FlowRevisionRow.flow_id == flow.id)
-            )
+        draft = await session.scalar(
+            select(FlowRevisionRow)
+            .join(ServiceFlowRow)
+            .where(ServiceFlowRow.code == "advies", FlowRevisionRow.revision == 3)
         )
-        assert numbers == [1, 2, 4]  # the replaced draft 3 is gone, 1 and 2 are untouched
-        assert (flow.current_revision, flow.draft_revision) == (2, 4)
+        assert draft is not None
+        assert json.loads(draft.labels) == {"nl": "Drie", "en": "Three"}
 
 
 # --- references and counts --------------------------------------------------------------
 
 
-async def test_a_flow_cannot_use_another_organisations_pool_through_a_document(
+async def test_a_flow_cannot_use_the_legacy_pool_of_another_service_through_a_document(
     source: AsyncEngine,
 ) -> None:
     exported = await export(source)
     helpdesk = exported["organisations"][0]["groups"][0]
     advies = next(f for f in helpdesk["flows"] if f["code"] == "advies")
     advies["revisions"][2]["capacity_pool"] = None
-    advies["revisions"][2]["legacy_pool_of"] = "vestiging"
+    advies["revisions"][2]["legacy_pool_of"] = "loket"
 
     plan = await service(source).plan(HOST, encode(exported), None)
 
     assert [(r.code, r.field) for r in plan.refusals] == [
-        (ErrorCode.CONFIGURATION_OUT_OF_SCOPE, "capacity_pool_id")
+        (ErrorCode.INVALID_CONFIGURATION, "legacy_pool_of")
     ]
 
 
-async def test_two_pools_with_one_name_stop_an_export_instead_of_losing_one(
+async def test_the_writer_resolves_a_legacy_pool_only_for_the_flows_own_service(
     source: AsyncEngine,
 ) -> None:
+    change = planned(
+        "flow_revision",
+        ("acme", "helpdesk", "advies", "3"),
+        ChangeAction.UPDATE,
+        {**revision_json(), "legacy_pool_of": "loket"},
+        key=("3",),
+        organisation="acme",
+        group="helpdesk",
+    )
+
+    async with AsyncSession(source) as session, session.begin():
+        with pytest.raises(DomainError) as refused:
+            await write_flow_revision(session, None, change)
+
+    assert (refused.value.code, refused.value.field) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "legacy_pool_of",
+    )
+
+
+async def test_a_counted_pool_without_a_code_cannot_be_exported_but_does_not_stop_a_plan(
+    source: AsyncEngine,
+) -> None:
+    exported = await export(source)
     async with AsyncSession(source) as session, session.begin():
         acme = await session.scalar(select(OrganisationRow).where(OrganisationRow.slug == "acme"))
         assert acme is not None
-        session.add(CapacityPoolRow(organisation_id=acme.id, name="Kantoor", mode="counted"))
+        pool = CapacityPoolRow(organisation_id=acme.id, name="Oud", mode="counted")
+        session.add(pool)
+        await session.flush()
+        named = f"acme/{pool.id}"
 
-    async with AsyncSession(source) as session:
-        with pytest.raises(DomainError) as refused:
-            await read_catalogue(session)
+    with pytest.raises(DomainError) as refused:
+        await service(source).export(HOST, Scope(), None, secrets=False)
+    plan = await service(source).plan(HOST, encode(exported), None)
 
-    assert refused.value.code is ErrorCode.CONFIGURATION_OBJECT_EXISTS
+    assert (refused.value.code, refused.value.field) == (
+        ErrorCode.CONFIGURATION_POOL_WITHOUT_CODE,
+        named,
+    )
+    assert plan.refusals == ()
+    assert plan.changes == ()  # the pool has no address, so a document leaves it alone
 
 
 async def test_the_usage_facts_name_what_a_deletion_would_break(source: AsyncEngine) -> None:
@@ -537,9 +612,10 @@ async def test_the_usage_facts_name_what_a_deletion_would_break(source: AsyncEng
     async with AsyncSession(source) as session:
         usage = await read_usage(session, NOW, frozenset())
 
-    assert usage.in_use["skill"] == frozenset({("acme", "passport")})
-    assert usage.in_use["capacity_pool"] == frozenset({("acme", "Kantoor")})
-    assert usage.in_use["service_flow"] == frozenset({("acme", "helpdesk", "appointment")})
+    assert usage.kept["skill"] == frozenset({("acme", "passport")})
+    assert usage.kept["capacity_pool"] == frozenset({("acme", "kantoor")})
+    assert ("acme", "helpdesk", "appointment") in usage.kept["service_flow"]  # booked
+    assert ("acme", "helpdesk", "advies") in usage.kept["service_flow"]  # published
 
 
 async def test_subject_rows_without_skills_round_trip(
@@ -557,16 +633,190 @@ async def test_subject_rows_without_skills_round_trip(
 # --- step 2e -----------------------------------------------------------------------------
 
 
-@pytest.mark.skip(reason="needs step 2e: Transaction.ensure_default_flows is not on main yet")
+async def apply_document(engine: AsyncEngine, data: dict[str, Any]) -> Any:
+    """Apply a document to the engine; it must be accepted."""
+    plan = await service(engine).plan(HOST, encode(data), None)
+    assert plan.refusals == (), plan.refusals
+    result = await service(engine).apply(HOST, encode(data), None, plan.digest)
+    assert result.applied
+    return result
+
+
+async def flows_of_group(engine: AsyncEngine, slug: str) -> dict[str, tuple[str, bool]]:
+    """Return the flows of a group by code, as ``(state, legacy revision 1)``."""
+    async with AsyncSession(engine) as session:
+        rows = (
+            await session.execute(
+                select(ServiceFlowRow, FlowRevisionRow)
+                .join(GroupRow, GroupRow.id == ServiceFlowRow.group_id)
+                .join(FlowRevisionRow, FlowRevisionRow.flow_id == ServiceFlowRow.id)
+                .where(GroupRow.slug == slug, FlowRevisionRow.revision == 1)
+            )
+        ).all()
+    return {flow.code: (flow.state, revision.legacy) for flow, revision in rows}
+
+
+async def legacy_pools(engine: AsyncEngine, slug: str) -> int:
+    """Return how many pools wrap the group."""
+    async with AsyncSession(engine) as session:
+        return len(
+            list(
+                await session.scalars(
+                    select(CapacityPoolRow.id)
+                    .join(GroupRow, GroupRow.id == CapacityPoolRow.group_id)
+                    .where(GroupRow.slug == slug)
+                )
+            )
+        )
+
+
 async def test_a_group_created_by_a_document_without_flows_gets_the_default_set(
     target: AsyncEngine,
 ) -> None:
-    """A document of an older version creates a group; 2e's rule adds its legacy pool and flows.
+    await apply_document(target, organisation_document("acme", group_json("nieuw")))
 
-    The seam is the comment at the end of ``apply_configuration`` in
-    ``app/adapters/db/configuration_document.py``; once 2e lands, this test applies
-    ``{"organisations": [{"slug": "x", "name": "X", "groups": [{"slug": "y", ...}]}]}`` and expects
-    a legacy pool and the ``appointment`` flow, and, for a document with its own flows, exactly
-    those plus anything still missing.
-    """
-    raise AssertionError  # pragma: no cover
+    assert await legacy_pools(target, "nieuw") == 1
+    assert await flows_of_group(target, "nieuw") == {"appointment": ("active", True)}
+
+
+async def test_a_group_created_with_its_own_flows_gets_those_plus_what_is_still_missing(
+    target: AsyncEngine,
+) -> None:
+    own = flow_json(
+        "advies",
+        revision_json(1, published_at="2026-11-01T10:00:00+00:00", capacity_pool="loket"),
+        current_revision=1,
+        draft_revision=None,
+    )
+    await apply_document(
+        target,
+        organisation_document(
+            "acme",
+            group_json("nieuw", flows=[own]),
+            capacity_pools=[{"code": "loket", "name": "Loket", "guaranteed_skills": []}],
+        ),
+    )
+
+    assert await legacy_pools(target, "nieuw") == 1  # the document had none: the rule adds it
+    assert await flows_of_group(target, "nieuw") == {
+        "advies": ("draft", False),  # the document's own flow, as it states it
+        "appointment": ("active", True),  # what the group still lacked
+    }
+
+
+# --- the default entry path of a group, in either order -------------------------------------
+
+
+def flow_change(code: str, action: ChangeAction, **values: Any) -> Any:
+    """Return a change of a flow of group ``helpdesk``."""
+    return planned(
+        "service_flow",
+        ("acme", "helpdesk", code),
+        action,
+        values,
+        organisation="acme",
+        group="helpdesk",
+    )
+
+
+def revision_change(code: str, number: int) -> Any:
+    """Return the creation of a published revision of a flow of group ``helpdesk``."""
+    return planned(
+        "flow_revision",
+        ("acme", "helpdesk", code, str(number)),
+        ChangeAction.CREATE,
+        {**revision_json(), "published_at": "2026-11-01T10:00:00+00:00"},
+        key=(str(number),),
+        organisation="acme",
+        group="helpdesk",
+    )
+
+
+GAINS = flow_change(
+    "second",
+    ChangeAction.CREATE,
+    state="active",
+    default_for=["appointment"],
+    current_revision=1,
+    draft_revision=None,
+)
+LOSES = flow_change("appointment", ChangeAction.UPDATE, default_for=[])
+ARCHIVES = flow_change("appointment", ChangeAction.ARCHIVE, state="archived")
+
+
+def codes_of(changes: list[Any]) -> list[tuple[str, str]]:
+    return [(c.kind, c.key[0]) for c in changes]
+
+
+def test_the_flows_that_give_up_a_default_are_written_before_the_one_that_takes_it() -> None:
+    plan_order = [GAINS, revision_change("second", 1), LOSES, ARCHIVES]
+
+    ordered = order_flow_changes(plan_order)
+
+    assert codes_of(ordered) == [
+        ("service_flow", "appointment"),
+        ("service_flow", "appointment"),
+        ("service_flow", "second"),
+        ("flow_revision", "1"),
+    ]
+
+
+def test_changes_of_other_groups_and_other_kinds_keep_their_place() -> None:
+    elsewhere = planned(
+        "service_flow", ("acme", "loket", "x"), ChangeAction.CREATE, {"state": "active"}
+    )
+    skill_change = planned("skill", ("acme", "s"), ChangeAction.CREATE, {"archived": False})
+    plan_order = [skill_change, GAINS, LOSES, elsewhere, skill_change]
+
+    ordered = order_flow_changes(plan_order)
+
+    assert ordered == [skill_change, LOSES, GAINS, elsewhere, skill_change]
+
+
+async def default_holder(engine: AsyncEngine) -> list[tuple[str, str]]:
+    """Return the active flows of ``helpdesk`` that are the default of the appointment path."""
+    async with AsyncSession(engine) as session:
+        rows = await session.execute(
+            select(ServiceFlowRow.code, ServiceFlowRow.state)
+            .join(GroupRow, GroupRow.id == ServiceFlowRow.group_id)
+            .where(GroupRow.slug == "helpdesk", ServiceFlowRow.default_appointment.is_(True))
+            .order_by(ServiceFlowRow.code)
+        )
+        return [(code, state) for code, state in rows.all()]
+
+
+@pytest.mark.parametrize("first", ["gains", "loses"])
+async def test_a_default_can_move_to_a_new_flow_whatever_order_the_document_lists_them_in(
+    source: AsyncEngine, first: str
+) -> None:
+    plan_order = [GAINS, revision_change("second", 1), LOSES]
+    if first == "loses":
+        plan_order = [LOSES, GAINS, revision_change("second", 1)]
+
+    async with SqlUnitOfWork(source, None).locked() as tx:
+        await tx.apply_configuration(plan_order)
+
+    assert await default_holder(source) == [("second", "active")]
+
+
+async def test_a_default_that_is_taken_twice_is_a_document_error_and_not_a_server_error(
+    source: AsyncEngine,
+) -> None:
+    taken = flow_change(
+        "other",
+        ChangeAction.CREATE,
+        state="active",
+        default_for=["appointment"],
+        current_revision=1,
+        draft_revision=None,
+    )
+
+    with pytest.raises(DomainError) as refused:
+        async with SqlUnitOfWork(source, None).locked() as tx:
+            await tx.apply_configuration([taken])
+
+    assert (refused.value.code, refused.value.field) == (
+        ErrorCode.CONFIGURATION_OBJECT_EXISTS,
+        "default_for",
+    )
+    assert await default_holder(source) == [("appointment", "active")]  # nothing was written
