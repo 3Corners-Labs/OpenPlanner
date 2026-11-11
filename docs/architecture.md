@@ -300,7 +300,8 @@ same commit and rollback behaviour as the SQL one.
 | Concern | Module |
 |---|---|
 | Staffing blocks (formerly opening hours, ADR 0027), groups | `app/domain/scheduling.py` |
-| Slot calculation (time zones, daylight saving) | `app/domain/availability.py` |
+| Slot calculation (time zones, daylight saving), the start-time grid of a run of blocks (`grid_on`) | `app/domain/availability.py` |
+| Counted capacity pools: staffing as UTC segments, interval accounting (admission, start, earliest start, shortfalls; ADR 0122) | `app/domain/pool_staffing.py`, `app/domain/pool_accounting.py` |
 | Bookings, contact validation | `app/domain/booking.py` |
 | Book, cancel, reschedule (use cases) | `app/domain/services.py` |
 | Emergency closure, bookings on hold (ADR 0024) | `app/domain/closure.py`, `app/domain/closure_service.py`, `app/admin/closure_routes.py`, `app/admin/closure_image_routes.py`, `app/web/closure_labels.py` |

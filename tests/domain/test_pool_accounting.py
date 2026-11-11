@@ -398,6 +398,7 @@ def test_earliest_start_is_now_when_it_fits() -> None:
 
 def test_earliest_start_waits_for_the_staffing_to_begin() -> None:
     assert earliest_start(morning(2), [], at("08:40"), 20, 0, at("12:00")) == at("09:00")
+    assert earliest_start(morning(2), [], at("08:40"), 20, 0, at("09:00")) == at("09:00")
     assert earliest_start(morning(2), [], at("08:40"), 20, 0, at("08:59")) is None
 
 

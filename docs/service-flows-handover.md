@@ -122,7 +122,7 @@ Service *Persoonlijk advies / Personal advice*; subjects *Contract* and *Aanvraa
 
 ## Steps
 
-See the *Build status* table of ADR 0121. Do not activate a normal flow while skill enforcement, capacity accounting, a completion path, bounded retention or a rollback proof is missing.
+See the *Build status* table of ADR 0121. Step 3 continues in ADR 0122 (capacity of a shared pool: staffing and interval accounting; build brief `docs/service-flows-capacity-design.md`). Do not activate a normal flow while skill enforcement, capacity accounting, a completion path, bounded retention or a rollback proof is missing.
 
 ## Architecture for step 2 (phase 1 of the design, 2026-11-10)
 
