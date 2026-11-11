@@ -249,7 +249,7 @@ class CapacityService:
             if await _counted(tx, scope, organisation.id) >= value_of(self._max):
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, LIMIT_FIELD)
             stored = await tx.save_capacity_pool(scope, pool)
-            await self._record(tx, principal, slug, f"{CREATED},pool:{stored.code}")
+            await self._record(tx, principal, slug, f"{CREATED},pool:{_ref(stored)}")
         return stored
 
     async def update(
@@ -279,7 +279,7 @@ class CapacityService:
             if changed == current:
                 return False
             await tx.save_capacity_pool(scope, changed)
-            await self._record(tx, principal, slug, f"{CHANGED},pool:{current.code}")
+            await self._record(tx, principal, slug, f"{CHANGED},pool:{_ref(current)}")
         return True
 
     async def archive(self, principal: Principal, slug: str, pool_id: int) -> None:
@@ -299,7 +299,7 @@ class CapacityService:
                 return
             now = self._clock.now()
             await tx.archive_capacity_pool(scope, pool_id, now)
-            await self._record(tx, principal, slug, f"{ARCHIVED},pool:{pool.code}", now)
+            await self._record(tx, principal, slug, f"{ARCHIVED},pool:{_ref(pool)}", now)
 
     async def _record(
         self,
@@ -311,6 +311,15 @@ class CapacityService:
     ) -> None:
         """Audit a change of the pools in the transaction that made it (codes only)."""
         await record_change(tx, at or self._clock.now(), principal, _PERMISSION, slug, None, detail)
+
+
+def _ref(pool: CapacityPool) -> str:
+    """Return how an audit event names a pool: its code, never a name.
+
+    The id is used only for a counted pool stored without a code (a row from before migration
+    0110); a code is stable and carries no personal data, an id is the only other handle.
+    """
+    return pool.code if pool.code is not None else str(pool.id)
 
 
 async def _own_editable_pool(

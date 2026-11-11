@@ -278,7 +278,10 @@ class ServiceFlowStore:
             ),
         )
         kept = replace(
-            pool, id=pool.id or self._new_id(), archived_at=stored.archived_at if stored else None
+            pool,
+            id=pool.id or self._new_id(),
+            archived_at=stored.archived_at if stored else None,
+            code=stored.code if stored else pool.code,
         )
         self.state.pools[kept.id] = kept
         return kept

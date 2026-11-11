@@ -11,7 +11,6 @@ from app.domain.capacity import (
     PoolMode,
     check_pool_archive,
     check_pool_save,
-    derive_pool_code,
     guarantees,
     unguaranteed,
 )
@@ -173,8 +172,8 @@ def test_a_pool_flow_list_defaults_to_no_flows_and_none_hidden() -> None:
 # --- the stable code of a counted pool (ADR 0121 step 2f) -------------------------------------
 
 
-@pytest.mark.parametrize("code", [None, "", "Loket", "-loket", "lo ket", "x" * 41, "lo_ket"])
-def test_a_counted_pool_needs_a_code_in_the_grammar_of_a_skill_code(code: str | None) -> None:
+@pytest.mark.parametrize("code", ["", "Loket", "-loket", "lo ket", "x" * 41, "lo_ket"])
+def test_a_counted_pool_needs_a_code_in_the_grammar_of_a_skill_code(code: str) -> None:
     with pytest.raises(DomainError) as caught:
         pool(code=code)
     assert (caught.value.code, caught.value.field) == (ErrorCode.INVALID_CONFIGURATION, "pool_code")
@@ -227,18 +226,26 @@ def test_the_code_is_fixed_after_creation() -> None:
     ) == (ErrorCode.INVALID_CONFIGURATION, "pool_code")
 
 
-@pytest.mark.parametrize(
-    ("name", "code"),
-    [
-        ("Loket", "loket"),
-        ("  Eerste Loket  ", "eerste-loket"),
-        ("Caf\u00e9 - Zuid", "caf-zuid"),
-        ("a" * 80, "a" * 40),
-        ("a" * 39 + " b", "a" * 39),  # cut at 40, then trimmed
-        ("\u00e9\u00e9", "pool"),
-        ("---", "pool"),
-        ("A__B", "a-b"),
-    ],
-)
-def test_a_code_is_derived_from_a_name(name: str, code: str) -> None:
-    assert derive_pool_code(name) == code
+def test_a_new_counted_pool_needs_a_code_but_a_stored_one_may_lack_it() -> None:
+    with pytest.raises(DomainError) as caught:
+        replace(pool(code=None), id=None)
+    assert (caught.value.code, caught.value.field) == (ErrorCode.INVALID_CONFIGURATION, "pool_code")
+    assert pool(code=None).code is None  # a row from before the column existed
+
+
+def test_a_stored_pool_without_a_code_saves_without_one_and_blocks_nothing() -> None:
+    stored = pool(code=None)
+    check_pool_save(stored, stored, None, {}, frozenset())
+    check_pool_save(replace(stored, name="Ander"), stored, None, {}, frozenset())
+    # Nothing is compared or looked up for a pool that has no code.
+    check_pool_save(
+        replace(stored, code="nieuw"), stored, None, {}, frozenset(), same_code_exists=True
+    )
+    # A pool with a code is still fixed and still unique.
+    coded = pool(code="loket")
+    assert refusal(
+        lambda: check_pool_save(replace(coded, code=None), coded, None, {}, frozenset())
+    ) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "pool_code",
+    )

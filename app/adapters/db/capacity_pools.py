@@ -35,7 +35,6 @@ from app.domain.capacity import (
     PoolMode,
     check_pool_archive,
     check_pool_save,
-    derive_pool_code,
     same_name,
 )
 from app.domain.errors import missing_object
@@ -65,25 +64,10 @@ async def pools_from_rows(
             frozenset(guaranteed[row.id]),
             row.archived_at,
             row.group_id,
-            _code_of(row),
+            row.code,
         )
         for row in rows
     ]
-
-
-def _code_of(row: CapacityPoolRow) -> str | None:
-    """Return the pool's code, derived from the name for a counted pool that has none.
-
-    Such a pool was written by the image from before migration 0110 and gets the code the
-    migration would have derived from its name.
-
-    Nothing is written: the code is shown and compared, and stays NULL in the row. It is not made
-    unique here, and a pool that was never given a code cannot clash with one that has it in the
-    index (NULLs do not).
-    """
-    if row.code is None and row.mode == PoolMode.COUNTED.value:
-        return derive_pool_code(row.name)
-    return row.code
 
 
 def pool_visible(scope: Scope) -> ColumnElement[bool]:
@@ -146,7 +130,8 @@ class CapacityPoolQueries:
     async def save_capacity_pool(self, scope: Scope, pool: CapacityPool) -> CapacityPool:
         """Insert the pool (no id) or update its name and guaranteed skills; return it stored.
 
-        A pool's mode, group and code never change.
+        A pool's mode, group and code never change; a counted pool stored without a code (a row
+        from before migration 0110) keeps none.
 
         Raises:
             DomainError: ``configuration_object_missing`` for an organisation or pool that does

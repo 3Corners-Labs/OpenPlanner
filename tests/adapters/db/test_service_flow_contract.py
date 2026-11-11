@@ -57,6 +57,8 @@ class World:
     """Who granted a skill; only the SQL variant can read it (the port does not return it)."""
     archive_pool_directly: Callable[[int], Awaitable[None]]
     """Archive a pool behind the port's back, for a state the port refuses to produce."""
+    forget_pool_code: Callable[[int], Awaitable[None]]
+    """Clear a pool's code behind the port's back: a row written before migration 0110."""
 
 
 async def _seed(uow: Any) -> tuple[int, ...]:
@@ -110,8 +112,11 @@ async def world(request: pytest.FixtureRequest, database_url: str) -> AsyncItera
         async def archive_in_fake(pool_id: int) -> None:
             uow.state.pools[pool_id] = replace(uow.state.pools[pool_id], archived_at=NOW)
 
+        async def forget_in_fake(pool_id: int) -> None:
+            uow.state.pools[pool_id] = replace(uow.state.pools[pool_id], code=None)
+
         ids = await _seed(uow)
-        yield World(uow, *ids, None, archive_in_fake)
+        yield World(uow, *ids, None, archive_in_fake, forget_in_fake)
         return
     engine: AsyncEngine = create_engine(database_url, busy_timeout_ms=200)
     uow = SqlUnitOfWork(engine)
@@ -130,8 +135,14 @@ async def world(request: pytest.FixtureRequest, database_url: str) -> AsyncItera
                 update(CapacityPoolRow).where(CapacityPoolRow.id == pool_id).values(archived_at=NOW)
             )
 
+    async def forget_in_sql(pool_id: int) -> None:
+        async with AsyncSession(engine) as session, session.begin():
+            await session.execute(
+                update(CapacityPoolRow).where(CapacityPoolRow.id == pool_id).values(code=None)
+            )
+
     ids = await _seed(uow)
-    yield World(uow, *ids, granted_by_sql, archive_in_sql)
+    yield World(uow, *ids, granted_by_sql, archive_in_sql, forget_in_sql)
     await engine.dispose()
 
 

@@ -4,16 +4,20 @@ import re
 from dataclasses import replace
 
 import httpx
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.db.models import CapacityPoolRow
 from app.admin.capacity_views import flow_name, hidden_flows
 from app.domain.authorization import Scope
-from app.domain.capacity import CapacityPool, PoolMode, derive_pool_code
+from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.capacity_service import FlowRef
 from app.domain.service_flows import FlowState
 from app.i18n import Translator, load_catalogues
 from app.web.locale import RequestLocale
 from tests.admin.conftest import AUDITOR, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
-from tests.support.admin_site import audit_log, site_uow
+from tests.support.admin_site import audit_log, site_app, site_uow
+from tests.support.pool_code import derive_pool_code
 from tests.support.service_flows import flow as make_flow
 from tests.support.service_flows import revision
 from tests.support.skill_seed import add_pool, add_skill, archive_pool, archive_skill, limit
@@ -420,3 +424,32 @@ async def test_a_blank_invalid_or_taken_code_and_a_taken_name_are_refused(site: 
     assert 'href="#pool_name"' in same_name.text
     assert "Een andere pool van uw organisatie heeft al deze naam." in same_name.text
     assert "This code is already used by a pool of your organisation." in english.text
+
+
+async def test_a_pool_stored_without_a_code_shows_a_dash_and_is_edited_with_none(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+    pool = await add_pool(site, "Loket")
+    engine = site_app(site).state.engine
+    async with AsyncSession(engine) as session, session.begin():
+        await session.execute(update(CapacityPoolRow).values(code=None))
+
+    row = (await site.client.get(LIST)).text.split('<th scope="row">Loket')[1].split("</tr>")[0]
+    assert "<code>" not in row
+    assert (
+        'aria-hidden="true">&ndash;</span>'
+        '<span class="visually-hidden">Deze pool heeft geen code.</span>' in row
+    )
+    edit = (await site.client.get(f"{PAGE}/{pool}")).text
+    assert 'placeholder="\u2013"' in edit
+    assert "Deze pool heeft geen code." in edit
+    changed = await site.client.post(
+        f"{PAGE}/{pool}",
+        data={"pool_name": "Nieuw loket"},
+        headers=SAME_ORIGIN,
+    )
+    assert changed.status_code == 303
+    assert [e.detail for e in await audit_log(site) if e.action == "capacity.manage"][-1] == (
+        f"capacity_pool.changed,pool:{pool}"
+    )

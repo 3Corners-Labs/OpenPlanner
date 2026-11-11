@@ -84,16 +84,18 @@ def name_field(form: FormData, locale: RequestLocale, line: PoolLine | None) -> 
     )
 
 
-def code_field(form: FormData, locale: RequestLocale, line: PoolLine | None) -> Field:
+def pool_code_field(form: FormData, locale: RequestLocale, line: PoolLine | None) -> Field:
     """Return the code input: typed for a new pool, shown read-only for a stored one."""
     _ = locale.gettext
     if line is not None:
+        coded = line.pool.code is not None
         return Field(
             "pool_code",
             _("admin.capacity.code"),
             value=line.pool.code or "",
             readonly=True,
-            hint=_("admin.capacity.code_fixed"),
+            hint=_("admin.capacity.code_fixed" if coded else "admin.capacity.no_code"),
+            attributes={} if coded else {"placeholder": "\u2013"},
         )
     return Field(
         "pool_code",

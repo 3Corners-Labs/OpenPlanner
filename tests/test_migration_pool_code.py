@@ -2,7 +2,8 @@
 
 Counted pools get a code derived from their name, unique within the organisation and decided in
 id order; legacy pools keep NULL; downgrading drops the column and upgrading again gives the same
-codes. The migration's literal rule is compared with ``derive_pool_code`` of the domain.
+codes. The migration's literal rule is compared with the reference rule of
+``tests/support/pool_code.py`` (no application code derives a code).
 """
 
 import importlib.util
@@ -14,7 +15,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 
-from app.domain.capacity import derive_pool_code
+from tests.support.pool_code import derive_pool_code
 
 MIGRATION = Path(__file__).parent.parent / "migrations" / "versions" / "0110_capacity_pool_code.py"
 NAMES = [
@@ -30,6 +31,12 @@ NAMES = [
     (1, "---", "counted"),
     (1, "Balie", "legacy_group"),  # keeps NULL
     (2, "Loket", "counted"),  # another organisation starts again
+    (1, "a" * 39 + " b", "counted"),  # the 40-character cut ends in a hyphen: trimmed
+    (1, "a" * 39 + "-b", "counted"),  # the same code: the suffix replaces the hyphen
+    (1, "Advies", "counted"),
+    (1, "advies", "counted"),  # clashes with "Advies" only after lower-casing
+    (1, "?! ...", "counted"),  # only punctuation
+    (1, "\u00dcn\u00efcode \u00c9\u00e9n", "counted"),  # accents become hyphens
 ]
 EXPECTED = [
     "loket",
@@ -43,6 +50,12 @@ EXPECTED = [
     "pool-2",
     None,
     "loket",
+    "a" * 39,
+    "a" * 38 + "-2",
+    "advies",
+    "advies-2",
+    "pool-3",
+    "n-code-n",
 ]
 
 

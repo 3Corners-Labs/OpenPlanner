@@ -6,11 +6,11 @@ services are the application's own (``app.state``), so every rule and audit even
 the superuser.
 """
 
-from app.domain.capacity import derive_pool_code
 from app.domain.capacity_service import CapacityService
 from app.domain.skill_service import SkillService
 from tests.admin.conftest import SUPER, Site
 from tests.support.admin_site import site_app, site_uow
+from tests.support.pool_code import derive_pool_code
 
 
 async def add_skill(

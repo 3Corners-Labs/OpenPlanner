@@ -112,7 +112,7 @@
       {% for row in pool_rows %}
       <tr>
         <th scope="row">{{ row.name }}{% if row.legacy %}<br><span class="muted">{{ _("admin.capacity.legacy_note") }}</span>{% endif %}</th>
-        <td>{% if row.code %}<code>{{ row.code }}</code>{% endif %}</td>
+        <td>{% if row.code %}<code>{{ row.code }}</code>{% elif not row.legacy %}<span aria-hidden="true">&ndash;</span><span class="visually-hidden">{{ _("admin.capacity.no_code") }}</span>{% endif %}</td>
         <td><span class="chip">{{ row.tag }}</span></td>
         <td>{% if row.skills %}{{ row.skills | join(", ") }}{% else %}<span class="muted">{{ _("admin.capacity.no_skills") }}</span>{% endif %}</td>
         <td>

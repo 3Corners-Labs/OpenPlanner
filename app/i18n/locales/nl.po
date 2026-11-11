@@ -12507,6 +12507,9 @@ msgstr "Kleine letters, cijfers en streepjes, bijvoorbeeld loket of juridisch-te
 msgid "admin.capacity.code_fixed"
 msgstr "De code ligt vast."
 
+msgid "admin.capacity.no_code"
+msgstr "Deze pool heeft geen code."
+
 msgid "admin.capacity.guaranteed"
 msgstr "Vaardigheden die iedere getelde medewerker heeft"
 

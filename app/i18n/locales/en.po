@@ -12494,6 +12494,9 @@ msgstr "Lower-case letters, digits and hyphens, for example counter or legal-tea
 msgid "admin.capacity.code_fixed"
 msgstr "The code is fixed."
 
+msgid "admin.capacity.no_code"
+msgstr "This pool has no code."
+
 msgid "admin.capacity.guaranteed"
 msgstr "Skills every counted member of staff holds"
 

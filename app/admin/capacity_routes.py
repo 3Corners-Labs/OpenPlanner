@@ -25,7 +25,13 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission, capacity_service, skill_service
-from app.admin.capacity_views import CHOICE_FIELD, code_field, name_field, pool_choices, pool_row
+from app.admin.capacity_views import (
+    CHOICE_FIELD,
+    name_field,
+    pool_choices,
+    pool_code_field,
+    pool_row,
+)
 from app.admin.forms import FormData, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin, org_page, with_manual
 from app.admin.skill_inputs import chosen_ids, raise_unknown, refuse
@@ -75,7 +81,7 @@ async def _edit_page(
             "fields": with_manual(
                 request,
                 locale,
-                [code_field(form, locale, found.line), name_field(form, locale, found.line)],
+                [pool_code_field(form, locale, found.line), name_field(form, locale, found.line)],
             ),
             "choices": pool_choices(
                 found.choices, found.line.pool.guaranteed_skill_ids, form, locale

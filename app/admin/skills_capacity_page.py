@@ -15,10 +15,8 @@ from app.admin.capacity_views import (
     CHOICE_FIELD,
     name_field,
     pool_choices,
+    pool_code_field,
     pool_row,
-)
-from app.admin.capacity_views import (
-    code_field as pool_code_field,
 )
 from app.admin.forms import FormData, done_message
 from app.admin.pages import archived_requested, org_page, with_manual
