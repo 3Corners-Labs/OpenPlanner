@@ -144,15 +144,19 @@ Next to the form are six points: name and intake, capacity, skills, contact chan
 completion, and retention and deletion. Each point has a state in words: **In order**, **Missing**
 or **To follow** (that part of OpenPlanner comes in a later version; the sentence says which
 part). The heading says what the checklist judges and whether that is in order: *The draft is
-complete* or *The draft is not complete yet* when there is a draft, otherwise *The published
-revision is ready to use* or *… is not ready to use yet*.
+complete*, *The draft is complete, except for parts that are still to follow* or *The draft is not
+complete yet* when there is a draft, otherwise *The published revision is ready to use*, *… is
+complete, except for parts that are still to follow* or *… is not ready to use yet*. Points marked
+**To follow** cannot be fixed by you. When the pool does not cover every skill, the *Skills* point
+lists *Missing in the pool* with the skills it lacks.
 
 ## Publishing, activating, discarding and archiving
 
 - **Publish draft** makes the saved draft the published revision. A published revision does not
   change any more; existing appointments keep the revision they were made under. Publishing does
-  not activate the flow. The draft of a flow that is already active is judged first: a draft that
-  is not complete is not published, so an incomplete revision never comes into use.
+  not activate the flow. Every draft is judged first: you can publish only once every point is in
+  order, except the points that are still to follow. Otherwise there is no button, only the reason,
+  so an incomplete revision never comes to exist.
 - **Prepare a new revision** is on a flow without a draft and makes a draft as a copy of the
   published revision.
 - **Activate flow** is judged on the published revision and is possible only when every point of

@@ -146,16 +146,19 @@ Naast het formulier staan zes punten: naam en aanmelding, capaciteit, vaardighed
 afhandeling, afronden, en bewaren en verwijderen. Elk punt heeft een status in woorden: **In
 orde**, **Ontbreekt** of **Volgt** (dat onderdeel van OpenPlanner komt in een latere versie; de
 zin zegt welk onderdeel). De kop zegt wat het lijstje beoordeelt en of dat in orde is: *Het concept
-is volledig* of *Het concept is nog niet volledig* als er een concept is, anders *De gepubliceerde
-revisie is klaar voor gebruik* of *… is nog niet klaar voor gebruik*.
+is volledig*, *Het concept is volledig, op onderdelen na die nog volgen* of *Het concept is nog niet
+volledig* als er een concept is, anders *De gepubliceerde revisie is klaar voor gebruik*, *… is
+volledig, op onderdelen na die nog volgen* of *… is nog niet klaar voor gebruik*. Punten die **Volgt**
+tonen, kunt u zelf niet oplossen. Is de capaciteitspool niet voldoende, dan noemt het punt
+*Vaardigheden* onder *Ontbreekt in de pool* welke vaardigheden de pool niet garandeert.
 
 ## Publiceren, activeren, weggooien en archiveren
 
 - **Concept publiceren** maakt het opgeslagen concept de gepubliceerde revisie. Een gepubliceerde
   revisie verandert niet meer; bestaande afspraken houden de revisie waaronder ze zijn gemaakt.
-  Publiceren activeert de flow niet. Het concept van een flow die al actief is, wordt eerst
-  beoordeeld: een concept dat niet volledig is, wordt niet gepubliceerd, zodat er nooit een
-  onvolledige revisie in gebruik komt.
+  Publiceren activeert de flow niet. Elk concept wordt eerst beoordeeld: publiceren kan pas als
+  alle punten in orde zijn, behalve de punten die nog volgen. Is dat niet zo, dan staat er geen knop
+  maar de reden, zodat er nooit een onvolledige revisie ontstaat.
 - **Nieuwe revisie voorbereiden** staat op een flow zonder concept en maakt een concept als kopie
   van de gepubliceerde revisie.
 - **Flow activeren** wordt beoordeeld op de gepubliceerde revisie en kan alleen als alle punten van

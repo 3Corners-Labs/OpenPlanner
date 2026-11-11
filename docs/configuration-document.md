@@ -110,7 +110,9 @@ subject (`subjects`); no id appears anywhere, and neither does `published_by` (a
   archived skill or pool, or a subject its service no longer offers, is accepted only where that
   revision already had it), with a `published_at` that is not in the future and later than that of
   every revision before it, no gap in the numbers, and, as the current one, the entry paths the
-  flow is the default of; a published revision draws on a counted pool only. A draft is checked as
+  flow is the default of and a readiness checklist in order but for the points that follow (the
+  rule of publishing in the portal; a *restored* revision is exempt, history is imported as
+  recorded); a published revision draws on a counted pool only. A draft is checked as
   saving a draft in the portal, also in a flow that is restored: the flow's code and defaults
   against the stored flow, what it chooses (only what ADR 0121 has built: contact channel,
   dispatch, completion and first action, by the same function as the editor), that it draws on a
