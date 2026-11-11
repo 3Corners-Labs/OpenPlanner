@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from app.domain.capacity import CapacityPool
+from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.service_flows import (
     BUILT_ACTIONS,
@@ -29,13 +29,18 @@ from app.domain.service_flows import (
     ReadinessReason,
     ServiceFlow,
     can_activate,
+    check_combination,
     check_default_paths,
     check_draft_save,
     check_flow_references,
     check_publishable,
+    check_revision_editable,
     check_state_change,
+    draws_on_pool,
     legacy_revision,
     readiness,
+    revisions_in_effect,
+    skills_required_on_pool,
 )
 from app.domain.skills import Skill
 from tests.support.domain import NOW
@@ -390,6 +395,7 @@ def references(
         skills or {},
         already,
         subjects,
+        group_id=1,
         already_pool_id=already_pool_id,
     )
 
@@ -615,3 +621,86 @@ def test_a_published_flow_keeps_its_code_and_defaults_a_never_published_one_may_
         flow(state=FlowState.DRAFT, flow_id=1, current=None, draft=revision(flow_id=1)),
     )
     check_draft_save(replace(never, code="b", default_for=defaults), never, False)
+
+
+# --- what is in effect, what a flow draws on, history ---------------------------------------
+
+
+def test_the_revisions_in_effect_are_the_current_and_the_draft_only() -> None:
+    both = flow(
+        flow_id=1,
+        current=revision(revision=2, published_at=NOW),
+        draft=revision(revision=3, published_at=None),
+    )
+
+    assert [r.revision for r in revisions_in_effect(both)] == [2, 3]
+    only_draft = flow(state=FlowState.DRAFT, draft=revision())
+    assert revisions_in_effect(only_draft) == (revision(),)
+
+
+def test_a_flow_draws_on_a_pool_by_a_revision_in_effect_unless_it_is_archived() -> None:
+    drawing = flow(flow_id=1, current=revision(capacity_pool_id=5, published_at=NOW))
+    drafting = flow(draft=revision(capacity_pool_id=5), state=FlowState.DRAFT)
+
+    assert draws_on_pool(drawing, 5)
+    assert draws_on_pool(drafting, 5)
+    assert not draws_on_pool(drawing, 6)
+    assert not draws_on_pool(replace(drawing, state=FlowState.ARCHIVED), 5)
+
+
+def test_the_skills_flows_require_on_a_pool_are_those_of_the_flow_and_its_subjects() -> None:
+    first = flow(
+        "a",
+        current=revision(
+            capacity_pool_id=5,
+            required_skill_ids=frozenset({1}),
+            subject_skill_ids={"id": frozenset({2})},
+            published_at=NOW,
+        ),
+        flow_id=1,
+    )
+    elsewhere = flow("b", current=revision(capacity_pool_id=6, required_skill_ids=frozenset({3})))
+    archived = replace(
+        flow("c", current=revision(capacity_pool_id=5, required_skill_ids=frozenset({4}))),
+        state=FlowState.ARCHIVED,
+    )
+
+    assert skills_required_on_pool([first, elsewhere, archived], 5) == {1, 2}
+    assert skills_required_on_pool([], 5) == frozenset()
+
+
+def test_only_a_revision_that_is_not_published_may_be_changed() -> None:
+    check_revision_editable(None)
+    assert refusal(lambda: check_revision_editable(NOW, "labels")) == (
+        ErrorCode.CONFIGURATION_REVISION_PUBLISHED,
+        "labels",
+    )
+    assert refusal(lambda: check_revision_editable(NOW)) == (
+        ErrorCode.CONFIGURATION_REVISION_PUBLISHED,
+        "revision",
+    )
+
+
+def test_an_action_must_be_one_the_interaction_kind_allows_and_open_choices_pass() -> None:
+    check_combination(None, HandlingAction.CALL)
+    check_combination(InteractionKind.TELEPHONE, None)
+    check_combination(InteractionKind.TELEPHONE, HandlingAction.CALL)
+    assert refusal(
+        lambda: check_combination(InteractionKind.TELEPHONE, HandlingAction.OPEN_VIDEO)
+    ) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "handling_action",
+    )
+
+
+def test_a_legacy_pool_serves_the_flows_of_its_own_group_only() -> None:
+    wrapper = replace(pool(mode=PoolMode.LEGACY_GROUP), group_id=1)
+
+    check_flow_references(
+        1, revision(), wrapper, {}, frozenset(), (), group_id=1, already_pool_id=None
+    )
+    assert refusal(
+        lambda: check_flow_references(
+            1, revision(), wrapper, {}, frozenset(), (), group_id=2, already_pool_id=None
+        )
+    ) == (ErrorCode.INVALID_CONFIGURATION, "capacity_pool_id")

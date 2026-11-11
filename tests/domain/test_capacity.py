@@ -249,3 +249,21 @@ def test_a_stored_pool_without_a_code_saves_without_one_and_blocks_nothing() -> 
         ErrorCode.INVALID_CONFIGURATION,
         "pool_code",
     )
+
+
+def test_a_pool_cannot_stop_guaranteeing_a_skill_that_flows_on_it_still_require() -> None:
+    stored = replace(pool(), guaranteed_skill_ids=frozenset({1, 2}))
+    shrunk = replace(stored, guaranteed_skill_ids=frozenset({2}))
+    skills = {2: loaded_skill(2)}
+
+    assert refusal(
+        lambda: check_pool_save(
+            shrunk, stored, None, skills, stored.guaranteed_skill_ids, still_required=frozenset({1})
+        )
+    ) == (ErrorCode.CONFIGURATION_OBJECT_IN_USE, "guaranteed_skill_ids")
+    check_pool_save(  # what no flow requires may go, and a skill a flow requires may stay
+        shrunk, stored, None, skills, stored.guaranteed_skill_ids, still_required=frozenset({2})
+    )
+    check_pool_save(  # a new pool has no flows
+        replace(shrunk, id=None), None, None, skills, frozenset(), still_required=frozenset({1})
+    )

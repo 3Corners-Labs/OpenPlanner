@@ -147,6 +147,11 @@ def refuse(form: FormData, error: DomainError, locale: RequestLocale, choice_fie
         form.errors.append(FormError(SKILL_LIMIT_NOTICE, _("admin.skills.error.limit")))
     elif error.field == "pool_limit":
         form.errors.append(FormError(POOL_LIMIT_NOTICE, _("admin.capacity.error.limit")))
+    elif (
+        error.code is ErrorCode.CONFIGURATION_OBJECT_IN_USE
+        and error.field == "guaranteed_skill_ids"
+    ):
+        form.errors.append(FormError(choice_field, _("admin.capacity.error.skill_in_use")))
     elif error.field in ("skill_ids", "guaranteed_skill_ids"):
         form.errors.append(FormError(choice_field, _("admin.skills.error.choice")))
     elif error.code is ErrorCode.CONFIGURATION_OUT_OF_SCOPE and error.field == "organisation_id":

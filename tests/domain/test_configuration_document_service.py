@@ -12,14 +12,17 @@ from app.domain.admin import AdminService
 from app.domain.audit import Outcome
 from app.domain.authorization import Permission, Role, Target
 from app.domain.configuration_changes import ConfigurationSnapshot, RuleContext, Usage
-from app.domain.configuration_document import Scope
+from app.domain.configuration_document import Scope, parse_document
 from app.domain.configuration_document_service import Actor, ConfigurationDocumentService
 from app.domain.configuration_tree import Entity
+from app.domain.configuration_v1 import FORMATS
 from app.domain.configuration_values import Secret
 from app.domain.errors import DomainError, ErrorCode
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import SUPER, principal
+from tests.support.flow_documents import installation, skill
+from tests.support.flow_documents import organisation as flow_organisation
 
 NOW = datetime(2026, 11, 8, 12, 0, tzinfo=UTC)
 HOST = Actor.host()
@@ -517,3 +520,73 @@ async def test_a_plain_export_applies_again_and_changes_nothing_the_second_time(
     assert plan.ok
     assert not plan.sealed
     assert plan.changes == ()
+
+
+async def test_a_plan_that_archives_needs_the_reviewed_hash_as_one_that_deletes_does() -> None:
+    root = installation(
+        flow_organisation("acme", skills=(skill("passport"),)), flow_organisation("beta")
+    )
+    unit = InMemoryUnitOfWork()
+    unit.state.configuration = ConfigurationSnapshot(
+        root, Usage(kept={"skill": frozenset({("acme", "passport")})}), 0
+    )
+    data = {
+        "format": "openplanner.config/v1",
+        "mode": "replace",
+        "scope": {"organisation": "acme"},
+        "organisations": [{"slug": "acme", "skills": []}],
+    }
+    service = build(unit)
+    plan = await service.plan(HOST, encoded(data), None)
+
+    with pytest.raises(DomainError) as missing:
+        await service.apply(HOST, encoded(data), None, None)
+    with pytest.raises(DomainError) as wrong:
+        await service.apply(HOST, encoded(data), None, "0" * 64)
+    result = await service.apply(HOST, encoded(data), None, plan.digest)
+
+    assert [line.split(":")[0] for line in plan.lines()] == ["archive skill acme/passport"]
+    assert missing.value.code is ErrorCode.CONFIGURATION_PLAN_STALE
+    assert wrong.value.code is ErrorCode.CONFIGURATION_PLAN_STALE
+    assert result.applied
+    assert [c.action.value for c in unit.state.applied_configuration[0]] == ["archive"]
+
+
+async def test_an_import_that_cannot_be_reviewed_may_confirm_an_archive_as_it_may_a_delete() -> (
+    None
+):
+    root = installation(flow_organisation("acme", skills=(skill("passport"),)))
+    unit = InMemoryUnitOfWork()
+    unit.state.configuration = ConfigurationSnapshot(
+        root, Usage(kept={"skill": frozenset({("acme", "passport")})}), 0
+    )
+    service = build(unit)
+    document = parse_document(
+        {
+            "format": "openplanner.config/v1",
+            "mode": "replace",
+            "scope": {"organisation": "acme"},
+            "organisations": [{"slug": "acme", "skills": []}],
+        },
+        FORMATS,
+    )
+
+    with pytest.raises(DomainError) as refused:
+        await service.apply_document(HOST, document, None)
+    confirmed = await service.apply_document(HOST, document, None, confirmed=True)
+
+    assert refused.value.code is ErrorCode.CONFIGURATION_PLAN_STALE
+    assert confirmed.applied
+
+
+async def test_an_export_names_a_counted_pool_that_has_no_code_and_writes_nothing() -> None:
+    unit = uow(organisation(), usage=Usage(unaddressable=frozenset({"acme/17"})))
+
+    with pytest.raises(DomainError) as refused:
+        await build(unit).export(HOST, Scope(), None, secrets=False)
+
+    assert (refused.value.code, refused.value.field) == (
+        ErrorCode.CONFIGURATION_POOL_WITHOUT_CODE,
+        "acme/17",
+    )
+    assert unit.state.audit == []

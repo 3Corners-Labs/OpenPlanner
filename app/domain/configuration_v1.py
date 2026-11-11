@@ -2,8 +2,9 @@
 
 The document is a tree of aggregates: ``platform`` (settings, secrets, the API switch, log
 destinations, custom roles, holiday calendars, alert targets), ``organisations`` (each with its
-settings, texts, branding, channels, identity providers, closure scenarios, alert targets and
-``groups``) and ``api_clients``. Each part is declared in its own module; this one only joins
+settings, texts, branding, channels, identity providers, closure scenarios, alert targets,
+``skills``, ``capacity_pools`` and ``groups``, each group with its ``legacy_pool`` and
+``flows``) and ``api_clients``. Each part is declared in its own module; this one only joins
 them into the registry that reading, planning, the JSON Schema and the table-coverage test all
 use, and collects the rules across objects.
 """
@@ -14,11 +15,14 @@ from app.domain import (
     configuration_v1_alerts,
     configuration_v1_channels,
     configuration_v1_clients,
+    configuration_v1_flow_rules,
+    configuration_v1_flows,
     configuration_v1_group,
     configuration_v1_login,
     configuration_v1_organisation,
     configuration_v1_platform,
     configuration_v1_scenarios,
+    configuration_v1_skills,
 )
 from app.domain.configuration_schema import Collection, Format, Kind, Shape
 
@@ -37,6 +41,8 @@ _GROUP = replace(
     collections=(
         *configuration_v1_group.GROUP.collections,
         configuration_v1_scenarios.GROUP_SCENARIOS,
+        configuration_v1_flows.GROUP_LEGACY_POOL,
+        configuration_v1_flows.GROUP_FLOWS,
     ),
 )
 _ORGANISATION = replace(
@@ -48,6 +54,8 @@ _ORGANISATION = replace(
         configuration_v1_login.IDENTITY_PROVIDERS,
         configuration_v1_scenarios.ORGANISATION_SCENARIOS,
         configuration_v1_alerts.ORGANISATION_ALERT_TARGETS,
+        configuration_v1_skills.SKILLS,
+        configuration_v1_skills.CAPACITY_POOLS,
         Collection("groups", _GROUP, Shape.ENTITIES, "The organisation's bookable teams."),
     ),
 )
@@ -74,6 +82,7 @@ V1 = Format(
         *configuration_v1_scenarios.INTEGRITY,
         *configuration_v1_alerts.INTEGRITY,
         *configuration_v1_group.INTEGRITY,
+        *configuration_v1_flow_rules.INTEGRITY,
         *configuration_v1_clients.INTEGRITY,
     ),
 )

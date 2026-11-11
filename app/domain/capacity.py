@@ -85,6 +85,7 @@ def check_pool_save(
     group_taken: bool = False,
     same_code_exists: bool = False,
     same_name_exists: bool = False,
+    still_required: frozenset[int] = frozenset(),
 ) -> None:
     """Refuse saving ``pool`` given what is stored; the adapter loads the facts.
 
@@ -95,7 +96,11 @@ def check_pool_save(
     ``same_code_exists`` says another pool of the organisation has the code, ``same_name_exists``
     that another counted pool that is not archived has the name (compared case-insensitively
     after stripping; only asked of a new pool or a changed name, so a duplicate that was stored
-    earlier does not block editing the rest of the pool).
+    earlier does not block editing the rest of the pool). ``still_required`` are the skills that
+    the flows, not archived, drawing on the stored pool by their current or draft revision still
+    require (``app.domain.service_flows.skills_required_on_pool``): a pool cannot stop
+    guaranteeing one of them, because publishing or activating that flow would then be refused
+    only afterwards, and a flow already live would draw on a pool that cannot serve it.
     A pool's mode and group never change; a skill must be the organisation's own, and an
     archived one stays but is not newly added.
 
@@ -104,8 +109,9 @@ def check_pool_save(
             ``guaranteed_skill_ids``), ``configuration_object_missing`` (``group_id``,
             ``pool_id``, ``guaranteed_skill_ids``), ``configuration_out_of_scope``
             (``group_id``, ``organisation_id``, ``guaranteed_skill_ids``) or
-            ``configuration_object_exists`` (``group_id``), ``slug_taken`` (``pool_code``,
-            ``pool_name``) or
+            ``configuration_object_exists`` (``group_id``), ``configuration_object_in_use``
+            (``guaranteed_skill_ids``, a skill a flow still requires), ``slug_taken``
+            (``pool_code``, ``pool_name``) or
             ``invalid_configuration`` (``pool_code``) for a code that differs from the stored
             one: it is fixed (not asked of a stored pool that has none).
     """
@@ -135,6 +141,8 @@ def check_pool_save(
     renamed = stored is None or same_name(stored.name) != same_name(pool.name)
     if same_name_exists and renamed and pool.mode is PoolMode.COUNTED:
         raise DomainError(ErrorCode.SLUG_TAKEN, "pool_name")
+    if pool.id is not None and still_required - pool.guaranteed_skill_ids:
+        raise DomainError(ErrorCode.CONFIGURATION_OBJECT_IN_USE, "guaranteed_skill_ids")
     check_skills_of(
         pool.organisation_id,
         pool.guaranteed_skill_ids,

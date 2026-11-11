@@ -59,6 +59,35 @@ async def load_skills(session: AsyncSession, ids: Collection[int]) -> dict[int, 
     return {row.id: skill_from_row(row) for row in rows}
 
 
+async def skill_ids_by_code(session: AsyncSession, organisation_id: int) -> dict[str, int]:
+    """Return the id of every skill of an organisation by its code."""
+    return {
+        code: skill_id
+        for skill_id, code in (
+            await session.execute(
+                select(SkillRow.id, SkillRow.code).where(
+                    SkillRow.organisation_id == organisation_id
+                )
+            )
+        ).all()
+    }
+
+
+async def write_skill(session: AsyncSession, skill: Skill, row: SkillRow | None) -> SkillRow:
+    """Write a skill's code and labels; return its row (new when ``row`` is ``None``).
+
+    The one row mapping of a skill: the portal's save and a configuration document both call it,
+    after the rules of ``check_skill_save``. The archive time is its own step.
+    """
+    if row is None:
+        row = SkillRow(organisation_id=skill.organisation_id)
+        session.add(row)
+    row.code = skill.code
+    row.labels = json.dumps(dict(skill.labels), sort_keys=True)
+    await session.flush()
+    return row
+
+
 class SkillQueries:
     """The skills' and grants' part of ``SqlTransaction``; needs ``self._session``."""
 
@@ -111,13 +140,7 @@ class SkillQueries:
             )
         )
         check_skill_save(skill, skill_from_row(row) if row else None, taken is not None)
-        if row is None:
-            row = SkillRow(organisation_id=skill.organisation_id)
-            self._session.add(row)
-        row.code = skill.code
-        row.labels = json.dumps(dict(skill.labels), sort_keys=True)
-        await self._session.flush()
-        return skill_from_row(row)
+        return skill_from_row(await write_skill(self._session, skill, row))
 
     async def archive_skill(self, scope: Scope, skill_id: int, at: datetime) -> None:
         """Archive a skill; flows, pools and staff that refer to it keep it (A28). Idempotent.

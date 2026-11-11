@@ -47,7 +47,6 @@ from app.adapters.db.routing_json import (
     subjects_from_column,
 )
 from app.adapters.db.schedule_rules import rule_from_row
-from app.adapters.db.service_flows import ensure_default_flows_in
 from app.domain.configuration_changes import Change, ChangeAction
 from app.domain.configuration_tree import Entity
 from app.domain.configuration_v1_group_parts import (
@@ -437,8 +436,6 @@ async def write_group(session: AsyncSession, box: SecretBox | None, change: Chan
         )
     await session.flush()
     await _replace_schedule(session, row.id, values, names)
-    if change.action is ChangeAction.CREATE or "schedule_rules" in names:
-        await ensure_default_flows_in(session, row.id)  # ADR 0121: the legacy pool and flows
     await _replace_holidays(session, row.id, values, names)
     if "reminder_rules" in names:
         await _replace_reminders(session, row.id, values)

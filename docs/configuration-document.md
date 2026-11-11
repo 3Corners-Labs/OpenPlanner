@@ -67,6 +67,58 @@ flags a typo. The planner is the authority: it also checks everything the admin 
   the secrets, and wrap it in a tool you trust (an AES zip, `age`, `sops`) before it travels.
 - **Files** (logo, fonts, closure images) are inline: media type, SHA-256 and base64 bytes.
 
+## Skills, capacity pools and flows (ADR 0121)
+
+An organisation may carry `skills` (key `code`, `labels`, `archived`) and `capacity_pools`
+(counted pools: key `code`, `name`, `guaranteed_skills` as codes, `archived`). A group may carry
+`legacy_pool` (the pool that wraps its own staffing: `name`, `guaranteed_skills`, `archived`) and
+`flows` (key `code`, `state`, `default_for`, `current_revision`, `draft_revision`) with their
+`revisions` (key `revision`, a number). A revision names its counted pool by **code**
+(`capacity_pool`) or the legacy pool of its own service by the service's slug (`legacy_pool_of`),
+the skills it requires by code (`required_skills`) and, per subject code, the extra skills of that
+subject (`subjects`); no id appears anywhere, and neither does `published_by` (a staff id).
+
+- **A pool is found by its code.** The code of a counted pool never changes (migration 0110 gave
+  every pool one), so a rename is an ordinary change of `name`. A counted pool whose stored code is
+  missing (a row an older image wrote) cannot be addressed: the export is refused with
+  `configuration_pool_without_code` naming the pool as `organisation/id`, and a plan or an apply
+  leaves that pool alone. Archive it and add it again in the portal, which gives the new one a code.
+- **Revisions are history.** An export carries every revision with `published_at` (empty for the
+  draft). A document never changes or removes a stored published revision
+  (`configuration_revision_published`); a draft may be replaced, and a `replace` document never
+  trims the revisions it leaves out.
+- **Publishing through a document** is publishing in the portal. A revision that the document
+  publishes (a new revision with `published_at`, or a draft that gains one) must be based on the
+  revision before it (a skill, pool or subject it names that the one before did not have must be
+  there and not archived), have a `published_at` that is not in the future and later than that of
+  every revision before it, follow the last revision without a gap, and, as the current one, keep
+  the entry paths the flow is the default of. An installation that does not have the flow yet is
+  filled in ascending order: each revision is checked against the one before it, and the first one
+  may keep what it names although it was archived or removed since.
+- **`legacy` is the wrapper and nothing else.** A revision with `legacy: true` is accepted only as
+  revision 1 of the flow `appointment` or `direct` of a service, published, opening video and
+  completed by `legacy_video_observation`, with no skills, the entry path of its code, drawing on
+  the legacy pool of **that service**. Its labels, length and dispatch are a snapshot and may
+  differ from the service's settings now. Any other `legacy: true` is refused, as is a draft with
+  it. The legacy pool of a service is never named by the flow of another service.
+- **Absent is not empty.** A document without these sections (every document of an earlier
+  version) leaves the installation's skills, pools and flows as they are. An empty list in a
+  `replace` document means none.
+- **Archive, not delete.** What a document would delete but that holds history is archived, and
+  the plan shows it as `archive`: a skill a person holds or any revision requires, a counted pool
+  any revision draws on, a flow with a published revision or a booking. So an **explicit** delete
+  of such an object is an archive too, and a `replace` document that leaves it out likewise. Only
+  a flow with nothing but a draft, and no booking, is deleted. A flow that was never published
+  and that something still refers to is refused with `configuration_draft_flow_in_use`: discard
+  its draft in the portal first. An archive needs the reviewed plan hash exactly as a delete does.
+  Who holds which skill is not in a document and is never changed by one.
+- **Same rules as the screens.** A flow cannot use another organisation's pool or skill, a pool
+  cannot stop guaranteeing a skill that a flow not archived still requires from it, two active
+  flows cannot be the default of one entry path, a draft cannot name a subject its service does not
+  offer, a document cannot set a location, and a flow becomes active only when the readiness
+  checklist passes. A default that moves from one flow to another is written releasing before
+  gaining, whatever order the document lists the flows in.
+
 ## In the portal
 
 The superuser works on *Advanced settings › Configuration package*, an organisation admin (and

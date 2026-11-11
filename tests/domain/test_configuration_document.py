@@ -13,7 +13,7 @@ from app.domain.configuration_document import (
     parse_document,
     to_json,
 )
-from app.domain.configuration_schema import Collection, Format, Kind, Shape
+from app.domain.configuration_schema import Collection, Format, Kind, Shape, integer, text
 from app.domain.configuration_tree import Action, path_of
 from app.domain.configuration_values import Binary, Sealed, Secret
 from app.domain.errors import DomainError, ErrorCode
@@ -466,3 +466,54 @@ def test_a_natural_key_is_trimmed_like_every_text() -> None:
     refused(
         {**base(), "boxes": [{"slug": "a", "tags": ["x", " x "]}]}, ErrorCode.INVALID_CONFIGURATION
     )
+
+
+# --- a number as a natural key (ADR 0121 step 2b-ii: a revision of a flow) ------------------
+
+SLOT = Kind(
+    "slot",
+    key=("number",),
+    tables=frozenset({"slots"}),
+    fields=(integer("number", required=True, minimum=1, maximum=99), text("label", nullable=True)),
+)
+NUMBERED = Format(
+    "test/v1",
+    Kind(
+        "installation",
+        collections=(Collection("slots", SLOT, Shape.ENTITIES),),
+    ),
+)
+
+
+def numbered(data: object) -> Document:
+    return parse_document(data, {NUMBERED.name: NUMBERED})
+
+
+def test_a_key_of_type_integer_is_a_number_in_the_document_and_its_decimal_text_in_the_tree() -> (
+    None
+):
+    document = numbered({"format": "test/v1", "slots": [{"number": 12, "label": "x"}]})
+
+    (slot,) = document.root.children["slots"]
+    assert slot.key == ("12",)
+    assert slot.path == "slots[12]"
+    assert slot.fields == {"label": "x"}
+
+
+def test_a_key_of_type_integer_is_written_back_as_a_number() -> None:
+    data = {"format": "test/v1", "slots": [{"number": 7, "label": "x"}]}
+
+    assert to_json(numbered(copy.deepcopy(data))) == data
+
+
+@pytest.mark.parametrize("bad", ["3", 3.5, True, None, 0, 100, -1])
+def test_a_key_of_type_integer_must_be_a_whole_number_within_its_bounds(bad: object) -> None:
+    with pytest.raises(DomainError) as error:
+        numbered({"format": "test/v1", "slots": [{"number": bad}]})
+
+    assert error.value.code is ErrorCode.INVALID_CONFIGURATION
+
+
+def test_two_objects_with_the_same_number_are_one_too_many() -> None:
+    with pytest.raises(DomainError):
+        numbered({"format": "test/v1", "slots": [{"number": 1}, {"number": 1}]})

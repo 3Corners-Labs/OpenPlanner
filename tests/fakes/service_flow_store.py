@@ -39,6 +39,8 @@ from app.domain.service_flows import (
     check_flow_references,
     check_publishable,
     check_state_change,
+    draws_on_pool,
+    skills_required_on_pool,
 )
 from app.domain.skills import Skill, SkillUsage, check_skill_save, check_staff_grant
 from app.domain.staff import StaffMember, StaffStatus
@@ -97,6 +99,7 @@ class ServiceFlowStore:
             {s: self.state.skills[s] for s in revision.all_skill_ids if s in self.state.skills},
             based_on.all_skill_ids if based_on else frozenset(),
             [subject.code for subject in group.routing.subjects],
+            group_id=group.id,
             already_pool_id=based_on.capacity_pool_id if based_on else None,
         )
 
@@ -329,6 +332,7 @@ class ServiceFlowStore:
                 for p in others
                 if p.mode is PoolMode.COUNTED and p.archived_at is None
             ),
+            still_required=skills_required_on_pool(self.state.flows.values(), pool.id or 0),
         )
         kept = replace(
             pool,
@@ -342,12 +346,7 @@ class ServiceFlowStore:
     def _drawing_on(self, pool_id: int) -> list[ServiceFlow]:
         """Return the flows not archived whose current or draft revision names the pool."""
         return sorted(
-            (
-                f
-                for f in self.state.flows.values()
-                if f.state is not FlowState.ARCHIVED
-                and pool_id in {r.capacity_pool_id for r in (f.current, f.draft) if r}
-            ),
+            (f for f in self.state.flows.values() if draws_on_pool(f, pool_id)),
             key=lambda f: f.id or 0,
         )
 
