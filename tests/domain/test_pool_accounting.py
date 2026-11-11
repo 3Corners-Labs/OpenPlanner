@@ -222,13 +222,13 @@ def test_p7_an_appointment_is_not_staffed_in_a_block_for_work_without_appointmen
     pool = supply(("09:00", "12:00", 2, Offer.DIRECT))
 
     assert admit_appointment(pool, [], at("10:00"), 30, 0) == Admission(NOT_STAFFED, 0)
-    assert check_start(pool, [], at("10:00"), 20, 0).may_start
+    assert check_start(pool, [], at("10:00"), 20, 0, intake=Intake.ON_DEMAND).may_start
 
 
 def test_p7_work_without_appointment_may_not_start_in_an_appointments_only_block() -> None:
     pool = supply(("09:00", "12:00", 2, Offer.SCHEDULED))
 
-    refused = check_start(pool, [], at("10:00"), 20, 0)
+    refused = check_start(pool, [], at("10:00"), 20, 0, intake=Intake.ON_DEMAND)
 
     assert refused.outcome is StartOutcome.REFUSED
     assert (refused.free, refused.short_at) == (0, at("10:00"))
@@ -275,7 +275,7 @@ def test_a_duration_or_buffer_out_of_bounds_is_refused(
     assert (caught.value.code, caught.value.field) == (ErrorCode.INVALID_CONFIGURATION, field)
     for call in (
         lambda: admit_appointment(morning(), [], at("10:00"), duration, buffer),
-        lambda: check_start(morning(), [], at("10:00"), duration, buffer),
+        lambda: check_start(morning(), [], at("10:00"), duration, buffer, intake=Intake.ON_DEMAND),
         lambda: earliest_start(morning(), [], at("10:00"), duration, buffer, at("11:00")),
     ):
         with pytest.raises(DomainError):
@@ -287,19 +287,41 @@ def test_the_longest_commitment_is_the_longest_length_plus_the_longest_buffer() 
 
 
 def test_a_commitment_must_end_after_it_starts() -> None:
-    with pytest.raises(ValueError, match="end after"):
-        Commitment(("booking", 1), at("10:00"), at("10:00"))
-    with pytest.raises(ValueError, match="end after"):
-        Commitment(("booking", 1), at("10:00"), at("09:00"))
+    for start, until in (("10:00", "10:00"), ("10:00", "09:00")):
+        with pytest.raises(DomainError) as caught:
+            Commitment(("booking", 1), at(start), at(until))
+        assert (caught.value.code, caught.value.field) == (ErrorCode.INVALID_CONFIGURATION, "until")
     Commitment(("booking", 1), at("10:00"), at("10:01"))
 
 
 def test_an_empty_or_reversed_interval_is_refused() -> None:
     for lower, upper in ((at("10:00"), at("10:00")), (at("10:00"), at("09:00"))):
-        with pytest.raises(ValueError, match="lower"):
+        with pytest.raises(DomainError) as caught:
             free_over(morning(), [], lower, upper, Intake.APPOINTMENT)
-        with pytest.raises(ValueError, match="lower"):
+        assert (caught.value.code, caught.value.field) == (
+            ErrorCode.INVALID_CONFIGURATION,
+            "interval",
+        )
+        with pytest.raises(DomainError) as caught:
             shortfalls(morning(), [], lower, upper)
+        assert caught.value.field == "interval"
+
+
+def test_naive_datetimes_are_refused_with_a_domain_error() -> None:
+    naive = datetime(2026, 1, 5, 10, 0)
+    calls = (
+        lambda: Commitment(("booking", 1), naive, at("11:00")),
+        lambda: Commitment(("booking", 1), at("10:00"), naive.replace(hour=11)),
+        lambda: free_over(morning(), [], naive, at("11:00"), Intake.APPOINTMENT),
+        lambda: shortfalls(morning(), [], at("10:00"), naive.replace(hour=11)),
+        lambda: admit_appointment(morning(), [], naive, 30, 0),
+        lambda: check_start(morning(), [], naive, 30, 0, intake=Intake.ON_DEMAND),
+        lambda: earliest_start(morning(), [], naive, 30, 0, at("11:00")),
+    )
+    for call in calls:
+        with pytest.raises(DomainError) as caught:
+            call()
+        assert caught.value.code is ErrorCode.INVALID_CONFIGURATION
 
 
 def test_free_over_leaves_out_an_ignored_key_and_the_interval_edges_do_not_count() -> None:
@@ -332,7 +354,7 @@ def reservations() -> list[Commitment]:
 def test_a17_the_brief_example_a_ticket_may_wait_but_treatment_may_not_start() -> None:
     pool = morning(2)
 
-    check = check_start(pool, reservations(), at("09:55"), 20, 0)
+    check = check_start(pool, reservations(), at("09:55"), 20, 0, intake=Intake.ON_DEMAND)
 
     assert check.outcome is StartOutcome.REFUSED
     assert not check.may_start
@@ -343,19 +365,23 @@ def test_a17_the_brief_example_a_ticket_may_wait_but_treatment_may_not_start() -
 def test_a17_ten_thirty_is_the_first_start_and_nothing_earlier_passes() -> None:
     pool = morning(2)
     for minute in range(55, 60):
-        assert not check_start(pool, reservations(), at(f"09:{minute}"), 20, 0).may_start
+        assert not check_start(
+            pool, reservations(), at(f"09:{minute}"), 20, 0, intake=Intake.ON_DEMAND
+        ).may_start
     for clock in ("10:00", "10:29"):
-        assert not check_start(pool, reservations(), at(clock), 20, 0).may_start
-    assert check_start(pool, reservations(), at("10:30"), 20, 0) == check_start(
-        pool, [], at("10:30"), 20, 0
-    )
-    assert check_start(pool, reservations(), at("10:30"), 20, 0).free == 2
+        assert not check_start(
+            pool, reservations(), at(clock), 20, 0, intake=Intake.ON_DEMAND
+        ).may_start
+    assert check_start(
+        pool, reservations(), at("10:30"), 20, 0, intake=Intake.ON_DEMAND
+    ) == check_start(pool, [], at("10:30"), 20, 0, intake=Intake.ON_DEMAND)
+    assert check_start(pool, reservations(), at("10:30"), 20, 0, intake=Intake.ON_DEMAND).free == 2
 
 
 def test_a17_a_request_that_ends_before_the_reservations_may_start() -> None:
     pool = morning(2)
 
-    check = check_start(pool, reservations(), at("09:35"), 20, 0)
+    check = check_start(pool, reservations(), at("09:35"), 20, 0, intake=Intake.ON_DEMAND)
 
     assert (check.outcome, check.free, check.short_at) == (StartOutcome.MAY_START, 2, None)
 
@@ -363,8 +389,12 @@ def test_a17_a_request_that_ends_before_the_reservations_may_start() -> None:
 def test_a17_with_a_buffer_the_interval_reaches_further() -> None:
     pool = morning(2)
 
-    assert not check_start(pool, reservations(), at("09:40"), 20, 5).may_start  # to 10:05
-    assert check_start(pool, reservations(), at("09:35"), 20, 5).may_start  # to 10:00, touching
+    assert not check_start(
+        pool, reservations(), at("09:40"), 20, 5, intake=Intake.ON_DEMAND
+    ).may_start  # to 10:05
+    assert check_start(
+        pool, reservations(), at("09:35"), 20, 5, intake=Intake.ON_DEMAND
+    ).may_start  # to 10:00, touching
     assert earliest_start(pool, reservations(), at("09:40"), 20, 5, at("12:00")) == at("10:30")
 
 
@@ -372,7 +402,9 @@ def test_a17_a_reservation_that_checks_in_keeps_its_own_unit() -> None:
     pool = morning(2)
     own = ("booking", 1)
 
-    check = check_start(pool, reservations(), at("10:00"), 30, 0, own_key=own)
+    check = check_start(
+        pool, reservations(), at("10:00"), 30, 0, own_key=own, intake=Intake.APPOINTMENT
+    )
 
     assert (check.outcome, check.free) == (StartOutcome.MAY_START, 1)
     started = [Commitment(own, at("10:00"), at("10:30"), True), reservations()[1]]
@@ -459,7 +491,7 @@ def test_a18_the_overrun_is_listed_as_a_shortfall_while_it_lasts() -> None:
 def test_a18_a_start_that_conflicts_with_the_overrun_is_refused() -> None:
     pool = morning(2)
 
-    check = check_start(pool, overrun_scene(), at("10:05"), 10, 0)
+    check = check_start(pool, overrun_scene(), at("10:05"), 10, 0, intake=Intake.ON_DEMAND)
 
     assert check.outcome is StartOutcome.REFUSED
     assert (check.free, check.short_at) == (-1, at("10:05"))
@@ -476,7 +508,7 @@ def test_a18_a_commitment_not_in_progress_past_its_end_is_no_overrun() -> None:
     pool = morning(1)
     done = [held(1, "09:00", "09:30")]
 
-    assert check_start(pool, done, at("09:30"), 20, 0).may_start
+    assert check_start(pool, done, at("09:30"), 20, 0, intake=Intake.ON_DEMAND).may_start
     assert (
         free_over(pool, done, at("09:30"), at("09:50"), Intake.ON_DEMAND, overrun_at=at("09:30"))
         == 1
@@ -487,8 +519,10 @@ def test_a18_a_commitment_in_progress_at_its_planned_end_already_counts_as_busy(
     pool = morning(1)
     running = [held(1, "09:00", "09:30", in_progress=True)]
 
-    assert not check_start(pool, running, at("09:30"), 20, 0).may_start
-    assert check_start(pool, running, at("09:29"), 1 * 5, 0).free == 0  # still inside its interval
+    assert not check_start(pool, running, at("09:30"), 20, 0, intake=Intake.ON_DEMAND).may_start
+    assert (
+        check_start(pool, running, at("09:29"), 1 * 5, 0, intake=Intake.ON_DEMAND).free == 0
+    )  # still inside its interval
     assert (
         free_over(pool, running, at("09:30"), at("09:50"), Intake.ON_DEMAND) == 1
     )  # no overrun_at
@@ -526,10 +560,18 @@ def test_p8_due_means_the_own_interval_has_begun_and_not_ended() -> None:
         Commitment(("request", 9), at("09:30"), at("09:50"), in_progress=True),
     ]
 
-    on_the_dot = check_start(pool, commitments, at("10:00"), 30, 0, own_key=own)
-    last_minute = check_start(pool, commitments, at("10:29"), 5, 0, own_key=own)
-    after_its_end = check_start(pool, commitments, at("10:30"), 5, 0, own_key=own)
-    unknown_key = check_start(pool, commitments, at("10:00"), 30, 0, own_key=("booking", 99))
+    on_the_dot = check_start(
+        pool, commitments, at("10:00"), 30, 0, own_key=own, intake=Intake.APPOINTMENT
+    )
+    last_minute = check_start(
+        pool, commitments, at("10:29"), 5, 0, own_key=own, intake=Intake.APPOINTMENT
+    )
+    after_its_end = check_start(
+        pool, commitments, at("10:30"), 5, 0, own_key=own, intake=Intake.APPOINTMENT
+    )
+    unknown_key = check_start(
+        pool, commitments, at("10:00"), 30, 0, own_key=("booking", 99), intake=Intake.APPOINTMENT
+    )
 
     assert on_the_dot.outcome is StartOutcome.OVERRUN_CONFLICT
     assert last_minute.outcome is StartOutcome.OVERRUN_CONFLICT
@@ -538,7 +580,7 @@ def test_p8_due_means_the_own_interval_has_begun_and_not_ended() -> None:
 
 
 def test_p8_work_without_an_appointment_is_refused_during_the_overrun() -> None:
-    check = check_start(morning(2), overrun_scene(), at("10:05"), 30, 0)
+    check = check_start(morning(2), overrun_scene(), at("10:05"), 30, 0, intake=Intake.ON_DEMAND)
 
     assert check.outcome is StartOutcome.REFUSED
 
@@ -546,7 +588,9 @@ def test_p8_work_without_an_appointment_is_refused_during_the_overrun() -> None:
 def test_p8_a_due_appointment_with_a_free_unit_starts_without_conflict() -> None:
     pool = morning(2)
 
-    check = check_start(pool, reservations(), at("10:00"), 30, 0, own_key=("booking", 1))
+    check = check_start(
+        pool, reservations(), at("10:00"), 30, 0, own_key=("booking", 1), intake=Intake.APPOINTMENT
+    )
 
     assert check.outcome is StartOutcome.MAY_START
 
@@ -556,20 +600,26 @@ def test_p8_a_due_appointment_with_a_free_unit_starts_without_conflict() -> None
 
 def test_a35_the_same_request_is_decided_again_on_the_staffing_and_load_of_that_moment() -> None:
     request = (at("09:35"), 20, 0)
-    assert check_start(morning(2), reservations(), *request).may_start
+    assert check_start(morning(2), reservations(), *request, intake=Intake.ON_DEMAND).may_start
 
     # Staffing dropped in between.
     assert (
-        check_start(morning(1), [held(3, "09:40", "09:50")], *request).outcome
+        check_start(
+            morning(1), [held(3, "09:40", "09:50")], *request, intake=Intake.ON_DEMAND
+        ).outcome
         is StartOutcome.REFUSED
     )
     # A reservation was made in between.
     taken = [*reservations(), held(3, "09:50", "10:10"), held(4, "09:50", "10:10")]
-    assert not check_start(morning(2), taken, *request).may_start
+    assert not check_start(morning(2), taken, *request, intake=Intake.ON_DEMAND).may_start
     # The block no longer takes work without appointment.
-    assert not check_start(morning(2, Offer.SCHEDULED), reservations(), *request).may_start
+    assert not check_start(
+        morning(2, Offer.SCHEDULED), reservations(), *request, intake=Intake.ON_DEMAND
+    ).may_start
     # A later moment that overlaps the reservations.
-    assert not check_start(morning(2), reservations(), at("09:45"), 20, 0).may_start
+    assert not check_start(
+        morning(2), reservations(), at("09:45"), 20, 0, intake=Intake.ON_DEMAND
+    ).may_start
 
 
 # --- A36: staffing falls below the commitments ---
@@ -699,3 +749,76 @@ def test_a_ninety_minute_appointment_across_the_fall_change_is_measured_in_real_
         is NOT_STAFFED
     )
     assert admit_appointment(pool, [], datetime(2026, 10, 25, 3, 30, tzinfo=UTC), 90, 0).admitted
+
+
+# --- review findings of step 3b-1 ---
+
+
+def test_a_due_appointment_in_a_block_for_appointments_only_may_start() -> None:
+    pool = supply(("09:00", "12:00", 1, Offer.SCHEDULED))
+    reservation = held(1, "10:00", "10:35")
+
+    check = check_start(
+        pool, [reservation], at("10:00"), 30, 5, intake=Intake.APPOINTMENT, own_key=reservation.key
+    )
+
+    assert (check.outcome, check.free, check.short_at) == (StartOutcome.MAY_START, 1, None)
+
+
+def test_work_with_a_commitment_of_its_own_must_ask_as_an_appointment() -> None:
+    reservation = held(1, "10:00", "10:35")
+
+    with pytest.raises(DomainError) as caught:
+        check_start(
+            morning(1), [reservation], at("10:00"), 30, 5,
+            intake=Intake.ON_DEMAND, own_key=reservation.key,
+        )  # fmt: skip
+
+    assert (caught.value.code, caught.value.field) == (ErrorCode.INVALID_CONFIGURATION, "own_key")
+
+
+def test_a_due_appointment_is_refused_when_nobody_is_staffed_any_more() -> None:
+    pool = supply(("09:00", "10:00", 1, Offer.BOTH))  # staffing dropped: nobody after 10:00
+    own = held(1, "09:50", "10:20")
+
+    check = check_start(pool, [own], at("10:05"), 15, 0, intake=Intake.APPOINTMENT, own_key=own.key)
+
+    assert check.outcome is StartOutcome.REFUSED
+    assert (check.free, check.short_at) == (0, at("10:05"))
+
+
+def test_a_due_appointment_is_refused_in_a_block_that_takes_no_appointments() -> None:
+    pool = supply(("09:00", "12:00", 1, Offer.DIRECT))
+    own = held(1, "10:00", "10:30")
+
+    check = check_start(pool, [own], at("10:00"), 30, 0, intake=Intake.APPOINTMENT, own_key=own.key)
+
+    assert check.outcome is StartOutcome.REFUSED
+
+
+def test_a_late_appointment_with_a_free_unit_starts_and_reports_the_next_reservation() -> None:
+    pool = morning(1)
+    own = held(1, "10:00", "10:30")
+    next_up = held(2, "10:30", "11:00")
+
+    check = check_start(
+        pool, [own, next_up], at("10:20"), 30, 0, intake=Intake.APPOINTMENT, own_key=own.key
+    )
+
+    # Not an overrun conflict: nobody holds the unit now. The later collision is reported.
+    assert check.outcome is StartOutcome.MAY_START
+    assert (check.free, check.short_at) == (0, at("10:30"))
+    # The same request without an appointment of its own is refused for the same interval.
+    assert not check_start(
+        pool, [own, next_up], at("10:20"), 30, 0, intake=Intake.ON_DEMAND
+    ).may_start
+
+
+def test_earliest_start_is_a_forecast_on_planned_ends_not_a_promise_of_check_start() -> None:
+    pool = morning(1)
+    running = [held(1, "10:00", "10:30", in_progress=True)]
+
+    # Seen from 10:10 the running work ends at 10:30 as planned: the forecast is 10:30.
+    assert earliest_start(pool, running, at("10:10"), 20, 0, at("12:00")) == at("10:30")
+    # If it runs over, check_start at 10:30 refuses: the forecast is not a reservation.
+    assert not check_start(pool, running, at("10:30"), 20, 0, intake=Intake.ON_DEMAND).may_start

@@ -92,7 +92,7 @@ Commitment(key, start, until, in_progress=False)                     # key: ("bo
     # an occupation (step 5/7):            [starts_at, planned_until), in_progress when started
 ```
 
-`supply_between` (in `pool_staffing.py`) turns local windows into UTC segments day by day, with the same DST handling as `slots_on` (a local time that does not exist is skipped, an ambiguous one takes its first occurrence). Touching windows stay separate segments; capacity across a border is the lower of the two, as ADR 0027 already does for a slot.
+`supply_between` (in `pool_staffing.py`) turns local windows into UTC segments day by day, with the same DST handling as `slots_on` for a start (a local time that does not exist falls one hour later, an ambiguous one takes its first occurrence); an end in the missing hour is the instant of the change, so that segments never overlap. Touching windows stay separate segments; capacity across a border is the lower of the two, as ADR 0027 already does for a slot.
 
 ```text
 def free_over(supply, commitments, a, b, intake, ignore=None, open_ended=False) -> int:
@@ -115,7 +115,7 @@ def admit_appointment(supply, commitments, start, duration, buffer) -> Admission
     free = free_over(supply, commitments, start, b, APPOINTMENT)
     return ADMITTED(free) if free >= 1 else FULL
 
-def check_start(supply, commitments, now, duration, buffer, own_key=None, intake=ON_DEMAND) -> StartCheck:
+def check_start(supply, commitments, now, duration, buffer, *, intake, own_key=None) -> StartCheck:
     """Treatment start (step 5) and on-demand start (step 7); A17, A18, A35."""
     b = now + duration + buffer
     free = free_over(supply, commitments, now, b, intake, ignore=own_key, open_ended=True)
@@ -301,7 +301,7 @@ Pool time zone and staffing (rules and exceptions) are configuration and must tr
 
 | Key | Class | Default | Bounds | Permission | Step | Why this class |
 |---|---|---|---|---|---|---|
-| `treatment_buffer_minutes` | D organisation | 0 | 0–120 | `capacity.manage` | **3b** | A working practice of the organisation (wrap-up time); not a protection; not needed before login. Read at admission and fixed into `occupied_until`, so a later change does not move existing commitments. One value per organisation as ADR 0121 lists it; a per-flow buffer is a follow-up if one organisation runs flows with different wrap-up times |
+| `treatment_buffer_minutes` | D organisation | 0 | 0–120 | `capacity.manage` | **3b** (registered in 3b-2, first read in 3b-5) | A working practice of the organisation (wrap-up time); not a protection; not needed before login. Read at admission and fixed into `occupied_until`, so a later change does not move existing commitments. One value per organisation (ADR 0121 and ADR 0122 say the same); `MAX_BUFFER_MINUTES` is derived from the registry bound in 3b-2, with a test; a per-flow buffer is a follow-up if one organisation runs flows with different wrap-up times |
 | `on_demand_admission_lookahead_minutes` | D organisation | 120 | 15–480 | `capacity.manage` | 7 (rule in 3b) | How far ahead a ticket must have a realistic start; a service-level judgement |
 | `assignment_start_lease_minutes` | D organisation | 5 | 1–30 | `capacity.manage` | 5 | As ADR 0121 |
 | `request_unresolved_hours` | D organisation | 24 | 1–168 | `capacity.manage` | 5 | As ADR 0121 |
@@ -377,7 +377,9 @@ Plain terms: a *pool* is a shared group of staff, counted as a number. A *unit* 
 - The staffed segments and the intake enum live in `app/domain/pool_staffing.py` (with `supply_between`), the commitment rules in `app/domain/pool_accounting.py`; section 2.2 listed both under accounting.
 - The overrun is passed as `overrun_at` (the instant at which a started commitment past its planned end counts as busy to the end of the interval) instead of a boolean `open_ended`.
 - Only the moments where free units can drop are measured (the start of the interval, commitment starts, staffing borders); a commitment's end only frees a unit.
-- `check_start` also answers P8: a commitment of its own that has begun and not ended makes the appointment due, and the outcome is `OVERRUN_CONFLICT` instead of a refusal.
+- `check_start` also answers P8: a commitment of its own that has begun and not ended makes the appointment due. `intake` is a required keyword, and `own_key` needs `APPOINTMENT`. When someone is staffed for appointments at `now` and no unit is free at `now`, the outcome is `OVERRUN_CONFLICT` instead of a refusal; a unit free at `now` with a shortage later in the interval is `MAY_START` with `short_at` set (the next reservation keeps its unit and is itself due later); nobody staffed at `now` is a refusal.
+- `earliest_start` is a forecast on planned ends, not a promise that `check_start` will pass: work in progress planned to end at 10:30 gives 10:30, and if it runs over, `check_start` refuses then.
+- Segments never overlap (`Supply` refuses them); naive datetimes and empty intervals are refused with `invalid_configuration`, not `ValueError`.
 - A shortage counts the people staffed whatever the block offers; admission and starts count only the units of the block's offer.
 - `grid_on(tz, length, day, windows)` takes one length (the step and the slot length); a flow on a pool passes duration plus buffer.
 - `ROLLBACK_SAFE` exists (section 5.2) and is not yet read by `readiness`; step 3b-5 adds the reason that reads it.

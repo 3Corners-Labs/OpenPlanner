@@ -13,10 +13,12 @@ the pool's time zone; everything that is compared or stored is UTC.
           ▼
     Supply.units_at(t, intake)          what pool_accounting measures commitments against
 
-Daylight saving time follows ``availability.slots_on``: a local time that does not exist
-(spring forward) is read with the offset from before the change, so it falls one hour later;
-an ambiguous local time (fall back) takes its first occurrence. A block that lies wholly in
-the missing hour vanishes; a block that spans the repeated hour lasts one hour longer.
+Daylight saving time follows ``availability.slots_on`` for a start: a local time that does not
+exist (spring forward) is read with the offset from before the change, so it falls one hour
+later; an ambiguous local time (fall back) takes its first occurrence. A block *ending* in the
+missing hour ends at the change itself (the hour does not exist, so it is not staffed), which
+keeps every segment before the next block's start: segments never overlap. A block that lies
+wholly in the missing hour vanishes; a block that spans the repeated hour lasts one hour longer.
 """
 
 from collections.abc import Collection, Iterable
@@ -44,6 +46,26 @@ class Intake(StrEnum):
     """Work without an appointment (a start now)."""
 
 
+def require_aware(moment: datetime, field: str) -> None:
+    """Require a timezone-aware instant (all time is UTC, CLAUDE.md).
+
+    Raises:
+        DomainError: ``invalid_configuration`` with ``field`` for a naive datetime.
+    """
+    if moment.tzinfo is None:
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, field)
+
+
+def check_interval(lower: datetime, upper: datetime) -> None:
+    """Require an interval of aware instants with ``lower`` before ``upper``.
+
+    Raises:
+        DomainError: ``invalid_configuration`` with field ``interval``.
+    """
+    if lower.tzinfo is None or upper.tzinfo is None or lower >= upper:
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "interval")
+
+
 @dataclass(frozen=True)
 class Segment:
     """A stretch of UTC time in which ``units`` people are staffed.
@@ -60,6 +82,13 @@ class Segment:
     end: datetime
     units: int
     offer: Offer = Offer.SCHEDULED
+
+    def __post_init__(self) -> None:
+        """Require aware instants and ``start < end``."""
+        require_aware(self.start, "start")
+        require_aware(self.end, "end")
+        if self.start >= self.end:
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "end")
 
     def covers(self, moment: datetime) -> bool:
         """Return whether ``moment`` lies in ``start <= moment < end``."""
@@ -80,9 +109,20 @@ class Segment:
 
 @dataclass(frozen=True)
 class Supply:
-    """The staffed segments of a pool, sorted by start; time outside them has 0 units."""
+    """The staffed segments of a pool, sorted by start; time outside them has 0 units.
+
+    Raises:
+        DomainError: ``invalid_configuration`` with field ``segments`` when the segments are
+            not sorted by start or overlap (touching is allowed); ``units_at`` relies on it.
+    """
 
     segments: tuple[Segment, ...] = ()
+
+    def __post_init__(self) -> None:
+        """Require sorted segments that do not overlap."""
+        for before, after in zip(self.segments, self.segments[1:], strict=False):
+            if before.end > after.start:
+                raise DomainError(ErrorCode.INVALID_CONFIGURATION, "segments")
 
     def units_at(self, moment: datetime, intake: Intake | None = None) -> int:
         """Return the units staffed at ``moment`` for ``intake``.
@@ -139,9 +179,21 @@ def with_closed_days(
     return [*given, *(ScheduleOverride(day, None) for day in sorted(set(closed_days) - excepted))]
 
 
-def _utc(day: date, local: time, zone: ZoneInfo) -> datetime:
-    """Return the UTC instant of local time ``local`` on ``day`` (see the module notes on DST)."""
-    return datetime.combine(day, local).replace(tzinfo=zone).astimezone(UTC)
+def _utc(day: date, local: time, zone: ZoneInfo, *, ends: bool = False) -> datetime:
+    """Return the UTC instant of local time ``local`` on ``day`` (see the module notes on DST).
+
+    A local time in the missing hour is one hour later for a start; for an end (``ends``) it
+    is the instant of the change, the last moment before the hour that does not exist.
+    """
+    naive = datetime.combine(day, local)
+    instant = naive.replace(tzinfo=zone).astimezone(UTC)
+    if not ends or instant.astimezone(zone).replace(tzinfo=None) == naive:
+        return instant
+    after = instant.astimezone(zone).utcoffset()
+    step = timedelta(minutes=1)
+    while (instant - step).astimezone(zone).utcoffset() == after:
+        instant -= step
+    return instant
 
 
 def supply_between(
@@ -164,10 +216,10 @@ def supply_between(
         upper: End of the interval (UTC, aware), after ``lower``.
 
     Raises:
-        ValueError: If the interval is empty or reversed.
+        DomainError: ``invalid_configuration`` with field ``interval`` if the interval is empty,
+            reversed or naive.
     """
-    if lower >= upper:
-        raise ValueError("lower must be before upper")
+    check_interval(lower, upper)
     zone = staffing.timezone
     overrides = with_closed_days(staffing.overrides, closed_days)
     first = lower.astimezone(zone).date()
@@ -176,7 +228,8 @@ def supply_between(
     for offset in range((last - first).days + 1):
         day = first + timedelta(days=offset)
         for window in windows_on(day, staffing.rules, overrides):
-            start, end = _utc(day, window.opens, zone), _utc(day, window.closes, zone)
+            start = _utc(day, window.opens, zone)
+            end = _utc(day, window.closes, zone, ends=True)
             if window.staffed and start < end and start < upper and lower < end:
                 segments.append(Segment(start, end, window.capacity, window.offer))
     return Supply(tuple(sorted(segments, key=lambda s: s.start)))

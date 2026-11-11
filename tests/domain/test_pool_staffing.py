@@ -183,10 +183,18 @@ def test_an_interval_over_several_days_collects_every_day() -> None:
 
 def test_an_empty_or_reversed_interval_is_refused() -> None:
     pool = staffing()
-    with pytest.raises(ValueError, match="lower"):
-        supply_between(pool, frozenset(), utc(2026, 1, 5, 9), utc(2026, 1, 5, 9))
-    with pytest.raises(ValueError, match="lower"):
-        supply_between(pool, frozenset(), utc(2026, 1, 5, 10), utc(2026, 1, 5, 9))
+    for lower, upper in (
+        (utc(2026, 1, 5, 9), utc(2026, 1, 5, 9)),
+        (utc(2026, 1, 5, 10), utc(2026, 1, 5, 9)),
+    ):
+        with pytest.raises(DomainError) as caught:
+            supply_between(pool, frozenset(), lower, upper)
+        assert (caught.value.code, caught.value.field) == (
+            ErrorCode.INVALID_CONFIGURATION,
+            "interval",
+        )
+    with pytest.raises(DomainError):
+        supply_between(pool, frozenset(), datetime(2026, 1, 5, 9), utc(2026, 1, 5, 10))
 
 
 # --- the two Sundays on which the clock changes ---
@@ -230,6 +238,66 @@ def test_fall_back_the_repeated_hour_starts_at_its_first_occurrence() -> None:
     (segment,) = supply_of(pool, FALL_SUNDAY)
 
     assert (segment.start, segment.end) == (utc(2026, 10, 25, 0), utc(2026, 10, 25, 2))
+
+
+def test_spring_forward_a_block_ending_in_the_missing_hour_ends_at_the_change() -> None:
+    pool = staffing(
+        weekly(6, block("01:00", "02:30", 2)),
+        weekly(6, block("03:00", "05:00", 3)),
+    )
+
+    first, second = supply_of(pool, SPRING_SUNDAY)
+
+    assert (first.start, first.end) == (utc(2026, 3, 29, 0), utc(2026, 3, 29, 1))  # to 02:00 CET
+    assert (second.start, second.end) == (utc(2026, 3, 29, 1), utc(2026, 3, 29, 3))
+    supply = Supply((first, second))
+    assert supply.units_at(utc(2026, 3, 29, 1, 15)) == 3  # not the first block's 2
+    assert supply.units_at(utc(2026, 3, 29, 0, 59)) == 2
+
+
+def test_spring_forward_a_block_ending_in_the_gap_alone_ends_at_the_change() -> None:
+    pool = staffing(weekly(6, block("01:00", "02:30", 2)))
+
+    (segment,) = supply_of(pool, SPRING_SUNDAY)
+
+    assert segment.end == utc(2026, 3, 29, 1)
+
+
+def test_spring_forward_a_start_in_the_gap_never_overlaps_the_block_before_it() -> None:
+    pool = staffing(
+        weekly(6, block("01:00", "02:30", 2)),
+        weekly(6, block("02:45", "05:00", 3)),
+    )
+
+    first, second = supply_of(pool, SPRING_SUNDAY)
+
+    assert first.end <= second.start  # the missing hour is not staffed
+    assert second.start == utc(2026, 3, 29, 1, 45)  # a start in the gap falls one hour later
+    Supply((first, second))
+
+
+def test_a_supply_refuses_overlapping_or_unsorted_segments() -> None:
+    early = Segment(utc(2026, 1, 5, 9), utc(2026, 1, 5, 11), 1)
+    late = Segment(utc(2026, 1, 5, 10), utc(2026, 1, 5, 12), 1)
+    for segments in ((early, late), (late, early)):
+        with pytest.raises(DomainError) as caught:
+            Supply(segments)
+        assert (caught.value.code, caught.value.field) == (
+            ErrorCode.INVALID_CONFIGURATION,
+            "segments",
+        )
+    Supply((early, Segment(utc(2026, 1, 5, 11), utc(2026, 1, 5, 12), 1)))  # touching is fine
+
+
+def test_a_segment_is_aware_and_ends_after_it_starts() -> None:
+    for start, end in (
+        (datetime(2026, 1, 5, 9), utc(2026, 1, 5, 10)),
+        (utc(2026, 1, 5, 9), datetime(2026, 1, 5, 10)),
+        (utc(2026, 1, 5, 9), utc(2026, 1, 5, 9)),
+    ):
+        with pytest.raises(DomainError) as caught:
+            Segment(start, end, 1)
+        assert caught.value.code is ErrorCode.INVALID_CONFIGURATION
 
 
 def test_the_ordinary_days_around_the_change_keep_their_offset() -> None:

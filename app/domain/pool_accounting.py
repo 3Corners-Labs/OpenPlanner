@@ -22,8 +22,11 @@ work over them (decision P3). The rules in one place:
 * appointments are admitted by planned ends; an overrun never refuses a future appointment;
 * a start without appointment, or an early start, is refused while no unit is free, and an
   occupation that runs past its planned end counts as busy (invariant 7, decision P8);
-* an appointment that is due (its own commitment has begun) may start even then; the outcome
-  says the conflict is to be recorded.
+* an appointment that is due (its own commitment has begun) may start when a colleague's
+  overrun holds the unit it needs now (someone is staffed, no unit is free at this moment);
+  the outcome says the conflict is to be recorded. A shortage that lies later in its interval
+  (a reservation that comes next) is reported, never overridden: it is that reservation's own
+  start that is then due and may be recorded as a conflict.
 """
 
 from collections.abc import Iterable, Sequence
@@ -32,7 +35,7 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.pool_staffing import Intake, Supply, lowest_units
+from app.domain.pool_staffing import Intake, Supply, check_interval, lowest_units, require_aware
 from app.domain.scheduling import MAX_SLOT_MINUTES, valid_slot_minutes
 
 MAX_BUFFER_MINUTES = 120
@@ -65,9 +68,15 @@ class Commitment:
     in_progress: bool = False
 
     def __post_init__(self) -> None:
-        """Require ``start < until``."""
+        """Require aware instants and ``start < until``.
+
+        Raises:
+            DomainError: ``invalid_configuration`` with field ``start`` or ``until``.
+        """
+        require_aware(self.start, "start")
+        require_aware(self.until, "until")
         if self.start >= self.until:
-            raise ValueError("a commitment must end after it starts")
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "until")
 
 
 class AdmissionOutcome(StrEnum):
@@ -99,7 +108,8 @@ class StartOutcome(StrEnum):
 
     MAY_START = "may_start"
     OVERRUN_CONFLICT = "overrun_conflict"
-    """A due appointment starts although no unit is free; the conflict is recorded (P8)."""
+    """A due appointment starts although a colleague's overrun holds the last unit now; the
+    conflict is recorded (P8)."""
     REFUSED = "refused"
 
 
@@ -111,6 +121,8 @@ class StartCheck:
         outcome: May start, starts with a recorded conflict, or is refused.
         free: Lowest free count over the interval (negative when more work than units).
         short_at: First moment of the interval with no free unit; ``None`` when ``free >= 1``.
+            Also set on ``MAY_START`` of a due appointment that is late: a unit is free now but
+            the interval runs into work reserved for later (``free`` is then below 1).
     """
 
     outcome: StartOutcome
@@ -157,6 +169,7 @@ def interval_end(start: datetime, duration_minutes: int, buffer_minutes: int) ->
         DomainError: ``invalid_configuration`` for a duration or buffer out of bounds.
     """
     check_lengths(duration_minutes, buffer_minutes)
+    require_aware(start, "start")
     return start + timedelta(minutes=duration_minutes + buffer_minutes)
 
 
@@ -235,10 +248,10 @@ def free_over(
         moment 10:00 is full), of 10:30–10:50 is 2.
 
     Raises:
-        ValueError: If the interval is empty or reversed.
+        DomainError: ``invalid_configuration`` with field ``interval`` if the interval is empty,
+            reversed or naive.
     """
-    if lower >= upper:
-        raise ValueError("lower must be before upper")
+    check_interval(lower, upper)
     live = _live(commitments, lower, upper, ignore, overrun_at)
     return min(free for _, free in _free_profile(supply, live, lower, upper, intake))
 
@@ -282,7 +295,7 @@ def check_start(
     duration_minutes: int,
     buffer_minutes: int,
     *,
-    intake: Intake = Intake.ON_DEMAND,
+    intake: Intake,
     own_key: CommitmentKey | None = None,
 ) -> StartCheck:
     """Decide whether work may start treatment at ``now``.
@@ -293,10 +306,23 @@ def check_start(
     at the moment of the start, so a late start sees the current staffing and load (A35).
 
     ``own_key`` is the commitment of the work itself, left out so a checked-in reservation does
-    not count twice. When it names a commitment that has begun (``start <= now < until``) the
-    appointment is due: if no unit is free it may still start, as ``OVERRUN_CONFLICT``, and the
-    caller records the conflict (decision P8). Work without a commitment, an early start (before
-    its own ``start``) and a start after its own ``until`` are ``REFUSED`` without a free unit.
+    not count twice; it belongs to an appointment, so ``intake`` must then be ``APPOINTMENT``.
+    ``intake`` has no default: a due appointment in a block for appointments only is judged
+    against that block's units, and a wrong default would refuse it.
+
+    An appointment is due when its own commitment has begun and not ended
+    (``start <= now < until``). The rule of decision P8, in one place:
+
+    * enough free units over the interval: ``MAY_START``;
+    * otherwise, when due and someone is staffed for appointments at ``now`` and no unit is
+      free *at ``now``* (a colleague's commitments, an overrun among them, hold them all):
+      ``OVERRUN_CONFLICT``, the caller records the conflict;
+    * otherwise, when due and a unit is free at ``now`` but the interval runs into later work
+      (a late arrival into the next reservation): ``MAY_START`` with ``short_at`` set to that
+      later moment and ``free`` below 1; the next reservation is not displaced, its own start is
+      the one that is due then;
+    * work without a commitment, an early start, a start after the own ``until`` and a start
+      where nobody is staffed (staffing dropped) are ``REFUSED``.
 
     Example:
         Two units, reservations R1 and R2 at 10:00 for 30 minutes: an on-demand request of 20
@@ -304,9 +330,12 @@ def check_start(
         may start with ``free == 1``.
 
     Raises:
-        DomainError: ``invalid_configuration`` for a duration or buffer out of bounds.
+        DomainError: ``invalid_configuration`` for a duration or buffer out of bounds, or for
+            ``own_key`` with ``intake`` ``ON_DEMAND`` (field ``own_key``).
     """
     end = interval_end(now, duration_minutes, buffer_minutes)
+    if own_key is not None and intake is not Intake.APPOINTMENT:
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "own_key")
     everything = one_per_key(commitments)
     live = _live(everything, now, end, own_key, now)
     profile = _free_profile(supply, live, now, end, intake)
@@ -315,8 +344,10 @@ def check_start(
         return StartCheck(StartOutcome.MAY_START, free, None)
     short_at = next(moment for moment, value in profile if value < 1)
     own = next((c for c in everything if c.key == own_key), None)
-    due = own is not None and own.start <= now < own.until
-    outcome = StartOutcome.OVERRUN_CONFLICT if due else StartOutcome.REFUSED
+    if own is None or not own.start <= now < own.until or supply.units_at(now, intake) < 1:
+        return StartCheck(StartOutcome.REFUSED, free, short_at)
+    free_now = profile[0][1]  # the profile starts at ``now``
+    outcome = StartOutcome.MAY_START if free_now >= 1 else StartOutcome.OVERRUN_CONFLICT
     return StartCheck(outcome, free, short_at)
 
 
@@ -330,7 +361,14 @@ def earliest_start(
     *,
     intake: Intake = Intake.ON_DEMAND,
 ) -> datetime | None:
-    """Return the first start from ``after`` up to ``limit`` that ``check_start`` would pass.
+    """Return the first start from ``after`` up to ``limit`` that fits, by the planned ends.
+
+    This is a forecast, not a promise: it assumes every commitment ends at its planned end. A
+    commitment in progress that has not reached its planned end at ``after`` is taken to end
+    there; if it then runs over, ``check_start`` at that moment is refused. Example: work in
+    progress planned to end at 10:30, asked at 10:10: the answer is 10:30, and at 10:30 an
+    overrun makes ``check_start`` refuse. Call ``check_start`` again, under the lock, at the
+    moment of the start (A35).
 
     The answer can only change where a commitment ends or a staffed segment begins, so those
     moments, and ``after`` itself, are the only candidates. A commitment in progress past its
@@ -345,6 +383,7 @@ def earliest_start(
         DomainError: ``invalid_configuration`` for a duration or buffer out of bounds.
     """
     check_lengths(duration_minutes, buffer_minutes)
+    require_aware(after, "after")
     everything = one_per_key(commitments)
     candidates = {after}
     candidates |= {c.until for c in everything if after < c.until <= limit}
@@ -378,10 +417,10 @@ def shortfalls(
         Two units, three commitments over 10:00–10:30: one entry, 10:00–10:30, units 2, load 3.
 
     Raises:
-        ValueError: If the interval is empty or reversed.
+        DomainError: ``invalid_configuration`` with field ``interval`` if the interval is empty,
+            reversed or naive.
     """
-    if lower >= upper:
-        raise ValueError("lower must be before upper")
+    check_interval(lower, upper)
     live = _live(commitments, lower, upper, None, overrun_at)
     edges = {lower, upper, *supply.borders_between(lower, upper)}
     for start, until in live:
