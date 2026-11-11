@@ -5,18 +5,19 @@ visibility as skills (``visible_organisation``); every method that takes an id f
 ``Scope`` in SQL, and an id outside it behaves like a missing one. What SQL cannot express (a skill
 of another organisation, a group of another organisation, a pool in use) is the pure functions of
 ``app.domain.capacity``, called here with the rows already loaded. Pools are archived, never
-deleted. Writes run in ``locked()`` transactions (``BEGIN IMMEDIATE``), so the pre-check that a
-group has one legacy pool cannot interleave with another writer; the unique constraint is the
-backstop.
+deleted. The write methods (save, archive) rely on the immediate write lock of ``locked()``
+(``BEGIN IMMEDIATE``), so the pre-check that a group has one legacy pool cannot interleave with
+another writer; the unique constraint is the backstop. They must not be called from a ``read()``
+transaction, which takes no lock; the unit of work does not stop it.
 """
 
 from collections.abc import Collection
 from datetime import datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.db.flow_usage import CURRENT_REVISION, REVISION_IN_EFFECT
+from app.adapters.db.flow_usage import REVISION_IN_EFFECT
 from app.adapters.db.models import (
     CapacityPoolRow,
     CapacityPoolSkillRow,
@@ -25,10 +26,16 @@ from app.adapters.db.models import (
     OrganisationRow,
     ServiceFlowRow,
 )
-from app.adapters.db.scope import organisation_is_visible, visible_organisation
+from app.adapters.db.scope import organisation_is_visible, scope_filter, visible_organisation
 from app.adapters.db.skills import load_skills
 from app.domain.authorization import Scope
-from app.domain.capacity import CapacityPool, PoolMode, check_pool_archive, check_pool_save
+from app.domain.capacity import (
+    CapacityPool,
+    PoolFlows,
+    PoolMode,
+    check_pool_archive,
+    check_pool_save,
+)
 from app.domain.errors import missing_object
 from app.domain.service_flows import FlowState
 
@@ -155,28 +162,42 @@ class CapacityPoolQueries:
         await self._session.flush()
         return (await pools_from_rows(self._session, [row]))[0]
 
-    async def flows_on_pool(self, scope: Scope, pool_id: int) -> list[int]:
-        """Return the ids of the flows, not archived, that draw on the pool, by id.
+    async def flows_on_pool(self, scope: Scope, pool_id: int) -> PoolFlows:
+        """Return the flows, not archived, that draw on the pool, by id, as far as ``scope`` sees.
 
-        A flow draws on the pool by its current or its draft revision. A pool that does not exist
-        or lies outside ``scope`` has no flows.
+        A flow draws on the pool by its current or its draft revision. Flows of groups outside
+        ``scope`` are not listed but counted in ``hidden``. A pool that does not exist or lies
+        outside ``scope`` has no flows.
         """
         if await self._pool_row(scope, pool_id) is None:
-            return []
+            return PoolFlows()
+        drawing = (
+            FlowRevisionRow.capacity_pool_id == pool_id,
+            ServiceFlowRow.state != FlowState.ARCHIVED.value,
+        )
         found = await self._session.scalars(
             select(ServiceFlowRow.id)
             .join(FlowRevisionRow, REVISION_IN_EFFECT)
-            .where(
-                FlowRevisionRow.capacity_pool_id == pool_id,
-                ServiceFlowRow.state != FlowState.ARCHIVED.value,
-            )
+            .join(GroupRow, GroupRow.id == ServiceFlowRow.group_id)
+            .join(OrganisationRow, OrganisationRow.id == GroupRow.organisation_id)
+            .where(*drawing, scope_filter(scope, OrganisationRow.slug, GroupRow.slug))
             .distinct()
             .order_by(ServiceFlowRow.id)
         )
-        return list(found)
+        seen = tuple(found)
+        total = await self._session.scalar(
+            select(func.count(func.distinct(ServiceFlowRow.id)))
+            .select_from(ServiceFlowRow)
+            .join(FlowRevisionRow, REVISION_IN_EFFECT)
+            .where(*drawing)
+        )
+        return PoolFlows(seen, (total or 0) - len(seen))
 
     async def archive_capacity_pool(self, scope: Scope, pool_id: int, at: datetime) -> None:
-        """Archive a pool; refused while an active flow's current revision draws on it.
+        """Archive a pool; refused while a flow not archived draws on it, by current or draft.
+
+        Every flow counts, whatever the scope of the caller: a pool must not become unusable
+        under a group the caller cannot see.
 
         Raises:
             DomainError: ``configuration_object_missing`` for a pool that does not exist or lies
@@ -187,14 +208,15 @@ class CapacityPoolQueries:
             raise missing_object("pool_id")
         if row.archived_at is not None:
             return
-        active = await self._session.scalars(
+        drawing = await self._session.scalars(
             select(ServiceFlowRow.code)
-            .join(FlowRevisionRow, CURRENT_REVISION)
+            .join(FlowRevisionRow, REVISION_IN_EFFECT)
             .where(
                 FlowRevisionRow.capacity_pool_id == pool_id,
-                ServiceFlowRow.state == FlowState.ACTIVE.value,
+                ServiceFlowRow.state != FlowState.ARCHIVED.value,
             )
+            .distinct()
         )
-        check_pool_archive(list(active))
+        check_pool_archive(list(drawing))
         row.archived_at = at
         await self._session.flush()

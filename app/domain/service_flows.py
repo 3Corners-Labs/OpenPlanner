@@ -181,6 +181,11 @@ class FlowRevision:
         if self.revision < 1:
             raise _invalid("revision")
 
+    @property
+    def all_skill_ids(self) -> frozenset[int]:
+        """Return every skill the revision names: required by the flow or by one of its subjects."""
+        return self.required_skill_ids.union(*self.subject_skill_ids.values())
+
 
 @dataclass(frozen=True)
 class ServiceFlow:
@@ -451,8 +456,13 @@ def check_flow_references(
             raise _invalid("capacity_pool_id")
     if any(code not in subject_codes for code in revision.subject_skill_ids):
         raise _invalid("subject_skill_ids")
-    wanted = revision.required_skill_ids.union(*revision.subject_skill_ids.values())
-    check_skills_of(group_organisation_id, wanted, skills, already_required, "required_skill_ids")
+    check_skills_of(
+        group_organisation_id,
+        revision.all_skill_ids,
+        skills,
+        already_required,
+        "required_skill_ids",
+    )
     if revision.location_id is not None:
         raise _invalid("location_id")
 
@@ -495,8 +505,10 @@ def check_state_change(flow: ServiceFlow, new_state: FlowState) -> None:
         raise _invalid("state")
 
 
-def check_publishable(flow: ServiceFlow) -> None:
+def check_publishable(flow: ServiceFlow) -> FlowRevision:
     """Refuse publishing a flow without a draft, or a draft that drops a default entry path.
+
+    Returns the draft to publish.
 
     Raises:
         DomainError: ``configuration_object_missing`` (field ``draft``) without a draft,
@@ -507,6 +519,7 @@ def check_publishable(flow: ServiceFlow) -> None:
         raise missing_object("draft")
     if not flow.default_for <= flow.draft.intake_modes:
         raise _invalid("default_for")
+    return flow.draft
 
 
 def check_draft_save(

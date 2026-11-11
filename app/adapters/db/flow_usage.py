@@ -16,9 +16,3 @@ REVISION_IN_EFFECT: ColumnElement[bool] = and_(
     ),
 )
 """Join condition: the revision row is the current or the draft revision of the flow row."""
-
-CURRENT_REVISION: ColumnElement[bool] = and_(
-    FlowRevisionRow.flow_id == ServiceFlowRow.id,
-    FlowRevisionRow.revision == ServiceFlowRow.current_revision,
-)
-"""Join condition: the revision row is the published revision of the flow row."""

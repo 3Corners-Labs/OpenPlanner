@@ -1,7 +1,9 @@
 """What the schema of skills, pools and flows enforces itself (ADR 0121 step 2b)."""
 
+from typing import Any
+
 import pytest
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
@@ -30,8 +32,11 @@ async def _group_and_organisation(engine: AsyncEngine) -> tuple[int, int]:
     return group_id, organisation
 
 
-def _flow(group_id: int, code: str, *, state: str = "active", **defaults: bool) -> ServiceFlowRow:
-    return ServiceFlowRow(group_id=group_id, code=code, state=state, **defaults)
+def _flow(group_id: int, code: str, *, state: str = "active", **columns: Any) -> ServiceFlowRow:
+    """Return a flow row; an active one names revision 1 as current, as the schema demands."""
+    if state == "active":
+        columns.setdefault("current_revision", 1)
+    return ServiceFlowRow(group_id=group_id, code=code, state=state, **columns)
 
 
 async def test_one_active_default_flow_per_entry_path_and_group(engine: AsyncEngine) -> None:
@@ -170,3 +175,95 @@ async def test_a_pool_that_a_revision_draws_on_cannot_be_deleted(engine: AsyncEn
     with pytest.raises(IntegrityError):
         async with AsyncSession(engine) as session, session.begin():
             await session.execute(delete(CapacityPoolRow).where(CapacityPoolRow.id == pool_id))
+
+
+async def _organisation_with_a_pool_in_use(engine: AsyncEngine) -> tuple[int, int, int]:
+    """Seed a counted pool used by a flow's current revision and another flow's draft.
+
+    Returns the ids of the organisation, the group and the pool.
+    """
+    group_id, organisation = await _group_and_organisation(engine)
+    async with AsyncSession(engine) as session, session.begin():
+        pool = CapacityPoolRow(organisation_id=organisation, name="P", mode="counted")
+        live = _flow(group_id, "live")
+        fresh = _flow(group_id, "fresh", state="draft")
+        session.add_all([pool, live, fresh])
+        await session.flush()
+        live.current_revision = 1
+        fresh.draft_revision = 1
+        session.add_all(
+            FlowRevisionRow(
+                flow_id=flow.id, revision=1, labels="{}", intake_modes="x", capacity_pool_id=pool.id
+            )
+            for flow in (live, fresh)
+        )
+        pool_id = pool.id
+    return organisation, group_id, pool_id
+
+
+async def _counts(engine: AsyncEngine) -> tuple[int, int, int]:
+    """Return how many pools, flows and revisions are stored."""
+    async with AsyncSession(engine) as session:
+        pools = await session.scalar(select(func.count()).select_from(CapacityPoolRow))
+        flows = await session.scalar(select(func.count()).select_from(ServiceFlowRow))
+        revisions = await session.scalar(select(func.count()).select_from(FlowRevisionRow))
+    return pools or 0, flows or 0, revisions or 0
+
+
+async def test_deleting_an_organisation_after_its_groups_removes_a_pool_in_use(
+    engine: AsyncEngine,
+) -> None:
+    """The organisation delete use case and the configuration import clear the groups first."""
+    organisation, group_id, _ = await _organisation_with_a_pool_in_use(engine)
+
+    async with SqlUnitOfWork(engine).locked() as tx:
+        await tx.delete_group(group_id)  # the flows and their revisions go with the group
+        await tx.delete_organisation(organisation)
+
+    assert await _counts(engine) == (0, 0, 0)
+
+
+async def test_a_plain_delete_removes_pool_and_revisions_in_one_statement(
+    engine: AsyncEngine,
+) -> None:
+    """Pool and revisions go in one cascade whatever the order: checked at statement end."""
+    organisation, group_id, _ = await _organisation_with_a_pool_in_use(engine)
+    async with AsyncSession(engine) as session, session.begin():
+        legacy = CapacityPoolRow(
+            organisation_id=organisation, name="L", mode="legacy_group", group_id=group_id
+        )
+        session.add(legacy)
+        await session.flush()
+        flow = await session.scalar(select(ServiceFlowRow).where(ServiceFlowRow.code == "live"))
+        assert flow is not None
+        revision = await session.get(FlowRevisionRow, (flow.id, 1))
+        assert revision is not None
+        revision.capacity_pool_id = legacy.id  # the group's own pool, deleted with the group
+
+    async with AsyncSession(engine) as session, session.begin():
+        await session.execute(text("DELETE FROM groups WHERE id = :id"), {"id": group_id})
+        await session.execute(
+            text("DELETE FROM organisations WHERE id = :id"), {"id": organisation}
+        )
+
+    assert await _counts(engine) == (0, 0, 0)
+
+
+async def test_deleting_a_group_keeps_the_organisations_pool(engine: AsyncEngine) -> None:
+    _, group_id, _ = await _organisation_with_a_pool_in_use(engine)
+
+    async with SqlUnitOfWork(engine).locked() as tx:
+        await tx.delete_group(group_id)
+
+    assert await _counts(engine) == (1, 0, 0)
+
+
+async def test_a_flow_must_be_active_with_a_current_revision(engine: AsyncEngine) -> None:
+    group_id, _ = await _group_and_organisation(engine)
+    async with AsyncSession(engine) as session, session.begin():
+        session.add(_flow(group_id, "live"))
+        session.add(_flow(group_id, "new", state="draft"))  # a draft needs none
+
+    with pytest.raises(IntegrityError):
+        async with AsyncSession(engine) as session, session.begin():
+            session.add(_flow(group_id, "broken", current_revision=None))

@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Any
 
 from app.domain.authorization import Scope
-from app.domain.capacity import CapacityPool, check_pool_archive, check_pool_save
+from app.domain.capacity import CapacityPool, PoolFlows, check_pool_archive, check_pool_save
 from app.domain.errors import DomainError, ErrorCode, missing_object
 from app.domain.scheduling import Group
 from app.domain.service_flows import (
@@ -39,13 +39,6 @@ def _visible(state: Any, scope: Scope, organisation_id: int) -> bool:
     )
 
 
-def _skills_of(revision: FlowRevision | None) -> frozenset[int]:
-    """Return every skill a revision requires, for the flow or for a subject."""
-    if revision is None:
-        return frozenset()
-    return revision.required_skill_ids.union(*revision.subject_skill_ids.values())
-
-
 class ServiceFlowStore:
     """The skills', pools' and flows' part of the in-memory transaction."""
 
@@ -58,6 +51,29 @@ class ServiceFlowStore:
     def _staff(self, staff_id: int) -> StaffMember | None:
         """Return the staff member with row id ``staff_id``."""
         return next((m for m in self.state.staff.values() if m.id == staff_id), None)
+
+    def _holds(self, staff_id: int, skill_id: int) -> bool:
+        """Return whether the person is a member of the skill's organisation, so a grant counts."""
+        member = self._staff(staff_id)
+        slug = self.state.organisation_slugs.get(self.state.skills[skill_id].organisation_id)
+        return member is not None and any(m.organisation == slug for m in member.memberships)
+
+    def _check_references(
+        self, group: Group, revision: FlowRevision, based_on: FlowRevision | None
+    ) -> None:
+        """Run ``check_flow_references`` against the present pool, skills and subjects."""
+        pool = (
+            self.state.pools.get(revision.capacity_pool_id) if revision.capacity_pool_id else None
+        )
+        check_flow_references(
+            group.organisation_id,
+            revision,
+            pool,
+            {s: self.state.skills[s] for s in revision.all_skill_ids if s in self.state.skills},
+            based_on.all_skill_ids if based_on else frozenset(),
+            [subject.code for subject in group.routing.subjects],
+            already_pool_id=based_on.capacity_pool_id if based_on else None,
+        )
 
     def _put_flow(self, flow: ServiceFlow) -> None:
         """Store a flow and index its revisions."""
@@ -138,25 +154,26 @@ class ServiceFlowStore:
     async def skill_usage(self, scope: Scope, skill_id: int) -> SkillUsage:
         if await self.get_skill(scope, skill_id) is None:
             return SkillUsage()
-        staff = sum(1 for _, skill in self.state.skill_grants if skill == skill_id)
+        staff = sum(
+            1
+            for who, skill in self.state.skill_grants
+            if skill == skill_id and self._holds(who, skill)
+        )
         pools = sum(1 for p in self.state.pools.values() if skill_id in p.guaranteed_skill_ids)
         flows = sum(
-            skill_id in _skills_of(flow.current) | _skills_of(flow.draft)
+            any(skill_id in r.all_skill_ids for r in (flow.current, flow.draft) if r)
             for flow in self.state.flows.values()
             if flow.state is not FlowState.ARCHIVED
         )
         return SkillUsage(staff, pools, flows)
 
     async def list_staff_skills(self, scope: Scope, staff_id: int) -> frozenset[int]:
-        member = self._staff(staff_id)
-        member_of = {m.organisation for m in member.memberships} if member else set()
         return frozenset(
             skill
             for staff, skill in self.state.skill_grants
             if staff == staff_id
             and _visible(self.state, scope, self.state.skills[skill].organisation_id)
-            and self.state.organisation_slugs.get(self.state.skills[skill].organisation_id)
-            in member_of
+            and self._holds(staff, skill)
         )
 
     async def set_staff_skills(
@@ -236,15 +253,24 @@ class ServiceFlowStore:
         self.state.pools[kept.id] = kept
         return kept
 
-    async def flows_on_pool(self, scope: Scope, pool_id: int) -> list[int]:
-        if await self.get_capacity_pool(scope, pool_id) is None:
-            return []
+    def _drawing_on(self, pool_id: int) -> list[ServiceFlow]:
+        """Return the flows not archived whose current or draft revision names the pool."""
         return sorted(
-            f.id or 0
-            for f in self.state.flows.values()
-            if f.state is not FlowState.ARCHIVED
-            and pool_id in {r.capacity_pool_id for r in (f.current, f.draft) if r}
+            (
+                f
+                for f in self.state.flows.values()
+                if f.state is not FlowState.ARCHIVED
+                and pool_id in {r.capacity_pool_id for r in (f.current, f.draft) if r}
+            ),
+            key=lambda f: f.id or 0,
         )
+
+    async def flows_on_pool(self, scope: Scope, pool_id: int) -> PoolFlows:
+        if await self.get_capacity_pool(scope, pool_id) is None:
+            return PoolFlows()
+        drawing = self._drawing_on(pool_id)
+        seen = tuple(f.id or 0 for f in drawing if self._scoped_flow(scope, f.id or 0))
+        return PoolFlows(seen, len(drawing) - len(seen))
 
     async def archive_capacity_pool(self, scope: Scope, pool_id: int, at: datetime) -> None:
         pool = await self.get_capacity_pool(scope, pool_id)
@@ -252,15 +278,7 @@ class ServiceFlowStore:
             raise missing_object("pool_id")
         if pool.archived_at is not None:
             return
-        check_pool_archive(
-            [
-                f.code
-                for f in self.state.flows.values()
-                if f.state is FlowState.ACTIVE
-                and f.current is not None
-                and f.current.capacity_pool_id == pool_id
-            ]
-        )
+        check_pool_archive([f.code for f in self._drawing_on(pool_id)])
         self.state.pools[pool_id] = replace(pool, archived_at=at)
 
     async def list_service_flows(self, scope: Scope, group_id: int) -> list[ServiceFlow]:
@@ -287,26 +305,21 @@ class ServiceFlowStore:
         )
         draft = check_draft_save(flow, stored, taken)
         based_on = (stored.draft or stored.current) if stored else None
-        pool = self.state.pools.get(draft.capacity_pool_id) if draft.capacity_pool_id else None
-        check_flow_references(
-            group.organisation_id,
-            draft,
-            pool,
-            {s: self.state.skills[s] for s in _skills_of(draft) if s in self.state.skills},
-            _skills_of(based_on),
-            [subject.code for subject in group.routing.subjects],
-            already_pool_id=based_on.capacity_pool_id if based_on else None,
-        )
+        self._check_references(group, draft, based_on)
         flow_id = flow.id or self._new_id()
         if stored is not None and stored.draft is not None:
             number = stored.draft.revision
         else:
             number = (stored.current.revision if stored and stored.current else 0) + 1
         draft = replace(draft, flow_id=flow_id, revision=number, published_at=None)
-        if stored is not None and stored.current is not None:
-            saved = replace(stored, draft=draft)
+        if stored is None:  # a new flow: always a draft, whatever state the caller passed
+            saved = ServiceFlow(
+                flow_id, flow.group_id, flow.code, FlowState.DRAFT, flow.default_for, None, draft
+            )
+        elif stored.current is None:  # never published: code and defaults may still change
+            saved = replace(stored, code=flow.code, default_for=flow.default_for, draft=draft)
         else:
-            saved = replace(flow, id=flow_id, current=None, draft=draft)
+            saved = replace(stored, draft=draft)
         self._put_flow(saved)
         return saved
 
@@ -316,9 +329,9 @@ class ServiceFlowStore:
         flow = self._scoped_flow(scope, flow_id)
         if flow is None:
             raise missing_object("flow_id")
-        check_publishable(flow)
-        assert flow.draft is not None
-        published = replace(flow.draft, published_at=at, published_by=by)
+        draft = check_publishable(flow)
+        self._check_references(self.state.groups[flow.group_id], draft, flow.current)
+        published = replace(draft, published_at=at, published_by=by)
         saved = replace(flow, current=published, draft=None)
         self._put_flow(saved)
         return saved

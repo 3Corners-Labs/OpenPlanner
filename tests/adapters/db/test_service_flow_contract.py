@@ -14,14 +14,14 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.db.engine import create_engine
-from app.adapters.db.models import StaffSkillRow
+from app.adapters.db.models import CapacityPoolRow, StaffSkillRow
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
-from app.domain.capacity import CapacityPool, PoolMode
+from app.domain.capacity import CapacityPool, PoolFlows, PoolMode
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.routing import GroupRouting, Subject
 from app.domain.scheduling import Organisation
@@ -53,10 +53,13 @@ class World:
     acme_staff: int
     beta_staff: int
     both_staff: int
-    granted_by: Callable[[int, int], Awaitable[int | None]]
+    granted_by: Callable[[int, int], Awaitable[int | None]] | None
+    """Who granted a skill; only the SQL variant can read it (the port does not return it)."""
+    archive_pool_directly: Callable[[int], Awaitable[None]]
+    """Archive a pool behind the port's back, for a state the port refuses to produce."""
 
 
-async def _seed(uow: Any) -> tuple[int, int, int, int, int, int, int]:
+async def _seed(uow: Any) -> tuple[int, ...]:
     """Seed through the port; return the ids of the organisations, groups and staff."""
     async with uow.locked() as tx:
         acme = await tx.add_organisation(Organisation(0, "Acme", "acme"))
@@ -78,8 +81,12 @@ async def _seed(uow: Any) -> tuple[int, int, int, int, int, int, int]:
             ("sub-ab", ["acme", "beta"]),
         ):
             await tx.save_staff(person(subject, slugs))
-        ids = [(await tx.get_staff(s)).id for s in ("sub-a", "sub-b", "sub-ab")]  # type: ignore[union-attr]
-    return acme.id, beta.id, a_group.id, b_group.id, *ids  # type: ignore[return-value]
+        ids = []
+        for subject in ("sub-a", "sub-b", "sub-ab"):
+            member = await tx.get_staff(subject)
+            assert member is not None
+            ids.append(member.id)
+    return acme.id, beta.id, a_group.id, b_group.id, *ids
 
 
 def person(subject: str, organisations: list[str]) -> StaffMember:
@@ -100,11 +107,11 @@ async def world(request: pytest.FixtureRequest, database_url: str) -> AsyncItera
     if request.param == "fake":
         uow: Any = InMemoryUnitOfWork()
 
-        async def granted_by_fake(staff_id: int, skill_id: int) -> int | None:
-            return uow.state.skill_grants[(staff_id, skill_id)][0]  # type: ignore[no-any-return]
+        async def archive_in_fake(pool_id: int) -> None:
+            uow.state.pools[pool_id] = replace(uow.state.pools[pool_id], archived_at=NOW)
 
         ids = await _seed(uow)
-        yield World(uow, *ids, granted_by_fake)
+        yield World(uow, *ids, None, archive_in_fake)
         return
     engine: AsyncEngine = create_engine(database_url, busy_timeout_ms=200)
     uow = SqlUnitOfWork(engine)
@@ -117,9 +124,22 @@ async def world(request: pytest.FixtureRequest, database_url: str) -> AsyncItera
                 )
             )
 
+    async def archive_in_sql(pool_id: int) -> None:
+        async with AsyncSession(engine) as session, session.begin():
+            await session.execute(
+                update(CapacityPoolRow).where(CapacityPoolRow.id == pool_id).values(archived_at=NOW)
+            )
+
     ids = await _seed(uow)
-    yield World(uow, *ids, granted_by_sql)
+    yield World(uow, *ids, granted_by_sql, archive_in_sql)
     await engine.dispose()
+
+
+def who_granted(world: World) -> Callable[[int, int], Awaitable[int | None]]:
+    """Return the reader of who granted a skill, or skip: only the SQL rows keep it."""
+    if world.granted_by is None:
+        pytest.skip("who granted a skill is not readable through the port; the SQL variant checks")
+    return world.granted_by
 
 
 def refused(code: ErrorCode, field: str | None = None) -> Any:
@@ -329,6 +349,22 @@ async def test_skill_usage_counts_the_current_and_the_draft_of_flows_not_archive
     assert (await usage(new.id)).flows == 0
 
 
+async def test_skill_usage_counts_the_grants_of_current_members_only(world: World) -> None:
+    skill = await add_skill(world)
+    assert skill.id is not None
+    await grant(world, world.acme_staff, {skill.id})
+    await grant(world, world.both_staff, {skill.id})
+    async with world.uow.read() as tx:
+        assert (await tx.skill_usage(ACME, skill.id)).staff == 2
+    async with world.uow.locked() as tx:  # the person leaves Acme; the grant row may stay
+        await tx.save_staff(person("sub-ab", ["beta"]))
+
+    async with world.uow.read() as tx:
+        assert (await tx.skill_usage(ACME, skill.id)).staff == 1
+        assert await tx.list_staff_skills(EVERYTHING, world.both_staff) == frozenset()
+        assert await tx.list_staff_skills(EVERYTHING, world.acme_staff) == {skill.id}
+
+
 async def test_a_skill_outside_the_scope_is_used_nowhere_and_cannot_be_archived_or_saved(
     world: World,
 ) -> None:
@@ -409,8 +445,18 @@ async def test_staff_skills_are_replaced_as_a_set_and_keep_unchanged_grants(worl
         assert await tx.list_staff_skills(ACME, world.acme_staff) == {two.id, three.id}
         assert await tx.list_staff_skills(BETA, world.acme_staff) == frozenset()
         assert await tx.list_staff_skills(NOBODY, world.acme_staff) == frozenset()
-    assert await world.granted_by(world.acme_staff, two.id) is None  # kept as granted first
-    assert await world.granted_by(world.acme_staff, three.id) == world.acme_staff
+
+
+async def test_a_kept_grant_keeps_who_granted_it(world: World) -> None:
+    granted_by = who_granted(world)
+    one, two = await add_skill(world, "one"), await add_skill(world, "two")
+    assert one.id
+    assert two.id
+    await grant(world, world.acme_staff, {one.id})
+    await grant(world, world.acme_staff, {one.id, two.id}, by=world.acme_staff, at=LATER)
+
+    assert await granted_by(world.acme_staff, one.id) is None  # kept as granted first
+    assert await granted_by(world.acme_staff, two.id) == world.acme_staff
 
 
 async def test_a_staff_member_holds_no_skill_of_an_organisation_they_have_no_place_in(
@@ -517,29 +563,39 @@ async def test_an_erased_or_unknown_staff_member_has_no_skills(world: World) -> 
             await grant(world, staff_id, {skill.id}, at=LATER)
 
 
-async def test_erasing_a_person_empties_who_granted_a_skill_and_who_published_a_revision(
-    world: World,
-) -> None:
+async def test_erasing_a_person_empties_who_published_a_revision(world: World) -> None:
     skill = await add_skill(world)
     assert skill.id is not None
     await grant(world, world.both_staff, {skill.id}, by=world.acme_staff)
     flow = await add_flow(world)
     assert flow.id is not None
     await publish(world, flow.id)  # published by Acme's admin, sub-a
-    assert await world.granted_by(world.both_staff, skill.id) == world.acme_staff
     assert (await get_flow(world, flow.id)).current is not None
 
     async with world.uow.locked() as tx:
         await tx.set_staff_status("sub-a", StaffStatus.SUSPENDED, NOW)
         await tx.erase_staff("sub-a", LATER)
 
-    assert await world.granted_by(world.both_staff, skill.id) is None
     stored = await get_flow(world, flow.id)
     assert stored.current is not None
     assert stored.current.published_by is None
     assert stored.current.published_at == NOW  # when it was published stays
     async with world.uow.read() as tx:
         assert await tx.list_staff_skills(EVERYTHING, world.both_staff) == {skill.id}
+
+
+async def test_erasing_a_person_empties_who_granted_a_skill(world: World) -> None:
+    granted_by = who_granted(world)
+    skill = await add_skill(world)
+    assert skill.id is not None
+    await grant(world, world.both_staff, {skill.id}, by=world.acme_staff)
+    assert await granted_by(world.both_staff, skill.id) == world.acme_staff
+
+    async with world.uow.locked() as tx:
+        await tx.set_staff_status("sub-a", StaffStatus.SUSPENDED, NOW)
+        await tx.erase_staff("sub-a", LATER)
+
+    assert await granted_by(world.both_staff, skill.id) is None
 
 
 # --- capacity pools ---------------------------------------------------------------------------
@@ -627,8 +683,8 @@ async def test_a_pool_outside_the_scope_is_missing_to_every_method(world: World)
             async with world.uow.locked() as tx:
                 await tx.archive_capacity_pool(scope, pool.id, NOW)
         async with world.uow.read() as tx:
-            assert await tx.flows_on_pool(scope, pool.id) == []
-            assert await tx.flows_on_pool(scope, 999) == []  # the same as a missing id
+            assert await tx.flows_on_pool(scope, pool.id) == PoolFlows()
+            assert await tx.flows_on_pool(scope, 999) == PoolFlows()  # the same as a missing id
     with refused(ErrorCode.CONFIGURATION_OBJECT_MISSING, "pool_id"):
         async with world.uow.locked() as tx:  # claims Beta, names Acme's id
             await tx.save_capacity_pool(BETA, replace(pool, organisation_id=world.beta))
@@ -636,20 +692,23 @@ async def test_a_pool_outside_the_scope_is_missing_to_every_method(world: World)
         async with world.uow.locked() as tx:
             await tx.save_capacity_pool(BETA, replace(pool, name="Taken over"))
     async with world.uow.read() as tx:
-        assert await tx.flows_on_pool(ACME, pool.id) == [flow.id]
+        assert await tx.flows_on_pool(ACME, pool.id) == PoolFlows((flow.id,))
         (unchanged,) = await tx.list_capacity_pools(EVERYTHING, world.acme)
     assert (unchanged.name, unchanged.archived_at) == ("Mine", None)
 
 
-async def test_a_pool_with_an_active_flow_cannot_be_archived(world: World) -> None:
+async def test_a_pool_that_a_flow_draws_on_cannot_be_archived(world: World) -> None:
     pool = await add_pool(world)
     assert pool.id is not None
     draft = await add_flow(world, capacity_pool_id=pool.id)
     assert draft.id is not None
     async with world.uow.read() as tx:
-        assert await tx.flows_on_pool(ACME, pool.id) == [draft.id]
-
-    async with world.uow.locked() as tx:  # a draft does not hold the pool
+        assert await tx.flows_on_pool(ACME, pool.id) == PoolFlows((draft.id,))
+    with refused(ErrorCode.CONFIGURATION_OBJECT_IN_USE, "capacity_pool"):  # a draft holds it
+        async with world.uow.locked() as tx:
+            await tx.archive_capacity_pool(ACME, pool.id, NOW)
+    async with world.uow.locked() as tx:  # once the draft is gone it can go
+        await tx.discard_draft(ACME, draft.id)
         await tx.archive_capacity_pool(ACME, pool.id, NOW)
     async with world.uow.read() as tx:
         assert await tx.list_capacity_pools(ACME, world.acme) == []
@@ -684,13 +743,72 @@ async def test_flows_on_a_pool_are_the_flows_not_archived_by_current_or_draft(
     )
 
     async with world.uow.read() as tx:
-        assert await tx.flows_on_pool(ACME, first.id) == [flow.id]  # the published revision
-        assert await tx.flows_on_pool(ACME, second.id) == [flow.id]  # the draft
+        assert (await tx.flows_on_pool(ACME, first.id)).flows == (flow.id,)  # the published one
+        assert (await tx.flows_on_pool(ACME, second.id)).flows == (flow.id,)  # the draft
     async with world.uow.locked() as tx:
         await tx.set_flow_state(EVERYTHING, flow.id, FlowState.ARCHIVED)
     async with world.uow.read() as tx:
-        assert await tx.flows_on_pool(ACME, first.id) == []
-        assert await tx.flows_on_pool(ACME, second.id) == []
+        assert await tx.flows_on_pool(ACME, first.id) == PoolFlows()
+        assert await tx.flows_on_pool(ACME, second.id) == PoolFlows()
+
+
+async def test_a_pool_cannot_be_archived_while_a_draft_or_a_current_revision_draws_on_it(
+    world: World,
+) -> None:
+    live, planned = await add_pool(world, "Live"), await add_pool(world, "Planned")
+    assert live.id
+    assert planned.id
+    flow = await add_flow(world, capacity_pool_id=live.id)
+    assert flow.id is not None
+    published = await activate(world, flow.id)
+    await save_draft(
+        world, replace(published, draft=revision(flow_id=flow.id, capacity_pool_id=planned.id))
+    )
+
+    for pool in (live, planned):  # the published revision holds one, the draft the other
+        with refused(ErrorCode.CONFIGURATION_OBJECT_IN_USE, "capacity_pool"):
+            async with world.uow.locked() as tx:
+                await tx.archive_capacity_pool(EVERYTHING, pool.id, NOW)
+    async with world.uow.locked() as tx:  # an archived flow holds nothing
+        await tx.set_flow_state(EVERYTHING, flow.id, FlowState.ARCHIVED)
+        await tx.archive_capacity_pool(EVERYTHING, live.id, NOW)
+        await tx.archive_capacity_pool(EVERYTHING, planned.id, NOW)
+
+
+async def test_a_pool_of_a_flow_in_another_group_still_blocks_a_group_scoped_archive(
+    world: World,
+) -> None:
+    pool = await add_pool(world)
+    assert pool.id is not None
+    async with world.uow.locked() as tx:
+        other = await tx.add_group(make_group(id=0, organisation_id=world.acme, slug="kantoor"))
+        await tx.save_draft(EVERYTHING, blank(world, "x", other.id, capacity_pool_id=pool.id))
+
+    with refused(ErrorCode.CONFIGURATION_OBJECT_IN_USE, "capacity_pool"):
+        async with world.uow.locked() as tx:
+            await tx.archive_capacity_pool(ACME_GROUP, pool.id, NOW)
+
+
+async def test_the_flows_on_a_pool_follow_the_callers_groups_and_count_the_rest(
+    world: World,
+) -> None:
+    pool = await add_pool(world)
+    assert pool.id is not None
+    mine = await add_flow(world, "mine", capacity_pool_id=pool.id)
+    async with world.uow.locked() as tx:
+        other = await tx.add_group(make_group(id=0, organisation_id=world.acme, slug="kantoor"))
+        elsewhere = [
+            await tx.save_draft(EVERYTHING, blank(world, code, other.id, capacity_pool_id=pool.id))
+            for code in ("x", "y")
+        ]
+        await tx.save_draft(EVERYTHING, blank(world, "unrelated", other.id))
+    assert mine.id is not None
+    flows = (mine.id, *(f.id for f in elsewhere))
+
+    async with world.uow.read() as tx:
+        assert await tx.flows_on_pool(ACME, pool.id) == PoolFlows(flows, 0)
+        assert await tx.flows_on_pool(EVERYTHING, pool.id) == PoolFlows(flows, 0)
+        assert await tx.flows_on_pool(ACME_GROUP, pool.id) == PoolFlows((mine.id,), 2)
 
 
 # --- flows ------------------------------------------------------------------------------------
@@ -1053,7 +1171,7 @@ async def test_an_archived_skill_or_pool_is_not_newly_chosen_but_a_held_one_stay
     async with world.uow.locked() as tx:
         await tx.archive_skill(EVERYTHING, held.id, NOW)
         await tx.archive_skill(EVERYTHING, fresh.id, NOW)
-        await tx.archive_capacity_pool(EVERYTHING, pool.id, NOW)
+    await world.archive_pool_directly(pool.id)  # the port refuses while the draft holds it
 
     async def save(skills: frozenset[int], pool_id: int | None = pool.id) -> ServiceFlow:
         draft = revision(flow_id=stored.id, capacity_pool_id=pool_id, required_skill_ids=skills)
@@ -1069,3 +1187,79 @@ async def test_an_archived_skill_or_pool_is_not_newly_chosen_but_a_held_one_stay
         await tx.archive_capacity_pool(EVERYTHING, new_pool.id, NOW)
     with refused(ErrorCode.INVALID_CONFIGURATION, "capacity_pool_id"):
         await save(frozenset(), new_pool.id)
+
+
+async def test_publishing_checks_the_draft_against_the_pool_as_it_is_now(world: World) -> None:
+    old, new = await add_pool(world, "Old"), await add_pool(world, "New")
+    assert old.id
+    assert new.id
+    flow = await add_flow(world, capacity_pool_id=old.id)
+    assert flow.id is not None
+    live = await activate(world, flow.id)
+    await save_draft(world, replace(live, draft=revision(flow_id=flow.id, capacity_pool_id=new.id)))
+    await world.archive_pool_directly(new.id)  # the port refuses to archive a pool in a draft
+
+    with refused(ErrorCode.INVALID_CONFIGURATION, "capacity_pool_id"):
+        await publish(world, flow.id)
+    assert (await get_flow(world, flow.id)).current == live.current
+    await save_draft(world, replace(live, draft=revision(flow_id=flow.id, capacity_pool_id=old.id)))
+    await publish(world, flow.id)  # a pool the live revision draws on may stay
+
+
+async def test_publishing_refuses_a_skill_archived_since_the_draft_was_saved(
+    world: World,
+) -> None:
+    held, added = await add_skill(world, "held"), await add_skill(world, "added")
+    assert held.id
+    assert added.id
+    flow = await add_flow(world, required_skill_ids=frozenset({held.id}))
+    assert flow.id is not None
+    live = await activate(world, flow.id)
+    both = frozenset({held.id, added.id})
+    await save_draft(
+        world,
+        replace(
+            live, draft=revision(flow_id=flow.id, capacity_pool_id=None, required_skill_ids=both)
+        ),
+    )
+    async with world.uow.locked() as tx:
+        await tx.archive_skill(EVERYTHING, held.id, NOW)  # in the live revision: may stay
+        await tx.archive_skill(EVERYTHING, added.id, NOW)  # newly added: refused
+
+    with refused(ErrorCode.INVALID_CONFIGURATION, "required_skill_ids"):
+        await publish(world, flow.id)
+    await save_draft(
+        world,
+        replace(
+            live,
+            draft=revision(
+                flow_id=flow.id, capacity_pool_id=None, required_skill_ids=frozenset({held.id})
+            ),
+        ),
+    )
+    published = await publish(world, flow.id)
+    assert published.current is not None
+    assert published.current.required_skill_ids == {held.id}
+
+
+async def test_the_state_and_defaults_of_a_flow_never_published_follow_the_stored_flow(
+    world: World,
+) -> None:
+    appointment = frozenset({IntakeMode.APPOINTMENT})
+    stored = await add_flow(world)
+    assert stored.id is not None
+
+    changed = replace(
+        stored,
+        state=FlowState.ARCHIVED,  # not the caller's to set: only the lifecycle methods do
+        code="renamed",
+        default_for=appointment,
+        draft=revision(flow_id=stored.id, capacity_pool_id=None),
+    )
+    saved = await save_draft(world, changed)
+
+    assert saved.state is FlowState.DRAFT
+    assert (saved.code, saved.default_for) == ("renamed", appointment)
+    assert await get_flow(world, stored.id) == saved
+    new = await save_draft(world, replace(blank(world, "n"), state=FlowState.DRAFT))
+    assert new.state is FlowState.DRAFT

@@ -134,6 +134,10 @@ def _create_flows() -> None:
         sa.CheckConstraint(
             "state IN ('draft', 'active', 'archived')", name=op.f("ck_service_flows_state")
         ),
+        sa.CheckConstraint(
+            "state != 'active' OR current_revision IS NOT NULL",
+            name=op.f("ck_service_flows_active_has_current_revision"),
+        ),
         _fk("group_id", "groups.id", "service_flows", "CASCADE"),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_service_flows")),
         sa.UniqueConstraint("group_id", "code", name=op.f("uq_service_flows_group_id_code")),
@@ -170,7 +174,7 @@ def _create_flows() -> None:
         sa.Column("published_at", UTCDateTime(), nullable=True),
         sa.Column("published_by", sa.Integer(), nullable=True),
         _fk("flow_id", "service_flows.id", "flow_revisions", "CASCADE"),
-        _fk("capacity_pool_id", "capacity_pools.id", "flow_revisions", "RESTRICT"),
+        _fk("capacity_pool_id", "capacity_pools.id", "flow_revisions", "NO ACTION"),
         _fk("published_by", "staff.id", "flow_revisions", "SET NULL"),
         sa.PrimaryKeyConstraint("flow_id", "revision", name=op.f("pk_flow_revisions")),
     )

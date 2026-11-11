@@ -1899,6 +1899,9 @@ class ServiceFlowRow(Base):
     __table_args__ = (
         UniqueConstraint("group_id", "code"),
         CheckConstraint("state IN ('draft', 'active', 'archived')", name="state"),
+        CheckConstraint(
+            "state != 'active' OR current_revision IS NOT NULL", name="active_has_current_revision"
+        ),
         Index(
             "uq_service_flows_default_appointment",
             "group_id",
@@ -1931,9 +1934,11 @@ class FlowRevisionRow(Base):
     intake_modes: Mapped[str] = mapped_column(String(32))
     interaction_kind: Mapped[str | None] = mapped_column(String(16))
     duration_minutes: Mapped[int | None] = mapped_column(Integer)
-    # RESTRICT: pools are archived, never deleted, and a published revision must not change.
+    # NO ACTION, checked at the end of the statement: pools are archived, never deleted, so
+    # deleting a pool on its own fails while a revision draws on it, yet deleting an organisation
+    # lets the cascades remove the pool and the revisions in one statement (RESTRICT fails there).
     capacity_pool_id: Mapped[int | None] = mapped_column(
-        ForeignKey("capacity_pools.id", ondelete="RESTRICT")
+        ForeignKey("capacity_pools.id", ondelete="NO ACTION")
     )
     dispatch: Mapped[str | None] = mapped_column(String(16))
     handling_action: Mapped[str | None] = mapped_column(String(24))

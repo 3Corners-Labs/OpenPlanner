@@ -10,9 +10,11 @@ pure functions of ``app.domain.service_flows``, called here with the rows alread
 revision is *ready* to be published or activated is the readiness checklist, which the use case of
 ADR 0121 step 2d runs first; nothing here reads it.
 
-Writes run in ``locked()`` transactions (``BEGIN IMMEDIATE``), so the pre-checks that select
-before they insert (the code of a flow, the free default path) cannot interleave with another
-writer; the unique constraint and the partial unique indexes stay as the backstop.
+The write methods (save, publish, discard, set state) rely on the immediate write lock of
+``locked()`` (``BEGIN IMMEDIATE``), so the pre-checks that select before they insert (the code of
+a flow, the free default path) cannot interleave with another writer; the unique constraint and
+the partial unique indexes stay as the backstop. They must not be called from a ``read()``
+transaction, which takes no lock; the unit of work does not stop it.
 """
 
 import json
@@ -118,13 +120,6 @@ def _defaults(row: ServiceFlowRow) -> frozenset[IntakeMode]:
         IntakeMode.ON_DEMAND: row.default_on_demand,
     }
     return frozenset(mode for mode, default in modes.items() if default)
-
-
-def _skills_of(revision: FlowRevision | None) -> frozenset[int]:
-    """Return every skill a revision requires, for the flow or for a subject."""
-    if revision is None:
-        return frozenset()
-    return revision.required_skill_ids.union(*revision.subject_skill_ids.values())
 
 
 class ServiceFlowQueries:
@@ -244,6 +239,28 @@ class ServiceFlowQueries:
         """
         return (await self._revisions([(flow_id, revision)])).get((flow_id, revision))
 
+    async def _check_references(
+        self, group: GroupRow, revision: FlowRevision, based_on: FlowRevision | None
+    ) -> None:
+        """Run ``check_flow_references`` for ``revision`` against the pool, skills, subjects now.
+
+        ``based_on`` is the revision whose choices may stay even when archived since.
+        """
+        pool_row = (
+            await self._session.get(CapacityPoolRow, revision.capacity_pool_id)
+            if revision.capacity_pool_id is not None
+            else None
+        )
+        check_flow_references(
+            group.organisation_id,
+            revision,
+            (await pools_from_rows(self._session, [pool_row]))[0] if pool_row else None,
+            await load_skills(self._session, revision.all_skill_ids),
+            based_on.all_skill_ids if based_on else frozenset(),
+            [subject.code for subject in routing_from_json(group.routing).subjects],
+            already_pool_id=based_on.capacity_pool_id if based_on else None,
+        )
+
     async def _write_revision(self, flow_id: int, number: int, revision: FlowRevision) -> None:
         """Write the revision row and its skill and subject rows, in place when it exists.
 
@@ -312,20 +329,7 @@ class ServiceFlowQueries:
         )
         revision = check_draft_save(flow, stored, taken is not None)
         based_on = (stored.draft or stored.current) if stored else None
-        pool_row = (
-            await self._session.get(CapacityPoolRow, revision.capacity_pool_id)
-            if revision.capacity_pool_id is not None
-            else None
-        )
-        check_flow_references(
-            group.organisation_id,
-            revision,
-            (await pools_from_rows(self._session, [pool_row]))[0] if pool_row else None,
-            await load_skills(self._session, _skills_of(revision)),
-            _skills_of(based_on),
-            [subject.code for subject in routing_from_json(group.routing).subjects],
-            already_pool_id=based_on.capacity_pool_id if based_on else None,
-        )
+        await self._check_references(group, revision, based_on)
         if row is None:
             row = ServiceFlowRow(group_id=flow.group_id, state=FlowState.DRAFT.value)
             self._session.add(row)
@@ -347,16 +351,25 @@ class ServiceFlowQueries:
     ) -> ServiceFlow:
         """Publish the flow's draft: it becomes the current revision and is immutable from now on.
 
+        The draft is checked again against what exists now: a pool, skill or subject that was
+        archived or removed since it was saved, and was not part of the published revision, is
+        refused, so publishing cannot bring an archived pool or skill live.
+
         Raises:
             DomainError: ``configuration_object_missing`` for a flow outside ``scope`` or a flow
                 without a draft (field ``draft``), ``invalid_configuration`` (field
-                ``default_for``) for a draft that drops a default entry path.
+                ``default_for``) for a draft that drops a default entry path, and what
+                ``check_flow_references`` refuses.
         """
         row = await self._flow_row(scope, flow_id)
         if row is None:
             raise missing_object("flow_id")
         (flow,) = await self._flows([row])
-        check_publishable(flow)
+        draft = check_publishable(flow)
+        group = (
+            await self._session.execute(select(GroupRow).where(GroupRow.id == row.group_id))
+        ).scalar_one()
+        await self._check_references(group, draft, flow.current)
         revision = await self._session.get(FlowRevisionRow, (flow_id, row.draft_revision or 0))
         if revision is None:
             raise missing_object("draft")

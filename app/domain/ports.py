@@ -42,7 +42,7 @@ from app.domain.calls import (
     MeetingStatus,
     TaskSnapshot,
 )
-from app.domain.capacity import CapacityPool
+from app.domain.capacity import CapacityPool, PoolFlows
 from app.domain.change_requests import ChangeRequest
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
@@ -832,7 +832,9 @@ class Transaction(Protocol):
     test enforces this for new methods. Every method that takes an object id from a caller takes
     a ``Scope`` too and filters by it in SQL: an id outside it behaves like a missing one (the
     methods of skills, pools, flows and grants of ADR 0121 follow this; ``flow_revision`` is the
-    one exception and says why).
+    one exception and says why). The save, archive, publish, discard and set methods of those
+    objects rely on the immediate write lock of ``locked()`` for their uniqueness pre-checks and
+    must not be called from a ``read()`` transaction; nothing in the unit of work stops them.
     """
 
     async def list_groups(self, scope: Scope, *, archived: bool = False) -> list[GroupSummary]:
@@ -1616,11 +1618,19 @@ class Transaction(Protocol):
         ...
 
     async def skill_usage(self, scope: Scope, skill_id: int) -> SkillUsage:
-        """Return how many staff, pools and not archived flows (current or draft) use the skill."""
+        """Return how many staff, pools and not archived flows (current or draft) use the skill.
+
+        ``staff`` counts the people who hold it and are a member of its organisation now, the same
+        grants ``list_staff_skills`` returns.
+        """
         ...
 
     async def list_staff_skills(self, scope: Scope, staff_id: int) -> frozenset[int]:
-        """Return the skill ids a staff member holds in organisations they are a member of now."""
+        """Return the skill ids a staff member holds in organisations they are a member of now.
+
+        Someone without a membership in the organisation, a superuser included, therefore holds
+        no skills there: a grant never outlives the membership for eligibility.
+        """
         ...
 
     async def set_staff_skills(
@@ -1651,11 +1661,18 @@ class Transaction(Protocol):
         ...
 
     async def archive_capacity_pool(self, scope: Scope, pool_id: int, at: datetime) -> None:
-        """Archive a pool; ``configuration_object_in_use`` while an active flow draws on it."""
+        """Archive a pool; ``configuration_object_in_use`` while a flow not archived draws on it.
+
+        A flow draws on it by its current or its draft revision.
+        """
         ...
 
-    async def flows_on_pool(self, scope: Scope, pool_id: int) -> list[int]:
-        """Return the ids of the not archived flows (current or draft) that draw on the pool."""
+    async def flows_on_pool(self, scope: Scope, pool_id: int) -> PoolFlows:
+        """Return the not archived flows (current or draft) that draw on the pool.
+
+        Only flows of groups inside ``scope`` are listed; ``hidden`` counts the others, so a
+        group-scoped caller learns that more exist without learning which.
+        """
         ...
 
     async def list_service_flows(self, scope: Scope, group_id: int) -> list[ServiceFlow]:

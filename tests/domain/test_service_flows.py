@@ -463,6 +463,15 @@ def test_the_skills_of_a_revision_follow_the_catalogue_rules() -> None:
     check(old, frozenset({2}))
 
 
+def test_a_revision_names_every_skill_of_the_flow_and_its_subjects() -> None:
+    assert revision().all_skill_ids == frozenset()
+    named = revision(
+        required_skill_ids=frozenset({1}),
+        subject_skill_ids={"id": frozenset({2, 3}), "visa": frozenset(), "x": frozenset({1})},
+    )
+    assert named.all_skill_ids == frozenset({1, 2, 3})
+
+
 def test_a_revision_names_no_location_until_locations_are_built() -> None:
     assert refusal(lambda: references({"location_id": 7}, the_pool=pool())) == (
         ErrorCode.INVALID_CONFIGURATION,

@@ -8,9 +8,10 @@ that takes an id filters by the scope in SQL, and an id outside it behaves like 
 The rules that SQL cannot express (a skill of another organisation, an archived skill newly added)
 are the pure functions of ``app.domain.skills``, called here with the rows already loaded.
 
-Writes run in ``locked()`` transactions (``BEGIN IMMEDIATE``), so a select-then-insert pre-check
-such as the code of a skill cannot interleave with another writer; the unique constraint stays
-as the backstop.
+The write methods (save, archive, set staff skills) rely on the immediate write lock of
+``locked()`` (``BEGIN IMMEDIATE``), so a select-then-insert pre-check such as the code of a skill
+cannot interleave with another writer; the unique constraint stays as the backstop. They must not
+be called from a ``read()`` transaction, which takes no lock; the unit of work does not stop it.
 """
 
 import json
@@ -135,6 +136,8 @@ class SkillQueries:
     async def skill_usage(self, scope: Scope, skill_id: int) -> SkillUsage:
         """Return how many staff hold the skill, pools guarantee it and flows require it.
 
+        ``staff`` counts the same grants ``list_staff_skills`` returns: people who are a member of
+        the skill's organisation now, once each.
         ``flows`` counts the flows that are not archived, by their current or draft revision, for
         the flow itself or one of its subjects, once each. A skill that does not exist or lies
         outside ``scope`` is used nowhere: all zero.
@@ -142,7 +145,16 @@ class SkillQueries:
         if await self._skill_row(scope, skill_id) is None:
             return SkillUsage()
         staff = await self._session.scalar(
-            select(func.count()).where(StaffSkillRow.skill_id == skill_id)
+            select(func.count(func.distinct(StaffSkillRow.staff_id)))
+            .select_from(StaffSkillRow)
+            .join(SkillRow, SkillRow.id == StaffSkillRow.skill_id)
+            .join(OrganisationRow, OrganisationRow.id == SkillRow.organisation_id)
+            .join(
+                StaffMembershipRow,
+                (StaffMembershipRow.staff_id == StaffSkillRow.staff_id)
+                & (StaffMembershipRow.organisation == OrganisationRow.slug),
+            )
+            .where(StaffSkillRow.skill_id == skill_id)
         )
         pools = await self._session.scalar(
             select(func.count()).where(CapacityPoolSkillRow.skill_id == skill_id)
@@ -176,6 +188,8 @@ class SkillQueries:
 
         Only skills of organisations the person has a membership in *now* count, so a grant never
         outlives the membership for eligibility (the row may stay until they are granted again).
+        Someone without a membership in the organisation, a superuser included, therefore holds
+        no skills there.
         """
         found = await self._session.scalars(
             select(StaffSkillRow.skill_id)

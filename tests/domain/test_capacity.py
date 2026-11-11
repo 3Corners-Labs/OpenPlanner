@@ -7,6 +7,7 @@ import pytest
 
 from app.domain.capacity import (
     CapacityPool,
+    PoolFlows,
     PoolMode,
     check_pool_archive,
     check_pool_save,
@@ -155,9 +156,14 @@ def test_a_pool_guarantees_own_skills_and_an_archived_one_only_if_it_already_doe
     assert refusal(lambda: save({3})) == (ErrorCode.INVALID_CONFIGURATION, "guaranteed_skill_ids")
 
 
-def test_a_pool_with_an_active_flow_cannot_be_archived() -> None:
+def test_a_pool_that_a_flow_draws_on_cannot_be_archived() -> None:
     check_pool_archive([])
     assert refusal(lambda: check_pool_archive(["a"])) == (
         ErrorCode.CONFIGURATION_OBJECT_IN_USE,
         "capacity_pool",
     )
+
+
+def test_a_pool_flow_list_defaults_to_no_flows_and_none_hidden() -> None:
+    assert PoolFlows() == PoolFlows((), 0)
+    assert PoolFlows((1, 2), 3).hidden == 3

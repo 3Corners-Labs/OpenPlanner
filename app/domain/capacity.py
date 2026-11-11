@@ -114,13 +114,29 @@ def check_pool_save(
     )
 
 
-def check_pool_archive(active_flow_codes: Collection[str]) -> None:
-    """Refuse archiving a pool while an active flow's current revision draws on it.
+@dataclass(frozen=True)
+class PoolFlows:
+    """The flows that draw on a pool, as far as the caller may see them.
 
-    ``active_flow_codes`` are the codes of those flows (the screen can name them).
+    Attributes:
+        flows: Ids of the not archived flows of groups inside the caller's scope, by id.
+        hidden: How many further flows, of groups outside the scope, draw on the pool; only the
+            count is given, so a screen can say "and 2 flows of other services".
+    """
+
+    flows: tuple[int, ...] = ()
+    hidden: int = 0
+
+
+def check_pool_archive(flow_codes: Collection[str]) -> None:
+    """Refuse archiving a pool while a flow that is not archived draws on it.
+
+    ``flow_codes`` are the codes of the flows whose current *or* draft revision names the pool
+    (the screen can name them). A draft counts: publishing it would otherwise bring an archived
+    pool live.
 
     Raises:
         DomainError: ``configuration_object_in_use`` (field ``capacity_pool``).
     """
-    if active_flow_codes:
+    if flow_codes:
         raise DomainError(ErrorCode.CONFIGURATION_OBJECT_IN_USE, "capacity_pool")
