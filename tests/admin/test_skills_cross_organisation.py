@@ -27,7 +27,7 @@ async def test_an_id_of_another_organisation_is_not_found_for_every_role(
     skill = await add_skill(site, "theirs", organisation="andere")
     pool = await add_pool(site, "Theirs", organisation="andere")
     await site.login_as(ROLES[role])
-    wanted = {"label_nl": "x", "label_en": "x", "pool_name": "x"}
+    wanted = {"label_nl": "x", "label_en": "x", "pool_name": "x", "pool_code": "x"}
 
     async def status(method: str, path: str) -> int:
         response = await site.client.request(method, path, data=wanted, headers=SAME_ORIGIN)

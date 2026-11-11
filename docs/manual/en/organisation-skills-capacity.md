@@ -84,10 +84,19 @@ pool.
 
 ### Adding and changing a capacity pool
 
+<!-- field: pool_code -->
+#### Code
+
+The code by which the pool is recognised in configuration and when settings are moved to another
+installation: lower-case letters, numbers and hyphens, at most 40 characters, unused by another pool
+of your organisation. You cannot change the code after you add the pool.
+
 <!-- field: pool_name -->
 #### Name of the pool
 
-The name by which you recognise the pool, at most 80 characters.
+The name by which you recognise the pool, at most 80 characters. Another pool that is not archived
+cannot have the same name, so that you can tell them apart; you can rename a pool at any time
+without changing its code.
 
 Below the name you tick the skills that every counted member of staff holds. Only skills that
 are not archived can be ticked; an archived skill the pool already guarantees stays shown, marked

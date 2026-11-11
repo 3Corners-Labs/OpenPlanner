@@ -43,9 +43,12 @@ def pool(
     mode: PoolMode = PoolMode.COUNTED,
     guaranteed: frozenset[int] = frozenset(),
     archived_at: datetime | None = None,
+    code: str | None = "loket",
 ) -> CapacityPool:
-    """Return a pool of organisation 1."""
-    return CapacityPool(1, 1, name, mode, guaranteed, archived_at)
+    """Return a pool of organisation 1; a counted pool has ``code``, a legacy pool none."""
+    return CapacityPool(
+        1, 1, name, mode, guaranteed, archived_at, code=code if mode is PoolMode.COUNTED else None
+    )
 
 
 def revision(**changes: Any) -> FlowRevision:
