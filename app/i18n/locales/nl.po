@@ -12655,7 +12655,7 @@ msgid "admin.flows.archived_heading"
 msgstr "Gearchiveerde flows"
 
 msgid "admin.flows.lead"
-msgstr "Een flow bepaalt hoe een verzoek wordt afgehandeld: aanmelden, contactkanaal, capaciteit en vaardigheden. De naam kiest u zelf; die bepaalt niets."
+msgstr "Een flow bepaalt hoe een verzoek wordt afgehandeld: hoe het binnenkomt, het contactkanaal, de capaciteit en de vaardigheden. De naam kiest u zelf; die bepaalt niets."
 
 msgid "admin.flows.archived_only"
 msgstr "Alleen gearchiveerde flows"
@@ -12670,7 +12670,7 @@ msgid "admin.flows.col.code"
 msgstr "Code"
 
 msgid "admin.flows.col.intake"
-msgstr "Aanmelden"
+msgstr "Aanmelding"
 
 msgid "admin.flows.col.channel"
 msgstr "Contactkanaal"
@@ -12730,7 +12730,7 @@ msgid "admin.flows.section.name"
 msgstr "Naam"
 
 msgid "admin.flows.section.intake"
-msgstr "Aanmelden en contact"
+msgstr "Aanmelding en contact"
 
 msgid "admin.flows.section.capacity"
 msgstr "Capaciteit en vaardigheden"
@@ -12757,13 +12757,13 @@ msgid "admin.flows.name_hint"
 msgstr "Deelnemers zien deze naam. De naam bepaalt niet hoe de flow werkt."
 
 msgid "admin.flows.intake"
-msgstr "Aanmelden"
+msgstr "Hoe komt een verzoek binnen?"
 
 msgid "admin.flows.intake.appointment"
-msgstr "Op afspraak"
+msgstr "Met een afspraak"
 
 msgid "admin.flows.intake.on_demand"
-msgstr "Direct"
+msgstr "Direct, zonder afspraak"
 
 msgid "admin.flows.contact_channel"
 msgstr "Contactkanaal"
@@ -12796,7 +12796,7 @@ msgid "admin.flows.kind_follows"
 msgstr "Deze gegevens volgen het opgeslagen contactkanaal. Sla het concept op na een wijziging."
 
 msgid "admin.flows.readout.ready"
-msgstr "Gereed voor behandeling: {policy}"
+msgstr "Gereed voor afhandeling: {policy}"
 
 msgid "admin.flows.readout.action"
 msgstr "Eerste actie van de medewerker: {action}"
@@ -12826,7 +12826,7 @@ msgid "admin.flows.action.assign_workstation"
 msgstr "een werkplek toewijzen"
 
 msgid "admin.flows.first_action"
-msgstr "Eerste actie van de medewerker"
+msgstr "Kies de eerste actie"
 
 msgid "admin.flows.to_follow"
 msgstr "{label} (volgt)"
@@ -12868,7 +12868,7 @@ msgid "admin.flows.subjects_table"
 msgstr "Onderwerpen in deze flow"
 
 msgid "admin.flows.subjects_hint"
-msgstr "Vink aan welke onderwerpen van de dienst deze flow aanbiedt en welke extra vaardigheden een onderwerp vraagt."
+msgstr "Vink aan welke onderwerpen van de dienst deze flow aanbiedt. Extra vaardigheden per onderwerp kiest u op een eigen pagina, nadat u het concept hebt opgeslagen."
 
 msgid "admin.flows.subject"
 msgstr "Onderwerp"
@@ -12882,6 +12882,21 @@ msgstr "Extra vaardigheden"
 msgid "admin.flows.extra_skills_for"
 msgstr "Extra vaardigheden voor {subject}"
 
+msgid "admin.flows.subjects_dropped_hint"
+msgstr "Een onderwerp dat u niet meer aanbiedt, verliest hier zijn extra vaardigheden."
+
+msgid "admin.flows.choose_extra_skills"
+msgstr "Extra vaardigheden kiezen"
+
+msgid "admin.flows.extra_skills_save_first"
+msgstr "Sla het concept eerst op om extra vaardigheden te kiezen."
+
+msgid "admin.flows.subject_lead"
+msgstr "Een medewerker die een verzoek over dit onderwerp oppakt, heeft naast de vaardigheden van de flow ook deze vaardigheden. De capaciteitspool moet ze garanderen. Ze worden in het concept van de flow opgeslagen."
+
+msgid "admin.flows.subject_save"
+msgstr "Extra vaardigheden opslaan"
+
 msgid "admin.flows.no_subjects"
 msgstr "Deze dienst heeft nog geen onderwerpen."
 
@@ -12889,7 +12904,7 @@ msgid "admin.flows.no_subjects_link"
 msgstr "Onderwerpen beheert u bij de instellingen."
 
 msgid "admin.flows.dispatch"
-msgstr "Waar gaan verzoeken naartoe?"
+msgstr "Waar het verzoek terechtkomt"
 
 msgid "admin.flows.dispatch.own_queue"
 msgstr "Eigen wachtrij"
@@ -12898,7 +12913,7 @@ msgid "admin.flows.dispatch.contact_center"
 msgstr "Contactcenter"
 
 msgid "admin.flows.completion"
-msgstr "Wat rondt een verzoek af?"
+msgstr "Afronding"
 
 msgid "admin.flows.completion.operator"
 msgstr "De medewerker rondt het af"
@@ -12928,7 +12943,7 @@ msgid "admin.flows.defaults_legend"
 msgstr "Standaardflow"
 
 msgid "admin.flows.defaults_hint"
-msgstr "Een dienst heeft per aanmeldweg hoogstens één standaardflow. De opties staan open voor de aanmeldwegen die de flow aanbiedt; sla het concept op na een wijziging van het aanmelden."
+msgstr "Een dienst heeft per aanmeldweg hoogstens één standaardflow. De opties staan open voor de aanmeldwegen die de flow aanbiedt; sla het concept op na een wijziging van de aanmelding."
 
 msgid "admin.flows.defaults_fixed"
 msgstr "Zodra een flow een gepubliceerde revisie heeft, staan de standaardwegen vast."
@@ -12946,7 +12961,7 @@ msgid "admin.flows.save"
 msgstr "Concept opslaan"
 
 msgid "admin.flows.state.draft"
-msgstr "Concept"
+msgstr "Nog niet actief"
 
 msgid "admin.flows.state.active"
 msgstr "Actief"
@@ -12963,12 +12978,6 @@ msgstr "Ontbreekt"
 msgid "admin.flows.ready_word.follows"
 msgstr "Volgt"
 
-msgid "admin.flows.ready_heading.ready"
-msgstr "Deze flow is klaar voor gebruik"
-
-msgid "admin.flows.ready_heading.not_ready"
-msgstr "Deze flow is nog niet klaar voor gebruik"
-
 msgid "admin.flows.ready_count"
 msgstr "{done} van {total} punten in orde."
 
@@ -12978,8 +12987,20 @@ msgstr "Beoordeeld op het opgeslagen concept (revisie {revision})."
 msgid "admin.flows.basis_published"
 msgstr "Beoordeeld op de gepubliceerde revisie ({revision})."
 
+msgid "admin.flows.ready_heading.draft_ready"
+msgstr "Het concept is volledig"
+
+msgid "admin.flows.ready_heading.draft_not_ready"
+msgstr "Het concept is nog niet volledig"
+
+msgid "admin.flows.ready_heading.published_ready"
+msgstr "De gepubliceerde revisie is klaar voor gebruik"
+
+msgid "admin.flows.ready_heading.published_not_ready"
+msgstr "De gepubliceerde revisie is nog niet klaar voor gebruik"
+
 msgid "admin.flows.check.data"
-msgstr "Naam en aanmelden"
+msgstr "Naam en aanmelding"
 
 msgid "admin.flows.check.capacity"
 msgstr "Capaciteit"
@@ -13000,7 +13021,7 @@ msgid "admin.flows.reason.labels_invalid"
 msgstr "De naam ontbreekt in het Nederlands of het Engels, of is ongeldig."
 
 msgid "admin.flows.reason.intake_missing"
-msgstr "Kies minstens één manier van aanmelden."
+msgstr "Kies minstens één manier waarop een verzoek binnenkomt."
 
 msgid "admin.flows.reason.pool_missing"
 msgstr "Kies een capaciteitspool."
@@ -13027,10 +13048,19 @@ msgid "admin.flows.reason.action_not_allowed"
 msgstr "De eerste actie van de medewerker past niet bij het contactkanaal."
 
 msgid "admin.flows.reason.location_missing"
-msgstr "Voor deze actie is een locatie nodig."
+msgstr "Voor deze manier van afhandelen zijn locaties nodig. Die volgen in een latere versie."
 
 msgid "admin.flows.reason.not_built_yet"
 msgstr "Dit onderdeel van OpenPlanner volgt in een latere versie."
+
+msgid "admin.flows.reason.not_built_yet.dispatch"
+msgstr "Dit contactkanaal of deze manier van afhandelen volgt in een latere versie."
+
+msgid "admin.flows.reason.not_built_yet.completion"
+msgstr "Deze manier van afronden volgt in een latere versie."
+
+msgid "admin.flows.reason.not_built_yet.retention"
+msgstr "Het automatisch afsluiten en verwijderen van gegevens voor nieuwe flows volgt in een latere versie."
 
 msgid "admin.flows.reason.completion_missing"
 msgstr "Kies wat een verzoek afrondt."
@@ -13075,13 +13105,16 @@ msgid "admin.flows.activate_heading"
 msgstr "Flow activeren"
 
 msgid "admin.flows.activate_not_ready"
-msgstr "Activeren kan zodra alle punten in orde zijn."
+msgstr "Activeren kan zodra de gepubliceerde revisie op alle punten in orde is."
 
 msgid "admin.flows.activate_ready"
 msgstr "Alle punten van de gepubliceerde revisie zijn in orde. Na het activeren gaan verzoeken door deze flow."
 
 msgid "admin.flows.activate_publish_first"
-msgstr "Activeren kan zodra alle punten in orde zijn. Publiceer daarvoor eerst een revisie."
+msgstr "Publiceer eerst het concept."
+
+msgid "admin.flows.activate_not_built"
+msgstr "Nieuwe flows kunnen in deze versie nog niet worden geactiveerd. U kunt de flow wel voorbereiden en publiceren; activeren volgt in een latere versie."
 
 msgid "admin.flows.activate"
 msgstr "Flow activeren"
@@ -13120,10 +13153,10 @@ msgid "admin.flows.archive_button"
 msgstr "Flow archiveren"
 
 msgid "admin.flows.archive_lead"
-msgstr "U archiveert een actieve flow."
+msgstr "U archiveert deze flow."
 
-msgid "admin.flows.archive_not_active"
-msgstr "Alleen een actieve flow kan worden gearchiveerd. Een flow in concept haalt u weg door het concept weg te gooien."
+msgid "admin.flows.archive_not_possible"
+msgstr "Alleen een flow die actief is of al een gepubliceerde revisie heeft, kan worden gearchiveerd. Een flow zonder gepubliceerde revisie haalt u weg door het concept weg te gooien."
 
 msgid "admin.flows.archive_effect_new"
 msgstr "Er komen geen nieuwe verzoeken meer binnen via deze flow."
@@ -13133,6 +13166,9 @@ msgstr "Bestaande verzoeken houden de flow waarmee ze zijn gemaakt."
 
 msgid "admin.flows.archive_effect_listed"
 msgstr "De flow blijft zichtbaar onder de gearchiveerde flows."
+
+msgid "admin.flows.archive_effect_draft"
+msgstr "Een concept van de flow wordt weggegooid."
 
 msgid "admin.flows.error.choice"
 msgstr "Een gekozen vaardigheid is niet langer beschikbaar of er zijn er te veel gekozen. Laad de pagina opnieuw en kies opnieuw."
@@ -13155,6 +13191,12 @@ msgstr "Een andere actieve flow van deze dienst is al de standaard voor deze aan
 msgid "admin.flows.error.not_ready"
 msgstr "De flow is niet geactiveerd: niet alle punten van de gepubliceerde revisie zijn in orde."
 
+msgid "admin.flows.error.not_ready_publish"
+msgstr "Het concept is nog niet volledig. Een actieve flow krijgt alleen een volledig concept als nieuwe revisie."
+
+msgid "admin.flows.notice.action_adjusted"
+msgstr "De eerste actie is aangepast aan het gekozen contactkanaal."
+
 msgid "admin.form.error.flow_code"
 msgstr "Gebruik alleen kleine letters, cijfers en streepjes, beginnend met een letter of cijfer (hoogstens 40 tekens). De code “new” is gereserveerd."
 
@@ -13172,6 +13214,12 @@ msgstr "De flow is aangemaakt als concept."
 
 msgid "admin.done.flow_saved"
 msgstr "Het concept is opgeslagen."
+
+msgid "admin.done.flow_saved_adjusted"
+msgstr "Het concept is opgeslagen. De eerste actie is aangepast aan het gekozen contactkanaal."
+
+msgid "admin.done.flow_subject_saved"
+msgstr "De extra vaardigheden zijn in het concept opgeslagen."
 
 msgid "admin.done.flow_prepared"
 msgstr "Er is een concept van een nieuwe revisie voorbereid."

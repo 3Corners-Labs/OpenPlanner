@@ -67,7 +67,7 @@ async def test_a_flow_is_created_edited_published_and_audited_with_codes_only(si
     editor = (await site.client.get(f"{BASE}/advies")).text
     assert 'value="Samen bespreken"' in editor
     assert "Concept opslaan" in editor
-    assert "Deze flow is nog niet klaar voor gebruik" in editor
+    assert "Het concept is nog niet volledig" in editor
     assert (await save(site, label_nl="Nieuwe naam", capacity_pool_id=str(pool))).status_code == 303
     assert (await act(site, "publish")).status_code == 303
     after = (await site.client.get(f"{BASE}/advies")).text
@@ -82,7 +82,7 @@ async def test_a_flow_is_created_edited_published_and_audited_with_codes_only(si
     assert "Nieuwe naam" not in repr(await audit_log(site))
 
 
-@pytest.mark.parametrize("kind", ["video", "telephone", "in_person", "none"])
+@pytest.mark.parametrize("kind", ["telephone", "in_person", "none"])
 async def test_the_read_outs_follow_the_saved_contact_channel(site: Site, kind: str) -> None:
     await site.login_as(ORG_ADMIN)
     await create(site, interaction_kind="none")
@@ -91,15 +91,58 @@ async def test_the_read_outs_follow_the_saved_contact_channel(site: Site, kind: 
     page = (await site.client.get(f"{BASE}/advies")).text
 
     expected = {
-        "video": ("zodra de deelnemer in de videoruimte is", "de videoruimte openen"),
         "telephone": ("direct, zonder aparte melding", "de deelnemer bellen"),
         "in_person": ("wanneer de deelnemer zich meldt", "het verzoek bekijken"),
         "none": ("direct, zonder aparte melding", "het verzoek bekijken"),
     }[kind]
     for text in expected:
         assert text in page
-    assert "Gereed voor behandeling:" in page
+    readout = page.split('<div id="kind-readout">')[1].split("</div>")[0]
+    assert "Gereed voor afhandeling:" in readout
+    assert readout.count("Eerste actie van de medewerker:") == 1
+    assert " / " not in readout  # one action, never the list of the allowed ones
     assert ("handling_action" in page) is (kind == "in_person")
     if kind == "in_person":
         assert "een werkplek toewijzen (volgt)" in page
         assert "disabled" in page.split("een werkplek toewijzen (volgt)")[0].rsplit("<option", 1)[1]
+        assert "Kies de eerste actie" in page
+
+
+async def test_video_is_listed_to_follow_and_refused_like_every_other_unbuilt_option(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+    created = await create(site, interaction_kind="video")
+    await create(site, interaction_kind="none")
+
+    saved = await save(site, interaction_kind="video")
+    page = (await site.client.get(f"{BASE}/advies")).text
+
+    assert created.status_code == saved.status_code == 422
+    assert 'href="#interaction_kind"' in created.text
+    radio = page.split('id="kind-video"')[1].split(">")[0]
+    assert "disabled" in radio
+    assert "Videogesprek (volgt)" in page
+
+
+async def test_an_action_that_does_not_fit_the_posted_channel_is_replaced_and_the_page_says_so(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+    await create(site, interaction_kind="in_person")
+    await save(site, interaction_kind="in_person", handling_action="view_request")
+
+    saved = await save(site, interaction_kind="telephone", handling_action="view_request")
+    refused = await save(
+        site, interaction_kind="telephone", handling_action="view_request", label_en=""
+    )
+    page = (await site.client.get(f"{BASE}/advies")).text
+
+    assert saved.status_code == 303
+    assert saved.headers["location"] == f"{BASE}/advies?done=flow_saved_adjusted"
+    assert "De eerste actie is aangepast aan het gekozen contactkanaal." in refused.text
+    assert "de deelnemer bellen" in page  # the channel's own first action
+    after = await site.client.get(saved.headers["location"])
+    assert "De eerste actie is aangepast aan het gekozen contactkanaal." in after.text
+    quiet = await save(site, interaction_kind="telephone", handling_action="call")
+    assert quiet.headers["location"] == f"{BASE}/advies?done=flow_saved"

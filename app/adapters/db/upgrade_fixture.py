@@ -37,6 +37,7 @@ from app.adapters.db.seed import (
     local_time,
     seed_closure_examples,
     seed_demo,
+    seed_flow_examples,
     seeded_group,
     store_example_booking,
 )
@@ -127,6 +128,7 @@ async def seed_upgrade_fixture(
     """
     await seed_demo(engine)
     await seed_closure_examples(engine, now, token_key)
+    await seed_flow_examples(engine)
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:
         await _bookings_in_every_status(tx, now, token_key)

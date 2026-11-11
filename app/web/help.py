@@ -179,6 +179,7 @@ TOPICS = (
             "/admin/groups/{slug}/flows",
             "/admin/groups/{slug}/flows/new",
             "/admin/groups/{slug}/flows/{code}",
+            "/admin/groups/{slug}/flows/{code}/subjects/{subject}",
             "/admin/groups/{slug}/flows/{code}/prepare",
             "/admin/groups/{slug}/flows/{code}/publish",
             "/admin/groups/{slug}/flows/{code}/discard",

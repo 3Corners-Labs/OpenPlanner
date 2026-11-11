@@ -424,6 +424,15 @@
       ]
     },
     {
+      "name": "service: flow subject skills",
+      "path": "{flow_subject}",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
       "name": "organisation: edit skill",
       "path": "{skill_edit}",
       "user": "super",

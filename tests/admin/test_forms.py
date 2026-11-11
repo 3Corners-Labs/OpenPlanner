@@ -105,3 +105,35 @@ def test_moment_needs_a_valid_day_and_time(values: dict[str, str]) -> None:
 def test_moment_value_keeps_the_submitted_parts_or_falls_back() -> None:
     assert _form({"ends_at_time": "8:00"}).moment_value("ends_at") == "T8:00"
     assert _form({}).moment_value("ends_at", "2026-01-03T00:00") == "2026-01-03T00:00"
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"), [("0", 0), ("30", 30), ("007", 7), ("999999", 999999)]
+)
+def test_integer_reads_plain_ascii_digits(raw: str, expected: int) -> None:
+    form = _form({"duration_minutes": raw})
+
+    assert form.integer("duration_minutes") == expected
+    assert form.errors == []
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["²", "٣", "３０", "+5", "-5", "5.0", "1 2", "", "   ", "1000000", "abc"],
+    ids=lambda raw: repr(raw),
+)
+def test_integer_refuses_anything_else_with_an_error_of_the_field_and_never_raises(
+    raw: str,
+) -> None:
+    form = _form({"duration_minutes": raw})
+
+    assert form.integer("duration_minutes") is None
+    assert [e.field for e in form.errors] == ["duration_minutes"]
+    assert form.errors[0].message
+
+
+def test_optional_integer_is_none_without_an_error_when_empty() -> None:
+    form = _form({"duration_minutes": "  "})
+
+    assert form.optional_integer("duration_minutes") is None
+    assert form.errors == []

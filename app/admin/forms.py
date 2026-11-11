@@ -171,6 +171,8 @@ DONE_MESSAGES: dict[str, str] = {
     # ADR 0121 step 2d: the flows of a service.
     "flow_created": "admin.done.flow_created",
     "flow_saved": "admin.done.flow_saved",
+    "flow_saved_adjusted": "admin.done.flow_saved_adjusted",
+    "flow_subject_saved": "admin.done.flow_subject_saved",
     "flow_prepared": "admin.done.flow_prepared",
     "flow_published": "admin.done.flow_published",
     "flow_discarded": "admin.done.flow_discarded",

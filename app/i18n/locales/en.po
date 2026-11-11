@@ -12642,7 +12642,7 @@ msgid "admin.flows.archived_heading"
 msgstr "Archived flows"
 
 msgid "admin.flows.lead"
-msgstr "A flow determines how a request is handled: intake, contact channel, capacity and skills. You choose the name yourself; it determines nothing."
+msgstr "A flow determines how a request is handled: how it comes in, the contact channel, capacity and skills. You choose the name yourself; it determines nothing."
 
 msgid "admin.flows.archived_only"
 msgstr "Archived flows only"
@@ -12744,13 +12744,13 @@ msgid "admin.flows.name_hint"
 msgstr "Participants see this name. The name does not determine how the flow works."
 
 msgid "admin.flows.intake"
-msgstr "Intake"
+msgstr "How does a request come in?"
 
 msgid "admin.flows.intake.appointment"
 msgstr "By appointment"
 
 msgid "admin.flows.intake.on_demand"
-msgstr "On demand"
+msgstr "On demand, without an appointment"
 
 msgid "admin.flows.contact_channel"
 msgstr "Contact channel"
@@ -12813,7 +12813,7 @@ msgid "admin.flows.action.assign_workstation"
 msgstr "assign a workstation"
 
 msgid "admin.flows.first_action"
-msgstr "First action of the operator"
+msgstr "Choose the first action"
 
 msgid "admin.flows.to_follow"
 msgstr "{label} (to follow)"
@@ -12855,7 +12855,7 @@ msgid "admin.flows.subjects_table"
 msgstr "Subjects in this flow"
 
 msgid "admin.flows.subjects_hint"
-msgstr "Tick which subjects of the service this flow offers and which extra skills a subject needs."
+msgstr "Tick which subjects of the service this flow offers. You choose the extra skills of a subject on a page of its own, after saving the draft."
 
 msgid "admin.flows.subject"
 msgstr "Subject"
@@ -12869,6 +12869,21 @@ msgstr "Extra skills"
 msgid "admin.flows.extra_skills_for"
 msgstr "Extra skills for {subject}"
 
+msgid "admin.flows.subjects_dropped_hint"
+msgstr "A subject you no longer offer loses its extra skills here."
+
+msgid "admin.flows.choose_extra_skills"
+msgstr "Choose extra skills"
+
+msgid "admin.flows.extra_skills_save_first"
+msgstr "Save the draft first to choose extra skills."
+
+msgid "admin.flows.subject_lead"
+msgstr "An operator who picks up a request about this subject has these skills as well as those of the flow. The capacity pool must guarantee them. They are saved in the flow's draft."
+
+msgid "admin.flows.subject_save"
+msgstr "Save extra skills"
+
 msgid "admin.flows.no_subjects"
 msgstr "This service has no subjects yet."
 
@@ -12876,7 +12891,7 @@ msgid "admin.flows.no_subjects_link"
 msgstr "Manage subjects in the settings."
 
 msgid "admin.flows.dispatch"
-msgstr "Where do requests go?"
+msgstr "Where the request goes"
 
 msgid "admin.flows.dispatch.own_queue"
 msgstr "Own queue"
@@ -12885,7 +12900,7 @@ msgid "admin.flows.dispatch.contact_center"
 msgstr "Contact center"
 
 msgid "admin.flows.completion"
-msgstr "What completes a request?"
+msgstr "Completion"
 
 msgid "admin.flows.completion.operator"
 msgstr "The operator completes it"
@@ -12933,7 +12948,7 @@ msgid "admin.flows.save"
 msgstr "Save draft"
 
 msgid "admin.flows.state.draft"
-msgstr "Draft"
+msgstr "Not active yet"
 
 msgid "admin.flows.state.active"
 msgstr "Active"
@@ -12950,12 +12965,6 @@ msgstr "Missing"
 msgid "admin.flows.ready_word.follows"
 msgstr "To follow"
 
-msgid "admin.flows.ready_heading.ready"
-msgstr "This flow is ready to use"
-
-msgid "admin.flows.ready_heading.not_ready"
-msgstr "This flow is not ready to use"
-
 msgid "admin.flows.ready_count"
 msgstr "{done} of {total} points in order."
 
@@ -12964,6 +12973,18 @@ msgstr "Judged on the saved draft (revision {revision})."
 
 msgid "admin.flows.basis_published"
 msgstr "Judged on the published revision ({revision})."
+
+msgid "admin.flows.ready_heading.draft_ready"
+msgstr "The draft is complete"
+
+msgid "admin.flows.ready_heading.draft_not_ready"
+msgstr "The draft is not complete yet"
+
+msgid "admin.flows.ready_heading.published_ready"
+msgstr "The published revision is ready to use"
+
+msgid "admin.flows.ready_heading.published_not_ready"
+msgstr "The published revision is not ready to use yet"
 
 msgid "admin.flows.check.data"
 msgstr "Name and intake"
@@ -13014,10 +13035,19 @@ msgid "admin.flows.reason.action_not_allowed"
 msgstr "The first action of the operator does not fit the contact channel."
 
 msgid "admin.flows.reason.location_missing"
-msgstr "This action needs a location."
+msgstr "This way of handling needs locations. They follow in a later version."
 
 msgid "admin.flows.reason.not_built_yet"
 msgstr "This part of OpenPlanner follows in a later version."
+
+msgid "admin.flows.reason.not_built_yet.dispatch"
+msgstr "This contact channel or way of handling follows in a later version."
+
+msgid "admin.flows.reason.not_built_yet.completion"
+msgstr "This way of completing follows in a later version."
+
+msgid "admin.flows.reason.not_built_yet.retention"
+msgstr "Closing and deleting data automatically for new flows follows in a later version."
 
 msgid "admin.flows.reason.completion_missing"
 msgstr "Choose what completes a request."
@@ -13062,13 +13092,16 @@ msgid "admin.flows.activate_heading"
 msgstr "Activate the flow"
 
 msgid "admin.flows.activate_not_ready"
-msgstr "Activation is possible once every point is in order."
+msgstr "Activation is possible once the published revision is in order on every point."
 
 msgid "admin.flows.activate_ready"
 msgstr "Every point of the published revision is in order. Once activated, requests go through this flow."
 
 msgid "admin.flows.activate_publish_first"
-msgstr "Activation is possible once every point is in order. Publish a revision first."
+msgstr "Publish the draft first."
+
+msgid "admin.flows.activate_not_built"
+msgstr "New flows cannot be activated in this version yet. You can prepare and publish the flow; activation follows in a later version."
 
 msgid "admin.flows.activate"
 msgstr "Activate flow"
@@ -13107,10 +13140,10 @@ msgid "admin.flows.archive_button"
 msgstr "Archive flow"
 
 msgid "admin.flows.archive_lead"
-msgstr "You are archiving an active flow."
+msgstr "You are archiving this flow."
 
-msgid "admin.flows.archive_not_active"
-msgstr "Only an active flow can be archived. A flow that is a draft is removed by discarding its draft."
+msgid "admin.flows.archive_not_possible"
+msgstr "Only a flow that is active or has a published revision can be archived. A flow without a published revision is removed by discarding its draft."
 
 msgid "admin.flows.archive_effect_new"
 msgstr "No new requests come in through this flow."
@@ -13120,6 +13153,9 @@ msgstr "Existing requests keep the flow they were made with."
 
 msgid "admin.flows.archive_effect_listed"
 msgstr "The flow stays visible under the archived flows."
+
+msgid "admin.flows.archive_effect_draft"
+msgstr "A draft of the flow is discarded."
 
 msgid "admin.flows.error.choice"
 msgstr "A chosen skill is no longer available or too many are chosen. Reload the page and choose again."
@@ -13142,6 +13178,12 @@ msgstr "Another active flow of this service is already the default for this entr
 msgid "admin.flows.error.not_ready"
 msgstr "The flow was not activated: not every point of the published revision is in order."
 
+msgid "admin.flows.error.not_ready_publish"
+msgstr "The draft is not complete yet. An active flow only gets a complete draft as its new revision."
+
+msgid "admin.flows.notice.action_adjusted"
+msgstr "The first action was adjusted to the chosen contact channel."
+
 msgid "admin.form.error.flow_code"
 msgstr "Use only lower-case letters, digits and hyphens, starting with a letter or digit (at most 40 characters). The code “new” is reserved."
 
@@ -13159,6 +13201,12 @@ msgstr "The flow has been created as a draft."
 
 msgid "admin.done.flow_saved"
 msgstr "The draft has been saved."
+
+msgid "admin.done.flow_saved_adjusted"
+msgstr "The draft has been saved. The first action was adjusted to the chosen contact channel."
+
+msgid "admin.done.flow_subject_saved"
+msgstr "The extra skills have been saved in the draft."
 
 msgid "admin.done.flow_prepared"
 msgstr "A draft of a new revision has been prepared."

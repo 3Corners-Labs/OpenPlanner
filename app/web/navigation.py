@@ -700,6 +700,7 @@ OBJECTS = (
                         (
                             f"{_GROUP}/flows/new",
                             f"{_GROUP}/flows/{{code}}",
+                            f"{_GROUP}/flows/{{code}}/subjects/{{subject}}",
                             f"{_GROUP}/flows/{{code}}/discard",
                             f"{_GROUP}/flows/{{code}}/archive",
                         ),

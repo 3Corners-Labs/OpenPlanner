@@ -1,11 +1,22 @@
 """The flows of a service (ADR 0121 step 2d): refusals, the checklist and the lifecycle actions."""
 
-import pytest
+import re
+from urllib.parse import parse_qsl, urlencode
 
+import pytest
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.adapters.db.models import CapacityPoolRow
+from app.admin import flow_views as views
+from app.admin.forms import MAX_FORM_BYTES
 from app.domain import service_flows
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, Site
+from app.domain.routing import GroupRouting, Subject
+from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.admin.test_flow_routes import BASE, act, create, form_data, save
-from tests.support.admin_site import audit_log
+from tests.admin.test_flow_views import nl_locale
+from tests.support.admin_site import audit_log, site_app, site_uow
+from tests.support.domain import NOW
 from tests.support.flow_seed import add_subjects
 from tests.support.skill_seed import add_pool, add_skill
 
@@ -23,7 +34,10 @@ async def test_the_page_speaks_english_with_the_names_of_both_languages(site: Si
     row = page.split("<code>advies</code>")[0].rsplit("<tr>", 1)[1]
     assert "Discuss together" in row
     assert "Samen bespreken" in row  # the other language underneath
-    assert "This flow is not ready to use" in editor
+    assert "The draft is not complete yet" in editor
+    assert "Not active yet" in editor
+    assert "How does a request come in?" in editor
+    assert "By appointment" in editor
     assert "of 6 points in order." in editor
     assert "Save draft" in editor
     assert "Participants see this name. The name does not determine how the flow works." in editor
@@ -119,7 +133,9 @@ async def test_a_default_for_a_path_the_flow_does_not_offer_is_a_field_error(sit
     assert "alleen de standaard zijn voor een aanmeldweg die hij zelf aanbiedt" in response.text
 
 
-async def test_the_subjects_are_offered_with_extra_skills_and_read_back(site: Site) -> None:
+async def test_the_subjects_are_offered_and_their_extra_skills_are_chosen_on_a_page_of_their_own(
+    site: Site,
+) -> None:
     await site.login_as(ORG_ADMIN)
     await add_subjects(site, {"contract": "Contract", "aanvraag": "Aanvraag"})
     general = await add_skill(site, "general-advice", "Algemeen advies", "General advice")
@@ -129,23 +145,93 @@ async def test_the_subjects_are_offered_with_extra_skills_and_read_back(site: Si
     created = await create(
         site,
         capacity_pool_id=str(pool),
-        **{
-            f"skill-{general}": "on",
-            "offer_contract": "yes",
-            f"extra_contract_{english}": "on",
-            f"extra_aanvraag_{english}": "on",  # not offered: ignored
-        },
+        **{f"skill-{general}": "on", "offer_contract": "yes"},
     )
 
     assert created.status_code == 303
     page = (await site.client.get(f"{BASE}/advies")).text
     assert f'id="skill-{general}" name="skill-{general}" value="on" checked' in page
-    assert f'id="skill-{english}" name="skill-{english}" value="on">' in page
     assert 'id="offer_contract" name="offer_contract" value="yes" checked' in page
     assert 'id="offer_aanvraag" name="offer_aanvraag" value="yes">' in page
-    assert f'name="extra_contract_{english}" value="on" checked' in page
-    assert f'name="extra_aanvraag_{english}" value="on">' in page
+    assert "extra_contract_" not in page  # the main form carries no extra skills
+    assert f'href="{BASE}/advies/subjects/contract"' in page
+    assert f'href="{BASE}/advies/subjects/aanvraag"' not in page  # not offered
+    assert "Extra vaardigheden kiezen" in page
+    assert "verliest hier zijn extra vaardigheden" in page
+    form = await site.client.get(f"{BASE}/advies/subjects/contract")
+    assert form.status_code == 200
+    assert f'id="skill-{english}" name="skill-{english}" value="on">' in form.text
+    saved = await site.client.post(
+        f"{BASE}/advies/subjects/contract", data={f"skill-{english}": "on"}, headers=SAME_ORIGIN
+    )
+    assert saved.status_code == 303
+    assert saved.headers["location"] == f"{BASE}/advies?done=flow_subject_saved#subjects"
+    page = (await site.client.get(f"{BASE}/advies")).text
     assert "5 van 6 punten in orde." in page  # the pool guarantees what the flow needs
+    row = page.split('id="offer_contract"')[1].split("</tr>")[0]
+    assert "Engels" in row
+    again = await site.client.get(f"{BASE}/advies/subjects/contract")
+    assert f'id="skill-{english}" name="skill-{english}" value="on" checked' in again.text
+    details = [e.detail for e in await audit_log(site) if e.action == "group.edit"]
+    assert details[-1] == "flow.draft_saved,flow:advies,revision:1"
+
+
+async def test_saving_the_main_form_keeps_the_extra_skills_of_a_subject_that_stays_offered(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+    await add_subjects(site, {"contract": "Contract", "aanvraag": "Aanvraag"})
+    english = await add_skill(site, "language-en", "Engels", "English")
+    pool = await add_pool(site, "Advies", (english,))
+    await create(site, capacity_pool_id=str(pool), offer_contract="yes", offer_aanvraag="yes")
+    for subject in ("contract", "aanvraag"):
+        await site.client.post(
+            f"{BASE}/advies/subjects/{subject}",
+            data={f"skill-{english}": "on"},
+            headers=SAME_ORIGIN,
+        )
+
+    await save(site, capacity_pool_id=str(pool), offer_contract="yes")
+    page = (await site.client.get(f"{BASE}/advies")).text
+
+    contract = page.split('id="offer_contract"')[1].split("</tr>")[0]
+    aanvraag = page.split('id="offer_aanvraag"')[1].split("</tr>")[0]
+    assert "Engels" in contract
+    assert "Engels" not in aanvraag  # no longer offered: it lost its extra skills
+    await save(site, capacity_pool_id=str(pool), offer_contract="yes", offer_aanvraag="yes")
+    again = (await site.client.get(f"{BASE}/advies")).text
+    assert "Engels" not in again.split('id="offer_aanvraag"')[1].split("</tr>")[0]
+
+
+async def test_the_page_of_a_subject_is_missing_without_a_draft_or_for_a_subject_not_offered(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+    await add_subjects(site, {"contract": "Contract"})
+    await create(site, offer_contract="yes")
+    await act(site, "publish")
+
+    for method in ("GET", "POST"):
+        response = await site.client.request(
+            method, f"{BASE}/advies/subjects/contract", headers=SAME_ORIGIN
+        )
+        assert response.status_code == 404, method
+    await act(site, "prepare")
+    assert (await site.client.get(f"{BASE}/advies/subjects/contract")).status_code == 200
+    assert (await site.client.get(f"{BASE}/advies/subjects/nope")).status_code == 404
+
+
+async def test_an_offered_subject_that_is_not_saved_yet_says_to_save_first(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    await add_subjects(site, {"contract": "Contract"})
+    await create(site)
+
+    refused = await save(site, offer_contract="yes", label_en="")  # ticked, but not saved
+
+    assert refused.status_code == 422
+    row = refused.text.split('id="offer_contract"')[1].split("</tr>")[0]
+    assert "Sla het concept eerst op om extra vaardigheden te kiezen." in row
+    assert "/subjects/contract" not in row
 
 
 async def test_a_pool_that_does_not_guarantee_the_skills_is_a_missing_point_on_the_checklist(
@@ -162,36 +248,74 @@ async def test_a_pool_that_does_not_guarantee_the_skills_is_a_missing_point_on_t
     assert "4 van 6 punten in orde." in page
 
 
-async def test_the_checklist_says_every_state_in_words_and_follows_for_what_is_not_built(
-    site: Site,
+async def test_the_checklist_says_every_state_in_words_and_which_part_follows(
+    site: Site, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    built = service_flows.BUILT_DISPATCH
+    monkeypatch.setattr(
+        service_flows,
+        "BUILT_DISPATCH",
+        frozenset({*built, service_flows.DispatchKind.CONTACT_CENTER}),
+    )
     await site.login_as(ORG_ADMIN)
-    await create(site, interaction_kind="video")
+    await create(site, dispatch="contact_center")
+    monkeypatch.setattr(service_flows, "BUILT_DISPATCH", built)
 
     page = (await site.client.get(f"{BASE}/advies")).text
 
     checklist = page.split('<ol class="checklist">')[1].split("</ol>")[0]
     assert checklist.count('class="checklist__item"') == 6
-    assert checklist.count("<span>Volgt</span>") == 2  # video and retention are not built
+    assert checklist.count("<span>Volgt</span>") == 2  # the dispatch and retention are not built
     assert checklist.count("<span>Ontbreekt</span>") == 2  # no pool: capacity and skills
     assert checklist.count("<span>In orde</span>") == 2
-    assert "Dit onderdeel van OpenPlanner volgt in een latere versie." in checklist
+    assert (
+        "Dit contactkanaal of deze manier van afhandelen volgt in een latere versie." in checklist
+    )
+    assert "Het automatisch afsluiten en verwijderen van gegevens" in checklist
+    assert "Dit onderdeel van OpenPlanner volgt" not in checklist
     assert "Kies een capaciteitspool." in checklist
+    assert "Het concept is nog niet volledig" in page
 
 
-async def test_activation_is_a_disabled_button_with_its_explanation_and_a_refusal_with_the_list(
-    site: Site,
+async def test_the_checklist_names_what_it_judges_in_its_heading(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    pool = await add_pool(site, "Advies")
+    await create(site, capacity_pool_id=str(pool))
+
+    draft = (await site.client.get(f"{BASE}/advies")).text
+    await act(site, "publish")
+    published = (await site.client.get(f"{BASE}/advies")).text
+    await act(site, "prepare")
+    both = (await site.client.get(f"{BASE}/advies")).text
+
+    assert "Het concept is nog niet volledig" in draft
+    assert "De gepubliceerde revisie is nog niet klaar voor gebruik" in published
+    assert "Het concept is nog niet volledig" in both
+    assert "Beoordeeld op het opgeslagen concept (revisie 2)." in both
+
+
+async def test_activation_has_no_disabled_button_but_says_why_not_and_a_refusal_lists_the_points(
+    site: Site, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     await site.login_as(ORG_ADMIN)
     pool = await add_pool(site, "Advies")
     await create(site, capacity_pool_id=str(pool))
-    await act(site, "publish")
+    await create(site, "leeg")
 
+    unpublished = (await site.client.get(f"{BASE}/advies")).text
+    await act(site, "publish")
+    await act(site, "publish", "leeg")
     page = (await site.client.get(f"{BASE}/advies")).text
     refused = await act(site, "activate")
+    monkeypatch.setattr(service_flows, "RETENTION_BUILT", True)  # only the missing pool is left
+    other = (await site.client.get(f"{BASE}/leeg")).text
 
-    assert "Activeren kan zodra alle punten in orde zijn." in page
-    assert 'disabled aria-describedby="activate-hint">Flow activeren' in page
+    assert "Publiceer eerst het concept." in unpublished
+    assert "Nieuwe flows kunnen in deze versie nog niet worden geactiveerd." in page
+    assert "Activeren kan zodra de gepubliceerde revisie op alle punten in orde is." in other
+    for text in (unpublished, page, other):
+        assert "disabled" not in text.split('id="activate-heading"')[1].split("</section>")[0]
+        assert "Flow activeren</button>" not in text
     assert refused.status_code == 409
     assert "De flow is niet geactiveerd" in refused.text
     assert "<span>Volgt</span>" in refused.text
@@ -211,8 +335,8 @@ async def test_a_flow_that_is_ready_is_activated_with_the_constants_patched(
     page = (await site.client.get(f"{BASE}/advies")).text
     activated = await act(site, "activate")
 
-    assert "Deze flow is klaar voor gebruik" in page
-    assert 'disabled aria-describedby="activate-hint"' not in page
+    assert "De gepubliceerde revisie is klaar voor gebruik" in page
+    assert "Flow activeren</button>" in page
     assert activated.status_code == 303
     assert activated.headers["location"] == f"{BASE}/advies?done=flow_activated"
     after = (await site.client.get(f"{BASE}/advies", params={"done": "flow_activated"})).text
@@ -257,21 +381,64 @@ async def test_discarding_the_draft_of_a_published_flow_keeps_the_published_revi
     assert "Concept in bewerking" not in page
 
 
-async def test_a_flow_in_draft_state_cannot_be_archived_and_the_page_says_discard(
+async def test_a_published_flow_that_is_not_active_yet_is_archived_with_its_draft(
     site: Site,
 ) -> None:
     await site.login_as(ORG_ADMIN)
     await create(site)
     await act(site, "publish")
+    await act(site, "prepare")
+
+    before = (await site.client.get(f"{BASE}/advies")).text
+    page = await site.client.get(f"{BASE}/advies/archive")
+    done = await act(site, "archive")
+
+    assert page.status_code == 200
+    assert "Nog niet actief" in before
+    assert "Een concept van de flow wordt weggegooid." in page.text
+    assert "Flow archiveren</button>" in page.text
+    assert done.headers["location"] == f"{BASE}?done=flow_archived"
+    details = [e.detail for e in await audit_log(site) if e.action == "group.edit"]
+    assert details[-2:] == [
+        "flow.draft_discarded,flow:advies,revision:2",
+        "flow.archived,flow:advies,revision:1",
+    ]
+    archived = (await site.client.get(f"{BASE}/advies")).text
+    assert "Gearchiveerd" in archived
+    assert "Concept weggooien" not in archived
+
+
+async def test_a_flow_never_published_cannot_be_archived_and_the_page_says_discard(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+    await create(site)
 
     page = await site.client.get(f"{BASE}/advies/archive")
     refused = await act(site, "archive")
 
     assert page.status_code == 200
-    assert "Alleen een actieve flow kan worden gearchiveerd." in page.text
+    assert "zonder gepubliceerde revisie haalt u weg door het concept weg te gooien" in page.text
     assert "Flow archiveren</button>" not in page.text
     assert refused.status_code == 422
     assert "Dat kan niet in de huidige status van deze flow." in refused.text
+
+
+async def test_the_draft_of_an_archived_flow_is_not_discarded_and_the_page_says_so(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+    await create(site)
+    await act(site, "publish")
+    await act(site, "archive")
+
+    page = await site.client.get(f"{BASE}/advies/discard")
+    refused = await act(site, "discard")
+
+    assert page.status_code == 200
+    assert "Deze flow heeft geen concept om weg te gooien." in page.text
+    assert "Concept weggooien</button>" not in page.text
+    assert refused.status_code == 422
 
 
 async def test_archiving_an_active_flow_says_what_happens(
@@ -351,7 +518,7 @@ async def test_every_edit_publish_discard_activate_and_archive_of_a_legacy_flow_
 async def test_two_flows_with_arbitrary_names_and_one_configuration_read_the_same(
     site: Site,
 ) -> None:
-    """A01 at this level: a name decides nothing, not the read-outs nor the checklist."""
+    """A01 at this level: a name decides nothing, not the read-outs nor the checklist items."""
     await site.login_as(ORG_ADMIN)
     pool = await add_pool(site, "Advies")
     for code, nl, en in (("een", "zzz", "yyy"), ("twee", "Balie 7", "Desk 7")):
@@ -364,16 +531,19 @@ async def test_two_flows_with_arbitrary_names_and_one_configuration_read_the_sam
             interaction_kind="telephone",
         )
 
-    def judged(page: str) -> tuple[str, str]:
-        readout = page.split('<div id="kind-readout">')[1].split("</div>")[0]
-        checklist = page.split('<ol class="checklist">')[1].split("</ol>")[0]
-        return readout, checklist
+    async def judged(code: str) -> tuple[object, object]:
+        page = await site_app(site).state.flow_service.page(SUPER, "demo", code)
+        saved = page.flow.working
+        return (
+            page.items,
+            views.readout(saved.interaction_kind, saved.handling_action, nl_locale()),
+        )
 
-    first = judged((await site.client.get(f"{BASE}/een")).text)
-    second = judged((await site.client.get(f"{BASE}/twee")).text)
+    first, second = await judged("een"), await judged("twee")
 
     assert first == second
-    assert "de deelnemer bellen" in first[0]
+    assert first[1] is not None
+    assert "de deelnemer bellen" in first[1].action
 
 
 async def test_the_pool_text_links_to_skills_and_capacity_for_a_reader_of_the_organisation(
@@ -442,13 +612,14 @@ async def test_too_many_ticked_skills_are_refused_before_anything_is_looked_up(
 async def test_the_new_pages_have_no_script_and_no_inline_style(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
     await add_subjects(site, {"contract": "Contract"})
-    await create(site)
+    await create(site, offer_contract="yes")
     await act(site, "publish")
     await act(site, "prepare")
     pages = [
         BASE,
         f"{BASE}/new",
         f"{BASE}/advies",
+        f"{BASE}/advies/subjects/contract",
         f"{BASE}/advies/discard",
         f"{BASE}/advies/archive",
     ]
@@ -475,3 +646,73 @@ async def test_a_flow_with_an_archived_skill_keeps_it_shown_and_untickable(site:
     assert f'id="skill-{old}" name="skill-{old}" value="on" checked' in page
     assert "Gearchiveerd" in page.split(f'id="skill-{old}"')[1].split("</div>")[0]
     assert unticked.status_code == 303
+
+
+async def archive_directly(site: Site, pool_id: int) -> None:
+    """Archive a pool behind the service's back: it refuses while a flow draws on the pool."""
+    async with AsyncSession(site_app(site).state.engine) as session, session.begin():
+        await session.execute(
+            update(CapacityPoolRow).where(CapacityPoolRow.id == pool_id).values(archived_at=NOW)
+        )
+
+
+async def test_an_archived_pool_the_revision_uses_is_marked_and_kept_never_newly_chosen(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+    old = await add_pool(site, "Oud")
+    other = await add_pool(site, "Ander")
+    await create(site, capacity_pool_id=str(old))
+    await archive_directly(site, old)
+    await archive_directly(site, other)
+
+    editor = (await site.client.get(f"{BASE}/advies")).text
+    kept = await save(site, capacity_pool_id=str(old))
+    chosen = await save(site, capacity_pool_id=str(other))
+
+    option = editor.split(f'<option value="{old}"')[1].split("</option>")[0]
+    assert "selected" in option
+    assert "Oud (gearchiveerd)" in option
+    assert f'<option value="{other}"' not in editor  # an archived pool nobody uses is not offered
+    assert kept.status_code == 303
+    assert chosen.status_code == 422
+    assert 'href="#capacity_pool_id"' in chosen.text
+    assert "Deze keuze bestaat niet meer" in chosen.text
+
+
+async def test_the_main_form_with_the_most_subjects_stays_far_below_the_size_limit(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+    maximum = 100  # the highest ``max_subjects_per_group`` the superuser can set
+    routing = GroupRouting(
+        subjects=tuple(
+            Subject.create(f"onderwerp-{n:03d}", {"nl": f"Onderwerp {n}", "en": f"Subject {n}"})
+            for n in range(maximum)
+        )
+    )
+    async with site_uow(site).locked() as tx:
+        group = await tx.get_group("demo")
+        assert group is not None
+        await tx.save_group_routing(group.id, routing)
+    skills = [await add_skill(site, f"vaardigheid-{n}", f"V{n}", f"S{n}") for n in range(10)]
+    pool = await add_pool(site, "Advies", tuple(skills))
+    await create(site, capacity_pool_id=str(pool))
+    page = (await site.client.get(f"{BASE}/advies")).text
+    form = page.split('id="flow-form-heading"')[1].split("</form>")[0]
+    names = re.findall(r'<(?:input|select|textarea)[^>]*\bname="([^"]+)"', form)
+    body = urlencode(
+        {
+            **{name: "yes" for name in names if name.startswith("offer_")},
+            **{name: "on" for name in names if name.startswith("skill-")},
+            "label_nl": "x" * 80,
+            "label_en": "x" * 80,
+            "flow_code": "advies",
+        }
+    )
+
+    assert len([n for n in names if n.startswith("offer_")]) == maximum
+    assert not [n for n in names if n.startswith("extra_")]
+    assert len(body) < MAX_FORM_BYTES // 2, len(body)
+    saved = await save(site, capacity_pool_id=str(pool), **dict(parse_qsl(body)))
+    assert saved.status_code == 303

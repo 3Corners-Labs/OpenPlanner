@@ -3,10 +3,12 @@
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
 import pytest
 
+from app.domain import service_flows
 from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.service_flows import (
@@ -31,12 +33,16 @@ from app.domain.service_flows import (
     can_activate,
     check_combination,
     check_default_paths,
+    check_draft_content,
     check_draft_save,
     check_flow_references,
     check_publishable,
     check_revision_editable,
     check_state_change,
+    choosable_actions,
+    default_action,
     draws_on_pool,
+    flow_actions,
     legacy_revision,
     readiness,
     revisions_in_effect,
@@ -502,7 +508,7 @@ def test_a_default_entry_path_is_taken_by_one_active_flow() -> None:
         (FlowState.DRAFT, FlowState.ACTIVE, True),
         (FlowState.ACTIVE, FlowState.ARCHIVED, True),
         (FlowState.ARCHIVED, FlowState.ACTIVE, True),
-        (FlowState.DRAFT, FlowState.ARCHIVED, False),
+        (FlowState.DRAFT, FlowState.ARCHIVED, True),
         (FlowState.ACTIVE, FlowState.DRAFT, False),
         (FlowState.ARCHIVED, FlowState.DRAFT, False),
         (FlowState.ACTIVE, FlowState.ACTIVE, False),
@@ -518,6 +524,15 @@ def test_the_lifecycle_has_three_changes(current: FlowState, new: FlowState, all
             ErrorCode.INVALID_CONFIGURATION,
             "state",
         )
+
+
+def test_a_flow_that_was_never_published_is_not_archived() -> None:
+    unpublished = flow(state=FlowState.DRAFT, current=None, draft=revision())
+
+    assert refusal(lambda: check_state_change(unpublished, FlowState.ARCHIVED)) == (
+        ErrorCode.INVALID_CONFIGURATION,
+        "state",
+    )
 
 
 def test_activating_needs_a_published_revision() -> None:
@@ -693,14 +708,234 @@ def test_an_action_must_be_one_the_interaction_kind_allows_and_open_choices_pass
     )
 
 
-def test_a_legacy_pool_serves_the_flows_of_its_own_group_only() -> None:
+def test_a_legacy_pool_serves_the_legacy_wrapper_of_its_own_group_only() -> None:
     wrapper = replace(pool(mode=PoolMode.LEGACY_GROUP), group_id=1)
 
     check_flow_references(
-        1, revision(), wrapper, {}, frozenset(), (), group_id=1, already_pool_id=None
+        1, legacy(), wrapper, {}, frozenset(), (), group_id=1, already_pool_id=None
     )
     assert refusal(
         lambda: check_flow_references(
-            1, revision(), wrapper, {}, frozenset(), (), group_id=2, already_pool_id=None
+            1, legacy(), wrapper, {}, frozenset(), (), group_id=2, already_pool_id=None
         )
     ) == (ErrorCode.INVALID_CONFIGURATION, "capacity_pool_id")
+
+
+@pytest.mark.parametrize("own_group", [True, False])
+def test_a_new_revision_never_draws_on_a_legacy_pool_not_its_groups_own_either(
+    own_group: bool,
+) -> None:
+    wrapper = replace(pool(mode=PoolMode.LEGACY_GROUP), group_id=1)
+
+    assert refusal(
+        lambda: check_flow_references(
+            1,
+            revision(),
+            wrapper,
+            {},
+            frozenset(),
+            (),
+            group_id=1 if own_group else 2,
+            already_pool_id=None,
+        )
+    ) == (ErrorCode.INVALID_CONFIGURATION, "capacity_pool_id")
+    check_flow_references(
+        1, revision(), pool(), {}, frozenset(), (), group_id=1, already_pool_id=None
+    )
+
+
+def test_a_flow_knows_whether_it_is_legacy_and_which_revision_a_list_and_a_page_show() -> None:
+    wrapper = flow(current=legacy(published_at=NOW), flow_id=1)
+    own = flow(flow_id=1, current=revision(published_at=NOW), draft=revision(revision=2))
+    fresh = flow(state=FlowState.DRAFT, current=None, draft=revision())
+
+    assert (wrapper.legacy, own.legacy, fresh.legacy) == (True, False, False)
+    assert own.listed is own.current
+    assert own.working is own.draft
+    assert fresh.listed is fresh.working is fresh.draft
+    assert flow(current=revision(published_at=NOW), flow_id=1).working.revision == 1
+
+
+def test_the_actions_of_a_channel_follow_the_closed_table() -> None:
+    assert choosable_actions(None) == ()
+    assert choosable_actions(InteractionKind.IN_PERSON) == (
+        HandlingAction.VIEW_REQUEST,
+        HandlingAction.ASSIGN_WORKSTATION,
+    )
+    assert choosable_actions(InteractionKind.TELEPHONE) == (HandlingAction.CALL,)
+    assert default_action(None) is None
+    assert default_action(InteractionKind.IN_PERSON) is HandlingAction.VIEW_REQUEST
+    assert default_action(InteractionKind.VIDEO) is HandlingAction.OPEN_VIDEO
+
+
+def test_the_default_action_is_the_first_one_that_is_built(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        service_flows, "BUILT_ACTIONS", frozenset({HandlingAction.ASSIGN_WORKSTATION})
+    )
+
+    assert default_action(InteractionKind.IN_PERSON) is HandlingAction.ASSIGN_WORKSTATION
+    monkeypatch.setattr(service_flows, "BUILT_ACTIONS", frozenset())
+    assert default_action(InteractionKind.IN_PERSON) is HandlingAction.VIEW_REQUEST
+
+
+def ready_items(ok: bool = True) -> tuple[ReadinessItem, ...]:
+    """Return a checklist that is in order, or has one point missing."""
+    return tuple(
+        ReadinessItem(
+            check, ok or check is not ReadinessCheck.DATA, None if ok else R.LABELS_INVALID
+        )
+        for check in ReadinessCheck
+    )
+
+
+@pytest.mark.parametrize(
+    ("the_flow", "items", "expected"),
+    [
+        (flow(state=FlowState.DRAFT, current=None, draft=revision()), None, "save publish discard"),
+        (
+            flow(state=FlowState.DRAFT, flow_id=1),
+            ready_items(),
+            "prepare activate archive",
+        ),
+        (flow(state=FlowState.DRAFT, flow_id=1), ready_items(False), "prepare archive"),
+        (
+            flow(
+                state=FlowState.DRAFT,
+                flow_id=1,
+                current=revision(published_at=NOW),
+                draft=revision(revision=2),
+            ),
+            ready_items(),
+            "save publish discard activate archive",
+        ),
+        (flow(state=FlowState.ACTIVE, flow_id=1), ready_items(), "prepare archive"),
+        (
+            flow(
+                state=FlowState.ACTIVE,
+                flow_id=1,
+                current=revision(published_at=NOW),
+                draft=revision(revision=2),
+            ),
+            ready_items(),
+            "save publish discard archive",
+        ),
+        (flow(state=FlowState.ARCHIVED, flow_id=1), ready_items(), ""),
+        (
+            flow(state=FlowState.ACTIVE, flow_id=1, current=legacy(published_at=NOW)),
+            ready_items(),
+            "",
+        ),
+    ],
+    ids=[
+        "never published",
+        "published, ready",
+        "published, not ready",
+        "published with a draft",
+        "active",
+        "active with a draft",
+        "archived",
+        "legacy",
+    ],
+)
+def test_the_actions_the_lifecycle_allows(
+    the_flow: ServiceFlow, items: tuple[ReadinessItem, ...] | None, expected: str
+) -> None:
+    allowed = flow_actions(the_flow, items)
+
+    assert {name for name, on in vars(allowed).items() if on} == set(expected.split())
+
+
+def test_activation_needs_the_checklist_of_the_published_revision_in_order() -> None:
+    published = flow(state=FlowState.DRAFT, flow_id=1)
+
+    assert flow_actions(published, None).activate is False
+    assert flow_actions(published, ready_items(False)).activate is False
+    assert flow_actions(published, ready_items()).activate is True
+
+
+def test_a_draft_that_is_wrong_in_itself_is_refused_and_one_that_is_incomplete_passes() -> None:
+    check_draft_content(
+        revision(
+            interaction_kind=None,
+            duration_minutes=None,
+            dispatch=None,
+            completion=None,
+            handling_action=None,
+        )
+    )
+    wrong = {
+        "labels": {"labels": {"nl": "x", "en": ""}},
+        "duration_minutes": {"duration_minutes": 7},
+        "interaction_kind": {
+            "interaction_kind": InteractionKind.VIDEO,
+            "handling_action": HandlingAction.OPEN_VIDEO,
+        },
+        "dispatch": {"dispatch": DispatchKind.CONTACT_CENTER},
+        "completion": {"completion": CompletionPolicy.PROVIDER_EVENT},
+        "handling_action": {
+            "interaction_kind": InteractionKind.IN_PERSON,
+            "handling_action": HandlingAction.ASSIGN_WORKSTATION,
+        },
+    }
+    for field, changes in wrong.items():
+        assert refusal(lambda c=changes: check_draft_content(revision(**c))) == (
+            ErrorCode.INVALID_CONFIGURATION,
+            field,
+        )
+    assert refusal(
+        lambda: check_draft_content(
+            revision(interaction_kind=None, handling_action=HandlingAction.CALL)
+        )
+    ) == (ErrorCode.INVALID_CONFIGURATION, "handling_action")
+    assert refusal(
+        lambda: check_draft_content(
+            revision(interaction_kind=InteractionKind.NONE, handling_action=HandlingAction.CALL)
+        )
+    ) == (ErrorCode.INVALID_CONFIGURATION, "handling_action")
+
+
+@pytest.mark.parametrize(
+    ("constant", "member", "changes"),
+    [
+        (
+            "BUILT_KINDS",
+            InteractionKind.VIDEO,
+            {
+                "interaction_kind": InteractionKind.VIDEO,
+                "handling_action": HandlingAction.OPEN_VIDEO,
+            },
+        ),
+        ("BUILT_DISPATCH", DispatchKind.CONTACT_CENTER, {"dispatch": DispatchKind.CONTACT_CENTER}),
+        (
+            "BUILT_COMPLETION",
+            CompletionPolicy.PROVIDER_EVENT,
+            {"completion": CompletionPolicy.PROVIDER_EVENT},
+        ),
+        (
+            "BUILT_ACTIONS",
+            HandlingAction.ASSIGN_WORKSTATION,
+            {
+                "interaction_kind": InteractionKind.IN_PERSON,
+                "handling_action": HandlingAction.ASSIGN_WORKSTATION,
+            },
+        ),
+    ],
+)
+def test_each_built_constant_alone_decides_what_a_draft_may_choose(
+    monkeypatch: pytest.MonkeyPatch, constant: str, member: StrEnum, changes: dict[str, Any]
+) -> None:
+    assert refusal(lambda: check_draft_content(revision(**changes)))[0] is (
+        ErrorCode.INVALID_CONFIGURATION
+    )
+
+    monkeypatch.setattr(
+        service_flows, constant, frozenset({*getattr(service_flows, constant), member})
+    )
+
+    check_draft_content(revision(**changes))
+
+
+def test_a_legacy_draft_is_not_held_to_what_is_built() -> None:
+    check_draft_content(legacy(published_at=None))

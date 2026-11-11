@@ -10,15 +10,18 @@ of the form, never a way in.
 
 import pytest
 
+from app.domain.authorization import Scope
 from tests.admin.conftest import SAME_ORIGIN, Site
+from tests.support.admin_site import site_uow
 from tests.support.authorization_matrix import ROLES
+from tests.support.domain import make_group
 from tests.support.flow_seed import add_flow, add_subjects
 from tests.support.skill_seed import add_pool, add_skill
 
 DEMO, OTHER = "/admin/groups/demo/flows", "/admin/groups/andere-team/flows"
 MANAGES_DEMO = {"superuser", "org_admin (demo)"}
 MANAGES_ANDERE = {"superuser", "org_admin (andere)"}
-SUFFIXES = ("", "/prepare", "/publish", "/discard", "/activate", "/archive")
+SUFFIXES = ("", "/prepare", "/publish", "/discard", "/activate", "/archive", "/subjects/x")
 
 
 @pytest.mark.matrix
@@ -44,7 +47,7 @@ async def test_a_flow_code_of_another_service_is_not_found_for_every_role(
 
     for suffix in SUFFIXES:
         for method in ("GET", "POST"):
-            if method == "GET" and suffix not in ("", "/discard", "/archive"):
+            if method == "GET" and suffix not in ("", "/discard", "/archive", "/subjects/x"):
                 continue
             # Through demo's address: the code belongs to another organisation's service.
             expected = 404 if role in MANAGES_DEMO else 403
@@ -55,7 +58,10 @@ async def test_a_flow_code_of_another_service_is_not_found_for_every_role(
             )
             # Through its own service's address it exists, for whoever manages that service.
             if role in MANAGES_ANDERE:
-                assert await status(method, f"{OTHER}/geheim{suffix}") in (200, 303, 409, 422), (
+                exists = (200, 303, 409, 422) + (
+                    (404,) if "subjects" in suffix else ()
+                )  # no such subject
+                assert await status(method, f"{OTHER}/geheim{suffix}") in exists, (
                     role,
                     method,
                     suffix,
@@ -95,8 +101,61 @@ async def test_a_pool_and_a_skill_of_another_organisation_are_form_errors_never_
     for extra in (
         {"capacity_pool_id": str(their_pool)},
         {f"skill-{their_skill}": "on"},
-        {"offer_contract": "yes", f"extra_contract_{their_skill}": "on"},
     ):
         response = await site.client.post(DEMO, data={**base, **extra}, headers=SAME_ORIGIN)
         assert response.status_code == 422, extra
         assert "<code>advies</code>" not in (await site.client.get(DEMO)).text
+    await add_flow(
+        site, "advies", await add_pool(site, "Mine"), subject_skill_ids={"contract": frozenset()}
+    )
+    response = await site.client.post(
+        f"{DEMO}/advies/subjects/contract", data={f"skill-{their_skill}": "on"}, headers=SAME_ORIGIN
+    )
+    assert response.status_code == 422
+    assert 'href="#required_skills"' in response.text
+
+
+async def legacy_pools(site: Site) -> tuple[int, int]:
+    """Return the legacy pool of ``demo`` and of a second service of the same organisation."""
+    async with site_uow(site).locked() as tx:
+        organisation = await tx.get_organisation("demo")
+        assert organisation is not None
+        second = await tx.add_group(
+            make_group(id=0, organisation_id=organisation.id, slug="tweede", name="Tweede")
+        )
+        found = []
+        for slug in ("demo", "tweede"):
+            group = await tx.get_group(slug)
+            assert group is not None
+            await tx.ensure_default_flows(group.id)
+            pools = await tx.list_capacity_pools(Scope(everything=True), organisation.id)
+            found.append(next(p.id for p in pools if p.group_id == group.id))
+    assert second.id
+    return found[0], found[1]
+
+
+async def test_a_legacy_pool_of_any_service_reads_as_a_pool_that_does_not_exist(site: Site) -> None:
+    await site.login_as(ROLES["org_admin (demo)"])
+    own, other = await legacy_pools(site)
+    base = {
+        "flow_code": "advies",
+        "label_nl": "x",
+        "label_en": "x",
+        "intake_appointment": "yes",
+        "interaction_kind": "none",
+        "dispatch": "own_queue",
+        "completion": "operator",
+    }
+
+    async def message(pool_id: int) -> str:
+        response = await site.client.post(
+            DEMO, data={**base, "capacity_pool_id": str(pool_id)}, headers=SAME_ORIGIN
+        )
+        assert response.status_code == 422, pool_id
+        return response.text.split('id="capacity_pool_id-error"')[1].split("</p>")[0]
+
+    unknown = await message(999_999)
+
+    assert await message(own) == unknown
+    assert await message(other) == unknown
+    assert "<code>advies</code>" not in (await site.client.get(DEMO)).text

@@ -6,7 +6,7 @@ the ticked boxes into ids and map the domain's refusals of those screens to form
 """
 
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import NoReturn
 
@@ -113,6 +113,48 @@ def chosen_ids(form: FormData, max_skills: int) -> frozenset[int]:
     return ids
 
 
+@dataclass(frozen=True)
+class Rule:
+    """One refusal of the domain and the form error it becomes.
+
+    Attributes:
+        field: The refusal's field, ``None`` for any.
+        key: The catalogue key of the message.
+        target: The id of the input the error links to: ``None`` for a page-level error,
+            ``CHOICE`` for the group of checkboxes of the screen.
+        code: The refusal's code, ``None`` for any.
+    """
+
+    field: str | None
+    key: str
+    target: str | None
+    code: ErrorCode | None = None
+
+    def matches(self, error: DomainError) -> bool:
+        """Return whether ``error`` is the refusal this rule is for."""
+        return (self.field is None or error.field == self.field) and (
+            self.code is None or error.code is self.code
+        )
+
+
+CHOICE = ":choice"
+"""The target of a rule that links to the screen's group of checkboxes (``refuse``'s argument)."""
+
+
+@dataclass(frozen=True)
+class RefusalTable:
+    """How the refusals of one set of screens become form errors, in order of precedence.
+
+    Attributes:
+        rules: The refusals that are errors of an input or of the page; the first match wins.
+        unknown: Whether a refusal means "no such thing for you" (answered 404), for the
+            refusals no rule took.
+    """
+
+    rules: tuple[Rule, ...]
+    unknown: Callable[[DomainError], bool]
+
+
 def is_unknown(error: DomainError) -> bool:
     """Return whether a refusal means "no such thing for you" (answered 404).
 
@@ -124,53 +166,72 @@ def is_unknown(error: DomainError) -> bool:
     )
 
 
-def refuse(form: FormData, error: DomainError, locale: RequestLocale, choice_field: str) -> None:
-    """Add the form error for a refusal of these screens; raise the page-level ones.
+SKILLS = RefusalTable(
+    (
+        Rule("skill_code", "admin.skills.error.code_taken", "skill_code", ErrorCode.SLUG_TAKEN),
+        Rule("pool_code", "admin.capacity.error.code_taken", "pool_code", ErrorCode.SLUG_TAKEN),
+        Rule("pool_name", "admin.capacity.error.name_taken", "pool_name", ErrorCode.SLUG_TAKEN),
+        Rule("skill_limit", "admin.skills.error.limit", SKILL_LIMIT_NOTICE),
+        Rule("pool_limit", "admin.capacity.error.limit", POOL_LIMIT_NOTICE),
+        Rule(
+            "guaranteed_skill_ids",
+            "admin.capacity.error.skill_in_use",
+            CHOICE,
+            ErrorCode.CONFIGURATION_OBJECT_IN_USE,
+        ),
+        Rule("skill_ids", "admin.skills.error.choice", CHOICE),
+        Rule("guaranteed_skill_ids", "admin.skills.error.choice", CHOICE),
+        Rule(
+            "organisation_id",
+            "admin.skills.error.no_membership",
+            CHOICE,
+            ErrorCode.CONFIGURATION_OUT_OF_SCOPE,
+        ),
+    ),
+    is_unknown,
+)
+"""The refusals of the screens of skills, capacity pools and a person's skills."""
+
+
+def refuse(
+    form: FormData,
+    error: DomainError,
+    locale: RequestLocale,
+    choice_field: str,
+    table: RefusalTable = SKILLS,
+) -> None:
+    """Add the form error for a refusal of a set of screens; raise the page-level ones.
 
     A refused permission is an ``AccessDenied``; an object that is missing or another
     organisation's, a legacy pool and a person the viewer may not see answer 404 like an unknown
-    address. ``choice_field`` is the id of the group of checkboxes an error about the choice
-    links to.
+    address (``table.unknown``). ``choice_field`` is the id of the group of checkboxes an error
+    about the choice links to. What no rule of ``table`` takes is the form's generic message.
 
     Raises:
         AccessDenied: For ``not_permitted``.
         RejectedRequest: 404 for an unknown object.
     """
-    _ = locale.gettext
-    if error.code is ErrorCode.SLUG_TAKEN and error.field == "skill_code":
-        form.errors.append(FormError("skill_code", _("admin.skills.error.code_taken")))
-    elif error.code is ErrorCode.SLUG_TAKEN and error.field == "pool_code":
-        form.errors.append(FormError("pool_code", _("admin.capacity.error.code_taken")))
-    elif error.code is ErrorCode.SLUG_TAKEN and error.field == "pool_name":
-        form.errors.append(FormError("pool_name", _("admin.capacity.error.name_taken")))
-    elif error.field == "skill_limit":
-        form.errors.append(FormError(SKILL_LIMIT_NOTICE, _("admin.skills.error.limit")))
-    elif error.field == "pool_limit":
-        form.errors.append(FormError(POOL_LIMIT_NOTICE, _("admin.capacity.error.limit")))
-    elif (
-        error.code is ErrorCode.CONFIGURATION_OBJECT_IN_USE
-        and error.field == "guaranteed_skill_ids"
-    ):
-        form.errors.append(FormError(choice_field, _("admin.capacity.error.skill_in_use")))
-    elif error.field in ("skill_ids", "guaranteed_skill_ids"):
-        form.errors.append(FormError(choice_field, _("admin.skills.error.choice")))
-    elif error.code is ErrorCode.CONFIGURATION_OUT_OF_SCOPE and error.field == "organisation_id":
-        form.errors.append(FormError(choice_field, _("admin.skills.error.no_membership")))
-    elif error.code is ErrorCode.NOT_PERMITTED or is_unknown(error):
-        raise_unknown(error)
-    else:
-        form.refusal(error)
+    raise_refusal(error)
+    for rule in table.rules:
+        if rule.matches(error):
+            target = choice_field if rule.target == CHOICE else rule.target
+            form.errors.append(FormError(target, locale.gettext(rule.key)))
+            return
+    if table.unknown(error):
+        raise_unknown(error, table)
+    form.refusal(error)
 
 
-def raise_unknown(error: DomainError) -> NoReturn:
+def raise_unknown(error: DomainError, table: RefusalTable = SKILLS) -> NoReturn:
     """Turn a refusal of a page that has no form into its response, or re-raise it.
 
     Raises:
         AccessDenied: For ``not_permitted``.
-        RejectedRequest: 404 for an unknown object, organisation or person, and a legacy pool.
+        RejectedRequest: 404 for an unknown object, organisation or person, and a legacy pool
+            (what ``table.unknown`` says).
         DomainError: ``error`` itself for anything else (the portal answers it).
     """
     raise_refusal(error)
-    if is_unknown(error):
+    if table.unknown(error):
         raise RejectedRequest(404)
     raise error

@@ -1471,6 +1471,24 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             404, 403, 403, 404, 403, 403, 403
         ),
     },
+    "GET /admin/groups/{slug}/flows/{code}/subjects/{subject}": {
+        "/admin/groups/demo/flows/nope/subjects/x": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/demo/flows/appointment/subjects/x": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/flows/nope/subjects/x": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/flows/{code}/subjects/{subject}": {
+        "/admin/groups/demo/flows/nope/subjects/x": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/demo/flows/appointment/subjects/x": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/flows/nope/subjects/x": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
     "GET /admin/groups/{slug}/flows/{code}/archive": {
         "/admin/groups/demo/flows/nope/archive": statuses(404, 404, 403, 403, 403, 403, 403),
         "/admin/groups/demo/flows/appointment/archive": statuses(404, 404, 403, 403, 403, 403, 403),

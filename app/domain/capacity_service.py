@@ -19,9 +19,8 @@ one pool, are ``capacity.manage``.
 
 from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
-from datetime import datetime
 
-from app.domain.admin import AdminService, record_change
+from app.domain.admin import AdminService
 from app.domain.authorization import Permission, Principal, Scope, scope_for
 from app.domain.capacity import CapacityPool, PoolFlows, PoolMode
 from app.domain.errors import DomainError, ErrorCode, missing_object
@@ -249,7 +248,15 @@ class CapacityService:
             if await _counted(tx, scope, organisation.id) >= value_of(self._max):
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, LIMIT_FIELD)
             stored = await tx.save_capacity_pool(scope, pool)
-            await self._record(tx, principal, slug, f"{CREATED},pool:{_ref(stored)}")
+            await self._admin.record_change(
+                tx,
+                self._clock.now(),
+                principal,
+                _PERMISSION,
+                slug,
+                None,
+                f"{CREATED},pool:{_ref(stored)}",
+            )
         return stored
 
     async def update(
@@ -279,7 +286,15 @@ class CapacityService:
             if changed == current:
                 return False
             await tx.save_capacity_pool(scope, changed)
-            await self._record(tx, principal, slug, f"{CHANGED},pool:{_ref(current)}")
+            await self._admin.record_change(
+                tx,
+                self._clock.now(),
+                principal,
+                _PERMISSION,
+                slug,
+                None,
+                f"{CHANGED},pool:{_ref(current)}",
+            )
         return True
 
     async def archive(self, principal: Principal, slug: str, pool_id: int) -> None:
@@ -299,18 +314,9 @@ class CapacityService:
                 return
             now = self._clock.now()
             await tx.archive_capacity_pool(scope, pool_id, now)
-            await self._record(tx, principal, slug, f"{ARCHIVED},pool:{_ref(pool)}", now)
-
-    async def _record(
-        self,
-        tx: Transaction,
-        principal: Principal,
-        slug: str,
-        detail: str,
-        at: datetime | None = None,
-    ) -> None:
-        """Audit a change of the pools in the transaction that made it (codes only)."""
-        await record_change(tx, at or self._clock.now(), principal, _PERMISSION, slug, None, detail)
+            await self._admin.record_change(
+                tx, now, principal, _PERMISSION, slug, None, f"{ARCHIVED},pool:{_ref(pool)}"
+            )
 
 
 def _ref(pool: CapacityPool) -> str:

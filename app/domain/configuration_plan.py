@@ -180,7 +180,9 @@ class _Planner:
         digest = hashlib.sha256(
             f"{self._document.digest}:{settings_version}:{effect}".encode()
         ).hexdigest()
-        return Plan(changes, tuple(self._refusals), digest)
+        # One refusal per path, code and field: a rule of the document and a rule of the screens
+        # (the same function the portal calls) may both refuse the same thing.
+        return Plan(changes, tuple(dict.fromkeys(self._refusals)), digest)
 
     def _refuse(self, path: str, code: ErrorCode, field: str | None = None) -> None:
         """Record one refusal."""

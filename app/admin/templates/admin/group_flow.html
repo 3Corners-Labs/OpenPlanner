@@ -12,6 +12,7 @@
 <h2 class="section-title">{{ heading }}</h2>
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
 {% include "_error_summary.html" %}
+{% if notice %}<div class="alert alert--warning" role="status"><p>{{ notice }}</p></div>{% endif %}
 {% if not new %}
 <p>
   <span class="chip">{{ state_word }}</span>
@@ -38,7 +39,7 @@
     <fieldset class="field choice{% if kind_error %} field--error{% endif %}" id="interaction_kind" aria-describedby="kind-follows{% if kind_error %} interaction_kind-error{% endif %}">
       <legend>{{ _("admin.flows.contact_channel") }}</legend>
       {% for k in kinds %}
-      <div class="choice__option"><input type="radio" id="kind-{{ k.value }}" name="interaction_kind" value="{{ k.value }}"{% if k.checked %} checked{% endif %} aria-describedby="kind-{{ k.value }}-hint"><label for="kind-{{ k.value }}">{{ k.label }}</label></div>
+      <div class="choice__option"><input type="radio" id="kind-{{ k.value }}" name="interaction_kind" value="{{ k.value }}"{% if k.checked %} checked{% endif %}{% if k.disabled %} disabled{% endif %} aria-describedby="kind-{{ k.value }}-hint"><label for="kind-{{ k.value }}">{{ k.label }}</label></div>
       <p class="hint" id="kind-{{ k.value }}-hint">{{ k.hint }}</p>
       {% endfor %}
       <p class="hint" id="kind-follows">{{ _("admin.flows.kind_follows") }}</p>
@@ -47,7 +48,7 @@
     <div id="kind-readout">
       {% if readout %}
       <p>{{ readout.ready }}</p>
-      <p>{{ readout.action }}</p>
+      {% if readout.action %}<p>{{ readout.action }}</p>{% endif %}
       {% else %}
       <p class="hint">{{ _("admin.flows.readout.none") }}</p>
       {% endif %}
@@ -75,7 +76,7 @@
           <tr>
             <th scope="col">{{ _("admin.flows.subject") }}</th>
             <th scope="col">{{ _("admin.flows.offered") }}</th>
-            <th scope="col">{{ _("admin.flows.extra_skills") }}</th>
+            <th scope="col">{{ _("admin.flows.extra_skills") }}<br><span class="muted">{{ _("admin.flows.subjects_dropped_hint") }}</span></th>
           </tr>
         </thead>
         <tbody>
@@ -84,14 +85,11 @@
             <th scope="row">{{ s.label }} <span class="muted">({{ s.code }})</span></th>
             <td><div class="choice__option"><input type="checkbox" id="{{ s.offer_name }}" name="{{ s.offer_name }}" value="yes"{% if s.offered %} checked{% endif %}><label for="{{ s.offer_name }}">{{ _("admin.flows.offered") }}<span class="visually-hidden"> {{ s.label }}</span></label></div></td>
             <td>
-              <fieldset class="choice">
-                <legend class="visually-hidden">{{ _("admin.flows.extra_skills_for", subject=s.label) }}</legend>
-                {% for e in s.skills %}
-                <div class="choice__option"><input type="checkbox" id="{{ e.name }}" name="{{ e.name }}" value="on"{% if e.checked %} checked{% endif %}><label for="{{ e.name }}">{{ e.label }}{% if e.archived %} <span class="chip">{{ _("admin.status.archived") }}</span>{% endif %}</label></div>
-                {% else %}
-                <p class="muted">{{ _("admin.skills.none_to_choose") }}</p>
-                {% endfor %}
-              </fieldset>
+              {% if s.offered %}
+              {% if s.extras %}{{ s.extras | join(", ") }}{% else %}<span class="muted">{{ _("admin.flows.no_skills") }}</span>{% endif %}
+              {% if s.link %}<br><a href="{{ s.link }}">{{ _("admin.flows.choose_extra_skills") }}<span class="visually-hidden"> {{ s.label }}</span></a>
+              {% else %}<br><span class="muted">{{ _("admin.flows.extra_skills_save_first") }}</span>{% endif %}
+              {% else %}<span class="muted">{{ _("admin.flows.no_skills") }}</span>{% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -143,35 +141,39 @@
   </dl>
 </section>
 {% endif %}
-{% if not new and not archived %}
+{% if actions and (actions.prepare or actions.publish or actions.discard or actions.archive or activation) %}
 <section class="card" aria-labelledby="actions-heading">
   <div class="card__header">
     <h2 id="actions-heading">{{ _("admin.flows.actions_heading") }}</h2>
   </div>
-  {% if can_prepare %}
+  {% if actions.prepare %}
   <form method="post" action="{{ base }}/{{ code }}/prepare" novalidate aria-labelledby="prepare-heading">
     <h3 id="prepare-heading">{{ _("admin.flows.prepare_heading") }}</h3>
     <p class="hint" id="prepare-hint">{{ _("admin.flows.prepare_hint") }}</p>
     <div class="form-actions"><button type="submit" class="button" aria-describedby="prepare-hint">{{ _("admin.flows.prepare") }}</button></div>
   </form>
   {% endif %}
-  {% if can_publish %}
+  {% if actions.publish %}
   <form method="post" action="{{ base }}/{{ code }}/publish" novalidate aria-labelledby="publish-heading">
     <h3 id="publish-heading">{{ _("admin.flows.publish_heading") }}</h3>
     <p class="hint" id="publish-hint">{{ _("admin.flows.publish_hint") }}</p>
     <div class="form-actions"><button type="submit" class="button" aria-describedby="publish-hint">{{ _("admin.flows.publish") }}</button></div>
   </form>
   {% endif %}
-  {% if show_activate %}
+  {% if activation %}
+  <h3 id="activate-heading">{{ _("admin.flows.activate_heading") }}</h3>
+  {% if activation.button %}
   <form method="post" action="{{ base }}/{{ code }}/activate" novalidate aria-labelledby="activate-heading">
-    <h3 id="activate-heading">{{ _("admin.flows.activate_heading") }}</h3>
-    <p class="hint" id="activate-hint">{{ activate_hint }}</p>
-    <div class="form-actions"><button type="submit" class="button"{% if not can_activate %} disabled{% endif %} aria-describedby="activate-hint">{{ _("admin.flows.activate") }}</button></div>
+    <p class="hint" id="activate-hint">{{ activation.text }}</p>
+    <div class="form-actions"><button type="submit" class="button" aria-describedby="activate-hint">{{ _("admin.flows.activate") }}</button></div>
   </form>
+  {% else %}
+  <p id="activate-hint">{{ activation.text }}</p>
+  {% endif %}
   {% endif %}
   <p>
-    {% if can_discard %}<a href="{{ base }}/{{ code }}/discard">{{ _("admin.flows.discard_link") }}</a>{% endif %}
-    {% if can_archive %}<a href="{{ base }}/{{ code }}/archive">{{ _("admin.flows.archive_link") }}</a>{% endif %}
+    {% if actions.discard %}<a href="{{ base }}/{{ code }}/discard">{{ _("admin.flows.discard_link") }}</a>{% endif %}
+    {% if actions.archive %}<a href="{{ base }}/{{ code }}/archive">{{ _("admin.flows.archive_link") }}</a>{% endif %}
   </p>
 </section>
 {% endif %}

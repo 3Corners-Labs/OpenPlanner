@@ -24,7 +24,15 @@ from app.domain.skills import Skill
 from app.domain.staff import Membership, StaffMember
 from tests.fakes import clock as fake_clock
 from tests.fakes.persistence import InMemoryUnitOfWork
-from tests.support.admin import AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, two_organisations
+from tests.support.admin import (
+    AUDITOR,
+    GROUP_ADMIN,
+    ORG_ADMIN,
+    OUTSIDER,
+    SUPER,
+    three_groups,
+    two_organisations,
+)
 from tests.support.domain import NOW
 from tests.support.flow_seed import draft
 
@@ -266,7 +274,7 @@ async def test_a_flow_that_is_ready_is_activated_and_archived(
     assert edit.value.field == "state"
 
 
-async def test_a_flow_in_draft_state_is_not_archived_but_discarded(
+async def test_a_flow_that_is_not_active_yet_is_archived_when_it_has_a_published_revision(
     service: FlowService, uow: InMemoryUnitOfWork
 ) -> None:
     await person(uow, ORG_ADMIN.subject)
@@ -274,10 +282,109 @@ async def test_a_flow_in_draft_state_is_not_archived_but_discarded(
     await service.create(ORG_ADMIN, "demo", "advies", draft(pool))
     await service.publish(ORG_ADMIN, "demo", "advies")
 
+    archived = await service.archive(ORG_ADMIN, "demo", "advies")
+
+    assert archived.state is FlowState.ARCHIVED
+    assert details(uow)[-1] == "flow.archived,flow:advies,revision:1"
+
+
+async def test_a_flow_that_was_never_published_is_removed_by_discarding_not_archived(
+    service: FlowService, uow: InMemoryUnitOfWork
+) -> None:
+    await person(uow, ORG_ADMIN.subject)
+    _, pool = await seed(uow)
+    await service.create(ORG_ADMIN, "demo", "advies", draft(pool))
+
     with pytest.raises(DomainError) as error:
         await service.archive(ORG_ADMIN, "demo", "advies")
 
     assert (error.value.code, error.value.field) == (ErrorCode.INVALID_CONFIGURATION, "state")
+    assert await service.discard(ORG_ADMIN, "demo", "advies") is True
+    assert not uow.state.flows
+
+
+async def test_archiving_a_flow_with_a_draft_discards_the_draft_in_the_same_transaction(
+    service: FlowService, uow: InMemoryUnitOfWork
+) -> None:
+    await person(uow, ORG_ADMIN.subject)
+    _, pool = await seed(uow)
+    await service.create(ORG_ADMIN, "demo", "advies", draft(pool))
+    await service.publish(ORG_ADMIN, "demo", "advies")
+    await service.prepare(ORG_ADMIN, "demo", "advies")
+
+    archived = await service.archive(ORG_ADMIN, "demo", "advies")
+
+    assert archived.state is FlowState.ARCHIVED
+    assert archived.draft is None
+    (stored,) = uow.state.flows.values()
+    assert stored.draft is None
+    assert details(uow)[-2:] == [
+        "flow.draft_discarded,flow:advies,revision:2",
+        "flow.archived,flow:advies,revision:1",
+    ]
+
+
+async def test_the_draft_of_an_archived_flow_cannot_be_discarded_nor_saved_nor_published(
+    service: FlowService, uow: InMemoryUnitOfWork
+) -> None:
+    await person(uow, ORG_ADMIN.subject)
+    _, pool = await seed(uow)
+    await service.create(ORG_ADMIN, "demo", "advies", draft(pool))
+    await service.publish(ORG_ADMIN, "demo", "advies")
+    await service.archive(ORG_ADMIN, "demo", "advies")
+    before = len(details(uow))
+
+    for action in (
+        lambda: service.discard(ORG_ADMIN, "demo", "advies"),
+        lambda: service.save(ORG_ADMIN, "demo", "advies", draft(pool)),
+        lambda: service.publish(ORG_ADMIN, "demo", "advies"),
+        lambda: service.prepare(ORG_ADMIN, "demo", "advies"),
+    ):
+        with pytest.raises(DomainError) as error:
+            await action()
+        assert (error.value.code, error.value.field) == (ErrorCode.INVALID_CONFIGURATION, "state")
+    assert len(details(uow)) == before
+
+
+async def test_the_draft_of_an_active_flow_is_published_only_when_it_is_in_order(
+    service: FlowService, uow: InMemoryUnitOfWork, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(flows, "RETENTION_BUILT", True)
+    await person(uow, ORG_ADMIN.subject)
+    _, pool = await seed(uow)
+    await service.create(ORG_ADMIN, "demo", "advies", draft(pool))
+    await service.publish(ORG_ADMIN, "demo", "advies")
+    assert (await service.activate(ORG_ADMIN, "demo", "advies")).activated
+    await service.prepare(ORG_ADMIN, "demo", "advies")
+    await service.save(
+        ORG_ADMIN, "demo", "advies", draft(pool, interaction_kind=None, handling_action=None)
+    )
+
+    with pytest.raises(DomainError) as error:
+        await service.publish(ORG_ADMIN, "demo", "advies")
+
+    assert (error.value.code, error.value.field) == (ErrorCode.INVALID_CONFIGURATION, "readiness")
+    (live,) = uow.state.flows.values()
+    assert live.current is not None
+    assert live.current.revision == 1
+    assert live.draft is not None
+    await service.save(ORG_ADMIN, "demo", "advies", draft(pool))
+    published = await service.publish(ORG_ADMIN, "demo", "advies")
+    assert published.current is not None
+    assert published.current.revision == 2
+
+
+async def test_the_draft_of_a_flow_that_is_not_active_is_published_even_when_incomplete(
+    service: FlowService, uow: InMemoryUnitOfWork
+) -> None:
+    await person(uow, ORG_ADMIN.subject)
+    await service.create(
+        ORG_ADMIN, "demo", "advies", draft(None, interaction_kind=None, handling_action=None)
+    )
+
+    published = await service.publish(ORG_ADMIN, "demo", "advies")
+
+    assert published.current is not None
 
 
 async def test_a_second_active_default_is_refused_when_the_flow_is_activated(
@@ -537,7 +644,7 @@ async def test_a_legacy_flow_is_listed_and_every_action_on_it_answers_like_an_un
     listed = await service.overview(ORG_ADMIN, "demo")
 
     (line,) = listed.lines
-    assert line.legacy is True
+    assert line.flow.legacy is True
     assert line.flow.code == "appointment"
     assert listed.can_add is True  # a legacy flow does not count against the limit
     for action in (
@@ -585,10 +692,96 @@ async def test_the_page_judges_the_draft_and_the_activation_the_current_revision
     page = await service.page(ORG_ADMIN, "demo", "advies")
 
     assert new.activation is None
-    assert new.can_activate is False
-    assert page.editable is True
+    assert new.actions.activate is False
+    assert page.actions.save is True
     assert page.shown is page.flow.draft
     assert [i.reason for i in page.items if not i.ok][0] is flows.ReadinessReason.KIND_MISSING
     assert page.activation is not None
     assert all(i.ok for i in page.activation[:3])
-    assert page.can_activate is False  # retention is not built
+    assert page.actions.activate is False  # retention is not built
+
+
+async def test_a_group_scoped_caller_cannot_draw_on_a_legacy_pool_like_on_an_unknown_one() -> None:
+    uow = three_groups()
+    service = make(uow)
+    custom = CustomRole(1, Role.GROUP_ADMIN, frozenset({Permission.GROUP_EDIT}), "c", "Rol", "Role")
+    caller = Principal(
+        "g-3", "G3", frozenset({Grant(custom.key, "demo", "demo")}), frozenset({custom})
+    )
+    async with uow.locked() as tx:
+        own, other = [
+            (
+                await tx.save_capacity_pool(
+                    EVERYTHING,
+                    CapacityPool(None, 1, "Eigen", PoolMode.LEGACY_GROUP, group_id=group),
+                )
+            ).id
+            for group in (1, 3)
+        ]
+
+    results = []
+    for pool_id in (own, other, 9999):
+        with pytest.raises(DomainError) as error:
+            await service.create(caller, "demo", "advies", draft(pool_id))
+        results.append((error.value.field, error.value.code))
+
+    refused_as_invalid = ("capacity_pool_id", ErrorCode.INVALID_CONFIGURATION)
+    assert results == [
+        refused_as_invalid,
+        refused_as_invalid,
+        ("capacity_pool_id", ErrorCode.CONFIGURATION_OBJECT_MISSING),
+    ]
+    assert not uow.state.flows
+
+
+async def test_the_extra_skills_of_an_offered_subject_are_saved_into_the_draft(
+    service: FlowService, uow: InMemoryUnitOfWork
+) -> None:
+    await person(uow, ORG_ADMIN.subject)
+    skill, pool = await seed(uow)
+    uow.state.groups[1] = replace(
+        uow.state.groups[1],
+        routing=GroupRouting(subjects=(Subject.create("contract", {"nl": "C", "en": "C"}),)),
+    )
+    await service.create(
+        ORG_ADMIN, "demo", "advies", draft(pool, subject_skill_ids={"contract": frozenset()})
+    )
+
+    page = await service.subject_page(ORG_ADMIN, "demo", "advies", "contract")
+    written = await service.save_subject_skills(
+        ORG_ADMIN, "demo", "advies", "contract", frozenset({skill})
+    )
+
+    assert page.chosen == frozenset()
+    assert [s.id for s in page.skills] == [skill]
+    assert written.draft is not None
+    assert written.draft.subject_skill_ids == {"contract": frozenset({skill})}
+    assert details(uow)[-1] == "flow.draft_saved,flow:advies,revision:1"
+    assert (await service.subject_page(ORG_ADMIN, "demo", "advies", "contract")).chosen == {skill}
+
+
+async def test_the_page_of_a_subject_is_missing_unless_the_draft_offers_it(
+    service: FlowService, uow: InMemoryUnitOfWork
+) -> None:
+    await person(uow, ORG_ADMIN.subject)
+    _, pool = await seed(uow)
+    uow.state.groups[1] = replace(
+        uow.state.groups[1],
+        routing=GroupRouting(subjects=(Subject.create("contract", {"nl": "C", "en": "C"}),)),
+    )
+    await service.create(ORG_ADMIN, "demo", "advies", draft(pool))
+    await service.publish(ORG_ADMIN, "demo", "advies")
+
+    for subject in ("contract", "nope"):
+        for action in (
+            lambda s=subject: service.subject_page(ORG_ADMIN, "demo", "advies", s),
+            lambda s=subject: service.save_subject_skills(
+                ORG_ADMIN, "demo", "advies", s, frozenset()
+            ),
+        ):
+            with pytest.raises(DomainError) as error:  # no draft, or a subject it does not offer
+                await action()
+            assert (error.value.code, error.value.field) == (
+                ErrorCode.CONFIGURATION_OBJECT_MISSING,
+                "subject",
+            )

@@ -7,15 +7,15 @@ and a test fails for a member of an enum without text. Nothing here decides anyt
 readiness checklist and the table of combinations are the domain's, the views only say them.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 
-from app.admin.flow_inputs import extra_name, offer_name
+from app.admin.flow_inputs import offer_name
 from app.admin.forms import Field, FormData
 from app.admin.skill_inputs import SkillChoice, choices, skill_label
 from app.domain import service_flows as flows
 from app.domain.capacity import CapacityPool, PoolMode
-from app.domain.flow_service import FlowChoices, FlowDraftInput, FlowLine
+from app.domain.flow_service import FlowChoices, FlowDraftInput, FlowLine, FlowPage
 from app.domain.scheduling import MAX_SLOT_MINUTES, MIN_SLOT_MINUTES, SLOT_STEP_MINUTES
 from app.domain.service_flows import (
     CompletionPolicy,
@@ -38,6 +38,9 @@ INTAKE_LABELS: Mapping[IntakeMode, str] = {
     IntakeMode.ON_DEMAND: "admin.flows.intake.on_demand",
 }
 """The words of the entry paths."""
+
+MIN_CHOICE = 2
+"""A contact channel with fewer allowed actions has no choice of action to show."""
 
 KIND_LABELS: Mapping[InteractionKind, str] = {
     InteractionKind.VIDEO: "admin.flows.kind.video",
@@ -99,6 +102,22 @@ CHECK_TITLES: Mapping[ReadinessCheck, str] = {
     ReadinessCheck.RETENTION: "admin.flows.check.retention",
 }
 """The title of each readiness check."""
+
+HEADINGS: Mapping[tuple[bool, bool], str] = {
+    (True, True): "admin.flows.ready_heading.draft_ready",
+    (True, False): "admin.flows.ready_heading.draft_not_ready",
+    (False, True): "admin.flows.ready_heading.published_ready",
+    (False, False): "admin.flows.ready_heading.published_not_ready",
+}
+"""The heading of the checklist by what it judges (the draft, or not) and whether it is in order."""
+
+NOT_BUILT_TEXTS: Mapping[ReadinessCheck, str] = {
+    ReadinessCheck.DISPATCH: "admin.flows.reason.not_built_yet.dispatch",
+    ReadinessCheck.COMPLETION: "admin.flows.reason.not_built_yet.completion",
+    ReadinessCheck.RETENTION: "admin.flows.reason.not_built_yet.retention",
+}
+"""The sentence of ``not_built_yet`` for the checks that can fail on it, saying which part
+follows; any other check says it in general (``REASON_TEXTS``)."""
 
 REASON_TEXTS: Mapping[ReadinessReason, str] = {
     ReadinessReason.LABELS_INVALID: "admin.flows.reason.labels_invalid",
@@ -189,28 +208,29 @@ class KindView:
     label: str
     hint: str
     checked: bool
-
-
-@dataclass(frozen=True)
-class ExtraView:
-    """One extra skill of a subject as a checkbox."""
-
-    id: int
-    name: str
-    label: str
-    checked: bool
-    archived: bool
+    disabled: bool = False
 
 
 @dataclass(frozen=True)
 class SubjectView:
-    """One subject of the service in the table of the editor."""
+    """One subject of the service in the table of the editor.
+
+    Attributes:
+        code: The subject's code.
+        label: Its name in the admin's language.
+        offer_name: The name of its "offered" checkbox.
+        offered: Whether the shown values offer it.
+        extras: The extra skills the saved draft requires for it, by name; empty for none.
+        link: The address of the page that chooses them, only for a subject the saved draft
+            offers (none otherwise: what is not saved cannot be edited yet).
+    """
 
     code: str
     label: str
     offer_name: str
     offered: bool
-    skills: tuple[ExtraView, ...]
+    extras: tuple[str, ...]
+    link: str | None
 
 
 @dataclass(frozen=True)
@@ -262,7 +282,7 @@ def flow_row(line: FlowLine, locale: RequestLocale) -> FlowRowView:
     flow, revision = line.flow, line.revision
     other = "en" if locale.code == "nl" else "nl"
     kind = revision.interaction_kind
-    modes = sorted(revision.intake_modes, key=lambda m: m.value)
+    modes = sorted(revision.intake_modes)
     return FlowRowView(
         flow.code,
         _label(revision.labels, locale.code) or flow.code,
@@ -275,13 +295,19 @@ def flow_row(line: FlowLine, locale: RequestLocale) -> FlowRowView:
         tuple(skill_label(s, locale.code) for s in line.skills),
         _(STATE_LABELS[flow.state]),
         flow.draft is not None and flow.current is not None,
-        line.legacy,
+        flow.legacy,
         flow.state is FlowState.ARCHIVED,
     )
 
 
-def readiness_view(items: Sequence[ReadinessItem], locale: RequestLocale) -> ReadinessView:
-    """Translate the readiness checklist: a title, a state as a word and a sentence per item."""
+def readiness_view(
+    items: Sequence[ReadinessItem], locale: RequestLocale, *, draft: bool
+) -> ReadinessView:
+    """Translate the readiness checklist: a title, a state as a word and a sentence per item.
+
+    ``draft`` says what the checklist judges: the draft, or the published revision. The heading
+    names it, and a point that cannot be met yet says which part follows.
+    """
     _ = locale.gettext
     rows = []
     for item in items:
@@ -293,28 +319,70 @@ def readiness_view(items: Sequence[ReadinessItem], locale: RequestLocale) -> Rea
             word = _(
                 "admin.flows.ready_word.follows" if follows else "admin.flows.ready_word.missing"
             )
-            sentence, missing = _(REASON_TEXTS[reason]), True
+            key = REASON_TEXTS[reason]
+            sentence, missing = _(NOT_BUILT_TEXTS.get(item.code, key) if follows else key), True
         rows.append(ReadinessRow(_(CHECK_TITLES[item.code]), word, missing, sentence))
     done = sum(1 for item in items if item.ok)
     ready = flows.can_activate(items)
     return ReadinessView(
-        _("admin.flows.ready_heading.ready" if ready else "admin.flows.ready_heading.not_ready"),
+        _(HEADINGS[draft, ready]),
         _("admin.flows.ready_count", done=done, total=len(items)),
         ready,
         tuple(rows),
     )
 
 
-def readout(kind: InteractionKind | None, locale: RequestLocale) -> ReadoutView | None:
-    """Return what the contact channel ``kind`` means (from the closed table), none for no kind."""
+@dataclass(frozen=True)
+class ActivationView:
+    """What the page says about activating the flow: a button, or why there is none.
+
+    Attributes:
+        button: Whether activation is possible now, so the form with its button is shown.
+        text: The sentence beside the button, or instead of it.
+    """
+
+    button: bool
+    text: str
+
+
+def activation_view(page: FlowPage, locale: RequestLocale) -> ActivationView | None:
+    """Return the activation section of a flow that is not active yet; none for the others.
+
+    There is no disabled button: when activation is not allowed the page says why, and when the
+    reason is a part of OpenPlanner that follows later, it says that.
+    """
+    _ = locale.gettext
+    if page.flow.state is not FlowState.DRAFT:
+        return None
+    if page.actions.activate:
+        return ActivationView(True, _("admin.flows.activate_ready"))
+    if page.activation is None:
+        return ActivationView(False, _("admin.flows.activate_publish_first"))
+    follows = any(item.reason is ReadinessReason.NOT_BUILT_YET for item in page.activation)
+    return ActivationView(
+        False,
+        _("admin.flows.activate_not_built" if follows else "admin.flows.activate_not_ready"),
+    )
+
+
+def readout(
+    kind: InteractionKind | None, action: HandlingAction | None, locale: RequestLocale
+) -> ReadoutView | None:
+    """Return what the saved contact channel means, none for a channel not saved yet.
+
+    The readiness policy is the channel's row of the closed table; the action is the saved one,
+    or the channel's default when none is saved: always one action, never a list of them.
+    """
     _ = locale.gettext
     if kind is None:
         return None
-    combination = flows.COMBINATIONS[kind]
-    first = " / ".join(_(ACTION_LABELS[a]) for a in HandlingAction if a in combination.actions)
+    shown = action if action is not None else flows.default_action(kind)
     return ReadoutView(
-        _("admin.flows.readout.ready", policy=_(READINESS_TEXTS[combination.readiness])),
-        _("admin.flows.readout.action", action=first),
+        _(
+            "admin.flows.readout.ready",
+            policy=_(READINESS_TEXTS[flows.COMBINATIONS[kind].readiness]),
+        ),
+        _("admin.flows.readout.action", action=_(ACTION_LABELS[shown])) if shown else "",
     )
 
 
@@ -394,18 +462,32 @@ def duration_field(form: FormData, values: FlowDraftInput, locale: RequestLocale
     )
 
 
+def _available[M](
+    member: M, built: Collection[M], label: str, locale: RequestLocale
+) -> tuple[str, bool]:
+    """Return the label of an option and whether it is disabled, from the ``BUILT_*`` constant.
+
+    The one place that says which option can be chosen: what ``built`` (one of the ``BUILT_*``
+    constants of ``service_flows``, read when called) does not hold is listed, marked "to follow"
+    in words and disabled, so the screen widens with the constants and with nothing else.
+    """
+    if member in built:
+        return label, False
+    return locale.gettext("admin.flows.to_follow", label=label), True
+
+
 def kind_views(values: FlowDraftInput, locale: RequestLocale) -> list[KindView]:
     """Return the contact channels of the radio group, the chosen one checked."""
     _ = locale.gettext
-    return [
-        KindView(k.value, _(KIND_LABELS[k]), _(KIND_HINTS[k]), values.interaction_kind is k)
-        for k in InteractionKind
-    ]
-
-
-def _suffixed(label: str, built: bool, locale: RequestLocale) -> str:
-    """Return ``label``, with "to follow" added for something not built yet."""
-    return label if built else locale.gettext("admin.flows.to_follow", label=label)
+    views = []
+    for kind in InteractionKind:
+        label, disabled = _available(kind, flows.BUILT_KINDS, _(KIND_LABELS[kind]), locale)
+        views.append(
+            KindView(
+                kind.value, label, _(KIND_HINTS[kind]), values.interaction_kind is kind, disabled
+            )
+        )
+    return views
 
 
 def action_select(
@@ -416,25 +498,17 @@ def action_select(
 ) -> SelectView | None:
     """Return the select of the first action, only for a saved channel that allows a choice."""
     _ = locale.gettext
-    if saved_kind is None:
+    allowed = flows.choosable_actions(saved_kind)
+    if len(allowed) < MIN_CHOICE:
         return None
-    allowed = flows.COMBINATIONS[saved_kind].actions
-    if len(allowed) < 2:  # noqa: PLR2004 - one action is no choice
-        return None
-    options = tuple(
-        OptionView(
-            a.value,
-            _suffixed(_(ACTION_LABELS[a]), a in flows.BUILT_ACTIONS, locale),
-            values.handling_action is a,
-            a not in flows.BUILT_ACTIONS,
-        )
-        for a in HandlingAction
-        if a in allowed
-    )
+    options = []
+    for action in allowed:
+        label, disabled = _available(action, flows.BUILT_ACTIONS, _(ACTION_LABELS[action]), locale)
+        options.append(OptionView(action.value, label, values.handling_action is action, disabled))
     return SelectView(
         "handling_action",
         _("admin.flows.first_action"),
-        options,
+        tuple(options),
         error=form.error_for("handling_action"),
     )
 
@@ -465,35 +539,35 @@ def pool_select(
 def dispatch_select(values: FlowDraftInput, form: FormData, locale: RequestLocale) -> SelectView:
     """Return the select of the dispatch; what is not built yet is listed but not choosable."""
     _ = locale.gettext
-    options = tuple(
-        OptionView(
-            d.value,
-            _suffixed(_(DISPATCH_LABELS[d]), d in flows.BUILT_DISPATCH, locale),
-            values.dispatch is d,
-            d not in flows.BUILT_DISPATCH,
+    options = []
+    for dispatch in DispatchKind:
+        label, disabled = _available(
+            dispatch, flows.BUILT_DISPATCH, _(DISPATCH_LABELS[dispatch]), locale
         )
-        for d in DispatchKind
-    )
+        options.append(OptionView(dispatch.value, label, values.dispatch is dispatch, disabled))
     return SelectView(
-        "dispatch", _("admin.flows.dispatch"), options, error=form.error_for("dispatch")
+        "dispatch", _("admin.flows.dispatch"), tuple(options), error=form.error_for("dispatch")
     )
 
 
 def completion_select(values: FlowDraftInput, form: FormData, locale: RequestLocale) -> SelectView:
     """Return the select of the completion; the legacy observation is not offered at all."""
     _ = locale.gettext
-    options = tuple(
-        OptionView(
-            c.value,
-            _suffixed(_(COMPLETION_LABELS[c]), c in flows.BUILT_COMPLETION, locale),
-            values.completion is c,
-            c not in flows.BUILT_COMPLETION,
+    options = []
+    for completion in CompletionPolicy:
+        if completion is CompletionPolicy.LEGACY_VIDEO_OBSERVATION:
+            continue
+        label, disabled = _available(
+            completion, flows.BUILT_COMPLETION, _(COMPLETION_LABELS[completion]), locale
         )
-        for c in CompletionPolicy
-        if c is not CompletionPolicy.LEGACY_VIDEO_OBSERVATION
-    )
+        options.append(
+            OptionView(completion.value, label, values.completion is completion, disabled)
+        )
     return SelectView(
-        "completion", _("admin.flows.completion"), options, error=form.error_for("completion")
+        "completion",
+        _("admin.flows.completion"),
+        tuple(options),
+        error=form.error_for("completion"),
     )
 
 
@@ -551,29 +625,32 @@ def required_choices(
 
 
 def subject_views(
-    choices_: FlowChoices, values: FlowDraftInput, locale: RequestLocale
+    page: FlowPage | None,
+    choices_: FlowChoices,
+    values: FlowDraftInput,
+    locale: RequestLocale,
+    base: str,
 ) -> list[SubjectView]:
-    """Return one row per subject of the service: offered, and the extra skills it needs."""
+    """Return one row per subject: offered, its extra skills and where to choose them.
+
+    The extra skills are the saved draft's, never the form's: they are chosen on a page of their
+    own (``base`` is the address of the flow), and only for a subject the saved draft offers.
+    """
+    saved = page.flow.draft.subject_skill_ids if page and page.flow.draft else {}
+    named = page.skills if page else {}
     views = []
     for subject in choices_.subjects:
-        extras = values.subject_skill_ids.get(subject.code, frozenset())
+        extras = sorted(
+            skill_label(named[i], locale.code) for i in saved.get(subject.code, ()) if i in named
+        )
         views.append(
             SubjectView(
                 subject.code,
                 subject.label(locale.code),
                 offer_name(subject.code),
                 subject.code in values.subject_skill_ids,
-                tuple(
-                    ExtraView(
-                        s.id or 0,
-                        extra_name(subject.code, s.id or 0),
-                        skill_label(s, locale.code),
-                        s.id in extras,
-                        s.archived,
-                    )
-                    for s in choices_.skills
-                    if s.id is not None
-                ),
+                tuple(extras),
+                f"{base}/subjects/{subject.code}" if subject.code in saved else None,
             )
         )
     return views
@@ -601,7 +678,7 @@ def summary_rows(
         (_("admin.flows.label_en"), revision.labels.get("en", "")),
         (
             _("admin.flows.intake"),
-            ", ".join(_(INTAKE_LABELS[m]) for m in sorted(revision.intake_modes, key=str)) or none,
+            ", ".join(_(INTAKE_LABELS[m]) for m in sorted(revision.intake_modes)) or none,
         ),
         (_("admin.flows.contact_channel"), _(KIND_LABELS[kind]) if kind else none),
         (
@@ -638,7 +715,7 @@ def summary_rows(
         ),
         (
             _("admin.flows.defaults"),
-            ", ".join(_(INTAKE_LABELS[m]) for m in sorted(default_for, key=str)) or none,
+            ", ".join(_(INTAKE_LABELS[m]) for m in sorted(default_for)) or none,
         ),
     ]
     return rows
