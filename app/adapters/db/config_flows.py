@@ -26,7 +26,7 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -56,7 +56,13 @@ from app.adapters.db.models import (
     SubjectFlowRow,
     SubjectFlowSkillRow,
 )
-from app.adapters.db.service_flows import set_flow_defaults, write_revision
+from app.adapters.db.service_flows import (
+    prune_unpublished_revisions,
+    set_flow_defaults,
+    write_flow_pointers,
+    write_flow_state,
+    write_revision,
+)
 from app.adapters.db.skills import skill_ids_by_code
 from app.adapters.db.skills import write_skill as write_skill_row
 from app.domain.capacity import CapacityPool, PoolMode
@@ -95,12 +101,14 @@ type Sections = dict[str, tuple[Entity, ...]]
 
 async def read_catalogue(
     session: AsyncSession,
-) -> tuple[dict[str, Sections], frozenset[str]]:
+) -> tuple[dict[str, Sections], frozenset[str], dict[str, frozenset[str]]]:
     """Return every organisation's ``skills`` and counted ``capacity_pools``, by slug.
 
     A counted pool is addressed by its code. One whose stored code is missing (a row an older
-    image wrote after migration 0110) has no address and is left out of the tree; its name is
-    the second result, as ``organisation/id``, so an export can refuse it by name.
+    image wrote after migration 0110) has no address and is left out of the tree; the second
+    result names it, as ``organisation/id``, so an export can refuse it, and the third gives the
+    names of those that are not archived by organisation, so a document cannot create a second
+    pool with a name that one still holds.
     """
     skills: dict[str, list[Entity]] = defaultdict(list)
     for row, organisation in (
@@ -124,6 +132,7 @@ async def read_catalogue(
     guaranteed = await _guaranteed(session, codes)
     pools: dict[str, list[Entity]] = defaultdict(list)
     without_code: set[str] = set()
+    hidden_names: dict[str, set[str]] = defaultdict(set)
     for pool_row, organisation in (
         await session.execute(
             select(CapacityPoolRow, OrganisationRow.slug)
@@ -134,6 +143,8 @@ async def read_catalogue(
     ).all():
         if pool_row.code is None:
             without_code.add(f"{organisation}/{pool_row.id}")
+            if pool_row.archived_at is None:
+                hidden_names[organisation].add(pool_row.name)
             continue
         pools[organisation].append(
             Entity(
@@ -154,7 +165,11 @@ async def read_catalogue(
         }
         for slug in {*skills, *pools}
     }
-    return sections, frozenset(without_code)
+    return (
+        sections,
+        frozenset(without_code),
+        {slug: frozenset(names) for slug, names in hidden_names.items()},
+    )
 
 
 async def _skill_codes(session: AsyncSession) -> dict[int, str]:
@@ -354,11 +369,16 @@ def _names(change: Change) -> set[str]:
     return set(change.values) if change.action is ChangeAction.CREATE else set(change.fields)
 
 
-def _archived_at(was: datetime | None, archived: Value) -> datetime | None:
-    """Return the archive time a flag gives: kept when archived already, else now, else none."""
+def _archived_at(was: datetime | None, archived: Value, change: Change) -> datetime | None:
+    """Return the archive time a flag gives: kept when archived already, else when it happens.
+
+    The time is the apply's own (``Change.at``, the service's clock), so archive times are
+    deterministic and the portal's; a change that did not come through the service has none and
+    falls back to the system clock.
+    """
     if not archived:
         return None
-    return was or datetime.now(UTC)
+    return was or change.at or datetime.now(UTC)
 
 
 async def write_skill(session: AsyncSession, box: SecretBox | None, change: Change) -> None:
@@ -382,7 +402,7 @@ async def write_skill(session: AsyncSession, box: SecretBox | None, change: Chan
     )
     row = await write_skill_row(session, skill, row)
     if "archived" in _names(change):
-        row.archived_at = _archived_at(row.archived_at, change.values.get("archived"))
+        row.archived_at = _archived_at(row.archived_at, change.values.get("archived"), change)
     await session.flush()
 
 
@@ -407,7 +427,7 @@ async def _write_pool(
     """Store a pool through the portal's writer, then its archive flag as the change states it."""
     row = await write_pool(session, pool, row)
     if "archived" in _names(change):
-        row.archived_at = _archived_at(row.archived_at, change.values.get("archived"))
+        row.archived_at = _archived_at(row.archived_at, change.values.get("archived"), change)
     await session.flush()
 
 
@@ -483,6 +503,16 @@ def _is_default_path_clash(error: IntegrityError) -> bool:
     return "service_flows.group_id" in message and "service_flows.code" not in message
 
 
+def _pointer(
+    values: Mapping[str, Value], stored: int | None, name: str, names: set[str]
+) -> int | None:
+    """Return a flow pointer after the change: the document's value when it states one."""
+    if name not in names:
+        return stored
+    value = values.get(name)
+    return value if isinstance(value, int) else None
+
+
 async def write_service_flow(session: AsyncSession, box: SecretBox | None, change: Change) -> None:
     """Apply one change to a flow: create it, change its state or pointers, or delete it.
 
@@ -507,13 +537,15 @@ async def write_service_flow(session: AsyncSession, box: SecretBox | None, chang
     elif row is None:
         raise DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, "flow_id")
     if "state" in names:
-        row.state = text_of(values, "state")
+        write_flow_state(row, text_of(values, "state"))
     if "default_for" in names:
         set_flow_defaults(row, [IntakeMode(mode) for mode in strings_of(values, "default_for")])
-    for name in ("current_revision", "draft_revision"):
-        if name in names:
-            value = values.get(name)
-            setattr(row, name, value if isinstance(value, int) else None)
+    if names & {"current_revision", "draft_revision"}:
+        write_flow_pointers(
+            row,
+            current_revision=_pointer(values, row.current_revision, "current_revision", names),
+            draft_revision=_pointer(values, row.draft_revision, "draft_revision", names),
+        )
     try:
         await session.flush()
     except IntegrityError as error:
@@ -521,13 +553,7 @@ async def write_service_flow(session: AsyncSession, box: SecretBox | None, chang
             raise DomainError(ErrorCode.CONFIGURATION_OBJECT_EXISTS, "default_for") from error
         raise
     if "draft_revision" in names:
-        await session.execute(
-            delete(FlowRevisionRow).where(
-                FlowRevisionRow.flow_id == row.id,
-                FlowRevisionRow.published_at.is_(None),
-                FlowRevisionRow.revision != (row.draft_revision or -1),
-            )
-        )
+        await prune_unpublished_revisions(session, row.id, row.draft_revision)
 
 
 async def _pool_id(

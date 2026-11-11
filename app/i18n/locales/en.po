@@ -11651,6 +11651,9 @@ msgstr "Note: this plan changes a claim value (the key of an organisation or ser
 msgid "admin.configuration.warning.webex"
 msgstr "Note: this plan replaces the tokens of the Webex Service App. The installation the document came from can no longer connect."
 
+msgid "admin.configuration.warning.pools_without_code"
+msgstr "Note: {count} capacity pool(s) of this scope have no code (an older image created them) and are left out of the document, so this plan does not show or change them. A pool you create here may not take one of their names. Archive them and add them again in the portal to give them a code."
+
 msgid "details.title"
 msgstr "Change your details"
 

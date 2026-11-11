@@ -10,6 +10,7 @@ from app.domain.configuration_changes import ChangeAction, Usage
 from app.domain.configuration_tree import Entity
 from app.domain.errors import DomainError, ErrorCode
 from tests.support.flow_documents import (
+    acme,
     advies,
     document_json,
     draft,
@@ -72,32 +73,149 @@ def test_a_flow_cannot_use_a_skill_that_only_another_organisation_has() -> None:
     ]
 
 
-def test_a_draft_cannot_offer_a_subject_the_service_does_not_have() -> None:
+def test_a_draft_of_a_flow_the_installation_has_cannot_offer_a_subject_the_service_lacks() -> None:
     data = document_json()
     draft(data)["subjects"] = {"rijbewijs": ["passport"]}
 
-    result = plan(data, empty_flows())
+    result = plan(data, full())
 
     assert refusals(result) == [
         (f"{FLOW}.revisions[3]", ErrorCode.INVALID_CONFIGURATION, "subject_skill_ids")
     ]
 
 
-def test_the_first_revision_may_keep_a_subject_that_is_gone_so_an_export_imports_again() -> None:
+def test_a_restored_flow_keeps_every_subject_it_was_recorded_with() -> None:
     data = document_json()
-    advies(data)["revisions"][0]["subjects"] = {"rijbewijs": ["passport"]}
+    for found in advies(data)["revisions"]:
+        found["subjects"] = {"rijbewijs": ["passport"]}  # published or draft, the service lost it
+
+    assert plan(data, empty_flows()).ok
+
+
+def test_a_subject_code_of_a_restored_flow_still_has_to_be_a_code() -> None:
+    data = document_json()
+    advies(data)["revisions"][0]["subjects"] = {"Not A Code": ["passport"]}
+
+    assert plan(data, empty_flows()).refusals
+
+
+def test_a_later_revision_of_a_stored_flow_cannot_name_what_the_current_one_lacks() -> None:
+    stored = flow("advies", "archived", 1, None, [], revision(1, required_skills=["passport"]))
+    data = document_json()
+    advies(data)["revisions"][1]["subjects"] = {"rijbewijs": ["passport"]}
+    advies(data)["draft_revision"] = None
+    advies(data)["current_revision"] = 2
+    advies(data)["revisions"].pop()
+
+    assert refusals(plan(data, full(stored))) == [
+        (f"{FLOW}.revisions[2]", ErrorCode.INVALID_CONFIGURATION, "subject_skill_ids")
+    ]
+
+
+def test_a_later_revision_of_a_restored_flow_may_name_what_the_one_before_it_did_not() -> None:
+    data = document_json()
     advies(data)["revisions"][1]["subjects"] = {"rijbewijs": ["passport"]}
 
     assert plan(data, empty_flows()).ok
 
 
-def test_a_later_revision_cannot_name_a_subject_that_the_one_before_it_did_not() -> None:
-    data = document_json()
-    advies(data)["revisions"][1]["subjects"] = {"rijbewijs": ["passport"]}
+def archived_pool(data: dict[str, Any]) -> None:
+    """Add the pool ``oud``, archived since the flow's revisions were published."""
+    acme(data)["capacity_pools"].append(
+        {"code": "oud", "name": "Oud", "guaranteed_skills": [], "archived": True}
+    )
 
-    assert refusals(plan(data, empty_flows())) == [
-        (f"{FLOW}.revisions[2]", ErrorCode.INVALID_CONFIGURATION, "subject_skill_ids")
+
+def test_a_new_pool_cannot_take_the_name_of_a_pool_hidden_for_lack_of_a_code() -> None:
+    data = document_json()
+    acme(data)["capacity_pools"].append(
+        {"code": "extra", "name": " LOKET 2 ", "guaranteed_skills": [], "archived": False}
+    )
+    hidden = Usage(hidden_pool_names={"acme": frozenset({"Loket 2"})})
+
+    assert refusals(plan(data, full(), usage=hidden)) == [
+        ("organisations[acme].capacity_pools[extra]", ErrorCode.SLUG_TAKEN, "pool_name")
     ]
+    assert plan(data, full()).ok  # nothing hidden, so the name is free
+    assert plan(data, full(), usage=Usage(hidden_pool_names={"beta": frozenset({"Loket 2"})})).ok
+
+
+def test_a_restored_pool_may_still_guarantee_a_skill_archived_since() -> None:
+    data = document_json()
+    acme(data)["capacity_pools"][0]["guaranteed_skills"] = ["passport", "old"]  # "old" is archived
+
+    assert plan(data, empty_flows()).ok
+
+
+def test_a_restore_keeps_a_published_revision_two_that_requires_a_skill_archived_since() -> None:
+    data = document_json()
+    advies(data)["revisions"][1]["required_skills"] = ["old"]  # revision 2, published
+
+    assert plan(data, empty_flows()).ok
+
+
+def test_a_restore_keeps_a_draft_that_requires_a_skill_archived_since() -> None:
+    data = document_json()
+    draft(data)["required_skills"] = ["old"]
+
+    assert plan(data, empty_flows()).ok
+
+
+def test_a_restore_keeps_a_current_revision_on_a_pool_archived_since() -> None:
+    data = document_json()
+    archived_pool(data)
+    advies(data)["revisions"][1]["capacity_pool"] = "oud"  # the current revision
+
+    assert plan(data, empty_flows()).ok
+
+
+def test_a_restore_keeps_a_draft_on_a_pool_archived_since() -> None:
+    data = document_json()
+    archived_pool(data)
+    draft(data)["capacity_pool"] = "oud"
+
+    assert plan(data, empty_flows()).ok
+
+
+def test_a_draft_of_a_flow_the_installation_has_cannot_newly_choose_an_archived_pool() -> None:
+    data = document_json()
+    archived_pool(data)
+    draft(data)["capacity_pool"] = "oud"
+    stored = full()
+    stored.children["organisations"][0].children["capacity_pools"] += (pool("oud", archived=True),)
+
+    assert refusals(plan(data, stored)) == [
+        (f"{FLOW}.revisions[3]", ErrorCode.INVALID_CONFIGURATION, "capacity_pool_id")
+    ]
+
+
+def test_a_restore_still_refuses_a_pool_the_tree_does_not_hold() -> None:
+    data = document_json()
+    draft(data)["capacity_pool"] = "elders"
+    assert refusals(plan(data, empty_flows())) == [
+        (f"{FLOW}.revisions[3]", ErrorCode.CONFIGURATION_OBJECT_MISSING, "capacity_pool_id")
+    ]
+
+
+def test_a_restore_still_refuses_an_unpublished_revision_that_is_not_the_draft() -> None:
+    data = document_json()
+    advies(data)["draft_revision"] = None
+    advies(data)["current_revision"] = 2
+
+    assert (f"{FLOW}.revisions[3]", ErrorCode.INVALID_CONFIGURATION, "published_at") in refusals(
+        plan(data, empty_flows())
+    )
+
+
+def test_an_unpublished_revision_left_behind_by_a_draft_that_moved_on_is_refused() -> None:
+    """Apply deletes it, so the plan refuses the document instead of hiding the deletion."""
+    data = document_json()
+    advies(data)["revisions"].append({**copy.deepcopy(advies(data)["revisions"][2]), "revision": 4})
+    advies(data)["draft_revision"] = 4
+
+    assert (f"{FLOW}.revisions[3]", ErrorCode.INVALID_CONFIGURATION, "published_at") in refusals(
+        plan(data, full())
+    )
 
 
 def test_a_published_revision_may_name_a_skill_archived_afterwards() -> None:

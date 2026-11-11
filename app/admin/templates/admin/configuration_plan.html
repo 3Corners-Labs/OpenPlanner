@@ -15,7 +15,7 @@
   </div>
   {% endif %}
   {% for warning in plan.warnings %}
-  <div class="alert alert--warning" role="status"><p>{{ _(warning, count=plan.deletes) }}</p></div>
+  <div class="alert alert--warning" role="status"><p>{{ _(warning, count=plan.counts.get(warning, plan.deletes)) }}</p></div>
   {% endfor %}
   {% if plan.changes %}
   <p>{{ _("admin.configuration.plan.summary", count=plan.changes | length) }}</p>

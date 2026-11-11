@@ -139,6 +139,44 @@ def set_flow_defaults(row: ServiceFlowRow, modes: Collection[IntakeMode]) -> Non
     row.default_on_demand = IntakeMode.ON_DEMAND in modes
 
 
+def write_flow_state(row: ServiceFlowRow, state: FlowState | str) -> None:
+    """Store a flow's lifecycle state; the one writer of ``ServiceFlowRow.state``.
+
+    The portal's state change and a configuration document both call it, after the rules of
+    ``check_state_change`` and ``check_default_paths``.
+    """
+    row.state = state.value if isinstance(state, FlowState) else state
+
+
+def write_flow_pointers(
+    row: ServiceFlowRow, *, current_revision: int | None, draft_revision: int | None
+) -> None:
+    """Store which revision is the current one and which is the draft; the one writer of both.
+
+    The portal's save, publish and discard and a configuration document call it, so a pointer is
+    never set in two ways. The caller says both, because ``None`` is a value (no draft).
+    """
+    row.current_revision = current_revision
+    row.draft_revision = draft_revision
+
+
+async def prune_unpublished_revisions(
+    session: AsyncSession, flow_id: int, draft_revision: int | None
+) -> None:
+    """Delete the flow's unpublished revisions other than ``draft_revision``.
+
+    What a draft that was discarded or replaced leaves behind; a published revision is history
+    and is never touched. The portal's discard and a document that moves the draft both call it.
+    """
+    await session.execute(
+        delete(FlowRevisionRow).where(
+            FlowRevisionRow.flow_id == flow_id,
+            FlowRevisionRow.published_at.is_(None),
+            FlowRevisionRow.revision != (draft_revision or -1),
+        )
+    )
+
+
 async def write_revision(
     session: AsyncSession, flow_id: int, number: int, revision: FlowRevision
 ) -> None:
@@ -471,7 +509,7 @@ class ServiceFlowQueries:
             number = stored.draft.revision
         else:
             number = (stored.current.revision if stored and stored.current else 0) + 1
-        row.draft_revision = number
+        write_flow_pointers(row, current_revision=row.current_revision, draft_revision=number)
         await self._session.flush()
         await write_revision(self._session, row.id, number, revision)
         return (await self._flows([row]))[0]
@@ -505,8 +543,7 @@ class ServiceFlowQueries:
             raise missing_object("draft")
         revision.published_at = at
         revision.published_by = by
-        row.current_revision = row.draft_revision
-        row.draft_revision = None
+        write_flow_pointers(row, current_revision=row.draft_revision, draft_revision=None)
         await self._session.flush()
         return (await self._flows([row]))[0]
 
@@ -525,13 +562,8 @@ class ServiceFlowQueries:
         if row.current_revision is None:
             await self._session.delete(row)  # the database removes the revision with it
         else:
-            await self._session.execute(
-                delete(FlowRevisionRow).where(
-                    FlowRevisionRow.flow_id == flow_id,
-                    FlowRevisionRow.revision == row.draft_revision,
-                )
-            )
-            row.draft_revision = None
+            write_flow_pointers(row, current_revision=row.current_revision, draft_revision=None)
+            await prune_unpublished_revisions(self._session, flow_id, None)
         await self._session.flush()
 
     async def set_flow_state(self, scope: Scope, flow_id: int, state: FlowState) -> ServiceFlow:
@@ -560,6 +592,6 @@ class ServiceFlowQueries:
             check_default_paths(
                 flow, frozenset().union(*(flow_defaults(other) for other in others))
             )
-        row.state = state.value
+        write_flow_state(row, state)
         await self._session.flush()
         return (await self._flows([row]))[0]

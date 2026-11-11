@@ -102,7 +102,7 @@ class ConfigurationDocumentQueries:
         channels = await config_channels.read_channels(session, box)
         by_organisation, by_group = await config_scenarios.read_scenarios(session)
         groups = await config_group.read_groups(session)
-        catalogue, unaddressable = await config_flows.read_catalogue(session)
+        catalogue, unaddressable, hidden_names = await config_flows.read_catalogue(session)
         flows = await config_flows.read_flows(session)
         clients = await config_clients.read_api_clients(session, box)
         platform = replace(
@@ -141,7 +141,7 @@ class ConfigurationDocumentQueries:
             ),
         )
         usage = await read_usage(session, now, locked_settings)
-        usage = replace(usage, unaddressable=unaddressable)
+        usage = replace(usage, unaddressable=unaddressable, hidden_pool_names=hidden_names)
         return ConfigurationSnapshot(
             root,
             usage,

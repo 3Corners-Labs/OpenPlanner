@@ -60,12 +60,16 @@ class Plan:
         sealed: Whether the document held sealed secrets, so a caller knows to ask for the
             passphrase again at the apply. Set by ``ConfigurationDocumentService.plan`` only; the
             plan inside an apply result leaves it ``False``.
+        left_out: How many objects of the document's scope the installation holds that a
+            document cannot address (counted pools without a code) and the plan therefore
+            leaves alone; a preview warns about them.
     """
 
     changes: tuple[Change, ...]
     refusals: tuple[Refusal, ...]
     digest: str
     sealed: bool = False
+    left_out: int = 0
 
     @property
     def ok(self) -> bool:
@@ -118,7 +122,7 @@ def plan_document(
         settings_version: The configuration's version the plan is computed against.
         max_changes: The most changes one apply may hold. A plan with more is never applied, so
             the rules across objects, which read everything the plan touches, are not run on it
-            (the caller refuses it with ``configuration_too_many_changes``).
+            (the plan refuses itself with ``configuration_too_many_changes``).
 
     Returns:
         The plan: changes, refusals and the plan hash.
@@ -174,15 +178,18 @@ class _Planner:
         if self._max_changes is None or len(changes) <= self._max_changes:
             for rule in self._document.schema.integrity:
                 self._refusals.extend(rule(resolution))
+        else:
+            # The rules across objects are not run on a plan that is never applied, so the plan
+            # says so itself: a preview refuses it and offers no apply.
+            self._refusals.append(Refusal("", ErrorCode.CONFIGURATION_TOO_MANY_CHANGES))
         effect = "\n".join(
             f"{c.action.value} {c.kind} {'/'.join(c.address)} {','.join(c.fields)}" for c in changes
         )
         digest = hashlib.sha256(
             f"{self._document.digest}:{settings_version}:{effect}".encode()
         ).hexdigest()
-        # One refusal per path, code and field: a rule of the document and a rule of the screens
-        # (the same function the portal calls) may both refuse the same thing.
-        return Plan(changes, tuple(dict.fromkeys(self._refusals)), digest)
+        left_out = len(self._usage.unaddressable_in(self._document.scope.organisation))
+        return Plan(changes, tuple(self._refusals), digest, left_out=left_out)
 
     def _refuse(self, path: str, code: ErrorCode, field: str | None = None) -> None:
         """Record one refusal."""

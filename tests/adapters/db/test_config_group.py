@@ -286,6 +286,105 @@ async def test_a_group_and_its_slots_are_deleted(seeded: AsyncEngine) -> None:
         assert await session.scalar(select(func.count()).select_from(SlotRow)) == 0
 
 
+async def flows_by_group(engine: AsyncEngine) -> dict[str, list[tuple[str, str]]]:
+    """Return each group's flows as ``(code, state)`` and the number of pools, by slug."""
+    async with AsyncSession(engine) as session:
+        rows = (
+            await session.execute(
+                select(GroupRow.slug, ServiceFlowRow.code, ServiceFlowRow.state)
+                .join(ServiceFlowRow, ServiceFlowRow.group_id == GroupRow.id)
+                .order_by(GroupRow.slug, ServiceFlowRow.id)
+            )
+        ).all()
+    found: dict[str, list[tuple[str, str]]] = {}
+    for slug, code, state in rows:
+        found.setdefault(slug, []).append((code, state))
+    return found
+
+
+async def count_of(engine: AsyncEngine, table: type) -> int:
+    """Return the number of rows of ``table``."""
+    async with AsyncSession(engine) as session:
+        return int(await session.scalar(select(func.count()).select_from(table)) or 0)
+
+
+async def test_an_imported_group_gets_its_pool_and_flows_and_loses_them_when_deleted(
+    engine: AsyncEngine,
+) -> None:
+    await seed(engine)
+    rules = [
+        {"weekday": 2, "opens": "10:00", "closes": "12:00", "capacity": 2, "offer": "both"},
+    ]
+    data = {
+        "organisations": [
+            {
+                "slug": "acme",
+                "groups": [
+                    {
+                        "slug": "balie",
+                        "name": "Balie",
+                        "timezone": "Europe/Amsterdam",
+                        "slot_minutes": 30,
+                    },
+                    {
+                        "slug": "direct",
+                        "name": "Direct",
+                        "timezone": "Europe/Amsterdam",
+                        "slot_minutes": 30,
+                        "schedule_rules": rules,
+                    },
+                ],
+            }
+        ]
+    }
+
+    plan = await apply_document(engine, data, whole_apply=True)
+
+    assert plan.ok, plan.refusals
+    found = await flows_by_group(engine)
+    assert found["balie"] == [("appointment", "active")]
+    assert found["direct"] == [("appointment", "active"), ("direct", "active")]
+    pools_before = await count_of(engine, CapacityPoolRow)
+    gone = {
+        "organisations": [
+            {
+                "slug": "acme",
+                "groups": [
+                    {"slug": "balie", "action": "delete"},
+                    {"slug": "direct", "action": "delete"},
+                ],
+            }
+        ]
+    }
+    assert (await apply_document(engine, gone, whole_apply=True)).ok
+    assert await count_of(engine, CapacityPoolRow) == pools_before - 2
+    assert "balie" not in await flows_by_group(engine)
+
+
+async def test_a_change_of_the_rules_gives_an_existing_group_the_direct_flow(
+    seeded: AsyncEngine,
+) -> None:
+    assert await flows_by_group(seeded) == {}
+    rules = [{"weekday": 3, "opens": "08:00", "closes": "09:00", "capacity": 1, "offer": "direct"}]
+    data = {
+        "organisations": [{"slug": "acme", "groups": [{"slug": "loket", "schedule_rules": rules}]}]
+    }
+
+    assert (await apply_document(seeded, data, whole_apply=True)).ok
+
+    assert await flows_by_group(seeded) == {
+        "loket": [("appointment", "active"), ("direct", "active")]
+    }
+
+
+async def test_a_change_that_leaves_the_rules_alone_writes_no_flows(seeded: AsyncEngine) -> None:
+    data = {"organisations": [{"slug": "acme", "groups": [{"slug": "loket", "name": "Nieuw"}]}]}
+
+    assert (await apply_document(seeded, data, whole_apply=True)).ok
+
+    assert await flows_by_group(seeded) == {}
+
+
 async def test_a_text_is_set_changed_and_removed(seeded: AsyncEngine) -> None:
     def doc(texts: dict[str, object]) -> dict[str, object]:
         return {

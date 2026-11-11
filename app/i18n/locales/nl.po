@@ -11664,6 +11664,9 @@ msgstr "Let op: dit plan wijzigt een claimwaarde (de sleutel van een organisatie
 msgid "admin.configuration.warning.webex"
 msgstr "Let op: dit plan vervangt de tokens van de Webex Service App. De installatie waar het document vandaan komt, kan daardoor geen verbinding meer maken."
 
+msgid "admin.configuration.warning.pools_without_code"
+msgstr "Let op: {count} capaciteitspool(s) van dit bereik hebben geen code (een oudere image maakte ze aan) en blijven buiten het document, dus dit plan toont of wijzigt ze niet. Een pool die u hier aanmaakt mag niet de naam van een van hen krijgen. Archiveer ze en voeg ze opnieuw toe in het portaal om ze een code te geven."
+
 msgid "details.title"
 msgstr "Gegevens aanpassen"
 
