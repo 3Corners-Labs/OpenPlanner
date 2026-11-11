@@ -138,7 +138,7 @@ CREATABLES: dict[str, Creatable] = {
         delete="/admin/organisations/{org}/capacity/{pool_id}/archive",
     ),
     # ADR 0121 step 2d: a flow's code is fixed, its draft changes; an active flow is archived (a
-    # draft that was never published is discarded, at `.../discard`).
+    # flow that was never active is deleted, at `.../delete`).
     "/admin/groups/{slug}/flows": Creatable(
         change="/admin/groups/{slug}/flows/{code}",
         delete="/admin/groups/{slug}/flows/{code}/archive",

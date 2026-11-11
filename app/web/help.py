@@ -185,6 +185,7 @@ TOPICS = (
             "/admin/groups/{slug}/flows/{code}/discard",
             "/admin/groups/{slug}/flows/{code}/activate",
             "/admin/groups/{slug}/flows/{code}/archive",
+            "/admin/groups/{slug}/flows/{code}/delete",
         ),
         Permission.GROUP_EDIT,
     ),

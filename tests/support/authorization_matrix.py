@@ -1499,4 +1499,14 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/demo/flows/appointment/archive": statuses(404, 404, 403, 403, 403, 403, 403),
         "/admin/groups/andere-team/flows/nope/archive": statuses(404, 403, 403, 404, 403, 403, 403),
     },
+    "GET /admin/groups/{slug}/flows/{code}/delete": {
+        "/admin/groups/demo/flows/nope/delete": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/demo/flows/appointment/delete": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/flows/nope/delete": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/flows/{code}/delete": {
+        "/admin/groups/demo/flows/nope/delete": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/demo/flows/appointment/delete": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/flows/nope/delete": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
 }
