@@ -6,7 +6,7 @@ Status: design of ADR 0122 (step 3b of ADR 0121), all open questions decided by 
 
 - **The handover.** The capacity rules (the ten invariants, the 09:55 example, acceptance cases A11 to A18, A24, A35 and A36, the rollback rule and the settings list) are those of the original handover of ADR 0121; `docs/service-flows-handover.md` is its condensed form. "Invariant n" below means the n-th capacity invariant of that handover.
 - **Step 3a.** ADR 0121's step 3 is one row ("one flow resolver ...; interval accounting; new-pool admission"). I assume it is split into **3a: the flow resolver** (page, widget, API, admin resolve an explicit or default flow; legacy defaults unchanged; A04, A05) and **3b: this document**. 3b depends on 3a only in its last PR (section 8). I did not find a 3a design or branch; if the resolver does not exist when 3b-5 starts, 3b-5 builds the minimum of it.
-- **Open PRs.** I could not query GitHub from here. The ADR's build table marks 2b-ii and 2d as `merged` with `#PRNUM`; the task calls them open. Section 8 states dependencies either way.
+- **Open PRs.** Steps 2b-ii and 2d of ADR 0121 were still open when this brief was written. Section 8 states the dependencies either way.
 - **Not measured:** query times on a realistic database; how many staffing blocks real pools will have. The complexity figures in section 2 are analytical.
 
 ## 1. Where a counted pool's staffing lives
