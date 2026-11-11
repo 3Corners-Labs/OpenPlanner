@@ -186,6 +186,43 @@
       ],
       "additionalProperties": false
     },
+    "capacity_pool": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "archived": {
+          "type": "boolean"
+        },
+        "guaranteed_skills": {
+          "allOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "Codes of the skills every counted unit of the pool holds."
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 80
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "description": "A counted capacity pool, addressed by its name within the organisation."
+    },
     "email_channel": {
       "type": "object",
       "properties": {
@@ -276,6 +313,184 @@
       },
       "additionalProperties": false,
       "description": "The organisation's SMTP server and sender (ADR 0022, 0073)."
+    },
+    "flow_revision": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "capacity_pool": {
+          "allOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          ],
+          "description": "The name of the counted pool the revision draws on."
+        },
+        "collects_email": {
+          "type": "boolean"
+        },
+        "completion": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "operator",
+                "provider_event",
+                "legacy_video_observation"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dispatch": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "own_queue",
+                "contact_center"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "duration_minutes": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 480
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "handling_action": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "open_video",
+                "view_request",
+                "call",
+                "assign_workstation"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "intake_modes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "interaction_kind": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "video",
+                "telephone",
+                "in_person",
+                "none"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "labels": {
+          "allOf": [
+            {
+              "type": "object"
+            }
+          ],
+          "description": "The label per locale."
+        },
+        "legacy": {
+          "type": "boolean"
+        },
+        "legacy_pool_of": {
+          "allOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          ],
+          "description": "The slug of the group whose legacy pool the revision draws on."
+        },
+        "published_at": {
+          "allOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          ],
+          "description": "When it was published (UTC); none for a draft."
+        },
+        "required_skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9999
+        },
+        "subjects": {
+          "allOf": [
+            {
+              "type": "object"
+            }
+          ],
+          "description": "Subject code to the extra skill codes that subject requires."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "revision"
+      ],
+      "description": "One revision of a flow; a published one is history and never changes."
     },
     "group": {
       "type": "object",
@@ -379,6 +594,13 @@
               "type": "null"
             }
           ]
+        },
+        "flows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/service_flow"
+          },
+          "description": "The service's flows."
         },
         "form_fields": {
           "type": "array",
@@ -500,6 +722,14 @@
             "browser",
             "choice"
           ]
+        },
+        "legacy_pool": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/legacy_capacity_pool"
+            }
+          ],
+          "description": "The pool that wraps the service's own staffing."
         },
         "max_bookings_per_email": {
           "type": "integer",
@@ -1147,6 +1377,35 @@
       ],
       "description": "A signing key pair of a private_key_jwt provider; only with secrets."
     },
+    "legacy_capacity_pool": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "archived": {
+          "type": "boolean"
+        },
+        "guaranteed_skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 80
+        }
+      },
+      "additionalProperties": false,
+      "description": "The pool that wraps this group's own staffing; a group has at most one."
+    },
     "log_destination": {
       "type": "object",
       "properties": {
@@ -1263,6 +1522,13 @@
               ]
             }
           }
+        },
+        "capacity_pools": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/capacity_pool"
+          },
+          "description": "The organisation's counted capacity pools."
         },
         "closure_scenarios": {
           "type": "array",
@@ -1398,6 +1664,13 @@
               }
             ]
           }
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/skill"
+          },
+          "description": "The organisation's skill catalogue."
         },
         "slug": {
           "type": "string",
@@ -1950,6 +2223,113 @@
           "$ref": "#/$defs/plain"
         }
       ]
+    },
+    "service_flow": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "code": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "current_revision": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9999
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "default_for": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "draft_revision": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9999
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "revisions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/flow_revision"
+          },
+          "description": "Every revision."
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "active",
+            "archived"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "code"
+      ],
+      "description": "A way a service is taken in and handled, with its revisions."
+    },
+    "skill": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "enum": [
+            "upsert",
+            "create",
+            "update",
+            "delete"
+          ],
+          "default": "upsert"
+        },
+        "archived": {
+          "allOf": [
+            {
+              "type": "boolean"
+            }
+          ],
+          "description": "Archived skills stay where they are used but are not newly required."
+        },
+        "code": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "labels": {
+          "allOf": [
+            {
+              "type": "object"
+            }
+          ],
+          "description": "The label per locale; nl and en are required."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "code"
+      ],
+      "description": "A skill of the organisation's catalogue."
     },
     "sms_channel": {
       "type": "object",

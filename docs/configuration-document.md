@@ -67,6 +67,37 @@ flags a typo. The planner is the authority: it also checks everything the admin 
   the secrets, and wrap it in a tool you trust (an AES zip, `age`, `sops`) before it travels.
 - **Files** (logo, fonts, closure images) are inline: media type, SHA-256 and base64 bytes.
 
+## Skills, capacity pools and flows (ADR 0121)
+
+An organisation may carry `skills` (key `code`, `labels`, `archived`) and `capacity_pools` (counted
+pools: key `name`, `guaranteed_skills` as codes, `archived`). A group may carry `legacy_pool` (the
+pool that wraps its own staffing: `name`, `guaranteed_skills`, `archived`) and `flows` (key `code`,
+`state`, `default_for`, `current_revision`, `draft_revision`) with their `revisions` (key
+`revision`, a number). A revision names its counted pool by name (`capacity_pool`) or a service's
+legacy pool by the service's slug (`legacy_pool_of`), the skills it requires by code
+(`required_skills`) and, per subject code, the extra skills of that subject (`subjects`); no id
+appears anywhere, and neither does `published_by` (a staff id).
+
+- **Revisions are history.** An export carries every revision with `published_at` (empty for the
+  draft). A document never changes or removes a published revision
+  (`configuration_revision_published`); a draft may be replaced, a new revision is added with the
+  number it has, and a `replace` document never trims the revisions it leaves out.
+- **Absent is not empty.** A document without these sections (every document of an earlier
+  version) leaves the installation's skills, pools and flows as they are. An empty list in a
+  `replace` document means none.
+- **Archive, not delete.** In `replace` mode, a skill (held by a person, guaranteed by a pool or
+  required by a revision), a counted pool (drawn on by a revision) or a flow (a booking was made
+  under it) that the document leaves out is archived; the plan shows it as `archive`. What nothing
+  refers to is deleted as before. Who holds which skill is not in a document and is never changed
+  by one.
+- **Same rules as the screens.** A flow cannot use another organisation's pool or skill, two
+  active flows cannot be the default of one entry path, a draft cannot name a subject its
+  service does not offer, a document cannot set a location, a flow becomes active only when the
+  readiness checklist passes, and a revision marked `legacy` must be exactly the wrapper the
+  backfill writes.
+- **Limit.** A counted pool is identified by its name within the organisation; an installation
+  with two counted pools of one name in one organisation cannot be exported until one is renamed.
+
 ## In the portal
 
 The superuser works on *Advanced settings › Configuration package*, an organisation admin (and

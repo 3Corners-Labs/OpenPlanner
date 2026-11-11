@@ -151,6 +151,8 @@ class ErrorCode(StrEnum):
     """ADR 0099 point 7: a booking, a slot or an active closure still refers to the object."""
     CONFIGURATION_CAPACITY_BELOW_BOOKED = "configuration_capacity_below_booked"
     """ADR 0099 point 7: a capacity lower than the places already booked in that window."""
+    CONFIGURATION_REVISION_PUBLISHED = "configuration_revision_published"
+    """ADR 0121 point 3: a published flow revision is history and a document never changes it."""
     CHANGE_REQUESTS_DISABLED = "change_requests_disabled"
     """ADR 0023 step 2: the organisation has not switched on change requests by a bot."""
     INVALID_APPOINTMENT_CODE = "invalid_appointment_code"

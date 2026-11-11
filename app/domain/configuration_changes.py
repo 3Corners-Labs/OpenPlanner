@@ -26,11 +26,14 @@ class ChangeAction(StrEnum):
         CREATE: The object is added.
         UPDATE: Some of its fields change.
         DELETE: It is removed, with everything it holds.
+        ARCHIVE: It is kept but marked archived, because something still refers to it (a kind
+            that declares ``Kind.archive``); never a deletion, and reversible by a document.
     """
 
     CREATE = "create"
     UPDATE = "update"
     DELETE = "delete"
+    ARCHIVE = "archive"
 
 
 @dataclass(frozen=True)

@@ -12,6 +12,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.db.config_flows import flow_usage
 from app.adapters.db.models import (
     ApiClientGroupRow,
     BookingRow,
@@ -99,7 +100,7 @@ async def read_usage(
     for organisation, group, start, end, booked in slots.all():
         loads.setdefault((organisation, group), []).append(SlotLoad(start, end, int(booked)))
     return Usage(
-        in_use={GROUP_KIND: frozenset(in_use)},
+        in_use={GROUP_KIND: frozenset(in_use), **await flow_usage(session)},
         future_bookings=frozenset(future),
         slot_loads={address: tuple(found) for address, found in loads.items()},
         locked_settings=locked_settings,

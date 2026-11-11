@@ -19,6 +19,7 @@ from app.adapters.db import (
     config_alerts,
     config_channels,
     config_clients,
+    config_flows,
     config_group,
     config_login,
     config_organisation,
@@ -38,6 +39,7 @@ WRITERS: dict[str, Writer] = {
     **config_login.WRITERS,
     **config_channels.WRITERS,
     **config_scenarios.WRITERS,
+    **config_flows.WRITERS,
     **config_group.WRITERS,
     **config_clients.WRITERS,
 }
@@ -85,6 +87,8 @@ class ConfigurationDocumentQueries:
         channels = await config_channels.read_channels(session, box)
         by_organisation, by_group = await config_scenarios.read_scenarios(session)
         groups = await config_group.read_groups(session)
+        catalogue = await config_flows.read_catalogue(session)
+        flows = await config_flows.read_flows(session)
         clients = await config_clients.read_api_clients(session, box)
         platform = replace(
             platform,
@@ -99,6 +103,7 @@ class ConfigurationDocumentQueries:
                         {
                             **group.children,
                             "closure_scenarios": by_group.get((slug, group.key[0]), ()),
+                            **flows.get((slug, group.key[0]), {}),
                         }
                     ),
                 )
@@ -110,6 +115,7 @@ class ConfigurationDocumentQueries:
                 "identity_providers": providers.get(slug, ()),
                 "closure_scenarios": by_organisation.get(slug, ()),
                 "alert_targets": alerts.get(slug, ()),
+                **catalogue.get(slug, {}),
                 "groups": own_groups,
             }
             tree.append(replace(organisation, children=_present(children)))
@@ -139,5 +145,9 @@ class ConfigurationDocumentQueries:
             if writer is None:
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, change.kind)
             await writer(self._session, self._box, change)
+        # ADR 0121 step 2e seam: once the rule that gives a service its legacy pool and default
+        # flows exists, it is called here, after every change above (a group, then its own pools
+        # and flows, are written in plan order), for each group a change created, so a document
+        # without flows yields the default set and one with flows only what is still missing.
         await config_login.ensure_signing_keys(self._session, self._box)
         return await self.bump_settings_version()

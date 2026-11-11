@@ -8968,6 +8968,9 @@ msgstr "This alert target already exists."
 msgid "admin.form.error.configuration_capacity_below_booked"
 msgstr "The capacity is lower than the number of places already booked."
 
+msgid "admin.form.error.configuration_revision_published"
+msgstr "A published revision is history and cannot be changed or removed. Add a new revision instead."
+
 msgid "admin.settings.package.title"
 msgstr "SQLite package (old format)"
 
@@ -11618,8 +11621,14 @@ msgstr "Update"
 msgid "admin.configuration.action.delete"
 msgstr "Delete"
 
+msgid "admin.configuration.action.archive"
+msgstr "Archive"
+
 msgid "admin.configuration.warning.deletes"
 msgstr "Note: this plan deletes {count} object(s). That cannot be undone."
+
+msgid "admin.configuration.warning.archives"
+msgstr "Note: skills, capacity pools and flows that something still refers to are archived, not deleted. Nobody loses a skill they hold, and bookings keep their flow."
 
 msgid "admin.configuration.warning.claims"
 msgstr "Note: this plan changes a claim value (the key of an organisation or service, or a role's claim value). People who match the old value lose access until the identity provider sends the new value."

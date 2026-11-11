@@ -422,6 +422,11 @@ class Kind:
         organisation_field: The field that names the organisation of an object that sits at
             the top of the tree but belongs to one (an API client).
         deletable: Whether a document may delete one.
+        archive: ``(field, value)`` when an object that something still refers to is archived
+            instead of refused: the field that marks it and the value that means archived. An
+            object that nothing refers to is deleted as before.
+        retain_omitted: Whether a ``replace`` document keeps the objects of this kind that it
+            does not list (history that is never trimmed by leaving it out).
         description: One sentence for the generated JSON Schema.
         derived: The columns of its tables that are deliberately not in a document because
             the adapter sets them (``table.column``: timestamps, digests, version counters).
@@ -439,6 +444,8 @@ class Kind:
     anchor: Anchor | None = None
     organisation_field: str | None = None
     deletable: bool = True
+    archive: tuple[str, Json] | None = None
+    retain_omitted: bool = False
     description: str = ""
     derived: frozenset[str] = frozenset()
 
@@ -448,6 +455,8 @@ class Kind:
         missing = [name for name in self.key if name not in names]
         if missing:
             raise ValueError(f"{self.name}: key fields {missing} are not fields of the kind")
+        if self.archive is not None and self.archive[0] not in names:
+            raise ValueError(f"{self.name}: the archive field {self.archive[0]} is not a field")
 
     def field(self, name: str) -> FieldSpec:
         """Return the field called ``name``.

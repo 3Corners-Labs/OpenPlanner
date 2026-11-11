@@ -141,6 +141,9 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.CONFIGURATION_CAPACITY_BELOW_BOOKED: (
         "admin.form.error.configuration_capacity_below_booked"
     ),
+    ErrorCode.CONFIGURATION_REVISION_PUBLISHED: (
+        "admin.form.error.configuration_revision_published"
+    ),
 }
 
 FIELD_ERROR_KEYS: dict[str, str] = {

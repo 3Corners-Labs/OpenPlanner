@@ -8981,6 +8981,9 @@ msgstr "Dit alarmdoel bestaat al."
 msgid "admin.form.error.configuration_capacity_below_booked"
 msgstr "De capaciteit is lager dan het aantal plaatsen dat al is geboekt."
 
+msgid "admin.form.error.configuration_revision_published"
+msgstr "Een gepubliceerde revisie is historie en kan niet worden gewijzigd of verwijderd. Voeg een nieuwe revisie toe."
+
 msgid "admin.settings.package.title"
 msgstr "SQLite-pakket (oud formaat)"
 
@@ -11631,8 +11634,14 @@ msgstr "Wijzigen"
 msgid "admin.configuration.action.delete"
 msgstr "Verwijderen"
 
+msgid "admin.configuration.action.archive"
+msgstr "Archiveren"
+
 msgid "admin.configuration.warning.deletes"
 msgstr "Let op: dit plan verwijdert {count} object(en). Dat kan niet ongedaan worden gemaakt."
+
+msgid "admin.configuration.warning.archives"
+msgstr "Let op: vaardigheden, capaciteitspools en flows waar nog iets naar verwijst worden gearchiveerd, niet verwijderd. Niemand verliest een vaardigheid die hij heeft en boekingen houden hun flow."
 
 msgid "admin.configuration.warning.claims"
 msgstr "Let op: dit plan wijzigt een claimwaarde (de sleutel van een organisatie of dienst, of de claimwaarde van een rol). Wie op de oude waarde matcht, verliest toegang totdat de identiteitsprovider de nieuwe waarde stuurt."

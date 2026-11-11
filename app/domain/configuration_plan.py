@@ -18,7 +18,7 @@ hash.
 import copy
 import hashlib
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import NamedTuple
 
 from app.domain.authorization import LEVELS, Level, Permission, Target
@@ -196,12 +196,17 @@ class _Planner:
         if self._document.mode is Mode.REPLACE and coll.shape is not Shape.SINGLE:
             listed = {wanted.key for wanted in desired}
             for key, entity in existing.items():
-                if key in listed or (
-                    place.root and not self._in_scope(coll.kind, key, None, entity)
+                if (
+                    key in listed
+                    or coll.kind.retain_omitted
+                    or (place.root and not self._in_scope(coll.kind, key, None, entity))
                 ):
                     continue
-                if self._delete(coll, entity, path_of(place.path, coll.name, key), place):
+                kept = self._delete(coll, entity, path_of(place.path, coll.name, key), place)
+                if kept is None:
                     result.pop(key, None)
+                else:
+                    result[key] = kept
         return tuple(result.values())
 
     def _in_scope(
@@ -236,7 +241,7 @@ class _Planner:
                 return None
             for name in wanted.children:
                 self._refuse(path_of(wanted.path, name, ()), ErrorCode.INVALID_CONFIGURATION)
-            return current if not self._delete(coll, current, wanted.path, place) else None
+            return self._delete(coll, current, wanted.path, place)
         if wanted.action is Action.CREATE and current is not None:
             self._refuse(wanted.path, ErrorCode.CONFIGURATION_OBJECT_EXISTS)
             return current
@@ -398,19 +403,37 @@ class _Planner:
                 self._refuse(change.path, ErrorCode.NOT_PERMITTED)
                 return
 
-    def _delete(self, coll: Collection, entity: Entity, path: str, above: _Place) -> bool:
-        """Delete an object with what it holds; refuse it while something refers to it."""
+    def _delete(self, coll: Collection, entity: Entity, path: str, above: _Place) -> Entity | None:
+        """Remove an object with what it holds; return what is left of it, ``None`` when gone.
+
+        An object something refers to is refused, or archived instead when its kind says so
+        (``Kind.archive``); an object that is archived already stays as it is, without a change.
+        """
         kind = coll.kind
         if not kind.deletable:
             self._refuse(path, ErrorCode.INVALID_CONFIGURATION)
-            return False
+            return entity
         if self._in_use(kind, entity, above.address):
-            self._refuse(path, ErrorCode.CONFIGURATION_OBJECT_IN_USE)
-            return False
+            if kind.archive is None:
+                self._refuse(path, ErrorCode.CONFIGURATION_OBJECT_IN_USE)
+                return entity
+            return self._archive(kind, entity, path, above)
         wanted = Entity(kind.name, entity.key, Action.DELETE, {}, {}, path)
         here = self._place(kind, wanted, dict(entity.fields), above)
         self._emit(kind, wanted, here, ChangeAction.DELETE, (), {})
-        return True
+        return None
+
+    def _archive(self, kind: Kind, entity: Entity, path: str, above: _Place) -> Entity:
+        """Mark an object archived instead of deleting it; return it as it is afterwards."""
+        assert kind.archive is not None  # noqa: S101  # nosec B101 - the caller checked it
+        name, value = kind.archive
+        if entity.fields.get(name) == value:
+            return entity
+        fields = {**entity.fields, name: value}
+        wanted = Entity(kind.name, entity.key, Action.UPSERT, {}, {}, path)
+        here = self._place(kind, wanted, dict(entity.fields), above)
+        self._emit(kind, wanted, here, ChangeAction.ARCHIVE, (name,), fields)
+        return replace(entity, fields=fields)
 
     def _in_use(self, kind: Kind, entity: Entity, above: Address) -> bool:
         """Whether something outside the configuration refers to the object or what it holds."""
@@ -458,7 +481,7 @@ def permissions_of(
     permissions: set[Permission] = set()
     if action is ChangeAction.CREATE:
         own = kind.create_permission or base
-    elif action is ChangeAction.DELETE:
+    elif action in (ChangeAction.DELETE, ChangeAction.ARCHIVE):
         own = kind.delete_permission or base
     else:
         own = None

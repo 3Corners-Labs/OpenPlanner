@@ -68,3 +68,26 @@ def test_claim_values_and_the_webex_tokens_warn() -> None:
 
 def test_a_plan_without_changes_cannot_be_applied() -> None:
     assert not plan_view(Plan((), (), "abc"), _).can_apply
+
+
+def test_an_archive_is_its_own_row_with_the_field_it_marks_and_a_warning_that_is_no_delete() -> (
+    None
+):
+    plan = Plan(
+        (
+            change("skill", ChangeAction.ARCHIVE, ("acme", "passport"), "archived"),
+            change("service_flow", ChangeAction.ARCHIVE, ("acme", "balie", "advies"), "state"),
+        ),
+        (),
+        "abc",
+    )
+
+    view = plan_view(plan, _)
+
+    assert [(r.action, r.label, r.fields) for r in view.changes] == [
+        ("archive", "admin.configuration.action.archive", "archived"),
+        ("archive", "admin.configuration.action.archive", "state"),
+    ]
+    assert view.deletes == 0
+    assert view.warnings == ("admin.configuration.warning.archives",)
+    assert view.can_apply
