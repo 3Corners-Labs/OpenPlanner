@@ -1930,7 +1930,10 @@ fieldset.card {
 }
 
 /* --- Tables -------------------------------------------------------------------------------- */
+/* Positioned, so the visually hidden texts inside its cells (absolute) are clipped with the
+   table instead of widening the page past the scroll region. */
 .admin .table-scroll {
+  position: relative;
   max-width: 100%;
   border: 1px solid var(--adm-border);
   border-radius: var(--adm-radius);
