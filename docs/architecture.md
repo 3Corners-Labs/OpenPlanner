@@ -392,6 +392,22 @@ erDiagram
     CLOSURE |o--o{ BOOKING : "put on hold"
     BOOKING |o--o| BOOKING : "rescheduled from"
     GROUP ||--o| GROUP_CONTACT_CENTER : "routes to a contact center"
+    ORGANISATION ||--o{ SKILL : "owns the catalogue (ADR 0121)"
+    ORGANISATION ||--o{ CAPACITY_POOL : owns
+    GROUP |o--o| CAPACITY_POOL : "legacy pool wraps its staffing"
+    GROUP ||--o{ SERVICE_FLOW : "has (the service is the group)"
+    SERVICE_FLOW ||--|{ FLOW_REVISION : "published as"
+    FLOW_REVISION }o--o| CAPACITY_POOL : "draws on"
+    FLOW_REVISION ||--o{ FLOW_REVISION_SKILL : requires
+    FLOW_REVISION ||--o{ SUBJECT_FLOW : offers
+    SUBJECT_FLOW ||--o{ SUBJECT_FLOW_SKILL : "requires extra"
+    SKILL ||--o{ FLOW_REVISION_SKILL : ""
+    SKILL ||--o{ SUBJECT_FLOW_SKILL : ""
+    SKILL ||--o{ CAPACITY_POOL_SKILL : "guaranteed by"
+    CAPACITY_POOL ||--o{ CAPACITY_POOL_SKILL : guarantees
+    STAFF ||--o{ STAFF_SKILL : holds
+    SKILL ||--o{ STAFF_SKILL : ""
+    BOOKING }o--o| FLOW_REVISION : "made under (flow_id, flow_revision; NULL is the default flow)"
 
     ORGANISATION {
         int id
@@ -483,6 +499,43 @@ erDiagram
         string channel
         string status
         int attempts
+    }
+    SKILL {
+        string code "unique per organisation"
+        string labels "JSON per locale"
+        datetime archived_at
+    }
+    STAFF_SKILL {
+        int staff_id
+        int skill_id
+        datetime granted_at
+        int granted_by
+    }
+    CAPACITY_POOL {
+        string name
+        string mode "legacy_group | counted"
+        int group_id "set only for legacy_group"
+        datetime archived_at
+    }
+    SERVICE_FLOW {
+        string code "unique per group"
+        string state "draft | active | archived"
+        bool default_appointment
+        bool default_on_demand
+        int current_revision "NULL until first published"
+        int draft_revision "NULL when nobody is editing"
+    }
+    FLOW_REVISION {
+        int revision
+        string labels "JSON per locale"
+        string intake_modes
+        string interaction_kind
+        int duration_minutes
+        string dispatch
+        string handling_action
+        string completion
+        bool legacy
+        datetime published_at "immutable once set"
     }
 ```
 

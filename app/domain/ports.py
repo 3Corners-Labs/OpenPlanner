@@ -42,6 +42,7 @@ from app.domain.calls import (
     MeetingStatus,
     TaskSnapshot,
 )
+from app.domain.capacity import CapacityPool, PoolFlows
 from app.domain.change_requests import ChangeRequest
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
@@ -92,6 +93,8 @@ from app.domain.scheduling import (
     ScheduleOverride,
     ScheduleRule,
 )
+from app.domain.service_flows import FlowRevision, FlowState, ServiceFlow
+from app.domain.skills import Skill, SkillUsage
 from app.domain.slot_close import EndedSlots
 from app.domain.staff import (
     GrantHolders,
@@ -826,7 +829,12 @@ class Transaction(Protocol):
     """Everything the domain reads and writes within one database transaction.
 
     Every ``list_*`` method takes a ``Scope`` and returns only what it covers (ADR 0014); a
-    test enforces this for new methods.
+    test enforces this for new methods. Every method that takes an object id from a caller takes
+    a ``Scope`` too and filters by it in SQL: an id outside it behaves like a missing one (the
+    methods of skills, pools, flows and grants of ADR 0121 follow this; ``flow_revision`` is the
+    one exception and says why). The save, archive, publish, discard and set methods of those
+    objects rely on the immediate write lock of ``locked()`` for their uniqueness pre-checks and
+    must not be called from a ``read()`` transaction; nothing in the unit of work stops them.
     """
 
     async def list_groups(self, scope: Scope, *, archived: bool = False) -> list[GroupSummary]:
@@ -1589,6 +1597,112 @@ class Transaction(Protocol):
 
     async def delete_change_requests_expired_before(self, cutoff: datetime) -> int:
         """Delete change requests that expired before ``cutoff``; return how many (step 2b)."""
+        ...
+
+    async def list_skills(
+        self, scope: Scope, organisation_id: int, *, archived: bool = False
+    ) -> list[Skill]:
+        """Return the organisation's skills inside ``scope`` (ADR 0121); archived on request."""
+        ...
+
+    async def get_skill(self, scope: Scope, skill_id: int) -> Skill | None:
+        """Return one skill, or ``None`` when it is missing or outside ``scope``."""
+        ...
+
+    async def save_skill(self, scope: Scope, skill: Skill) -> Skill:
+        """Insert a skill (no id) or update its code and labels; ``slug_taken`` on a duplicate."""
+        ...
+
+    async def archive_skill(self, scope: Scope, skill_id: int, at: datetime) -> None:
+        """Archive a skill; what already refers to it keeps it (ADR 0121 A28)."""
+        ...
+
+    async def skill_usage(self, scope: Scope, skill_id: int) -> SkillUsage:
+        """Return how many staff, pools and not archived flows (current or draft) use the skill.
+
+        ``staff`` counts the people who hold it and are a member of its organisation now, the same
+        grants ``list_staff_skills`` returns.
+        """
+        ...
+
+    async def list_staff_skills(self, scope: Scope, staff_id: int) -> frozenset[int]:
+        """Return the skill ids a staff member holds in organisations they are a member of now.
+
+        Someone without a membership in the organisation, a superuser included, therefore holds
+        no skills there: a grant never outlives the membership for eligibility.
+        """
+        ...
+
+    async def set_staff_skills(
+        self,
+        scope: Scope,
+        staff_id: int,
+        organisation_id: int,
+        skill_ids: Collection[int],
+        *,
+        granted_by: int | None,
+        at: datetime,
+    ) -> None:
+        """Replace a staff member's skills of one organisation; their other grants stay."""
+        ...
+
+    async def list_capacity_pools(
+        self, scope: Scope, organisation_id: int, *, archived: bool = False
+    ) -> list[CapacityPool]:
+        """Return the organisation's capacity pools inside ``scope``; archived on request."""
+        ...
+
+    async def get_capacity_pool(self, scope: Scope, pool_id: int) -> CapacityPool | None:
+        """Return one pool, or ``None`` when it is missing or outside ``scope``."""
+        ...
+
+    async def save_capacity_pool(self, scope: Scope, pool: CapacityPool) -> CapacityPool:
+        """Insert a pool (no id) or update its name and guaranteed skills; return it stored."""
+        ...
+
+    async def archive_capacity_pool(self, scope: Scope, pool_id: int, at: datetime) -> None:
+        """Archive a pool; ``configuration_object_in_use`` while a flow not archived draws on it.
+
+        A flow draws on it by its current or its draft revision.
+        """
+        ...
+
+    async def flows_on_pool(self, scope: Scope, pool_id: int) -> PoolFlows:
+        """Return the not archived flows (current or draft) that draw on the pool.
+
+        Only flows of groups inside ``scope`` are listed; ``hidden`` counts the others, so a
+        group-scoped caller learns that more exist without learning which.
+        """
+        ...
+
+    async def list_service_flows(self, scope: Scope, group_id: int) -> list[ServiceFlow]:
+        """Return the group's flows inside ``scope``, each with its current and draft revision."""
+        ...
+
+    async def get_service_flow(self, scope: Scope, flow_id: int) -> ServiceFlow | None:
+        """Return one flow, or ``None`` when it is missing or outside ``scope``."""
+        ...
+
+    async def save_draft(self, scope: Scope, flow: ServiceFlow) -> ServiceFlow:
+        """Create a draft flow, or write the draft revision of an existing one (``flow.draft``)."""
+        ...
+
+    async def publish_draft(
+        self, scope: Scope, flow_id: int, *, by: int, at: datetime
+    ) -> ServiceFlow:
+        """Make the flow's draft its current revision, stamped with who and when."""
+        ...
+
+    async def discard_draft(self, scope: Scope, flow_id: int) -> None:
+        """Delete the flow's unpublished draft; a flow never published is deleted with it."""
+        ...
+
+    async def set_flow_state(self, scope: Scope, flow_id: int, state: FlowState) -> ServiceFlow:
+        """Activate (needs a current revision and a free default path), archive or reactivate."""
+        ...
+
+    async def flow_revision(self, flow_id: int, revision: int) -> FlowRevision | None:
+        """Return one revision of a flow, published or not; no scope, for a resolved flow only."""
         ...
 
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:

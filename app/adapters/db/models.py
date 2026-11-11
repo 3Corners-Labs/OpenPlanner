@@ -42,6 +42,7 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     LargeBinary,
@@ -585,6 +586,11 @@ class BookingRow(Base):
     # the booking all the same (privacy.ROUTING_FIELDS).
     subject_code: Mapped[str | None] = mapped_column(String(40))
     routing_answers: Mapped[str | None] = mapped_column(String(500))
+    # ADR 0121: the flow revision the booking was made under; NULL is the group's default flow
+    # for its entry path (a legacy booking). No foreign key: a column pair added to the large
+    # table stays a plain ALTER, and the adapter writes only revisions that exist.
+    flow_id: Mapped[int | None] = mapped_column(Integer)
+    flow_revision: Mapped[int | None] = mapped_column(Integer)
 
     __table_args__ = (
         Index("ix_bookings_slot_status", "slot_id", "status"),
@@ -1796,4 +1802,212 @@ class WallboardLinkRow(Base):
     __table_args__ = (
         Index("ix_wallboard_links_organisation_id", "organisation_id"),
         Index("ix_wallboard_links_session_hash", "session_hash"),
+    )
+
+
+class SkillRow(Base):
+    """One skill of an organisation's catalogue (ADR 0121 point 5); no personal data.
+
+    ``labels`` is a JSON object of locale to label, like the labels of a subject (ADR 0081).
+    """
+
+    __tablename__ = "skills"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id", ondelete="CASCADE"))
+    code: Mapped[str] = mapped_column(String(40))
+    labels: Mapped[str] = mapped_column(Text)
+    archived_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+    __table_args__ = (UniqueConstraint("organisation_id", "code"),)
+
+
+class StaffSkillRow(Base):
+    """A skill a staff member holds (ADR 0121 point 5); data about staff, erased with them."""
+
+    __tablename__ = "staff_skills"
+
+    staff_id: Mapped[int] = mapped_column(
+        ForeignKey("staff.id", ondelete="CASCADE"), primary_key=True
+    )
+    skill_id: Mapped[int] = mapped_column(
+        ForeignKey("skills.id", ondelete="CASCADE"), primary_key=True
+    )
+    granted_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    granted_by: Mapped[int | None] = mapped_column(ForeignKey("staff.id", ondelete="SET NULL"))
+
+    __table_args__ = (Index("ix_staff_skills_skill_id", "skill_id"),)
+
+
+class CapacityPoolRow(Base):
+    """A capacity pool of an organisation (ADR 0121 point 6).
+
+    A ``legacy_group`` pool wraps one group's present staffing (``group_id`` set, unique); a
+    ``counted`` pool belongs to the organisation alone.
+    """
+
+    __tablename__ = "capacity_pools"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(80))
+    mode: Mapped[str] = mapped_column(String(16))
+    group_id: Mapped[int | None] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), unique=True
+    )
+    archived_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        CheckConstraint("mode IN ('legacy_group', 'counted')", name="mode"),
+        CheckConstraint("(mode = 'legacy_group') = (group_id IS NOT NULL)", name="group_mode"),
+        Index("ix_capacity_pools_organisation_id", "organisation_id"),
+    )
+
+
+class CapacityPoolSkillRow(Base):
+    """A skill every counted unit of a pool holds."""
+
+    __tablename__ = "capacity_pool_skills"
+
+    pool_id: Mapped[int] = mapped_column(
+        ForeignKey("capacity_pools.id", ondelete="CASCADE"), primary_key=True
+    )
+    skill_id: Mapped[int] = mapped_column(
+        ForeignKey("skills.id", ondelete="CASCADE"), primary_key=True
+    )
+
+
+class ServiceFlowRow(Base):
+    """A flow of a group (ADR 0121 point 3).
+
+    ``current_revision`` names the published revision in effect, NULL for a flow never published;
+    ``draft_revision`` the unpublished revision being edited, NULL when there is none. At most one
+    active flow per group is the default of each entry path (partial unique indexes).
+    """
+
+    __tablename__ = "service_flows"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
+    code: Mapped[str] = mapped_column(String(40))
+    state: Mapped[str] = mapped_column(String(16))
+    default_appointment: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    default_on_demand: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    current_revision: Mapped[int | None] = mapped_column(Integer)
+    draft_revision: Mapped[int | None] = mapped_column(Integer)
+
+    __table_args__ = (
+        UniqueConstraint("group_id", "code"),
+        CheckConstraint("state IN ('draft', 'active', 'archived')", name="state"),
+        CheckConstraint(
+            "state != 'active' OR current_revision IS NOT NULL", name="active_has_current_revision"
+        ),
+        Index(
+            "uq_service_flows_default_appointment",
+            "group_id",
+            unique=True,
+            sqlite_where=text("default_appointment = 1 AND state = 'active'"),
+        ),
+        Index(
+            "uq_service_flows_default_on_demand",
+            "group_id",
+            unique=True,
+            sqlite_where=text("default_on_demand = 1 AND state = 'active'"),
+        ),
+    )
+
+
+class FlowRevisionRow(Base):
+    """One revision of a flow; immutable once ``published_at`` is set (ADR 0121 point 3).
+
+    ``intake_modes`` is a comma-separated list, ``labels`` a JSON object. ``location_id`` is a
+    plain number: locations do not exist yet.
+    """
+
+    __tablename__ = "flow_revisions"
+
+    flow_id: Mapped[int] = mapped_column(
+        ForeignKey("service_flows.id", ondelete="CASCADE"), primary_key=True
+    )
+    revision: Mapped[int] = mapped_column(Integer, primary_key=True)
+    labels: Mapped[str] = mapped_column(Text)
+    intake_modes: Mapped[str] = mapped_column(String(32))
+    interaction_kind: Mapped[str | None] = mapped_column(String(16))
+    duration_minutes: Mapped[int | None] = mapped_column(Integer)
+    # NO ACTION, checked at the end of the statement: pools are archived, never deleted, so
+    # deleting a pool on its own fails while a revision draws on it, yet deleting an organisation
+    # lets the cascades remove the pool and the revisions in one statement (RESTRICT fails there).
+    capacity_pool_id: Mapped[int | None] = mapped_column(
+        ForeignKey("capacity_pools.id", ondelete="NO ACTION")
+    )
+    dispatch: Mapped[str | None] = mapped_column(String(16))
+    handling_action: Mapped[str | None] = mapped_column(String(24))
+    completion: Mapped[str | None] = mapped_column(String(32))
+    location_id: Mapped[int | None] = mapped_column(Integer)
+    collects_email: Mapped[bool] = mapped_column(Boolean, server_default=text("1"))
+    legacy: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    published_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    published_by: Mapped[int | None] = mapped_column(ForeignKey("staff.id", ondelete="SET NULL"))
+
+    __table_args__ = (Index("ix_flow_revisions_capacity_pool_id", "capacity_pool_id"),)
+
+
+class FlowRevisionSkillRow(Base):
+    """A skill every handler of a revision needs (ALL_OF)."""
+
+    __tablename__ = "flow_revision_skills"
+
+    flow_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    revision: Mapped[int] = mapped_column(Integer, primary_key=True)
+    skill_id: Mapped[int] = mapped_column(
+        ForeignKey("skills.id", ondelete="CASCADE"), primary_key=True
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["flow_id", "revision"],
+            ["flow_revisions.flow_id", "flow_revisions.revision"],
+            ondelete="CASCADE",
+        ),
+        Index("ix_flow_revision_skills_skill_id", "skill_id"),
+    )
+
+
+class SubjectFlowRow(Base):
+    """A subject a revision offers; the subject's code stays where ADR 0081 put it."""
+
+    __tablename__ = "subject_flows"
+
+    flow_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    revision: Mapped[int] = mapped_column(Integer, primary_key=True)
+    subject_code: Mapped[str] = mapped_column(String(40), primary_key=True)
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["flow_id", "revision"],
+            ["flow_revisions.flow_id", "flow_revisions.revision"],
+            ondelete="CASCADE",
+        ),
+    )
+
+
+class SubjectFlowSkillRow(Base):
+    """An extra skill the combination of a subject and a revision requires."""
+
+    __tablename__ = "subject_flow_skills"
+
+    flow_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    revision: Mapped[int] = mapped_column(Integer, primary_key=True)
+    subject_code: Mapped[str] = mapped_column(String(40), primary_key=True)
+    skill_id: Mapped[int] = mapped_column(
+        ForeignKey("skills.id", ondelete="CASCADE"), primary_key=True
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["flow_id", "revision", "subject_code"],
+            ["subject_flows.flow_id", "subject_flows.revision", "subject_flows.subject_code"],
+            ondelete="CASCADE",
+        ),
+        Index("ix_subject_flow_skills_skill_id", "skill_id"),
     )

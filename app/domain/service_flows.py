@@ -5,6 +5,10 @@ combination of interaction kind, readiness and handling action is a closed table
 (``COMBINATIONS``, ADR 0121 point 4). A draft is activated only when the readiness checklist
 is all green. Behaviour never depends on a label; labels are display text only.
 
+A published flow is changed by a *draft* revision next to its current one (``ServiceFlow.draft``);
+publishing the draft makes it the current revision and the old one stays for the bookings made
+under it.
+
 Until ADR 0121 steps 5 and 6 are built, the checklist refuses every value of a non-legacy
 revision that is outside the ``BUILT_*`` constants below (reason ``not_built_yet``), and
 every non-legacy revision while ``RETENTION_BUILT`` is false, so no new flow can be activated.
@@ -12,13 +16,14 @@ every non-legacy revision while ``RETENTION_BUILT`` is false, so no new flow can
 
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 
 from app.domain.capacity import CapacityPool, guarantees
-from app.domain.errors import DomainError, ErrorCode
+from app.domain.errors import DomainError, ErrorCode, missing_object, outside_organisation
 from app.domain.routing import SUBJECT_CODE, validate_labels
 from app.domain.scheduling import valid_slot_minutes
-from app.domain.skills import effective_requirements
+from app.domain.skills import Skill, check_skills_of, effective_requirements
 
 
 def _invalid(name: str) -> DomainError:
@@ -90,11 +95,15 @@ BUILT_DISPATCH: frozenset[DispatchKind] = frozenset({DispatchKind.OWN_QUEUE})
 """Dispatch kinds a new flow may use; step 6 of ADR 0121 adds the contact center."""
 BUILT_COMPLETION: frozenset[CompletionPolicy] = frozenset({CompletionPolicy.OPERATOR})
 """Completion policies a new flow may use; step 6 of ADR 0121 adds the provider event."""
+BUILT_ACTIONS: frozenset[HandlingAction] = frozenset(
+    {HandlingAction.OPEN_VIDEO, HandlingAction.VIEW_REQUEST, HandlingAction.CALL}
+)
+"""Handling actions a new flow may use; assigning a workstation needs locations, not built."""
 RETENTION_BUILT = False
 """Whether the watchdog and deletion of ADR 0121 point 7 exist; step 5 sets it true.
 
-Each later step of ADR 0121 widens exactly these four constants and nothing else here. A
-legacy revision skips all four tests.
+Each later step of ADR 0121 widens exactly these five constants and nothing else here. A
+legacy revision skips all five tests.
 """
 
 
@@ -144,6 +153,9 @@ class FlowRevision:
         location_id: The location, needed for assigning a workstation.
         collects_email: Whether the form asks for an email address.
         legacy: Whether this is the wrapper of a pre-flow group.
+        published_at: When the revision was published (UTC), ``None`` while it is a draft; a
+            published revision never changes.
+        published_by: Staff id of whoever published it, ``None`` for a draft or the backfill.
     """
 
     flow_id: int | None
@@ -161,24 +173,32 @@ class FlowRevision:
     location_id: int | None = None
     collects_email: bool = True
     legacy: bool = False
+    published_at: datetime | None = None
+    published_by: int | None = None
 
     def __post_init__(self) -> None:
         """Validate the revision number (``revision``)."""
         if self.revision < 1:
             raise _invalid("revision")
 
+    @property
+    def all_skill_ids(self) -> frozenset[int]:
+        """Return every skill the revision names: required by the flow or by one of its subjects."""
+        return self.required_skill_ids.union(*self.subject_skill_ids.values())
+
 
 @dataclass(frozen=True)
 class ServiceFlow:
-    """A flow of a group with its current revision.
+    """A flow of a group with its published revision and, perhaps, a draft of the next one.
 
     Attributes:
         id: Database id, ``None`` before it is stored.
         group_id: The group (service offering) it belongs to.
         code: Stable code, the same grammar as a subject code.
-        state: Draft, active or archived.
+        state: Draft, active or archived; an active flow always has a current revision.
         default_for: The entry paths this flow is the default of.
-        current: The current revision.
+        current: The published revision in effect, ``None`` for a flow never published.
+        draft: The unpublished revision being edited, ``None`` when nobody is editing.
     """
 
     id: int | None
@@ -186,16 +206,35 @@ class ServiceFlow:
     code: str
     state: FlowState
     default_for: frozenset[IntakeMode]
-    current: FlowRevision
+    current: FlowRevision | None
+    draft: FlowRevision | None = None
 
     def __post_init__(self) -> None:
-        """Validate the code (``flow_code``), ``default_for`` and the revision's ``flow_id``."""
+        """Validate the revisions, the code, ``default_for`` and the state.
+
+        Raises:
+            DomainError: ``invalid_configuration`` with field ``revision`` (neither revision),
+                ``flow_code``, ``default_for``, ``state`` (active without a current revision),
+                ``flow_id`` or ``published_at`` (a stored flow's current revision is published,
+                its draft is not).
+        """
+        shown = self.current or self.draft
+        if shown is None:
+            raise _invalid("revision")
         if not SUBJECT_CODE.fullmatch(self.code):
             raise _invalid("flow_code")
-        if not self.default_for <= self.current.intake_modes:
+        if not self.default_for <= shown.intake_modes:
             raise _invalid("default_for")
-        if None not in (self.id, self.current.flow_id) and self.current.flow_id != self.id:
-            raise _invalid("flow_id")
+        if self.state is FlowState.ACTIVE and self.current is None:
+            raise _invalid("state")
+        for revision in (self.current, self.draft):
+            if revision and None not in (self.id, revision.flow_id) and revision.flow_id != self.id:
+                raise _invalid("flow_id")
+        if self.id is not None and (
+            (self.current is not None and self.current.published_at is None)
+            or (self.draft is not None and self.draft.published_at is not None)
+        ):
+            raise _invalid("published_at")
 
 
 class ReadinessCheck(StrEnum):
@@ -302,10 +341,14 @@ def _dispatch_reason(revision: FlowRevision) -> ReadinessReason | None:
     action = revision.handling_action
     if action is None or action not in COMBINATIONS[kind].actions:
         return ReadinessReason.ACTION_NOT_ALLOWED
+    if not revision.legacy and (
+        kind not in BUILT_KINDS
+        or revision.dispatch not in BUILT_DISPATCH
+        or action not in BUILT_ACTIONS
+    ):
+        return ReadinessReason.NOT_BUILT_YET
     if action is HandlingAction.ASSIGN_WORKSTATION and revision.location_id is None:
         return ReadinessReason.LOCATION_MISSING
-    if not revision.legacy and (kind not in BUILT_KINDS or revision.dispatch not in BUILT_DISPATCH):
-        return ReadinessReason.NOT_BUILT_YET
     return None
 
 
@@ -377,3 +420,147 @@ def legacy_revision(
         completion=CompletionPolicy.LEGACY_VIDEO_OBSERVATION,
         legacy=True,
     )
+
+
+def check_flow_references(
+    group_organisation_id: int,
+    revision: FlowRevision,
+    pool: CapacityPool | None,
+    skills: Mapping[int, Skill],
+    already_required: frozenset[int],
+    subject_codes: Collection[str],
+    *,
+    already_pool_id: int | None = None,
+) -> None:
+    """Refuse a revision that refers to what its group's organisation does not offer.
+
+    ``pool`` is the revision's capacity pool as loaded (``None`` when there is none with that
+    id), ``skills`` every skill it names (for the flow or a subject) by id as loaded,
+    ``already_required`` the skills the revision it is based on requires, ``already_pool_id``
+    that revision's pool, and ``subject_codes`` the codes of the group's subjects. An archived
+    pool or skill may stay where it is but is not newly chosen (A28). The location is a plain
+    number until locations are built, so a revision names none.
+
+    Raises:
+        DomainError: ``configuration_object_missing`` or ``configuration_out_of_scope`` (fields
+            ``capacity_pool_id``, ``required_skill_ids``), ``invalid_configuration`` (fields
+            ``capacity_pool_id``, ``required_skill_ids``, ``subject_skill_ids``,
+            ``location_id``).
+    """
+    if revision.capacity_pool_id is not None:
+        if pool is None:
+            raise missing_object("capacity_pool_id")
+        if pool.organisation_id != group_organisation_id:
+            raise outside_organisation("capacity_pool_id")
+        if pool.archived_at is not None and revision.capacity_pool_id != already_pool_id:
+            raise _invalid("capacity_pool_id")
+    if any(code not in subject_codes for code in revision.subject_skill_ids):
+        raise _invalid("subject_skill_ids")
+    check_skills_of(
+        group_organisation_id,
+        revision.all_skill_ids,
+        skills,
+        already_required,
+        "required_skill_ids",
+    )
+    if revision.location_id is not None:
+        raise _invalid("location_id")
+
+
+def check_default_paths(flow: ServiceFlow, other_active_defaults: Collection[IntakeMode]) -> None:
+    """Refuse activating ``flow`` when another active flow of its group is the default of a path.
+
+    ``other_active_defaults`` are the entry paths the group's other active flows are the
+    default of; the partial unique indexes of the schema stay as the backstop.
+
+    Raises:
+        DomainError: ``configuration_object_exists`` (field ``default_for``).
+    """
+    if flow.default_for & frozenset(other_active_defaults):
+        raise DomainError(ErrorCode.CONFIGURATION_OBJECT_EXISTS, "default_for")
+
+
+_TRANSITIONS: frozenset[tuple[FlowState, FlowState]] = frozenset(
+    {
+        (FlowState.DRAFT, FlowState.ACTIVE),
+        (FlowState.ACTIVE, FlowState.ARCHIVED),
+        (FlowState.ARCHIVED, FlowState.ACTIVE),
+    }
+)
+
+
+def check_state_change(flow: ServiceFlow, new_state: FlowState) -> None:
+    """Refuse a change of state the lifecycle does not have.
+
+    Draft to active and archived to active need a published revision; active to archived is
+    always allowed, a legacy flow included. Whether the readiness checklist is green is the
+    caller's check (``readiness``), and whether a default path is free is ``check_default_paths``.
+
+    Raises:
+        DomainError: ``invalid_configuration`` (field ``state``).
+    """
+    if (flow.state, new_state) not in _TRANSITIONS:
+        raise _invalid("state")
+    if new_state is FlowState.ACTIVE and flow.current is None:
+        raise _invalid("state")
+
+
+def check_publishable(flow: ServiceFlow) -> FlowRevision:
+    """Refuse publishing a flow without a draft, or a draft that drops a default entry path.
+
+    Returns the draft to publish.
+
+    Raises:
+        DomainError: ``configuration_object_missing`` (field ``draft``) without a draft,
+            ``invalid_configuration`` (field ``default_for``) when the draft no longer offers a
+            path the flow is the default of.
+    """
+    if flow.draft is None:
+        raise missing_object("draft")
+    if not flow.default_for <= flow.draft.intake_modes:
+        raise _invalid("default_for")
+    return flow.draft
+
+
+def check_draft_save(
+    flow: ServiceFlow, stored: ServiceFlow | None, code_taken: bool
+) -> FlowRevision:
+    """Refuse saving ``flow``'s draft given what is stored; the adapter loads the facts.
+
+    ``stored`` is the flow with ``flow.id`` inside the caller's scope (``None`` for a new flow
+    or an id that is missing or outside it), ``code_taken`` whether another flow of the group
+    has the code. A draft is never legacy: the wrapper of a pre-flow group skips the readiness
+    tests of what is built, so only the migration and ADR 0121 step 2e write one. Returns the
+    draft to write. A new flow is a draft with no current revision. Once a flow has a published
+    revision its code and defaults stay as they are; only the draft revision changes.
+
+    Raises:
+        DomainError: ``invalid_configuration`` (fields ``draft``, ``published_at``, ``legacy``,
+            ``state``, ``revision``, ``flow_code``, ``code``, ``default_for``),
+            ``configuration_object_missing`` (field ``flow_id``), ``configuration_out_of_scope``
+            (field ``group_id``) or ``slug_taken`` (field ``flow_code``).
+    """
+    draft = flow.draft
+    if draft is None:
+        raise _invalid("draft")
+    if draft.published_at is not None:
+        raise _invalid("published_at")
+    if draft.legacy:
+        raise _invalid("legacy")
+    if flow.id is None:
+        if flow.state is not FlowState.DRAFT:
+            raise _invalid("state")
+        if flow.current is not None:
+            raise _invalid("revision")
+    elif stored is None:
+        raise missing_object("flow_id")
+    else:
+        if stored.group_id != flow.group_id:
+            raise outside_organisation("group_id")
+        if stored.current is not None and (
+            (stored.code, stored.default_for) != (flow.code, flow.default_for)
+        ):
+            raise _invalid("code" if stored.code != flow.code else "default_for")
+    if code_taken:
+        raise DomainError(ErrorCode.SLUG_TAKEN, "flow_code")
+    return draft

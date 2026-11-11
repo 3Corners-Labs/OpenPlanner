@@ -13,6 +13,8 @@ from app.adapters.db.contact_json import contacts_json
 from app.adapters.db.models import (
     ApiClientGroupRow,
     ApiClientRow,
+    CapacityPoolRow,
+    FlowRevisionRow,
     GroupRow,
     HolidayCalendarRow,
     IntegrationCredentialRow,
@@ -24,6 +26,7 @@ from app.adapters.db.models import (
     OrganisationRow,
     OrganisationSettingRow,
     OrganisationTextRow,
+    ServiceFlowRow,
     SlotRow,
 )
 from app.domain.branding import FontFile, FontRole, Logo
@@ -362,12 +365,39 @@ async def test_a_delete_takes_groups_slots_clients_and_the_bot_token_with_it(
             name=f"webex-bot:{acme}", nonce=b"n", ciphertext=b"c", updated_at=datetime.now(UTC)
         )
     )
+    pool = CapacityPoolRow(organisation_id=acme, name="P", mode="counted")
+    session.add(pool)
+    await session.flush()
+    for code, state, current, draft in (("live", "active", 1, None), ("new", "draft", None, 1)):
+        flow = ServiceFlowRow(
+            group_id=group.id,
+            code=code,
+            state=state,
+            current_revision=current,
+            draft_revision=draft,
+        )
+        session.add(flow)
+        await session.flush()
+        session.add(
+            FlowRevisionRow(
+                flow_id=flow.id, revision=1, labels="{}", intake_modes="x", capacity_pool_id=pool.id
+            )
+        )  # a pool that a current revision and another flow's draft draw on
     await session.flush()
 
     await apply(session, change("organisation", ChangeAction.DELETE, ("acme",), ("acme",), {}))
 
     assert set(await read_organisations(session, None)) == {"bare"}
-    for model in (GroupRow, SlotRow, ApiClientRow, IntegrationCredentialRow, OrganisationOriginRow):
+    for model in (
+        GroupRow,
+        SlotRow,
+        ApiClientRow,
+        IntegrationCredentialRow,
+        OrganisationOriginRow,
+        CapacityPoolRow,
+        ServiceFlowRow,
+        FlowRevisionRow,
+    ):
         assert await session.scalar(select(func.count()).select_from(model)) == 0
 
 

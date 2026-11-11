@@ -99,6 +99,17 @@ STATE_TABLES = frozenset(
         "slots",
         "staff",
         "staff_memberships",
+        "staff_skills",
+        # ADR 0121 step 2b: configuration in kind, but not yet carried by a package. Step 2b-ii
+        # moves these eight into CONFIGURATION_TABLES together with their export and import.
+        "skills",
+        "capacity_pools",
+        "capacity_pool_skills",
+        "service_flows",
+        "flow_revisions",
+        "flow_revision_skills",
+        "subject_flows",
+        "subject_flow_skills",
         "wallboard_links",
         "staff_refused_entitlements",
         "update_requests",
