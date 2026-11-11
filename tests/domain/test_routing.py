@@ -14,6 +14,8 @@ from app.domain.routing import (
     RoutingChoice,
     Subject,
     check_subject_count,
+    validate_label,
+    validate_labels,
 )
 
 
@@ -170,3 +172,33 @@ def test_the_catalogue_keys_are_written_out_for_every_question_and_value() -> No
         for key in (question_key(attribute.value), *(value_key(attribute.value, c) for c in codes))
     }
     assert set(CATALOGUE_KEYS) == built
+
+
+def refused_field(text: str | dict[str, str]) -> str | None:
+    """Return the field the shared label check refuses ``text`` with, ``None`` when accepted."""
+    try:
+        if isinstance(text, str):
+            validate_label(text, "the_field")
+        else:
+            validate_labels(text, "the_field")
+    except DomainError as error:
+        return error.field if error.code is ErrorCode.INVALID_CONFIGURATION else "other"
+    return None
+
+
+@pytest.mark.parametrize("text", ["", "   ", "x" * 81, "a\tb", "a\x7f"])
+def test_a_blank_long_or_control_character_label_is_refused(text: str) -> None:
+    assert refused_field(text) == "the_field"
+
+
+def test_surrounding_spaces_do_not_count_towards_the_label_length() -> None:
+    assert refused_field(" " + "x" * 80 + " ") is None
+    assert refused_field("x" * 80) is None
+
+
+def test_labels_need_both_required_locales_and_every_label_valid() -> None:
+    assert refused_field({"nl": "a", "en": "b"}) is None
+    assert refused_field({"nl": "a", "en": "b", "de": "c"}) is None
+    assert refused_field({"nl": "a"}) == "the_field"
+    assert refused_field({"nl": "a", "en": " "}) == "the_field"
+    assert refused_field({"nl": "a", "en": "b", "de": "c" * 81}) == "the_field"

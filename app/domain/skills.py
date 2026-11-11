@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.routing import MAX_LABEL_LENGTH, REQUIRED_LOCALES, SUBJECT_CODE
+from app.domain.routing import SUBJECT_CODE, validate_labels
 
 
 def _invalid(name: str) -> DomainError:
@@ -40,12 +40,7 @@ class Skill:
         """Validate the code (``skill_code``) and the labels (``skill_label``)."""
         if not SUBJECT_CODE.fullmatch(self.code):
             raise _invalid("skill_code")
-        for locale in REQUIRED_LOCALES:
-            if not self.labels.get(locale, "").strip():
-                raise _invalid("skill_label")
-        for text in self.labels.values():
-            if len(text.strip()) > MAX_LABEL_LENGTH:
-                raise _invalid("skill_label")
+        validate_labels(self.labels, "skill_label")
 
     @property
     def archived(self) -> bool:
@@ -68,8 +63,3 @@ def effective_requirements(
 ) -> frozenset[int]:
     """Return what a booking needs: the flow's skills plus the chosen subject's extra ones."""
     return frozenset(flow_skills) | frozenset(subject_flow_skills)
-
-
-def usable_for_new_requirement(skill: Skill) -> bool:
-    """Return whether ``skill`` may be newly required by a flow or subject (not archived)."""
-    return not skill.archived

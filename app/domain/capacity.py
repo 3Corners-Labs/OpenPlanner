@@ -10,8 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
-from app.domain.errors import DomainError, ErrorCode
-from app.domain.routing import MAX_LABEL_LENGTH
+from app.domain.routing import validate_label
 
 
 class PoolMode(StrEnum):
@@ -28,7 +27,7 @@ class CapacityPool:
     Attributes:
         id: Database id, ``None`` before it is stored.
         organisation_id: The owning organisation.
-        name: Admin-facing name, 1 to 80 characters after stripping.
+        name: Admin-facing name, 1 to 80 characters after stripping, no control characters.
         mode: Legacy group pool or counted pool.
         guaranteed_skill_ids: Skills that every counted unit of the pool holds.
         archived_at: When it was archived.
@@ -43,9 +42,7 @@ class CapacityPool:
 
     def __post_init__(self) -> None:
         """Validate the name (``pool_name``)."""
-        stripped = self.name.strip()
-        if not stripped or len(stripped) > MAX_LABEL_LENGTH:
-            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "pool_name")
+        validate_label(self.name, "pool_name")
 
 
 def unguaranteed(pool: CapacityPool, required: Collection[int]) -> frozenset[int]:
@@ -61,11 +58,3 @@ def guarantees(pool: CapacityPool, required: Collection[int]) -> bool:
     guarantees only X guarantee both.
     """
     return not unguaranteed(pool, required)
-
-
-def shareable(pool: CapacityPool) -> bool:
-    """Return whether several flows may share the pool.
-
-    A legacy pool wraps one group's present staffing and is not shared.
-    """
-    return pool.mode is not PoolMode.LEGACY_GROUP

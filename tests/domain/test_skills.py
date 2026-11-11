@@ -5,33 +5,16 @@ from datetime import UTC, datetime
 import pytest
 
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.skills import (
-    Skill,
-    effective_requirements,
-    eligible,
-    missing_skills,
-    usable_for_new_requirement,
-)
-
-LABELS = {"nl": "Paspoort", "en": "Passport"}
+from app.domain.skills import effective_requirements, eligible, missing_skills
+from tests.support.service_flows import skill
 
 
-def skill(code: str = "passport", labels: dict[str, str] | None = None, **kw: object) -> Skill:
-    """Return a skill of organisation 1."""
-    return Skill(None, 1, code, LABELS if labels is None else labels, **kw)  # type: ignore[arg-type]
-
-
-def refused(**kw: object) -> str | None:
-    """Return the field of the error a skill with ``kw`` raises."""
+def refused(code: str = "passport", labels: dict[str, str] | None = None) -> str | None:
+    """Return the field of the error the skill built from the arguments raises."""
     with pytest.raises(DomainError) as caught:
-        skill(**kw)  # type: ignore[arg-type]
+        skill(code=code, labels=labels)
     assert caught.value.code is ErrorCode.INVALID_CONFIGURATION
     return caught.value.field
-
-
-def test_a_valid_skill_is_kept_as_given() -> None:
-    made = skill()
-    assert (made.code, made.labels, made.archived) == ("passport", LABELS, False)
 
 
 @pytest.mark.parametrize("code", ["", "Passport", "-x", "a b", "a" * 41])
@@ -58,11 +41,15 @@ def test_a_label_may_be_80_characters_but_not_81() -> None:
     assert refused(labels={"nl": "a", "en": "b", "de": "c" * 81}) == "skill_label"
 
 
-def test_archived_follows_archived_at() -> None:
-    gone = skill(archived_at=datetime(2026, 1, 1, tzinfo=UTC))
-    assert gone.archived
-    assert not usable_for_new_requirement(gone)
-    assert usable_for_new_requirement(skill())
+def test_a_label_with_a_control_character_is_refused_in_any_locale() -> None:
+    assert refused(labels={"nl": "a\nb", "en": "b"}) == "skill_label"
+    assert refused(labels={"nl": "a", "en": "b", "de": "c\x00"}) == "skill_label"
+    assert refused(labels={"nl": "a", "en": "b", "de": " "}) == "skill_label"
+
+
+def test_a_skill_is_archived_exactly_when_it_has_an_archive_time() -> None:
+    assert skill(archived_at=datetime(2026, 1, 1, tzinfo=UTC)).archived
+    assert not skill().archived
 
 
 def test_missing_and_eligible() -> None:
