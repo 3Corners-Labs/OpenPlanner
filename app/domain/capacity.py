@@ -11,7 +11,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from app.domain.errors import DomainError, ErrorCode, missing_object, outside_organisation
-from app.domain.routing import validate_label
+from app.domain.routing import SUBJECT_CODE, validate_label
 from app.domain.skills import Skill, check_skills_of
 
 
@@ -34,6 +34,10 @@ class CapacityPool:
         guaranteed_skill_ids: Skills that every counted unit of the pool holds.
         archived_at: When it was archived.
         group_id: The group a legacy group pool wraps; ``None`` for a counted pool.
+        code: Stable code of a counted pool, the grammar of a skill code, fixed after creation.
+            ``None`` for a legacy pool, which is identified by its service, and for a stored
+            counted pool written before the column existed (it is never derived: a rename
+            would change it and two pools could show one); a new counted pool needs a code.
     """
 
     id: int | None
@@ -43,10 +47,17 @@ class CapacityPool:
     guaranteed_skill_ids: frozenset[int] = field(default_factory=frozenset)
     archived_at: datetime | None = None
     group_id: int | None = None
+    code: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate the name (``pool_name``)."""
+        """Validate the name (``pool_name``) and the code (``pool_code``)."""
         validate_label(self.name, "pool_name")
+        if self.code is None:
+            # A stored counted pool may lack a code (a row from before 0110); a new one may not.
+            if self.mode is PoolMode.COUNTED and self.id is None:
+                raise DomainError(ErrorCode.INVALID_CONFIGURATION, "pool_code")
+        elif self.mode is not PoolMode.COUNTED or not SUBJECT_CODE.fullmatch(self.code):
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "pool_code")
 
 
 def unguaranteed(pool: CapacityPool, required: Collection[int]) -> frozenset[int]:
@@ -72,6 +83,8 @@ def check_pool_save(
     already_guaranteed: frozenset[int],
     *,
     group_taken: bool = False,
+    same_code_exists: bool = False,
+    same_name_exists: bool = False,
 ) -> None:
     """Refuse saving ``pool`` given what is stored; the adapter loads the facts.
 
@@ -79,6 +92,10 @@ def check_pool_save(
     ``group_organisation_id`` the organisation of ``pool.group_id`` (``None`` when there is no
     such group), ``skills`` the guaranteed skills by id as loaded, ``already_guaranteed`` what
     the stored pool guarantees and ``group_taken`` whether another pool wraps the group already.
+    ``same_code_exists`` says another pool of the organisation has the code, ``same_name_exists``
+    that another counted pool that is not archived has the name (compared case-insensitively
+    after stripping; only asked of a new pool or a changed name, so a duplicate that was stored
+    earlier does not block editing the rest of the pool).
     A pool's mode and group never change; a skill must be the organisation's own, and an
     archived one stays but is not newly added.
 
@@ -87,7 +104,10 @@ def check_pool_save(
             ``guaranteed_skill_ids``), ``configuration_object_missing`` (``group_id``,
             ``pool_id``, ``guaranteed_skill_ids``), ``configuration_out_of_scope``
             (``group_id``, ``organisation_id``, ``guaranteed_skill_ids``) or
-            ``configuration_object_exists`` (``group_id``).
+            ``configuration_object_exists`` (``group_id``), ``slug_taken`` (``pool_code``,
+            ``pool_name``) or
+            ``invalid_configuration`` (``pool_code``) for a code that differs from the stored
+            one: it is fixed (not asked of a stored pool that has none).
     """
     if (pool.mode is PoolMode.LEGACY_GROUP) != (pool.group_id is not None):
         raise DomainError(ErrorCode.INVALID_CONFIGURATION, "group_id")
@@ -105,6 +125,16 @@ def check_pool_save(
             raise outside_organisation("organisation_id")
         if (stored.mode, stored.group_id) != (pool.mode, pool.group_id):
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, "mode")
+        if stored.code is not None and stored.code != pool.code:
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "pool_code")
+    # A stored pool without a code keeps none (the adapter never writes one), so its code and the
+    # duplicate check do not apply.
+    codeless = stored is not None and stored.code is None
+    if same_code_exists and not codeless:
+        raise DomainError(ErrorCode.SLUG_TAKEN, "pool_code")
+    renamed = stored is None or same_name(stored.name) != same_name(pool.name)
+    if same_name_exists and renamed and pool.mode is PoolMode.COUNTED:
+        raise DomainError(ErrorCode.SLUG_TAKEN, "pool_name")
     check_skills_of(
         pool.organisation_id,
         pool.guaranteed_skill_ids,
@@ -112,6 +142,11 @@ def check_pool_save(
         already_guaranteed,
         "guaranteed_skill_ids",
     )
+
+
+def same_name(name: str) -> str:
+    """Return ``name`` as pool names are compared: stripped and case-folded."""
+    return name.strip().casefold()
 
 
 @dataclass(frozen=True)

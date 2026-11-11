@@ -216,8 +216,11 @@ class SkillQueries:
         *,
         granted_by: int | None,
         at: datetime,
-    ) -> None:
+    ) -> tuple[frozenset[int], frozenset[int]]:
         """Replace the skills the staff member holds *of this organisation*; others stay.
+
+        Returns the ids granted and the ids taken away; every grant of a skill of the
+        organisation counts as held, whether or not the person still has a membership in it.
 
         Removing is always allowed. A skill that is added must be the organisation's own, not
         archived, and the person needs a membership in the organisation; one already held stays
@@ -268,3 +271,4 @@ class SkillQueries:
             for skill_id in sorted(wanted - held)
         )
         await self._session.flush()
+        return frozenset(wanted - held), frozenset(held - wanted)

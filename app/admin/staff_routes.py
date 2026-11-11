@@ -17,6 +17,20 @@ A suspended or erased person carries a chip in words (ADR 0046 steps 2); an eras
 no name, only "Erased staff member". The actions on a person (suspend, reinstate, erase) are
 in ``app.admin.staff_status_routes``.
 
+A person's page also shows the skills they hold, per organisation they belong to (ADR 0121):
+as a list under ``staff.view``, as checkboxes for an administrator with ``skills.manage`` in
+that organisation:
+
+    POST /admin/staff/{member_id}/skills/{org}                 skills.manage, fresh login
+
+The save replaces the skills the person holds in that one organisation (their skills elsewhere
+stay). The route depends on ``skills.manage`` in the organisation; ``SkillService`` checks the
+matrix again, that the viewer may see the person (``staff.view``), that the person belongs to
+the organisation for every skill that is added, and audits the change with skill codes and the
+person's number, never a name. A person the viewer may not see, or an organisation they have no
+right in, answers like an unknown address. A change applies from the next request that is picked
+up or started.
+
 A person's page also lists the entitlement values of their last login that this installation
 did not recognise, with the reason (ADR 0049 point 8), within the viewer's scope.
 """
@@ -26,21 +40,29 @@ from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
-from starlette.responses import HTMLResponse
+from starlette.responses import HTMLResponse, Response
 
 from app.admin.audit_routes import audit_views
-from app.admin.authz import AdminContext, RequirePermission, admin_service
-from app.admin.forms import FormData, Option
+from app.admin.authz import AdminContext, RequirePermission, admin_service, skill_service
+from app.admin.forms import FormData, Option, done_message, read_form, redirect_done
 from app.admin.idp_mapping_routes import reason_label
-from app.admin.pages import Locale, admin_moment
+from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
+from app.admin.skill_inputs import (
+    SkillChoice,
+    choices,
+    chosen_ids,
+    raise_unknown,
+    refuse,
+    ticked_ids,
+)
 from app.admin.staff_directory_routes import (
     add_fields,
     directory_service,
     manage_view,
 )
 from app.domain.audit import AuditFilter
-from app.domain.authorization import Permission, Role, scope_for
+from app.domain.authorization import Permission, Principal, Role, scope_for
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.identity import PLATFORM
 from app.domain.scheduling import GroupSummary
@@ -291,14 +313,90 @@ async def staff_list(
     )
 
 
-@router.get("/staff/{member_id}", response_class=HTMLResponse)
-async def staff_member(
+SKILLS_DONE = ("staff_skills_saved", "unchanged")
+"""The confirmations of a save of the skills, shown in that section of the page."""
+
+SkillsManage = Annotated[
+    AdminContext,
+    Depends(RequirePermission(Permission.SKILLS_MANAGE, organisation_param="org", fresh=True)),
+]
+"""The permission of the skills of a person in one organisation."""
+
+
+@dataclass(frozen=True)
+class SkillSection:
+    """One organisation's skills of a person, as the staff page shows them.
+
+    Attributes:
+        slug: The organisation's slug; the section's form and anchor are named by it.
+        name: The organisation's name.
+        choices: The skills as checkboxes (those held ticked).
+        held: Labels of the skills the person holds, for a viewer who may not change them.
+        editable: Whether the viewer may change them (``skills.manage``, ADR 0121).
+        error: The refusal of the last save of this section, if any.
+    """
+
+    slug: str
+    name: str
+    choices: tuple[SkillChoice, ...]
+    held: tuple[str, ...]
+    editable: bool
+    error: str | None = None
+
+
+async def skill_sections(
     request: Request,
-    locale: Locale,
+    locale: RequestLocale,
+    principal: Principal,
     member_id: int,
-    context: Annotated[AdminContext, Depends(RequirePermission(Permission.STAFF_VIEW))],
+    form: FormData | None = None,
+    error_org: str | None = None,
+) -> list[SkillSection]:
+    """Return the person's skills per organisation; ``form`` keeps the ticks of a refused save.
+
+    Raises:
+        RejectedRequest: 404 for a person the viewer may not see.
+    """
+    try:
+        found = await skill_service(request).staff_skills(principal, member_id)
+    except DomainError as error:
+        raise_unknown(error)
+    sections = []
+    for person in found:
+        slug = person.organisation.slug
+        refused = form is not None and slug == error_org
+        ticked = ticked_ids(form) if form is not None and refused else person.held
+        message = form.error_for(f"skills-{slug}") if form is not None and refused else None
+        shown = choices(person.choices, ticked, locale.code)
+        sections.append(
+            SkillSection(
+                slug,
+                person.organisation.name,
+                tuple(shown),
+                tuple(
+                    c.label for c in choices(person.choices, person.held, locale.code) if c.checked
+                ),
+                person.editable,
+                message,
+            )
+        )
+    return sections
+
+
+async def member_page(
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    member_id: int,
+    *,
+    form: FormData | None = None,
+    error_org: str | None = None,
+    status: int = 200,
 ) -> HTMLResponse:
-    """Show one person and their recent activity; outside the scope it does not exist (404)."""
+    """Render one person's page; outside the viewer's scope it does not exist (404).
+
+    ``form`` and ``error_org`` re-show a refused save of the skills of that organisation.
+    """
     service = admin_service(request)
     member = await service.staff_member(context.principal, member_id)
     if member is None:
@@ -314,7 +412,12 @@ async def staff_member(
     now = request.app.state.clock.now()
     managed = await directory_service(request).person(context.principal, member.subject)
     manage = manage_view(request, locale, context, managed, in_scope) if managed else None
-    return _page(
+    sections = (
+        []
+        if member.status is StaffStatus.ERASED
+        else await skill_sections(request, locale, context.principal, member_id, form, error_org)
+    )
+    response = _page(
         request,
         locale,
         "admin/staff_member.html",
@@ -327,5 +430,49 @@ async def staff_member(
                 context.principal, locale, in_scope, FormData({}, locale.gettext)
             ),
             "activity_limit": ACTIVITY_LIMIT,
+            "skill_sections": sections,
+            "skills_done": done_message(request, locale.gettext, only=SKILLS_DONE),
+            "errors": form.errors if form is not None else [],
         },
+    )
+    response.status_code = status
+    return response
+
+
+@router.get("/staff/{member_id}", response_class=HTMLResponse)
+async def staff_member(
+    request: Request,
+    locale: Locale,
+    member_id: int,
+    context: Annotated[AdminContext, Depends(RequirePermission(Permission.STAFF_VIEW))],
+) -> HTMLResponse:
+    """Show one person and their recent activity; outside the scope it does not exist (404)."""
+    return await member_page(request, locale, context, member_id)
+
+
+@router.post("/staff/{member_id}/skills/{org}", response_model=None)
+async def save_staff_skills(
+    request: Request,
+    locale: Locale,
+    member_id: int,
+    org: str,
+    _: SameOrigin,
+    context: SkillsManage,
+) -> Response:
+    """Replace the skills the person holds in ``org``; their skills elsewhere stay."""
+    form = await read_form(request, locale)
+    service = skill_service(request)
+    try:
+        changed = await service.grant(
+            context.principal, org, member_id, chosen_ids(form, service.max_skills)
+        )
+    except DomainError as error:
+        refuse(form, error, locale, f"skills-{org}")
+        return await member_page(
+            request, locale, context, member_id, form=form, error_org=org, status=422
+        )
+    return redirect_done(
+        f"/admin/staff/{member_id}",
+        "staff_skills_saved" if changed else "unchanged",
+        anchor="skills",
     )

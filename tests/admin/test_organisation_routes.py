@@ -77,6 +77,7 @@ async def test_tabs_follow_the_rights_of_the_role(site: Site) -> None:
         "/admin/organisations/demo",
         "/admin/organisations/demo/settings",
         "/admin/organisations/demo/embedding",
+        "/admin/organisations/demo/skills",
         "/admin/organisations/demo/login",
         "/admin/organisations/demo/configuration",
         "/admin/organisations/demo/usage",

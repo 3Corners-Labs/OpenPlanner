@@ -1,0 +1,23 @@
+{#- The labels of one skill (ADR 0121); its code is shown but fixed. -#}
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% block title %}{{ _("admin.skills.edit_title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_organisation_header.html" %}
+<p><a href="{{ back }}">{{ _("admin.skills_capacity.back") }}</a></p>
+<h2 class="section-title">{{ _("admin.skills.edit_title") }}</h2>
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/skills/{{ row.id }}" novalidate aria-labelledby="edit-heading">
+  <div class="card__header">
+    <h2 id="edit-heading">{{ row.label }}</h2>
+    <p class="card__lead">{{ _("admin.skills.used_by", pools=row.pools, flows=row.flows) }} · {{ _("admin.skills.staff_count", count=row.staff) }}</p>
+  </div>
+  <div class="form-grid">
+    {% for f in fields %}{{ field(f) }}{% endfor %}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.save") }}</button>
+    <a href="{{ back }}">{{ _("admin.cancel") }}</a>
+  </div>
+</form>
+{% endblock %}

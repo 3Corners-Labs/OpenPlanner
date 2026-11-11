@@ -13,7 +13,14 @@ from datetime import datetime
 from typing import Any
 
 from app.domain.authorization import Scope
-from app.domain.capacity import CapacityPool, PoolFlows, check_pool_archive, check_pool_save
+from app.domain.capacity import (
+    CapacityPool,
+    PoolFlows,
+    PoolMode,
+    check_pool_archive,
+    check_pool_save,
+    same_name,
+)
 from app.domain.default_flows import (
     DefaultFlowSet,
     default_flow_set,
@@ -36,6 +43,17 @@ from app.domain.service_flows import (
 from app.domain.skills import Skill, SkillUsage, check_skill_save, check_staff_grant
 from app.domain.staff import StaffMember, StaffStatus
 from tests.support.domain import NOW
+
+
+def _pool_visible(state: Any, scope: Scope, pool: CapacityPool) -> bool:
+    """Return whether a pool is visible: like its organisation, a legacy one only with its group."""
+    if not _visible(state, scope, pool.organisation_id):
+        return False
+    if pool.mode is not PoolMode.LEGACY_GROUP:
+        return True
+    group = state.groups.get(pool.group_id)
+    slug = state.organisation_slugs.get(pool.organisation_id, "org")
+    return group is not None and scope.contains(slug, group.slug)
 
 
 def _visible(state: Any, scope: Scope, organisation_id: int) -> bool:
@@ -238,7 +256,7 @@ class ServiceFlowStore:
         *,
         granted_by: int | None,
         at: datetime,
-    ) -> None:
+    ) -> tuple[frozenset[int], frozenset[int]]:
         if not self._visible_organisation(scope, organisation_id):
             raise missing_object("organisation_id")
         member = self._staff(staff_id)
@@ -264,6 +282,7 @@ class ServiceFlowStore:
             del self.state.skill_grants[(staff_id, skill_id)]
         for skill_id in wanted - held:
             self.state.skill_grants[(staff_id, skill_id)] = (granted_by, at)
+        return frozenset(wanted - held), frozenset(held - wanted)
 
     async def list_capacity_pools(
         self, scope: Scope, organisation_id: int, *, archived: bool = False
@@ -273,13 +292,13 @@ class ServiceFlowStore:
             for p in self.state.pools.values()
             if p.organisation_id == organisation_id
             and (p.archived_at is not None) == archived
-            and _visible(self.state, scope, p.organisation_id)
+            and _pool_visible(self.state, scope, p)
         ]
         return sorted(found, key=lambda p: (p.name, p.id or 0))
 
     async def get_capacity_pool(self, scope: Scope, pool_id: int) -> CapacityPool | None:
         pool = self.state.pools.get(pool_id)
-        return pool if pool and _visible(self.state, scope, pool.organisation_id) else None
+        return pool if pool and _pool_visible(self.state, scope, pool) else None
 
     async def save_capacity_pool(self, scope: Scope, pool: CapacityPool) -> CapacityPool:
         if not self._visible_organisation(scope, pool.organisation_id):
@@ -292,6 +311,11 @@ class ServiceFlowStore:
             if pool.group_id is not None
         )
         held = stored.guaranteed_skill_ids if stored else frozenset[int]()
+        others = [
+            p
+            for p in self.state.pools.values()
+            if p.organisation_id == pool.organisation_id and p.id != pool.id
+        ]
         check_pool_save(
             pool,
             stored,
@@ -299,9 +323,18 @@ class ServiceFlowStore:
             {s: self.state.skills[s] for s in pool.guaranteed_skill_ids if s in self.state.skills},
             held,
             group_taken=taken,
+            same_code_exists=pool.code is not None and any(p.code == pool.code for p in others),
+            same_name_exists=any(
+                same_name(p.name) == same_name(pool.name)
+                for p in others
+                if p.mode is PoolMode.COUNTED and p.archived_at is None
+            ),
         )
         kept = replace(
-            pool, id=pool.id or self._new_id(), archived_at=stored.archived_at if stored else None
+            pool,
+            id=pool.id or self._new_id(),
+            archived_at=stored.archived_at if stored else None,
+            code=stored.code if stored else pool.code,
         )
         self.state.pools[kept.id] = kept
         return kept

@@ -1,5 +1,6 @@
 {% extends "admin/layout.html" %}
 {% from "admin/_fields.html" import field with context %}
+{% from "admin/_skill_checkboxes.html" import skill_checkboxes with context %}
 {% block title %}{{ person.name }} – {{ _("admin.staff.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 <p><a href="/admin/staff">{{ _("admin.staff.back") }}</a></p>
@@ -11,6 +12,7 @@
     {% if person.erased %}<p><span class="chip">{{ _("admin.staff.status.erased") }}</span></p>{% endif %}
   </div>
 </div>
+{% include "_error_summary.html" %}
 <section class="card" aria-labelledby="access-heading">
   <h2 id="access-heading">{{ _("admin.staff.access") }}</h2>
   <dl class="facts">
@@ -22,6 +24,27 @@
   </dl>
   <p class="muted">{{ _("admin.staff.source") }}</p>
 </section>
+{% if skill_sections %}
+<section class="card" id="skills" aria-labelledby="skills-heading">
+  <h2 id="skills-heading">{{ _("admin.staff.skills.heading") }}</h2>
+  <p class="muted">{{ _("admin.staff.skills.intro", name=person.name) }}</p>
+  {% if skills_done %}<div class="alert alert--success" role="status"><p>{{ skills_done }}</p></div>{% endif %}
+  {% for section in skill_sections %}
+  {% if section.editable %}
+  <form method="post" action="/admin/staff/{{ person.id }}/skills/{{ section.slug }}" novalidate aria-labelledby="skills-{{ section.slug }}-heading">
+    <h3 id="skills-{{ section.slug }}-heading">{{ section.name }}</h3>
+    {{ skill_checkboxes(section.choices, "skills-" ~ section.slug, _("admin.staff.skills.legend", organisation=section.name), section.error) }}
+    <div class="form-actions">
+      <button type="submit" class="button">{{ _("admin.staff.skills.save") }}</button>
+    </div>
+  </form>
+  {% else %}
+  <h3>{{ section.name }}</h3>
+  {% if section.held %}<ul>{% for label in section.held %}<li>{{ label }}</li>{% endfor %}</ul>{% else %}<p class="empty-state">{{ _("admin.staff.skills.none") }}</p>{% endif %}
+  {% endif %}
+  {% endfor %}
+</section>
+{% endif %}
 {% if manage %}{% set back = "/admin/staff/" ~ person.id %}{% include "admin/_staff_manage.html" %}{% endif %}
 {% if person.refused %}
 <section class="card" aria-labelledby="refused-heading">

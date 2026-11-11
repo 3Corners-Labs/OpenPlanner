@@ -163,6 +163,17 @@ PATHS: dict[str, str] = {
         "/admin/organisations/demo/usage/wallboard/live"
     ),
     "/admin/organisations/{org}/embedding": "/admin/organisations/demo/embedding",
+    # ADR 0121: the skills and capacity pools; the sweep stores one of each.
+    "/admin/organisations/{org}/skills": "/admin/organisations/demo/skills",
+    "/admin/organisations/{org}/skills/{skill_id}": "/admin/organisations/demo/skills/{skill}",
+    "/admin/organisations/{org}/skills/{skill_id}/archive": (
+        "/admin/organisations/demo/skills/{skill}/archive"
+    ),
+    "/admin/organisations/{org}/capacity": "/admin/organisations/demo/capacity",
+    "/admin/organisations/{org}/capacity/{pool_id}": "/admin/organisations/demo/capacity/{pool}",
+    "/admin/organisations/{org}/capacity/{pool_id}/archive": (
+        "/admin/organisations/demo/capacity/{pool}/archive"
+    ),
     "/admin/organisations/{org}/closure/scenarios": "/admin/organisations/demo/closure/scenarios",
     "/admin/organisations/{org}/closure/scenarios/{scenario_id}": (
         "/admin/organisations/demo/closure/scenarios/{org_scenario}"

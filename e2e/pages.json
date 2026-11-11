@@ -312,6 +312,15 @@
       ]
     },
     {
+      "name": "organisation: skills and capacity",
+      "path": "/admin/organisations/demo/skills",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
       "name": "advanced settings: configuration package",
       "path": "/admin/settings/package",
       "user": "super",

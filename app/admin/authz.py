@@ -44,6 +44,7 @@ from app.domain.authorization import (
     scope_for,
     target_text,
 )
+from app.domain.capacity_service import CapacityService
 from app.domain.event_context import bind_actor_role, bind_level
 from app.domain.login_service import LoginService
 from app.domain.maintenance_service import MaintenanceService
@@ -51,6 +52,7 @@ from app.domain.overview_layout import OverviewLayoutService
 from app.domain.ports import Clock
 from app.domain.roles import RoleService
 from app.domain.scheduling import GroupSummary
+from app.domain.skill_service import SkillService
 from app.web.locale import RequestLocale, request_locale
 from app.web.organisation_settings import follow
 
@@ -122,6 +124,18 @@ async def _scope_to_organisation(
 def admin_service(request: Request) -> AdminService:
     """Return the application's admin service."""
     service: AdminService = request.app.state.admin_service
+    return service
+
+
+def skill_service(request: Request) -> SkillService:
+    """Return the application's skill service (ADR 0121)."""
+    service: SkillService = request.app.state.skill_service
+    return service
+
+
+def capacity_service(request: Request) -> CapacityService:
+    """Return the application's capacity service (ADR 0121)."""
+    service: CapacityService = request.app.state.capacity_service
     return service
 
 

@@ -1642,8 +1642,13 @@ class Transaction(Protocol):
         *,
         granted_by: int | None,
         at: datetime,
-    ) -> None:
-        """Replace a staff member's skills of one organisation; their other grants stay."""
+    ) -> tuple[frozenset[int], frozenset[int]]:
+        """Replace a staff member's skills of one organisation; their other grants stay.
+
+        Returns the skill ids granted and the skill ids taken away, so the change can be
+        audited from what was really replaced (a grant left over from a membership that ended
+        included).
+        """
         ...
 
     async def list_capacity_pools(

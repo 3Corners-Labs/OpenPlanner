@@ -14,7 +14,7 @@ transaction, which takes no lock; the unit of work does not stop it.
 from collections.abc import Collection
 from datetime import datetime
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import ColumnElement, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.flow_usage import REVISION_IN_EFFECT
@@ -35,6 +35,7 @@ from app.domain.capacity import (
     PoolMode,
     check_pool_archive,
     check_pool_save,
+    same_name,
 )
 from app.domain.errors import missing_object
 from app.domain.service_flows import FlowState
@@ -63,9 +64,23 @@ async def pools_from_rows(
             frozenset(guaranteed[row.id]),
             row.archived_at,
             row.group_id,
+            row.code,
         )
         for row in rows
     ]
+
+
+def pool_visible(scope: Scope) -> ColumnElement[bool]:
+    """Return the condition that a pool is visible in ``scope``.
+
+    Needs the query to join ``OrganisationRow`` and to left-join ``GroupRow`` on the pool's group.
+    A counted pool is visible like its organisation's skills (``visible_organisation``); a legacy
+    pool wraps one service's staffing and only a scope that reaches that service sees it.
+    """
+    return visible_organisation(scope, OrganisationRow.slug) & or_(
+        CapacityPoolRow.mode != PoolMode.LEGACY_GROUP.value,
+        scope_filter(scope, OrganisationRow.slug, GroupRow.slug),
+    )
 
 
 class CapacityPoolQueries:
@@ -78,19 +93,24 @@ class CapacityPoolQueries:
         return await self._session.scalar(
             select(CapacityPoolRow)
             .join(OrganisationRow, OrganisationRow.id == CapacityPoolRow.organisation_id)
-            .where(CapacityPoolRow.id == pool_id, visible_organisation(scope, OrganisationRow.slug))
+            .outerjoin(GroupRow, GroupRow.id == CapacityPoolRow.group_id)
+            .where(CapacityPoolRow.id == pool_id, pool_visible(scope))
         )
 
     async def list_capacity_pools(
         self, scope: Scope, organisation_id: int, *, archived: bool = False
     ) -> list[CapacityPool]:
-        """Return the organisation's pools inside ``scope``, by name; archived ones on request."""
+        """Return the organisation's pools inside ``scope``, by name; archived ones on request.
+
+        A legacy pool is listed only when its service lies inside ``scope``.
+        """
         rows = await self._session.scalars(
             select(CapacityPoolRow)
             .join(OrganisationRow, OrganisationRow.id == CapacityPoolRow.organisation_id)
+            .outerjoin(GroupRow, GroupRow.id == CapacityPoolRow.group_id)
             .where(
                 CapacityPoolRow.organisation_id == organisation_id,
-                visible_organisation(scope, OrganisationRow.slug),
+                pool_visible(scope),
                 CapacityPoolRow.archived_at.is_not(None)
                 if archived
                 else CapacityPoolRow.archived_at.is_(None),
@@ -100,14 +120,18 @@ class CapacityPoolQueries:
         return await pools_from_rows(self._session, list(rows))
 
     async def get_capacity_pool(self, scope: Scope, pool_id: int) -> CapacityPool | None:
-        """Return one pool, or ``None`` when it does not exist or lies outside ``scope``."""
+        """Return one pool, or ``None`` when it does not exist or lies outside ``scope``.
+
+        A legacy pool lies outside a scope that does not reach its service.
+        """
         row = await self._pool_row(scope, pool_id)
         return (await pools_from_rows(self._session, [row]))[0] if row is not None else None
 
     async def save_capacity_pool(self, scope: Scope, pool: CapacityPool) -> CapacityPool:
         """Insert the pool (no id) or update its name and guaranteed skills; return it stored.
 
-        A pool's mode and group never change.
+        A pool's mode, group and code never change; a counted pool stored without a code (a row
+        from before migration 0110) keeps none.
 
         Raises:
             DomainError: ``configuration_object_missing`` for an organisation or pool that does
@@ -133,6 +157,27 @@ class CapacityPoolQueries:
             is not None
         )
         held = stored.guaranteed_skill_ids if stored else frozenset[int]()
+        same_code = pool.code is not None and (
+            await self._session.scalar(
+                select(CapacityPoolRow.id).where(
+                    CapacityPoolRow.organisation_id == pool.organisation_id,
+                    CapacityPoolRow.code == pool.code,
+                    CapacityPoolRow.id != (pool.id or 0),
+                )
+            )
+            is not None
+        )
+        same_name_exists = pool.mode is PoolMode.COUNTED and any(
+            same_name(name) == same_name(pool.name)
+            for name in await self._session.scalars(
+                select(CapacityPoolRow.name).where(
+                    CapacityPoolRow.organisation_id == pool.organisation_id,
+                    CapacityPoolRow.mode == PoolMode.COUNTED.value,
+                    CapacityPoolRow.archived_at.is_(None),
+                    CapacityPoolRow.id != (pool.id or 0),
+                )
+            )
+        )
         check_pool_save(
             pool,
             stored,
@@ -140,10 +185,15 @@ class CapacityPoolQueries:
             await load_skills(self._session, pool.guaranteed_skill_ids),
             held,
             group_taken=group_taken,
+            same_code_exists=same_code,
+            same_name_exists=same_name_exists,
         )
         if row is None:
             row = CapacityPoolRow(
-                organisation_id=pool.organisation_id, mode=pool.mode.value, group_id=pool.group_id
+                organisation_id=pool.organisation_id,
+                mode=pool.mode.value,
+                group_id=pool.group_id,
+                code=pool.code,
             )
         row.name = pool.name
         self._session.add(row)
