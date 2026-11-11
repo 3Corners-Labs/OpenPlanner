@@ -173,6 +173,9 @@ PATHS: dict[str, str] = {
     "/admin/groups/{slug}/flows": "/admin/groups/demo/flows",
     "/admin/groups/{slug}/flows/new": "/admin/groups/demo/flows/new",
     "/admin/groups/{slug}/flows/{code}": "/admin/groups/demo/flows/sweep",
+    "/admin/groups/{slug}/flows/{code}/subjects/{subject}": (
+        "/admin/groups/demo/flows/sweep/subjects/sweep"
+    ),
     "/admin/groups/{slug}/flows/{code}/discard": "/admin/groups/demo/flows/sweep/discard",
     "/admin/groups/{slug}/flows/{code}/archive": "/admin/groups/demo/flows/sweep/archive",
     "/admin/organisations/{org}/capacity": "/admin/organisations/demo/capacity",

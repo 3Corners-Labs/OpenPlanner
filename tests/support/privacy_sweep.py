@@ -24,6 +24,7 @@ from app.domain.booking import ChangeReason, MeetingRef, TrialCall
 from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.form_fields import FieldDefinition, FieldType, FormDefinition
 from app.domain.planning import PlanningService
+from app.domain.routing import GroupRouting, Subject
 from app.domain.scheduling import DispatchKind, ScheduleOverride, TimeWindow
 from app.domain.service_flows import FlowState, ServiceFlow
 from app.domain.services import BookingService, ContactInput
@@ -300,6 +301,10 @@ async def mark(site: Site, monkeypatch: pytest.MonkeyPatch) -> Fixture:
         found.skill_id, found.pool_id = skill.id or 0, pool.id or 0
         group = await tx.get_group("demo")  # ADR 0121 step 2d: a draft flow for the flow pages
         assert group is not None
+        await tx.save_group_routing(  # ... that offers a subject, for its page of extra skills
+            group.id,
+            GroupRouting(subjects=(Subject.create("sweep", {"nl": "Sweep", "en": "Sweep"}),)),
+        )
         await tx.save_draft(
             Scope(everything=True),
             ServiceFlow(
@@ -309,7 +314,11 @@ async def mark(site: Site, monkeypatch: pytest.MonkeyPatch) -> Fixture:
                 FlowState.DRAFT,
                 frozenset(),
                 None,
-                revision(flow_id=None, capacity_pool_id=pool.id),
+                revision(
+                    flow_id=None,
+                    capacity_pool_id=pool.id,
+                    subject_skill_ids={"sweep": frozenset()},
+                ),
             ),
         )
     closed = await post_form(site, "/admin/groups/demo/closure", CLOSURE)
