@@ -212,7 +212,7 @@ class ReadinessCheck(StrEnum):
 class ReadinessReason(StrEnum):
     """Why a check fails; a stable code, never user-facing text."""
 
-    LABELS_MISSING = "labels_missing"
+    LABELS_INVALID = "labels_invalid"
     INTAKE_MISSING = "intake_missing"
     POOL_MISSING = "pool_missing"
     POOL_ARCHIVED = "pool_archived"
@@ -260,7 +260,7 @@ def _labels_valid(labels: Mapping[str, str]) -> bool:
 def _data_reason(revision: FlowRevision) -> ReadinessReason | None:
     """Return why the data check fails, if it does."""
     if not _labels_valid(revision.labels):
-        return ReadinessReason.LABELS_MISSING
+        return ReadinessReason.LABELS_INVALID
     if not revision.intake_modes:
         return ReadinessReason.INTAKE_MISSING
     return None

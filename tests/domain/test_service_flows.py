@@ -1,6 +1,6 @@
 """Service flows, the closed combination table and the readiness checklist (ADR 0121)."""
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
 
@@ -44,9 +44,8 @@ def reasons(
     return {i.code: i.reason for i in items}
 
 
-def refused_field(make: object) -> str | None:
+def refused_field(make: Callable[[], object]) -> str | None:
     """Call ``make`` and return the field of the configuration error it raises."""
-    assert callable(make)
     with pytest.raises(DomainError) as caught:
         make()
     assert caught.value.code is ErrorCode.INVALID_CONFIGURATION
@@ -150,11 +149,11 @@ def test_the_legacy_factory_builds_revision_one_of_a_video_wrapper() -> None:
 @pytest.mark.parametrize(
     ("changes", "reason"),
     [
-        ({"labels": {"en": "x"}}, R.LABELS_MISSING),
-        ({"labels": {"nl": "x"}}, R.LABELS_MISSING),
-        ({"labels": {"nl": " ", "en": "x"}}, R.LABELS_MISSING),
-        ({"labels": {"nl": "x", "en": ""}}, R.LABELS_MISSING),
-        ({"labels": {"nl": "x", "en": "y" * 81}}, R.LABELS_MISSING),
+        ({"labels": {"en": "x"}}, R.LABELS_INVALID),
+        ({"labels": {"nl": "x"}}, R.LABELS_INVALID),
+        ({"labels": {"nl": " ", "en": "x"}}, R.LABELS_INVALID),
+        ({"labels": {"nl": "x", "en": ""}}, R.LABELS_INVALID),
+        ({"labels": {"nl": "x", "en": "y" * 81}}, R.LABELS_INVALID),
         ({"intake_modes": frozenset()}, R.INTAKE_MISSING),
     ],
 )
@@ -162,9 +161,9 @@ def test_data_reasons(changes: dict[str, object], reason: ReadinessReason) -> No
     assert reasons(revision(**changes), pool())[ReadinessCheck.DATA] is reason
 
 
-def test_labels_missing_comes_before_intake_missing() -> None:
+def test_invalid_labels_come_before_a_missing_intake() -> None:
     result = reasons(revision(labels={}, intake_modes=frozenset()), pool())
-    assert result[ReadinessCheck.DATA] is R.LABELS_MISSING
+    assert result[ReadinessCheck.DATA] is R.LABELS_INVALID
 
 
 def test_capacity_reasons() -> None:
