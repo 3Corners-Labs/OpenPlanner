@@ -80,6 +80,16 @@ async def pools_of(world: World) -> list[CapacityPool]:
         return list(await tx.list_capacity_pools(EVERYTHING, world.organisation, archived=False))
 
 
+async def test_a_legacy_pool_has_no_code_and_can_be_saved_again(world: World) -> None:
+    await add_group(world, name="Balie")
+
+    (pool,) = await pools_of(world)
+    assert pool.code is None  # only a counted pool has a code (ADR 0121 step 2f)
+    async with world.uow.locked() as tx:
+        saved = await tx.save_capacity_pool(EVERYTHING, replace(pool, name="Loket"))
+    assert (saved.name, saved.code) == ("Loket", None)
+
+
 async def test_a_new_group_gets_its_legacy_pool_and_appointment_flow(world: World) -> None:
     group_id = await add_group(world, name="Balie", slot_minutes=20)
 
@@ -324,3 +334,6 @@ async def test_every_demo_group_has_its_pool_and_appointment_flow(engine: AsyncE
         flows = (await session.scalars(select(ServiceFlowRow.code))).all()
         pools = await session.scalar(select(func.count()).select_from(CapacityPoolRow))
     assert (list(flows), pools) == (["appointment"] * 2, 2)  # the seed makes two groups
+    async with AsyncSession(engine) as session:
+        codes = (await session.scalars(select(CapacityPoolRow.code))).all()
+    assert list(codes) == [None, None]  # legacy pools carry no code

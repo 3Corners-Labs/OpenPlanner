@@ -24,6 +24,7 @@ class PoolRowView:
 
     id: int
     name: str
+    code: str
     legacy: bool
     tag: str
     skills: tuple[str, ...]
@@ -60,6 +61,7 @@ def pool_row(line: PoolLine, locale: RequestLocale) -> PoolRowView:
     return PoolRowView(
         line.pool.id or 0,
         line.pool.name,
+        line.pool.code or "",
         line.pool.mode is PoolMode.LEGACY_GROUP,
         _tag(line, locale),
         tuple(skill_label(s, locale.code) for s in line.skills),
@@ -79,6 +81,29 @@ def name_field(form: FormData, locale: RequestLocale, line: PoolLine | None) -> 
         value=form.values.get("pool_name", stored),
         error=form.error_for("pool_name"),
         attributes={"maxlength": "80", "autocomplete": "off"},
+    )
+
+
+def pool_code_field(form: FormData, locale: RequestLocale, line: PoolLine | None) -> Field:
+    """Return the code input: typed for a new pool, shown read-only for a stored one."""
+    _ = locale.gettext
+    if line is not None:
+        coded = line.pool.code is not None
+        return Field(
+            "pool_code",
+            _("admin.capacity.code"),
+            value=line.pool.code or "",
+            readonly=True,
+            hint=_("admin.capacity.code_fixed" if coded else "admin.capacity.no_code"),
+            attributes={} if coded else {"placeholder": "\u2013"},
+        )
+    return Field(
+        "pool_code",
+        _("admin.capacity.code"),
+        value=form.text("pool_code"),
+        hint=_("admin.capacity.code_hint"),
+        error=form.error_for("pool_code"),
+        attributes={"maxlength": "40", "spellcheck": "false", "autocapitalize": "none"},
     )
 
 

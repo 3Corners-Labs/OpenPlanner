@@ -11,7 +11,13 @@ from fastapi import Request
 from starlette.responses import HTMLResponse
 
 from app.admin.authz import capacity_service, skill_service
-from app.admin.capacity_views import CHOICE_FIELD, name_field, pool_choices, pool_row
+from app.admin.capacity_views import (
+    CHOICE_FIELD,
+    name_field,
+    pool_choices,
+    pool_code_field,
+    pool_row,
+)
 from app.admin.forms import FormData, done_message
 from app.admin.pages import archived_requested, org_page, with_manual
 from app.admin.skill_inputs import POOL_LIMIT_NOTICE, SKILL_LIMIT_NOTICE, raise_unknown
@@ -113,11 +119,13 @@ async def skills_capacity_page(
             "pools_can_add": adding is not None,
             "pools_limit_reached": found_pools.editable and not found_pools.can_add,
             "pool_rows": [pool_row(line, locale) for line in found_pools.lines],
-            "pool_name_field": with_manual(request, locale, [name_field(pool_form, locale, None)])[
-                0
-            ]
+            "pool_fields": with_manual(
+                request,
+                locale,
+                [pool_code_field(pool_form, locale, None), name_field(pool_form, locale, None)],
+            )
             if adding is not None
-            else None,
+            else [],
             "pool_choices": pool_choices(adding.choices, frozenset(), pool_form, locale)
             if adding is not None
             else [],

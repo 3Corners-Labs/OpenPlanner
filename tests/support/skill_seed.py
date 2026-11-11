@@ -10,6 +10,7 @@ from app.domain.capacity_service import CapacityService
 from app.domain.skill_service import SkillService
 from tests.admin.conftest import SUPER, Site
 from tests.support.admin_site import site_app, site_uow
+from tests.support.pool_code import derive_pool_code
 
 
 async def add_skill(
@@ -35,9 +36,15 @@ async def add_pool(
     name: str = "Loket",
     skills: tuple[int, ...] = (),
     organisation: str = "demo",
+    code: str = "",
 ) -> int:
-    """Add a counted pool to ``organisation``, guaranteeing ``skills``, and return its id."""
-    pool = await site_app(site).state.capacity_service.create(SUPER, organisation, name, skills)
+    """Add a counted pool to ``organisation``, guaranteeing ``skills``, and return its id.
+
+    The code is the name's (``derive_pool_code``) unless given.
+    """
+    pool = await site_app(site).state.capacity_service.create(
+        SUPER, organisation, code or derive_pool_code(name), name, skills
+    )
     assert pool.id is not None
     return int(pool.id)
 

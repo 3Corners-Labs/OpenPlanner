@@ -12392,6 +12392,12 @@ msgstr "Your organisation has reached the maximum number of skills. Archive a sk
 msgid "admin.capacity.error.limit"
 msgstr "Your organisation has reached the maximum number of capacity pools. Archive a pool you no longer use first."
 
+msgid "admin.capacity.error.code_taken"
+msgstr "This code is already used by a pool of your organisation. Choose another."
+
+msgid "admin.capacity.error.name_taken"
+msgstr "Another pool of your organisation already has this name. Choose another name."
+
 msgid "admin.skills.limit_reached"
 msgstr "The maximum of {count} skills is reached. Archive a skill you no longer use to add a new one."
 
@@ -12424,6 +12430,9 @@ msgstr "An archived pool can no longer be newly chosen by any flow."
 
 msgid "admin.capacity.col.name"
 msgstr "Name"
+
+msgid "admin.capacity.col.code"
+msgstr "Code"
 
 msgid "admin.capacity.col.mode"
 msgstr "Kind"
@@ -12475,6 +12484,18 @@ msgstr "Add pool"
 
 msgid "admin.capacity.name"
 msgstr "Name of the pool"
+
+msgid "admin.capacity.code"
+msgstr "Code"
+
+msgid "admin.capacity.code_hint"
+msgstr "Lower-case letters, digits and hyphens, for example counter or legal-team (at most 40 characters). The code cannot be changed later."
+
+msgid "admin.capacity.code_fixed"
+msgstr "The code is fixed."
+
+msgid "admin.capacity.no_code"
+msgstr "This pool has no code."
 
 msgid "admin.capacity.guaranteed"
 msgstr "Skills every counted member of staff holds"
@@ -12547,6 +12568,9 @@ msgstr "Enter the name in Dutch and in English (each at most 80 characters, with
 
 msgid "admin.form.error.pool_name"
 msgstr "Enter a name of at most 80 characters, without control characters."
+
+msgid "admin.form.error.pool_code"
+msgstr "Use only lower-case letters, digits and hyphens, starting with a letter or digit (at most 40 characters)."
 
 msgid "admin.audit.detail.skill_created"
 msgstr "Skill added"

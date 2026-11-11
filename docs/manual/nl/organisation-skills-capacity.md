@@ -87,10 +87,19 @@ flows de pool gebruiken.
 
 ### Een capaciteitspool toevoegen en wijzigen
 
+<!-- field: pool_code -->
+#### Code
+
+De code waaraan de pool wordt herkend in de configuratie en wanneer instellingen naar een andere
+installatie gaan: kleine letters, cijfers en streepjes, hoogstens 40 tekens, door geen andere pool
+van uw organisatie gebruikt. U kunt de code na het toevoegen van de pool niet meer wijzigen.
+
 <!-- field: pool_name -->
 #### Naam van de pool
 
-De naam waaraan u de pool herkent, hoogstens 80 tekens.
+De naam waaraan u de pool herkent, hoogstens 80 tekens. Een andere pool die niet is gearchiveerd,
+mag niet dezelfde naam hebben, zodat u ze uit elkaar kunt houden; u kunt een pool altijd een andere
+naam geven zonder dat de code verandert.
 
 Onder de naam vinkt u de vaardigheden aan die iedere getelde medewerker heeft. Alleen
 vaardigheden die niet zijn gearchiveerd, zijn aan te vinken; een gearchiveerde vaardigheid die de

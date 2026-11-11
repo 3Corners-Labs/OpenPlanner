@@ -19,6 +19,7 @@ from app.domain.capacity import (
     PoolMode,
     check_pool_archive,
     check_pool_save,
+    same_name,
 )
 from app.domain.default_flows import (
     DefaultFlowSet,
@@ -310,6 +311,11 @@ class ServiceFlowStore:
             if pool.group_id is not None
         )
         held = stored.guaranteed_skill_ids if stored else frozenset[int]()
+        others = [
+            p
+            for p in self.state.pools.values()
+            if p.organisation_id == pool.organisation_id and p.id != pool.id
+        ]
         check_pool_save(
             pool,
             stored,
@@ -317,9 +323,18 @@ class ServiceFlowStore:
             {s: self.state.skills[s] for s in pool.guaranteed_skill_ids if s in self.state.skills},
             held,
             group_taken=taken,
+            same_code_exists=pool.code is not None and any(p.code == pool.code for p in others),
+            same_name_exists=any(
+                same_name(p.name) == same_name(pool.name)
+                for p in others
+                if p.mode is PoolMode.COUNTED and p.archived_at is None
+            ),
         )
         kept = replace(
-            pool, id=pool.id or self._new_id(), archived_at=stored.archived_at if stored else None
+            pool,
+            id=pool.id or self._new_id(),
+            archived_at=stored.archived_at if stored else None,
+            code=stored.code if stored else pool.code,
         )
         self.state.pools[kept.id] = kept
         return kept

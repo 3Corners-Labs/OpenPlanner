@@ -18,6 +18,8 @@ from app.adapters.db.models import (
     ScheduleRuleRow,
 )
 from tests.support.database import migrated_database
+from tests.support.flow_backends import BACKENDS
+from tests.support.flow_world import World, open_world
 
 
 @pytest.fixture
@@ -89,3 +91,10 @@ async def count_images(engine: AsyncEngine) -> int:
     async with engine.connect() as connection:
         result = await connection.execute(select(func.count()).select_from(ClosureImageRow))
         return int(result.scalar_one())
+
+
+@pytest.fixture(params=BACKENDS)
+async def world(request: pytest.FixtureRequest, database_url: str) -> AsyncIterator[World]:
+    """The seeded world of the flow contract tests, on the SQL adapter and on the fake."""
+    async with open_world(request.param, database_url) as seeded:
+        yield seeded
