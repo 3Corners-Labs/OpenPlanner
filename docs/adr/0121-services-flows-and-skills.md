@@ -31,7 +31,7 @@ None in step 1: it changes labels only. The later steps add the following, each 
 
 | Key | Class | Default | Bounds | Permission | Note |
 |---|---|---|---|---|---|
-| `treatment_buffer_minutes` | D organisation | 0 | 0–120 | `capacity.manage` (point 11) | per pool or flow policy |
+| `treatment_buffer_minutes` | D organisation | 0 | 0–120 | `capacity.manage` (point 11) | one value per organisation (ADR 0122, settings); a per-flow value is a follow-up if one organisation needs different wrap-up times |
 | `assignment_start_lease_minutes` | D organisation | 5 | 1–30 | `capacity.manage` (point 11) | expiry only before treatment starts |
 | `request_unresolved_hours` | D organisation | 24 | 1–168 | `capacity.manage` (point 11) | the watchdog |
 
@@ -50,7 +50,8 @@ None in step 1: it changes labels only. The later steps add the following, each 
 | 2d | Screens: flows tab and flow editor (draft and validate) | | planned |
 | 2e | A service created later, by the portal or by a configuration import, and a service that starts offering the direct call get their legacy pool and default flows from one domain rule; an idempotent repair covers services created by an older image during a rollback | #742 | merged |
 | 2f | A stable code for a capacity pool (migration 0110), unique pool names per organisation | #744 | merged |
-| 3 | P3: one flow resolver for page, widget, API and admin; interval accounting; new-pool admission | | planned |
+| 3a | One flow resolver for the standalone page, the direct page and the widget API; every new booking records its flow and revision (NULL when no active default exists); an optional explicit flow on the pages, the widget attribute and the widget API (additive); the choice screen for several flows follows in step 5 | #747 | merged |
+| 3b | Interval accounting and admission across flows of one pool, staffing of counted pools | | planned |
 | 4 | P4: skill enforcement in the locked claim; pool guarantees; external skill mapping | | planned |
 | 5 | P5: generic request execution without video, optional contact data, watchdog and deletion | | planned |
 | 6 | P6: channel-independent contact-center task contract, reconciliation and fencing | | planned |
