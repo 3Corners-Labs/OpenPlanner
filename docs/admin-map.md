@@ -91,7 +91,7 @@ Side navigation: *Services*. A row *Tab › Sub-tab* is a sub-tab of that tab.
 | Messages › Message texts | `/admin/groups/{slug}/messages` | `texts.manage` | standard | `/admin/groups/{slug}/messages/{text_locale}` |
 | Messages › Contact | `/admin/groups/{slug}/contact` | `closure.manage` | standard | – |
 | Settings | `/admin/groups/{slug}/settings` | `group.edit` | standard | `/admin/groups/{slug}/settings/form`, `/admin/groups/{slug}/settings/form/{key}`, `/admin/groups/{slug}/settings/routing`, `/admin/groups/{slug}/settings/routing/subjects/{code}`, `/admin/groups/{slug}/settings/archive` |
-| Settings › Flows | `/admin/groups/{slug}/flows` | `group.edit` | standard | `/admin/groups/{slug}/flows/new`, `/admin/groups/{slug}/flows/{code}`, `/admin/groups/{slug}/flows/{code}/subjects/{subject}`, `/admin/groups/{slug}/flows/{code}/discard`, `/admin/groups/{slug}/flows/{code}/archive` |
+| Settings › Flows | `/admin/groups/{slug}/flows` | `group.edit` | standard | `/admin/groups/{slug}/flows/new`, `/admin/groups/{slug}/flows/{code}`, `/admin/groups/{slug}/flows/{code}/subjects/{subject}`, `/admin/groups/{slug}/flows/{code}/discard`, `/admin/groups/{slug}/flows/{code}/archive`, `/admin/groups/{slug}/flows/{code}/delete` |
 | Emergency closure | `/admin/groups/{slug}/closure` | `closure.manage` | standard | `/admin/groups/{slug}/closure/bookings/{booking_id}/move`, `/admin/groups/{slug}/closure/scenarios`, `/admin/groups/{slug}/closure/scenarios/{scenario_id}`, `/admin/groups/{slug}/closure/scenarios/{scenario_id}/contacts` |
 
 ## Settings topics
