@@ -160,6 +160,14 @@ DONE_MESSAGES: dict[str, str] = {
     "staff_suspended": "admin.done.staff_suspended",
     "staff_reinstated": "admin.done.staff_reinstated",
     "staff_erased": "admin.done.staff_erased",
+    # ADR 0121: skills, capacity pools and the skills of a person.
+    "skill_created": "admin.done.skill_created",
+    "skill_saved": "admin.done.skill_saved",
+    "skill_archived": "admin.done.skill_archived",
+    "pool_created": "admin.done.pool_created",
+    "pool_saved": "admin.done.pool_saved",
+    "pool_archived": "admin.done.pool_archived",
+    "staff_skills_saved": "admin.done.staff_skills_saved",
 }
 """Confirmations after a change; only these keys are read from ``?done=``."""
 
@@ -279,6 +287,10 @@ FIELD_MESSAGES: dict[str, str] = {
     "mfa_policy": "admin.form.error.choice",
     "mfa_amr_values": "admin.form.error.mfa_values",
     "mfa_acr_values": "admin.form.error.mfa_values",
+    # ADR 0121: the code and labels of a skill, the name of a capacity pool.
+    "skill_code": "admin.form.error.skill_code",
+    "skill_label": "admin.form.error.skill_label",
+    "pool_name": "admin.form.error.pool_name",
 }
 """Message per field for ``invalid_configuration``; the key is also the input's id."""
 
@@ -286,6 +298,7 @@ FIELD_TARGET: dict[str, str] = {
     "window": "closes",
     "schedule_rules": "opens",
     "schedule_overrides": "day",
+    "skill_label": "label_nl",
     **ROUTING_TARGETS,
     **CONNECTION_TARGETS,
 }

@@ -239,6 +239,8 @@ SUBJECT_ACTIONS: Mapping[Subject, frozenset[str]] = {
             "branding.",
             "holidays.",
             "embedding.",
+            "skills.",
+            "capacity.",
             "texts.",
             "reminders.",
         }

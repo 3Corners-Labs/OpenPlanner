@@ -12244,3 +12244,333 @@ msgstr "Download as PNG"
 
 msgid "reports.chart.hint"
 msgstr "With scripts: arrow keys move through the chart, Enter opens that day, Escape closes the tip. The same numbers are in the table below."
+
+msgid "admin.tab.skills"
+msgstr "Skills"
+
+msgid "admin.tab.capacity"
+msgstr "Capacity"
+
+msgid "admin.skills.title"
+msgstr "Skills"
+
+msgid "admin.skills.lead"
+msgstr "Skills determine which expertise is needed to handle a request. A skill grants no rights and no access to data."
+
+msgid "admin.skills.count"
+msgstr "Skills ({count})"
+
+msgid "admin.skills.list_lead"
+msgstr "What a skill means is up to you. The code is fixed once the skill is created; the names can be changed."
+
+msgid "admin.skills.archived_heading"
+msgstr "Archived skills"
+
+msgid "admin.skills.archived_lead"
+msgstr "An archived skill can no longer be newly chosen anywhere. Requests, requirements and grants that already have it keep it."
+
+msgid "admin.skills.col.name"
+msgstr "Name"
+
+msgid "admin.skills.col.code"
+msgstr "Code"
+
+msgid "admin.skills.col.staff"
+msgstr "Staff"
+
+msgid "admin.skills.col.used_by"
+msgstr "Used by"
+
+msgid "admin.skills.col.actions"
+msgstr "Actions"
+
+msgid "admin.skills.used_by"
+msgstr "Pools: {pools}, flows: {flows}"
+
+msgid "admin.skills.staff_count"
+msgstr "Staff with this skill: {count}"
+
+msgid "admin.skills.edit"
+msgstr "Edit"
+
+msgid "admin.skills.archive"
+msgstr "Archive"
+
+msgid "admin.skills.archived_chip"
+msgstr "Archived"
+
+msgid "admin.skills.none"
+msgstr "No skills yet. Add one below."
+
+msgid "admin.skills.none_archived"
+msgstr "There are no archived skills."
+
+msgid "admin.skills.show_active"
+msgstr "Show the skills in use"
+
+msgid "admin.skills.show_archived"
+msgstr "Show archived skills"
+
+msgid "admin.skills.add"
+msgstr "Add a skill"
+
+msgid "admin.skills.add_button"
+msgstr "Add skill"
+
+msgid "admin.skills.edit_title"
+msgstr "Change a skill"
+
+msgid "admin.skills.back"
+msgstr "Back to the skills"
+
+msgid "admin.skills.label_nl"
+msgstr "Name in Dutch"
+
+msgid "admin.skills.label_en"
+msgstr "Name in English"
+
+msgid "admin.skills.code"
+msgstr "Code"
+
+msgid "admin.skills.code_hint"
+msgstr "Lower-case letters, digits and hyphens, for example intake or legal-advice (at most 40 characters). The code cannot be changed later."
+
+msgid "admin.skills.code_fixed"
+msgstr "The code is fixed."
+
+msgid "admin.skills.none_to_choose"
+msgstr "There are no skills to choose from yet. Create them first under Skills."
+
+msgid "admin.skills.archive_title"
+msgstr "Archive a skill"
+
+msgid "admin.skills.archive_lead"
+msgstr "Archiving is not deleting: whatever already has the skill keeps it."
+
+msgid "admin.skills.archive_what_happens"
+msgstr "What happens"
+
+msgid "admin.skills.archive_effect_new"
+msgstr "No new requirement and no new grant can use the skill any more."
+
+msgid "admin.skills.archive_effect_keeps"
+msgstr "Existing requests, requirements and grants keep the skill; nothing changes for work that was already accepted."
+
+msgid "admin.skills.archive_effect_listed"
+msgstr "You find the skill under Show archived skills. It cannot be deleted."
+
+msgid "admin.skills.archive_confirm_heading"
+msgstr "Confirm"
+
+msgid "admin.skills.archive_button"
+msgstr "Archive skill"
+
+msgid "admin.skills.error.code_taken"
+msgstr "This code is already used in your organisation. Choose another."
+
+msgid "admin.skills.error.choice"
+msgstr "A chosen skill no longer exists or can no longer be newly chosen. Reload the page and choose again."
+
+msgid "admin.skills.error.no_membership"
+msgstr "This person is not a member of this organisation, so you cannot grant skills here."
+
+msgid "admin.capacity.title"
+msgstr "Capacity"
+
+msgid "admin.capacity.lead"
+msgstr "A capacity pool is the time that flows draw on, with the skills every counted member of staff of the pool holds."
+
+msgid "admin.capacity.count_warning"
+msgstr "Mind the counting. A pool promises that every counted member of staff has all of the pool's skills. Do not count the same person in two pools at the same time: the portal cannot check that for you yet."
+
+msgid "admin.capacity.staffing_later"
+msgstr "How many members of staff work in a pool per time block is set once flows use the pool (to follow)."
+
+msgid "admin.capacity.count"
+msgstr "Capacity pools ({count})"
+
+msgid "admin.capacity.list_lead"
+msgstr "Existing pools are the staffing of a service itself and are only shown here. Own and shared pools are kept here."
+
+msgid "admin.capacity.archived_heading"
+msgstr "Archived capacity pools"
+
+msgid "admin.capacity.archived_lead"
+msgstr "An archived pool can no longer be newly chosen by any flow."
+
+msgid "admin.capacity.col.name"
+msgstr "Name"
+
+msgid "admin.capacity.col.mode"
+msgstr "Kind"
+
+msgid "admin.capacity.col.skills"
+msgstr "Skills of every member of staff"
+
+msgid "admin.capacity.col.flows"
+msgstr "Flows that draw on the pool"
+
+msgid "admin.capacity.col.actions"
+msgstr "Actions"
+
+msgid "admin.capacity.mode.legacy"
+msgstr "Existing"
+
+msgid "admin.capacity.mode.own"
+msgstr "Own"
+
+msgid "admin.capacity.mode.shared"
+msgstr "Shared"
+
+msgid "admin.capacity.legacy_note"
+msgstr "The service's own staffing, unchanged"
+
+msgid "admin.capacity.read_only"
+msgstr "Read only"
+
+msgid "admin.capacity.no_skills"
+msgstr "None"
+
+msgid "admin.capacity.no_flows"
+msgstr "No flow draws on this pool yet."
+
+msgid "admin.capacity.flows_hidden"
+msgstr "and {count} flows of other services"
+
+msgid "admin.capacity.flows_hidden_one"
+msgstr "and 1 flow of another service"
+
+msgid "admin.capacity.none"
+msgstr "No capacity pools yet."
+
+msgid "admin.capacity.none_archived"
+msgstr "There are no archived capacity pools."
+
+msgid "admin.capacity.show_active"
+msgstr "Show the pools in use"
+
+msgid "admin.capacity.show_archived"
+msgstr "Show archived pools"
+
+msgid "admin.capacity.add"
+msgstr "Add a pool"
+
+msgid "admin.capacity.add_button"
+msgstr "Add pool"
+
+msgid "admin.capacity.name"
+msgstr "Name of the pool"
+
+msgid "admin.capacity.guaranteed"
+msgstr "Skills every counted member of staff holds"
+
+msgid "admin.capacity.guaranteed_hint"
+msgstr "A flow that draws on this pool may only require skills ticked here."
+
+msgid "admin.capacity.edit_title"
+msgstr "Change a capacity pool"
+
+msgid "admin.capacity.back"
+msgstr "Back to the capacity pools"
+
+msgid "admin.capacity.archive_title"
+msgstr "Archive a capacity pool"
+
+msgid "admin.capacity.archive_lead"
+msgstr "A pool that a flow still draws on cannot be archived."
+
+msgid "admin.capacity.archive_effect_new"
+msgstr "No flow can newly choose the pool any more."
+
+msgid "admin.capacity.archive_effect_flows"
+msgstr "Flows that use the pool in a draft or a published revision stop the archiving; take the pool out of those flows first."
+
+msgid "admin.capacity.archive_confirm_heading"
+msgstr "Confirm"
+
+msgid "admin.capacity.archive_button"
+msgstr "Archive pool"
+
+msgid "admin.capacity.error.in_use"
+msgstr "The pool is still used by: {flows}. Take the pool out of those flows first."
+
+msgid "admin.staff.skills.heading"
+msgstr "Skills"
+
+msgid "admin.staff.skills.intro"
+msgstr "Rights determine what {name} may see. Skills determine which requests {name} may pick up. A change applies from the next request that is picked up or started."
+
+msgid "admin.staff.skills.legend"
+msgstr "Skills in {organisation}"
+
+msgid "admin.staff.skills.save"
+msgstr "Save skills"
+
+msgid "admin.staff.skills.none"
+msgstr "No skills."
+
+msgid "admin.done.skill_created"
+msgstr "The skill has been added."
+
+msgid "admin.done.skill_saved"
+msgstr "The skill has been saved."
+
+msgid "admin.done.skill_archived"
+msgstr "The skill has been archived."
+
+msgid "admin.done.pool_created"
+msgstr "The capacity pool has been added."
+
+msgid "admin.done.pool_saved"
+msgstr "The capacity pool has been saved."
+
+msgid "admin.done.pool_archived"
+msgstr "The capacity pool has been archived."
+
+msgid "admin.done.staff_skills_saved"
+msgstr "The skills have been saved. They apply from the next request that is picked up or started."
+
+msgid "admin.form.error.skill_code"
+msgstr "Use only lower-case letters, digits and hyphens, starting with a letter or digit (at most 40 characters)."
+
+msgid "admin.form.error.skill_label"
+msgstr "Enter the name in Dutch and in English (each at most 80 characters, without control characters)."
+
+msgid "admin.form.error.pool_name"
+msgstr "Enter a name of at most 80 characters, without control characters."
+
+msgid "admin.audit.detail.skill_created"
+msgstr "Skill added"
+
+msgid "admin.audit.detail.skill_changed"
+msgstr "Skill changed"
+
+msgid "admin.audit.detail.skill_archived"
+msgstr "Skill archived"
+
+msgid "admin.audit.detail.capacity_pool_created"
+msgstr "Capacity pool added"
+
+msgid "admin.audit.detail.capacity_pool_changed"
+msgstr "Capacity pool changed"
+
+msgid "admin.audit.detail.capacity_pool_archived"
+msgstr "Capacity pool archived"
+
+msgid "admin.audit.detail.staff_skills_changed"
+msgstr "Skills of a staff member changed"
+
+msgid "admin.audit.detail.skill"
+msgstr "skill {value}"
+
+msgid "admin.audit.detail.pool"
+msgstr "pool {value}"
+
+msgid "admin.audit.detail.staff"
+msgstr "staff member number {value}"
+
+msgid "admin.audit.detail.skill_add"
+msgstr "skill {value} granted"
+
+msgid "admin.audit.detail.skill_remove"
+msgstr "skill {value} taken away"

@@ -127,6 +127,16 @@ CREATABLES: dict[str, Creatable] = {
         change="/admin/logging/{destination_id}",
         delete="/admin/logging/{destination_id}/delete",
     ),
+    # ADR 0121: a skill's code is fixed, its labels change and it is archived (never deleted);
+    # a counted pool changes and is archived.
+    "/admin/organisations/{org}/skills": Creatable(
+        change="/admin/organisations/{org}/skills/{skill_id}",
+        delete="/admin/organisations/{org}/skills/{skill_id}/archive",
+    ),
+    "/admin/organisations/{org}/capacity": Creatable(
+        change="/admin/organisations/{org}/capacity/{pool_id}",
+        delete="/admin/organisations/{org}/capacity/{pool_id}/archive",
+    ),
     "/admin/organisations/{org}/closure/scenarios": Creatable(
         change="/admin/organisations/{org}/closure/scenarios/{scenario_id}",
         delete="/admin/organisations/{org}/closure/scenarios/{scenario_id}/delete",

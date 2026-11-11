@@ -106,6 +106,25 @@ TOPICS = (
         ("/admin/organisations/{org}/embedding",),
         Permission.EMBEDDING_MANAGE,
     ),
+    # ADR 0121: the organisation's skill catalogue and capacity pools.
+    HelpTopic(
+        "organisation-skills",
+        (
+            "/admin/organisations/{org}/skills",
+            "/admin/organisations/{org}/skills/{skill_id}",
+            "/admin/organisations/{org}/skills/{skill_id}/archive",
+        ),
+        Permission.SKILLS_MANAGE,
+    ),
+    HelpTopic(
+        "organisation-capacity",
+        (
+            "/admin/organisations/{org}/capacity",
+            "/admin/organisations/{org}/capacity/{pool_id}",
+            "/admin/organisations/{org}/capacity/{pool_id}/archive",
+        ),
+        Permission.CAPACITY_MANAGE,
+    ),
     HelpTopic(
         "queue",
         ("/admin/groups/{slug}/queue", "/admin/groups/{slug}/queue/{booking_id}"),

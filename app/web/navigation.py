@@ -446,6 +446,32 @@ OBJECTS = (
                         Permission.EMBEDDING_MANAGE,
                         "code",
                     ),
+                    # ADR 0121 point 11: the skill catalogue and the capacity pools are lists
+                    # with forms of their own, so they cannot be topics of the settings page
+                    # (anchors on one form); each is a sub-tab like Embedding, with its own
+                    # permission (``skills.manage``, ``capacity.manage``).
+                    Screen(
+                        "organisation.skills",
+                        "admin.tab.skills",
+                        f"{_ORGANISATION}/skills",
+                        Permission.SKILLS_MANAGE,
+                        "people",
+                        (
+                            f"{_ORGANISATION}/skills/{{skill_id}}",
+                            f"{_ORGANISATION}/skills/{{skill_id}}/archive",
+                        ),
+                    ),
+                    Screen(
+                        "organisation.capacity",
+                        "admin.tab.capacity",
+                        f"{_ORGANISATION}/capacity",
+                        Permission.CAPACITY_MANAGE,
+                        "sliders",
+                        (
+                            f"{_ORGANISATION}/capacity/{{pool_id}}",
+                            f"{_ORGANISATION}/capacity/{{pool_id}}/archive",
+                        ),
+                    ),
                     # ADR 0083 step 2: the organisation's own identity providers. A sub-tab
                     # of the overview, like the other organisation-wide settings, so the
                     # organisation page keeps its tabs (ADR 0047 §7).

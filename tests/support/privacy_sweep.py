@@ -19,12 +19,14 @@ import pytest
 from jinja2 import Environment, Template
 
 from app.domain.admin import AdminService
-from app.domain.authorization import MATRIX, Role
+from app.domain.authorization import MATRIX, Role, Scope
 from app.domain.booking import ChangeReason, MeetingRef, TrialCall
+from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.form_fields import FieldDefinition, FieldType, FormDefinition
 from app.domain.planning import PlanningService
 from app.domain.scheduling import DispatchKind, ScheduleOverride, TimeWindow
 from app.domain.services import BookingService, ContactInput
+from app.domain.skills import Skill
 from app.domain.staff_directory import DirectoryUser
 from app.domain.updates import Release, ReleaseCheck, Version
 from tests.admin.conftest import GROUP_ADMIN, SUPER, Site
@@ -127,6 +129,8 @@ class Fixture:
         self.override_id = 0
         self.scenario_id = 0
         self.org_scenario_id = 0
+        self.skill_id = 0
+        self.pool_id = 0
         self.role_id = 0
         self.member_id = 0
         self.client_id = ""
@@ -141,6 +145,8 @@ class Fixture:
             "{override}": self.override_id,
             "{scenario}": self.scenario_id,
             "{org_scenario}": self.org_scenario_id,
+            "{skill}": self.skill_id,
+            "{pool}": self.pool_id,
             "{role}": self.role_id,
             "{member}": self.member_id,
             "{client}": self.client_id,
@@ -271,6 +277,20 @@ async def mark(site: Site, monkeypatch: pytest.MonkeyPatch) -> Fixture:
         await post_form(site, "/admin/organisations/demo/closure/scenarios", SCENARIO),
         r"/admin/organisations/demo/closure/scenarios/(\d+)",
     )
+    async with uow.locked() as tx:  # ADR 0121: a skill and a counted pool for their pages
+        organisation = await tx.get_organisation("demo")
+        assert organisation is not None
+        skill = await tx.save_skill(
+            Scope(everything=True),
+            Skill(None, organisation.id, "intake", {"nl": "Intake", "en": "Intake"}),
+        )
+        pool = await tx.save_capacity_pool(
+            Scope(everything=True),
+            CapacityPool(
+                None, organisation.id, "Loket", PoolMode.COUNTED, frozenset({skill.id or 0})
+            ),
+        )
+        found.skill_id, found.pool_id = skill.id or 0, pool.id or 0
     closed = await post_form(site, "/admin/groups/demo/closure", CLOSURE)
     assert closed.status_code == 303, closed.text
     secret_page = await post_form(site, "/admin/api/clients", CLIENT)  # renders api_secret.html

@@ -1217,6 +1217,81 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/organisations/demo/embedding": statuses(303, 303, 403, 403, 403, 403, 403),
         "/admin/organisations/andere/embedding": statuses(303, 403, 403, 303, 403, 403, 403),
     },
+    # ADR 0121 point 11: the skill catalogue and the capacity pools (skills.manage and
+    # capacity.manage, organisation level). An allowed POST with an empty form is refused (422);
+    # an id that does not exist, or is another organisation's, answers 404 to whoever may ask.
+    "GET /admin/organisations/{org}/skills": {
+        "/admin/organisations/demo/skills": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/skills": statuses(200, 403, 403, 200, 403, 403, 403),
+        "/admin/organisations/nope/skills": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/skills": {
+        "/admin/organisations/demo/skills": statuses(422, 422, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/skills": statuses(422, 403, 403, 422, 403, 403, 403),
+    },
+    "GET /admin/organisations/{org}/skills/{skill_id}": {
+        "/admin/organisations/demo/skills/999999": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/skills/999999": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/skills/{skill_id}": {
+        "/admin/organisations/demo/skills/999999": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/skills/999999": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "GET /admin/organisations/{org}/skills/{skill_id}/archive": {
+        "/admin/organisations/demo/skills/999999/archive": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/skills/999999/archive": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/skills/{skill_id}/archive": {
+        "/admin/organisations/demo/skills/999999/archive": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/skills/999999/archive": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "GET /admin/organisations/{org}/capacity": {
+        "/admin/organisations/demo/capacity": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/capacity": statuses(200, 403, 403, 200, 403, 403, 403),
+        "/admin/organisations/nope/capacity": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/capacity": {
+        "/admin/organisations/demo/capacity": statuses(422, 422, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/capacity": statuses(422, 403, 403, 422, 403, 403, 403),
+    },
+    "GET /admin/organisations/{org}/capacity/{pool_id}": {
+        "/admin/organisations/demo/capacity/999999": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/capacity/999999": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "POST /admin/organisations/{org}/capacity/{pool_id}": {
+        "/admin/organisations/demo/capacity/999999": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/organisations/andere/capacity/999999": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "GET /admin/organisations/{org}/capacity/{pool_id}/archive": {
+        "/admin/organisations/demo/capacity/999999/archive": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/capacity/999999/archive": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/capacity/{pool_id}/archive": {
+        "/admin/organisations/demo/capacity/999999/archive": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/capacity/999999/archive": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    # The skills of a person on the staff page: skills.manage in the organisation, and the
+    # person must be one the viewer may see (staff.view); an unknown or foreign person is 404.
+    "POST /admin/staff/{member_id}/skills/{org}": {
+        "/admin/staff/999999/skills/demo": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/staff/999999/skills/andere": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
     # ADR 0085 step 4: the log destinations of the platform. The list and a destination are
     # for the superuser and the auditor (logging.view); every change is the superuser's
     # (logging.manage is locked). No destination exists, so an id answers 404 to whoever may look.

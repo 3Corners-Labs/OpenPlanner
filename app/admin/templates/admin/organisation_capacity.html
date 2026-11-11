@@ -1,0 +1,73 @@
+{#- The capacity pools of an organisation (ADR 0121): the list with what each guarantees and which flows draw on it, the count warning, and the form that adds a counted pool. -#}
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% from "admin/_skill_checkboxes.html" import skill_checkboxes with context %}
+{% block title %}{{ _("admin.capacity.title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_organisation_header.html" %}
+<h2 class="section-title">{{ _("admin.capacity.title") }}</h2>
+<p>{{ _("admin.capacity.lead") }}</p>
+<div class="alert alert--warning" role="note"><p>{{ _("admin.capacity.count_warning") }}</p></div>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% include "_error_summary.html" %}
+<section class="card" aria-labelledby="pools-heading">
+  <div class="card__header">
+    <h2 id="pools-heading">{% if archived %}{{ _("admin.capacity.archived_heading") }}{% else %}{{ _("admin.capacity.count", count=rows | length) }}{% endif %}</h2>
+    <p class="card__lead">{% if archived %}{{ _("admin.capacity.archived_lead") }}{% else %}{{ _("admin.capacity.list_lead") }}{% endif %}</p>
+  </div>
+  {% if rows %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.capacity.title") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.capacity.col.name") }}</th>
+        <th scope="col">{{ _("admin.capacity.col.mode") }}</th>
+        <th scope="col">{{ _("admin.capacity.col.skills") }}</th>
+        <th scope="col">{{ _("admin.capacity.col.flows") }}</th>
+        <th scope="col">{{ _("admin.capacity.col.actions") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <th scope="row">{{ row.name }}{% if row.legacy %}<br><span class="muted">{{ _("admin.capacity.legacy_note") }}</span>{% endif %}</th>
+        <td><span class="chip">{{ row.tag }}</span></td>
+        <td>{% if row.skills %}{{ row.skills | join(", ") }}{% else %}<span class="muted">{{ _("admin.capacity.no_skills") }}</span>{% endif %}</td>
+        <td>
+          {% if row.flows or row.hidden %}{{ row.flows | join(", ") }}{% if row.hidden %} {{ row.hidden }}{% endif %}{% else %}<span class="muted">{{ _("admin.capacity.no_flows") }}</span>{% endif %}
+        </td>
+        <td>
+          {% if row.legacy %}<span class="muted">{{ _("admin.capacity.read_only") }}</span>
+          {% elif row.archived %}<span class="chip">{{ _("admin.skills.archived_chip") }}</span>
+          {% else %}
+          <a href="/admin/organisations/{{ organisation.slug }}/capacity/{{ row.id }}">{{ _("admin.skills.edit") }}<span class="visually-hidden"> {{ row.name }}</span></a>
+          · <a href="/admin/organisations/{{ organisation.slug }}/capacity/{{ row.id }}/archive">{{ _("admin.skills.archive") }}<span class="visually-hidden"> {{ row.name }}</span></a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{% if archived %}{{ _("admin.capacity.none_archived") }}{% else %}{{ _("admin.capacity.none") }}{% endif %}</p>
+  {% endif %}
+  <p>{% if archived %}<a href="/admin/organisations/{{ organisation.slug }}/capacity">{{ _("admin.capacity.show_active") }}</a>{% else %}<a href="/admin/organisations/{{ organisation.slug }}/capacity?archived=1">{{ _("admin.capacity.show_archived") }}</a>{% endif %}</p>
+</section>
+{% if not archived %}
+<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/capacity" novalidate aria-labelledby="add-heading">
+  <div class="card__header">
+    <h2 id="add-heading">{{ _("admin.capacity.add") }}</h2>
+    <p class="card__lead">{{ _("admin.capacity.staffing_later") }}</p>
+  </div>
+  <div class="form-grid">
+    {{ field(name_field) }}
+  </div>
+  {{ skill_checkboxes(choices, choice_field, _("admin.capacity.guaranteed"), choice_error, _("admin.capacity.guaranteed_hint")) }}
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.capacity.add_button") }}</button>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,16 @@
+{#- A group of skill checkboxes named skill-<id> (one value per name, ADR 0121): a fieldset with a visible legend, an optional hint and an error linked with aria-describedby. An archived skill that is kept is marked in words. ``choices`` are SkillChoice items. -#}
+{% from "_error_message.html" import error_message %}
+{% macro skill_checkboxes(choices, id, legend, error=none, hint=none) -%}
+<fieldset class="field choice{% if error %} field--error{% endif %}" id="{{ id }}"{% if hint or error %} aria-describedby="{% if hint %}{{ id }}-hint{% endif %}{% if hint and error %} {% endif %}{% if error %}{{ id }}-error{% endif %}"{% endif %}>
+  <legend>{{ legend }}</legend>
+  {%- if hint %}
+  <p class="hint" id="{{ id }}-hint">{{ hint }}</p>
+  {%- endif %}
+  {%- for choice in choices %}
+  <div class="choice__option"><input type="checkbox" id="skill-{{ choice.id }}" name="skill-{{ choice.id }}" value="on"{% if choice.checked %} checked{% endif %}><label for="skill-{{ choice.id }}">{{ choice.label }} <span class="muted">({{ choice.code }})</span>{% if choice.archived %} <span class="chip">{{ _("admin.skills.archived_chip") }}</span>{% endif %}</label></div>
+  {%- else %}
+  <p class="empty-state">{{ _("admin.skills.none_to_choose") }}</p>
+  {%- endfor %}
+  {{ error_message(error, id ~ "-error") }}
+</fieldset>
+{%- endmacro %}

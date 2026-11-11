@@ -85,6 +85,7 @@ from app.domain.api_access import ApiAccessService
 from app.domain.branding_service import BrandingService
 from app.domain.call_retry import CallRetryService
 from app.domain.call_service import CallService
+from app.domain.capacity_service import CapacityService
 from app.domain.change_request_service import ChangePolicy, ChangeRequestService
 from app.domain.channel_service import ChannelSettingsService
 from app.domain.client_pseudonym import ClientPseudonyms
@@ -138,6 +139,7 @@ from app.domain.scenario_service import ScenarioService
 from app.domain.security_log import SecurityLog
 from app.domain.settings_service import SettingsService
 from app.domain.simulation import SimulationService
+from app.domain.skill_service import SkillService
 from app.domain.staff_directory_service import DirectorySettings, StaffDirectoryService
 from app.domain.staff_lifecycle import StaffLifecycleService
 from app.domain.staff_usage import StaffUsage
@@ -705,6 +707,8 @@ def create_app(
             allow_local=settings.environment != "prod",
         )
         app.state.holiday_service = HolidayService(uow, clock, app.state.admin_service)
+        app.state.skill_service = SkillService(uow, clock, app.state.admin_service)
+        app.state.capacity_service = CapacityService(uow, clock, app.state.admin_service)
         app.state.agenda_service = AgendaService(
             uow,
             clock,

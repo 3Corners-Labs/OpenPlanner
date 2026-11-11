@@ -1,0 +1,65 @@
+{#- The skill catalogue of an organisation (ADR 0121): the list with where each skill is used, the archived ones behind a filter, and the form that adds one. -#}
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field with context %}
+{% block title %}{{ _("admin.skills.title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_organisation_header.html" %}
+<h2 class="section-title">{{ _("admin.skills.title") }}</h2>
+<p>{{ _("admin.skills.lead") }}</p>
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% include "_error_summary.html" %}
+<section class="card" aria-labelledby="skills-heading">
+  <div class="card__header">
+    <h2 id="skills-heading">{% if archived %}{{ _("admin.skills.archived_heading") }}{% else %}{{ _("admin.skills.count", count=rows | length) }}{% endif %}</h2>
+    <p class="card__lead">{% if archived %}{{ _("admin.skills.archived_lead") }}{% else %}{{ _("admin.skills.list_lead") }}{% endif %}</p>
+  </div>
+  {% if rows %}
+  <div class="table-scroll">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.skills.title") }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ _("admin.skills.col.name") }}</th>
+        <th scope="col">{{ _("admin.skills.col.code") }}</th>
+        <th scope="col">{{ _("admin.skills.col.staff") }}</th>
+        <th scope="col">{{ _("admin.skills.col.used_by") }}</th>
+        <th scope="col">{{ _("admin.skills.col.actions") }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <th scope="row">{{ row.label }}<br><span class="muted">{{ row.other_label }}</span></th>
+        <td><code>{{ row.code }}</code></td>
+        <td>{{ row.staff }}</td>
+        <td>{{ _("admin.skills.used_by", pools=row.pools, flows=row.flows) }}</td>
+        <td>
+          {% if not row.archived %}
+          <a href="/admin/organisations/{{ organisation.slug }}/skills/{{ row.id }}">{{ _("admin.skills.edit") }}<span class="visually-hidden"> {{ row.label }}</span></a>
+          · <a href="/admin/organisations/{{ organisation.slug }}/skills/{{ row.id }}/archive">{{ _("admin.skills.archive") }}<span class="visually-hidden"> {{ row.label }}</span></a>
+          {% else %}<span class="chip">{{ _("admin.skills.archived_chip") }}</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">{% if archived %}{{ _("admin.skills.none_archived") }}{% else %}{{ _("admin.skills.none") }}{% endif %}</p>
+  {% endif %}
+  <p>{% if archived %}<a href="/admin/organisations/{{ organisation.slug }}/skills">{{ _("admin.skills.show_active") }}</a>{% else %}<a href="/admin/organisations/{{ organisation.slug }}/skills?archived=1">{{ _("admin.skills.show_archived") }}</a>{% endif %}</p>
+</section>
+{% if not archived %}
+<form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/skills" novalidate aria-labelledby="add-heading">
+  <div class="card__header">
+    <h2 id="add-heading">{{ _("admin.skills.add") }}</h2>
+  </div>
+  <div class="form-grid">
+    {% for f in fields %}{{ field(f) }}{% endfor %}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.skills.add_button") }}</button>
+  </div>
+</form>
+{% endif %}
+{% endblock %}
