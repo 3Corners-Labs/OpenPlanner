@@ -63,3 +63,18 @@ def effective_requirements(
 ) -> frozenset[int]:
     """Return what a booking needs: the flow's skills plus the chosen subject's extra ones."""
     return frozenset(flow_skills) | frozenset(subject_flow_skills)
+
+
+@dataclass(frozen=True)
+class SkillUsage:
+    """Where a skill is used, so a screen can say "used by" and refuse a careless change.
+
+    Attributes:
+        staff: Staff members who hold it.
+        pools: Capacity pools that guarantee it.
+        flows: Flows whose current revision requires it, for the flow or for a subject.
+    """
+
+    staff: int = 0
+    pools: int = 0
+    flows: int = 0

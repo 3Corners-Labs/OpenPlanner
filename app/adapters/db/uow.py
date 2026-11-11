@@ -36,6 +36,7 @@ from app.adapters.db.admin_sessions import AdminSessionQueries
 from app.adapters.db.alert_targets import AlertTargetQueries
 from app.adapters.db.api_clients import ApiClientQueries
 from app.adapters.db.call_status_rows import call_status_of
+from app.adapters.db.capacity_pools import CapacityPoolQueries
 from app.adapters.db.certificate import CertificateQueries
 from app.adapters.db.change_requests import ChangeRequestQueries
 from app.adapters.db.configuration_document import ConfigurationDocumentQueries
@@ -119,6 +120,8 @@ from app.adapters.db.routing_json import (
 )
 from app.adapters.db.scenarios import ScenarioQueries
 from app.adapters.db.scope import scope_filter
+from app.adapters.db.service_flows import ServiceFlowQueries
+from app.adapters.db.skills import SkillQueries
 from app.adapters.db.staff import StaffQueries
 from app.adapters.db.updates import UpdateQueries
 from app.adapters.db.usage import UsageQueries
@@ -492,6 +495,9 @@ class SqlTransaction(
     AdminSessionQueries,
     ProposalQueries,
     ChangeRequestQueries,
+    SkillQueries,
+    CapacityPoolQueries,
+    ServiceFlowQueries,
     AlertTargetQueries,
     ConfigurationDocumentQueries,
     HealthQueries,

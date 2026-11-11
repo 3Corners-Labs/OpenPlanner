@@ -31,6 +31,7 @@ class CapacityPool:
         mode: Legacy group pool or counted pool.
         guaranteed_skill_ids: Skills that every counted unit of the pool holds.
         archived_at: When it was archived.
+        group_id: The group a legacy group pool wraps; ``None`` for a counted pool.
     """
 
     id: int | None
@@ -39,6 +40,7 @@ class CapacityPool:
     mode: PoolMode
     guaranteed_skill_ids: frozenset[int] = field(default_factory=frozenset)
     archived_at: datetime | None = None
+    group_id: int | None = None
 
     def __post_init__(self) -> None:
         """Validate the name (``pool_name``)."""

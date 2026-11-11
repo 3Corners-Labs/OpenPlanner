@@ -33,6 +33,7 @@ from app.domain.booking import (
 from app.domain.booking_rollup import DayCount, RollableBooking
 from app.domain.branding import Branding, FontFile, FontRole, Logo
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
+from app.domain.capacity import CapacityPool
 from app.domain.change_requests import ChangeRequest
 from app.domain.channel_settings import ChannelConfig, ChannelSettings
 from app.domain.channels import ChannelKind, ReminderRule
@@ -90,6 +91,8 @@ from app.domain.scheduling import (
     ScheduleRule,
 )
 from app.domain.security_log import TOKEN_REFRESH_FAILED
+from app.domain.service_flows import FlowRevision, ServiceFlow
+from app.domain.skills import Skill
 from app.domain.slot_close import ClosedBooking, EndedSlot, EndedSlots
 from app.domain.staff import (
     GrantHolders,
@@ -105,6 +108,7 @@ from app.domain.tls import CertificateCheck
 from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
 from app.domain.usage import StaffFact, UsageFact
 from app.domain.worker_check import WorkerHeartbeat
+from tests.fakes.service_flow_store import ServiceFlowStore
 from tests.support.domain import NOW
 
 
@@ -193,10 +197,15 @@ class State:
     alert_targets: dict[int, AlertTarget] = field(default_factory=dict)
     alert_deliveries: dict[tuple[int, str], DeliveryState] = field(default_factory=dict)
     inbound: dict[Platform, InboundEvent] = field(default_factory=dict)
+    skills: dict[int, Skill] = field(default_factory=dict)
+    skill_grants: dict[tuple[int, int], tuple[int | None, datetime]] = field(default_factory=dict)
+    pools: dict[int, CapacityPool] = field(default_factory=dict)
+    flows: dict[int, ServiceFlow] = field(default_factory=dict)
+    flow_revisions: dict[tuple[int, int], FlowRevision] = field(default_factory=dict)
     next_id: int = 1
 
 
-class InMemoryTransaction:
+class InMemoryTransaction(ServiceFlowStore):
     def __init__(self, state: State) -> None:
         self.state = state
 
@@ -335,6 +344,8 @@ class InMemoryTransaction:
         if member is not None and member.status is not StaffStatus.ERASED:
             self.state.staff[subject] = member.erased(at)
             self.state.overview_layouts.pop(subject, None)
+            for grant in [g for g in self.state.skill_grants if g[0] == member.id]:
+                del self.state.skill_grants[grant]
 
     async def set_staff_seen(self, subject: str, at: datetime) -> None:
         if subject in self.state.staff:

@@ -12,6 +12,7 @@ every non-legacy revision while ``RETENTION_BUILT`` is false, so no new flow can
 
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 
 from app.domain.capacity import CapacityPool, guarantees
@@ -144,6 +145,9 @@ class FlowRevision:
         location_id: The location, needed for assigning a workstation.
         collects_email: Whether the form asks for an email address.
         legacy: Whether this is the wrapper of a pre-flow group.
+        published_at: When the revision was published (UTC), ``None`` while it is a draft; a
+            published revision never changes.
+        published_by: Staff id of whoever published it, ``None`` for a draft or the backfill.
     """
 
     flow_id: int | None
@@ -161,6 +165,8 @@ class FlowRevision:
     location_id: int | None = None
     collects_email: bool = True
     legacy: bool = False
+    published_at: datetime | None = None
+    published_by: int | None = None
 
     def __post_init__(self) -> None:
         """Validate the revision number (``revision``)."""
