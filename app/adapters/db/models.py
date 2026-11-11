@@ -1843,7 +1843,8 @@ class CapacityPoolRow(Base):
     """A capacity pool of an organisation (ADR 0121 point 6).
 
     A ``legacy_group`` pool wraps one group's present staffing (``group_id`` set, unique); a
-    ``counted`` pool belongs to the organisation alone.
+    ``counted`` pool belongs to the organisation alone and has a stable ``code`` (NULL only for a
+    legacy pool, and for a counted one written by an image from before migration 0110).
     """
 
     __tablename__ = "capacity_pools"
@@ -1856,11 +1857,19 @@ class CapacityPoolRow(Base):
         ForeignKey("groups.id", ondelete="CASCADE"), unique=True
     )
     archived_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    code: Mapped[str | None] = mapped_column(String(40))
 
     __table_args__ = (
         CheckConstraint("mode IN ('legacy_group', 'counted')", name="mode"),
         CheckConstraint("(mode = 'legacy_group') = (group_id IS NOT NULL)", name="group_mode"),
         Index("ix_capacity_pools_organisation_id", "organisation_id"),
+        Index(
+            "uq_capacity_pools_organisation_id_code",
+            "organisation_id",
+            "code",
+            unique=True,
+            sqlite_where=text("code IS NOT NULL"),
+        ),
     )
 
 

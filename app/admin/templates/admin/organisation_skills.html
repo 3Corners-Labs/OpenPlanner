@@ -101,6 +101,7 @@
     <thead>
       <tr>
         <th scope="col">{{ _("admin.capacity.col.name") }}</th>
+        <th scope="col">{{ _("admin.capacity.col.code") }}</th>
         <th scope="col">{{ _("admin.capacity.col.mode") }}</th>
         <th scope="col">{{ _("admin.capacity.col.skills") }}</th>
         <th scope="col">{{ _("admin.capacity.col.flows") }}</th>
@@ -111,6 +112,7 @@
       {% for row in pool_rows %}
       <tr>
         <th scope="row">{{ row.name }}{% if row.legacy %}<br><span class="muted">{{ _("admin.capacity.legacy_note") }}</span>{% endif %}</th>
+        <td>{% if row.code %}<code>{{ row.code }}</code>{% endif %}</td>
         <td><span class="chip">{{ row.tag }}</span></td>
         <td>{% if row.skills %}{{ row.skills | join(", ") }}{% else %}<span class="muted">{{ _("admin.capacity.no_skills") }}</span>{% endif %}</td>
         <td>
@@ -144,7 +146,7 @@
     <p class="card__lead">{{ _("admin.capacity.staffing_later") }}</p>
   </div>
   <div class="form-grid">
-    {{ field(pool_name_field) }}
+    {% for f in pool_fields %}{{ field(f) }}{% endfor %}
   </div>
   {{ skill_checkboxes(pool_choices, choice_field, _("admin.capacity.guaranteed"), choice_error, _("admin.capacity.guaranteed_hint")) }}
   <div class="form-actions">

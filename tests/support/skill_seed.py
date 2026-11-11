@@ -6,6 +6,7 @@ services are the application's own (``app.state``), so every rule and audit even
 the superuser.
 """
 
+from app.domain.capacity import derive_pool_code
 from app.domain.capacity_service import CapacityService
 from app.domain.skill_service import SkillService
 from tests.admin.conftest import SUPER, Site
@@ -35,9 +36,15 @@ async def add_pool(
     name: str = "Loket",
     skills: tuple[int, ...] = (),
     organisation: str = "demo",
+    code: str = "",
 ) -> int:
-    """Add a counted pool to ``organisation``, guaranteeing ``skills``, and return its id."""
-    pool = await site_app(site).state.capacity_service.create(SUPER, organisation, name, skills)
+    """Add a counted pool to ``organisation``, guaranteeing ``skills``, and return its id.
+
+    The code is the name's (``derive_pool_code``) unless given.
+    """
+    pool = await site_app(site).state.capacity_service.create(
+        SUPER, organisation, code or derive_pool_code(name), name, skills
+    )
     assert pool.id is not None
     return int(pool.id)
 

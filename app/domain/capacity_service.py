@@ -4,7 +4,7 @@ A *legacy* pool wraps one service's present staffing and is only shown; a *count
 kept here: a name and the skills every counted unit holds. How many units work per time block
 is not set here yet (it arrives with interval accounting). Every operation asks the matrix
 first (``AdminService.scoped``); every change runs in one locked transaction with its audit
-event, carrying the pool's number and never a name. Reading the pools is ``organisation.view``
+event, carrying the pool's code and never a name. Reading the pools is ``organisation.view``
 (a legacy pool only for a reader who reaches its service); every change, and the pages that edit
 one pool, are ``capacity.manage``.
 
@@ -13,7 +13,7 @@ one pool, are ``capacity.manage``.
     form       capacity.manage     a pool's form (``None``: a new one) with the skills to choose
     create     capacity.manage     a counted pool: name and guaranteed skills; at most
                                    ``max_capacity_pools_per_organisation`` counted, not archived
-    update     capacity.manage     name and guaranteed skills of a counted pool
+    update     capacity.manage     name and guaranteed skills of a counted pool (code is fixed)
     archive    capacity.manage     refused while a flow draws on it
 """
 
@@ -219,27 +219,37 @@ class CapacityService:
         return PoolEdit(organisation, line, tuple(choices))
 
     async def create(
-        self, principal: Principal, slug: str, name: str, skill_ids: Collection[int]
+        self,
+        principal: Principal,
+        slug: str,
+        code: str,
+        name: str,
+        skill_ids: Collection[int],
     ) -> CapacityPool:
         """Add a counted pool.
 
         Raises:
             DomainError: ``not_permitted``, ``organisation_not_found``, ``invalid_configuration``
-                (``pool_name``, or ``pool_limit`` when the organisation has as many counted
-                pools not archived as the platform allows) or, for ``guaranteed_skill_ids``,
+                (``pool_code``, ``pool_name``, or ``pool_limit`` when the organisation has as many
+                counted pools not archived as the platform allows) or, for ``guaranteed_skill_ids``,
                 ``configuration_object_missing``, ``configuration_out_of_scope`` and
-                ``invalid_configuration``.
+                ``invalid_configuration``; ``slug_taken`` for a code or a name already used.
         """
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.locked() as tx:
             organisation = await organisation_by_slug(tx, slug)
             pool = CapacityPool(
-                None, organisation.id, name.strip(), PoolMode.COUNTED, frozenset(skill_ids)
+                None,
+                organisation.id,
+                name.strip(),
+                PoolMode.COUNTED,
+                frozenset(skill_ids),
+                code=code.strip(),
             )
             if await _counted(tx, scope, organisation.id) >= value_of(self._max):
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, LIMIT_FIELD)
             stored = await tx.save_capacity_pool(scope, pool)
-            await self._record(tx, principal, slug, f"{CREATED},pool:{stored.id}")
+            await self._record(tx, principal, slug, f"{CREATED},pool:{stored.code}")
         return stored
 
     async def update(
@@ -264,11 +274,12 @@ class CapacityService:
                 frozenset(skill_ids),
                 current.archived_at,
                 current.group_id,
+                current.code,
             )
             if changed == current:
                 return False
             await tx.save_capacity_pool(scope, changed)
-            await self._record(tx, principal, slug, f"{CHANGED},pool:{pool_id}")
+            await self._record(tx, principal, slug, f"{CHANGED},pool:{current.code}")
         return True
 
     async def archive(self, principal: Principal, slug: str, pool_id: int) -> None:
@@ -288,7 +299,7 @@ class CapacityService:
                 return
             now = self._clock.now()
             await tx.archive_capacity_pool(scope, pool_id, now)
-            await self._record(tx, principal, slug, f"{ARCHIVED},pool:{pool_id}", now)
+            await self._record(tx, principal, slug, f"{ARCHIVED},pool:{pool.code}", now)
 
     async def _record(
         self,
@@ -298,7 +309,7 @@ class CapacityService:
         detail: str,
         at: datetime | None = None,
     ) -> None:
-        """Audit a change of the pools in the transaction that made it (numbers only)."""
+        """Audit a change of the pools in the transaction that made it (codes only)."""
         await record_change(tx, at or self._clock.now(), principal, _PERMISSION, slug, None, detail)
 
 

@@ -175,7 +175,8 @@ async def add_pool(world: World, name: str = "Loket", skills: frozenset[int] = f
     """Store a counted pool of Acme and return it."""
     async with world.uow.locked() as tx:
         return await tx.save_capacity_pool(
-            EVERYTHING, CapacityPool(None, world.acme, name, PoolMode.COUNTED, skills)
+            EVERYTHING,
+            CapacityPool(None, world.acme, name, PoolMode.COUNTED, skills, code=name.lower()),
         )
 
 
@@ -622,6 +623,64 @@ async def test_a_pool_keeps_its_guaranteed_skills_and_replaces_them_on_update(wo
     assert (found.name, found.guaranteed_skill_ids) == ("Kantoor", frozenset({two.id}))
 
 
+async def test_a_counted_pool_has_a_code_that_is_unique_per_organisation_and_fixed(
+    world: World,
+) -> None:
+    pool = await add_pool(world, "Loket")
+    assert pool.code == "loket"
+
+    async def save(candidate: CapacityPool) -> CapacityPool:
+        async with world.uow.locked() as tx:
+            return await tx.save_capacity_pool(EVERYTHING, candidate)
+
+    with refused(ErrorCode.SLUG_TAKEN, "pool_code"):
+        await save(CapacityPool(None, world.acme, "Anders", PoolMode.COUNTED, code="loket"))
+    other = await save(CapacityPool(None, world.beta, "Loket", PoolMode.COUNTED, code="loket"))
+    assert other.code == "loket"  # another organisation may use the same code and name
+    with refused(ErrorCode.INVALID_CONFIGURATION, "pool_code"):  # fixed after creation
+        await save(replace(pool, code="anders"))
+    renamed = await save(replace(pool, name="Kantoor"))
+    assert (renamed.code, renamed.name) == ("loket", "Kantoor")
+    await world.archive_pool_directly(pool.id or 0)
+    with refused(ErrorCode.SLUG_TAKEN, "pool_code"):  # an archived pool keeps its code
+        await save(CapacityPool(None, world.acme, "Nieuw", PoolMode.COUNTED, code="loket"))
+
+
+async def test_a_counted_pool_name_is_unique_among_pools_not_archived(world: World) -> None:
+    first = await add_pool(world, "Loket")
+    assert first.id is not None
+
+    async def save(candidate: CapacityPool) -> CapacityPool:
+        async with world.uow.locked() as tx:
+            return await tx.save_capacity_pool(EVERYTHING, candidate)
+
+    def named(name: str, code: str) -> CapacityPool:
+        return CapacityPool(None, world.acme, name, PoolMode.COUNTED, code=code)
+
+    with refused(ErrorCode.SLUG_TAKEN, "pool_name"):
+        await save(named("  LOKET ", "tweede"))
+    second = await save(named("Spreekuur", "spreekuur"))
+    with refused(ErrorCode.SLUG_TAKEN, "pool_name"):  # a rename onto another pool's name
+        await save(replace(second, name="loket"))
+    await save(replace(second, name="Spreekuur"))  # an unchanged name is not a clash
+    await world.archive_pool_directly(first.id)
+    again = await save(named("Loket", "loket-2"))  # an archived pool's name is free again
+    assert again.name == "Loket"
+    await save(CapacityPool(None, world.beta, "Loket", PoolMode.COUNTED, code="loket"))
+
+
+async def test_a_legacy_pool_has_no_code_and_may_share_a_name(world: World) -> None:
+    await add_pool(world, "Balie")
+    async with world.uow.locked() as tx:
+        legacy = await tx.save_capacity_pool(
+            EVERYTHING,
+            CapacityPool(
+                None, world.acme, "Balie", PoolMode.LEGACY_GROUP, group_id=world.acme_group
+            ),
+        )
+    assert legacy.code is None
+
+
 async def test_a_pool_guarantees_only_own_unarchived_skills(world: World) -> None:
     other = await add_skill(world, organisation="beta")
     old = await add_skill(world, "old")
@@ -660,7 +719,7 @@ async def test_a_legacy_group_pool_wraps_one_group_of_its_organisation(world: Wo
     with refused(ErrorCode.INVALID_CONFIGURATION, "mode"):  # mode and group never change
         async with world.uow.locked() as tx:
             await tx.save_capacity_pool(
-                EVERYTHING, replace(pool, mode=PoolMode.COUNTED, group_id=None)
+                EVERYTHING, replace(pool, mode=PoolMode.COUNTED, group_id=None, code="balie")
             )
 
 
@@ -1122,7 +1181,7 @@ async def test_a_flow_draws_only_on_its_organisations_pool_and_skills(world: Wor
     other_skill = await add_skill(world, organisation="beta")
     async with world.uow.locked() as tx:
         other_pool = await tx.save_capacity_pool(
-            EVERYTHING, CapacityPool(None, world.beta, "Elders", PoolMode.COUNTED)
+            EVERYTHING, CapacityPool(None, world.beta, "Elders", PoolMode.COUNTED, code="elders")
         )
     assert other_skill.id is not None
     assert other_pool.id is not None

@@ -15,7 +15,7 @@
     <p class="card__lead">{{ _("admin.capacity.staffing_later") }}</p>
   </div>
   <div class="form-grid">
-    {{ field(name_field) }}
+    {% for f in fields %}{{ field(f) }}{% endfor %}
   </div>
   {{ skill_checkboxes(choices, choice_field, _("admin.capacity.guaranteed"), choice_error, _("admin.capacity.guaranteed_hint")) }}
   <p>{% if row.flows or row.hidden %}{{ _("admin.capacity.col.flows") }}: {{ row.flows | join(", ") }}{% if row.hidden %} {{ row.hidden }}{% endif %}{% else %}{{ _("admin.capacity.no_flows") }}{% endif %}</p>

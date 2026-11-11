@@ -49,6 +49,7 @@ None in step 1: it changes labels only. The later steps add the following, each 
 | 2c | Screens: skill catalogue, capacity pools, skill grants on staff | #743 | merged |
 | 2d | Screens: flows tab and flow editor (draft and validate) | | planned |
 | 2e | A service created later, by the portal or by a configuration import, and a service that starts offering the direct call get their legacy pool and default flows from one domain rule; an idempotent repair covers services created by an older image during a rollback | | planned |
+| 2f | A stable code for a capacity pool (migration 0110), unique pool names per organisation | #PRNUM | merged |
 | 3 | P3: one flow resolver for page, widget, API and admin; interval accounting; new-pool admission | | planned |
 | 4 | P4: skill enforcement in the locked claim; pool guarantees; external skill mapping | | planned |
 | 5 | P5: generic request execution without video, optional contact data, watchdog and deletion | | planned |

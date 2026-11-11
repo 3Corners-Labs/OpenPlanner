@@ -12405,6 +12405,12 @@ msgstr "Uw organisatie heeft het maximale aantal vaardigheden bereikt. Archiveer
 msgid "admin.capacity.error.limit"
 msgstr "Uw organisatie heeft het maximale aantal capaciteitspools bereikt. Archiveer eerst een pool die u niet meer gebruikt."
 
+msgid "admin.capacity.error.code_taken"
+msgstr "Deze code is al in gebruik bij een pool van uw organisatie. Kies een andere."
+
+msgid "admin.capacity.error.name_taken"
+msgstr "Een andere pool van uw organisatie heeft al deze naam. Kies een andere naam."
+
 msgid "admin.skills.limit_reached"
 msgstr "Het maximum van {count} vaardigheden is bereikt. Archiveer een vaardigheid die u niet meer gebruikt om een nieuwe toe te voegen."
 
@@ -12437,6 +12443,9 @@ msgstr "Een gearchiveerde pool is door geen flow nieuw te kiezen."
 
 msgid "admin.capacity.col.name"
 msgstr "Naam"
+
+msgid "admin.capacity.col.code"
+msgstr "Code"
 
 msgid "admin.capacity.col.mode"
 msgstr "Soort"
@@ -12488,6 +12497,15 @@ msgstr "Pool toevoegen"
 
 msgid "admin.capacity.name"
 msgstr "Naam van de pool"
+
+msgid "admin.capacity.code"
+msgstr "Code"
+
+msgid "admin.capacity.code_hint"
+msgstr "Kleine letters, cijfers en streepjes, bijvoorbeeld loket of juridisch-team (hoogstens 40 tekens). De code kunt u later niet meer wijzigen."
+
+msgid "admin.capacity.code_fixed"
+msgstr "De code ligt vast."
 
 msgid "admin.capacity.guaranteed"
 msgstr "Vaardigheden die iedere getelde medewerker heeft"
@@ -12560,6 +12578,9 @@ msgstr "Vul de naam in het Nederlands en in het Engels in (elk hoogstens 80 teke
 
 msgid "admin.form.error.pool_name"
 msgstr "Vul een naam in van hoogstens 80 tekens, zonder stuurtekens."
+
+msgid "admin.form.error.pool_code"
+msgstr "Gebruik alleen kleine letters, cijfers en streepjes, beginnend met een letter of cijfer (hoogstens 40 tekens)."
 
 msgid "admin.audit.detail.skill_created"
 msgstr "Vaardigheid toegevoegd"

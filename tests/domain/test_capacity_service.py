@@ -58,7 +58,7 @@ async def test_a_refusal_is_audited_and_changes_nothing(
 ) -> None:
     for who in (GROUP_ADMIN, OUTSIDER, AUDITOR):
         with pytest.raises(DomainError) as refused:
-            await service.create(who, "demo", "Loket", set())
+            await service.create(who, "demo", "loket", "Loket", set())
         assert refused.value.code is ErrorCode.NOT_PERMITTED
     with pytest.raises(DomainError):
         await service.overview(GROUP_ADMIN, "demo")
@@ -70,7 +70,7 @@ async def test_a_refusal_is_audited_and_changes_nothing(
 async def test_the_overview_is_read_under_organisation_view_and_says_who_may_change(
     service: CapacityService,
 ) -> None:
-    await service.create(ORG_ADMIN, "demo", "Loket", set())
+    await service.create(ORG_ADMIN, "demo", "loket", "Loket", set())
 
     seen = await service.overview(AUDITOR, "demo")
     own = await service.overview(ORG_ADMIN, "demo")
@@ -85,7 +85,7 @@ async def test_changes_are_audited_by_pool_number_and_an_equal_save_writes_nothi
     service: CapacityService, uow: InMemoryUnitOfWork
 ) -> None:
     passport = await skill(uow)
-    pool = await service.create(ORG_ADMIN, "demo", " Loket ", {passport})
+    pool = await service.create(ORG_ADMIN, "demo", "loket", " Loket ", {passport})
     assert pool.id is not None
     assert await service.update(ORG_ADMIN, "demo", pool.id, "Loket", {passport}) is False
     assert await service.update(ORG_ADMIN, "demo", pool.id, "Spreekuur", {passport}) is True
@@ -93,9 +93,9 @@ async def test_changes_are_audited_by_pool_number_and_an_equal_save_writes_nothi
     await service.archive(ORG_ADMIN, "demo", pool.id)
 
     assert details(uow)[1:] == [
-        f"capacity_pool.created,pool:{pool.id}",
-        f"capacity_pool.changed,pool:{pool.id}",
-        f"capacity_pool.archived,pool:{pool.id}",
+        "capacity_pool.created,pool:loket",
+        "capacity_pool.changed,pool:loket",
+        "capacity_pool.archived,pool:loket",
     ]
     assert all("Spreekuur" not in d for d in details(uow))
 
@@ -103,7 +103,7 @@ async def test_changes_are_audited_by_pool_number_and_an_equal_save_writes_nothi
 async def test_an_archived_pool_has_no_form_and_cannot_be_changed(
     service: CapacityService,
 ) -> None:
-    pool = await service.create(ORG_ADMIN, "demo", "Loket", set())
+    pool = await service.create(ORG_ADMIN, "demo", "loket", "Loket", set())
     assert pool.id is not None
     await service.archive(ORG_ADMIN, "demo", pool.id)
 
@@ -143,15 +143,15 @@ async def test_the_limit_counts_counted_pools_not_archived_and_not_legacy_ones(
     service: CapacityService, uow: InMemoryUnitOfWork
 ) -> None:
     await legacy(uow)
-    first = await service.create(ORG_ADMIN, "demo", "Een", set())
-    await service.create(ORG_ADMIN, "demo", "Twee", set())
+    first = await service.create(ORG_ADMIN, "demo", "een", "Een", set())
+    await service.create(ORG_ADMIN, "demo", "twee", "Twee", set())
 
     with pytest.raises(DomainError) as refused:
-        await service.create(ORG_ADMIN, "demo", "Drie", set())
+        await service.create(ORG_ADMIN, "demo", "drie", "Drie", set())
     full = await service.overview(ORG_ADMIN, "demo")
     assert first.id is not None
     await service.archive(ORG_ADMIN, "demo", first.id)
-    await service.create(ORG_ADMIN, "demo", "Drie", set())
+    await service.create(ORG_ADMIN, "demo", "drie", "Drie", set())
 
     assert (refused.value.code, refused.value.field) == (
         ErrorCode.INVALID_CONFIGURATION,
@@ -164,11 +164,11 @@ async def test_a_pool_takes_only_own_skills_and_another_organisations_pool_is_mi
     service: CapacityService, uow: InMemoryUnitOfWork
 ) -> None:
     theirs_skill = await skill(uow, "theirs", "andere")
-    theirs = await service.create(SUPER, "andere", "Hun", set())
+    theirs = await service.create(SUPER, "andere", "hun", "Hun", set())
     assert theirs.id is not None
 
     with pytest.raises(DomainError) as foreign_skill:
-        await service.create(ORG_ADMIN, "demo", "Loket", {theirs_skill})
+        await service.create(ORG_ADMIN, "demo", "loket", "Loket", {theirs_skill})
     for call in (
         service.edit(ORG_ADMIN, "demo", theirs.id),
         service.update(ORG_ADMIN, "demo", theirs.id, "x", set()),
@@ -179,3 +179,26 @@ async def test_a_pool_takes_only_own_skills_and_another_organisations_pool_is_mi
         assert refused.value.code is ErrorCode.CONFIGURATION_OBJECT_MISSING
 
     assert foreign_skill.value.field == "guaranteed_skill_ids"
+
+
+async def test_a_pool_code_is_required_unique_fixed_and_audited_instead_of_the_number(
+    service: CapacityService, uow: InMemoryUnitOfWork
+) -> None:
+    first = await service.create(ORG_ADMIN, "demo", " eerste ", "Eerste", set())
+    assert first.code == "eerste"
+    assert first.id is not None
+
+    for code, name, field in (
+        ("", "Zonder", "pool_code"),
+        ("Hoofdletter", "Hoofd", "pool_code"),
+        ("eerste", "Tweede", "pool_code"),
+        ("tweede", " EERSTE ", "pool_name"),
+    ):
+        with pytest.raises(DomainError) as refused:
+            await service.create(ORG_ADMIN, "demo", code, name, set())
+        assert refused.value.field == field
+    assert (await service.page(ORG_ADMIN, "demo", first.id)).line.pool.code == "eerste"
+    await service.update(ORG_ADMIN, "demo", first.id, "Hernoemd", set())  # the code stays
+    assert (await service.page(ORG_ADMIN, "demo", first.id)).line.pool.code == "eerste"
+    assert details(uow)[-1] == "capacity_pool.changed,pool:eerste"
+    assert all(f"pool:{first.id}" != d.split(",")[-1] for d in details(uow))

@@ -7,7 +7,7 @@ import httpx
 
 from app.admin.capacity_views import flow_name, hidden_flows
 from app.domain.authorization import Scope
-from app.domain.capacity import CapacityPool, PoolMode
+from app.domain.capacity import CapacityPool, PoolMode, derive_pool_code
 from app.domain.capacity_service import FlowRef
 from app.domain.service_flows import FlowState
 from app.i18n import Translator, load_catalogues
@@ -28,7 +28,11 @@ async def create(
     site: Site, name: str = "Loket", skills: tuple[int, ...] = (), page: str = PAGE
 ) -> httpx.Response:
     """Post the form that adds a counted pool, ticking ``skills``."""
-    data = {"pool_name": name, **{f"skill-{i}": "on" for i in skills}}
+    data = {
+        "pool_code": derive_pool_code(name),
+        "pool_name": name,
+        **{f"skill-{i}": "on" for i in skills},
+    }
     return await site.client.post(page, data=data, headers=SAME_ORIGIN)
 
 
@@ -79,7 +83,7 @@ async def test_a_counted_pool_is_added_with_its_skills_listed_and_audited(site: 
     assert "Hoeveel medewerkers per tijdblok in een pool werken" in page
     assert 'name="staffing' not in page
     details = [e.detail for e in await audit_log(site) if e.action == "capacity.manage"]
-    assert re.fullmatch(r"capacity_pool\.created,pool:\d+", details[0])
+    assert re.fullmatch(r"capacity_pool\.created,pool:loket", details[0])
 
 
 async def test_the_page_speaks_english(site: Site) -> None:
@@ -191,7 +195,7 @@ async def test_an_unused_pool_is_archived_after_the_confirmation_page(site: Site
     assert ADD_POOL_FORM not in archived  # no add form on the archived view
     assert 'name="pool_name"' not in archived
     details = [e.detail for e in await audit_log(site) if e.action == "capacity.manage"]
-    assert details[-1] == f"capacity_pool.archived,pool:{pool}"
+    assert details[-1] == "capacity_pool.archived,pool:loket"
 
 
 async def test_an_archived_pool_has_no_edit_or_archive_page(site: Site) -> None:
@@ -333,7 +337,7 @@ async def test_a_crafted_checkbox_name_is_ignored_and_never_a_server_error(site:
     crafted = {name: "on" for name in ("skill-\u00b2", "skill-\u0663", "skill--1", "skill-")}
 
     created = await site.client.post(
-        PAGE, data={"pool_name": "Loket", **crafted}, headers=SAME_ORIGIN
+        PAGE, data={"pool_code": "nieuw", "pool_name": "Nieuw", **crafted}, headers=SAME_ORIGIN
     )
     saved = await site.client.post(
         f"{PAGE}/{pool}", data={"pool_name": "Spreekuur", **crafted}, headers=SAME_ORIGIN
@@ -358,3 +362,61 @@ async def test_an_archived_skill_a_pool_holds_is_saved_unchanged_at_the_skill_li
 
     assert saved.status_code == 303
     assert "done=unchanged" in saved.headers["location"]
+
+
+async def test_a_pool_is_added_with_a_code_that_is_listed_and_read_only_afterwards(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+
+    form = (await site.client.get(LIST)).text
+    created = await create(site, "Eerste Loket")
+    pool = await add_pool(site, "Tweede")
+    page = (await site.client.get(LIST)).text
+    edit = (await site.client.get(f"{PAGE}/{pool}")).text
+    saved = await site.client.post(
+        f"{PAGE}/{pool}",
+        data={"pool_code": "gewijzigd", "pool_name": "Tweede loket"},
+        headers=SAME_ORIGIN,
+    )
+
+    assert 'name="pool_code"' in form
+    assert created.status_code == 303
+    assert "<code>eerste-loket</code>" in page
+    assert "<code>tweede</code>" in page
+    assert 'value="tweede"' in edit.split('name="pool_code"')[1].split(">")[0]
+    assert "readonly" in edit.split('name="pool_code"')[1].split(">")[0]
+    assert saved.status_code == 303  # the posted code is ignored: the code is fixed
+    details = [e.detail for e in await audit_log(site) if e.action == "capacity.manage"]
+    assert details[-1] == "capacity_pool.changed,pool:tweede"
+    assert "<code>tweede</code>" in (await site.client.get(LIST)).text
+
+
+async def test_a_blank_invalid_or_taken_code_and_a_taken_name_are_refused(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    await add_pool(site, "Loket")
+
+    async def post(code: str, name: str, lang: str = "nl") -> httpx.Response:
+        return await site.client.post(
+            PAGE,
+            params={"lang": lang},
+            data={"pool_code": code, "pool_name": name},
+            headers=SAME_ORIGIN,
+        )
+
+    blank = await post("", "Nieuw")
+    invalid = await post("Hoofd Letter", "Nieuw")
+    taken = await post("loket", "Nieuw")
+    same_name = await post("nieuw", " LOKET ")
+    english = await post("loket", "Nieuw", "en")
+
+    for refused in (blank, invalid, taken):
+        assert refused.status_code == 422
+        assert 'href="#pool_code"' in refused.text
+        assert 'aria-describedby="pool_code-hint pool_code-error"' in refused.text
+    assert "Gebruik alleen kleine letters" in blank.text
+    assert "Deze code is al in gebruik bij een pool van uw organisatie." in taken.text
+    assert same_name.status_code == 422
+    assert 'href="#pool_name"' in same_name.text
+    assert "Een andere pool van uw organisatie heeft al deze naam." in same_name.text
+    assert "This code is already used by a pool of your organisation." in english.text
