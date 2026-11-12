@@ -1955,8 +1955,9 @@ fieldset.card {
 }
 
 /* A table in its scroll region keeps room for its columns instead of squeezing a word to a
-   letter per line: on a narrow screen it scrolls inside its region (WCAG 1.4.10). */
-.admin .table-scroll > .data-table {
+   letter per line: on a narrow screen it scrolls inside its region (WCAG 1.4.10). Only a region
+   the keyboard can reach (`tabindex`) may scroll, so only those keep the room. */
+.admin .table-scroll[tabindex] > .data-table {
   min-width: 34rem;
 }
 
