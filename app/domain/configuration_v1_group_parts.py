@@ -70,7 +70,7 @@ def clock_text(value: time) -> str:
     return value.isoformat(timespec="minutes" if value.second == 0 else "seconds")
 
 
-def _window(item: Mapping[str, Json]) -> TimeWindow:
+def window_of(item: Mapping[str, Json]) -> TimeWindow:
     """Build the staffing block of a rule or an exception item."""
     return TimeWindow(
         clock_of(item["opens"], "opens"),
@@ -82,18 +82,18 @@ def _window(item: Mapping[str, Json]) -> TimeWindow:
     )
 
 
-def _rule(item: Mapping[str, Json]) -> ScheduleRule:
+def rule_of(item: Mapping[str, Json]) -> ScheduleRule:
     """Build a weekly staffing rule from its item."""
     start, end = item.get("valid_from"), item.get("valid_to")
     return ScheduleRule(
         int(cast("int", item["weekday"])),
-        _window(item),
+        window_of(item),
         None if start is None else day_of(start, "valid_from"),
         None if end is None else day_of(end, "valid_to"),
     )
 
 
-def _override(item: Mapping[str, Json]) -> ScheduleOverride:
+def override_of(item: Mapping[str, Json]) -> ScheduleOverride:
     """Build an exception from its item: all three of opens, closes and capacity, or none."""
     day = day_of(item["day"], "day")
     parts = (item.get("opens"), item.get("closes"), item.get("capacity"))
@@ -101,7 +101,7 @@ def _override(item: Mapping[str, Json]) -> ScheduleOverride:
         return ScheduleOverride(day, None)
     if any(part is None for part in parts):
         raise invalid("window")
-    return ScheduleOverride(day, _window(item))
+    return ScheduleOverride(day, window_of(item))
 
 
 def rule_json(rule: ScheduleRule) -> dict[str, Json]:
@@ -142,8 +142,8 @@ def schedule_of(
     Raises:
         DomainError: ``invalid_configuration`` naming the offending part of an item.
     """
-    rules = [_rule(item) for item in items_of(fields.get("schedule_rules"))]
-    overrides = [_override(item) for item in items_of(fields.get("schedule_overrides"))]
+    rules = [rule_of(item) for item in items_of(fields.get("schedule_rules"))]
+    overrides = [override_of(item) for item in items_of(fields.get("schedule_overrides"))]
     return rules, overrides
 
 

@@ -276,3 +276,48 @@ class PoolStaffingQueries(CapacityPoolQueries):
             .order_by(SlotRow.start, RescheduleProposalRow.id)
         )
         return found + [Commitment(("proposal", i), s, u) for i, s, u in held if u is not None]
+
+
+async def read_all_pool_staffing(
+    session: AsyncSession,
+) -> dict[int, tuple[list[ScheduleRule], list[ScheduleOverride]]]:
+    """Return the blocks and exceptions of every pool by pool id, for the configuration export.
+
+    No scope: the export reads the whole installation, as ``read_catalogue`` does, and the
+    document service has decided what the caller may export.
+    """
+    found: dict[int, tuple[list[ScheduleRule], list[ScheduleOverride]]] = {}
+    for rule_row in await session.scalars(
+        select(PoolStaffingRuleRow).order_by(PoolStaffingRuleRow.id)
+    ):
+        found.setdefault(rule_row.pool_id, ([], []))[0].append(_rule(rule_row))
+    for override_row in await session.scalars(
+        select(PoolStaffingOverrideRow).order_by(PoolStaffingOverrideRow.id)
+    ):
+        found.setdefault(override_row.pool_id, ([], []))[1].append(_override(override_row))
+    return found
+
+
+async def replace_pool_staffing(
+    session: AsyncSession,
+    pool_id: int,
+    rules: list[ScheduleRule] | None,
+    overrides: list[ScheduleOverride] | None,
+) -> None:
+    """Replace a pool's weekly blocks and/or exceptions as a whole; ``None`` leaves that part.
+
+    For the configuration import, which has found the pool by its code inside the organisation
+    the document names. The caller has checked the blocks with ``check_pool_staffing``.
+    """
+    if rules is not None:
+        await session.execute(
+            delete(PoolStaffingRuleRow).where(PoolStaffingRuleRow.pool_id == pool_id)
+        )
+        session.add_all(PoolStaffingRuleRow(pool_id=pool_id, **_rule_columns(r)) for r in rules)
+    if overrides is not None:
+        await session.execute(
+            delete(PoolStaffingOverrideRow).where(PoolStaffingOverrideRow.pool_id == pool_id)
+        )
+        session.add_all(
+            PoolStaffingOverrideRow(pool_id=pool_id, **_override_columns(o)) for o in overrides
+        )

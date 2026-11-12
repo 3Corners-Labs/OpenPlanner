@@ -2,7 +2,7 @@
 
 import json
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -10,9 +10,6 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-from app.adapters.configuration_json import JsonCodec
-from app.adapters.configuration_seal import PassphraseSealing
-from app.adapters.crypto import SecretBox
 from app.adapters.db.config_flows import order_flow_changes, write_flow_revision
 from app.adapters.db.config_usage import read_usage
 from app.adapters.db.engine import create_engine
@@ -34,14 +31,12 @@ from app.adapters.db.models import (
 )
 from app.adapters.db.service_flows import delete_flow_row
 from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.admin import AdminService
-from app.domain.configuration_changes import ChangeAction, RuleContext
+from app.domain.configuration_changes import ChangeAction
 from app.domain.configuration_document import Scope
-from app.domain.configuration_document_service import Actor, ConfigurationDocumentService
 from app.domain.errors import DomainError, ErrorCode
-from tests.fakes.clock import FixedClock
 from tests.support.config_changes import planned
 from tests.support.config_seed import give_default_flows, seed
+from tests.support.config_service import CLOCK, HOST, NOW, PASSPHRASE, export, service, transfer
 from tests.support.database import migrated_database
 from tests.support.flow_documents import (
     encode,
@@ -51,45 +46,8 @@ from tests.support.flow_documents import (
     revision_json,
 )
 
-NOW = datetime(2026, 11, 8, 12, 0, tzinfo=UTC)
-CLOCK = NOW + timedelta(days=1)
-"""What the service takes for now: after every revision that the seed publishes."""
-HOST = Actor.host()
-PASSPHRASE = "a long enough passphrase"
 LABELS = json.dumps({"nl": "Balie", "en": "Desk"})
 STAFF_NAME, STAFF_MAIL = "Jan Jansen", "jan@voorbeeld.nl"
-
-
-def service(engine: AsyncEngine, key: bytes = b"a") -> ConfigurationDocumentService:
-    clock = FixedClock(CLOCK)
-    uow = SqlUnitOfWork(engine, SecretBox(key * 32))
-    return ConfigurationDocumentService(
-        uow,
-        clock,
-        AdminService(uow, clock),
-        JsonCodec(),
-        PassphraseSealing(),
-        installation="test",
-        app_version="0.0.0",
-        context=lambda: RuleContext(),
-        locked=lambda: frozenset(),
-        max_bytes=lambda: 8 * 1024 * 1024,
-        max_changes=lambda: 500,
-        plaintext_export=lambda: True,
-    )
-
-
-async def export(engine: AsyncEngine) -> dict[str, Any]:
-    exported: dict[str, Any] = json.loads(
-        await service(engine).export(HOST, Scope(), None, secrets=False)
-    )
-    return exported
-
-
-async def transfer(source: AsyncEngine, target: AsyncEngine) -> Any:
-    """Export the source with its secrets sealed and apply it to the target (another key)."""
-    sealed = await service(source).export(HOST, Scope(), PASSPHRASE, secrets=True)
-    return await service(target, b"b").apply(HOST, sealed, PASSPHRASE, None)
 
 
 async def seed_flows(engine: AsyncEngine) -> None:
@@ -530,7 +488,8 @@ async def test_no_staff_identity_and_no_grant_is_in_the_document(source: AsyncEn
     assert STAFF_NAME.encode() not in exported
     assert STAFF_MAIL.encode() not in exported
     assert b"published_by" not in exported
-    assert b"staff" not in exported
+    # "staffing" (ADR 0122 step 3, a pool's weekly blocks) is no person; the staff table is.
+    assert b"staff" not in exported.replace(b"staffing_", b"")
     assert b"granted" not in exported
 
 
