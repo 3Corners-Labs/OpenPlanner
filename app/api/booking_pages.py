@@ -36,6 +36,7 @@ The cookie rule is in ``app.api.link_session``; the join, trial and waiting page
 from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Annotated
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
@@ -49,6 +50,7 @@ from app.api.contact_form import (
     load_contact_form,
     read_contact,
 )
+from app.api.flow_choice import checked_flow
 from app.api.labels import slot_label
 from app.api.link_session import authorise, exchange, start
 from app.api.participant import participant_page
@@ -60,6 +62,7 @@ from app.domain.change_request_service import ChangeRequestService
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock
 from app.domain.scheduling import Group
+from app.domain.service_flows import IntakeMode
 from app.domain.services import BookingDetails, BookingService
 from app.i18n.dates import format_clock, format_day, local_day
 from app.web.closure_labels import closure_view, delete_by_label
@@ -142,10 +145,13 @@ async def group_page(
     month: str | None = None,
     day: str | None = None,
     status: str | None = None,
+    flow: str | None = None,
 ) -> HTMLResponse:
     """Show the group's month calendar and the free times of one day.
 
-    While the team is closed, the closure page takes the calendar's place (ADR 0037 §5).
+    While the team is closed, the closure page takes the calendar's place (ADR 0037 §5). An
+    optional ``flow`` (ADR 0121 step 3a) must resolve for the appointment path, else the page
+    is refused; it is carried to the booking form.
     """
     service = _service(request)
     group = await service.get_group(slug)
@@ -156,7 +162,10 @@ async def group_page(
         deleted_by = await service.closure_delete_by(group, closure)
         banner = closure_view(closure, group, locale, now, deleted_by)
         return await participant_page(request, locale, "closure.html", group, {"closure": banner})
-    slot_filter = parse_filter(request.query_params.multi_items(), group.routing)
+    chosen_flow = await checked_flow(service, slug, IntakeMode.APPOINTMENT, flow)
+    slot_filter = replace(
+        parse_filter(request.query_params.multi_items(), group.routing), flow=chosen_flow
+    )
     view = await picker(
         service,
         group,
@@ -234,8 +243,9 @@ def _book_context(
     locale: RequestLocale,
     errors: list[FormError],
     values: dict[str, str],
+    flow: str | None = None,
 ) -> dict[str, object]:
-    """Context of the contact form."""
+    """Context of the contact form; ``flow`` is the checked flow code the page was opened with."""
     group = contact.group
     return {
         "group": group,
@@ -244,6 +254,7 @@ def _book_context(
         "fields": contact.fields(locale, errors, values),
         "errors": errors,
         "honeypot": HONEYPOT_FIELD,
+        "flow": flow,
     }
 
 
@@ -255,22 +266,27 @@ async def booking_form(
     locale: Locale,
     start: str | None = None,
     subject: str | None = None,
+    flow: str | None = None,
 ) -> Response:
     """Show the contact form for one slot, or send the visitor back to choose one.
 
     A ``subject`` chosen before the calendar (ADR 0081) pre-selects the form's first question.
+    An optional ``flow`` (ADR 0121 step 3a) must resolve for the appointment path; the form
+    posts it back.
     """
     service = _service(request)
     group = await service.get_group(slug)
+    chosen_flow = await checked_flow(service, slug, IntakeMode.APPOINTMENT, flow)
     parsed = parse_start(start)
     chosen = group.routing.subject(subject)
     code = chosen.code if chosen else None
     slot = await _available(service, group, parsed, code) if parsed else None
     if parsed is None or slot is None:
-        return RedirectResponse(f"/g/{group.slug}?status=unavailable", status_code=303)
+        again = [("status", "unavailable")] + ([("flow", chosen_flow)] if chosen_flow else [])
+        return RedirectResponse(f"/g/{group.slug}?{urlencode(again)}", status_code=303)
     contact = await load_contact_form(service, group, _clock(request).now())
     values = {SUBJECT_INPUT: chosen.code} if chosen else {}
-    context = _book_context(contact, parsed, slot, locale, [], values)
+    context = _book_context(contact, parsed, slot, locale, [], values, chosen_flow)
     return await participant_page(request, locale, "book.html", group, context)
 
 
@@ -285,17 +301,21 @@ async def book(request: Request, slug: str, locale: Locale, _: SameOrigin) -> Re
     start = parse_start(str(form.get("start", "")))
     if start is None:
         raise RejectedRequest(400)
+    chosen_flow = await checked_flow(service, slug, IntakeMode.APPOINTMENT, form.get("flow"))
     try:
         receipt = await service.book(
             group_slug=group.slug,
             start=start,
             contact=contact_input(values),
             locale=locale.code,
+            flow=chosen_flow,
         )
     except DomainError as error:
         slot = await _available(service, group, start)
         contact = await load_contact_form(service, group, _clock(request).now())
-        context = _book_context(contact, start, slot, locale, contact.errors(error, locale), values)
+        context = _book_context(
+            contact, start, slot, locale, contact.errors(error, locale), values, chosen_flow
+        )
         return await participant_page(
             request, locale, "book.html", group, context, status_for(error)
         )

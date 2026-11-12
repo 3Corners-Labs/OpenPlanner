@@ -218,6 +218,8 @@ Content-Type: application/json
   request reached it, a new one sends nothing. Cancelling is possible until the start, moving
   until the change deadline. If the bot's client is switched off or loses the scope, or the API
   is switched off, its open requests can no longer be confirmed.
+- This API creates no booking, so it has no `flow` field (ADR 0121 step 3a): a confirmed move
+  keeps the service flow and revision the appointment was made under.
 - A request is deleted *Keep change requests after expiry* days (default 30) after it expired;
   its status is then `404 change_request_not_found`.
 - `GET /api/agent/v1/change-requests/{id}` answers `pending`, `confirmed` or `expired`, only to

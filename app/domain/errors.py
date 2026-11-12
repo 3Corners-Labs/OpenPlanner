@@ -155,6 +155,11 @@ class ErrorCode(StrEnum):
     """ADR 0023 step 2: the organisation has not switched on change requests by a bot."""
     INVALID_APPOINTMENT_CODE = "invalid_appointment_code"
     """ADR 0023 step 2: the appointment code is not eight digits."""
+    FLOW_NOT_AVAILABLE = "flow_not_available"
+    """ADR 0121 step 3a: the flow a request named does not exist for this service, is not active
+    or does not offer this entry path; there is no fallback to the default."""
+    FLOW_DEFAULT_AMBIGUOUS = "flow_default_ambiguous"
+    """ADR 0121 step 3a: more than one active flow is the default of the entry path."""
     CHANGE_REQUEST_NOT_FOUND = "change_request_not_found"
     """ADR 0023 step 2: no such request of this client, or nothing open to confirm."""
 

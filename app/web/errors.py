@@ -27,6 +27,8 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.INVALID_CONTACT: "error.invalid_request",
     ErrorCode.INVALID_RANGE: "error.invalid_request",
     ErrorCode.INVALID_CONFIGURATION: "error.invalid_request",
+    ErrorCode.FLOW_NOT_AVAILABLE: "error.invalid_request",
+    ErrorCode.FLOW_DEFAULT_AMBIGUOUS: "error.invalid_request",  # a server fault, like the above
     ErrorCode.GROUP_NOT_FOUND: "error.not_found.text",
     ErrorCode.BOOKING_NOT_FOUND: "error.not_found.text",
     ErrorCode.LINK_REQUIRED: "error.link_required",
@@ -156,6 +158,8 @@ HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.INVALID_FORM_FIELD: 422,
     ErrorCode.FORM_FIELD_FORBIDDEN: 422,
     ErrorCode.INVALID_RANGE: 400,
+    ErrorCode.FLOW_NOT_AVAILABLE: 422,
+    ErrorCode.FLOW_DEFAULT_AMBIGUOUS: 500,
     ErrorCode.GROUP_NOT_FOUND: 404,
     ErrorCode.BOOKING_NOT_FOUND: 404,
     ErrorCode.LINK_REQUIRED: 403,

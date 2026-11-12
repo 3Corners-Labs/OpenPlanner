@@ -21,7 +21,7 @@ from dataclasses import dataclass, replace
 
 from app.domain.admin import AdminService, require
 from app.domain.audit import AuditEvent, Outcome
-from app.domain.authorization import Permission, Principal, Scope
+from app.domain.authorization import PUBLIC_READ, Permission, Principal
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.log_destinations import (
     AUDIT_ACTION,
@@ -36,8 +36,6 @@ from app.domain.log_destinations import (
 from app.domain.ports import Clock, Transaction, UnitOfWork
 
 _VIEW = Permission.LOGGING_VIEW
-_EVERYTHING = Scope(everything=True)
-"""A global permission has no narrower scope: once the matrix allowed it, it covers all."""
 _MANAGE = Permission.LOGGING_MANAGE
 
 _CHANGEABLE = (
@@ -121,7 +119,7 @@ class LogDestinationService:
             DomainError: ``not_permitted``.
         """
         require(await self._admin.authorize(principal, _VIEW))
-        scope = _EVERYTHING
+        scope = PUBLIC_READ
         async with self._uow.read() as tx:
             destinations = await tx.list_log_destinations(scope)
             reported = await tx.list_log_destination_status(scope)
@@ -139,7 +137,7 @@ class LogDestinationService:
             DomainError: ``not_permitted`` or ``log_destination_not_found``.
         """
         require(await self._admin.authorize(principal, _VIEW))
-        scope = _EVERYTHING
+        scope = PUBLIC_READ
         async with self._uow.read() as tx:
             found = await _found(tx, destination_id)
             reported = [

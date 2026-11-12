@@ -189,6 +189,11 @@ FLOWS: dict[str, Flow] = {
         no_event="static manual text for signed-in admins; nothing is changed or refused"
     ),
     "## Flow: holiday calendars (ADR 0025)": Flow(ADMIN),
+    "## Flow: the flow of a new booking (ADR 0121 step 3a)": Flow(
+        no_event="a code that does not resolve is a 422 like any invalid input: it names no "
+        "caller, changes nothing and books nothing, and the booking flows above log what they "
+        "refuse"
+    ),
     "## Flow: emergency closure (ADR 0024)": Flow(ADMIN),
     "## Flow: alternative contact options (ADR 0037 §2)": Flow(ADMIN),
     "## Flow: custom booking form fields (ADR 0055)": Flow((PUBLIC, DENIED, CHANGE)),

@@ -1,0 +1,6 @@
+{#- The choices a page carries from step to step as hidden inputs (ADR 0081, ADR 0121):
+    the subject (unless the form asks for it itself) and the flow, both from SlotFilter. -#}
+{% macro carried_inputs(f, with_subject=true) -%}
+{% if with_subject and f.subject %}<input type="hidden" name="subject" value="{{ f.subject }}">{% endif %}
+{% if f.flow %}<input type="hidden" name="flow" value="{{ f.flow }}">{% endif %}
+{%- endmacro %}

@@ -44,6 +44,7 @@ from sqlalchemy.exc import DBAPIError
 from starlette.responses import JSONResponse, Response
 
 from app.api.contact_form import ANSWER_PREFIX, HONEYPOT_FIELD, load_contact_form
+from app.api.flow_choice import checked_flow
 from app.api.labels import slot_label
 from app.api.maintenance import WidgetMaintenance, retry_after
 from app.api.slot_picker import PickerView, SlotFilter, picker, slot_value, subject_filter
@@ -75,6 +76,7 @@ from app.domain.security_log import (
     RATE_LIMITED,
     TOO_MANY_REQUESTS,
 )
+from app.domain.service_flows import IntakeMode
 from app.domain.services import BookingService, ContactInput
 from app.web.closure_labels import closure_view
 from app.web.errors import status_for
@@ -155,7 +157,7 @@ or not available."""
 _ERRORS: dict[int | str, dict[str, Any]] = {
     403: {"model": WidgetError, "description": "`origin_not_allowed`."},
     404: {"model": WidgetError, "description": "`group_not_found`: unknown or not embeddable."},
-    422: {"model": WidgetError, "description": "`invalid_request`."},
+    422: {"model": WidgetError, "description": "`invalid_request` or `flow_not_available`."},
     429: {"model": WidgetError, "description": "`rate_limited`."},
     503: {"model": WidgetError, "description": "`maintenance`, with `Retry-After`."},
 }
@@ -309,10 +311,22 @@ def _texts(locale: RequestLocale, group: Group) -> dict[str, str]:
 
 @router.get("/{org}/{group}/", response_model=WidgetGroup, responses=_ERRORS, summary="Group")
 @limiter.limit(read_limit)
-async def group_info(request: Request, org: str, group: str, locale: Locale) -> WidgetGroup:
-    """Return the group's name, contact form, closure notice and the widget's texts."""
+async def group_info(
+    request: Request,
+    org: str,
+    group: str,
+    locale: Locale,
+    flow: Annotated[str | None, Query(max_length=40)] = None,
+) -> WidgetGroup:
+    """Return the group's name, contact form, closure notice and the widget's texts.
+
+    With ``flow`` (the host page's ``flow`` attribute, ADR 0121) the load is refused with
+    ``flow_not_available`` (422) when that flow does not resolve for the appointment path, so
+    the widget shows its "not available here" state instead of a form that cannot book.
+    """
     found = _group(request)
     service = _booking_service(request)
+    await checked_flow(service, found.slug, IntakeMode.APPOINTMENT, flow)
     contact = await load_contact_form(service, found, request.app.state.clock.now())
     closure = await service.closure_notice(found)
     banner = (
@@ -469,7 +483,10 @@ def _read_booking(raw: bytes) -> WidgetBookingRequest:
         400: {"model": WidgetError, "description": "`invalid_request`: honeypot filled in."},
         409: {"model": WidgetError, "description": "`slot_unavailable`, `slot_full`, …"},
         413: {"model": WidgetError, "description": "`invalid_request`: body too large."},
-        422: {"model": WidgetError, "description": "`invalid_request` or `invalid_contact`."},
+        422: {
+            "model": WidgetError,
+            "description": "`invalid_request`, `invalid_contact` or `flow_not_available`.",
+        },
     },
     summary="Book",
     openapi_extra={
@@ -496,6 +513,7 @@ async def book(request: Request, org: str, group: str, locale: Locale) -> JSONRe
         start=start,
         contact=ContactInput(*body.names(), body.email, body.phone or None, body.answers),
         locale=locale.code,
+        flow=body.flow,
     )
     booking = receipt.booking
     answer = WidgetBooking(
