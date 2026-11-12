@@ -84,19 +84,21 @@ Step 4 adds no new pool rule; it adds tests that pin rules 1 and 2 as part of th
 
 An organisation maps each of its skills to one **provider skill code**: the string its contact-center flow tests (for Webex Contact Center, a value the flow compares in a condition or passes to *Queue To Agent* as a skill requirement). One code per skill per organisation; the organisation has at most one contact-center connection (its own or, for one minor, the installation's, ADR 0032 point 11), so "per connection" and "per organisation" are the same key, and the mapping survives replacing the connection's credentials.
 
-| Table (expand only) | Columns | Notes |
+| Column (expand only) | Type | Notes |
 |---|---|---|
-| `contact_center_skill_codes` | `skill_id` (PK, FK `skills`, `RESTRICT`), `organisation_id` (FK, denormalised for the unique key), `code` `String(64)` | unique `(organisation_id, code)`; code grammar `[A-Za-z0-9_.:-]{1,64}`; no PII, no secret |
+| `skills.contact_center_code` | `String(64)`, nullable | the code grammar of a routing value of ADR 0081 (`[A-Za-z0-9_.:-]{1,64}`); unique per organisation where set (partial unique index); no PII, no secret |
 
-Migration 0112 (next free number on `main` when written; checked again before the PR) creates the table only; nothing is backfilled, because no skill was ever mapped. Expand/contract (ADR 0116): the previous minor never reads the table, and nothing it does depends on it.
+A column on the skill rather than a table of its own: there is exactly one code per skill and per organisation, the code lives and is archived with its skill, and the configuration package carries it as one optional field of the skill (A29) without a new kind. Migration 0112 (next free number on `main` when written; checked again before the PR) adds the nullable column and the index; nothing is backfilled, because no skill was ever mapped. Expand/contract (ADR 0116): the previous minor neither reads nor writes the column, and a skill it saves keeps its code.
 
 ### Where it lives (ADR 0047)
 
-Organisation → *Channels* (`/admin/organisations/{org}/channels`) → the *Contact center* card → a sub-page *Skill codes* (`/admin/organisations/{org}/channels/contact-center/skills`), registered as a sub-page of the channels screen, width `standard`, one table (skill, code input) and one Save. Read under `organisation.view`; the form and the POST need `skills.manage` (the organisation admin): the codes are skill configuration that only makes sense against the connection, they hold no secret, and `integrations.manage` (the connection's credentials) stays with whom it is today. No new tab, no new top-level entry. The skill catalogue shows a link to it; it is not a second home.
+The code is a property of the skill, so it lives where the skill lives: organisation → Overview → sub-tab *Skills and capacity* → the skill's own page (`/admin/organisations/{org}/skills/{skill_id}`), one more field *Contact-center code* next to the labels, saved by the same form under `skills.manage`; the catalogue table shows it in a column. No new screen, tab or sub-page (ADR 0047: one home per concern, and the screen that has the skill already has the right owner).
+
+A sub-page of the contact-center card on *Channels* was considered and rejected: *Channels* is read and changed under `integrations.manage`, which is locked to the superuser, so the organisation admin, who keeps the catalogue, could never reach it, and a page there under `skills.manage` would be a second home for skill configuration. The connection's credentials stay where they are.
 
 ### The payload
 
-`ContactCenterTask` gains `skills: tuple[str, ...]`: the mapped codes of the booking's requirement, sorted. `app/domain/contact_center_dispatch.py` (the domain side) builds it with `mapped_skill_codes(required, codes)`, which **refuses** (`integration_not_ready`, field `skill_codes`) when one required skill has no code: an unmapped requirement is an incomplete configuration, never dropped. `app/adapters/wxcc.py` (still the one place that builds the payload) writes them as the reserved flow variable `openplannerSkills`, comma-separated, next to `openplannerGroup`, both written last so a routing variable of ADR 0081 can never overwrite them; the name `openplannerSkills` becomes reserved in the ADR 0081 mapping grammar too. An empty requirement sends no key at all, so the payload of every legacy flow is byte-for-byte what it is today. A code is no PII and no free text: it comes from the closed per-organisation table, like the mapped codes of ADR 0081, and the outbound allow-list of CLAUDE.md ("the routing variables of ADR 0081") is extended by "the mapped skill codes" in the same PR (a CLAUDE.md change makes 4b a decision PR).
+`ContactCenterTask` gains `skills: tuple[str, ...]`: the mapped codes of the booking's requirement, sorted. `app/domain/contact_center_dispatch.py` (the domain side) builds it with `mapped_skill_codes(required, codes)`, which **refuses** (`integration_not_ready`, field `skill_codes`) when one required skill has no code: an unmapped requirement is an incomplete configuration, never dropped. `app/adapters/wxcc.py` (still the one place that builds the payload) writes them as the flow variable `openplannerSkills`, comma-separated, next to `openplannerGroup`, both written last so a routing variable of ADR 0081 can never overwrite them. An empty requirement sends no key at all, so the payload of every legacy flow is byte-for-byte what it is today. A code is no PII and no free text: it comes from the organisation's own catalogue, like the mapped codes of ADR 0081, and the outbound allow-list of CLAUDE.md ("the routing variables of ADR 0081") is extended by "the mapped skill codes" in the same PR (a CLAUDE.md change makes 4b a decision PR).
 
 ### Readiness
 
@@ -104,7 +106,7 @@ The readiness check *Skills* gains the reason `skill_unmapped`: a revision whose
 
 ### Conflicts with ADR 0081
 
-- A routing variable named `openplannerSkills` already stored by a service: the payload writes the reserved key last (as for `openplannerGroup`), and the mapping form refuses the name from now on. The configuration check of ADR 0082 lists a stored mapping that uses the reserved name.
+- A routing variable named `openplannerSkills`: the payload writes OpenPlanner's key last (as for `openplannerGroup`), so the variable cannot stand in for the skills. Adding the name to `RESERVED_VARIABLES` would make a stored mapping of that name unreadable (the constructor validates on load), which expand/contract forbids; the mapping form refuses it from step 4b on, and a stored one keeps loading.
 - Two skills with the same code: refused by the unique key (`slug_taken`, field `code`).
 - The total of `openplannerSkills` stays under WxCC's 512-byte value limit: at most 15 skills required by one booking times 64 bytes would exceed it, so the mapping adapter checks the joined length per task and refuses (`integration_not_ready`, `skill_codes`) above 512 bytes; a limit of the platform, a constant, not a setting.
 
@@ -121,7 +123,7 @@ The readiness check *Skills* gains the reason `skill_unmapped`: a revision whose
 | D1 | Must the claimant also hold the pool's other guaranteed skills, beyond the booking's requirement? | No: only the booking's requirement (section 4 point 3) |
 | D2 | Is an ineligible row moved to the end of the queue? | No: it stays in its place, marked, so the queue is the same for every agent |
 | D3 | A notice when a pool counts more units than members hold all its guaranteed skills | Follow-up, not in step 4 (needs staffing peaks against grants; it is a planning aid, not enforcement) |
-| D4 | Who maps skill codes | `skills.manage` (organisation admin), on a sub-page of the contact-center card |
+| D4 | Who maps skill codes, and where | `skills.manage` (organisation admin), as a field of the skill's own page under *Skills and capacity*, not under *Channels* (superuser only) |
 | D5 | How codes reach the platform | One reserved flow variable `openplannerSkills`, comma-separated, sorted |
 | D6 | A superuser without a membership claims work that requires skills | Refused: a superuser holds no skills in an organisation (rule of step 2b, unchanged) |
 
@@ -130,7 +132,7 @@ The readiness check *Skills* gains the reason `skill_unmapped`: a revision whose
 | PR | Content | Acceptance |
 |---|---|---|
 | 4a | `eligibility` and `requirement_of`; `WorkEligibility`; the checks in `claim_next`, `claim` and `claimed`; error `not_eligible`; queue rows with missing skills and the *Release* of an ineligible own claim; tests for A07–A10, A13, A23, A35, A36 and the unchanged skill-less paths; threat model rows; this brief; ADR 0121 build status rows 4a and 4b | A07, A08, A09, A10, A13, A23, A35, A36 (claim side) |
-| 4b | Migration 0112, the `Transaction` methods and adapter of skill codes, the sub-page *Skill codes*, `mapped_skill_codes`, `ContactCenterTask.skills`, `openplannerSkills` in `wxcc.py`, the reserved name, readiness reason `skill_unmapped`, configuration package (codes travel with the skills, A29), manual topic file, e2e page entry, CLAUDE.md allow-list sentence | A21 (skill side), A29 |
+| 4b | Migration 0112 (`skills.contact_center_code`), the code on `Skill` and in the skills adapter, the field on the skill's page and the column in the catalogue, `mapped_skill_codes`, `ContactCenterTask.skills`, `openplannerSkills` in `wxcc.py`, the refused variable name in the ADR 0081 mapping form, readiness reason `skill_unmapped`, configuration package (the code travels with its skill, A29), `docs/webhooks.md`, CLAUDE.md allow-list sentence | A21 (skill side), A29 |
 | 4c | The staff detail's table "what this person may pick up, and why" (screen 5 of the handover) | A07, A08 (explained) |
 
-4b branches off `main` after 4a is open (it touches different files apart from the ADR's build status table and `docs/adr-status.md`, which it rebuilds after 4a merges). No setting is added by 4a or 4b: eligibility has no threshold, and the 512-byte limit and the code grammar are the platform's fixed rules.
+4b is stacked on 4a's branch once 4a is open: both change the ADR's build status rows, `docs/adr-status.md` and `app/domain/skills.py`, so a branch off `main` would conflict at once. Its pull request targets 4a's branch without auto-merge until 4a has merged and GitHub has retargeted it to `main`. No setting is added by 4a or 4b: eligibility has no threshold, and the 512-byte limit and the code grammar are the platform's fixed rules.

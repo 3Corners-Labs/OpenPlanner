@@ -295,3 +295,18 @@ async def test_an_archived_skill_still_binds_accepted_work(
 
     assert [s.code for s in (await queue.view(UNSKILLED, "demo")).rows[0].missing] == ["german"]
     assert (await queue.claim(SKILLED, "demo", booking_id)).booking_id == booking_id
+
+
+async def test_a_requirement_that_cannot_be_named_still_closes_the_work(
+    queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """Eligibility is decided on skill ids, never on the skills found to name them."""
+    booking_id = await book(uow, clock, SKILL_FLOW)
+    del uow.state.skills[GERMAN]
+    at_start(clock)
+
+    row = (await queue.view(UNSKILLED, "demo")).rows[0]
+
+    assert (row.eligible, row.missing) == (False, ())
+    assert await refused(queue.claim_next(UNSKILLED, "demo")) is ErrorCode.NOT_ELIGIBLE
+    assert uow.state.bookings[booking_id].claim is None

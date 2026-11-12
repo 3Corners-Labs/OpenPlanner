@@ -23,7 +23,7 @@ Every row and the claimed booking carry the video link's state and the participa
 (ADR 0072), so the page can say what is going on instead of showing "no meeting".
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 
 from app.domain.admin import AdminService, record_change
@@ -82,8 +82,9 @@ class QueueRow:
         video: Whether the meeting is ready, pending or failed (ADR 0072).
         routing: The subject and attribute codes the participant chose (ADR 0081 point 4).
         fallback: The booking fell back to this queue from the contact center (ADR 0082).
-        missing: The skills the booking requires that the viewer does not hold (ADR 0121,
-            choice S3); empty when the viewer may take it.
+        eligible: The viewer holds every skill the booking requires (ADR 0121 point 5).
+        missing: The skills the booking requires that the viewer does not hold, to name them
+            (choice S3); empty when the viewer may take it.
     """
 
     booking_id: int
@@ -98,12 +99,8 @@ class QueueRow:
     video: VideoState = VideoState.PENDING
     routing: RoutingChoice | None = None
     fallback: bool = False
+    eligible: bool = True
     missing: tuple[Skill, ...] = ()
-
-    @property
-    def eligible(self) -> bool:
-        """Whether the viewer holds every skill the booking requires."""
-        return not self.missing
 
 
 @dataclass(frozen=True)
@@ -199,13 +196,22 @@ class QueueService:
         async with self._uow.read() as tx:
             entries = await self._entries(tx, principal, group, now)
             judge = WorkEligibility(tx, principal, summary.organisation_slug)
-            missing = await _missing(judge, entries)
+            lacking = await _lacking(judge, entries)
+            named = {i: await judge.skills(ids) for i, ids in lacking.items() if ids}
         me = agent_pseudonyms(self._keys, principal.subject)
         limit = timedelta(minutes=group.not_picked_up_minutes)
-        nxt = next_up(e for e in entries if not missing[_id(e.booking)])
+        nxt = next_up(e for e in entries if not lacking[_id(e.booking)])
+        rows = [
+            replace(
+                _row(e, me, e.not_picked_up(now, limit)),
+                eligible=not lacking[_id(e.booking)],
+                missing=named.get(_id(e.booking), ()),
+            )
+            for e in entries
+        ]
         return QueueView(
             group,
-            [_row(e, me, e.not_picked_up(now, limit), missing[_id(e.booking)]) for e in entries],
+            rows,
             nxt.booking.id if nxt else None,
             group.queue_free_pick_allowed,
             _supervises(principal, summary),
@@ -270,8 +276,8 @@ class QueueService:
             if nxt is None:
                 raise DomainError(ErrorCode.QUEUE_EMPTY)
             if isinstance(await judge.of(nxt.booking), Missing):
-                missing = await _missing(judge, entries)
-                nxt = next_up(e for e in entries if not missing[_id(e.booking)])
+                lacking = await _lacking(judge, entries)
+                nxt = next_up(e for e in entries if not lacking[_id(e.booking)])
                 if nxt is None:
                     raise DomainError(ErrorCode.NOT_ELIGIBLE)
             return await self._claim(tx, principal, summary, nxt.booking, now)
@@ -440,22 +446,22 @@ def _supervises(principal: Principal, summary: GroupSummary) -> bool:
     return decide(principal, Permission.BOOKINGS_VIEW, target).allowed
 
 
-async def _missing(
-    judge: WorkEligibility, entries: list[QueueEntry]
-) -> dict[int, tuple[Skill, ...]]:
-    """Return, per booking id, the skills the viewer lacks for it (empty when it fits)."""
-    lacking: dict[int, tuple[Skill, ...]] = {}
+async def _lacking(judge: WorkEligibility, entries: list[QueueEntry]) -> dict[int, frozenset[int]]:
+    """Return, per booking id, the ids of the skills the viewer lacks for it (empty: it fits).
+
+    Eligibility is decided on these ids, never on the skills found to name them.
+    """
+    lacking: dict[int, frozenset[int]] = {}
     for entry in entries:
         verdict = await judge.of(entry.booking)
-        ids = verdict.skill_ids if isinstance(verdict, Missing) else frozenset[int]()
-        lacking[_id(entry.booking)] = await judge.skills(ids) if ids else ()
+        lacking[_id(entry.booking)] = (
+            verdict.skill_ids if isinstance(verdict, Missing) else frozenset()
+        )
     return lacking
 
 
-def _row(
-    entry: QueueEntry, me: tuple[str, ...], overdue: bool, missing: tuple[Skill, ...] = ()
-) -> QueueRow:
-    """Map a queue entry to what the agent sees, with the skills the agent lacks for it."""
+def _row(entry: QueueEntry, me: tuple[str, ...], overdue: bool) -> QueueRow:
+    """Map a queue entry to what the agent sees."""
     booking = entry.booking
     claim = booking.claim
     return QueueRow(
@@ -471,7 +477,6 @@ def _row(
         video=entry.video,
         routing=booking.routing,
         fallback=entry.status.fallback,
-        missing=missing,
     )
 
 

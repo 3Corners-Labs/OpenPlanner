@@ -6,7 +6,8 @@ page of a booking the agent claimed. A row the agent lacks a skill for stays in 
 the missing skills named and no *Claim* button (ADR 0121, choice S3); a row the agent holds but
 no longer qualifies for offers *Release* instead of *Open*. The list and the claimed booking
 refresh themselves through a fragment that ``static/live-region.js`` polls (ADR 0072); without
-the script the "Refresh" link reloads, and new and waiting rows are announced in a polite live region.
+the script the "Refresh" link reloads, and new and waiting rows are announced in a polite live
+region.
 
     GET  /admin/groups/{slug}/queue                         queue.work
     GET  /admin/groups/{slug}/queue/live?seen=KEY           queue.work  (fragment, 204 if same)
@@ -101,6 +102,8 @@ class RowView:
     video_tone: str
     routing: str = ""
     fallback: bool = False
+    eligible: bool = True
+    """The viewer holds every skill the row requires (ADR 0121 point 5)."""
     missing: str = ""
     """The skills the viewer lacks for the row, named for the page; empty when it fits."""
 
@@ -182,6 +185,7 @@ def _row(
         video_tone=video_tone,
         routing=routing_summary(routing, row.routing, locale.gettext, locale.code),
         fallback=row.fallback,
+        eligible=row.eligible,
         missing=", ".join(skill_name(skill, locale.code) for skill in row.missing),
     )
 
@@ -196,7 +200,17 @@ async def _list_view(
     waiting = sum(1 for r in view.rows if r.in_lobby and not r.claimed)
     has_next = view.next_booking_id is not None
     shown = [
-        (r.id, r.state, r.overdue, r.video, r.mine, r.can_claim, r.can_release, r.missing)
+        (
+            r.id,
+            r.state,
+            r.overdue,
+            r.video,
+            r.mine,
+            r.can_claim,
+            r.can_release,
+            r.eligible,
+            r.missing,
+        )
         for r in rows
     ]
     return ListView(
