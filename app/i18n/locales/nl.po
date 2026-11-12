@@ -377,6 +377,12 @@ msgstr "In deze dienst pakt u altijd de volgende afspraak op."
 msgid "error.not_claimed"
 msgstr "Deze afspraak is niet door u opgepakt."
 
+msgid "error.not_eligible"
+msgstr "U heeft niet elke vaardigheid die dit werk vraagt. Pak ander werk op of geef het terug."
+
+msgid "admin.queue.not_for_you"
+msgstr "Niet voor u: ontbrekende vaardigheid: {skills}"
+
 msgid "error.booking_not_active"
 msgstr "Deze afspraak is niet meer actief."
 

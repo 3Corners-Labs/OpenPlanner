@@ -58,6 +58,41 @@ def eligible(required: Collection[int], held: Collection[int]) -> bool:
     return not missing_skills(required, held)
 
 
+@dataclass(frozen=True)
+class Eligible:
+    """The person holds every required skill (or nothing is required)."""
+
+
+@dataclass(frozen=True)
+class Missing:
+    """The person lacks at least one required skill.
+
+    Attributes:
+        skill_ids: The required skill ids the person does not hold; never empty.
+    """
+
+    skill_ids: frozenset[int]
+
+    def __post_init__(self) -> None:
+        """Refuse an empty set: lacking nothing is ``Eligible``."""
+        if not self.skill_ids:
+            raise ValueError("Missing without a skill")
+
+
+Eligibility = Eligible | Missing
+"""Whether someone may take a piece of work by skill (ADR 0121 point 5); rights are separate."""
+
+
+def eligibility(required: Collection[int], held: Collection[int]) -> Eligibility:
+    """Return whether ``held`` covers ``required`` (ALL_OF), naming what is missing if not.
+
+    The one answer the queue, the claim and the start of treatment use. Nothing required is
+    always ``Eligible``, so work without skills is open to everyone the matrix lets in.
+    """
+    missing = missing_skills(required, held)
+    return Missing(missing) if missing else Eligible()
+
+
 def effective_requirements(
     flow_skills: Collection[int], subject_flow_skills: Collection[int]
 ) -> frozenset[int]:

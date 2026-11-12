@@ -5,12 +5,17 @@ of that group; a booking of another group does not exist here. A claim runs in a
 transaction (``BEGIN IMMEDIATE``) with a conditional update, so of two agents claiming at once
 exactly one wins; the other gets ``already_claimed`` (a chosen row) or the next row.
 
-    view        ─► visible rows, first names only, which one is next
+    view        ─► visible rows, first names only, which one is next for the viewer
     summaries   ─► per own queue in reach: waiting, longest wait, staff signed in (ADR 0061)
-    claim_next  ─► locked: next unclaimed ─► claim_booking ─► audit queue.claimed
-    claim       ─► only with queue_free_pick_allowed
-    claimed     ─► the meeting link, for the claiming agent only
+    claim_next  ─► locked: next unclaimed the agent is eligible for ─► claim_booking ─► audit
+    claim       ─► only with queue_free_pick_allowed; locked: eligible ─► claim_booking
+    claimed     ─► eligible again (the start of treatment) ─► the meeting link, claimer only
     release     ─► the claiming agent, or anyone who may view the group's bookings
+
+Skills (ADR 0121 point 5): a claim needs the right (``queue.work``), the skills the booking's
+flow revision and subject require (``WorkEligibility``, read inside the locked transaction) and
+an assignable booking. Work an agent may not take stays visible in its place with the missing
+skills named (choice S3); work without skills, every legacy flow among it, is open as before.
 
 The meeting link is shown only after a claim, so two agents cannot both start the same
 meeting unannounced. The agent is recorded as a pseudonym (``tokens.agent_pseudonym``).
@@ -48,10 +53,12 @@ from app.domain.own_queue import (
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.routing import RoutingChoice
 from app.domain.scheduling import Group, GroupSummary
+from app.domain.skills import Missing, Skill
 from app.domain.staff import StaffFilter, StaffMember
 from app.domain.staff_usage import StaffUsage
 from app.domain.tokens import agent_pseudonym, agent_pseudonyms
 from app.domain.usage_recording import record_queue_claimed, record_queue_released
+from app.domain.work_eligibility import WorkEligibility
 
 CLAIMED = "queue.claimed"
 RELEASED = "queue.released"
@@ -74,6 +81,9 @@ class QueueRow:
         overdue: Not claimed ``not_picked_up_minutes`` after its start.
         video: Whether the meeting is ready, pending or failed (ADR 0072).
         routing: The subject and attribute codes the participant chose (ADR 0081 point 4).
+        fallback: The booking fell back to this queue from the contact center (ADR 0082).
+        missing: The skills the booking requires that the viewer does not hold (ADR 0121,
+            choice S3); empty when the viewer may take it.
     """
 
     booking_id: int
@@ -88,6 +98,12 @@ class QueueRow:
     video: VideoState = VideoState.PENDING
     routing: RoutingChoice | None = None
     fallback: bool = False
+    missing: tuple[Skill, ...] = ()
+
+    @property
+    def eligible(self) -> bool:
+        """Whether the viewer holds every skill the booking requires."""
+        return not self.missing
 
 
 @dataclass(frozen=True)
@@ -97,6 +113,7 @@ class QueueView:
     group: Group
     rows: list[QueueRow]
     next_booking_id: int | None
+    """The booking "pick up next" claims for the viewer: the first open one they may take."""
     free_pick: bool
     can_release_any: bool
 
@@ -181,12 +198,14 @@ class QueueService:
         now = self._clock.now()
         async with self._uow.read() as tx:
             entries = await self._entries(tx, principal, group, now)
+            judge = WorkEligibility(tx, principal, summary.organisation_slug)
+            missing = await _missing(judge, entries)
         me = agent_pseudonyms(self._keys, principal.subject)
         limit = timedelta(minutes=group.not_picked_up_minutes)
-        nxt = next_up(entries)
+        nxt = next_up(e for e in entries if not missing[_id(e.booking)])
         return QueueView(
             group,
-            [_row(e, me, e.not_picked_up(now, limit)) for e in entries],
+            [_row(e, me, e.not_picked_up(now, limit), missing[_id(e.booking)]) for e in entries],
             nxt.booking.id if nxt else None,
             group.queue_free_pick_allowed,
             _supervises(principal, summary),
@@ -233,17 +252,28 @@ class QueueService:
         return sorted(rows, key=lambda r: (-r.waiting, -r.longest_wait, r.summary.group.name))
 
     async def claim_next(self, principal: Principal, slug: str) -> ClaimedBooking:
-        """Claim the booking "pick up next" points at.
+        """Claim the booking "pick up next" points at: the first open one the agent may take.
+
+        Eligibility is read inside the locked transaction, so a skill revoked after the page was
+        shown counts (A09).
 
         Raises:
-            DomainError: ``queue_empty`` when nothing is left to claim, or as ``view``.
+            DomainError: ``queue_empty`` when nothing is left to claim, ``not_eligible`` when
+                open work is left but none of it fits the agent's skills, or as ``view``.
         """
         summary = await self._group(principal, slug)
         now = self._clock.now()
         async with self._uow.locked() as tx:
-            nxt = next_up(await self._entries(tx, principal, summary.group, now))
+            entries = await self._entries(tx, principal, summary.group, now)
+            judge = WorkEligibility(tx, principal, summary.organisation_slug)
+            nxt = next_up(entries)
             if nxt is None:
                 raise DomainError(ErrorCode.QUEUE_EMPTY)
+            if isinstance(await judge.of(nxt.booking), Missing):
+                missing = await _missing(judge, entries)
+                nxt = next_up(e for e in entries if not missing[_id(e.booking)])
+                if nxt is None:
+                    raise DomainError(ErrorCode.NOT_ELIGIBLE)
             return await self._claim(tx, principal, summary, nxt.booking, now)
 
     async def claim(self, principal: Principal, slug: str, booking_id: int) -> ClaimedBooking:
@@ -251,7 +281,8 @@ class QueueService:
 
         Raises:
             DomainError: ``free_pick_not_allowed``, ``booking_not_found``,
-                ``already_claimed``, ``booking_not_active``, or as ``view``.
+                ``already_claimed``, ``booking_not_active``, ``not_eligible`` (a skill the
+                booking requires is missing, judged inside the lock), or as ``view``.
         """
         summary = await self._group(principal, slug)
         if not summary.group.queue_free_pick_allowed:
@@ -265,6 +296,7 @@ class QueueService:
                 raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
             if booking.claim is not None:
                 raise DomainError(ErrorCode.ALREADY_CLAIMED)
+            await WorkEligibility(tx, principal, summary.organisation_slug).check(booking)
             return await self._claim(tx, principal, summary, booking, self._clock.now())
 
     async def claimed(
@@ -272,18 +304,24 @@ class QueueService:
     ) -> ClaimedBooking:
         """Return a booking ``principal`` claimed, with its meeting link.
 
-        The answers an agent may see (never PII) come with the labels in ``locale``.
+        Opening the claimed booking is where treatment starts in the own queue, so the skills
+        are judged again here (ADR 0121 point 5, A35): a skill revoked since the claim gives
+        ``not_eligible`` and no link. The claim itself stays; the agent or a supervisor
+        releases it. The answers an agent may see (never PII) come with the labels in
+        ``locale``.
 
         Raises:
-            DomainError: ``not_claimed`` unless ``principal`` holds the claim, or as ``claim``.
+            DomainError: ``not_claimed`` unless ``principal`` holds the claim,
+                ``not_eligible``, or as ``claim``.
         """
-        group = (await self._group(principal, slug)).group
+        summary = await self._group(principal, slug)
         async with self._uow.read() as tx:
             booking = await _booking_of(tx, slug, booking_id)
-            form = await tx.get_form(group.id)
+            if not self._holds(principal, booking):
+                raise DomainError(ErrorCode.NOT_CLAIMED)
+            await WorkEligibility(tx, principal, summary.organisation_slug).check(booking)
+            form = await tx.get_form(summary.group.id)
             status = await tx.get_call_status(booking_id)
-        if not self._holds(principal, booking):
-            raise DomainError(ErrorCode.NOT_CLAIMED)
         return _claimed(booking, form, locale, status)
 
     async def release(self, principal: Principal, slug: str, booking_id: int) -> None:
@@ -402,8 +440,22 @@ def _supervises(principal: Principal, summary: GroupSummary) -> bool:
     return decide(principal, Permission.BOOKINGS_VIEW, target).allowed
 
 
-def _row(entry: QueueEntry, me: tuple[str, ...], overdue: bool) -> QueueRow:
-    """Map a queue entry to what the agent sees."""
+async def _missing(
+    judge: WorkEligibility, entries: list[QueueEntry]
+) -> dict[int, tuple[Skill, ...]]:
+    """Return, per booking id, the skills the viewer lacks for it (empty when it fits)."""
+    lacking: dict[int, tuple[Skill, ...]] = {}
+    for entry in entries:
+        verdict = await judge.of(entry.booking)
+        ids = verdict.skill_ids if isinstance(verdict, Missing) else frozenset[int]()
+        lacking[_id(entry.booking)] = await judge.skills(ids) if ids else ()
+    return lacking
+
+
+def _row(
+    entry: QueueEntry, me: tuple[str, ...], overdue: bool, missing: tuple[Skill, ...] = ()
+) -> QueueRow:
+    """Map a queue entry to what the agent sees, with the skills the agent lacks for it."""
     booking = entry.booking
     claim = booking.claim
     return QueueRow(
@@ -419,6 +471,7 @@ def _row(entry: QueueEntry, me: tuple[str, ...], overdue: bool) -> QueueRow:
         video=entry.video,
         routing=booking.routing,
         fallback=entry.status.fallback,
+        missing=missing,
     )
 
 
