@@ -395,6 +395,61 @@ class ScheduleOverrideRow(Base):
     )
 
 
+class PoolStaffingRuleRow(Base):
+    """A weekly staffing block of a counted pool; ``units`` is the number of people counted.
+
+    Shaped like ``ScheduleRuleRow`` without subjects (ADR 0122 point 1). ``offer`` says whether
+    the block takes appointments (``scheduled``), work without appointment (``direct``) or both.
+    """
+
+    __tablename__ = "pool_staffing_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pool_id: Mapped[int] = mapped_column(
+        ForeignKey("capacity_pools.id", ondelete="CASCADE"), index=True
+    )
+    weekday: Mapped[int] = mapped_column(Integer)
+    opens: Mapped[time] = mapped_column(Time)
+    closes: Mapped[time] = mapped_column(Time)
+    units: Mapped[int] = mapped_column(Integer)
+    label: Mapped[str | None] = mapped_column(String(50))
+    offer: Mapped[str] = mapped_column(String(9), server_default=text("'scheduled'"))
+    valid_from: Mapped[date | None] = mapped_column(Date)
+    valid_to: Mapped[date | None] = mapped_column(Date)
+
+    __table_args__ = (
+        CheckConstraint("weekday BETWEEN 0 AND 6", name="weekday"),
+        CheckConstraint("opens < closes", name="window"),
+        CheckConstraint("units >= 0", name="units"),
+        CheckConstraint(f"offer IN {OFFERS}", name="offer"),
+    )
+
+
+class PoolStaffingOverrideRow(Base):
+    """One date's staffing window of a counted pool, or a closed day when the window is NULL."""
+
+    __tablename__ = "pool_staffing_overrides"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pool_id: Mapped[int] = mapped_column(ForeignKey("capacity_pools.id", ondelete="CASCADE"))
+    day: Mapped[date] = mapped_column(Date)
+    opens: Mapped[time | None] = mapped_column(Time)
+    closes: Mapped[time | None] = mapped_column(Time)
+    units: Mapped[int | None] = mapped_column(Integer)
+    label: Mapped[str | None] = mapped_column(String(50))
+    offer: Mapped[str] = mapped_column(String(9), server_default=text("'scheduled'"))
+
+    __table_args__ = (
+        Index("ix_pool_staffing_overrides_pool_id_day", "pool_id", "day"),
+        CheckConstraint(
+            "(opens IS NULL AND closes IS NULL AND units IS NULL) "
+            "OR (opens < closes AND units >= 0)",
+            name="window_or_closed",
+        ),
+        CheckConstraint(f"offer IN {OFFERS}", name="offer"),
+    )
+
+
 class HolidayCalendarRow(Base):
     """A reusable set of closed days, maintained by the superuser (ADR 0022)."""
 
@@ -512,17 +567,35 @@ class SlotRow(Base):
     end: Mapped[datetime] = mapped_column(UTCDateTime())
     capacity_snapshot: Mapped[int] = mapped_column(Integer)
     kind: Mapped[str] = mapped_column(String(16), server_default=text("'scheduled'"))
+    # ADR 0122 step 2: NULL for every legacy slot; the pool a slot of a non-legacy flow draws on,
+    # and the end of its appointment plus the wrap-up, fixed at creation.
+    capacity_pool_id: Mapped[int | None] = mapped_column(
+        ForeignKey("capacity_pools.id", ondelete="RESTRICT")
+    )
+    occupied_until: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
-    # Backstop for the write lock: one scheduled slot per group and start. Direct calls
-    # (ADR 0019) each have their own slot and are not part of it.
+    # Backstop for the write lock: one legacy scheduled slot per group and start. Direct calls
+    # (ADR 0019) each have their own slot and are not part of it; neither is a pool slot, which
+    # is unique per pool, service, start and length instead (ADR 0122).
     __table_args__ = (
         Index(
             "uq_slots_group_start_scheduled",
             "group_id",
             "start",
             unique=True,
-            sqlite_where=text("kind = 'scheduled'"),
+            sqlite_where=text("kind = 'scheduled' AND capacity_pool_id IS NULL"),
         ),
+        Index(
+            "uq_slots_pool",
+            "capacity_pool_id",
+            "group_id",
+            "start",
+            "occupied_until",
+            unique=True,
+            sqlite_where=text("capacity_pool_id IS NOT NULL"),
+        ),
+        # The commitments of a pool in a window (ADR 0122).
+        Index("ix_slots_pool_start", "capacity_pool_id", "start"),
         # The group's recent direct calls, for the cap and the queue (ADR 0026).
         Index("ix_slots_group_kind_start", "group_id", "kind", "start"),
         CheckConstraint("kind IN ('scheduled', 'direct')", name="kind"),
@@ -1858,6 +1931,9 @@ class CapacityPoolRow(Base):
     )
     archived_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     code: Mapped[str | None] = mapped_column(String(40))
+    # ADR 0122 step 2: the zone the pool's weekly blocks are local to; NULL for a legacy pool
+    # and for a counted pool that has no staffing yet.
+    timezone: Mapped[str | None] = mapped_column(String(64))
 
     __table_args__ = (
         CheckConstraint("mode IN ('legacy_group', 'counted')", name="mode"),
