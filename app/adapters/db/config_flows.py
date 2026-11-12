@@ -128,11 +128,7 @@ async def read_catalogue(
                 fields={
                     "labels": json_texts(json.loads(row.labels)),
                     "archived": row.archived_at is not None,
-                    **(
-                        {"contact_center_code": row.contact_center_code}
-                        if row.contact_center_code is not None
-                        else {}
-                    ),
+                    "contact_center_code": row.contact_center_code,
                 },
             )
         )

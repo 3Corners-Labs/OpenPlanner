@@ -107,6 +107,8 @@ The readiness check *Skills* gains the reason `skill_unmapped`: a revision whose
 ### Conflicts with ADR 0081
 
 - A routing variable named `openplannerSkills`: the payload writes OpenPlanner's key last (as for `openplannerGroup`), so the variable cannot stand in for the skills. Adding the name to `RESERVED_VARIABLES` would make a stored mapping of that name unreadable (the constructor validates on load), which expand/contract forbids; the mapping form refuses it from step 4b on, and a stored one keeps loading.
+- A stored routing variable named `openplannerSkills` (from before step 4b) is dropped by the task body even when the booking requires no skill, and a configuration document may not map onto the name.
+- Taking a code away while a contact-center flow's current revision (not archived) requires the skill is refused (`configuration_object_in_use`, field `contact_center_code`), on the skill's page and in a configuration document; another code is allowed.
 - Two skills of one organisation with the same contact-center code: refused by `check_skill_save` and the partial unique index (`slug_taken`, field `contact_center_code`).
 - The total of `openplannerSkills` stays under WxCC's 512-byte value limit: at most 15 skills required by one booking times 64 bytes would exceed it, so `mapped_skill_codes` checks the joined length per task and refuses (`integration_not_ready`, `skill_codes`) above 512 bytes; a limit of the platform, a constant, not a setting.
 

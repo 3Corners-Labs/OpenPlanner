@@ -69,13 +69,25 @@ async def test_the_code_goes_out_and_comes_back(source: AsyncEngine, target: Asy
     )
 
     assert skills["german"]["contact_center_code"] == "lang_de"
-    assert "contact_center_code" not in skills["intake"]
+    assert skills["intake"]["contact_center_code"] is None  # an explicit null: exact round trip
     assert applied.applied, applied.plan.refusals
     assert await _codes(target) == {"german": "lang_de", "intake": None}
     assert again.changes == ()
 
 
-async def test_a_change_of_the_labels_keeps_the_stored_code(source: AsyncEngine) -> None:
+async def test_an_explicit_null_takes_the_code_away(source: AsyncEngine) -> None:
+    exported = await export(source)
+    german = next(s for s in exported["organisations"][0]["skills"] if s["code"] == "german")
+    german["contact_center_code"] = None
+
+    applied = await service(source).apply(HOST, encode(exported), None, None)
+
+    assert applied.applied, applied.plan.refusals
+    assert (await _codes(source))["german"] is None
+
+
+async def test_a_document_without_the_key_keeps_the_stored_code(source: AsyncEngine) -> None:
+    """An older document has no ``contact_center_code`` at all (expand/contract): keep it."""
     exported = await export(source)
     german = next(s for s in exported["organisations"][0]["skills"] if s["code"] == "german")
     german["labels"] = {"nl": "Duitse taal", "en": "German language"}

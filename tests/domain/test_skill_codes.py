@@ -12,6 +12,7 @@ import pytest
 from app.domain.admin import AdminService
 from app.domain.booking import MeetingRef
 from app.domain.call_service import CallService
+from app.domain.configuration_v1_group import _check_routing
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.flow_resolution import FlowRef
 from app.domain.integration import IntegrationService
@@ -20,8 +21,11 @@ from app.domain.routing_service import RoutingService
 from app.domain.scheduling import Organisation, ScheduleRule
 from app.domain.service_flows import (
     DispatchKind,
+    FlowState,
     ReadinessCheck,
     ReadinessReason,
+    ServiceFlow,
+    check_code_kept,
     readiness,
 )
 from app.domain.services import BookingService
@@ -206,3 +210,74 @@ async def test_a_new_routing_variable_may_not_take_the_name_of_the_codes() -> No
         "variable_name",
     )
     assert RouteVariable(name, (("move", "MV"),)).name == name
+
+
+def test_a_configuration_document_may_not_map_onto_the_name_of_the_codes() -> None:
+    routing = {
+        "subjects": [{"code": "move", "labels": {"nl": "V", "en": "M"}}],
+        "mapping": {"subject": {"name": "openplannerSkills", "values": {"move": "MV"}}},
+    }
+
+    assert _refused(lambda: _check_routing(routing, None)) == (  # type: ignore[arg-type]
+        ErrorCode.INVALID_CONFIGURATION,
+        "variable_name",
+    )
+
+
+async def test_a_code_a_contact_center_flow_needs_cannot_be_taken_away() -> None:
+    uow = InMemoryUnitOfWork(two_organisations())
+    clock = FixedClock(NOW)
+    service = SkillService(uow, clock, AdminService(uow, clock), lambda: 10)
+    skill = await service.create(ORG_ADMIN, "demo", "german", "Duits", "German")
+    assert skill.id is not None
+    await service.relabel(ORG_ADMIN, "demo", skill.id, "Duits", "German", "lang_de")
+    uow.state.flows[60] = ServiceFlow(
+        60,
+        1,
+        "cc",
+        FlowState.ACTIVE,
+        frozenset(),
+        revision(
+            flow_id=60,
+            dispatch=DispatchKind.CONTACT_CENTER,
+            required_skill_ids=frozenset({skill.id}),
+            published_at=NOW,
+        ),
+    )
+
+    with pytest.raises(DomainError) as excinfo:
+        await service.relabel(ORG_ADMIN, "demo", skill.id, "Duits", "German", "")
+
+    assert (excinfo.value.code, excinfo.value.field) == (
+        ErrorCode.CONFIGURATION_OBJECT_IN_USE,
+        "contact_center_code",
+    )
+    assert uow.state.skills[skill.id].contact_center_code == "lang_de"
+    assert await service.relabel(ORG_ADMIN, "demo", skill.id, "Duits", "German", "lang_de2")
+    uow.state.flows[60] = replace(uow.state.flows[60], state=FlowState.ARCHIVED)
+    assert await service.relabel(ORG_ADMIN, "demo", skill.id, "Duits", "German", "")
+
+
+def test_only_a_current_contact_center_revision_that_requires_the_skill_keeps_the_code() -> None:
+    def flow(**changes: object) -> ServiceFlow:
+        current = revision(
+            flow_id=1,
+            dispatch=DispatchKind.CONTACT_CENTER,
+            required_skill_ids=frozenset({10}),
+            published_at=NOW,
+        )
+        return ServiceFlow(1, 1, "cc", FlowState.ACTIVE, frozenset(), replace(current, **changes))
+
+    with pytest.raises(DomainError):
+        check_code_kept(10, "lang_de", None, [flow()])
+    with pytest.raises(DomainError):  # the subject's extra skill counts as well
+        check_code_kept(
+            10,
+            "lang_de",
+            None,
+            [flow(required_skill_ids=frozenset(), subject_skill_ids={"a": frozenset({10})})],
+        )
+    check_code_kept(10, "lang_de", "other", [flow()])
+    check_code_kept(10, "lang_de", None, [flow(dispatch=DispatchKind.OWN_QUEUE)])
+    check_code_kept(10, "lang_de", None, [flow(required_skill_ids=frozenset({11}))])
+    check_code_kept(10, None, None, [flow()])

@@ -318,6 +318,32 @@ def requirement_of(revision: FlowRevision | None, subject: str | None) -> frozen
     return effective_requirements(revision.required_skill_ids, extra)
 
 
+def check_code_kept(
+    skill_id: int, before: str | None, after: str | None, flows: Iterable[ServiceFlow]
+) -> None:
+    """Refuse taking a skill's contact-center code away while a flow dispatches on it.
+
+    A flow that is not archived and whose current (published) revision dispatches to the
+    contact center and requires the skill, for itself or a subject, needs the code: without it
+    every dispatch of its bookings would be refused (ADR 0121 step 4b). Changing the code to
+    another one is allowed.
+
+    Raises:
+        DomainError: ``configuration_object_in_use`` (field ``contact_center_code``).
+    """
+    if before is None or after is not None:
+        return
+    for flow in flows:
+        current = flow.current
+        if (
+            flow.state is not FlowState.ARCHIVED
+            and current is not None
+            and current.dispatch is DispatchKind.CONTACT_CENTER
+            and skill_id in current.all_skill_ids
+        ):
+            raise DomainError(ErrorCode.CONFIGURATION_OBJECT_IN_USE, "contact_center_code")
+
+
 def revisions_in_effect(flow: ServiceFlow) -> tuple[FlowRevision, ...]:
     """Return the revisions of ``flow`` that count: the current one and the draft.
 

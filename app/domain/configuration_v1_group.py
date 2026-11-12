@@ -86,6 +86,7 @@ from app.domain.form_fields import (
 )
 from app.domain.form_fields import FieldType as FormFieldType
 from app.domain.message_texts import clean_text
+from app.domain.routing import RESERVED_FROM_NOW
 from app.domain.routing_codec import routing_from_json, routing_to_json
 from app.domain.scheduling import (
     MAX_BOOKINGS_PER_EMAIL,
@@ -259,8 +260,18 @@ def _check_contact_center(value: Value, ctx: RuleContext) -> Value:
 
 
 def _check_routing(value: Value, ctx: RuleContext) -> Value:
-    """Check a group's routing as the routing screens do; return it as it is stored."""
-    return cast("Json", routing_to_json(routing_from_json(value)))
+    """Check a group's routing as the routing screens do; return it as it is stored.
+
+    A mapping onto a name OpenPlanner sends itself since ADR 0121 step 4b (``RESERVED_FROM_NOW``)
+    is refused, as the mapping form refuses it.
+
+    Raises:
+        DomainError: ``invalid_configuration`` (``variable_name``) for such a name.
+    """
+    routing = routing_from_json(value)
+    if any(variable.name in RESERVED_FROM_NOW for _, variable in routing.mapping):
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "variable_name")
+    return cast("Json", routing_to_json(routing))
 
 
 def _build_group(view: Mapping[str, Value], ctx: RuleContext) -> Group:

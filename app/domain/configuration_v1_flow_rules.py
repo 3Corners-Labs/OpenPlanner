@@ -95,6 +95,7 @@ from app.domain.service_flows import (
     ServiceFlow,
     can_activate,
     check_built_choices,
+    check_code_kept,
     check_default_paths,
     check_draft_identity,
     check_flow_references,
@@ -405,7 +406,8 @@ class _Run:
 
 
 def _skill_rules(run: _Run) -> Iterator[Refusal]:
-    """A skill is checked as the screen saves it."""
+    """A skill is checked as the screen saves it, its contact-center code kept while in use."""
+    stored_skills = dict(walk(run.resolution.current, SKILL_KIND))
     for change in run.resolution.changes:
         if change.kind != SKILL_KIND or change.action not in _WRITES:
             continue
@@ -426,6 +428,14 @@ def _skill_rules(run: _Run) -> Iterator[Refusal]:
                 False,
                 same_contact_center_code_exists=twins,
             )
+            before = stored_skills.get(change.address)
+            if before is not None and skill.id is not None:
+                check_code_kept(
+                    skill.id,
+                    _contact_code(before.fields.get("contact_center_code")),
+                    skill.contact_center_code,
+                    run.built_flows().values(),
+                )
         except DomainError as error:
             yield _refusal(change.path, error)
 

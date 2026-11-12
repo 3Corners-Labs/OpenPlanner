@@ -43,3 +43,9 @@ def test_a_task_without_skills_has_no_skill_key() -> None:
 def test_a_routing_variable_cannot_stand_in_for_the_codes() -> None:
     forced = replace(TASK, variables=((SKILLS_KEY, "forged"),), skills=("lang_de",))
     assert _settings(forced) == {SKILLS_KEY: "lang_de", ROUTING_KEY: "demo"}
+
+
+def test_a_stored_variable_of_that_name_never_reaches_a_task_without_skills() -> None:
+    """A mapping stored before step 4b may carry the name; the body drops it all the same."""
+    stored = replace(TASK, variables=(("topic", "MOVE"), (SKILLS_KEY, "forged")))
+    assert _settings(stored) == {"topic": "MOVE", ROUTING_KEY: "demo"}

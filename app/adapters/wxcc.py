@@ -158,7 +158,7 @@ def task_body(item: ContactCenterTask, alias_id: str, timestamp_ms: int) -> dict
         "channelType": "workItem",
         "channel": channel,
         "flowSettings": {
-            **dict(item.variables),
+            **{name: value for name, value in item.variables if name != SKILLS_KEY},
             **({SKILLS_KEY: ",".join(item.skills)} if item.skills else {}),
             ROUTING_KEY: item.routing_value,
         },

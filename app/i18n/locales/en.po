@@ -12386,6 +12386,9 @@ msgstr "Another skill of your organisation already has this code. Choose another
 msgid "admin.skills.error.contact_center_code"
 msgstr "Use only letters, digits and _ . : - (at most 64 characters)."
 
+msgid "admin.skills.error.contact_center_code_in_use"
+msgstr "A flow that sends work to the contact center requires this skill, so the code cannot be taken away. Give another code, or change or archive that flow first."
+
 msgid "admin.skills.error.choice"
 msgstr "A chosen skill no longer exists or can no longer be newly chosen. Reload the page and choose again."
 

@@ -27,6 +27,7 @@ from app.domain.errors import DomainError, ErrorCode, missing_object
 from app.domain.organisations import organisation_by_slug, own_object
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Organisation
+from app.domain.service_flows import ServiceFlow, check_code_kept
 from app.domain.skills import Skill, SkillUsage
 from app.domain.tunable import value_of
 
@@ -250,8 +251,10 @@ class SkillService:
         Raises:
             DomainError: ``not_permitted``, ``organisation_not_found``,
                 ``configuration_object_missing`` (also for an archived skill),
-                ``invalid_configuration`` (``skill_label``, ``contact_center_code``) or
-                ``slug_taken`` (``contact_center_code`` of another skill).
+                ``invalid_configuration`` (``skill_label``, ``contact_center_code``),
+                ``slug_taken`` (``contact_center_code`` of another skill) or
+                ``configuration_object_in_use`` (``contact_center_code``: the code is taken away
+                while a contact-center flow's current revision requires the skill).
         """
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.locked() as tx:
@@ -272,6 +275,13 @@ class SkillService:
                 current.contact_center_code,
             ):
                 return False
+            if current.contact_center_code is not None and changed.contact_center_code is None:
+                check_code_kept(
+                    skill_id,
+                    current.contact_center_code,
+                    None,
+                    await _organisation_flows(tx, scope, slug),
+                )
             await tx.save_skill(scope, changed)
             await self._record(tx, principal, slug, f"{CHANGED},skill:{current.code}")
         return True
@@ -362,6 +372,15 @@ class SkillService:
             detail = ",".join([GRANTS_CHANGED, f"staff:{member_id}", *changes])
             await self._record(tx, principal, slug, detail, now)
         return True
+
+
+async def _organisation_flows(tx: Transaction, scope: Scope, slug: str) -> list[ServiceFlow]:
+    """Return the flows of every service of organisation ``slug`` inside ``scope``."""
+    flows: list[ServiceFlow] = []
+    for summary in await tx.list_groups(scope):
+        if summary.organisation_slug == slug:
+            flows += await tx.list_service_flows(scope, summary.group.id)
+    return flows
 
 
 async def _own_active_skill(
