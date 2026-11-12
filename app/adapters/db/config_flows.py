@@ -40,7 +40,7 @@ from app.adapters.db.config_common import (
     row_or_refuse,
 )
 from app.adapters.db.flow_usage import (
-    flows_in_use,
+    flows_kept,
     pools_referred_to,
     skills_referred_to,
 )
@@ -57,6 +57,7 @@ from app.adapters.db.models import (
     SubjectFlowSkillRow,
 )
 from app.adapters.db.service_flows import (
+    delete_flow_row,
     prune_unpublished_revisions,
     set_flow_defaults,
     write_flow_pointers,
@@ -330,7 +331,7 @@ async def read_usage_of_flows(session: AsyncSession) -> dict[str, frozenset[tupl
 
     A skill is in use when a person holds it, a pool guarantees it or any revision (old ones
     too) or subject requires it; a counted pool when any revision draws on it; a flow when a
-    booking was made under it or it has any published revision. Such an object is archived,
+    booking refers to it or it is or was active. Such an object is archived,
     never deleted, by a document that leaves it out or deletes it, because deleting it would
     silently remove history or grants. The definitions are in ``app.adapters.db.flow_usage``.
     """
@@ -352,7 +353,7 @@ async def read_usage_of_flows(session: AsyncSession) -> dict[str, frozenset[tupl
         select(OrganisationRow.slug, GroupRow.slug, ServiceFlowRow.code)
         .join(GroupRow, GroupRow.id == ServiceFlowRow.group_id)
         .join(OrganisationRow, OrganisationRow.id == GroupRow.organisation_id)
-        .where(ServiceFlowRow.id.in_(flows_in_use()))
+        .where(ServiceFlowRow.id.in_(flows_kept()))
     )
     return {
         SKILL_KIND: frozenset((org, code) for org, code in skills.all()),
@@ -527,7 +528,7 @@ async def write_service_flow(session: AsyncSession, box: SecretBox | None, chang
     row = await _flow_row(session, change) if change.action is not ChangeAction.CREATE else None
     if change.action is ChangeAction.DELETE:
         if row is not None:
-            await session.delete(row)
+            await delete_flow_row(session, row)
         return
     names, values = _names(change), change.values
     if change.action is ChangeAction.CREATE:

@@ -21,7 +21,7 @@ from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 
-from app.domain.admin import AdminService, record_change
+from app.domain.admin import AdminService
 from app.domain.authorization import Permission, Principal, Scope, scope_for
 from app.domain.capacity import CapacityPool, PoolFlows, PoolMode
 from app.domain.errors import DomainError, ErrorCode, missing_object
@@ -148,6 +148,19 @@ class CapacityService:
         self._clock = clock
         self._admin = admin
         self._max = max_pools
+
+    async def _record(
+        self,
+        tx: Transaction,
+        principal: Principal,
+        slug: str,
+        detail: str,
+        at: datetime | None = None,
+    ) -> None:
+        """Audit a change of the organisation in the transaction that made it."""
+        await self._admin.record_change(
+            tx, at or self._clock.now(), principal, _PERMISSION, slug, None, detail
+        )
 
     async def overview(
         self, principal: Principal, slug: str, *, archived: bool = False
@@ -300,17 +313,6 @@ class CapacityService:
             now = self._clock.now()
             await tx.archive_capacity_pool(scope, pool_id, now)
             await self._record(tx, principal, slug, f"{ARCHIVED},pool:{_ref(pool)}", now)
-
-    async def _record(
-        self,
-        tx: Transaction,
-        principal: Principal,
-        slug: str,
-        detail: str,
-        at: datetime | None = None,
-    ) -> None:
-        """Audit a change of the pools in the transaction that made it (codes only)."""
-        await record_change(tx, at or self._clock.now(), principal, _PERMISSION, slug, None, detail)
 
 
 def _ref(pool: CapacityPool) -> str:

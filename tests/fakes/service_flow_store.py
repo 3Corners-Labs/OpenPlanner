@@ -36,6 +36,7 @@ from app.domain.service_flows import (
     ServiceFlow,
     check_default_paths,
     check_draft_save,
+    check_flow_delete,
     check_flow_references,
     check_publishable,
     check_state_change,
@@ -427,11 +428,19 @@ class ServiceFlowStore:
             raise missing_object("flow_id")
         if flow.draft is None:
             raise missing_object("draft")
-        self.state.flow_revisions.pop((flow_id, flow.draft.revision), None)
         if flow.current is None:
-            del self.state.flows[flow_id]
-        else:
-            self.state.flows[flow_id] = replace(flow, draft=None)
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "state")
+        self.state.flow_revisions.pop((flow_id, flow.draft.revision), None)
+        self.state.flows[flow_id] = replace(flow, draft=None)
+
+    async def delete_service_flow(self, scope: Scope, flow_id: int) -> None:
+        flow = self._scoped_flow(scope, flow_id)
+        if flow is None:
+            raise missing_object("flow_id")
+        check_flow_delete(flow, False)  # the domain's Booking carries no flow until step 3
+        for key in [k for k in self.state.flow_revisions if k[0] == flow_id]:
+            del self.state.flow_revisions[key]
+        del self.state.flows[flow_id]
 
     async def set_flow_state(self, scope: Scope, flow_id: int, state: FlowState) -> ServiceFlow:
         flow = self._scoped_flow(scope, flow_id)

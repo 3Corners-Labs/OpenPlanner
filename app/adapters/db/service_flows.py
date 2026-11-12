@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.adapters.db.capacity_pools import pools_from_rows
+from app.adapters.db.flow_usage import flows_with_bookings
 from app.adapters.db.models import (
     CapacityPoolRow,
     FlowRevisionRow,
@@ -65,6 +66,7 @@ from app.domain.service_flows import (
     ServiceFlow,
     check_default_paths,
     check_draft_save,
+    check_flow_delete,
     check_flow_references,
     check_publishable,
     check_revision_editable,
@@ -175,6 +177,27 @@ async def prune_unpublished_revisions(
             FlowRevisionRow.revision != (draft_revision or -1),
         )
     )
+
+
+async def delete_flow_row(session: AsyncSession, row: ServiceFlowRow) -> None:
+    """Delete a flow that was never active, with all its revisions and child rows.
+
+    The one writer of a flow's deletion: the portal's delete and a configuration document that
+    leaves out or deletes a flow call it, after the same rule (``check_flow_delete``). The
+    database removes the revisions, their skills and subjects with the flow row (cascades).
+
+    Raises:
+        DomainError: What ``check_flow_delete`` refuses.
+    """
+    (flow,) = await _Reader(session)._flows([row])
+    referred = await session.scalar(
+        select(ServiceFlowRow.id).where(
+            ServiceFlowRow.id == row.id, ServiceFlowRow.id.in_(flows_with_bookings())
+        )
+    )
+    check_flow_delete(flow, referred is not None)
+    await session.delete(row)
+    await session.flush()
 
 
 async def write_revision(
@@ -548,11 +571,12 @@ class ServiceFlowQueries:
         return (await self._flows([row]))[0]
 
     async def discard_draft(self, scope: Scope, flow_id: int) -> None:
-        """Delete the flow's unpublished draft; a flow never published goes with it.
+        """Delete the flow's unpublished draft; the published revision stays.
 
         Raises:
             DomainError: ``configuration_object_missing`` for a flow outside ``scope`` or a flow
-                without a draft (field ``draft``).
+                without a draft (field ``draft``), ``invalid_configuration`` (field ``state``)
+                for a flow never published: that one is deleted (``delete_service_flow``).
         """
         row = await self._flow_row(scope, flow_id)
         if row is None:
@@ -560,11 +584,22 @@ class ServiceFlowQueries:
         if row.draft_revision is None:
             raise missing_object("draft")
         if row.current_revision is None:
-            await self._session.delete(row)  # the database removes the revision with it
-        else:
-            write_flow_pointers(row, current_revision=row.current_revision, draft_revision=None)
-            await prune_unpublished_revisions(self._session, flow_id, None)
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "state")
+        write_flow_pointers(row, current_revision=row.current_revision, draft_revision=None)
+        await prune_unpublished_revisions(self._session, flow_id, None)
         await self._session.flush()
+
+    async def delete_service_flow(self, scope: Scope, flow_id: int) -> None:
+        """Delete a flow that was never active, with all its revisions and child rows.
+
+        Raises:
+            DomainError: ``configuration_object_missing`` for a flow outside ``scope``, and what
+                ``check_flow_delete`` refuses.
+        """
+        row = await self._flow_row(scope, flow_id)
+        if row is None:
+            raise missing_object("flow_id")
+        await delete_flow_row(self._session, row)
 
     async def set_flow_state(self, scope: Scope, flow_id: int, state: FlowState) -> ServiceFlow:
         """Change the state of a flow: draft to active, active to archived, archived to active.
@@ -595,3 +630,11 @@ class ServiceFlowQueries:
         write_flow_state(row, state)
         await self._session.flush()
         return (await self._flows([row]))[0]
+
+
+class _Reader(ServiceFlowQueries):
+    """``ServiceFlowQueries`` over a bare session, for the writers that have no transaction."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Keep the session the reads go through."""
+        self._session = session

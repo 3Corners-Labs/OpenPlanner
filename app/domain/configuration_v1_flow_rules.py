@@ -5,8 +5,9 @@ leave behind into one *run*: the skills, pools, groups and flows of every organi
 domain objects of the admin screens (``Skill``, ``CapacityPool``, ``ServiceFlow``,
 ``FlowRevision``), with ids that are only there for this run. Then they call the very functions
 the screens call (``check_skill_save``, ``check_pool_save``, ``check_pool_archive``,
-``check_draft_save``, ``check_publishable``, ``check_flow_references``, ``check_default_paths``,
-``check_state_change``, ``check_revision_editable``, ``readiness``), and the constructors of the
+``check_draft_identity``, ``check_built_choices``, ``check_publishable``,
+``check_flow_references``, ``check_default_paths``, ``check_state_change``,
+``check_revision_editable``, ``readiness``), and the constructors of the
 domain objects run their own invariants, so no rule of the screens is written out a second time
 here. The run is built once per resolution and shared by every rule below.
 
@@ -19,7 +20,8 @@ How a document may bring a revision into being. A flow the installation does not
 * **Restoring** imports every revision of the flow as it was recorded, published or draft,
   because an export of valid data must import into an empty installation: archiving keeps what
   existing revisions require, so a revision may name a skill or pool archived since, or a subject
-  the service no longer offers. What a restore still checks: every skill and pool a revision names
+  the service no longer offers, or a pool that is a service's own staffing (``restoring`` in
+  ``check_flow_references``). What a restore still checks: every skill and pool a revision names
   is in the resulting tree and belongs to the service's organisation (a pool the document creates
   may also still guarantee a skill archived since), a legacy pool is named only
   by its own service's flows, the legacy shape, numbers without a gap from 1, ``published_at``
@@ -32,10 +34,15 @@ How a document may bring a revision into being. A flow the installation does not
   skipped. A revision the document *publishes* is checked as publishing in the portal is:
   ``check_flow_references`` against the stored current revision (an archived skill or pool, or a
   subject no longer offered, is accepted only where that revision already had it),
-  ``check_publishable`` for the one that becomes current, a ``published_at`` that is not in the
+  ``check_publishable`` and ``check_publish_ready`` (every checklist point in order but the ones
+  that follow) for the one that becomes current, a ``published_at`` that is not in the
   future (``RuleContext.now``) and later than that of every revision before it, and numbers
-  without a gap. A *draft* is checked as a save in the portal is (``check_draft_save`` against the
-  stored flow, ``check_flow_references`` against the stored draft, else the current revision).
+  without a gap. A *draft* is checked as a save in the portal is (``check_draft_identity`` against
+  the stored flow, ``check_built_choices`` for what ADR 0121 has not built, and
+  ``check_flow_references`` against the stored draft, else the current revision); the schema of
+  the document has checked the labels, the duration and the combination already, so those are
+  not asked twice. A draft is never restored: it draws on a counted pool and on built choices
+  only, as one saved in the portal does.
 * An unpublished revision that is not the flow's draft is refused in both cases: the writer would
   delete it when the draft moves on, and a plan shows only what apply does.
 
@@ -87,9 +94,11 @@ from app.domain.service_flows import (
     IntakeMode,
     ServiceFlow,
     can_activate,
+    check_built_choices,
     check_default_paths,
-    check_draft_save,
+    check_draft_identity,
     check_flow_references,
+    check_publish_ready,
     check_publishable,
     check_revision_editable,
     check_state_change,
@@ -274,7 +283,7 @@ class _Run:
         self._stored: dict[Address, ServiceFlow | None] = {}
 
     def pool_for(self, address: Address, fields: Mapping[str, Value]) -> CapacityPool | None:
-        """Return the pool a revision's fields name, ``None`` when it names none.
+        """Return the pool a revision's fields name, ``None`` when it names none (or two).
 
         A group's legacy pool is named by the group's slug and only by the group's own flows.
 
@@ -283,8 +292,8 @@ class _Run:
                 another group, ``configuration_object_missing`` for a pool not in the tree.
         """
         code, legacy_of = fields.get("capacity_pool"), fields.get("legacy_pool_of")
-        if code is None and legacy_of is None:
-            return None
+        if (code is None) == (legacy_of is None):
+            return None  # none named; or both, which the schema of the revision refuses, once
         if legacy_of is not None:
             if legacy_of != address[1]:
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, "legacy_pool_of")
@@ -601,12 +610,18 @@ def _check_revision(
 
 
 def _check_references(
-    run: _Run, address: Address, built: FlowRevision, based_on: FlowRevision | None
+    run: _Run,
+    address: Address,
+    built: FlowRevision,
+    based_on: FlowRevision | None,
+    *,
+    restoring: bool = False,
 ) -> None:
     """Run ``check_flow_references`` for a revision against the world of this run.
 
     ``based_on`` is the revision whose choices may stay although archived or removed since: the
     stored one when the flow is changed, the revision itself when the flow is restored.
+    ``restoring`` is true for a published revision of a flow the installation lacks.
     """
     pool = run.world.pool_by_id.get(built.capacity_pool_id or 0)
     offered = run.world.subjects.get(address[1], frozenset())
@@ -619,6 +634,7 @@ def _check_references(
         offered | frozenset(based_on.subject_skill_ids if based_on else ()),
         group_id=run.world.groups[address[1]],
         already_pool_id=based_on.capacity_pool_id if based_on else None,
+        restoring=restoring,
     )
 
 
@@ -631,18 +647,21 @@ def _check_draft(run: _Run, address: Address, built: FlowRevision, flow: Service
     compare with, and the draft keeps what it was recorded with.
 
     Raises:
-        DomainError: What ``check_draft_save`` and ``check_flow_references`` refuse.
+        DomainError: What ``check_draft_identity``, ``check_built_choices`` and
+            ``check_flow_references`` refuse.
     """
     stored = run.stored(address)
     if stored is None:
         if flow.current is None:
-            check_draft_save(replace(flow, id=None), None, False)
+            check_draft_identity(replace(flow, id=None), None, False)
         # With a current revision there is no stored flow to compare code and defaults with, and
         # the draft's own flags are held by ``check_legacy_shape`` (a legacy draft has no
         # ``published_at``) and by ``FlowRevision``; a call would compare the flow with itself.
+        check_built_choices(built)
         _check_references(run, address, built, built)
         return
-    check_draft_save(flow, stored, False)
+    check_draft_identity(flow, stored, False)
+    check_built_choices(built)
     published_now = flow.current is not None and (
         stored.current is None or flow.current.revision != stored.current.revision
     )
@@ -681,7 +700,17 @@ def _check_publication(run: _Run, address: Address, number: int, built: FlowRevi
             )
         )
     stored = run.stored(address)
-    _check_references(run, address, built, built if stored is None else stored.current)
+    _check_references(
+        run, address, built, built if stored is None else stored.current, restoring=stored is None
+    )
+    if stored is not None:
+        # A flow the installation has: every revision this document newly publishes is held to
+        # the portal's rule for publishing, as the portal gates each publish. A restored
+        # revision is history as it was recorded.
+        pool = run.world.pool_by_id.get(built.capacity_pool_id or 0)
+        check_publish_ready(
+            readiness(built, pool, offered_subjects=run.world.subjects.get(address[1], ()))
+        )
 
 
 def _check_state(run: _Run, address: Address, built: ServiceFlow) -> Iterator[Refusal]:
@@ -689,8 +718,10 @@ def _check_state(run: _Run, address: Address, built: ServiceFlow) -> Iterator[Re
     path = _flow_path(address)
     old = run.before.get(address)
     if address in run.archived:
-        if built.current is None:
-            yield Refusal(path, ErrorCode.CONFIGURATION_DRAFT_FLOW_IN_USE, "draft_revision")
+        # A flow that was never active is deleted, never archived (``check_flow_delete``); one a
+        # booking still refers to cannot be deleted, so it is refused here.
+        if old is not None and old.fields.get("state") == FlowState.DRAFT.value:
+            yield Refusal(path, ErrorCode.CONFIGURATION_DRAFT_FLOW_IN_USE, "state")
         return
     if old is not None and old.fields.get("state") != built.state.value:
         try:

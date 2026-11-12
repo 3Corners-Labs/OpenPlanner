@@ -99,6 +99,7 @@ from app.domain.embedding_service import EmbeddingService
 from app.domain.entitlements import ClaimMode
 from app.domain.event_context import set_service
 from app.domain.fallback import FallbackService
+from app.domain.flow_service import FlowService
 from app.domain.form_service import FormService
 from app.domain.holiday_service import HolidayService
 from app.domain.identity_provider_service import IdentityProviderService
@@ -715,6 +716,9 @@ def create_app(
             clock,
             app.state.admin_service,
             lambda: live().max_capacity_pools_per_organisation,
+        )
+        app.state.flow_service = FlowService(
+            uow, clock, app.state.admin_service, lambda: live().max_flows_per_service
         )
         app.state.agenda_service = AgendaService(
             uow,

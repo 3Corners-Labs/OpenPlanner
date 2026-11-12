@@ -7,9 +7,10 @@ import pytest
 
 from app.i18n import CATALOGUE_DIR, DEFAULT_LOCALE, load_catalogues, placeholders
 from app.i18n.terms import AgentTermPlaceholders
+from tests.support.locales import REQUIRED_LOCALES
 
 APP = Path(__file__).resolve().parents[2] / "app"
-REQUIRED = ("nl", "en")
+REQUIRED = REQUIRED_LOCALES
 _KEY = r"[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+"
 # Keys passed to _() / gettext(locale, ...) in code and templates.
 _CALLS = re.compile(rf"""(?:\b_\(\s*|\bgettext\([^,()]+,\s*)["']({_KEY})["']""")

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.configuration_json import JsonCodec
@@ -32,6 +32,7 @@ from app.adapters.db.models import (
     SubjectFlowRow,
     SubjectFlowSkillRow,
 )
+from app.adapters.db.service_flows import delete_flow_row
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.admin import AdminService
 from app.domain.configuration_changes import ChangeAction, RuleContext
@@ -585,7 +586,7 @@ async def book_appointment(engine: AsyncEngine) -> None:
         )
 
 
-async def test_what_a_replace_document_leaves_out_is_archived_when_it_is_in_use(
+async def test_what_a_replace_document_leaves_out_is_archived_or_deleted_by_what_it_was(
     source: AsyncEngine,
 ) -> None:
     await book_appointment(source)
@@ -602,7 +603,9 @@ async def test_what_a_replace_document_leaves_out_is_archived_when_it_is_in_use(
     lines = plan.lines()
     assert plan.refusals == ()
     assert "archive service_flow acme/helpdesk/appointment: state" in lines  # booked
-    assert "archive service_flow acme/loket/telefoon: state" in lines  # it has a published revision
+    assert (
+        "delete service_flow acme/loket/telefoon" in lines
+    )  # never active: deleted, though published
     assert "archive skill acme/passport: archived" in lines  # a person holds it
     assert "delete skill acme/old" in lines  # archived and unused
     assert "archive capacity_pool acme/kantoor: archived" in lines
@@ -617,11 +620,11 @@ async def test_what_a_replace_document_leaves_out_is_archived_when_it_is_in_use(
         assert appointment is not None
         assert appointment.state == "archived"
         assert await session.get(FlowRevisionRow, (appointment.id, 1)) is not None
-        telefoon = await session.scalar(
-            select(ServiceFlowRow).where(ServiceFlowRow.code == "telefoon")
-        )
-        assert telefoon is not None
-        assert telefoon.state == "archived"  # a flow with a published revision is never deleted
+        assert (
+            await session.scalar(select(ServiceFlowRow).where(ServiceFlowRow.code == "telefoon"))
+            is None
+        )  # a flow that was never active goes with its revisions
+        assert await session.scalar(select(func.count()).select_from(FlowRevisionRow)) > 0
         passport = await session.scalar(select(SkillRow).where(SkillRow.code == "passport"))
         assert passport is not None
         assert passport.archived_at is not None
@@ -632,6 +635,65 @@ async def test_what_a_replace_document_leaves_out_is_archived_when_it_is_in_use(
         assert kantoor is not None
         assert kantoor.archived_at is not None
         assert (await session.scalars(select(StaffSkillRow))).all()  # the grant is untouched
+
+
+async def book_telefoon(engine: AsyncEngine) -> int:
+    """Make a booking refer to the flow ``telefoon`` (never active); return the flow's id."""
+    async with AsyncSession(engine) as session, session.begin():
+        flow = await session.scalar(select(ServiceFlowRow).where(ServiceFlowRow.code == "telefoon"))
+        group = await session.scalar(select(GroupRow).where(GroupRow.slug == "loket"))
+        assert flow is not None
+        assert group is not None
+        slot = SlotRow(group_id=group.id, start=NOW, end=NOW, capacity_snapshot=1)
+        session.add(slot)
+        await session.flush()
+        session.add(
+            BookingRow(
+                slot_id=slot.id,
+                group_id=group.id,
+                status="cancelled",
+                locale="nl",
+                management_token_hash="b" * 64,
+                public_ref="ref-b",
+                created_at=NOW,
+                flow_id=flow.id,
+                flow_revision=1,
+            )
+        )
+        return int(flow.id)
+
+
+async def test_a_flow_a_booking_refers_to_is_not_deleted_by_the_writer(
+    source: AsyncEngine,
+) -> None:
+    flow_id = await book_telefoon(source)
+
+    async with AsyncSession(source) as session, session.begin():
+        row = await session.get(ServiceFlowRow, flow_id)
+        assert row is not None
+        with pytest.raises(DomainError) as refused:
+            await delete_flow_row(session, row)
+
+    assert (refused.value.code, refused.value.field) == (
+        ErrorCode.CONFIGURATION_OBJECT_IN_USE,
+        "flow_id",
+    )
+
+
+async def test_a_flow_never_active_that_a_booking_refers_to_is_not_deleted_nor_archived(
+    source: AsyncEngine,
+) -> None:
+    await book_telefoon(source)
+    exported = await export(source)
+    exported["mode"] = "replace"
+    for found in exported["organisations"][0]["groups"]:
+        found["flows"] = [f for f in found.get("flows", []) if f["code"] != "telefoon"]
+
+    plan = await service(source).plan(HOST, encode(exported), None)
+
+    assert [(r.code, r.field) for r in plan.refusals] == [
+        (ErrorCode.CONFIGURATION_DRAFT_FLOW_IN_USE, "state")
+    ]
 
 
 # --- history is immutable ---------------------------------------------------------------

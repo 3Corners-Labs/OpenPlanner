@@ -8972,7 +8972,7 @@ msgid "admin.form.error.configuration_revision_published"
 msgstr "A published revision is history and cannot be changed or removed. Add a new revision instead."
 
 msgid "admin.form.error.configuration_draft_flow_in_use"
-msgstr "A flow that was never published cannot be archived while something still refers to it. Discard its draft in the portal first, then leave the flow out again."
+msgstr "A flow that has never been active cannot be archived. A booking still refers to it, so it cannot be deleted either."
 
 msgid "admin.form.error.configuration_pool_without_code"
 msgstr "A capacity pool has no code, so it cannot be addressed in a document. Archive it and add it again in the portal, which gives it a code."
@@ -10103,6 +10103,9 @@ msgstr "Skills per organisation (at most)"
 
 msgid "settings.field.max_capacity_pools_per_organisation.label"
 msgstr "Capacity pools per organisation (at most)"
+
+msgid "settings.field.max_flows_per_service.label"
+msgstr "Flows per service (at most)"
 
 msgid "admin.tab.planning"
 msgstr "Planning"
@@ -12300,7 +12303,7 @@ msgid "admin.skills.col.used_by"
 msgstr "Used by"
 
 msgid "admin.skills.used_by"
-msgstr "Pools: {pools}, flows: {flows}"
+msgstr "Capacity pools: {pools}, flows: {flows}"
 
 msgid "admin.skills.staff_count"
 msgstr "Staff with this skill: {count}"
@@ -12351,7 +12354,7 @@ msgid "admin.skills.archive_effect_keeps"
 msgstr "Existing requests, requirements and grants keep the skill; nothing changes for work that was already accepted."
 
 msgid "admin.skills.archive_effect_listed"
-msgstr "You find the skill under Show archived skills. It cannot be deleted."
+msgstr "You find the skill under {filter_label}. It cannot be deleted."
 
 msgid "admin.skills.archive_button"
 msgstr "Archive skill"
@@ -12423,7 +12426,7 @@ msgid "admin.skills.limit_reached"
 msgstr "The maximum of {count} skills is reached. Archive a skill you no longer use to add a new one."
 
 msgid "admin.capacity.limit_reached"
-msgstr "The maximum of {count} own and shared pools is reached. Archive a pool you no longer use to add a new one."
+msgstr "The maximum of {count} own and shared capacity pools is reached. Archive a capacity pool you no longer use to add a new one."
 
 msgid "admin.capacity.title"
 msgstr "Capacity pools"
@@ -12628,3 +12631,672 @@ msgstr "skill {value} granted"
 
 msgid "admin.audit.detail.skill_remove"
 msgstr "skill {value} taken away"
+
+msgid "admin.tab.flows"
+msgstr "Flows"
+
+msgid "admin.flows.title"
+msgstr "Flows of this service"
+
+msgid "admin.flows.count"
+msgstr "Flows ({count})"
+
+msgid "admin.flows.archived_heading"
+msgstr "Archived flows"
+
+msgid "admin.flows.lead"
+msgstr "A flow determines how a request is handled: how it comes in, the contact channel, capacity and skills. You choose the name yourself; it determines nothing."
+
+msgid "admin.flows.archived_only"
+msgstr "Archived flows only"
+
+msgid "admin.flows.filter_flows"
+msgstr "for flows"
+
+msgid "admin.flows.col.name"
+msgstr "Name"
+
+msgid "admin.flows.col.code"
+msgstr "Code"
+
+msgid "admin.flows.col.intake"
+msgstr "Intake"
+
+msgid "admin.flows.col.channel"
+msgstr "Contact channel"
+
+msgid "admin.flows.col.pool"
+msgstr "Capacity pool"
+
+msgid "admin.flows.col.skills"
+msgstr "Required skills"
+
+msgid "admin.flows.col.state"
+msgstr "State"
+
+msgid "admin.flows.legacy_note"
+msgstr "This service's existing way of working. This flow follows the service's settings and cannot be changed here."
+
+msgid "admin.flows.read_only"
+msgstr "Read only"
+
+msgid "admin.flows.not_chosen"
+msgstr "Not chosen yet"
+
+msgid "admin.flows.no_skills"
+msgstr "None"
+
+msgid "admin.flows.in_progress"
+msgstr "Draft in progress"
+
+msgid "admin.flows.view"
+msgstr "View"
+
+msgid "admin.flows.none"
+msgstr "This service has no flows yet."
+
+msgid "admin.flows.none_archived"
+msgstr "This service has no archived flows."
+
+msgid "admin.flows.new"
+msgstr "New flow"
+
+msgid "admin.flows.limit_reached"
+msgstr "This service has reached the maximum number of flows ({count}). Archive a flow you no longer use first."
+
+msgid "admin.flows.new_heading"
+msgstr "New flow"
+
+msgid "admin.flows.back"
+msgstr "Back to the flows"
+
+msgid "admin.flows.back_to_flow"
+msgstr "Back to the flow"
+
+msgid "admin.flows.form_heading"
+msgstr "Details of the flow"
+
+msgid "admin.flows.section.name"
+msgstr "Name"
+
+msgid "admin.flows.section.intake"
+msgstr "Intake and contact"
+
+msgid "admin.flows.section.capacity"
+msgstr "Capacity and skills"
+
+msgid "admin.flows.section.handling"
+msgstr "Handling"
+
+msgid "admin.flows.code"
+msgstr "Code"
+
+msgid "admin.flows.code_hint"
+msgstr "Lower-case letters, digits and hyphens, at most 40 characters. The code is the flow's address and cannot be changed later."
+
+msgid "admin.flows.code_fixed"
+msgstr "The code is fixed."
+
+msgid "admin.flows.label_nl"
+msgstr "Name in Dutch"
+
+msgid "admin.flows.label_en"
+msgstr "Name in English"
+
+msgid "admin.flows.name_hint"
+msgstr "Participants see this name. The name does not determine how the flow works."
+
+msgid "admin.flows.intake"
+msgstr "How does a request come in?"
+
+msgid "admin.flows.summary.intake"
+msgstr "Intake"
+
+msgid "admin.flows.intake.appointment"
+msgstr "By appointment"
+
+msgid "admin.flows.intake.on_demand"
+msgstr "On demand, without an appointment"
+
+msgid "admin.flows.contact_channel"
+msgstr "Contact channel"
+
+msgid "admin.flows.kind.video"
+msgstr "Video call"
+
+msgid "admin.flows.kind.telephone"
+msgstr "Telephone"
+
+msgid "admin.flows.kind.in_person"
+msgstr "In person"
+
+msgid "admin.flows.kind.none"
+msgstr "No conversation"
+
+msgid "admin.flows.kind.video_hint"
+msgstr "The participant and the {agent} speak in a video call."
+
+msgid "admin.flows.kind.telephone_hint"
+msgstr "The {agent} calls the participant."
+
+msgid "admin.flows.kind.in_person_hint"
+msgstr "The participant comes by and is received."
+
+msgid "admin.flows.kind.none_hint"
+msgstr "There is no conversation: the {agent} handles the request."
+
+msgid "admin.flows.kind_follows"
+msgstr "These follow the saved contact channel. Save the draft after a change."
+
+msgid "admin.flows.readout.ready"
+msgstr "Ready for handling: {policy}"
+
+msgid "admin.flows.readout.action"
+msgstr "First action of the {agent}: {action}"
+
+msgid "admin.flows.readout.none"
+msgstr "Choose a contact channel and save the draft to see when a request is ready and what the {agent} does first."
+
+msgid "admin.flows.ready.explicit_check_in"
+msgstr "when the participant checks in"
+
+msgid "admin.flows.ready.media_presence"
+msgstr "as soon as the participant is in the video room"
+
+msgid "admin.flows.ready.automatic"
+msgstr "straight away, without a separate check-in"
+
+msgid "admin.flows.action.open_video"
+msgstr "open the video room"
+
+msgid "admin.flows.action.view_request"
+msgstr "view the request"
+
+msgid "admin.flows.action.call"
+msgstr "call the participant"
+
+msgid "admin.flows.action.assign_workstation"
+msgstr "assign a workstation"
+
+msgid "admin.flows.first_action"
+msgstr "Choose the first action"
+
+msgid "admin.flows.to_follow"
+msgstr "{label} (to follow)"
+
+msgid "admin.flows.duration"
+msgstr "Expected duration (minutes)"
+
+msgid "admin.flows.duration_hint"
+msgstr "A length of {minimum} to {maximum} minutes, in steps of {step}."
+
+msgid "admin.flows.pool"
+msgstr "Capacity pool"
+
+msgid "admin.flows.pool.none"
+msgstr "Choose a capacity pool"
+
+msgid "admin.flows.pool.archived"
+msgstr "{name} (archived)"
+
+msgid "admin.flows.pool.legacy"
+msgstr "Own staffing (existing)"
+
+msgid "admin.flows.pool_hint"
+msgstr "A new flow draws on a capacity pool of the organisation, not on the service's own staffing."
+
+msgid "admin.flows.pool_managed"
+msgstr "Capacity pools are managed by the organisation admin."
+
+msgid "admin.flows.pool_managed_link"
+msgstr "Go to skills and capacity"
+
+msgid "admin.flows.required_skills"
+msgstr "Required skills"
+
+msgid "admin.flows.required_skills_hint"
+msgstr "Every {agent} who picks up a request of this flow has all of these skills. The pool must guarantee them."
+
+msgid "admin.flows.subjects_table"
+msgstr "Subjects in this flow"
+
+msgid "admin.flows.subjects_hint"
+msgstr "Tick which subjects of the service this flow offers. You choose the extra skills of a subject on a page of its own, after saving the draft."
+
+msgid "admin.flows.subject"
+msgstr "Subject"
+
+msgid "admin.flows.offered"
+msgstr "Offered"
+
+msgid "admin.flows.extra_skills"
+msgstr "Extra skills"
+
+msgid "admin.flows.extra_skills_for"
+msgstr "Extra skills for {subject}"
+
+msgid "admin.flows.subjects_dropped_hint"
+msgstr "A subject you no longer offer loses the extra skills you chose for it."
+
+msgid "admin.flows.choose_extra_skills"
+msgstr "Choose extra skills"
+
+msgid "admin.flows.extra_skills_save_first"
+msgstr "Save the draft first to choose extra skills."
+
+msgid "admin.flows.subject_lead"
+msgstr "Each {agent} who picks up a request about this subject needs these skills as well as those of the flow. The capacity pool must guarantee them. They are saved in the flow's draft."
+
+msgid "admin.flows.subject_save"
+msgstr "Save extra skills"
+
+msgid "admin.flows.no_subjects"
+msgstr "This service has no subjects yet."
+
+msgid "admin.flows.no_subjects_link"
+msgstr "Manage subjects in the settings."
+
+msgid "admin.flows.dispatch"
+msgstr "Where the request goes"
+
+msgid "admin.flows.dispatch.own_queue"
+msgstr "Own queue"
+
+msgid "admin.flows.dispatch.contact_center"
+msgstr "Contact center"
+
+msgid "admin.flows.completion"
+msgstr "Completion"
+
+msgid "admin.flows.completion.operator"
+msgstr "The {agent} completes it"
+
+msgid "admin.flows.completion.provider_event"
+msgstr "An event from the provider"
+
+msgid "admin.flows.completion.legacy_video_observation"
+msgstr "Observation of the video call (existing)"
+
+msgid "admin.flows.data_legend"
+msgstr "Which data do you ask for?"
+
+msgid "admin.flows.data_hint"
+msgstr "The name is always asked."
+
+msgid "admin.flows.collects_email"
+msgstr "Email address (needed for a confirmation by email)"
+
+msgid "admin.flows.collects"
+msgstr "Data asked for"
+
+msgid "admin.flows.collects_name_only"
+msgstr "The name only"
+
+msgid "admin.flows.defaults_legend"
+msgstr "Default flow"
+
+msgid "admin.flows.defaults_hint"
+msgstr "A service has at most one default flow per entry path. The options are open for the entry paths the flow offers; save the draft after changing the intake."
+
+msgid "admin.flows.defaults_fixed"
+msgstr "Once a flow has a published revision, its default paths are fixed."
+
+msgid "admin.flows.default_appointment"
+msgstr "Default for appointments"
+
+msgid "admin.flows.default_on_demand"
+msgstr "Default for on demand"
+
+msgid "admin.flows.save_hint"
+msgstr "A draft may be incomplete. The checklist shows what is still missing."
+
+msgid "admin.flows.save"
+msgstr "Save draft"
+
+msgid "admin.flows.state.draft"
+msgstr "Not active yet"
+
+msgid "admin.flows.state.active"
+msgstr "Active"
+
+msgid "admin.flows.state.archived"
+msgstr "Archived"
+
+msgid "admin.flows.ready_word.ok"
+msgstr "In order"
+
+msgid "admin.flows.ready_word.missing"
+msgstr "Missing"
+
+msgid "admin.flows.ready_word.follows"
+msgstr "To follow"
+
+msgid "admin.flows.ready_count"
+msgstr "{done} of {total} points in order."
+
+msgid "admin.flows.ready_follows_note"
+msgstr "Points marked ‘{word}’ cannot be fixed by you."
+
+msgid "admin.flows.basis_draft"
+msgstr "Judged on the saved draft (revision {revision})."
+
+msgid "admin.flows.basis_published"
+msgstr "Judged on the published revision ({revision})."
+
+msgid "admin.flows.ready_heading.draft_ready"
+msgstr "The draft is complete"
+
+msgid "admin.flows.ready_heading.draft_not_ready"
+msgstr "The draft is not complete yet"
+
+msgid "admin.flows.ready_heading.draft_follows"
+msgstr "The draft is complete, except for parts that are still to follow"
+
+msgid "admin.flows.ready_heading.published_ready"
+msgstr "The published revision is ready to use"
+
+msgid "admin.flows.ready_heading.published_not_ready"
+msgstr "The published revision is not ready to use yet"
+
+msgid "admin.flows.ready_heading.published_follows"
+msgstr "The published revision is complete, except for parts that are still to follow"
+
+msgid "admin.flows.check.data"
+msgstr "Name and intake"
+
+msgid "admin.flows.check.capacity"
+msgstr "Capacity"
+
+msgid "admin.flows.check.skills"
+msgstr "Skills"
+
+msgid "admin.flows.check.dispatch"
+msgstr "Contact channel and dispatch"
+
+msgid "admin.flows.check.completion"
+msgstr "Completion"
+
+msgid "admin.flows.check.retention"
+msgstr "Retention and deletion"
+
+msgid "admin.flows.reason.labels_invalid"
+msgstr "The name is missing in Dutch or English, or is invalid."
+
+msgid "admin.flows.reason.intake_missing"
+msgstr "Choose at least one way of intake."
+
+msgid "admin.flows.reason.pool_missing"
+msgstr "Choose a capacity pool."
+
+msgid "admin.flows.reason.pool_archived"
+msgstr "The chosen capacity pool is archived. Choose another."
+
+msgid "admin.flows.reason.duration"
+msgstr "Enter a valid expected duration."
+
+msgid "admin.flows.reason.pool_does_not_guarantee"
+msgstr "The capacity pool does not guarantee every skill that this flow or one of its subjects requires."
+
+msgid "admin.flows.reason.missing_skills"
+msgstr "Missing in the pool: {skills}"
+
+msgid "admin.flows.reason.subject_unknown"
+msgstr "A subject of this flow no longer exists in the service."
+
+msgid "admin.flows.reason.kind_missing"
+msgstr "Choose a contact channel."
+
+msgid "admin.flows.reason.dispatch_missing"
+msgstr "Choose where requests go."
+
+msgid "admin.flows.reason.action_not_allowed"
+msgstr "The first action of the {agent} does not fit the contact channel."
+
+msgid "admin.flows.reason.location_missing"
+msgstr "This way of handling needs locations. They follow in a later version."
+
+msgid "admin.flows.reason.not_built_yet"
+msgstr "This part of OpenPlanner follows in a later version."
+
+msgid "admin.flows.reason.not_built_yet.dispatch"
+msgstr "Handling through the contact center follows in a later version."
+
+msgid "admin.flows.reason.not_built_yet.completion"
+msgstr "This way of completing follows in a later version."
+
+msgid "admin.flows.reason.not_built_yet.retention"
+msgstr "Closing and deleting data automatically for new flows follows in a later version."
+
+msgid "admin.flows.reason.completion_missing"
+msgstr "Choose what completes a request."
+
+msgid "admin.flows.reason.completion_legacy_only"
+msgstr "This completion is only for existing services and cannot be chosen."
+
+msgid "admin.flows.summary.none"
+msgstr "Not set"
+
+msgid "admin.flows.summary.minutes"
+msgstr "{minutes} minutes"
+
+msgid "admin.flows.published_heading"
+msgstr "Published revision {revision}"
+
+msgid "admin.flows.published_lead"
+msgstr "A published revision does not change any more. To change something, prepare a new revision."
+
+msgid "admin.flows.actions_heading"
+msgstr "What you can do with this flow"
+
+msgid "admin.flows.prepare_heading"
+msgstr "Prepare a new revision"
+
+msgid "admin.flows.prepare_hint"
+msgstr "Makes a draft as a copy of the published revision. The published revision stays as it is until you publish the draft."
+
+msgid "admin.flows.prepare"
+msgstr "Prepare a new revision"
+
+msgid "admin.flows.publish_heading"
+msgstr "Publish the draft"
+
+msgid "admin.flows.publish_hint"
+msgstr "Publishes the saved draft as the new revision. Publishing does not activate the flow. Save what you changed in the form first."
+
+msgid "admin.flows.publish"
+msgstr "Publish draft"
+
+msgid "admin.flows.activate_heading"
+msgstr "Activate the flow"
+
+msgid "admin.flows.activate_not_ready"
+msgstr "Activation is possible once the published revision is in order on every point."
+
+msgid "admin.flows.activate_ready"
+msgstr "Every point of the published revision is in order. Once activated, requests go through this flow."
+
+msgid "admin.flows.activate_publish_first"
+msgstr "Publish the draft first."
+
+msgid "admin.flows.activate_not_built"
+msgstr "New flows cannot be activated in this version yet. You can prepare and publish the flow; activation follows in a later version."
+
+msgid "admin.flows.activate"
+msgstr "Activate flow"
+
+msgid "admin.flows.discard_link"
+msgstr "Discard the draft"
+
+msgid "admin.flows.delete_link"
+msgstr "Delete the flow"
+
+msgid "admin.flows.archive_link"
+msgstr "Archive the flow"
+
+msgid "admin.flows.discard_title"
+msgstr "Discard the draft"
+
+msgid "admin.flows.discard_button"
+msgstr "Discard the draft"
+
+msgid "admin.flows.discard_lead"
+msgstr "You are discarding this flow's draft."
+
+msgid "admin.flows.discard_none"
+msgstr "Only the draft of a flow that has a published revision can be discarded. A flow that has never been active is deleted."
+
+msgid "admin.flows.discard_effect_draft"
+msgstr "What you set in the draft is lost."
+
+msgid "admin.flows.discard_effect_published"
+msgstr "The published revision stays as it is."
+
+msgid "admin.flows.archive_title"
+msgstr "Archive the flow"
+
+msgid "admin.flows.archive_button"
+msgstr "Archive flow"
+
+msgid "admin.flows.archive_lead"
+msgstr "You are archiving this flow."
+
+msgid "admin.flows.archive_not_possible"
+msgstr "Only an active flow can be archived. A flow that has never been active is deleted."
+
+msgid "admin.flows.delete_title"
+msgstr "Delete the flow"
+
+msgid "admin.flows.delete_button"
+msgstr "Delete the flow"
+
+msgid "admin.flows.delete_lead"
+msgstr "This flow has never been active. Deleting removes the flow and all its revisions. This cannot be undone."
+
+msgid "admin.flows.delete_not_possible"
+msgstr "Only a flow that has never been active can be deleted. Archive a flow that is or was active."
+
+msgid "admin.flows.archive_effect_new"
+msgstr "No new requests come in through this flow."
+
+msgid "admin.flows.archive_effect_keeps"
+msgstr "Existing requests keep the flow they were made with."
+
+msgid "admin.flows.archive_effect_listed"
+msgstr "The flow stays visible under the archived flows."
+
+msgid "admin.flows.archive_effect_final"
+msgstr "An archived flow cannot be activated again in the portal."
+
+msgid "admin.flows.archive_effect_draft"
+msgstr "A draft of the flow is discarded."
+
+msgid "admin.flows.error.choice"
+msgstr "A chosen skill is no longer available or too many are chosen. Reload the page and choose again."
+
+msgid "admin.flows.error.code_taken"
+msgstr "This code is already used by a flow of this service. Choose another."
+
+msgid "admin.flows.error.code_reserved"
+msgstr "The code “new” is reserved and cannot be used. Choose another."
+
+msgid "admin.flows.publish_blocked_hint"
+msgstr "Publishing is possible once every point is in order, except the points that are still to follow."
+
+msgid "admin.flows.error.code_required"
+msgstr "Enter a code."
+
+msgid "admin.flows.error.limit"
+msgstr "This service has reached the maximum number of flows. Archive a flow you no longer use first."
+
+msgid "admin.flows.error.no_draft"
+msgstr "This flow has no draft."
+
+msgid "admin.flows.error.state"
+msgstr "That is not possible in this flow's current state."
+
+msgid "admin.flows.error.delete_in_use"
+msgstr "A booking still refers to this flow, so it cannot be deleted."
+
+msgid "admin.flows.error.default_taken"
+msgstr "Another active flow of this service is already the default for this entry path."
+
+msgid "admin.flows.error.not_ready"
+msgstr "The flow was not activated: not every point of the published revision is in order."
+
+msgid "admin.flows.error.not_ready_publish"
+msgstr "You can only publish once every point is in order, except the points that are still to follow."
+
+msgid "admin.flows.notice.action_adjusted"
+msgstr "The first action was adjusted to the chosen contact channel."
+
+msgid "admin.form.error.flow_code"
+msgstr "Use only lower-case letters, digits and hyphens, starting with a letter or digit (at most 40 characters)."
+
+msgid "admin.form.error.flow_labels"
+msgstr "Enter the name in Dutch and in English (each at most 80 characters, without control characters)."
+
+msgid "admin.form.error.flow_choice"
+msgstr "This choice no longer exists or cannot be chosen. Reload the page and choose again."
+
+msgid "admin.form.error.flow_default_for"
+msgstr "A flow can only be the default for an entry path it offers itself."
+
+msgid "admin.done.flow_created"
+msgstr "The flow has been created as a draft."
+
+msgid "admin.done.flow_saved"
+msgstr "The draft has been saved."
+
+msgid "admin.done.flow_saved_adjusted"
+msgstr "The draft has been saved. The first action was adjusted to the chosen contact channel."
+
+msgid "admin.done.flow_subject_saved"
+msgstr "The extra skills have been saved in the draft."
+
+msgid "admin.done.flow_prepared"
+msgstr "A draft of a new revision has been prepared."
+
+msgid "admin.done.flow_published"
+msgstr "The draft has been published. This does not activate the flow."
+
+msgid "admin.done.flow_discarded"
+msgstr "The draft has been discarded."
+
+msgid "admin.done.flow_deleted"
+msgstr "The flow has been deleted."
+
+msgid "admin.done.flow_activated"
+msgstr "The flow has been activated."
+
+msgid "admin.done.flow_archived"
+msgstr "The flow has been archived."
+
+msgid "admin.audit.detail.flow_created"
+msgstr "Flow created"
+
+msgid "admin.audit.detail.flow_draft_saved"
+msgstr "Draft of a flow saved"
+
+msgid "admin.audit.detail.flow_published"
+msgstr "Flow published"
+
+msgid "admin.audit.detail.flow_draft_discarded"
+msgstr "Draft of a flow discarded"
+
+msgid "admin.audit.detail.flow_activated"
+msgstr "Flow activated"
+
+msgid "admin.audit.detail.flow_archived"
+msgstr "Flow archived"
+
+msgid "admin.audit.detail.flow"
+msgstr "flow {value}"
+
+msgid "admin.audit.detail.revision"
+msgstr "revision {value}"
+
+msgid "admin.flows.defaults"
+msgstr "Default for"
+
+msgid "admin.flows.subjects"
+msgstr "Subjects"

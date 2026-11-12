@@ -172,6 +172,23 @@ TOPICS = (
         ),
         Permission.GROUP_EDIT,
     ),
+    # ADR 0121 step 2d: the flows of a service, a sub-tab of its settings.
+    HelpTopic(
+        "group-flows",
+        (
+            "/admin/groups/{slug}/flows",
+            "/admin/groups/{slug}/flows/new",
+            "/admin/groups/{slug}/flows/{code}",
+            "/admin/groups/{slug}/flows/{code}/subjects/{subject}",
+            "/admin/groups/{slug}/flows/{code}/prepare",
+            "/admin/groups/{slug}/flows/{code}/publish",
+            "/admin/groups/{slug}/flows/{code}/discard",
+            "/admin/groups/{slug}/flows/{code}/activate",
+            "/admin/groups/{slug}/flows/{code}/archive",
+            "/admin/groups/{slug}/flows/{code}/delete",
+        ),
+        Permission.GROUP_EDIT,
+    ),
     HelpTopic(
         "closure-scenarios",
         tuple(

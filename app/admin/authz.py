@@ -46,6 +46,7 @@ from app.domain.authorization import (
 )
 from app.domain.capacity_service import CapacityService
 from app.domain.event_context import bind_actor_role, bind_level
+from app.domain.flow_service import FlowService
 from app.domain.login_service import LoginService
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.overview_layout import OverviewLayoutService
@@ -136,6 +137,12 @@ def skill_service(request: Request) -> SkillService:
 def capacity_service(request: Request) -> CapacityService:
     """Return the application's capacity service (ADR 0121)."""
     service: CapacityService = request.app.state.capacity_service
+    return service
+
+
+def flow_service(request: Request) -> FlowService:
+    """Return the application's flow service (ADR 0121 step 2d)."""
+    service: FlowService = request.app.state.flow_service
     return service
 
 

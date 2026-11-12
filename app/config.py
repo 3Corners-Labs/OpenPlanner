@@ -356,6 +356,8 @@ class Settings(BaseSettings):
     # may keep at most (class C platform).
     max_skills_per_organisation: int = Field(default=100, ge=10, le=500)
     max_capacity_pools_per_organisation: int = Field(default=50, ge=5, le=200)
+    # ADR 0121: flows (not archived) a service may keep at most (class C platform).
+    max_flows_per_service: int = Field(default=20, ge=3, le=100)
     phone_default_region: str = Field(default="NL", pattern=r"^[A-Z]{2}$")
     # ADR 0056: a participant confirms a booking by email link within the earlier of this many
     # hours after booking and this many hours before the start, with this many reminders.

@@ -14,7 +14,7 @@
   <ul>
     <li>{{ _("admin.skills.archive_effect_new") }}</li>
     <li>{{ _("admin.skills.archive_effect_keeps") }}</li>
-    <li>{{ _("admin.skills.archive_effect_listed") }}</li>
+    <li>{{ _("admin.skills.archive_effect_listed", filter_label=_("admin.skills.archived_only")) }}</li>
   </ul>
   <p>{{ _("admin.skills.used_by", pools=row.pools, flows=row.flows) }} · {{ _("admin.skills.staff_count", count=row.staff) }}</p>
 </section>

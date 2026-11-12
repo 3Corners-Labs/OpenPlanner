@@ -1,0 +1,18 @@
+{#- The readiness checklist of a flow (ADR 0121 step 2d): an aside next to the editor, rendered by the server from the domain's six checks. Every item says its state in a word; the chip colour only repeats it. Expects ``readiness`` (ReadinessView) and ``readiness_basis``. -#}
+{% from "admin/_icons.html" import icon %}
+<aside class="card flow-editor__aside" aria-labelledby="readiness-heading">
+  <div class="card__header">
+    <h2 id="readiness-heading">{{ readiness.heading }}</h2>
+    <p class="card__lead">{{ readiness.summary }}</p>
+    {% if readiness.follows_note %}<p class="card__lead">{{ readiness.follows_note }}</p>{% endif %}
+    <p class="hint">{{ readiness_basis }}</p>
+  </div>
+  <ol class="checklist">
+    {% for row in readiness.rows %}
+    <li class="checklist__item">
+      <span class="chip {% if row.missing %}chip--warning{% else %}chip--success{% endif %}">{% if row.missing %}{{ icon("alert") }}{% else %}{{ icon("check") }}{% endif %}<span>{{ row.word }}</span></span>
+      <span><strong>{{ row.title }}</strong>{% if row.sentence %} {{ row.sentence }}{% endif %}{% if row.skills %}<br><span class="muted">{{ row.skills }}</span>{% endif %}</span>
+    </li>
+    {% endfor %}
+  </ol>
+</aside>
