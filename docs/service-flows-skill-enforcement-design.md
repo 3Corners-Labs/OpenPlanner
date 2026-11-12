@@ -92,7 +92,7 @@ A column on the skill rather than a table of its own: there is exactly one code 
 
 ### Where it lives (ADR 0047)
 
-The code is a property of the skill, so it lives where the skill lives: organisation → Overview → sub-tab *Skills and capacity* → the skill's own page (`/admin/organisations/{org}/skills/{skill_id}`), one more field *Contact-center code* next to the labels, saved by the same form under `skills.manage`; the catalogue table shows it in a column. No new screen, tab or sub-page (ADR 0047: one home per concern, and the screen that has the skill already has the right owner).
+The code is a property of the skill, so it lives where the skill lives: organisation → Overview → sub-tab *Skills and capacity* → the skill's own page (`/admin/organisations/{org}/skills/{skill_id}`), one more field *Contact-center code* next to the labels, saved by the same form under `skills.manage`; the catalogue table shows it under the skill's code. No new screen, tab or sub-page (ADR 0047: one home per concern, and the screen that has the skill already has the right owner).
 
 A sub-page of the contact-center card on *Channels* was considered and rejected: *Channels* is read and changed under `integrations.manage`, which is locked to the superuser, so the organisation admin, who keeps the catalogue, could never reach it, and a page there under `skills.manage` would be a second home for skill configuration. The connection's credentials stay where they are.
 
@@ -102,13 +102,13 @@ A sub-page of the contact-center card on *Channels* was considered and rejected:
 
 ### Readiness
 
-The readiness check *Skills* gains the reason `skill_unmapped`: a revision whose dispatch is the contact center and which requires (for the flow or a subject) a skill without a code cannot be published or activated; the page names the skills. Contact-center dispatch of a new flow is itself not built until step 6 (`BUILT_DISPATCH`), so until then the reason can only appear next to `not_built_yet`; it is built now so step 6 cannot forget it.
+The readiness check *Skills* gains the reason `skill_unmapped`: a revision whose dispatch is the contact center and which requires (for the flow or a subject) a skill without a code cannot be published or activated; the checklist says to give the skills a code under *Skills and capacity*. Contact-center dispatch of a new flow is itself not built until step 6 (`BUILT_DISPATCH`), so until then the reason can only appear next to `not_built_yet`; it is built now so step 6 cannot forget it.
 
 ### Conflicts with ADR 0081
 
 - A routing variable named `openplannerSkills`: the payload writes OpenPlanner's key last (as for `openplannerGroup`), so the variable cannot stand in for the skills. Adding the name to `RESERVED_VARIABLES` would make a stored mapping of that name unreadable (the constructor validates on load), which expand/contract forbids; the mapping form refuses it from step 4b on, and a stored one keeps loading.
-- Two skills with the same code: refused by the unique key (`slug_taken`, field `code`).
-- The total of `openplannerSkills` stays under WxCC's 512-byte value limit: at most 15 skills required by one booking times 64 bytes would exceed it, so the mapping adapter checks the joined length per task and refuses (`integration_not_ready`, `skill_codes`) above 512 bytes; a limit of the platform, a constant, not a setting.
+- Two skills of one organisation with the same contact-center code: refused by `check_skill_save` and the partial unique index (`slug_taken`, field `contact_center_code`).
+- The total of `openplannerSkills` stays under WxCC's 512-byte value limit: at most 15 skills required by one booking times 64 bytes would exceed it, so `mapped_skill_codes` checks the joined length per task and refuses (`integration_not_ready`, `skill_codes`) above 512 bytes; a limit of the platform, a constant, not a setting.
 
 ## 6. Nothing changes for flows without skills (proof)
 
