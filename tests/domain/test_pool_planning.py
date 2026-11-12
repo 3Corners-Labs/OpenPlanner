@@ -58,6 +58,16 @@ def monday(
     return ScheduleRule(0, TimeWindow(time(opens), time(closes), units, None, offer))
 
 
+async def rule_v(service: PoolPlanningService, pid: int, rule_id: int) -> str:
+    """Return the version of block ``rule_id`` as a change form would carry it."""
+    return (await service.rule(ORG_ADMIN, "demo", pid, rule_id)).version
+
+
+async def override_v(service: PoolPlanningService, pid: int, override_id: int) -> str:
+    """Return the version of exception ``override_id`` as a change form would carry it."""
+    return (await service.override(ORG_ADMIN, "demo", pid, override_id)).version
+
+
 def details(uow: InMemoryUnitOfWork) -> list[str]:
     return [e.detail for e in uow.state.audit if e.outcome is audit.Outcome.SUCCESS]
 
@@ -76,12 +86,14 @@ async def test_every_operation_needs_capacity_manage_and_a_refusal_is_audited(
             service.override(who, "demo", pid, 1),
             service.set_timezone(who, "demo", pid, AMSTERDAM),
             service.add_rule(who, "demo", pid, monday()),
-            service.update_rule(who, "demo", pid, 1, monday(8)),
-            service.split_rule(who, "demo", pid, 1, time(10), 0),
-            service.remove_rule(who, "demo", pid, 1),
+            service.update_rule(who, "demo", pid, 1, monday(8), "x"),
+            service.split_rule(who, "demo", pid, 1, time(10), 0, None, "x"),
+            service.remove_rule(who, "demo", pid, 1, "x"),
             service.add_override(who, "demo", pid, ScheduleOverride(date(2026, 3, 2), None)),
-            service.update_override(who, "demo", pid, 1, ScheduleOverride(date(2026, 3, 2), None)),
-            service.remove_override(who, "demo", pid, 1),
+            service.update_override(
+                who, "demo", pid, 1, ScheduleOverride(date(2026, 3, 2), None), "x"
+            ),
+            service.remove_override(who, "demo", pid, 1, "x"),
         ):
             with pytest.raises(DomainError) as refused:
                 await call
@@ -138,12 +150,15 @@ async def test_a_block_is_added_changed_split_and_removed_with_audit_keys_only(
 
     rule_id = await service.add_rule(ORG_ADMIN, "demo", pid, monday())
     stored = await service.rule(ORG_ADMIN, "demo", pid, rule_id)
-    assert await service.update_rule(ORG_ADMIN, "demo", pid, rule_id, stored) is False
+    same = await service.update_rule(ORG_ADMIN, "demo", pid, rule_id, stored.rule, stored.version)
+    assert same is False
     changed = ScheduleRule(0, TimeWindow(time(9), time(12), 3, "Balie", Offer.BOTH), id=rule_id)
-    assert await service.update_rule(ORG_ADMIN, "demo", pid, rule_id, changed) is True
-    second = await service.split_rule(ORG_ADMIN, "demo", pid, rule_id, time(11), 0, "Lunch")
+    assert await service.update_rule(ORG_ADMIN, "demo", pid, rule_id, changed, stored.version)
+    second = await service.split_rule(
+        ORG_ADMIN, "demo", pid, rule_id, time(11), 0, "Lunch", await rule_v(service, pid, rule_id)
+    )
     page = await service.staffing(ORG_ADMIN, "demo", pid)
-    await service.remove_rule(ORG_ADMIN, "demo", pid, second)
+    await service.remove_rule(ORG_ADMIN, "demo", pid, second, await rule_v(service, pid, second))
 
     assert [(r.window.opens, r.window.closes, r.window.capacity) for r in page.rules] == [
         (time(9), time(11), 3),
@@ -166,7 +181,9 @@ async def test_overlapping_blocks_and_blocks_with_subjects_are_refused(
     with pytest.raises(DomainError) as overlap:
         await service.add_rule(ORG_ADMIN, "demo", pid, monday(11, 13))
     with pytest.raises(DomainError) as split_outside:
-        await service.split_rule(ORG_ADMIN, "demo", pid, first, time(12), 0)
+        await service.split_rule(
+            ORG_ADMIN, "demo", pid, first, time(12), 0, None, await rule_v(service, pid, first)
+        )
     subjects = ScheduleRule(1, TimeWindow(time(9), time(10), 1, None, Offer.SCHEDULED, ("id",)))
     with pytest.raises(DomainError) as with_subjects:
         await service.add_rule(ORG_ADMIN, "demo", pid, subjects)
@@ -185,7 +202,9 @@ async def test_a_change_may_overlap_its_own_old_times(
 
     moved = ScheduleRule(0, TimeWindow(time(10), time(13), 2, None), id=rule_id)
 
-    assert await service.update_rule(ORG_ADMIN, "demo", pid, rule_id, moved) is True
+    version = await rule_v(service, pid, rule_id)
+
+    assert await service.update_rule(ORG_ADMIN, "demo", pid, rule_id, moved, version) is True
 
 
 async def test_exceptions_are_added_changed_and_removed_and_may_not_lie_in_the_past(
@@ -196,10 +215,15 @@ async def test_exceptions_are_added_changed_and_removed_and_may_not_lie_in_the_p
 
     closed = await service.add_override(ORG_ADMIN, "demo", pid, ScheduleOverride(day, None))
     stored = await service.override(ORG_ADMIN, "demo", pid, closed)
-    assert await service.update_override(ORG_ADMIN, "demo", pid, closed, stored) is False
+    unchanged = await service.update_override(
+        ORG_ADMIN, "demo", pid, closed, stored.override, stored.version
+    )
+    assert unchanged is False
     own = ScheduleOverride(day, TimeWindow(time(10), time(11), 1))
-    assert await service.update_override(ORG_ADMIN, "demo", pid, closed, own) is True
-    await service.remove_override(ORG_ADMIN, "demo", pid, closed)
+    assert await service.update_override(ORG_ADMIN, "demo", pid, closed, own, stored.version)
+    await service.remove_override(
+        ORG_ADMIN, "demo", pid, closed, await override_v(service, pid, closed)
+    )
     with pytest.raises(DomainError) as past:
         await service.add_override(
             ORG_ADMIN, "demo", pid, ScheduleOverride(date(2025, 12, 31), None)
@@ -207,7 +231,12 @@ async def test_exceptions_are_added_changed_and_removed_and_may_not_lie_in_the_p
     kept = await service.add_override(ORG_ADMIN, "demo", pid, ScheduleOverride(day, None))
     with pytest.raises(DomainError) as past_change:
         await service.update_override(
-            ORG_ADMIN, "demo", pid, kept, ScheduleOverride(date(2025, 12, 31), None)
+            ORG_ADMIN,
+            "demo",
+            pid,
+            kept,
+            ScheduleOverride(date(2025, 12, 31), None),
+            await override_v(service, pid, kept),
         )
 
     assert past.value.field == "day"
@@ -225,14 +254,14 @@ async def test_an_unknown_block_or_exception_is_missing_and_changes_nothing(
     mine = await service.add_rule(ORG_ADMIN, "demo", pid, monday())
     attempts = (
         service.rule(ORG_ADMIN, "demo", other, mine),
-        service.update_rule(ORG_ADMIN, "demo", other, mine, monday(8)),
-        service.split_rule(ORG_ADMIN, "demo", other, mine, time(10), 0),
-        service.remove_rule(ORG_ADMIN, "demo", other, mine),
+        service.update_rule(ORG_ADMIN, "demo", other, mine, monday(8), "x"),
+        service.split_rule(ORG_ADMIN, "demo", other, mine, time(10), 0, None, "x"),
+        service.remove_rule(ORG_ADMIN, "demo", other, mine, "x"),
         service.override(ORG_ADMIN, "demo", pid, 99),
         service.update_override(
-            ORG_ADMIN, "demo", pid, 99, ScheduleOverride(date(2026, 2, 2), None)
+            ORG_ADMIN, "demo", pid, 99, ScheduleOverride(date(2026, 2, 2), None), "x"
         ),
-        service.remove_override(ORG_ADMIN, "demo", pid, 99),
+        service.remove_override(ORG_ADMIN, "demo", pid, 99, "x"),
     )
 
     for attempt in attempts:
@@ -318,7 +347,9 @@ async def test_dropping_the_staffing_shows_the_shortage_and_touches_no_booking(
     bookings = dict(uow.state.bookings)
 
     drop = ScheduleRule(0, TimeWindow(time(9), time(12), 1), id=rule_id)
-    await service.update_rule(ORG_ADMIN, "demo", pid, rule_id, drop)
+    await service.update_rule(
+        ORG_ADMIN, "demo", pid, rule_id, drop, await rule_v(service, pid, rule_id)
+    )
 
     assert len((await service.staffing(ORG_ADMIN, "demo", pid)).shortfalls) == 1
     assert uow.state.bookings == bookings
@@ -376,3 +407,86 @@ async def test_past_exceptions_are_not_listed_and_the_zone_decides_today(
     assert [o.day for o in page.overrides] == [date(2026, 1, 6)]
     with pytest.raises(DomainError):  # 5 January is past in Amsterdam
         await service.add_override(ORG_ADMIN, "demo", pid, ScheduleOverride(date(2026, 1, 5), None))
+
+
+async def test_a_change_from_a_stale_form_is_refused_and_writes_nothing(
+    service: PoolPlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    pid = await pool(uow)
+    rule_id = await service.add_rule(ORG_ADMIN, "demo", pid, monday())
+    day = await service.add_override(
+        ORG_ADMIN, "demo", pid, ScheduleOverride(date(2026, 1, 12), None)
+    )
+    loaded_rule = await rule_v(service, pid, rule_id)
+    loaded_day = await override_v(service, pid, day)
+    # Another admin changes both between the form load and the save.
+    other = ScheduleRule(0, TimeWindow(time(9), time(12), 5), id=rule_id)
+    await service.update_rule(ORG_ADMIN, "demo", pid, rule_id, other, loaded_rule)
+    await service.update_override(
+        ORG_ADMIN,
+        "demo",
+        pid,
+        day,
+        ScheduleOverride(date(2026, 1, 13), None),
+        loaded_day,
+    )
+    before = len(details(uow))
+    mine = ScheduleRule(0, TimeWindow(time(9), time(12), 1), id=rule_id)
+
+    for attempt in (
+        service.update_rule(ORG_ADMIN, "demo", pid, rule_id, mine, loaded_rule),
+        service.split_rule(ORG_ADMIN, "demo", pid, rule_id, time(10), 0, None, loaded_rule),
+        service.remove_rule(ORG_ADMIN, "demo", pid, rule_id, loaded_rule),
+        service.remove_rule(ORG_ADMIN, "demo", pid, rule_id, ""),
+        service.update_override(
+            ORG_ADMIN, "demo", pid, day, ScheduleOverride(date(2026, 1, 14), None), loaded_day
+        ),
+        service.remove_override(ORG_ADMIN, "demo", pid, day, loaded_day),
+    ):
+        with pytest.raises(DomainError) as refused:
+            await attempt
+        assert refused.value.code is ErrorCode.POOL_STAFFING_CHANGED
+
+    page = await service.staffing(ORG_ADMIN, "demo", pid)
+    assert [r.window.capacity for r in page.rules] == [5]
+    assert [o.day for o in page.overrides] == [date(2026, 1, 13)]
+    assert len(details(uow)) == before
+
+
+async def test_past_exceptions_neither_count_nor_block_and_are_dropped_with_the_next_change(
+    service: PoolPlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    pid = await pool(uow)
+    async with uow.locked() as tx:
+        for offset in range(800):  # MAX_POOL_OVERRIDES past days, none of them listed
+            await tx.add_pool_override(
+                EVERYTHING, pid, ScheduleOverride(date(2025, 12, 31) - timedelta(days=offset), None)
+            )
+    assert (await service.staffing(ORG_ADMIN, "demo", pid)).overrides == ()
+
+    await service.add_rule(ORG_ADMIN, "demo", pid, monday())  # the 800 past ones do not count
+    added = await service.add_override(
+        ORG_ADMIN, "demo", pid, ScheduleOverride(date(2026, 1, 12), None)
+    )
+
+    async with uow.read() as tx:
+        stored = await tx.get_pool_staffing(EVERYTHING, pid)
+    assert stored is not None
+    assert [o.id for o in stored.overrides] == [added]  # the past ones went with the change
+
+
+async def test_the_page_lists_the_first_shortfalls_and_counts_the_rest(
+    service: PoolPlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    pid = await pool(uow)
+    await service.add_rule(ORG_ADMIN, "demo", pid, monday(0, 23, units=1))
+    for week in range(2):  # 25 short stretches on two Mondays, 1 unit and 2 places each
+        for hour in range(13):
+            if week == 1 and hour > 11:
+                continue
+            await commit(uow, pid, 2, SLOT_0900 + timedelta(days=7 * week, hours=hour - 9))
+
+    page = await service.staffing(ORG_ADMIN, "demo", pid)
+
+    assert len(page.shortfalls) == 20
+    assert page.shortfall_total == 25

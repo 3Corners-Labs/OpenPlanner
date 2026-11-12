@@ -32,8 +32,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
-from app.admin.authz import AdminContext, RequirePermission, capacity_service, pool_planning_service
-from app.admin.capacity_views import pool_row
+from app.admin.authz import AdminContext, RequirePermission, pool_planning_service
 from app.admin.forms import Field, FormData, done_message, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin, org_page
 from app.admin.pool_staffing_views import TIMEZONE_FIELD, shortfall_list, timezone_field
@@ -55,8 +54,10 @@ from app.admin.staffing_views import (
     week,
 )
 from app.domain.authorization import Permission
-from app.domain.capacity_service import PoolPage
-from app.domain.errors import DomainError
+from app.domain.capacity import CapacityPool
+from app.domain.errors import DomainError, ErrorCode
+from app.domain.pool_planning import override_version, rule_version
+from app.domain.scheduling import Organisation
 from app.web.locale import RequestLocale
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -88,34 +89,42 @@ def _refused(form: FormData, error: DomainError, locale: RequestLocale) -> None:
     refuse(form, error, locale, "")
 
 
-async def _found(request: Request, context: AdminContext, org: str, pool_id: int) -> PoolPage:
-    """Return the pool and its organisation, or raise the 404 of a pool that is not for them."""
-    try:
-        return await capacity_service(request).page(context.principal, org, pool_id)
-    except DomainError as error:
-        raise_unknown(error)
+def _changed(error: DomainError) -> bool:
+    """Whether the refusal says the row changed since the form was loaded."""
+    return error.code is ErrorCode.POOL_STAFFING_CHANGED
 
 
-async def _page(
+def _notice(locale: RequestLocale, error: DomainError) -> FormData:
+    """Return an empty form that carries the refusal ``error`` as its error summary."""
+    form = FormData({}, locale.gettext)
+    form.refusal(error)
+    return form
+
+
+def _page(
     request: Request,
     locale: RequestLocale,
     context: AdminContext,
-    org: str,
-    pool_id: int,
+    organisation: Organisation,
+    pool: CapacityPool,
     template: str,
     extra: dict[str, object],
     status: int,
 ) -> HTMLResponse:
-    """Render a staffing page: the organisation's header, the pool's name and links, ``extra``."""
-    found = await _found(request, context, org, pool_id)
+    """Render a staffing page: the organisation's header, the pool's name and links, ``extra``.
+
+    The organisation and the pool come from the use case that read the page's own data, so a page
+    view is one authorisation and one read.
+    """
+    org, pool_id = organisation.slug, pool.id or 0
     return org_page(
         request,
         locale,
         context.principal,
-        found.organisation,
+        organisation,
         template,
         {
-            "row": pool_row(found.line, locale),
+            "row": pool,
             "list_path": f"{skills_capacity_url(org)}#{POOLS_ANCHOR}",
             "pool_path": _pool_path(org, pool_id),
             "staffing_path": _staffing_path(org, pool_id),
@@ -152,20 +161,22 @@ async def _staffing_response(
         found = await pool_planning_service(request).staffing(context.principal, org, pool_id)
     except DomainError as error:
         raise_unknown(error)
-    return await _page(
+    return _page(
         request,
         locale,
         context,
-        org,
-        pool_id,
+        found.organisation,
+        found.pool,
         "admin/organisation_pool_staffing.html",
         {
             "timezone": found.timezone,
             "timezone_field": timezone_field(zone, locale, found.timezone),
-            "week": week(found.rules, locale),
+            "week": week(found.rules, locale, rule_version),
             "staffing_base": _staffing_path(org, pool_id),
             "fields": hours_fields(block, locale, POOL_HINTS),
-            "shortfalls": shortfall_list(found.shortfalls, found.timezone, locale)
+            "shortfalls": shortfall_list(
+                found.shortfalls, found.shortfall_total, found.timezone, locale
+            )
             if found.timezone
             else None,
             "horizon_days": found.horizon_days,
@@ -218,13 +229,14 @@ async def add_block(
     return await _staffing_response(request, locale, context, org, pool_id, block=form, status=422)
 
 
-async def _form_page(
+def _form_page(
     request: Request,
     locale: RequestLocale,
     context: AdminContext,
-    org: str,
-    pool_id: int,
+    organisation: Organisation,
+    pool: CapacityPool,
     *,
+    template: str,
     heading: str,
     lead: str,
     action: str,
@@ -232,17 +244,21 @@ async def _form_page(
     cancel: str,
     fields: list[Field],
     form: FormData,
-    exception: bool = False,
+    expected: str,
     status: int = 200,
 ) -> HTMLResponse:
-    """Render the one-form page of a change: a block, a split or an exception."""
-    return await _page(
+    """Render the one-form page of a change: a block, a split or an exception.
+
+    ``expected`` is the version of the stored row the form was loaded from; the form sends it
+    back and the use case refuses the change if the row is no longer that version.
+    """
+    return _page(
         request,
         locale,
         context,
-        org,
-        pool_id,
-        "admin/organisation_pool_staffing_form.html",
+        organisation,
+        pool,
+        template,
         {
             "heading": heading,
             "lead": lead,
@@ -250,13 +266,17 @@ async def _form_page(
             "button": button,
             "cancel": cancel,
             "fields": fields,
-            "exception": exception,
+            "expected": expected,
             "kind": form.text("kind") or "closed",
             "kind_error": form.error_for("kind"),
             "errors": form.errors,
         },
         status,
     )
+
+
+BLOCK_FORM = "admin/organisation_pool_block_form.html"
+EXCEPTION_FORM = "admin/organisation_pool_exception_form.html"
 
 
 async def _block_page(
@@ -268,15 +288,31 @@ async def _block_page(
     rule_id: int,
     form: FormData,
     status: int = 200,
+    conflict: DomainError | None = None,
 ) -> HTMLResponse:
-    """Render the change form of one weekly block."""
+    """Render the change form of one weekly block.
+
+    After a ``conflict`` it shows the block as it is stored now, with the new version and the
+    reason, so the admin looks at it and saves again.
+    """
     _ = locale.gettext
-    return await _form_page(
+    try:
+        item = await pool_planning_service(request).rule(context.principal, org, pool_id, rule_id)
+    except DomainError as error:
+        raise_unknown(error)
+    expected = form.text("expected") or item.version
+    if not form.values:
+        form = FormData(rule_values(item.rule), _)
+    if conflict is not None:
+        form, expected, status = FormData(rule_values(item.rule), _), item.version, 409
+        form.refusal(conflict)
+    return _form_page(
         request,
         locale,
         context,
-        org,
-        pool_id,
+        item.organisation,
+        item.pool,
+        template=BLOCK_FORM,
         heading=_("admin.hours.edit"),
         lead=_("admin.hours.edit_lead"),
         action=f"{_staffing_path(org, pool_id)}/{rule_id}",
@@ -284,6 +320,7 @@ async def _block_page(
         cancel=_staffing_path(org, pool_id),
         fields=hours_fields(form, locale, POOL_HINTS),
         form=form,
+        expected=expected,
         status=status,
     )
 
@@ -295,11 +332,7 @@ async def edit_block(
     request: Request, locale: Locale, org: str, pool_id: int, rule_id: int, context: Manage
 ) -> HTMLResponse:
     """Show the change form of a weekly block, pre-filled with its values."""
-    try:
-        rule = await pool_planning_service(request).rule(context.principal, org, pool_id, rule_id)
-    except DomainError as error:
-        raise_unknown(error)
-    form = FormData(rule_values(rule), locale.gettext)
+    form = FormData({}, locale.gettext)
     return await _block_page(request, locale, context, org, pool_id, rule_id, form)
 
 
@@ -321,9 +354,13 @@ async def update_block(
     if rule is not None:
         try:
             changed = await pool_planning_service(request).update_rule(
-                context.principal, org, pool_id, rule_id, rule
+                context.principal, org, pool_id, rule_id, rule, form.text("expected")
             )
         except DomainError as error:
+            if _changed(error):
+                return await _block_page(
+                    request, locale, context, org, pool_id, rule_id, form, conflict=error
+                )
             _refused(form, error, locale)
         else:
             return redirect_done(_staffing_path(org, pool_id), "saved" if changed else "unchanged")
@@ -339,26 +376,33 @@ async def _split_page(
     rule_id: int,
     form: FormData,
     status: int = 200,
+    conflict: DomainError | None = None,
 ) -> HTMLResponse:
     """Render the split form of one weekly block, described in words above the inputs."""
     _ = locale.gettext
     try:
-        rule = await pool_planning_service(request).rule(context.principal, org, pool_id, rule_id)
+        item = await pool_planning_service(request).rule(context.principal, org, pool_id, rule_id)
     except DomainError as error:
         raise_unknown(error)
-    return await _form_page(
+    expected = form.text("expected") or item.version
+    if conflict is not None:
+        form, expected, status = FormData({}, _), item.version, 409
+        form.refusal(conflict)
+    return _form_page(
         request,
         locale,
         context,
-        org,
-        pool_id,
+        item.organisation,
+        item.pool,
+        template=BLOCK_FORM,
         heading=_("admin.hours.split_title"),
-        lead=_("admin.hours.split_lead", block=block_description(rule, locale)),
+        lead=_("admin.hours.split_lead", block=block_description(item.rule, locale)),
         action=f"{_staffing_path(org, pool_id)}/{rule_id}/split",
         button=_("admin.hours.split_button"),
         cancel=_staffing_path(org, pool_id),
         fields=split_fields(form, locale, POOL_HINTS),
         form=form,
+        expected=expected,
         status=status,
     )
 
@@ -395,9 +439,13 @@ async def split_block(
     if not form.errors and at is not None and capacity is not None:
         try:
             await pool_planning_service(request).split_rule(
-                context.principal, org, pool_id, rule_id, at, capacity, label
+                context.principal, org, pool_id, rule_id, at, capacity, label, form.text("expected")
             )
         except DomainError as error:
+            if _changed(error):
+                return await _split_page(
+                    request, locale, context, org, pool_id, rule_id, form, conflict=error
+                )
             _refused(form, error, locale)
         else:
             return redirect_done(_staffing_path(org, pool_id), "saved")
@@ -417,11 +465,18 @@ async def remove_block(
     _: SameOrigin,
     context: Manage,
 ) -> Response:
-    """Remove a weekly block."""
+    """Remove a weekly block, if it is still the one the page showed."""
+    form = await read_form(request, locale)
     try:
-        await pool_planning_service(request).remove_rule(context.principal, org, pool_id, rule_id)
+        await pool_planning_service(request).remove_rule(
+            context.principal, org, pool_id, rule_id, form.text("expected")
+        )
     except DomainError as error:
-        raise_unknown(error)
+        if not _changed(error):
+            raise_unknown(error)
+        return await _staffing_response(
+            request, locale, context, org, pool_id, block=_notice(locale, error), status=409
+        )
     return redirect_done(_staffing_path(org, pool_id), "removed")
 
 
@@ -442,16 +497,16 @@ async def _exceptions_response(
         found = await pool_planning_service(request).staffing(context.principal, org, pool_id)
     except DomainError as error:
         raise_unknown(error)
-    return await _page(
+    return _page(
         request,
         locale,
         context,
-        org,
-        pool_id,
+        found.organisation,
+        found.pool,
         "admin/organisation_pool_exceptions.html",
         {
             "timezone": found.timezone,
-            "exceptions": exception_views(found.overrides, locale),
+            "exceptions": exception_views(found.overrides, locale, override_version),
             "exceptions_base": _exceptions_path(org, pool_id),
             "fields": exception_fields(form, locale, POOL_HINTS),
             "kind": form.text("kind") or "closed",
@@ -499,15 +554,29 @@ async def _exception_page(
     override_id: int,
     form: FormData,
     status: int = 200,
+    conflict: DomainError | None = None,
 ) -> HTMLResponse:
-    """Render the change form of one exception."""
+    """Render the change form of one exception (after a ``conflict``: as it is stored now)."""
     _ = locale.gettext
-    return await _form_page(
+    try:
+        item = await pool_planning_service(request).override(
+            context.principal, org, pool_id, override_id
+        )
+    except DomainError as error:
+        raise_unknown(error)
+    expected = form.text("expected") or item.version
+    if not form.values:
+        form = FormData(override_values(item.override), _)
+    if conflict is not None:
+        form, expected, status = FormData(override_values(item.override), _), item.version, 409
+        form.refusal(conflict)
+    return _form_page(
         request,
         locale,
         context,
-        org,
-        pool_id,
+        item.organisation,
+        item.pool,
+        template=EXCEPTION_FORM,
         heading=_("admin.exceptions.edit"),
         lead=_("admin.exceptions.edit_lead"),
         action=f"{_exceptions_path(org, pool_id)}/{override_id}",
@@ -515,7 +584,7 @@ async def _exception_page(
         cancel=_exceptions_path(org, pool_id),
         fields=exception_fields(form, locale, POOL_HINTS),
         form=form,
-        exception=True,
+        expected=expected,
         status=status,
     )
 
@@ -528,13 +597,7 @@ async def edit_exception(
     request: Request, locale: Locale, org: str, pool_id: int, override_id: int, context: Manage
 ) -> HTMLResponse:
     """Show the change form of an exception, pre-filled with its values."""
-    try:
-        override = await pool_planning_service(request).override(
-            context.principal, org, pool_id, override_id
-        )
-    except DomainError as error:
-        raise_unknown(error)
-    form = FormData(override_values(override), locale.gettext)
+    form = FormData({}, locale.gettext)
     return await _exception_page(request, locale, context, org, pool_id, override_id, form)
 
 
@@ -557,9 +620,13 @@ async def update_exception(
     if override is not None:
         try:
             changed = await pool_planning_service(request).update_override(
-                context.principal, org, pool_id, override_id, override
+                context.principal, org, pool_id, override_id, override, form.text("expected")
             )
         except DomainError as error:
+            if _changed(error):
+                return await _exception_page(
+                    request, locale, context, org, pool_id, override_id, form, conflict=error
+                )
             _refused(form, error, locale)
         else:
             return redirect_done(
@@ -581,11 +648,16 @@ async def remove_exception(
     _: SameOrigin,
     context: Manage,
 ) -> Response:
-    """Remove an exception."""
+    """Remove an exception, if it is still the one the page showed."""
+    form = await read_form(request, locale)
     try:
         await pool_planning_service(request).remove_override(
-            context.principal, org, pool_id, override_id
+            context.principal, org, pool_id, override_id, form.text("expected")
         )
     except DomainError as error:
-        raise_unknown(error)
+        if not _changed(error):
+            raise_unknown(error)
+        return await _exceptions_response(
+            request, locale, context, org, pool_id, _notice(locale, error), status=409
+        )
     return redirect_done(_exceptions_path(org, pool_id), "removed")

@@ -16,7 +16,7 @@
     <p class="card__lead">{{ _("admin.exceptions.lead") }} {{ _("admin.pool_staffing.holidays_note") }}</p>
   </div>
   {% if exceptions %}
-  <div class="table-scroll">
+  <div class="table-scroll" role="region" aria-labelledby="list-heading" tabindex="0">
   <table class="data-table">
     <caption class="visually-hidden">{{ _("admin.exceptions.upcoming") }}</caption>
     <thead>
@@ -28,10 +28,15 @@
         <th scope="row">{{ item.day }}</th>
         <td>{% if item.closed %}<span class="chip chip--warning">{{ _("admin.exceptions.closed") }}</span>{% else %}<span class="chip chip--accent">{{ item.time }}</span> {{ item.capacity }}{% if item.offer %} · {{ item.offer }}{% endif %}{% endif %}</td>
         <td>
-          <a href="{{ exceptions_base }}/{{ item.id }}" aria-label="{{ _("admin.exceptions.edit_label", day=item.day) }}">{{ _("admin.edit") }}</a>
-          <form class="inline-form" method="post" action="{{ exceptions_base }}/{{ item.id }}/delete">
-            <button type="submit" class="button button--quiet" aria-label="{{ _("admin.exceptions.remove_label", day=item.day) }}">{{ _("admin.remove") }}</button>
-          </form>
+          <ul class="row-actions">
+            <li><a href="{{ exceptions_base }}/{{ item.id }}" aria-label="{{ _("admin.exceptions.edit_label", day=item.day) }}">{{ _("admin.edit") }}</a></li>
+            <li>
+              <form class="inline-form" method="post" action="{{ exceptions_base }}/{{ item.id }}/delete">
+                <input type="hidden" name="expected" value="{{ item.version }}">
+                <button type="submit" class="button button--quiet" aria-label="{{ _("admin.exceptions.remove_label", day=item.day) }}">{{ _("admin.remove") }}</button>
+              </form>
+            </li>
+          </ul>
         </td>
       </tr>
       {% endfor %}

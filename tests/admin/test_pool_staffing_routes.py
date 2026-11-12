@@ -52,6 +52,18 @@ async def details(site: Site) -> list[str]:
     ]
 
 
+def token(page: str, action: str = "") -> str:
+    """Return the ``expected`` version of the form (whose action ends with ``action``) on a page."""
+    found = re.search(
+        rf'action="[^"]*{re.escape(action)}"[^>]*>(?:(?!</form>).)*?'
+        r'name="expected" value="([0-9a-f]+)"',
+        page,
+        re.DOTALL,
+    )
+    assert found, action
+    return found.group(1)
+
+
 def ids(page: str, kind: str) -> list[int]:
     """Return the ids of the blocks or exceptions that a page links to, in page order."""
     return [int(i) for i in re.findall(rf"/{kind}/(\d+)\"", page)]
@@ -107,14 +119,22 @@ async def test_a_block_is_added_listed_changed_split_and_removed(site: Site) -> 
     page = (await site.client.get(f"{path}/staffing")).text
     (block,) = ids(page, "staffing")
     form = (await site.client.get(f"{path}/staffing/{block}")).text
-    changed = await post(site, f"{path}/staffing/{block}", {**BLOCK, "capacity": "3"})
+    changed = await post(
+        site, f"{path}/staffing/{block}", {**BLOCK, "capacity": "3", "expected": token(form)}
+    )
     split_form = (await site.client.get(f"{path}/staffing/{block}/split")).text
     splitted = await post(
-        site, f"{path}/staffing/{block}/split", {"split_at": "11:00", "capacity": "0"}
+        site,
+        f"{path}/staffing/{block}/split",
+        {"split_at": "11:00", "capacity": "0", "expected": token(split_form)},
     )
     after = (await site.client.get(f"{path}/staffing")).text
     second = ids(after, "staffing")[-1]
-    removed = await post(site, f"{path}/staffing/{second}/delete")
+    removed = await post(
+        site,
+        f"{path}/staffing/{second}/delete",
+        {"expected": token(after, f"/staffing/{second}/delete")},
+    )
 
     assert added.headers["location"] == f"{path}/staffing?done=added"
     assert "09:00–12:00" in page
@@ -179,9 +199,15 @@ async def test_exceptions_are_added_listed_changed_and_removed_and_not_in_the_pa
     first, second = ids(page, "exceptions")
     form = (await site.client.get(f"{path}/exceptions/{first}")).text
     changed = await post(
-        site, f"{path}/exceptions/{first}", {"day": "14-01-2026", "kind": "closed"}
+        site,
+        f"{path}/exceptions/{first}",
+        {"day": "14-01-2026", "kind": "closed", "expected": token(form)},
     )
-    removed = await post(site, f"{path}/exceptions/{second}/delete")
+    removed = await post(
+        site,
+        f"{path}/exceptions/{second}/delete",
+        {"expected": token(page, f"/exceptions/{second}/delete")},
+    )
 
     assert closed.headers["location"] == f"{path}/exceptions?done=added"
     assert own.status_code == 303
@@ -259,7 +285,10 @@ async def test_without_a_shortfall_the_page_says_so_and_raising_the_staffing_cle
     assert "plekken bezet" in (await site.client.get(f"{path}/staffing")).text
 
     (block,) = ids((await site.client.get(f"{path}/staffing")).text, "staffing")
-    await post(site, f"{path}/staffing/{block}", {**BLOCK, "capacity": "2"})
+    form = (await site.client.get(f"{path}/staffing/{block}")).text
+    await post(
+        site, f"{path}/staffing/{block}", {**BLOCK, "capacity": "2", "expected": token(form)}
+    )
 
     assert "Geen tekorten" in (await site.client.get(f"{path}/staffing")).text
 
@@ -435,3 +464,76 @@ async def test_the_week_is_a_region_free_list_and_every_input_has_a_label(site: 
     assert page.count("<h1") == 1
     assert 'class="week-frame"' in page
     assert 'data-width="wide"' in page
+
+
+async def test_a_stale_form_shows_the_stored_values_and_writes_nothing(site: Site) -> None:
+    path = await staffed(site)
+    await post(site, f"{path}/staffing", BLOCK)
+    await post(site, f"{path}/exceptions", {"day": "12-01-2026", "kind": "closed"})
+    page = (await site.client.get(f"{path}/staffing")).text
+    (block,) = ids(page, "staffing")
+    loaded_change = (await site.client.get(f"{path}/staffing/{block}")).text
+    loaded_split = (await site.client.get(f"{path}/staffing/{block}/split")).text
+    exceptions = (await site.client.get(f"{path}/exceptions")).text
+    (day,) = ids(exceptions, "exceptions")
+    loaded_day = (await site.client.get(f"{path}/exceptions/{day}")).text
+    # Admin B saves both between the loads and the saves of admin A.
+    fresh = await post(
+        site,
+        f"{path}/staffing/{block}",
+        {**BLOCK, "capacity": "5", "expected": token(loaded_change)},
+    )
+    await post(
+        site,
+        f"{path}/exceptions/{day}",
+        {"day": "13-01-2026", "kind": "closed", "expected": token(loaded_day)},
+    )
+    assert fresh.status_code == 303
+
+    mine = await post(
+        site,
+        f"{path}/staffing/{block}",
+        {**BLOCK, "capacity": "1", "expected": token(loaded_change)},
+    )
+    split = await post(
+        site,
+        f"{path}/staffing/{block}/split",
+        {"split_at": "11:00", "capacity": "0", "expected": token(loaded_split)},
+    )
+    removed = await post(
+        site,
+        f"{path}/staffing/{block}/delete",
+        {"expected": token(page, f"/staffing/{block}/delete")},
+    )
+    day_changed = await post(
+        site,
+        f"{path}/exceptions/{day}",
+        {"day": "14-01-2026", "kind": "closed", "expected": token(loaded_day)},
+    )
+    day_removed = await post(
+        site,
+        f"{path}/exceptions/{day}/delete",
+        {"expected": token(exceptions, f"/exceptions/{day}/delete")},
+    )
+    no_token = await post(site, f"{path}/staffing/{block}/delete")
+
+    for response in (mine, split, removed, day_changed, day_removed, no_token):
+        assert response.status_code == 409
+        assert "Iemand anders heeft dit inmiddels gewijzigd." in response.text
+    assert 'value="5"' in mine.text  # the stored values
+    assert token(mine.text) != token(loaded_change)  # and the form now carries the new version
+    after = (await site.client.get(f"{path}/staffing")).text
+    assert "5 medewerkers" in after
+    assert ids(after, "staffing") == [block]
+    assert "13 januari" in (await site.client.get(f"{path}/exceptions")).text
+
+
+async def test_the_exception_list_scrolls_in_a_labelled_region(
+    site: Site,
+) -> None:
+    path = await staffed(site)
+    await post(site, f"{path}/exceptions", {"day": "12-01-2026", "kind": "closed"})
+
+    page = (await site.client.get(f"{path}/exceptions")).text
+
+    assert 'class="table-scroll" role="region" aria-labelledby="list-heading" tabindex="0"' in page

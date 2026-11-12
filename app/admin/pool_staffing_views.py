@@ -15,9 +15,6 @@ from app.domain.pool_accounting import Shortfall
 from app.i18n.dates import format_clock, format_day_short
 from app.web.locale import RequestLocale
 
-MAX_SHORTFALLS_SHOWN = 20
-"""How many shortfalls the page lists before it says how many more there are (a display cap)."""
-
 TIMEZONE_FIELD = "timezone"
 """The name and id of the time-zone select, where an error about it links to."""
 
@@ -52,9 +49,12 @@ def _when(item: Shortfall, zone: ZoneInfo, locale: str) -> str:
 
 
 def shortfall_list(
-    found: tuple[Shortfall, ...], zone_name: str, locale: RequestLocale
+    found: tuple[Shortfall, ...], total: int, zone_name: str, locale: RequestLocale
 ) -> ShortfallList:
-    """Turn the pool's shortfalls into sentences in the pool's time zone, at most the cap."""
+    """Turn the pool's listed shortfalls into sentences in the pool's time zone.
+
+    ``total`` is how many there are in all; the page model carries only the first ones.
+    """
     _ = locale.gettext
     zone = ZoneInfo(zone_name)
     rows = [
@@ -66,9 +66,9 @@ def shortfall_list(
                 load=item.load,
             )
         )
-        for item in found[:MAX_SHORTFALLS_SHOWN]
+        for item in found
     ]
-    return ShortfallList(tuple(rows), max(0, len(found) - MAX_SHORTFALLS_SHOWN))
+    return ShortfallList(tuple(rows), max(0, total - len(found)))
 
 
 def timezone_field(form: FormData, locale: RequestLocale, stored: str | None) -> Field:

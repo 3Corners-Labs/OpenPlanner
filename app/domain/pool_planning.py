@@ -18,6 +18,7 @@ shows as a shortfall, a stretch where the commitments of the pool exceed its sta
 pool's staffing is not read by any booking path yet (``ROLLBACK_SAFE`` is false until step 5).
 """
 
+import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
@@ -29,7 +30,7 @@ from app.domain.capacity_service import own_editable_pool, pool_ref
 from app.domain.errors import DomainError, ErrorCode, missing_object
 from app.domain.holidays import closures
 from app.domain.organisations import organisation_by_slug
-from app.domain.pool_accounting import Shortfall, shortfalls
+from app.domain.pool_accounting import Shortfall, shortfall_page
 from app.domain.pool_staffing import (
     PoolStaffing,
     check_pool_staffing,
@@ -57,6 +58,9 @@ OVERRIDE_CHANGED = "pool_staffing.override_edit"
 OVERRIDE_REMOVED = "pool_staffing.override_remove"
 """Details of the audit events (action ``capacity.manage``); the labels are in the audit page."""
 
+MAX_SHORTFALLS_LISTED = 20
+"""How many shortfalls the page model carries; the rest is only counted (a display cap)."""
+
 RULE_FIELD = "rule_id"
 OVERRIDE_FIELD = "override_id"
 """The field of the refusal for a block or exception the pool does not have."""
@@ -73,8 +77,9 @@ class PoolStaffingPage:
             exceptions below are empty until then.
         rules: The weekly blocks, in week order.
         overrides: The exceptions from today (pool time) on, by date.
-        shortfalls: The stretches within ``horizon_days`` where more units are committed than
-            staffed, earliest first.
+        shortfalls: The first ``MAX_SHORTFALLS_LISTED`` stretches within ``horizon_days``
+            where more units are committed than staffed, earliest first.
+        shortfall_total: How many such stretches there are in all.
         horizon_days: How far ahead the shortfalls were looked for (``shortfall_horizon_days``).
     """
 
@@ -84,7 +89,74 @@ class PoolStaffingPage:
     rules: tuple[ScheduleRule, ...]
     overrides: tuple[ScheduleOverride, ...]
     shortfalls: tuple[Shortfall, ...]
+    shortfall_total: int
     horizon_days: int
+
+
+@dataclass(frozen=True)
+class PoolRule:
+    """One weekly block with the pool and organisation it belongs to, and its version."""
+
+    organisation: Organisation
+    pool: CapacityPool
+    rule: ScheduleRule
+    version: str
+
+
+@dataclass(frozen=True)
+class PoolOverride:
+    """One exception with the pool and organisation it belongs to, and its version."""
+
+    organisation: Organisation
+    pool: CapacityPool
+    override: ScheduleOverride
+    version: str
+
+
+def _digest(*parts: object) -> str:
+    """Return a short hash of ``parts``: what a form carries to tell the row it was loaded from."""
+    return hashlib.sha256("|".join(str(p) for p in parts).encode()).hexdigest()[:20]
+
+
+def rule_version(rule: ScheduleRule) -> str:
+    """Return the version of a block: a hash of its stored values.
+
+    A change form carries it back as ``expected``; a save or removal whose version differs from
+    the stored row's is refused (``pool_staffing_changed``), so an admin never overwrites or
+    deletes a block that someone else changed after the form was opened.
+    """
+    w = rule.window
+    return _digest(
+        rule.id,
+        rule.weekday,
+        w.opens,
+        w.closes,
+        w.capacity,
+        w.label,
+        w.offer.value,
+        rule.valid_from,
+        rule.valid_to,
+    )
+
+
+def override_version(override: ScheduleOverride) -> str:
+    """Return the version of an exception: a hash of its stored values (see ``rule_version``)."""
+    w = override.window
+    return _digest(
+        override.id,
+        override.day,
+        *(() if w is None else (w.opens, w.closes, w.capacity, w.label, w.offer.value)),
+    )
+
+
+def _unchanged(stored_version: str, expected: str) -> None:
+    """Require that the row still has the version the form was loaded with.
+
+    Raises:
+        DomainError: ``pool_staffing_changed`` when it does not (or no version was sent).
+    """
+    if stored_version != expected:
+        raise DomainError(ErrorCode.POOL_STAFFING_CHANGED)
 
 
 class PoolPlanningService:
@@ -127,23 +199,22 @@ class PoolPlanningService:
             found = await tx.get_pool_staffing(scope, pool_id)
             horizon = value_for(self._horizon_days, organisation.id)
             if found is None:
-                return PoolStaffingPage(organisation, pool, None, (), (), (), horizon)
+                return PoolStaffingPage(organisation, pool, None, (), (), (), 0, horizon)
             today = now.astimezone(found.timezone).date()
             upcoming = tuple(o for o in found.overrides if o.day >= today)
-            short = await _shortfalls(tx, organisation, pool_id, found, now, horizon)
+            short, total = await _shortfalls(tx, organisation, pool_id, found, now, horizon)
         return PoolStaffingPage(
             organisation,
             pool,
             found.timezone.key,
             found.rules,
             upcoming,
-            short,
+            tuple(short),
+            total,
             horizon,
         )
 
-    async def rule(
-        self, principal: Principal, slug: str, pool_id: int, rule_id: int
-    ) -> ScheduleRule:
+    async def rule(self, principal: Principal, slug: str, pool_id: int, rule_id: int) -> PoolRule:
         """Return the pool's weekly block ``rule_id``, to change it.
 
         Raises:
@@ -151,13 +222,14 @@ class PoolPlanningService:
         """
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.read() as tx:
-            await _own_pool(tx, scope, slug, pool_id)
+            organisation, pool = await _own_pool(tx, scope, slug, pool_id)
             staffing = await tx.get_pool_staffing(scope, pool_id)
-        return _rule_by_id(staffing.rules if staffing else (), rule_id)
+        rule = _rule_by_id(staffing.rules if staffing else (), rule_id)
+        return PoolRule(organisation, pool, rule, rule_version(rule))
 
     async def override(
         self, principal: Principal, slug: str, pool_id: int, override_id: int
-    ) -> ScheduleOverride:
+    ) -> PoolOverride:
         """Return the pool's exception ``override_id``, to change it.
 
         Raises:
@@ -165,9 +237,10 @@ class PoolPlanningService:
         """
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.read() as tx:
-            await _own_pool(tx, scope, slug, pool_id)
+            organisation, pool = await _own_pool(tx, scope, slug, pool_id)
             staffing = await tx.get_pool_staffing(scope, pool_id)
-        return _override_by_id(staffing.overrides if staffing else (), override_id)
+        override = _override_by_id(staffing.overrides if staffing else (), override_id)
+        return PoolOverride(organisation, pool, override, override_version(override))
 
     async def set_timezone(
         self, principal: Principal, slug: str, pool_id: int, timezone: str
@@ -201,7 +274,7 @@ class PoolPlanningService:
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.locked() as tx:
             _, pool = await _own_pool(tx, scope, slug, pool_id)
-            staffing = await _staffing(tx, scope, pool_id)
+            staffing, _ = await _staffing(tx, scope, pool_id, self._clock.now())
             check_pool_staffing(_with(staffing, rules=(*staffing.rules, rule)))
             rule_id = await tx.add_pool_rule(scope, pool_id, rule)
             if rule_id is None:  # pragma: no cover - the pool was just read in this transaction
@@ -210,18 +283,29 @@ class PoolPlanningService:
         return rule_id
 
     async def update_rule(
-        self, principal: Principal, slug: str, pool_id: int, rule_id: int, rule: ScheduleRule
+        self,
+        principal: Principal,
+        slug: str,
+        pool_id: int,
+        rule_id: int,
+        rule: ScheduleRule,
+        expected: str,
     ) -> bool:
-        """Replace weekly block ``rule_id``; ``False`` if nothing changed.
+        """Replace weekly block ``rule_id`` that the form loaded as ``expected``.
+
+        Returns ``False`` if nothing changed.
 
         Raises:
-            DomainError: As ``add_rule``, and ``configuration_object_missing`` (``rule_id``).
+            DomainError: As ``add_rule``, ``configuration_object_missing`` (``rule_id``) and
+                ``pool_staffing_changed`` when the block is no longer the version loaded.
         """
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.locked() as tx:
             _, pool = await _own_pool(tx, scope, slug, pool_id)
-            staffing = await _staffing(tx, scope, pool_id)
-            if _rule_by_id(staffing.rules, rule_id) == rule:
+            staffing, _ = await _staffing(tx, scope, pool_id, self._clock.now())
+            stored = _rule_by_id(staffing.rules, rule_id)
+            _unchanged(rule_version(stored), expected)
+            if stored == rule:
                 return False
             others = tuple(r for r in staffing.rules if r.id != rule_id)
             check_pool_staffing(_with(staffing, rules=(*others, rule)))
@@ -237,21 +321,24 @@ class PoolPlanningService:
         rule_id: int,
         at: time,
         capacity: int,
-        label: str | None = None,
+        label: str | None,
+        expected: str,
     ) -> int:
         """Split weekly block ``rule_id`` at ``at`` into two touching blocks (ADR 0027).
 
         Returns the id of the second part.
 
         Raises:
-            DomainError: As ``update_rule``, and ``invalid_configuration`` (``split_at``,
-                ``capacity``, ``label``).
+            DomainError: As ``update_rule`` (``expected`` is the version the form loaded), and
+                ``invalid_configuration`` (``split_at``, ``capacity``, ``label``).
         """
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.locked() as tx:
             _, pool = await _own_pool(tx, scope, slug, pool_id)
-            staffing = await _staffing(tx, scope, pool_id)
-            first, second = split_block(_rule_by_id(staffing.rules, rule_id), at, capacity, label)
+            staffing, _ = await _staffing(tx, scope, pool_id, self._clock.now())
+            stored = _rule_by_id(staffing.rules, rule_id)
+            _unchanged(rule_version(stored), expected)
+            first, second = split_block(stored, at, capacity, label)
             others = tuple(r for r in staffing.rules if r.id != rule_id)
             check_pool_staffing(_with(staffing, rules=(*others, first, second)))
             await tx.update_pool_rule(scope, pool_id, rule_id, first)
@@ -262,17 +349,21 @@ class PoolPlanningService:
         return second_id
 
     async def remove_rule(
-        self, principal: Principal, slug: str, pool_id: int, rule_id: int
+        self, principal: Principal, slug: str, pool_id: int, rule_id: int, expected: str
     ) -> None:
-        """Remove a weekly block of the pool.
+        """Remove weekly block ``rule_id`` that the form loaded as ``expected``.
 
         Raises:
-            DomainError: As ``staffing``, and ``configuration_object_missing`` (``rule_id``).
+            DomainError: As ``staffing``, ``configuration_object_missing`` (``rule_id``) and
+                ``pool_staffing_changed`` when the block is no longer the version loaded.
         """
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.locked() as tx:
             _, pool = await _own_pool(tx, scope, slug, pool_id)
-            if not await tx.delete_pool_rule(scope, pool_id, rule_id):
+            found = await tx.get_pool_staffing(scope, pool_id)
+            stored = _rule_by_id(found.rules if found else (), rule_id)
+            _unchanged(rule_version(stored), expected)
+            if not await tx.delete_pool_rule(scope, pool_id, rule_id):  # pragma: no cover
                 raise missing_object(RULE_FIELD)
             await self._record(tx, principal, slug, RULE_REMOVED, pool)
 
@@ -288,9 +379,10 @@ class PoolPlanningService:
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.locked() as tx:
             _, pool = await _own_pool(tx, scope, slug, pool_id)
-            staffing = await _staffing(tx, scope, pool_id)
+            staffing, past = await _staffing(tx, scope, pool_id, self._clock.now())
             self._check_day(override, staffing)
             check_pool_staffing(_with(staffing, overrides=(*staffing.overrides, override)))
+            await _drop(tx, scope, pool_id, past)
             override_id = await tx.add_pool_override(scope, pool_id, override)
             if override_id is None:  # pragma: no cover - the pool was just read in this transaction
                 raise missing_object("pool_id")
@@ -304,38 +396,49 @@ class PoolPlanningService:
         pool_id: int,
         override_id: int,
         override: ScheduleOverride,
+        expected: str,
     ) -> bool:
-        """Replace exception ``override_id``; ``False`` if nothing changed.
+        """Replace exception ``override_id`` that the form loaded as ``expected``.
+
+        Returns ``False`` if nothing changed.
 
         Raises:
-            DomainError: As ``add_override``, and ``configuration_object_missing``
-                (``override_id``).
+            DomainError: As ``add_override``, ``configuration_object_missing``
+                (``override_id``) and ``pool_staffing_changed`` when the exception is no longer
+                the version loaded.
         """
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.locked() as tx:
             _, pool = await _own_pool(tx, scope, slug, pool_id)
-            staffing = await _staffing(tx, scope, pool_id)
-            if _override_by_id(staffing.overrides, override_id) == override:
+            staffing, past = await _staffing(tx, scope, pool_id, self._clock.now())
+            stored = _override_by_id(staffing.overrides, override_id)
+            _unchanged(override_version(stored), expected)
+            if stored == override:
                 return False
             self._check_day(override, staffing)
             others = tuple(o for o in staffing.overrides if o.id != override_id)
             check_pool_staffing(_with(staffing, overrides=(*others, override)))
+            await _drop(tx, scope, pool_id, past)
             await tx.update_pool_override(scope, pool_id, override_id, override)
             await self._record(tx, principal, slug, OVERRIDE_CHANGED, pool)
         return True
 
     async def remove_override(
-        self, principal: Principal, slug: str, pool_id: int, override_id: int
+        self, principal: Principal, slug: str, pool_id: int, override_id: int, expected: str
     ) -> None:
-        """Remove an exception of the pool.
+        """Remove exception ``override_id`` that the form loaded as ``expected``.
 
         Raises:
-            DomainError: As ``staffing``, and ``configuration_object_missing`` (``override_id``).
+            DomainError: As ``staffing``, ``configuration_object_missing`` (``override_id``) and
+                ``pool_staffing_changed`` when the exception is no longer the version loaded.
         """
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.locked() as tx:
             _, pool = await _own_pool(tx, scope, slug, pool_id)
-            if not await tx.delete_pool_override(scope, pool_id, override_id):
+            found = await tx.get_pool_staffing(scope, pool_id)
+            stored = _override_by_id(found.overrides if found else (), override_id)
+            _unchanged(override_version(stored), expected)
+            if not await tx.delete_pool_override(scope, pool_id, override_id):  # pragma: no cover
                 raise missing_object(OVERRIDE_FIELD)
             await self._record(tx, principal, slug, OVERRIDE_REMOVED, pool)
 
@@ -368,17 +471,32 @@ async def _own_pool(
     return organisation, await own_editable_pool(tx, scope, organisation, pool_id)
 
 
-async def _staffing(tx: Transaction, scope: Scope, pool_id: int) -> PoolStaffing:
-    """Return the pool's blocks and all its exceptions.
+async def _staffing(
+    tx: Transaction, scope: Scope, pool_id: int, now: datetime
+) -> tuple[PoolStaffing, tuple[int, ...]]:
+    """Return the pool's blocks and its exceptions from today (pool time) on, and the past ones.
+
+    A past exception can overlap nothing that matters and is neither listed nor changed, so it
+    is neither validated nor counted against ``MAX_POOL_OVERRIDES``; the ids of the past ones are
+    returned for the change that drops them (``_drop``).
 
     Raises:
         DomainError: ``invalid_configuration`` (``timezone``) while the pool has no time zone:
             its blocks cannot be read before one is chosen.
     """
-    staffing = await tx.get_pool_staffing(scope, pool_id)
-    if staffing is None:
+    found = await tx.get_pool_staffing(scope, pool_id)
+    if found is None:
         raise DomainError(ErrorCode.INVALID_CONFIGURATION, "timezone")
-    return staffing
+    today = now.astimezone(found.timezone).date()
+    coming = tuple(o for o in found.overrides if o.day >= today)
+    past = tuple(o.id for o in found.overrides if o.day < today and o.id is not None)
+    return PoolStaffing(found.timezone, found.rules, coming), past
+
+
+async def _drop(tx: Transaction, scope: Scope, pool_id: int, override_ids: tuple[int, ...]) -> None:
+    """Delete the past exceptions ``override_ids``, in the transaction of the change at hand."""
+    for override_id in override_ids:
+        await tx.delete_pool_override(scope, pool_id, override_id)
 
 
 def _with(
@@ -418,8 +536,10 @@ async def _shortfalls(
     staffing: PoolStaffing,
     now: datetime,
     horizon_days: int,
-) -> tuple[Shortfall, ...]:
-    """Return the stretches in the next ``horizon_days`` with more commitments than units.
+) -> tuple[list[Shortfall], int]:
+    """Return the first stretches in the next ``horizon_days`` with more commitments than units.
+
+    Only ``MAX_SHORTFALLS_LISTED`` are built; the second value counts all of them.
 
     The supply is the pool's staffing with the organisation's holidays closed (an own exception
     wins); the load is every place held in the pool, derived from the bookings. A booking is
@@ -430,7 +550,7 @@ async def _shortfalls(
     last = upper.astimezone(staffing.timezone).date()
     supply = supply_between(staffing, await _closed_days(tx, organisation, first, last), now, upper)
     commitments = await tx.get_pool_commitments(pool_id, now, upper)
-    return tuple(shortfalls(supply, commitments, now, upper))
+    return shortfall_page(supply, commitments, now, upper, MAX_SHORTFALLS_LISTED)
 
 
 async def _closed_days(

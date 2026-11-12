@@ -13412,3 +13412,6 @@ msgstr "Uitzondering op de bezetting van een pool gewijzigd"
 
 msgid "admin.audit.detail.pool_staffing_override_remove"
 msgstr "Uitzondering op de bezetting van een pool verwijderd"
+
+msgid "admin.pool_staffing.error.changed"
+msgstr "Iemand anders heeft dit inmiddels gewijzigd. De huidige waarden staan hieronder: controleer ze en sla opnieuw op."

@@ -80,6 +80,8 @@ class WindowView:
     staffed: bool
     offer: str | None = None
     """The block's offer in words when it is not the default (ADR 0072)."""
+    version: str = ""
+    """What a pool's change and removal forms send back (``expected``); empty on a service's."""
 
 
 @dataclass(frozen=True)
@@ -92,6 +94,8 @@ class ExceptionView:
     time: str | None
     capacity: str | None
     offer: str | None = None
+    version: str = ""
+    """What the removal form sends back (``expected``); empty where nothing checks it."""
 
 
 def clock_text(window: TimeWindow, locale: str) -> str:
@@ -113,7 +117,11 @@ def offer_text(window: TimeWindow, _: BoundGettext) -> str | None:
     return None if window.offer is Offer.SCHEDULED else _(OFFER_LABELS[window.offer])
 
 
-def week(rules: Sequence[ScheduleRule], locale: RequestLocale) -> list[DayView]:
+def week(
+    rules: Sequence[ScheduleRule],
+    locale: RequestLocale,
+    version: Callable[[ScheduleRule], str] | None = None,
+) -> list[DayView]:
     """Group the weekly ``rules`` per weekday, Monday first, in the order given."""
     _ = locale.gettext
     days = []
@@ -138,6 +146,7 @@ def week(rules: Sequence[ScheduleRule], locale: RequestLocale) -> list[DayView]:
                     rule.window.label,
                     rule.window.staffed,
                     offer_text(rule.window, _),
+                    version(rule) if version else "",
                 )
             )
         days.append(DayView(weekday, name, windows))
@@ -145,7 +154,9 @@ def week(rules: Sequence[ScheduleRule], locale: RequestLocale) -> list[DayView]:
 
 
 def exception_views(
-    overrides: Sequence[ScheduleOverride], locale: RequestLocale
+    overrides: Sequence[ScheduleOverride],
+    locale: RequestLocale,
+    version: Callable[[ScheduleOverride], str] | None = None,
 ) -> list[ExceptionView]:
     """Return the exceptions for display, in the order given."""
     _ = locale.gettext
@@ -157,6 +168,7 @@ def exception_views(
             clock_text(o.window, locale.code) if o.window else None,
             agents_text(o.window.capacity, _) if o.window else None,
             offer_text(o.window, _) if o.window else None,
+            version(o) if version else "",
         )
         for o in overrides
     ]

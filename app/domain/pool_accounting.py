@@ -29,10 +29,11 @@ work over them (decision P3). The rules in one place:
   start that is then due and may be recorded as a conflict.
 """
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
+from itertools import islice
 
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.pool_staffing import Intake, Supply, check_interval, lowest_units, require_aware
@@ -400,6 +401,57 @@ def earliest_start(
     return None
 
 
+def _shortfall_stream(
+    supply: Supply,
+    commitments: Iterable[Commitment],
+    lower: datetime,
+    upper: datetime,
+    overrun_at: datetime | None,
+) -> Iterator[Shortfall]:
+    """Yield the shortfalls of ``lower`` to ``upper`` in time order, as one sweep line.
+
+    Both the commitments and the staffed segments are walked once in time order, so the work is
+    ``O(n log n)`` for the sort and linear after it. The load at a moment is the number of
+    commitments that started at or before it and have not ended; the units are those of the
+    segment that covers it (segments are sorted and never overlap).
+    """
+    check_interval(lower, upper)
+    live = _live(commitments, lower, upper, None, overrun_at)
+    load = sum(1 for start, _ in live if start <= lower)
+    events: list[tuple[datetime, int]] = []
+    for start, until in live:
+        if start > lower:
+            events.append((start, 1))
+        if until is not None and until < upper:
+            events.append((until, -1))
+    events.sort(key=lambda event: event[0])
+    edges = sorted({lower, upper, *supply.borders_between(lower, upper), *(t for t, _ in events)})
+    segments = supply.segments
+    seen = 0
+    index = 0
+    pending: Shortfall | None = None
+    for start, end in zip(edges, edges[1:], strict=False):
+        while seen < len(events) and events[seen][0] <= start:
+            load += events[seen][1]
+            seen += 1
+        while index < len(segments) and segments[index].end <= start:
+            index += 1
+        covered = index < len(segments) and segments[index].start <= start
+        units = segments[index].units if covered else 0
+        if load <= units:
+            if pending is not None:
+                yield pending
+                pending = None
+        elif pending is not None and (pending.units, pending.load) == (units, load):
+            pending = Shortfall(pending.start, end, units, load)
+        else:
+            if pending is not None:
+                yield pending
+            pending = Shortfall(start, end, units, load)
+    if pending is not None:
+        yield pending
+
+
 def shortfalls(
     supply: Supply,
     commitments: Iterable[Commitment],
@@ -422,20 +474,25 @@ def shortfalls(
         DomainError: ``invalid_configuration`` with field ``interval`` if the interval is empty,
             reversed or naive.
     """
-    check_interval(lower, upper)
-    live = _live(commitments, lower, upper, None, overrun_at)
-    edges = {lower, upper, *supply.borders_between(lower, upper)}
-    for start, until in live:
-        edges |= {e for e in (start, until) if e is not None and lower < e < upper}
-    ordered = sorted(edges)
-    found: list[Shortfall] = []
-    for start, end in zip(ordered, ordered[1:], strict=False):
-        units, load = supply.units_at(start), _load_at(live, start)
-        if load <= units:
-            continue
-        previous = found[-1] if found else None
-        if previous and previous.end == start and (previous.units, previous.load) == (units, load):
-            found[-1] = Shortfall(previous.start, end, units, load)
-        else:
-            found.append(Shortfall(start, end, units, load))
-    return found
+    return list(_shortfall_stream(supply, commitments, lower, upper, overrun_at))
+
+
+def shortfall_page(
+    supply: Supply,
+    commitments: Iterable[Commitment],
+    lower: datetime,
+    upper: datetime,
+    limit: int,
+    *,
+    overrun_at: datetime | None = None,
+) -> tuple[list[Shortfall], int]:
+    """Return the first ``limit`` shortfalls of ``shortfalls`` and how many there are in all.
+
+    A screen lists a few and says how many more: only those are built as objects.
+
+    Raises:
+        DomainError: As ``shortfalls``.
+    """
+    stream = _shortfall_stream(supply, commitments, lower, upper, overrun_at)
+    first = list(islice(stream, limit))
+    return first, len(first) + sum(1 for _ in stream)

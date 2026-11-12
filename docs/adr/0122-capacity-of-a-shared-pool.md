@@ -49,6 +49,9 @@ Configuration of one object, not a setting (like a service's `direct_call_max_co
 | 3 | Pool time zone and staffing in the configuration package | #759 | merged |
 | 4 | Pool staffing screens: time zone, weekly blocks, exceptions, shortfall list, double-counting notice | #760 | merged |
 | 4 | Double-counting overlap list and the shortfall per service for a reader who may see it | | planned |
+| 4 | One staffing route factory shared by the service and the pool tabs (the flows of `pool_staffing_routes.py` and of `group_routes.py` / `planning.py` are duplicated) | | follow-up |
+| 4 | `_week.html` takes its base path from one variable for both tabs | | follow-up |
+| 4 | A zone change shown on the week card, and a notice for the daylight saving gap | | follow-up |
 | 5 | Booking on a pool (dark), the reason that reads `ROLLBACK_SAFE`, concurrency test | | planned |
 | 5 | Closing and reporting of pool bookings: `ended_slots`, usage closing and the facts skip pool slots until then | | planned |
 

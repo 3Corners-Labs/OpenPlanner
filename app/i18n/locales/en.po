@@ -13399,3 +13399,6 @@ msgstr "Exception of a pool's staffing changed"
 
 msgid "admin.audit.detail.pool_staffing_override_remove"
 msgstr "Exception of a pool's staffing removed"
+
+msgid "admin.pool_staffing.error.changed"
+msgstr "Someone else changed this in the meantime. The current values are shown: check them and save again."

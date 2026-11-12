@@ -21,6 +21,7 @@
           <a href="{{ base }}/{{ window.id }}" aria-label="{{ _("admin.hours.edit_label", day=day.name, time=window.time) }}">{{ _("admin.edit") }}</a>
           <a href="{{ base }}/{{ window.id }}/split" aria-label="{{ _("admin.hours.split_label", day=day.name, time=window.time) }}">{{ _("admin.hours.split") }}</a>
           <form class="inline-form" method="post" action="{{ base }}/{{ window.id }}/delete">
+            {% if window.version %}<input type="hidden" name="expected" value="{{ window.version }}">{% endif %}
             <button type="submit" class="button button--quiet" aria-label="{{ _("admin.hours.remove_label", day=day.name, time=window.time) }}">{{ _("admin.remove") }}</button>
           </form>
         </span>
