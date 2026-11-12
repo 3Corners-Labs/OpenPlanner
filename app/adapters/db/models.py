@@ -442,8 +442,8 @@ class PoolStaffingOverrideRow(Base):
     __table_args__ = (
         Index("ix_pool_staffing_overrides_pool_id_day", "pool_id", "day"),
         CheckConstraint(
-            "(opens IS NULL AND closes IS NULL AND units IS NULL) "
-            "OR (opens < closes AND units >= 0)",
+            "(opens IS NULL) = (closes IS NULL) AND (opens IS NULL) = (units IS NULL) "
+            "AND (opens IS NULL OR (opens < closes AND units >= 0))",
             name="window_or_closed",
         ),
         CheckConstraint(f"offer IN {OFFERS}", name="offer"),

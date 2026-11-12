@@ -9,15 +9,21 @@ in the fake's ``State`` (``pool_timezones``, ``pool_rules``, ``pool_overrides``)
 
 from dataclasses import replace
 from datetime import date, datetime
-from zoneinfo import ZoneInfo
 
 from app.domain.authorization import Scope
 from app.domain.booking import Slot
 from app.domain.capacity import PoolMode
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.pool_accounting import MAX_SPAN, Commitment
-from app.domain.pool_staffing import PoolStaffing
-from app.domain.scheduling import ScheduleOverride, ScheduleRule
+from app.domain.pool_staffing import PoolStaffing, check_timezone, zone_or_none
+from app.domain.scheduling import ScheduleOverride, ScheduleRule, TimeWindow
 from tests.fakes.service_flow_store import ServiceFlowStore
+
+
+def _no_subjects(window: TimeWindow | None) -> None:
+    """Refuse subjects on a pool's window, as the SQL adapter does."""
+    if window is not None and window.subjects:
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "subjects")
 
 
 class PoolStaffingStore(ServiceFlowStore):
@@ -31,7 +37,7 @@ class PoolStaffingStore(ServiceFlowStore):
     async def get_pool_staffing(
         self, scope: Scope, pool_id: int, from_day: date | None = None
     ) -> PoolStaffing | None:
-        zone = self.state.pool_timezones.get(pool_id)
+        zone = zone_or_none(self.state.pool_timezones.get(pool_id))
         if zone is None or not await self._counted(scope, pool_id):
             return None
         rules = [r for p, r in self.state.pool_rules.values() if p == pool_id]
@@ -42,9 +48,11 @@ class PoolStaffingStore(ServiceFlowStore):
             if p == pool_id and (from_day is None or o.day >= from_day)
         ]
         overrides.sort(key=lambda o: (o.day, o.window.opens if o.window else o.day.min))
-        return PoolStaffing(ZoneInfo(zone), tuple(rules), tuple(overrides))
+        return PoolStaffing(zone, tuple(rules), tuple(overrides))
 
     async def set_pool_timezone(self, scope: Scope, pool_id: int, timezone: str | None) -> bool:
+        if timezone is not None:
+            check_timezone(timezone)
         if not await self._counted(scope, pool_id):
             return False
         if timezone is None:
@@ -54,6 +62,7 @@ class PoolStaffingStore(ServiceFlowStore):
         return True
 
     async def add_pool_rule(self, scope: Scope, pool_id: int, rule: ScheduleRule) -> int | None:
+        _no_subjects(rule.window)
         if not await self._counted(scope, pool_id):
             return None
         rule_id = self._new_id()
@@ -63,6 +72,7 @@ class PoolStaffingStore(ServiceFlowStore):
     async def update_pool_rule(
         self, scope: Scope, pool_id: int, rule_id: int, rule: ScheduleRule
     ) -> bool:
+        _no_subjects(rule.window)
         found = self.state.pool_rules.get(rule_id)
         if found is None or found[0] != pool_id or not await self._counted(scope, pool_id):
             return False
@@ -79,6 +89,7 @@ class PoolStaffingStore(ServiceFlowStore):
     async def add_pool_override(
         self, scope: Scope, pool_id: int, override: ScheduleOverride
     ) -> int | None:
+        _no_subjects(override.window)
         if not await self._counted(scope, pool_id):
             return None
         override_id = self._new_id()
@@ -88,6 +99,7 @@ class PoolStaffingStore(ServiceFlowStore):
     async def update_pool_override(
         self, scope: Scope, pool_id: int, override_id: int, override: ScheduleOverride
     ) -> bool:
+        _no_subjects(override.window)
         found = self.state.pool_overrides.get(override_id)
         if found is None or found[0] != pool_id or not await self._counted(scope, pool_id):
             return False

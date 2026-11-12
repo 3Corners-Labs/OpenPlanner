@@ -12,15 +12,20 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.adapters.db.models import CapacityPoolRow
 from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingKind, BookingStatus, Slot
 from app.domain.capacity import CapacityPool, PoolMode
+from app.domain.errors import ErrorCode
 from app.domain.pool_accounting import Commitment
 from app.domain.reschedule_proposal import HeldProposal, ProposalOutcome
 from app.domain.scheduling import Offer, ScheduleOverride, ScheduleRule, TimeWindow
 from tests.support.closures import confirmed_booking
 from tests.support.domain import SLOT_0900
-from tests.support.flow_world import EVERYTHING, World, add_pool
+from tests.support.flow_world import EVERYTHING, World, add_pool, refused
 
 AMSTERDAM = "Europe/Amsterdam"
 BETA = Scope(organisations=frozenset({"beta"}))
@@ -360,3 +365,44 @@ async def test_the_day_after_is_empty(world: World) -> None:
         world, pool, datetime(2026, 1, 6, tzinfo=UTC), datetime(2026, 1, 7, tzinfo=UTC)
     )
     assert nothing == []
+
+
+async def test_an_unknown_time_zone_is_refused_and_a_known_one_kept(world: World) -> None:
+    pool = await add_pool(world)
+
+    for bad in ("x", "Mars/Olympus", "A" * 5000, ""):
+        async with world.uow.locked() as tx:
+            with refused(ErrorCode.INVALID_CONFIGURATION, "timezone"):
+                await tx.set_pool_timezone(EVERYTHING, pool.id, bad)
+    assert await staffing(world, pool) is None
+    async with world.uow.locked() as tx:
+        assert await tx.set_pool_timezone(EVERYTHING, pool.id, "America/New_York")
+    assert (await staffing(world, pool)).timezone == ZoneInfo("America/New_York")
+
+
+async def test_a_stored_zone_that_cannot_be_read_means_no_staffing_not_an_error(
+    world: World,
+) -> None:
+    pool = await staffed_pool(world)
+    engine = getattr(world.uow, "_engine", None)
+    if engine is None:
+        world.uow.state.pool_timezones[pool.id] = "Gone/Away"
+    else:
+        async with AsyncSession(engine) as session, session.begin():
+            await session.execute(
+                update(CapacityPoolRow)
+                .where(CapacityPoolRow.id == pool.id)
+                .values(timezone="Gone/Away")
+            )
+
+    assert await staffing(world, pool) is None
+
+
+async def test_a_block_with_subjects_is_refused_not_silently_stripped(world: World) -> None:
+    pool = await staffed_pool(world)
+    window = TimeWindow(time(9), time(12), 2, None, Offer.SCHEDULED, ("id",))
+    async with world.uow.locked() as tx:
+        with refused(ErrorCode.INVALID_CONFIGURATION, "subjects"):
+            await tx.add_pool_rule(EVERYTHING, pool.id, ScheduleRule(0, window))
+        with refused(ErrorCode.INVALID_CONFIGURATION, "subjects"):
+            await tx.add_pool_override(EVERYTHING, pool.id, ScheduleOverride(OTHER_DAY, window))

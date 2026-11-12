@@ -15,7 +15,6 @@ rollback gate ``ROLLBACK_SAFE`` is false until ADR 0122 step 5).
 
 from datetime import date, datetime
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,8 +33,9 @@ from app.adapters.db.proposals import open_proposal
 from app.domain.authorization import Scope
 from app.domain.booking import HOLDS_PLACE, BookingKind, Slot
 from app.domain.capacity import PoolMode
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.pool_accounting import MAX_SPAN, Commitment
-from app.domain.pool_staffing import PoolStaffing
+from app.domain.pool_staffing import PoolStaffing, check_timezone, zone_or_none
 from app.domain.scheduling import Offer, ScheduleOverride, ScheduleRule, TimeWindow
 
 _HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
@@ -55,8 +55,15 @@ def _override(row: PoolStaffingOverrideRow) -> ScheduleOverride:
     return ScheduleOverride(day=row.day, window=window, id=row.id)
 
 
+def _no_subjects(window: TimeWindow | None) -> None:
+    """Refuse a window with subjects: a pool stores none, so they would be dropped silently."""
+    if window is not None and window.subjects:
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "subjects")
+
+
 def _rule_columns(rule: ScheduleRule) -> dict[str, Any]:
     """Return the stored columns of a block (without its id and pool)."""
+    _no_subjects(rule.window)
     return {
         "weekday": rule.weekday,
         "opens": rule.window.opens,
@@ -72,6 +79,7 @@ def _rule_columns(rule: ScheduleRule) -> dict[str, Any]:
 def _override_columns(override: ScheduleOverride) -> dict[str, Any]:
     """Return the stored columns of an exception; no window means a closed day."""
     window = override.window
+    _no_subjects(window)
     return {
         "day": override.day,
         "opens": window.opens if window else None,
@@ -101,7 +109,8 @@ class PoolStaffingQueries(CapacityPoolQueries):
         that has no time zone yet (nothing can be staffed before the zone is chosen).
         """
         row = await self._counted_pool_row(scope, pool_id)
-        if row is None or row.timezone is None:
+        zone = zone_or_none(row.timezone) if row is not None else None
+        if row is None or zone is None:
             return None
         rules = await self._session.scalars(
             select(PoolStaffingRuleRow)
@@ -115,7 +124,7 @@ class PoolStaffingQueries(CapacityPoolQueries):
             query.order_by(PoolStaffingOverrideRow.day, PoolStaffingOverrideRow.opens)
         )
         return PoolStaffing(
-            ZoneInfo(row.timezone),
+            zone,
             tuple(_rule(r) for r in rules),
             tuple(_override(o) for o in overrides),
         )
@@ -123,8 +132,14 @@ class PoolStaffingQueries(CapacityPoolQueries):
     async def set_pool_timezone(self, scope: Scope, pool_id: int, timezone: str | None) -> bool:
         """Set the time zone of a counted pool; ``False`` for a pool that is not one in ``scope``.
 
-        The caller has validated the name (an IANA zone); ``None`` clears it.
+        ``None`` clears it.
+
+        Raises:
+            DomainError: ``invalid_configuration`` with field ``timezone`` for a name that is
+                not an IANA time zone known to this host.
         """
+        if timezone is not None:
+            check_timezone(timezone)
         if await self._counted_pool_row(scope, pool_id) is None:
             return False
         await self._session.execute(

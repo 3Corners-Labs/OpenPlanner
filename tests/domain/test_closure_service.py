@@ -92,6 +92,26 @@ async def test_closing_suspends_covered_bookings_and_keeps_their_data(
     assert actions == [("closure.manage", "closure.start,bookings:1", "demo")]
 
 
+async def test_a_closure_suspends_a_pool_booking_as_well_as_a_legacy_one(
+    closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    legacy = await _book(bookings, SLOT_0900)
+    pooled = await _book(bookings, SLOT_0930)
+    slot = uow.state.slots[uow.state.bookings[pooled].slot_id]
+    uow.state.slots[slot.id or 0] = replace(
+        slot, capacity_pool_id=1, occupied_until=slot.end + timedelta(minutes=5)
+    )
+
+    count = await closures.close_group(GROUP_ADMIN, "demo", UNTIL_TUESDAY)
+
+    assert count == 2
+    for booking_id in (legacy, pooled):
+        assert _status(uow, booking_id) is BookingStatus.SUSPENDED
+        purge = uow.state.jobs[booking_id][-1]
+        assert purge.type is JobType.PURGE_PII
+        assert purge.run_at == UNTIL_TUESDAY.ends_at + RETENTION_AFTER_CLOSURE  # type: ignore[operator]
+
+
 async def test_open_ended_closure_purges_at_the_maximum_and_sooner_once_it_ends(
     closures: ClosureService, bookings: BookingService, uow: InMemoryUnitOfWork
 ) -> None:

@@ -150,6 +150,13 @@ def test_staffing_goes_with_its_pool_and_keeps_the_checks_of_a_service(
                 "INSERT INTO pool_staffing_overrides (pool_id, day, opens, closes, units)"
                 " VALUES (1, '2026-03-02', '12:00:00.000000', '09:00:00.000000', 1)"
             )
+        for partial in (
+            "INSERT INTO pool_staffing_overrides (pool_id, day, opens)"
+            " VALUES (1, '2026-03-02', '09:00')",
+            "INSERT INTO pool_staffing_overrides (pool_id, day, units) VALUES (1, '2026-03-02', 1)",
+        ):
+            with pytest.raises(sqlite3.IntegrityError):  # a window is all or none of its columns
+                database.execute(partial)
         database.execute(
             "INSERT INTO pool_staffing_overrides (pool_id, day) VALUES (1, '2026-03-02')"
         )

@@ -18,9 +18,17 @@ SQLite cannot add a named constraint to an existing table without rebuilding ``s
 referenced by ``bookings``; a pool is archived, never deleted, and a pool slot is only written by
 the booking path of ADR 0122 step 5, which reads the pool in the same transaction.
 
+``uq_slots_pool`` has a nullable column (``occupied_until``), and SQLite treats NULLs as distinct
+in a unique index: the booking path of ADR 0122 step 5 must always write both ``capacity_pool_id``
+and ``occupied_until`` of a pool slot, or the index guards nothing for it.
+
+The exceptions table has a stricter check than a service's: a window is all of opens, closes and
+units, or none of them (a closed day).
+
 Downgrade drops what was added and restores the old index, and refuses while a slot carries a
 pool: the bookings on it would lose their pool, and the restored unique index could then fail
-(the precedent is migration 0010 for direct-call slots).
+(the precedent is migration 0010 for direct-call slots). It drops the staffing tables without
+refusing: they hold configuration only, which is lost (a package or the screens can restore it).
 
 Revision ID: 0111
 Revises: 0110
@@ -89,8 +97,8 @@ def _create_staffing_tables() -> None:
             "offer", sa.String(length=9), server_default=sa.text("'scheduled'"), nullable=False
         ),
         sa.CheckConstraint(
-            "(opens IS NULL AND closes IS NULL AND units IS NULL) "
-            "OR (opens < closes AND units >= 0)",
+            "(opens IS NULL) = (closes IS NULL) AND (opens IS NULL) = (units IS NULL) "
+            "AND (opens IS NULL OR (opens < closes AND units >= 0))",
             name=op.f("ck_pool_staffing_overrides_window_or_closed"),
         ),
         sa.CheckConstraint(f"offer IN {OFFERS}", name=op.f("ck_pool_staffing_overrides_offer")),

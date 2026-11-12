@@ -1501,14 +1501,21 @@ class InMemoryTransaction(PoolStaffingStore):
         self.state.closures[closure_id] = replace(closure, image=None)
 
     async def find_confirmed_bookings(
-        self, group_id: int, lower: datetime, upper: datetime | None
+        self, group_id: int, lower: datetime, upper: datetime | None, *, include_pool: bool = False
     ) -> list[Booking]:
-        return self._scheduled(group_id, lower, upper, {BookingStatus.CONFIRMED})
+        return self._scheduled(
+            group_id, lower, upper, {BookingStatus.CONFIRMED}, include_pool=include_pool
+        )
 
     async def find_agenda_bookings(
         self, group_id: int, lower: datetime, upper: datetime
     ) -> list[Booking]:
         return self._scheduled(group_id, lower, upper, IN_AGENDA)
+
+    def _legacy(self, booking: Booking) -> bool:
+        """Return whether the booking sits on a legacy slot (no pool); a missing slot is legacy."""
+        slot = self.state.slots.get(booking.slot_id)
+        return slot is None or slot.capacity_pool_id is None
 
     def _scheduled(
         self,
@@ -1516,6 +1523,8 @@ class InMemoryTransaction(PoolStaffingStore):
         lower: datetime,
         upper: datetime | None,
         statuses: Collection[BookingStatus],
+        *,
+        include_pool: bool = False,
     ) -> list[Booking]:
         wanted = set(statuses)
         found = [
@@ -1524,6 +1533,7 @@ class InMemoryTransaction(PoolStaffingStore):
             if b.group_id == group_id
             and b.status in wanted
             and b.kind == "scheduled"
+            and (include_pool or self._legacy(b))
             and lower <= b.start
             and (upper is None or b.start < upper)
         ]

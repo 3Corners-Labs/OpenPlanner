@@ -2215,10 +2215,15 @@ class SqlTransaction(
             await self._save_notices(closure.id, closure)
 
     async def find_confirmed_bookings(
-        self, group_id: int, lower: datetime, upper: datetime | None
+        self, group_id: int, lower: datetime, upper: datetime | None, *, include_pool: bool = False
     ) -> list[Booking]:
-        """Return the group's confirmed scheduled bookings with lower <= start < upper."""
-        return await self._scheduled(group_id, lower, upper, {BookingStatus.CONFIRMED})
+        """Return the group's confirmed scheduled bookings with lower <= start < upper.
+
+        Bookings on pool slots only with ``include_pool`` (an emergency closure suspends them).
+        """
+        return await self._scheduled(
+            group_id, lower, upper, {BookingStatus.CONFIRMED}, include_pool=include_pool
+        )
 
     async def find_agenda_bookings(
         self, group_id: int, lower: datetime, upper: datetime
@@ -2232,8 +2237,13 @@ class SqlTransaction(
         lower: datetime,
         upper: datetime | None,
         statuses: Collection[BookingStatus],
+        *,
+        include_pool: bool = False,
     ) -> list[Booking]:
-        """Return the group's scheduled bookings with one of ``statuses``, by start."""
+        """Return the group's scheduled bookings with one of ``statuses``, by start.
+
+        Legacy slots only, unless ``include_pool``.
+        """
         query = (
             select(BookingRow, SlotRow)
             .join(SlotRow, SlotRow.id == BookingRow.slot_id)
@@ -2241,10 +2251,11 @@ class SqlTransaction(
                 BookingRow.group_id == group_id,
                 BookingRow.status.in_([status.value for status in statuses]),
                 SlotRow.kind == BookingKind.SCHEDULED.value,
-                legacy_slot(),
                 SlotRow.start >= lower,
             )
         )
+        if not include_pool:
+            query = query.where(legacy_slot())
         if upper is not None:
             query = query.where(SlotRow.start < upper)
         rows = await self._session.execute(query.order_by(SlotRow.start, BookingRow.id))

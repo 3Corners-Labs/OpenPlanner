@@ -39,7 +39,7 @@ from app.domain.pool_staffing import Intake, Supply, check_interval, lowest_unit
 from app.domain.scheduling import MAX_SLOT_MINUTES, valid_slot_minutes
 from app.domain.settings_registry import BY_KEY
 
-MAX_BUFFER_MINUTES = int(BY_KEY["treatment_buffer_minutes"].maximum or 0)
+MAX_BUFFER_MINUTES = int(BY_KEY["treatment_buffer_minutes"].maximum)  # type: ignore[arg-type]
 """Upper bound of ``treatment_buffer_minutes``: the bound of the setting in the registry."""
 MAX_SPAN = timedelta(minutes=MAX_SLOT_MINUTES + MAX_BUFFER_MINUTES)
 """The longest a commitment can last; bounds how far back an adapter must look for overlaps."""
