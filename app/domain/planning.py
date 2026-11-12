@@ -38,6 +38,7 @@ from app.domain.scheduling import (
     ScheduleOverride,
     ScheduleRule,
     TimeWindow,
+    split_block,
     validate_schedule,
     windows_on,
 )
@@ -343,14 +344,7 @@ class PlanningService:
             group = await group_by_slug(tx, slug)
             rules, overrides = await tx.get_schedule_items(group.id)
             old = _rule_by_id(rules, rule_id)
-            if not old.window.opens < at < old.window.closes:
-                raise DomainError(ErrorCode.INVALID_CONFIGURATION, "split_at")
-            first = replace(old, window=replace(old.window, closes=at), id=None)
-            second = replace(
-                old,
-                window=replace(old.window, opens=at, capacity=capacity, label=label),
-                id=None,
-            )
+            first, second = split_block(old, at, capacity, label)
             others = [r for r in rules if r.id != rule_id]
             validate_schedule([*others, first, second], overrides)
             await tx.update_schedule_rule(group.id, rule_id, first)

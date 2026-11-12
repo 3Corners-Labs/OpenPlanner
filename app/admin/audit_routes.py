@@ -316,6 +316,15 @@ DETAIL_LABELS: dict[str, str] = {
     "capacity_pool.changed": "admin.audit.detail.capacity_pool_changed",
     "capacity_pool.archived": "admin.audit.detail.capacity_pool_archived",
     "staff_skills.changed": "admin.audit.detail.staff_skills_changed",
+    # ADR 0122 step 4: the staffing of a counted pool (action capacity.manage; the pool follows).
+    "pool_staffing.timezone": "admin.audit.detail.pool_staffing_timezone",
+    "pool_staffing.rule_add": "admin.audit.detail.pool_staffing_rule_add",
+    "pool_staffing.rule_edit": "admin.audit.detail.pool_staffing_rule_edit",
+    "pool_staffing.rule_split": "admin.audit.detail.pool_staffing_rule_split",
+    "pool_staffing.rule_remove": "admin.audit.detail.pool_staffing_rule_remove",
+    "pool_staffing.override_add": "admin.audit.detail.pool_staffing_override_add",
+    "pool_staffing.override_edit": "admin.audit.detail.pool_staffing_override_edit",
+    "pool_staffing.override_remove": "admin.audit.detail.pool_staffing_override_remove",
     # ADR 0121 step 2d: the flows of a service (action group.edit; the code and a revision follow).
     "flow.created": "admin.audit.detail.flow_created",
     "flow.draft_saved": "admin.audit.detail.flow_draft_saved",

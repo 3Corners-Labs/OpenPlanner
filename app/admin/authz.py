@@ -50,6 +50,7 @@ from app.domain.flow_service import FlowService
 from app.domain.login_service import LoginService
 from app.domain.maintenance_service import MaintenanceService
 from app.domain.overview_layout import OverviewLayoutService
+from app.domain.pool_planning import PoolPlanningService
 from app.domain.ports import Clock
 from app.domain.roles import RoleService
 from app.domain.scheduling import GroupSummary
@@ -137,6 +138,12 @@ def skill_service(request: Request) -> SkillService:
 def capacity_service(request: Request) -> CapacityService:
     """Return the application's capacity service (ADR 0121)."""
     service: CapacityService = request.app.state.capacity_service
+    return service
+
+
+def pool_planning_service(request: Request) -> PoolPlanningService:
+    """Return the application's pool staffing service (ADR 0122)."""
+    service: PoolPlanningService = request.app.state.pool_planning_service
     return service
 
 

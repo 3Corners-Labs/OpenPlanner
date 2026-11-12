@@ -91,7 +91,7 @@ async def test_a_counted_pool_is_added_with_its_skills_listed_and_audited(site: 
     assert "Eigen pool</span>" in page
     # The warning and the missing staffing numbers are on the page (ADR 0121 screen 4).
     assert "Let op bij het tellen. Een pool belooft dat iedere getelde medewerker alle" in page
-    assert "Hoeveel medewerkers per tijdblok in een pool werken" in page
+    assert "Hoeveel mensen een pool per tijdblok telt" in page
     assert 'name="staffing' not in page
     details = [e.detail for e in await audit_log(site) if e.action == "capacity.manage"]
     assert re.fullmatch(r"capacity_pool\.created,pool:loket", details[0])
@@ -103,7 +103,7 @@ async def test_the_page_speaks_english(site: Site) -> None:
     page = (await site.client.get(LIST, params={"lang": "en"})).text
 
     assert "Mind the counting. A pool promises that every counted member of staff" in page
-    assert "How many members of staff work in a pool per time block is set once" in page
+    assert "How many people a pool counts per time block" in page
     assert "Add a capacity pool" in page
 
 

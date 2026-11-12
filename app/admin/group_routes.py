@@ -75,6 +75,20 @@ from app.admin.routing_inputs import (
     ROUTING_VALUE_FIELD,
 )
 from app.admin.shortfalls import group_shortfalls
+from app.admin.staffing_views import (
+    WEEKDAYS,
+    SubjectReader,
+    block_description,
+    exception_fields,
+    exception_views,
+    hours_fields,
+    override_values,
+    read_override,
+    read_rule,
+    rule_values,
+    split_fields,
+    week,
+)
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
 from app.domain.contact_center import ContactCenterRouting
@@ -84,13 +98,11 @@ from app.domain.planning import (
     NewGroup,
     PlanningService,
     PreviewDay,
-    Schedule,
     settings_of,
 )
 from app.domain.scheduling import (
     MAX_BOOKINGS_PER_EMAIL,
     MAX_DIRECT_CALLS,
-    MAX_LABEL_LENGTH,
     MAX_PARTICIPANT_CHANGE_LEAD_MINUTES,
     MAX_PLANNER_LEAD_MINUTES,
     MAX_QUEUE_VISIBLE_FROM_MINUTES,
@@ -102,23 +114,17 @@ from app.domain.scheduling import (
     MIN_TRIAL_CALL_MINUTES,
     DispatchFallback,
     DispatchKind,
-    Group,
     GroupSummary,
     JoinClient,
-    Offer,
     PhoneMode,
     ScheduleOverride,
     ScheduleRule,
-    TimeWindow,
     slug_from,
 )
 from app.i18n import BoundGettext
 from app.i18n.dates import (
     format_clock,
-    format_day,
     format_day_short,
-    format_time_of_day,
-    weekday_names,
 )
 from app.web.authz_labels import PERMISSION_LABELS
 from app.web.locale import RequestLocale
@@ -387,125 +393,11 @@ async def create_group(
 
 
 @dataclass(frozen=True)
-class DayView:
-    """One weekday (0 = Monday) with its staffing blocks."""
-
-    weekday: int
-    name: str
-    windows: list["WindowView"]
-
-
-@dataclass(frozen=True)
-class WindowView:
-    """A staffing block as shown in the week: times, agents in words, label, validity.
-
-    ``staffed`` is false for a 0-agent block; the template marks it with a class, and the
-    agent text ("geen medewerkers") says the same in words, so colour is never the only signal.
-    """
-
-    id: int | None
-    time: str
-    capacity: str
-    validity: str | None
-    label: str | None
-    staffed: bool
-    offer: str | None = None
-    """The block's offer in words when it is not the default (ADR 0072)."""
-
-
-@dataclass(frozen=True)
-class ExceptionView:
-    """An exception as shown in the list."""
-
-    id: int | None
-    day: str
-    closed: bool
-    time: str | None
-    capacity: str | None
-    offer: str | None = None
-
-
-@dataclass(frozen=True)
 class PreviewView:
     """One day of the preview of participants' slots."""
 
     day: str
     summary: str
-
-
-def _clock_text(window: TimeWindow, locale: str) -> str:
-    """Return ``09:00–12:00`` in the system clock style."""
-    return f"{format_time_of_day(window.opens, locale)}–{format_time_of_day(window.closes, locale)}"
-
-
-def _agents_text(count: int, _: BoundGettext) -> str:
-    """Return "3 medewerkers", "1 medewerker" or "geen medewerkers" (no plural forms yet)."""
-    if count == 0:
-        return _("admin.hours.capacity_none")
-    if count == 1:
-        return _("admin.hours.capacity_one")
-    return _("admin.hours.capacity", count=count)
-
-
-OFFER_LABELS: dict[Offer, str] = {
-    Offer.SCHEDULED: "admin.offer.scheduled",
-    Offer.DIRECT: "admin.offer.direct",
-    Offer.BOTH: "admin.offer.both",
-}
-"""Catalogue key per offer of a block (ADR 0072), for the select and the week view."""
-
-
-def _offer_text(window: TimeWindow, _: BoundGettext) -> str | None:
-    """Return the block's offer in words, or ``None`` for the default (slots only)."""
-    return None if window.offer is Offer.SCHEDULED else _(OFFER_LABELS[window.offer])
-
-
-def _week(schedule: Schedule, locale: RequestLocale) -> list[DayView]:
-    """Group the weekly rules per weekday, Monday first."""
-    _ = locale.gettext
-    names = weekday_names(locale.code)
-    days = []
-    for weekday, name in enumerate(names):
-        windows = []
-        for rule in (r for r in schedule.rules if r.weekday == weekday):
-            validity = None
-            if rule.valid_from or rule.valid_to:
-                validity = _(
-                    "admin.hours.validity",
-                    start=format_day_short(rule.valid_from, locale.code)
-                    if rule.valid_from
-                    else "…",
-                    end=format_day_short(rule.valid_to, locale.code) if rule.valid_to else "…",
-                )
-            windows.append(
-                WindowView(
-                    rule.id,
-                    _clock_text(rule.window, locale.code),
-                    _agents_text(rule.window.capacity, _),
-                    validity,
-                    rule.window.label,
-                    rule.window.staffed,
-                    _offer_text(rule.window, _),
-                )
-            )
-        days.append(DayView(weekday, name, windows))
-    return days
-
-
-def _exceptions(schedule: Schedule, locale: RequestLocale) -> list[ExceptionView]:
-    """Return the upcoming exceptions for display."""
-    _ = locale.gettext
-    return [
-        ExceptionView(
-            o.id,
-            format_day(o.day, locale.code),
-            o.window is None,
-            _clock_text(o.window, locale.code) if o.window else None,
-            _agents_text(o.window.capacity, _) if o.window else None,
-            _offer_text(o.window, _) if o.window else None,
-        )
-        for o in schedule.overrides
-    ]
 
 
 def _preview(
@@ -562,8 +454,8 @@ async def group(
             ),
             "phone_label": _(PHONE_LABELS[summary.group.phone_mode]),
             "group_rights": group_rights,
-            "week": _week(schedule, locale),
-            "exceptions": _exceptions(schedule, locale),
+            "week": week(schedule.rules, locale),
+            "exceptions": exception_views(schedule.overrides, locale),
             "preview": _preview(preview, summary, locale),
             "shortfalls": await group_shortfalls(request, locale, context),
             # ADR 0072: direct calls are offered per block, not per group.
@@ -999,39 +891,20 @@ async def _check_host(request: Request, slug: str) -> None:
 
 # --- staffing blocks ------------------------------------------------------------------------
 
-WEEKDAYS = frozenset(str(i) for i in range(7))
+
+def _subjects(form: FormData, context: AdminContext) -> SubjectReader:
+    """Return the reader of the subjects ticked on a block form of the context's group."""
+    return lambda: read_block_subjects(form, context.group.group)
 
 
-def _label_field(form: FormData, locale: RequestLocale) -> Field:
-    """Return the optional label input of a block (ADR 0027): admin content only."""
-    _ = locale.gettext
-    return Field(
-        "label",
-        _("admin.field.label"),
-        "text",
-        form.text("label"),
-        hint=_("admin.field.label_hint"),
-        error=form.error_for("label"),
-        required=False,
-        attributes={"maxlength": str(MAX_LABEL_LENGTH)},
-    )
+def _rule_form_values(rule: ScheduleRule) -> dict[str, str]:
+    """Return a stored rule as form values, with its subjects ticked."""
+    return {**rule_values(rule), **block_subject_values(rule.window)}
 
 
-def _capacity_field(
-    form: FormData, locale: RequestLocale, default: str, required: bool = True
-) -> Field:
-    """Return the agent-count input of a block, 0 to 1000 (0 for lunch, ADR 0027)."""
-    _ = locale.gettext
-    return Field(
-        "capacity",
-        _("admin.field.capacity"),
-        "number",
-        form.text("capacity") or default,
-        hint=_("admin.field.capacity_hint"),
-        error=form.error_for("capacity"),
-        required=required,
-        attributes={"min": "0", "max": "1000", "inputmode": "numeric"},
-    )
+def _override_form_values(override: ScheduleOverride) -> dict[str, str]:
+    """Return a stored exception as form values, with its subjects ticked."""
+    return {**override_values(override), **block_subject_values(override.window)}
 
 
 FALLBACK_LABELS: dict[DispatchFallback, str] = {
@@ -1039,118 +912,6 @@ FALLBACK_LABELS: dict[DispatchFallback, str] = {
     DispatchFallback.OWN_QUEUE: "admin.fallback.own_queue",
 }
 """The fallback choices of a contact-center group (ADR 0082 point 11)."""
-
-OFFER_VALUES = frozenset(offer.value for offer in Offer)
-
-
-def _read_offer(form: FormData) -> str | None:
-    """Return the submitted offer; a form without the field means the default (slots)."""
-    if not form.text("offer"):
-        return Offer.SCHEDULED.value
-    return form.choice("offer", OFFER_VALUES)
-
-
-def _offer_field(form: FormData, locale: RequestLocale) -> Field:
-    """Return the offer select of a block: slots, direct calls or both (ADR 0072)."""
-    _ = locale.gettext
-    return Field(
-        "offer",
-        _("admin.field.offer"),
-        "select",
-        form.text("offer") or Offer.SCHEDULED.value,
-        hint=_("admin.field.offer_hint"),
-        error=form.error_for("offer"),
-        options=tuple(Option(offer.value, _(OFFER_LABELS[offer])) for offer in Offer),
-    )
-
-
-def _hours_fields(form: FormData, locale: RequestLocale) -> list[Field]:
-    """Return the inputs of the add-block and change-block forms."""
-    _ = locale.gettext
-    days = tuple(Option(str(i), name) for i, name in enumerate(weekday_names(locale.code)))
-    return [
-        Field(
-            "weekday",
-            _("admin.field.weekday"),
-            "select",
-            form.text("weekday") or "0",
-            error=form.error_for("weekday"),
-            options=days,
-        ),
-        Field(
-            "opens",
-            _("admin.field.opens"),
-            "time",
-            form.text("opens") or "09:00",
-            error=form.error_for("opens"),
-        ),
-        Field(
-            "closes",
-            _("admin.field.closes"),
-            "time",
-            form.text("closes") or "12:00",
-            error=form.error_for("closes"),
-        ),
-        _capacity_field(form, locale, "1"),
-        _offer_field(form, locale),
-        _label_field(form, locale),
-        Field(
-            "valid_from",
-            _("admin.field.valid_from"),
-            "date",
-            form.text("valid_from"),
-            error=form.error_for("valid_from"),
-            required=False,
-        ),
-        Field(
-            "valid_to",
-            _("admin.field.valid_to"),
-            "date",
-            form.text("valid_to"),
-            hint=_("admin.field.valid_hint"),
-            error=form.error_for("valid_to"),
-            required=False,
-        ),
-    ]
-
-
-def _read_rule(form: FormData, group: Group) -> ScheduleRule | None:
-    """Parse the window form into a rule; ``None`` (with form errors) when it is incomplete."""
-    weekday = form.choice("weekday", WEEKDAYS)
-    opens, closes = form.clock("opens"), form.clock("closes")
-    capacity = form.integer("capacity")
-    offer = _read_offer(form)
-    valid_from, valid_to = form.optional_day("valid_from"), form.optional_day("valid_to")
-    if form.errors or not (weekday and opens and closes and offer and capacity is not None):
-        return None
-    try:
-        window = TimeWindow(
-            opens,
-            closes,
-            capacity,
-            form.optional_text("label"),
-            Offer(offer),
-            read_block_subjects(form, group),
-        )
-        return ScheduleRule(int(weekday), window, valid_from, valid_to)
-    except DomainError as error:
-        form.refusal(error)
-        return None
-
-
-def _rule_values(rule: ScheduleRule) -> dict[str, str]:
-    """Return a stored rule as form values, to pre-fill the change form."""
-    return {
-        "weekday": str(rule.weekday),
-        "opens": rule.window.opens.strftime("%H:%M"),
-        "closes": rule.window.closes.strftime("%H:%M"),
-        "capacity": str(rule.window.capacity),
-        "offer": rule.window.offer.value,
-        "label": rule.window.label or "",
-        "valid_from": rule.valid_from.isoformat() if rule.valid_from else "",
-        "valid_to": rule.valid_to.isoformat() if rule.valid_to else "",
-        **block_subject_values(rule.window),
-    }
 
 
 async def _hours_response(
@@ -1164,8 +925,8 @@ async def _hours_response(
         context,
         "admin/group_hours.html",
         {
-            "week": _week(schedule, locale),
-            "fields": _hours_fields(form, locale),
+            "week": week(schedule.rules, locale),
+            "fields": hours_fields(form, locale),
             "subject_choices": subject_choices(form, context.group.group, locale),
             "errors": form.errors,
             "shortfalls": await group_shortfalls(request, locale, context),
@@ -1199,7 +960,7 @@ async def add_hours(
 ) -> Response:
     """Add a weekly staffing block."""
     form = await read_form(request, locale)
-    rule = _read_rule(form, context.group.group)
+    rule = read_rule(form, _subjects(form, context))
     if rule is not None:
         try:
             await planning_service(request).add_rule(context.principal, slug, rule)
@@ -1227,7 +988,7 @@ def _edit_hours_response(
         "admin/group_hours_edit.html",
         {
             "rule_id": rule_id,
-            "fields": _hours_fields(form, locale),
+            "fields": hours_fields(form, locale),
             "subject_choices": subject_choices(form, context.group.group, locale),
             "errors": form.errors,
         },
@@ -1252,7 +1013,7 @@ async def edit_hours(
 ) -> HTMLResponse:
     """Show the change form of a weekly block, pre-filled with its values."""
     rule = await _stored_rule(request, context, slug, rule_id)
-    form = FormData(_rule_values(rule), locale.gettext)
+    form = FormData(_rule_form_values(rule), locale.gettext)
     return _edit_hours_response(request, locale, context, rule_id, form, 200)
 
 
@@ -1262,7 +1023,7 @@ async def update_hours(
 ) -> Response:
     """Change a weekly block; existing bookings keep their slots."""
     form = await read_form(request, locale)
-    rule = _read_rule(form, context.group.group)
+    rule = read_rule(form, _subjects(form, context))
     if rule is not None:
         try:
             changed = await planning_service(request).update_rule(
@@ -1278,23 +1039,6 @@ async def update_hours(
     return _edit_hours_response(request, locale, context, rule_id, form, 422)
 
 
-def _split_fields(form: FormData, locale: RequestLocale) -> list[Field]:
-    """Return the inputs of the split form: the split time, agents and label of part two."""
-    _ = locale.gettext
-    return [
-        Field(
-            "split_at",
-            _("admin.field.split_at"),
-            "time",
-            form.text("split_at"),
-            hint=_("admin.field.split_at_hint"),
-            error=form.error_for("split_at"),
-        ),
-        _capacity_field(form, locale, "0"),
-        _label_field(form, locale),
-    ]
-
-
 def _split_response(
     request: Request,
     locale: RequestLocale,
@@ -1305,12 +1049,7 @@ def _split_response(
 ) -> HTMLResponse:
     """Render the split form of one weekly block, described in words above the inputs."""
     _ = locale.gettext
-    day = weekday_names(locale.code)[rule.weekday]
-    parts = [
-        f"{day} {_clock_text(rule.window, locale.code)}",
-        _agents_text(rule.window.capacity, _),
-    ]
-    block = " · ".join([*parts, rule.window.label] if rule.window.label else parts)
+    block = block_description(rule, locale)
     return group_page(
         request,
         locale,
@@ -1319,7 +1058,7 @@ def _split_response(
         {
             "rule_id": rule.id,
             "lead": _("admin.hours.split_lead", block=block),
-            "fields": _split_fields(form, locale),
+            "fields": split_fields(form, locale),
             "errors": form.errors,
         },
         status,
@@ -1396,34 +1135,6 @@ async def old_edit_hours(slug: str, rule_id: int, context: OldStaffingPath) -> R
 # --- exceptions -----------------------------------------------------------------------------
 
 
-def _exception_fields(form: FormData, locale: RequestLocale) -> list[Field]:
-    """Return the inputs of the add-exception form (the kind is a separate radio group)."""
-    _ = locale.gettext
-    return [
-        Field("day", _("admin.field.day"), "date", form.text("day"), error=form.error_for("day")),
-        Field(
-            "opens",
-            _("admin.field.opens"),
-            "time",
-            form.text("opens"),
-            hint=_("admin.field.only_with_hours"),
-            error=form.error_for("opens"),
-            required=False,
-        ),
-        Field(
-            "closes",
-            _("admin.field.closes"),
-            "time",
-            form.text("closes"),
-            error=form.error_for("closes"),
-            required=False,
-        ),
-        _capacity_field(form, locale, "", required=False),
-        _offer_field(form, locale),
-        _label_field(form, locale),
-    ]
-
-
 async def _exceptions_response(
     request: Request, locale: RequestLocale, context: AdminContext, form: FormData, status: int
 ) -> HTMLResponse:
@@ -1435,8 +1146,8 @@ async def _exceptions_response(
         context,
         "admin/group_exceptions.html",
         {
-            "exceptions": _exceptions(schedule, locale),
-            "fields": _exception_fields(form, locale),
+            "exceptions": exception_views(schedule.overrides, locale),
+            "fields": exception_fields(form, locale),
             "subject_choices": subject_choices(form, context.group.group, locale),
             "kind": form.text("kind") or "closed",
             "kind_error": form.error_for("kind"),
@@ -1461,7 +1172,7 @@ async def add_exception(
 ) -> Response:
     """Close a date or give it its own hours."""
     form = await read_form(request, locale)
-    override = _read_override(form, context.group.group)
+    override = read_override(form, _subjects(form, context))
     if override is not None:
         try:
             await planning_service(request).add_override(context.principal, slug, override)
@@ -1471,51 +1182,6 @@ async def add_exception(
         else:
             return redirect_done(f"/admin/groups/{slug}/exceptions", "added")
     return await _exceptions_response(request, locale, context, form, 422)
-
-
-def _read_override(form: FormData, group: Group) -> ScheduleOverride | None:
-    """Parse the exception form; ``None`` (with form errors) when it is incomplete."""
-    day = form.day("day")
-    kind = form.choice("kind", {"closed", "hours"})
-    window = None
-    if kind == "hours":
-        opens, closes, capacity = (
-            form.clock("opens"),
-            form.clock("closes"),
-            form.integer("capacity"),
-        )
-        offer = _read_offer(form)
-        if opens and closes and offer and capacity is not None:
-            try:
-                window = TimeWindow(
-                    opens,
-                    closes,
-                    capacity,
-                    form.optional_text("label"),
-                    Offer(offer),
-                    read_block_subjects(form, group),
-                )
-            except DomainError as error:
-                form.refusal(error)
-    if form.errors or day is None:
-        return None
-    return ScheduleOverride(day, window)
-
-
-def _override_values(override: ScheduleOverride) -> dict[str, str]:
-    """Return a stored exception as form values, to pre-fill the change form."""
-    window = override.window
-    values = {"day": override.day.isoformat(), "kind": "closed" if window is None else "hours"}
-    if window is not None:
-        values |= {
-            "opens": window.opens.strftime("%H:%M"),
-            "closes": window.closes.strftime("%H:%M"),
-            "capacity": str(window.capacity),
-            "offer": window.offer.value,
-            "label": window.label or "",
-            **block_subject_values(window),
-        }
-    return values
 
 
 def _edit_exception_response(
@@ -1534,7 +1200,7 @@ def _edit_exception_response(
         "admin/group_exception_edit.html",
         {
             "override_id": override_id,
-            "fields": _exception_fields(form, locale),
+            "fields": exception_fields(form, locale),
             "subject_choices": subject_choices(form, context.group.group, locale),
             "kind": form.text("kind") or "closed",
             "kind_error": form.error_for("kind"),
@@ -1554,7 +1220,7 @@ async def edit_exception(
     except DomainError as error:
         raise_refusal(error)
         raise
-    form = FormData(_override_values(override), locale.gettext)
+    form = FormData(_override_form_values(override), locale.gettext)
     return _edit_exception_response(request, locale, context, override_id, form, 200)
 
 
@@ -1569,7 +1235,7 @@ async def update_exception(
 ) -> Response:
     """Change an exception; bookings made on the old day keep their slots."""
     form = await read_form(request, locale)
-    override = _read_override(form, context.group.group)
+    override = read_override(form, _subjects(form, context))
     if override is not None:
         try:
             changed = await planning_service(request).update_override(

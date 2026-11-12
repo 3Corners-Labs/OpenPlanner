@@ -19,7 +19,7 @@ deliberate.
 import re
 import unicodedata
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, time, timedelta
 from enum import StrEnum
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -618,6 +618,28 @@ def windows_on(
             return []
         return sorted(o.window for o in day_overrides if o.window is not None)
     return sorted(rule.window for rule in rules if rule.applies_on(day))
+
+
+def split_block(
+    old: ScheduleRule, at: time, capacity: int, label: str | None
+) -> tuple[ScheduleRule, ScheduleRule]:
+    """Split a weekly block at ``at`` into two touching blocks (ADR 0027), without ids.
+
+    The first part keeps the block's count and label and ends at ``at``; the second part runs
+    from ``at`` to the old end with ``capacity`` and ``label``. Both keep the weekday, the
+    validity period, the offer and the subjects. The caller validates the whole schedule.
+
+    Raises:
+        DomainError: ``invalid_configuration`` (``split_at``) unless ``at`` lies strictly inside
+            the block; the new count and label are checked by ``TimeWindow``.
+    """
+    if not old.window.opens < at < old.window.closes:
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "split_at")
+    first = replace(old, window=replace(old.window, closes=at), id=None)
+    second = replace(
+        old, window=replace(old.window, opens=at, capacity=capacity, label=label), id=None
+    )
+    return first, second
 
 
 def validate_schedule(rules: Sequence[ScheduleRule], overrides: Sequence[ScheduleOverride]) -> None:

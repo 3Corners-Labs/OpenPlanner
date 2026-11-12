@@ -120,6 +120,7 @@ from app.domain.participant_contact import ParticipantContactService
 from app.domain.participant_link_service import ParticipantLinkService
 from app.domain.planning import PlanningService
 from app.domain.platform_settings import PlatformSettingsStore
+from app.domain.pool_planning import PoolPlanningService
 from app.domain.ports import (
     CertificateProbe,
     Clock,
@@ -716,6 +717,12 @@ def create_app(
             clock,
             app.state.admin_service,
             lambda: live().max_capacity_pools_per_organisation,
+        )
+        app.state.pool_planning_service = PoolPlanningService(
+            uow,
+            clock,
+            app.state.admin_service,
+            lambda org: per_organisation(org).shortfall_horizon_days,
         )
         app.state.flow_service = FlowService(
             uow, clock, app.state.admin_service, lambda: live().max_flows_per_service

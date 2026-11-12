@@ -12440,9 +12440,6 @@ msgstr "A capacity pool is the time that flows draw on, with the skills every co
 msgid "admin.capacity.count_warning"
 msgstr "Mind the counting. A pool promises that every counted member of staff has all of the pool's skills. Do not count the same person in two pools at the same time: the portal cannot check that for you yet."
 
-msgid "admin.capacity.staffing_later"
-msgstr "How many members of staff work in a pool per time block is set once flows use the pool (to follow)."
-
 msgid "admin.capacity.count"
 msgstr "Capacity pools ({count})"
 
@@ -13303,3 +13300,102 @@ msgstr "Default for"
 
 msgid "admin.flows.subjects"
 msgstr "Subjects"
+
+msgid "admin.pool_staffing.pages"
+msgstr "Pages of this pool"
+
+msgid "admin.pool_staffing.page_pool"
+msgstr "Name and skills"
+
+msgid "admin.pool_staffing.page_staffing"
+msgstr "Staffing"
+
+msgid "admin.pool_staffing.page_exceptions"
+msgstr "Exceptions"
+
+msgid "admin.pool_staffing.title"
+msgstr "Staffing of a capacity pool"
+
+msgid "admin.pool_staffing.exceptions_title"
+msgstr "Staffing exceptions of a capacity pool"
+
+msgid "admin.pool_staffing.timezone_heading"
+msgstr "Time zone"
+
+msgid "admin.pool_staffing.timezone_lead"
+msgstr "The blocks below are read in this zone. Summer and winter time follow from the zone itself."
+
+msgid "admin.pool_staffing.timezone_first"
+msgstr "Choose the time zone first: the weekly blocks of this pool can be entered only after that."
+
+msgid "admin.pool_staffing.timezone_hint"
+msgstr "The blocks of the pool apply in this zone, also when the services that use the pool work in another zone."
+
+msgid "admin.pool_staffing.timezone_button"
+msgstr "Save time zone"
+
+msgid "admin.pool_staffing.timezone_needed"
+msgstr "Choose the time zone of this pool first, on the page"
+
+msgid "admin.pool_staffing.shortfall_heading"
+msgstr "Shortfalls ahead"
+
+msgid "admin.pool_staffing.shortfall_lead"
+msgstr "Moments in the next {days} days at which more places are held than people are counted."
+
+msgid "admin.pool_staffing.shortfall_stay"
+msgstr "Existing appointments stay; nothing is moved or cancelled. Adjust the staffing or move appointments yourself."
+
+msgid "admin.pool_staffing.shortfall_row"
+msgstr "{when}: {units} staffed, {load} places held"
+
+msgid "admin.pool_staffing.shortfall_more"
+msgstr "And {count} more."
+
+msgid "admin.pool_staffing.shortfall_none"
+msgstr "No shortfalls in the next {days} days."
+
+msgid "admin.pool_staffing.week_heading"
+msgstr "Weekly staffing"
+
+msgid "admin.pool_staffing.week_lead"
+msgstr "One or more blocks per day, each with the number of people counted at the same time; 0 for lunch, for example. Blocks of one day may not overlap."
+
+msgid "admin.pool_staffing.capacity_hint"
+msgstr "That many people are counted at the same time in this block. Enter 0 for lunch, for example: then nobody is counted."
+
+msgid "admin.pool_staffing.offer_hint"
+msgstr "What the block is kept for: appointments, work without an appointment (a direct call), or both."
+
+msgid "admin.pool_staffing.holidays_note"
+msgstr "Holidays of the organisation's calendars close the pool, unless an exception here gives that date its own blocks."
+
+msgid "admin.capacity.staffing_where"
+msgstr "How many people a pool counts per time block, and when, is set on its Staffing page after you add the pool."
+
+msgid "admin.capacity.staffing_edit_lead"
+msgstr "How many people the pool counts per time block, and when, is set on its Staffing page."
+
+msgid "admin.audit.detail.pool_staffing_timezone"
+msgstr "Time zone of a pool changed"
+
+msgid "admin.audit.detail.pool_staffing_rule_add"
+msgstr "Block added to a pool's staffing"
+
+msgid "admin.audit.detail.pool_staffing_rule_edit"
+msgstr "Block of a pool's staffing changed"
+
+msgid "admin.audit.detail.pool_staffing_rule_split"
+msgstr "Block of a pool's staffing split"
+
+msgid "admin.audit.detail.pool_staffing_rule_remove"
+msgstr "Block of a pool's staffing removed"
+
+msgid "admin.audit.detail.pool_staffing_override_add"
+msgstr "Exception added to a pool's staffing"
+
+msgid "admin.audit.detail.pool_staffing_override_edit"
+msgstr "Exception of a pool's staffing changed"
+
+msgid "admin.audit.detail.pool_staffing_override_remove"
+msgstr "Exception of a pool's staffing removed"

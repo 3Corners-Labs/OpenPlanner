@@ -1,0 +1,55 @@
+{#- The staffing of one counted capacity pool (ADR 0122 step 4): its time zone, the shortfalls ahead, the weekly blocks with their actions and the add-block form. Without a time zone only the zone form shows. -#}
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import field, form_body with context %}
+{% block title %}{{ _("admin.pool_staffing.title") }} · {{ row.name }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_organisation_header.html" %}
+{% set current = "staffing" %}
+{% include "admin/_pool_staffing_nav.html" %}
+{% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="{{ pool_path }}/timezone" novalidate aria-labelledby="timezone-heading">
+  <div class="card__header">
+    <h2 id="timezone-heading">{{ _("admin.pool_staffing.timezone_heading") }}</h2>
+    <p class="card__lead">{% if timezone %}{{ _("admin.pool_staffing.timezone_lead") }}{% else %}{{ _("admin.pool_staffing.timezone_first") }}{% endif %}</p>
+  </div>
+  <div class="form-grid">
+    {{ field(timezone_field) }}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.pool_staffing.timezone_button") }}</button>
+  </div>
+</form>
+{% if timezone %}
+<section class="card" aria-labelledby="shortfall-heading">
+  <div class="card__header">
+    <h2 id="shortfall-heading">{{ _("admin.pool_staffing.shortfall_heading") }}</h2>
+    <p class="card__lead">{{ _("admin.pool_staffing.shortfall_lead", days=horizon_days) }}</p>
+  </div>
+  {% if shortfalls.rows %}
+  <div class="alert alert--warning" role="note"><p>{{ _("admin.pool_staffing.shortfall_stay") }}</p></div>
+  <ul>
+    {% for item in shortfalls.rows %}<li>{{ item.text }}</li>{% endfor %}
+  </ul>
+  {% if shortfalls.more %}<p>{{ _("admin.pool_staffing.shortfall_more", count=shortfalls.more) }}</p>{% endif %}
+  {% else %}
+  <p class="empty-state">{{ _("admin.pool_staffing.shortfall_none", days=horizon_days) }}</p>
+  {% endif %}
+</section>
+<section class="card" aria-labelledby="week-heading">
+  <div class="card__header">
+    <h2 id="week-heading">{{ _("admin.pool_staffing.week_heading") }}</h2>
+    <p class="card__lead">{{ _("admin.pool_staffing.week_lead") }}</p>
+  </div>
+  {% set removable = true %}
+  {% include "admin/_week.html" %}
+</section>
+<form class="card" method="post" action="{{ staffing_path }}" novalidate aria-labelledby="add-heading">
+  <div class="card__header">
+    <h2 id="add-heading">{{ _("admin.hours.add") }}</h2>
+    <p class="card__lead">{{ _("admin.hours.add_lead") }}</p>
+  </div>
+  {{ form_body(fields, _("admin.hours.add_button")) }}
+</form>
+{% endif %}
+{% endblock %}

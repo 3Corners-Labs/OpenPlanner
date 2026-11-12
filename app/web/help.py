@@ -118,6 +118,18 @@ TOPICS = (
         ),
         Permission.ORGANISATION_VIEW,
     ),
+    # ADR 0122 step 4: the staffing of a counted pool, pages under the pool's own page.
+    HelpTopic(
+        "organisation-pool-staffing",
+        (
+            "/admin/organisations/{org}/capacity/{pool_id}/staffing",
+            "/admin/organisations/{org}/capacity/{pool_id}/staffing/{rule_id}",
+            "/admin/organisations/{org}/capacity/{pool_id}/staffing/{rule_id}/split",
+            "/admin/organisations/{org}/capacity/{pool_id}/exceptions",
+            "/admin/organisations/{org}/capacity/{pool_id}/exceptions/{override_id}",
+        ),
+        Permission.CAPACITY_MANAGE,
+    ),
     HelpTopic(
         "queue",
         ("/admin/groups/{slug}/queue", "/admin/groups/{slug}/queue/{booking_id}"),

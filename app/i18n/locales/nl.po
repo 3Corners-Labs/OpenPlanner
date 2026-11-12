@@ -12453,9 +12453,6 @@ msgstr "Een capaciteitspool is de tijd waaruit flows putten, met de vaardigheden
 msgid "admin.capacity.count_warning"
 msgstr "Let op bij het tellen. Een pool belooft dat iedere getelde medewerker alle vaardigheden van de pool heeft. Tel dezelfde persoon niet in twee pools op hetzelfde moment: het portaal kan dat nog niet voor u controleren."
 
-msgid "admin.capacity.staffing_later"
-msgstr "Hoeveel medewerkers per tijdblok in een pool werken, stelt u in zodra flows de pool gebruiken (volgt)."
-
 msgid "admin.capacity.count"
 msgstr "Capaciteitspools ({count})"
 
@@ -13316,3 +13313,102 @@ msgstr "Standaard voor"
 
 msgid "admin.flows.subjects"
 msgstr "Onderwerpen"
+
+msgid "admin.pool_staffing.pages"
+msgstr "Pagina's van deze pool"
+
+msgid "admin.pool_staffing.page_pool"
+msgstr "Naam en vaardigheden"
+
+msgid "admin.pool_staffing.page_staffing"
+msgstr "Bezetting"
+
+msgid "admin.pool_staffing.page_exceptions"
+msgstr "Uitzonderingen"
+
+msgid "admin.pool_staffing.title"
+msgstr "Bezetting van een capaciteitspool"
+
+msgid "admin.pool_staffing.exceptions_title"
+msgstr "Bezettingsuitzonderingen van een capaciteitspool"
+
+msgid "admin.pool_staffing.timezone_heading"
+msgstr "Tijdzone"
+
+msgid "admin.pool_staffing.timezone_lead"
+msgstr "De tijdblokken hieronder gelden in deze zone. Zomer- en wintertijd volgen vanzelf uit de zone."
+
+msgid "admin.pool_staffing.timezone_first"
+msgstr "Kies eerst de tijdzone: de wekelijkse tijdblokken van deze pool kunt u pas daarna invoeren."
+
+msgid "admin.pool_staffing.timezone_hint"
+msgstr "De tijdblokken van de pool gelden in deze zone, ook als de diensten die de pool gebruiken in een andere zone werken."
+
+msgid "admin.pool_staffing.timezone_button"
+msgstr "Tijdzone opslaan"
+
+msgid "admin.pool_staffing.timezone_needed"
+msgstr "Kies eerst de tijdzone van deze pool, op de pagina"
+
+msgid "admin.pool_staffing.shortfall_heading"
+msgstr "Tekorten vooruit"
+
+msgid "admin.pool_staffing.shortfall_lead"
+msgstr "Momenten in de komende {days} dagen waarop meer plekken bezet zijn dan er mensen geteld worden."
+
+msgid "admin.pool_staffing.shortfall_stay"
+msgstr "Bestaande afspraken blijven staan; er wordt niets verplaatst of geannuleerd. Pas de bezetting aan of verplaats afspraken zelf."
+
+msgid "admin.pool_staffing.shortfall_row"
+msgstr "{when}: {units} ingeroosterd, {load} plekken bezet"
+
+msgid "admin.pool_staffing.shortfall_more"
+msgstr "En nog {count} andere."
+
+msgid "admin.pool_staffing.shortfall_none"
+msgstr "Geen tekorten in de komende {days} dagen."
+
+msgid "admin.pool_staffing.week_heading"
+msgstr "Wekelijkse bezetting"
+
+msgid "admin.pool_staffing.week_lead"
+msgstr "Een of meer blokken per dag, elk met het aantal mensen dat tegelijk geteld wordt; bijvoorbeeld 0 voor de lunch. Blokken van één dag mogen elkaar niet overlappen."
+
+msgid "admin.pool_staffing.capacity_hint"
+msgstr "Zoveel mensen worden in dit blok tegelijk geteld. Vul bijvoorbeeld 0 in voor de lunch: dan wordt niemand geteld."
+
+msgid "admin.pool_staffing.offer_hint"
+msgstr "Waarvoor dit blok bedoeld is: afspraken, werk zonder afspraak (een direct gesprek), of beide."
+
+msgid "admin.pool_staffing.holidays_note"
+msgstr "Feestdagen uit de kalenders van de organisatie sluiten de pool, tenzij een uitzondering hier die datum eigen blokken geeft."
+
+msgid "admin.capacity.staffing_where"
+msgstr "Hoeveel mensen een pool per tijdblok telt, en wanneer, stelt u in op de pagina Bezetting van de pool, nadat u de pool hebt toegevoegd."
+
+msgid "admin.capacity.staffing_edit_lead"
+msgstr "Hoeveel mensen de pool per tijdblok telt, en wanneer, stelt u in op de pagina Bezetting van de pool."
+
+msgid "admin.audit.detail.pool_staffing_timezone"
+msgstr "Tijdzone van een pool gewijzigd"
+
+msgid "admin.audit.detail.pool_staffing_rule_add"
+msgstr "Blok toegevoegd aan de bezetting van een pool"
+
+msgid "admin.audit.detail.pool_staffing_rule_edit"
+msgstr "Blok van de bezetting van een pool gewijzigd"
+
+msgid "admin.audit.detail.pool_staffing_rule_split"
+msgstr "Blok van de bezetting van een pool gesplitst"
+
+msgid "admin.audit.detail.pool_staffing_rule_remove"
+msgstr "Blok van de bezetting van een pool verwijderd"
+
+msgid "admin.audit.detail.pool_staffing_override_add"
+msgstr "Uitzondering toegevoegd aan de bezetting van een pool"
+
+msgid "admin.audit.detail.pool_staffing_override_edit"
+msgstr "Uitzondering op de bezetting van een pool gewijzigd"
+
+msgid "admin.audit.detail.pool_staffing_override_remove"
+msgstr "Uitzondering op de bezetting van een pool verwijderd"
