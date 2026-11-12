@@ -58,6 +58,8 @@ CONFIGURATION_TABLES = frozenset(
         "organisation_texts",
         "organisations",
         "platform_settings",
+        "pool_staffing_overrides",
+        "pool_staffing_rules",
         "reminder_rules",
         "roles",
         "schedule_overrides",
@@ -108,10 +110,6 @@ STATE_TABLES = frozenset(
         "staff",
         "staff_memberships",
         "staff_skills",  # who holds which skill: per person, like ``staff`` (ADR 0121 2b-ii)
-        # ADR 0122 step 2: a counted pool's staffing is configuration in kind, not yet carried by
-        # a package; step 3 moves these two into CONFIGURATION_TABLES with their export and import.
-        "pool_staffing_rules",
-        "pool_staffing_overrides",
         "wallboard_links",
         "staff_refused_entitlements",
         "update_requests",

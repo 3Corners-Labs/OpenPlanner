@@ -36,6 +36,11 @@ from app.domain.scheduling import (
     windows_on,
 )
 
+MAX_POOL_RULES = 200
+"""Most weekly blocks one pool holds: a fixed rule that bounds the quadratic overlap check."""
+MAX_POOL_OVERRIDES = 800
+"""Most exceptions one pool holds (about two years of single days)."""
+
 
 class Intake(StrEnum):
     """What a unit is wanted for (decision P7: a block offers appointments, on demand, or both)."""
@@ -178,10 +183,17 @@ def check_pool_staffing(staffing: PoolStaffing) -> None:
 
     Subjects belong to a service (ADR 0081), and a pool serves several services.
 
+    The number of blocks and exceptions is bounded (``MAX_POOL_RULES``, ``MAX_POOL_OVERRIDES``)
+    before the overlap check, which compares every pair.
+
     Raises:
         DomainError: ``invalid_configuration`` with field ``schedule_rules``,
-            ``schedule_overrides`` (overlap) or ``subjects``.
+            ``schedule_overrides`` (too many, or overlap) or ``subjects``.
     """
+    if len(staffing.rules) > MAX_POOL_RULES:
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "schedule_rules")
+    if len(staffing.overrides) > MAX_POOL_OVERRIDES:
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "schedule_overrides")
     validate_schedule(staffing.rules, staffing.overrides)
     windows = [r.window for r in staffing.rules]
     windows += [o.window for o in staffing.overrides if o.window is not None]

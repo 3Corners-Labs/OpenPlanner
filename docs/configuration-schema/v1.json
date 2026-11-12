@@ -219,6 +219,168 @@
         "name": {
           "type": "string",
           "maxLength": 80
+        },
+        "staffing_overrides": {
+          "allOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "day": {
+                    "type": "string"
+                  },
+                  "opens": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "closes": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "units": {
+                    "oneOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "label": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 80
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "offer": {
+                    "type": "string",
+                    "enum": [
+                      "scheduled",
+                      "direct",
+                      "both"
+                    ]
+                  }
+                },
+                "required": [
+                  "day"
+                ],
+                "additionalProperties": false
+              }
+            }
+          ],
+          "description": "Exceptions per date: a window with units, or none for a closed day."
+        },
+        "staffing_rules": {
+          "allOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "weekday": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 6
+                  },
+                  "opens": {
+                    "type": "string"
+                  },
+                  "closes": {
+                    "type": "string"
+                  },
+                  "units": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  },
+                  "label": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 80
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "offer": {
+                    "type": "string",
+                    "enum": [
+                      "scheduled",
+                      "direct",
+                      "both"
+                    ]
+                  },
+                  "valid_from": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "valid_to": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "weekday",
+                  "opens",
+                  "closes",
+                  "units"
+                ],
+                "additionalProperties": false
+              }
+            }
+          ],
+          "description": "Weekly blocks: weekday, local opens and closes, units, offer."
+        },
+        "timezone": {
+          "allOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          ],
+          "description": "IANA time zone of the blocks; a pool with staffing needs one."
         }
       },
       "additionalProperties": false,
