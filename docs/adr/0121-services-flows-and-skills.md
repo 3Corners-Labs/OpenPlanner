@@ -47,7 +47,7 @@ None in step 1: it changes labels only. The later steps add the following, each 
 | 2b | Tables, migration and backfill of legacy pools and flows; persistence port and adapter | #738 | merged |
 | 2b-ii | Skills, pools and flows in the configuration package (export and import) | #755 | merged |
 | 2c | Screens: skill catalogue, capacity pools, skill grants on staff | #743 | merged |
-| 2d | Screens: flows tab and flow editor (draft and validate) | #PRNUM | merged |
+| 2d | Screens: flows tab and flow editor (draft and validate) | #756 | merged |
 | 2e | A service created later, by the portal or by a configuration import, and a service that starts offering the direct call get their legacy pool and default flows from one domain rule; an idempotent repair covers services created by an older image during a rollback | #742 | merged |
 | 2f | A stable code for a capacity pool (migration 0110), unique pool names per organisation | #744 | merged |
 | 3a | One flow resolver for the standalone page, the direct page and the widget API; every new booking records its flow and revision (NULL when no active default exists); an optional explicit flow on the pages, the widget attribute and the widget API (additive); the choice screen for several flows follows in step 5 | #747 | merged |
