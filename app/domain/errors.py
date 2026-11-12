@@ -66,6 +66,7 @@ class ErrorCode(StrEnum):
     ROLE_NOT_FOUND = "role_not_found"
     ROLE_INVALID = "role_invalid"
     ROLE_CHANGED = "role_changed"
+    POOL_STAFFING_CHANGED = "pool_staffing_changed"
     CLAIM_VALUE_TAKEN = "claim_value_taken"
     MAINTENANCE = "maintenance"
     MAINTENANCE_FROM_ENVIRONMENT = "maintenance_from_environment"

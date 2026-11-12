@@ -467,6 +467,51 @@
         "nl",
         "en"
       ]
+    },
+    {
+      "name": "organisation: capacity pool staffing",
+      "path": "{pool_staffing}",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "organisation: capacity pool exceptions",
+      "path": "{pool_exceptions}",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "organisation: change capacity pool block",
+      "path": "{pool_block_edit}",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "organisation: split capacity pool block",
+      "path": "{pool_block_split}",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "organisation: change capacity pool exception",
+      "path": "{pool_exception_edit}",
+      "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
     }
   ]
 }

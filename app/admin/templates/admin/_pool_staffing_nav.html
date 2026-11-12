@@ -1,0 +1,11 @@
+{#- The pages of one counted pool (ADR 0122): back to the list, the pool's own page, its weekly staffing and its exceptions. Expects ``row``, ``list_path``, ``pool_path``, ``staffing_path``, ``exceptions_path``; ``current`` ("staffing", "exceptions" or none) marks the page shown. -#}
+<p><a href="{{ list_path }}">{{ _("admin.skills_capacity.back") }}</a></p>
+<h2 class="section-title">{{ row.name }}</h2>
+<nav aria-label="{{ _("admin.pool_staffing.pages") }}">
+  <ul class="row-actions">
+    <li><a href="{{ pool_path }}">{{ _("admin.pool_staffing.page_pool") }}</a></li>
+    <li><a href="{{ staffing_path }}"{% if current == "staffing" %} aria-current="page"{% endif %}>{{ _("admin.pool_staffing.page_staffing") }}</a></li>
+    <li><a href="{{ exceptions_path }}"{% if current == "exceptions" %} aria-current="page"{% endif %}>{{ _("admin.pool_staffing.page_exceptions") }}</a></li>
+  </ul>
+</nav>
+<div class="alert alert--warning" role="note"><p>{{ _("admin.capacity.count_warning") }}</p></div>

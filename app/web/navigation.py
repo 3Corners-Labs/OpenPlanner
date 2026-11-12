@@ -462,7 +462,15 @@ OBJECTS = (
                             f"{_ORGANISATION}/skills/{{skill_id}}/archive",
                             f"{_ORGANISATION}/capacity/{{pool_id}}",
                             f"{_ORGANISATION}/capacity/{{pool_id}}/archive",
+                            # ADR 0122 step 4: the staffing of a counted pool hangs under the
+                            # pool's own page: a week of blocks, its exceptions, the time zone.
+                            f"{_ORGANISATION}/capacity/{{pool_id}}/staffing",
+                            f"{_ORGANISATION}/capacity/{{pool_id}}/staffing/{{rule_id}}",
+                            f"{_ORGANISATION}/capacity/{{pool_id}}/staffing/{{rule_id}}/split",
+                            f"{_ORGANISATION}/capacity/{{pool_id}}/exceptions",
+                            f"{_ORGANISATION}/capacity/{{pool_id}}/exceptions/{{override_id}}",
                         ),
+                        wide_subpages=(f"{_ORGANISATION}/capacity/{{pool_id}}/staffing",),
                     ),
                     # ADR 0083 step 2: the organisation's own identity providers. A sub-tab
                     # of the overview, like the other organisation-wide settings, so the

@@ -16,7 +16,8 @@ no page and no change here and answer like a missing one (404).
     POST /admin/organisations/{org}/capacity/{pool_id}/archive     capacity.manage    archive it
 
 The list has the archived pools behind ``?pools=archived``. How many members of staff a counted
-pool has per time block is not set here yet; it follows once flows use the pool.
+pool has per time block, and its exceptions and time zone, are set on the pages of
+``app.admin.pool_staffing_routes`` (ADR 0122).
 """
 
 from typing import Annotated
@@ -90,6 +91,7 @@ async def _edit_page(
             "choice_error": form.error_for(CHOICE_FIELD),
             "errors": form.errors,
             "back": f"{url(org)}#{POOLS_ANCHOR}",
+            "staffing_path": f"/admin/organisations/{org}/capacity/{pool_id}/staffing",
         },
         status=status,
     )

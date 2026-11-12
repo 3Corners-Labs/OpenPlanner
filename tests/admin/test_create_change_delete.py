@@ -137,6 +137,16 @@ CREATABLES: dict[str, Creatable] = {
         change="/admin/organisations/{org}/capacity/{pool_id}",
         delete="/admin/organisations/{org}/capacity/{pool_id}/archive",
     ),
+    # ADR 0122 step 4: a pool's weekly block and its exception are changed (a block also split)
+    # and removed on pages of their own.
+    "/admin/organisations/{org}/capacity/{pool_id}/staffing": Creatable(
+        change="/admin/organisations/{org}/capacity/{pool_id}/staffing/{rule_id}",
+        delete="/admin/organisations/{org}/capacity/{pool_id}/staffing/{rule_id}/delete",
+    ),
+    "/admin/organisations/{org}/capacity/{pool_id}/exceptions": Creatable(
+        change="/admin/organisations/{org}/capacity/{pool_id}/exceptions/{override_id}",
+        delete="/admin/organisations/{org}/capacity/{pool_id}/exceptions/{override_id}/delete",
+    ),
     # ADR 0121 step 2d: a flow's code is fixed, its draft changes; an active flow is archived (a
     # flow that was never active is deleted, at `.../delete`).
     "/admin/groups/{slug}/flows": Creatable(

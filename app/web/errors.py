@@ -74,6 +74,7 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.ROLE_NOT_FOUND: "error.not_found.text",
     ErrorCode.ROLE_INVALID: "admin.form.error.role_invalid",
     ErrorCode.ROLE_CHANGED: "admin.form.error.role_changed",
+    ErrorCode.POOL_STAFFING_CHANGED: "admin.pool_staffing.error.changed",
     ErrorCode.CLAIM_VALUE_TAKEN: "admin.form.error.claim_value_taken",
     ErrorCode.IDP_KEY_TAKEN: "admin.form.error.idp_key_taken",
     ErrorCode.STAFF_DIRECTORY_UNAVAILABLE: "admin.form.error.staff_directory_unavailable",
