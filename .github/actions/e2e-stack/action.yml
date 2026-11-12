@@ -16,11 +16,16 @@ runs:
         # Keycloak with one test user per role (dev/keycloak/), for the admin role specs.
         network="$(scripts/run-keycloak-container.sh)"
         # Three browsers each book, move and cancel from one IP: raise the write limit.
+        # Every admin spec opens /admin/login from that same IP, about two a second with two
+        # workers: the default 60 reads a minute refuses a login now and then, and the spec then
+        # waits for a field that the refusal page does not have. 300 a minute is the ceiling
+        # of the setting (ADR 0042 §7).
         # ORGANISATION_IDPS_ENABLED: tests/admin-org-idp.spec.ts registers realm `andere` as an
         # organisation's own identity provider (ADR 0083); until it does, logins are unchanged.
         # The journey spec (tests/video-journey.spec.ts) plays Webex and WxCC events with the
         # simulator (docs/runbook.md, section 10); the secrets sign them for the endpoints.
         scripts/run-app-container.sh openplanner:e2e -e RATE_LIMIT_BOOKINGS=100/hour \
+          -e RATE_LIMIT_READS=300/minute \
           --network "$network" \
           -e OIDC_DISCOVERY_URL=http://keycloak:8080/realms/openplanner/.well-known/openid-configuration \
           -e OIDC_ISSUER=http://127.0.0.1:8080/realms/openplanner \

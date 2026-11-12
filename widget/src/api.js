@@ -53,7 +53,7 @@ export function createApi(origin, organisation, group, lang) {
       if (!response?.ok) throw new ApiError('network', response?.status ?? 0);
       return response.json();
     },
-    group: () => call('/'),
+    group: (flow) => call('/', { flow }),
     availability: (month, day, subject) => call('/availability', { month, day, subject }),
     book: (details) =>
       call('/bookings', {}, {

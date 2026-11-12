@@ -31,6 +31,12 @@ export function requireKeycloak(): void {
  */
 async function passIdentifierPage(page: Page, identifier: string): Promise<void> {
   if (new URL(page.url()).pathname !== '/admin/login') return;
+  // The rate limiter answers this address with a refusal page that has no field: say so at once
+  // instead of waiting out the test's time limit.
+  await expect(
+    page.locator('#identifier'),
+    'the login page asks for an address; a refusal page here means the read limit was hit',
+  ).toBeVisible({ timeout: 5_000 });
   await page.locator('#identifier').fill(identifier);
   await page.locator('#identifier').press('Enter');
 }
@@ -78,6 +84,12 @@ export async function expectForbidden(page: Page, path: string): Promise<void> {
  */
 export async function loginByAddress(page: Page, identifier: string, user: string): Promise<void> {
   await page.goto('/admin/login');
+  // The rate limiter answers this address with a refusal page that has no field: say so at once
+  // instead of waiting out the test's time limit.
+  await expect(
+    page.locator('#identifier'),
+    'the login page asks for an address; a refusal page here means the read limit was hit',
+  ).toBeVisible({ timeout: 5_000 });
   await page.locator('#identifier').fill(identifier);
   await page.locator('#identifier').press('Enter');
   await expect(page).toHaveURL(new RegExp(`^${KEYCLOAK_URL}/`));

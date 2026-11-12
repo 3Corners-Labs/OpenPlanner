@@ -18,6 +18,7 @@ from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from typing import Final
 
 from app.domain.capacity import CapacityPool, PoolMode, guarantees
 from app.domain.errors import DomainError, ErrorCode, missing_object, outside_organisation
@@ -104,6 +105,20 @@ RETENTION_BUILT = False
 
 Each later step of ADR 0121 widens exactly these five constants and nothing else here. A
 legacy revision skips all five tests.
+"""
+ROLLBACK_SAFE: Final = False
+"""The rollback gate of ADR 0122 (design section 5.2): may a non-legacy flow be activated?
+
+A non-legacy flow writes pool slots (and later occupations and requests) that the previous
+supported minor does not know; it would count their bookings in a service's legacy slot and
+never respect the pool across services. So a flow may be activated only in an image whose
+previous supported minor already holds the readers and the accounting of every record it writes.
+This stays false until the release after the last reader-adding step, and until the upgrade
+matrix has proven it: activate a flow, book on the pool, roll back to the previous minor, book
+and claim there, and check that no unit was sold twice (A30). Setting it true is a decision.
+
+It is not wired into ``readiness`` yet: step 5 of ADR 0122 adds the reason that reads it, next
+to the booking path that needs it.
 """
 
 

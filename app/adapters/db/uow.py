@@ -186,6 +186,7 @@ from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
 from app.domain.embedding import AllowedOrigins
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.flow_resolution import FlowRef
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
 from app.domain.images import PageImage
 from app.domain.job_plan import (
@@ -441,6 +442,9 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         if row.claimed_at is not None and row.claimed_by is not None
         else None,
         routing=choice_from_columns(row.subject_code, row.routing_answers),
+        flow=FlowRef(row.flow_id, row.flow_revision)
+        if row.flow_id is not None and row.flow_revision is not None
+        else None,
     )
 
 
@@ -1848,6 +1852,8 @@ class SqlTransaction(
             confirmed_at=booking.confirmed_at,
             subject_code=booking.routing.subject if booking.routing else None,
             routing_answers=choice_json(booking.routing),
+            flow_id=booking.flow.flow_id if booking.flow else None,
+            flow_revision=booking.flow.revision if booking.flow else None,
         )
         self._session.add(row)
         await self._session.flush()
