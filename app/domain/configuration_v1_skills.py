@@ -2,8 +2,10 @@
 
 A skill and a counted pool belong to an organisation and are addressed by their ``code``, which
 never changes (migration 0110 gave a pool one, the screen of ADR 0121 step 2c asks for it); the
-name of a pool is an ordinary field and a rename is an ordinary change. A counted pool whose
-stored code is missing (a row an older image wrote) has no address, so an export refuses it.
+name of a pool is an ordinary field and a rename is an ordinary change. A counted pool also
+carries its time zone and staffing (``configuration_v1_pool_staffing``, ADR 0122 step 3). A
+counted pool whose stored code is missing (a row an older image wrote) has no address, so an
+export refuses it.
 Both are archived, never deleted, while anything still refers to them: a skill a person holds or
 any revision requires, a pool any revision draws on. Which person holds which skill is *state*
 and never in a document (``staff`` and ``staff_memberships`` are state tables), so archiving
@@ -39,6 +41,11 @@ from app.domain.configuration_schema import (
     text,
 )
 from app.domain.configuration_v1_names import CAPACITY_POOL_KIND, SKILL_KIND
+from app.domain.configuration_v1_pool_staffing import (
+    STAFFING_TABLES,
+    check_staffing,
+    staffing_fields,
+)
 from app.domain.configuration_values import Value
 from app.domain.routing import MAX_LABEL_LENGTH, SUBJECT_CODE
 from app.domain.skills import Skill
@@ -78,11 +85,15 @@ def _pool_check(
     """Check a counted pool as ``CapacityPool`` does; return it normalised.
 
     Raises:
-        DomainError: ``invalid_configuration`` with ``pool_code``, ``pool_name`` or
-            ``guaranteed_skills``.
+        DomainError: ``invalid_configuration`` with ``pool_code``, ``pool_name``,
+            ``guaranteed_skills``, ``timezone``, ``staffing_rules`` or ``staffing_overrides``.
     """
     CapacityPool(None, 0, text_of(merged, "name"), PoolMode.COUNTED, code=text_of(merged, "code"))
-    return {**merged, "guaranteed_skills": json_list(skill_codes(merged, "guaranteed_skills"))}
+    return {
+        **merged,
+        "guaranteed_skills": json_list(skill_codes(merged, "guaranteed_skills")),
+        **check_staffing(merged),
+    }
 
 
 SKILL = Kind(
@@ -109,7 +120,7 @@ CAPACITY_POOL = Kind(
     CAPACITY_POOL_KIND,
     key=("code",),
     permission=Permission.CAPACITY_MANAGE,
-    tables=frozenset({"capacity_pools", "capacity_pool_skills"}),
+    tables=frozenset({"capacity_pools", "capacity_pool_skills"}) | STAFFING_TABLES,
     fields=(
         text("code", required=True, max_length=MAX_CODE_LENGTH),
         text("name", required=True, max_length=MAX_LABEL_LENGTH),
@@ -120,12 +131,11 @@ CAPACITY_POOL = Kind(
             description="Codes of the skills every counted unit of the pool holds.",
         ),
         boolean("archived", default=False, columns=("archived_at",)),
+        *staffing_fields(),
     ),
     check=_pool_check,
     archive=("archived", True),
-    # ``timezone`` belongs to the pool's staffing (ADR 0122): it travels with the staffing tables
-    # in step 3 and is not part of the document before that.
-    derived=frozenset({"capacity_pools.mode", "capacity_pools.timezone"}),
+    derived=frozenset({"capacity_pools.mode"}),
     description="A counted capacity pool, addressed by its code within the organisation.",
 )
 

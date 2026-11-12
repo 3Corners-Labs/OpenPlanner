@@ -58,12 +58,26 @@ def skill(code: str, *, archived: bool = False) -> Entity:
     return entity("skill", (code,), {"labels": labels, "archived": archived})
 
 
-def pool(code: str, *skills: str, archived: bool = False, name: str | None = None) -> Entity:
-    """Return a counted pool with ``code`` guaranteeing ``skills``; its name is the code title."""
+def pool(
+    code: str,
+    *skills: str,
+    archived: bool = False,
+    name: str | None = None,
+    **staffing: Value,
+) -> Entity:
+    """Return a counted pool with ``code`` guaranteeing ``skills``; its name is the code title.
+
+    ``staffing`` gives ``timezone``, ``staffing_rules`` and ``staffing_overrides`` (ADR 0122).
+    """
     return entity(
         "capacity_pool",
         (code,),
-        {"name": name or code.title(), "guaranteed_skills": sorted(skills), "archived": archived},
+        {
+            "name": name or code.title(),
+            "guaranteed_skills": sorted(skills),
+            "archived": archived,
+            **staffing,
+        },
     )
 
 

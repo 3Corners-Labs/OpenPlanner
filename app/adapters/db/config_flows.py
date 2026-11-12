@@ -56,6 +56,7 @@ from app.adapters.db.models import (
     SubjectFlowRow,
     SubjectFlowSkillRow,
 )
+from app.adapters.db.pool_staffing import read_all_pool_staffing, replace_pool_staffing
 from app.adapters.db.service_flows import (
     delete_flow_row,
     prune_unpublished_revisions,
@@ -84,6 +85,7 @@ from app.domain.configuration_v1_names import (
     SERVICE_FLOW_KIND,
     SKILL_KIND,
 )
+from app.domain.configuration_v1_pool_staffing import sorted_items, staffing_of
 from app.domain.configuration_values import Value
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.service_flows import (
@@ -131,6 +133,7 @@ async def read_catalogue(
         )
     codes = await _skill_codes(session)
     guaranteed = await _guaranteed(session, codes)
+    staffing = await read_all_pool_staffing(session)
     pools: dict[str, list[Entity]] = defaultdict(list)
     without_code: set[str] = set()
     hidden_names: dict[str, set[str]] = defaultdict(set)
@@ -147,6 +150,7 @@ async def read_catalogue(
             if pool_row.archived_at is None:
                 hidden_names[organisation].add(pool_row.name)
             continue
+        rules, overrides = sorted_items(*staffing.get(pool_row.id, ([], [])))
         pools[organisation].append(
             Entity(
                 CAPACITY_POOL_KIND,
@@ -155,6 +159,9 @@ async def read_catalogue(
                     "name": pool_row.name,
                     "guaranteed_skills": json_list(sorted(guaranteed[pool_row.id])),
                     "archived": pool_row.archived_at is not None,
+                    "timezone": pool_row.timezone,
+                    "staffing_rules": rules,
+                    "staffing_overrides": overrides,
                 },
             )
         )
@@ -458,6 +465,40 @@ async def write_capacity_pool(session: AsyncSession, box: SecretBox | None, chan
         code=code,
     )
     await _write_pool(session, change, row, pool)
+    await _write_staffing(session, change)
+
+
+async def _write_staffing(session: AsyncSession, change: Change) -> None:
+    """Store a counted pool's time zone and staffing, as far as the change names them.
+
+    The pool is found again by its code inside the organisation of the change's address, so a
+    document can only ever reach its own organisation's pool. A part the document does not name
+    stays as it is; a part it names is replaced as a whole.
+    """
+    names = _names(change)
+    if not names & {"timezone", "staffing_rules", "staffing_overrides"}:
+        return
+    pool = await session.scalar(
+        select(CapacityPoolRow).where(
+            CapacityPoolRow.organisation_id
+            == await find_organisation_id(session, change.address[0]),
+            CapacityPoolRow.code == change.key[0],
+            CapacityPoolRow.mode == PoolMode.COUNTED.value,
+        )
+    )
+    if pool is None:
+        raise DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, "pool_id")
+    if "timezone" in names:
+        name = change.values.get("timezone")
+        pool.timezone = None if name is None else str(name)
+    rules, overrides = staffing_of(change.values)
+    await replace_pool_staffing(
+        session,
+        pool.id,
+        rules if "staffing_rules" in names else None,
+        overrides if "staffing_overrides" in names else None,
+    )
+    await session.flush()
 
 
 async def write_legacy_pool(session: AsyncSession, box: SecretBox | None, change: Change) -> None:

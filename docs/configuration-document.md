@@ -88,6 +88,21 @@ subject (`subjects`); no id appears anywhere, and neither does `published_by` (a
   name of a pool the document creates is also checked against theirs (`slug_taken`, field
   `pool_name`), so a second pool with the same name cannot appear next to one nobody can see
   here. Archive such a pool and add it again in the portal, which gives the new one a code.
+- **A counted pool carries its staffing** (ADR 0122 step 3): `timezone` (an IANA name, or null),
+  `staffing_rules` (weekly blocks: `weekday` 0-6, local `opens` and `closes`, `units` 0-1000,
+  `label`, `offer` `scheduled` for appointments only, `direct` for without appointment only or
+  `both`, `valid_from`, `valid_to`) and `staffing_overrides` (one date: `day`, and a window with
+  `units`, or no window for a closed day). A block has no subjects. The rules are the portal's:
+  the zone must be one this host knows and a pool with blocks needs one, blocks and exceptions
+  may not overlap on a date, and a pool holds at most 200 blocks and 800 exceptions (otherwise
+  `invalid_configuration` with `timezone`, `staffing_rules` or `staffing_overrides`). An item is
+  read as recorded: an exception in the past is no error. Lowering the units below what is already
+  booked is **not refused** (unlike a service's staffing): existing appointments stay and show as
+  a shortage, new ones stop at once (decision P3). A document that names none of the three fields
+  leaves the pool's staffing as it is, as an older document does; naming `staffing_rules` or
+  `staffing_overrides` replaces that list as a whole, and an empty list clears it. Changing
+  them needs `capacity.manage` on the organisation, like the rest of the pool. Items are listed
+  in one order (weekday and time, or date), so the same staffing is the same document.
 - **Revisions are history.** An export carries every revision with `published_at` (empty for the
   draft). A document never changes or removes a stored published revision
   (`configuration_revision_published`); a draft may be replaced, and a `replace` document never
