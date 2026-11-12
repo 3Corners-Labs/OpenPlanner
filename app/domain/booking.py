@@ -22,6 +22,7 @@ from enum import StrEnum
 from app.domain.channels import ChannelKind
 from app.domain.contact_center import ContactCenterTaskRef
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.flow_resolution import FlowRef
 from app.domain.form_fields import Answers, mailto_href, normalise_email, normalise_phone
 from app.domain.routing import RoutingChoice
 from app.domain.scheduling import PhoneMode
@@ -254,6 +255,10 @@ class Booking:
     confirmed_at: datetime | None = None
     routing: RoutingChoice | None = None
     """The subject and attribute codes the participant chose (ADR 0081); not personal data."""
+    flow: FlowRef | None = None
+    """The flow and revision it was made under (ADR 0121); ``None`` is the service's default for
+    its entry path (a booking from before flows, or a service without flow rows). A move keeps
+    it."""
 
     @property
     def subject(self) -> str | None:

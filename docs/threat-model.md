@@ -823,6 +823,21 @@ query parameter (anyone).
 | Information disclosure | A subject label or answer turns out to be personal data | Subjects and attributes are short choices from a list the organisation or OpenPlanner wrote; new attributes need an ADR; the code is stored, never a label | `tests/domain/test_routing.py::test_the_catalogue_offers_the_locales_with_a_catalogue` |
 | Elevation of privilege | A group admin or another organisation's admin changes the routing | `group.edit` on the route and again in `RoutingService`; denials audited, changes audited by code or source, never a label or value | `tests/admin/test_authorization_matrix.py` (rows `/settings/routing`), `tests/domain/test_routing_service.py::test_only_who_edits_the_group_may_change_its_routing` |
 
+## Flow: the flow of a new booking (ADR 0121 step 3a)
+
+Public: the optional `flow` code on `GET /g/{slug}`, `GET` and `POST /g/{slug}/book`, `GET` and
+`POST /g/{slug}/direct` and in the body of the widget's `POST …/bookings`. Every new booking
+stores the flow and revision it was made under (`bookings.flow_id`, `flow_revision`). Input from
+outside: the code (anyone). It is a code of the grammar of a subject code, not personal data.
+
+| STRIDE | Threat | Mitigation | Test |
+|---|---|---|---|
+| Tampering | A flow code of another service or organisation in a booking request books under, or reveals, a flow that is not the service's own | The resolver only reads the flows of the group the slug names (`resolve_flow`, filtered by group id) and refuses a code that is not among them with `flow_not_available`, the same answer as for an unknown code; no fallback to the default | `tests/api/test_flow_entry_paths.py::test_a_flow_code_of_another_service_is_refused`, `tests/domain/test_flow_resolution.py::test_a_flow_of_another_service_is_unknown` |
+| Tampering | A crafted code (markup, spaces, over-long, other case) reaches a query or the page | The code is checked against the flow-code grammar before anything is read (`flow_param` for pages, the schema pattern for the widget); a page never echoes an invalid value (only a code that resolved is written back into a hidden field) | `tests/api/test_flow_entry_paths.py::test_a_page_opened_with_a_flow_that_does_not_resolve_is_refused`, `test_a_malformed_widget_flow_is_refused_before_any_booking_work` |
+| Tampering | An invalid flow silently becomes the default and books something else | An explicit code that does not resolve is refused (page 422, widget `422 flow_not_available`) and nothing is stored: no slot, no booking | `tests/api/test_flow_entry_paths.py::test_a_booking_post_with_a_flow_that_does_not_resolve_books_nothing`, `tests/domain/test_services_flow.py::test_an_explicit_flow_that_does_not_resolve_is_refused_and_nothing_is_stored` |
+| Tampering | An archived, draft or wrong-path flow (a direct flow on the appointment page) is booked | `resolve_explicit` takes only an active flow that offers the entry path | `tests/domain/test_flow_resolution.py::test_an_archived_or_draft_flow_is_refused`, `test_a_flow_that_does_not_offer_the_path_is_refused` |
+| Information disclosure | The flow of a booking tells something personal | Only the numeric flow id and revision are stored on the booking; both are no personal data and not in a log, an event or an external payload | `tests/adapters/db/test_booking_flow.py` |
+
 ## Flow: embedded booking (ADR 0035, EM-2)
 
 Public, unauthenticated, called by `<openplanner-booking>` on a host website:

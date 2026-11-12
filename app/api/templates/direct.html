@@ -8,6 +8,7 @@
 <p>{{ _("direct.intro", group_name=group.name) }}</p>
 {% include "_queue_info.html" %}
 <form class="card" method="post" action="/g/{{ group.slug }}/direct" novalidate>
+  {% if flow %}<input type="hidden" name="flow" value="{{ flow }}">{% endif %}
   {% include "_contact_fields.html" %}
   <button type="submit" class="button button--large">{{ _("direct.submit") }}</button>
 </form>

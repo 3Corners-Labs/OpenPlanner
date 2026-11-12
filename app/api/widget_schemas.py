@@ -9,7 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.domain.routing import Attribute
+from app.domain.routing import SUBJECT_CODE, Attribute
 
 MAX_ANSWERS = 15 + 1 + len(Attribute)
 """At most the platform's highest field limit (ADR 0055) plus the routing questions: the
@@ -182,6 +182,13 @@ class WidgetBookingRequest(BaseModel):
         default_factory=dict,
         max_length=MAX_ANSWERS,
         description="Answers to the group's custom fields, by key (without `q_`).",
+    )
+    flow: str | None = Field(
+        default=None,
+        pattern=SUBJECT_CODE.pattern,
+        description="Optional code of the service flow to book under (the host page's `flow` "
+        "attribute, ADR 0121). Omitted: the service's default flow. A code that does not "
+        "resolve is refused with `flow_not_available`; there is no fallback to the default.",
     )
     website: str | None = Field(default=None, max_length=300)
 

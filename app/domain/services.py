@@ -67,6 +67,8 @@ from app.domain.direct_queue import (
     queue_info,
 )
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.flow_resolution import FlowRef, ResolvedFlow
+from app.domain.flow_resolver import flow_for, resolve_flow
 from app.domain.form_fields import FormDefinition, Purpose, validate_answers
 from app.domain.holiday_service import effective_schedule
 from app.domain.images import ImageFile
@@ -87,6 +89,7 @@ from app.domain.reschedule_proposal import HeldProposal
 from app.domain.routing import ANSWER_PREFIX as ROUTING_PREFIX
 from app.domain.routing import RoutingChoice
 from app.domain.scheduling import Group, open_for_direct
+from app.domain.service_flows import IntakeMode
 from app.domain.system_log import SystemLog
 from app.domain.tokens import (
     MIN_KEY_BYTES,
@@ -332,8 +335,12 @@ class BookingService:
         contact: ContactInput,
         locale: str,
         consents: frozenset[ChannelKind] = frozenset(),
+        flow: str | None = None,
     ) -> BookingReceipt:
         """Book the slot at ``start`` for a participant; it awaits confirmation (ADR 0056).
+
+        The booking records the flow it is made under (ADR 0121 step 3a): the default flow of
+        the appointment path, or the active flow with the code ``flow`` that offers it.
 
         An address over its limit in the group gets a refused booking instead of an error
         (ADR 0066 step 8): the page answers as for any booking, and only the email to that
@@ -341,20 +348,45 @@ class BookingService:
 
         Raises:
             DomainError: ``group_not_found``, ``invalid_contact``, ``outside_booking_window``,
-                ``slot_unavailable`` or ``slot_full``.
+                ``slot_unavailable``, ``slot_full`` or ``flow_not_available``.
             ValueError: If ``start`` is naive.
         """
         async with self._uow.locked() as tx:
             group = await self._group(tx, group_slug)
+            resolved = await resolve_flow(tx, group.id, IntakeMode.APPOINTMENT, flow)
             details = await self._contact(tx, group, contact)
             routing = _routing(group, contact)
             now = self._clock.now()
             slot = await self._reserve(tx, group, start, routing)
             if not await _address_allows(tx, group, details, slot.start, now):
-                return await self._refuse(tx, group, slot, details, locale, routing)
+                return await self._refuse(
+                    tx, group, slot, details, locale, routing, resolved.ref if resolved else None
+                )
             return await self._store(
-                tx, group, slot, details, locale, consents, None, pending=True, routing=routing
+                tx,
+                group,
+                slot,
+                details,
+                locale,
+                consents,
+                None,
+                pending=True,
+                routing=routing,
+                flow=resolved.ref if resolved else None,
             )
+
+    async def flow_for(
+        self, group_slug: str, mode: IntakeMode, flow: str | None
+    ) -> ResolvedFlow | None:
+        """Return the flow a page would book under, refusing an explicit ``flow`` that fails.
+
+        A page checks the flow it was opened with before it shows a form, so a participant never
+        fills one in for a flow that cannot be booked (ADR 0121 step 3a). See ``resolve_flow``.
+
+        Raises:
+            DomainError: ``group_not_found`` or ``flow_not_available``.
+        """
+        return await flow_for(self._uow, group_slug, mode, flow)
 
     async def direct_call_availability(self, group_slug: str) -> DirectAvailability:
         """Return whether a direct call can be started now: a block offers it, and room.
@@ -379,17 +411,22 @@ class BookingService:
         return queue_info(calls, group, now, booking_id)
 
     async def start_direct(
-        self, *, group_slug: str, contact: ContactInput, locale: str
+        self, *, group_slug: str, contact: ContactInput, locale: str, flow: str | None = None
     ) -> BookingReceipt:
         """Start a call right away (ADR 0019): a booking in its own slot from now on.
 
+        The booking records the flow it is made under (ADR 0121 step 3a): the default flow of
+        the on-demand path, or the active flow with the code ``flow`` that offers it.
+
         Raises:
-            DomainError: ``group_not_found``, ``invalid_contact``, ``direct_call_unavailable``
-                (no staffed block offers direct calls now, ADR 0072) or ``direct_call_full``
-                (the group's cap of open direct calls is reached).
+            DomainError: ``group_not_found``, ``flow_not_available``, ``invalid_contact``,
+                ``direct_call_unavailable`` (no staffed block offers direct calls now,
+                ADR 0072) or ``direct_call_full`` (the group's cap of open direct calls is
+                reached).
         """
         async with self._uow.locked() as tx:
             group = await self._group(tx, group_slug)
+            resolved = await resolve_flow(tx, group.id, IntakeMode.ON_DEMAND, flow)
             now = self._clock.now()
             routing = _routing(group, contact)
             subject = routing.subject if routing else None
@@ -417,6 +454,7 @@ class BookingService:
                     token_salt=salt,
                     kind=BookingKind.DIRECT,
                     routing=routing,
+                    flow=resolved.ref if resolved else None,
                 )
             )
             await tx.replace_jobs(_id(booking), plan_for_direct(start=now, end=end))
@@ -709,6 +747,7 @@ class BookingService:
             pending=old.awaits_confirmation,
             confirmed_at=old.confirmed_at,
             routing=old.routing,
+            flow=old.flow,  # ADR 0121: a move keeps the flow the booking was made under
         )
 
     async def _direct_open(
@@ -808,6 +847,7 @@ class BookingService:
         pending: bool = False,
         confirmed_at: datetime | None = None,
         routing: RoutingChoice | None = None,
+        flow: FlowRef | None = None,
     ) -> BookingReceipt:
         """Reserve a place at ``start`` and store the booking with its jobs.
 
@@ -840,6 +880,7 @@ class BookingService:
             pending=pending,
             confirmed_at=confirmed_at,
             routing=routing,
+            flow=flow,
         )
 
     async def _store(
@@ -856,6 +897,7 @@ class BookingService:
         pending: bool = False,
         confirmed_at: datetime | None = None,
         routing: RoutingChoice | None = None,
+        flow: FlowRef | None = None,
     ) -> BookingReceipt:
         """Store the booking in its reserved ``slot`` with its jobs (see ``_place``)."""
         now = self._clock.now()
@@ -889,6 +931,7 @@ class BookingService:
                 confirm_by=window.confirm_by if window else None,
                 confirmed_at=confirmed_at,
                 routing=routing,
+                flow=flow,
             )
         )
         jobs = (
@@ -908,6 +951,7 @@ class BookingService:
         contact: Contact,
         locale: str,
         routing: RoutingChoice | None,
+        flow: FlowRef | None,
     ) -> BookingReceipt:
         """Store a refused booking: no place, one email, purged a day later (ADR 0066 step 8).
 
@@ -931,6 +975,7 @@ class BookingService:
                 created_at=now,
                 token_salt=new_token_salt(),
                 routing=routing,
+                flow=flow,
             )
         )
         await tx.replace_jobs(_id(booking), plan_for_refusal(now=now))

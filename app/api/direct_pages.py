@@ -38,6 +38,7 @@ from app.api.contact_form import (
     load_contact_form,
     read_contact,
 )
+from app.api.flow_choice import checked_flow
 from app.api.link_session import authorise, start
 from app.api.participant import participant_page, templates
 from app.api.trace import bind_group_from_path
@@ -50,6 +51,7 @@ from app.domain.event_context import bind_booking
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock, IntegrationError
 from app.domain.scheduling import Group
+from app.domain.service_flows import IntakeMode
 from app.domain.services import BookingService
 from app.web.errors import status_for
 from app.web.locale import RequestLocale, request_locale
@@ -139,6 +141,7 @@ async def _form_page(
     availability: DirectAvailability,
     error: DomainError | None = None,
     values: dict[str, str] | None = None,
+    flow: str | None = None,
 ) -> HTMLResponse:
     """Render the direct-call form with the queue, or the page saying it is not possible now."""
     service = _bookings(request)
@@ -153,6 +156,7 @@ async def _form_page(
         "fields": contact.fields(locale, errors, values or {}),
         "errors": errors,
         "honeypot": HONEYPOT_FIELD,
+        "flow": flow,
     }
     status = status_for(error) if error else 200
     return await participant_page(request, locale, "direct.html", group, context, status)
@@ -160,12 +164,23 @@ async def _form_page(
 
 @router.get("/g/{slug}/direct", response_class=HTMLResponse)
 @limiter.limit(read_limit)
-async def direct_form(request: Request, slug: str, locale: Locale) -> HTMLResponse:
-    """Show the form to start a call now."""
+async def direct_form(
+    request: Request, slug: str, locale: Locale, flow: str | None = None
+) -> HTMLResponse:
+    """Show the form to start a call now.
+
+    An optional ``flow`` (ADR 0121 step 3a) must resolve for the on-demand path, else the page
+    is refused; the form posts it back.
+    """
     service = _bookings(request)
     group = await service.get_group(slug)
+    chosen = await checked_flow(service, slug, IntakeMode.ON_DEMAND, flow)
     return await _form_page(
-        request, locale, group, availability=await service.direct_call_availability(slug)
+        request,
+        locale,
+        group,
+        availability=await service.direct_call_availability(slug),
+        flow=chosen,
     )
 
 
@@ -175,12 +190,15 @@ async def start_direct(request: Request, slug: str, locale: Locale, _: SameOrigi
     """Start the call: booking, meeting and work item; then the waiting page."""
     service = _bookings(request)
     group = await service.get_group(slug)
-    values = read_contact(await request.form())
+    form = await request.form()
+    values = read_contact(form)
+    chosen = await checked_flow(service, slug, IntakeMode.ON_DEMAND, form.get("flow"))
     try:
         receipt = await service.start_direct(
             group_slug=slug,
             contact=contact_input(values),
             locale=locale.code,
+            flow=chosen,
         )
     except DomainError as error:
         return await _form_page(
@@ -190,6 +208,7 @@ async def start_direct(request: Request, slug: str, locale: Locale, _: SameOrigi
             availability=await service.direct_call_availability(slug),
             error=error,
             values=values,
+            flow=chosen,
         )
     calls: CallService = request.app.state.call_service
     bind_booking(receipt.booking.id)  # ADR 0068: the request events belong to this booking

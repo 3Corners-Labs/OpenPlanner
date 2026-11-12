@@ -18,6 +18,7 @@ from app.domain.service_flows import (
     BUILT_KINDS,
     COMBINATIONS,
     RETENTION_BUILT,
+    ROLLBACK_SAFE,
     CompletionPolicy,
     DispatchKind,
     FlowRevision,
@@ -111,6 +112,7 @@ def test_what_is_built_is_exactly_what_the_steps_before_5_and_6_allow() -> None:
         HandlingAction.CALL,
     }
     assert RETENTION_BUILT is False
+    assert ROLLBACK_SAFE is False  # the gate of ADR 0122 stays shut until the upgrade proof
 
 
 def test_a_flow_code_follows_the_subject_grammar() -> None:

@@ -47,7 +47,7 @@ function stylesheet() {
 const SUBJECT_FIELD = 'q__subject';
 
 class OpenplannerBooking extends HTMLElement {
-  static observedAttributes = ['organisation', 'group', 'lang', 'subject'];
+  static observedAttributes = ['organisation', 'group', 'lang', 'subject', 'flow'];
 
   connectedCallback() {
     if (!this.shadowRoot) {
@@ -116,7 +116,7 @@ class OpenplannerBooking extends HTMLElement {
       this.basic = basic;
       this.region.setAttribute('aria-label', this.t('widget.region'));
       this.body.replaceChildren(h('p', {}, this.t('widget.loading')));
-      const found = await this.api.group();
+      const found = await this.api.group(this.getAttribute('flow'));
       if (run !== this.run) return;
       this.group = found;
       await this.calendar();
@@ -224,6 +224,9 @@ class OpenplannerBooking extends HTMLElement {
     };
     if ('phone' in values) details.phone = values.phone;
     if (values[this.group.honeypot]) details.website = values[this.group.honeypot];
+    // ADR 0121: the host page's `flow` code; the server refuses one that does not resolve.
+    const flow = this.getAttribute('flow');
+    if (flow) details.flow = flow;
     try {
       const booking = await this.api.book(details);
       this.done(booking);

@@ -13,4 +13,5 @@
   var widget = document.querySelector('openplanner-booking');
   if (params.get('organisation')) widget.setAttribute('organisation', params.get('organisation'));
   if (params.get('group')) widget.setAttribute('group', params.get('group'));
+  if (params.get('flow')) widget.setAttribute('flow', params.get('flow'));
 })();

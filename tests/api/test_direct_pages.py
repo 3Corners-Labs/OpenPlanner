@@ -19,12 +19,13 @@ from app.domain.calls import EventKind
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobStatus, JobType
 from app.domain.ports import IntegrationError
-from app.domain.scheduling import DispatchKind, Offer
+from app.domain.scheduling import DispatchKind
 from app.web.static_assets import ASSETS
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo, webex_cc
 from tests.support.domain import NOW, webex_routing
+from tests.support.flows import engine_of, flow_columns, flow_ids, offer_direct_calls
 from tests.support.participant import confirm_newest, open_link
 from tests.support.webhooks import WXCC
 
@@ -39,10 +40,7 @@ async def _configure(database_url: str, **changes: object) -> None:
         group = await tx.get_group("demo")
         assert group is not None
         await tx.save_group(replace(group, **changes))
-        rules, _overrides = await tx.get_schedule_items(group.id)
-        for rule in rules:
-            block = replace(rule.window, offer=Offer.BOTH)
-            await tx.update_schedule_rule(group.id, rule.id or 0, replace(rule, window=block))
+    await offer_direct_calls(engine)
     await engine.dispose()
 
 
@@ -608,3 +606,37 @@ async def test_the_direct_page_says_what_the_organisation_and_the_group_call_the
     assert "een behandelaar laat u binnen" in organisation
     assert "een agent laat u binnen" in group
     assert "one of our agents lets you in" in english  # the words are per locale
+
+
+async def test_a_direct_call_records_the_default_on_demand_flow(site: Site) -> None:
+    assert (await site.start()).status_code == 303
+
+    assert await flow_columns(engine_of(site.client)) == [
+        ((await flow_ids(engine_of(site.client)))["direct"], 1)
+    ]
+
+
+async def test_a_direct_call_may_name_the_flow(site: Site) -> None:
+    page = (await site.client.get("/g/demo/direct", params={"flow": "direct"})).text
+    response = await site.client.post(
+        "/g/demo/direct", data={**ADA, "flow": "direct"}, headers=SAME_ORIGIN
+    )
+
+    assert 'name="flow" value="direct"' in page
+    assert response.status_code == 303
+    assert await flow_columns(engine_of(site.client)) == [
+        ((await flow_ids(engine_of(site.client)))["direct"], 1)
+    ]
+
+
+@pytest.mark.parametrize("code", ["appointment", "unknown", "Direct", "a b"])
+async def test_a_direct_flow_that_does_not_resolve_is_refused_and_starts_no_call(
+    site: Site, code: str
+) -> None:
+    page = await site.client.get("/g/demo/direct", params={"flow": code})
+    response = await site.client.post(
+        "/g/demo/direct", data={**ADA, "flow": code}, headers=SAME_ORIGIN
+    )
+
+    assert (page.status_code, response.status_code) == (422, 422)  # no fallback to the default
+    assert await flow_columns(engine_of(site.client)) == []

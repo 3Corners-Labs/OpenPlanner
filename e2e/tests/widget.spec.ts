@@ -95,6 +95,25 @@ test('the widget speaks English when the host page does', async ({ page }) => {
   await expect(widget.getByRole('list', { name: /steps/i })).toBeVisible();
 });
 
+test('the flow attribute travels with the group request (ADR 0121)', async ({ page }) => {
+  const asked = page.waitForRequest(
+    (request) => request.method() === 'GET' && new URL(request.url()).searchParams.get('flow') === 'appointment',
+  );
+  await page.goto(`${HOST}?flow=appointment`);
+  await asked;
+
+  // The default flow of the demo group resolves: the widget starts as usual.
+  const widget = page.locator('openplanner-booking');
+  await expect(widget.getByRole('heading', { level: 2, name: 'Demo: videogesprek' })).toBeVisible();
+});
+
+test('a flow that does not resolve says the group is not available (ADR 0121)', async ({ page }) => {
+  await page.goto(`${HOST}?flow=no-such-flow`);
+
+  await expect(page.locator('openplanner-booking')).toContainText('niet beschikbaar');
+  await expectNoAxeViolations(page);
+});
+
 test('a group that is not embedded here says so', async ({ page }) => {
   await page.goto(`${HOST}?organisation=andere&group=andere-team`);
 
