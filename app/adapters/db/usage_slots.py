@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.call_status_rows import call_status_of
+from app.adapters.db.legacy_slot import legacy_slot
 from app.adapters.db.models import BookingRow, CallStatusRow, SlotRow, UsageRollupStateRow
 from app.domain.booking import BookingKind, BookingStatus
 from app.domain.calls import new_status
@@ -31,7 +32,7 @@ class UsageSlotQueries:
 
     async def ended_slots(self, after: datetime, until: datetime, limit: int) -> EndedSlots:
         """Return the slots ending in (``after``, ``until``] with their bookings, oldest first."""
-        window = (SlotRow.end > after, SlotRow.end <= until)
+        window = (SlotRow.end > after, SlotRow.end <= until, legacy_slot())
         rows = list(
             await self._session.scalars(
                 select(SlotRow).where(*window).order_by(SlotRow.end, SlotRow.id).limit(limit)
@@ -44,7 +45,7 @@ class UsageSlotQueries:
             rows = list(
                 await self._session.scalars(
                     select(SlotRow)
-                    .where(SlotRow.end > after, SlotRow.end <= covered)
+                    .where(SlotRow.end > after, SlotRow.end <= covered, legacy_slot())
                     .order_by(SlotRow.end, SlotRow.id)
                 )
             )

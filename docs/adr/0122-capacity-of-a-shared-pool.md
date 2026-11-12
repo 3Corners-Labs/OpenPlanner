@@ -28,7 +28,7 @@ ADR 0121 lets several flows, of several services, draw on one capacity pool, so 
 
 | Key | Class | Default | Bounds | Permission | Note |
 |---|---|---|---|---|---|
-| `treatment_buffer_minutes` | D organisation | 0 | 0–120 | `capacity.manage` | Wrap-up time added to every appointment of a pool. Read at admission and fixed into the commitment's end, so a later change does not move existing commitments. One value per organisation, not per pool or flow. Planned: registered in step 2 (with its bound; `MAX_BUFFER_MINUTES` of step 1 is then derived from the registry), first read in step 5 (booking on a pool) |
+| `treatment_buffer_minutes` | D organisation | 0 | 0–120 | `settings.organisation.manage` | Wrap-up time added to every appointment of a pool. Read at admission and fixed into the commitment's end, so a later change does not move existing commitments. One value per organisation, not per pool or flow. Registered in step 2 (`MAX_BUFFER_MINUTES` is derived from the registry bound); first read in step 5 (booking on a pool). The registry derives the permission of every class D setting; it is held by the same roles as `capacity.manage` |
 | `on_demand_admission_lookahead_minutes` | D organisation | 120 | 15–480 | `capacity.manage` | How far ahead a ticket must have a realistic start. Planned: step 7 of ADR 0121 (the rule `earliest_start` exists in step 1) |
 | `assignment_start_lease_minutes` | D organisation | 5 | 1–30 | `capacity.manage` | As ADR 0121. Planned: its step 5 |
 | `request_unresolved_hours` | D organisation | 24 | 1–168 | `capacity.manage` | As ADR 0121. Planned: its step 5 |
@@ -44,11 +44,12 @@ Configuration of one object, not a setting (like a service's `direct_call_max_co
 |---|---|---|---|
 | 0 | ADR and build brief (`docs/service-flows-capacity-design.md`) | #746 | merged |
 | 1 | Pure domain: pool staffing, interval accounting, the grid, the rollback gate constant, the sentence in CLAUDE.md | #746 | merged |
-| 2 | Schema and adapter: migration, rows, `Transaction` methods, `legacy_slot()` predicate, regression test | | planned |
-| 2 | Settings: `treatment_buffer_minutes` in `app/domain/settings_registry.py`; `MAX_BUFFER_MINUTES` moves there or is derived from it, with a test that the two agree | | planned |
+| 2 | Schema and adapter: migration, rows, `Transaction` methods, `legacy_slot()` predicate, regression test | #754 | merged |
+| 2 | Settings: `treatment_buffer_minutes` in `app/domain/settings_registry.py`; `MAX_BUFFER_MINUTES` moves there or is derived from it, with a test that the two agree | #754 | merged |
 | 3 | Pool time zone and staffing in the configuration package | | planned |
 | 4 | Pool staffing screens, double-counting notice, shortfall list | | planned |
 | 5 | Booking on a pool (dark), the reason that reads `ROLLBACK_SAFE`, concurrency test | | planned |
+| 5 | Closing and reporting of pool bookings: `ended_slots`, usage closing and the facts skip pool slots until then | | planned |
 
 ## Decisions of the product owner (2026-11-11)
 

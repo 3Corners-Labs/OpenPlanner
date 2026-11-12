@@ -6399,6 +6399,9 @@ msgstr "Staff member dormant after (days)"
 msgid "settings.field.shortfall_horizon_days.label"
 msgstr "Shortfall look-ahead (days)"
 
+msgid "settings.field.treatment_buffer_minutes.label"
+msgstr "Wrap-up time per appointment on a pool (minutes)"
+
 msgid "settings.field.planner_changes_alert_per_hour.label"
 msgstr "Alert above changes per planner per hour"
 

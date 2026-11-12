@@ -1948,6 +1948,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=60,
     ),
     S(
+        "treatment_buffer_minutes",
+        K.INT,
+        0,
+        _D,
+        T.PLANNER,
+        "Wrap-up minutes added to every appointment of a shared capacity pool; read when an "
+        "appointment is admitted and fixed into its commitment (ADR 0122).",
+        minimum=0,
+        maximum=120,
+    ),
+    S(
         "planner_changes_alert_per_hour",
         K.INT,
         50,

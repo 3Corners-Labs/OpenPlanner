@@ -180,7 +180,7 @@ class ClosureService:
             group = await group_by_slug(tx, slug)
             closures = await tx.get_closures(group.id, now)
             suspended = await tx.list_suspended_bookings(self._scope(principal), group.id)
-            ahead = await tx.find_confirmed_bookings(group.id, now, None)
+            ahead = await tx.find_confirmed_bookings(group.id, now, None, include_pool=True)
         return ClosureOverview(closures[0] if closures else None, suspended, len(ahead))
 
     async def active(self, groups: Sequence[Group]) -> frozenset[str]:
@@ -528,7 +528,9 @@ class ClosureService:
         """Suspend the confirmed bookings inside ``closure``; return how many."""
         now = self._clock.now()
         closure_id = _id(closure)
-        bookings = await tx.find_confirmed_bookings(group.id, closure.starts_at, closure.ends_at)
+        bookings = await tx.find_confirmed_bookings(
+            group.id, closure.starts_at, closure.ends_at, include_pool=True
+        )
         for booking in bookings:
             await tx.save_booking(booking.suspend(closure_id))
             await record_closure_change(tx, FactKind.BOOKING_SUSPENDED, booking, group, now)

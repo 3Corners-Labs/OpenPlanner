@@ -108,7 +108,7 @@ from app.domain.tls import CertificateCheck
 from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
 from app.domain.usage import StaffFact, UsageFact
 from app.domain.worker_check import WorkerHeartbeat
-from tests.fakes.service_flow_store import ServiceFlowStore
+from tests.fakes.pool_staffing_store import PoolStaffingStore
 from tests.support.domain import NOW
 
 
@@ -200,12 +200,15 @@ class State:
     skills: dict[int, Skill] = field(default_factory=dict)
     skill_grants: dict[tuple[int, int], tuple[int | None, datetime]] = field(default_factory=dict)
     pools: dict[int, CapacityPool] = field(default_factory=dict)
+    pool_timezones: dict[int, str] = field(default_factory=dict)
+    pool_rules: dict[int, tuple[int, ScheduleRule]] = field(default_factory=dict)
+    pool_overrides: dict[int, tuple[int, ScheduleOverride]] = field(default_factory=dict)
     flows: dict[int, ServiceFlow] = field(default_factory=dict)
     flow_revisions: dict[tuple[int, int], FlowRevision] = field(default_factory=dict)
     next_id: int = 1
 
 
-class InMemoryTransaction(ServiceFlowStore):
+class InMemoryTransaction(PoolStaffingStore):
     def __init__(self, state: State) -> None:
         self.state = state
 
@@ -988,7 +991,10 @@ class InMemoryTransaction(ServiceFlowStore):
         return [
             SlotUsage(s.start, s.capacity_snapshot, await self.count_active_bookings(s.id or 0))
             for s in self.state.slots.values()
-            if s.group_id == group_id and lower <= s.start < upper and s.kind == "scheduled"
+            if s.group_id == group_id
+            and lower <= s.start < upper
+            and s.kind == "scheduled"
+            and s.capacity_pool_id is None
         ]
 
     async def get_slot(self, group_id: int, start: datetime) -> Slot | None:
@@ -996,7 +1002,10 @@ class InMemoryTransaction(ServiceFlowStore):
             (
                 s
                 for s in self.state.slots.values()
-                if s.group_id == group_id and s.start == start and s.kind == "scheduled"
+                if s.group_id == group_id
+                and s.start == start
+                and s.kind == "scheduled"
+                and s.capacity_pool_id is None
             ),
             None,
         )
@@ -1492,14 +1501,21 @@ class InMemoryTransaction(ServiceFlowStore):
         self.state.closures[closure_id] = replace(closure, image=None)
 
     async def find_confirmed_bookings(
-        self, group_id: int, lower: datetime, upper: datetime | None
+        self, group_id: int, lower: datetime, upper: datetime | None, *, include_pool: bool = False
     ) -> list[Booking]:
-        return self._scheduled(group_id, lower, upper, {BookingStatus.CONFIRMED})
+        return self._scheduled(
+            group_id, lower, upper, {BookingStatus.CONFIRMED}, include_pool=include_pool
+        )
 
     async def find_agenda_bookings(
         self, group_id: int, lower: datetime, upper: datetime
     ) -> list[Booking]:
         return self._scheduled(group_id, lower, upper, IN_AGENDA)
+
+    def _legacy(self, booking: Booking) -> bool:
+        """Return whether the booking sits on a legacy slot (no pool); a missing slot is legacy."""
+        slot = self.state.slots.get(booking.slot_id)
+        return slot is None or slot.capacity_pool_id is None
 
     def _scheduled(
         self,
@@ -1507,6 +1523,8 @@ class InMemoryTransaction(ServiceFlowStore):
         lower: datetime,
         upper: datetime | None,
         statuses: Collection[BookingStatus],
+        *,
+        include_pool: bool = False,
     ) -> list[Booking]:
         wanted = set(statuses)
         found = [
@@ -1515,6 +1533,7 @@ class InMemoryTransaction(ServiceFlowStore):
             if b.group_id == group_id
             and b.status in wanted
             and b.kind == "scheduled"
+            and (include_pool or self._legacy(b))
             and lower <= b.start
             and (upper is None or b.start < upper)
         ]

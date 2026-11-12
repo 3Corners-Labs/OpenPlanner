@@ -25,7 +25,7 @@ from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from enum import StrEnum
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, available_timezones
 
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.scheduling import (
@@ -149,6 +149,28 @@ class PoolStaffing:
     timezone: ZoneInfo
     rules: tuple[ScheduleRule, ...] = ()
     overrides: tuple[ScheduleOverride, ...] = ()
+
+
+def check_timezone(name: str) -> str:
+    """Return ``name`` when it is an IANA time zone this host knows.
+
+    Raises:
+        DomainError: ``invalid_configuration`` with field ``timezone``.
+    """
+    if name not in available_timezones():
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "timezone")
+    return name
+
+
+def zone_or_none(name: str | None) -> ZoneInfo | None:
+    """Return the zone of a stored name, ``None`` for no name or one that cannot be read.
+
+    A stored zone that the host no longer knows must not break a read; the pool then counts as
+    not staffed until an admin chooses a zone again.
+    """
+    if name is None or name not in available_timezones():
+        return None
+    return ZoneInfo(name)
 
 
 def check_pool_staffing(staffing: PoolStaffing) -> None:

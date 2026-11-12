@@ -180,6 +180,7 @@ async def test_the_organisation_states_show_the_source() -> None:
         "product_footer",
         "staff_dormant_after_days",
         "shortfall_horizon_days",
+        "treatment_buffer_minutes",
         "planner_rebook_days",
         "planner_rebook_reminder_days",
         "reschedule_proposal_confirm_hours",

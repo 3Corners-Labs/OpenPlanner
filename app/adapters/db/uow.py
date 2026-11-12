@@ -55,6 +55,7 @@ from app.adapters.db.form_fields import FormFieldQueries, answers_from_json, ans
 from app.adapters.db.health import HealthQueries
 from app.adapters.db.identity_providers import IdentityProviderQueries
 from app.adapters.db.images import ImageQueries, page_image
+from app.adapters.db.legacy_slot import legacy_slot
 from app.adapters.db.log_destinations import LogDestinationQueries
 from app.adapters.db.maintenance_state import MaintenanceQueries
 from app.adapters.db.models import (
@@ -100,6 +101,7 @@ from app.adapters.db.overview_layouts import OverviewLayoutQueries
 from app.adapters.db.own_certificate import OwnCertificateQueries
 from app.adapters.db.participant_links import ParticipantLinkQueries
 from app.adapters.db.platform_settings import PlatformSettingsQueries
+from app.adapters.db.pool_staffing import PoolStaffingQueries
 from app.adapters.db.proposals import ProposalQueries, places_taken
 from app.adapters.db.public_address import PublicAddressQueries
 from app.adapters.db.record_names import (
@@ -483,6 +485,7 @@ class SqlTransaction(
     ProposalQueries,
     ChangeRequestQueries,
     SkillQueries,
+    PoolStaffingQueries,
     CapacityPoolQueries,
     ServiceFlowQueries,
     AlertTargetQueries,
@@ -1769,6 +1772,7 @@ class SqlTransaction(
                 SlotRow.start >= lower,
                 SlotRow.start < upper,
                 SlotRow.kind == BookingKind.SCHEDULED.value,
+                legacy_slot(),
             )
         )
         return [SlotUsage(start, capacity, int(count)) for start, capacity, count in rows]
@@ -1780,6 +1784,7 @@ class SqlTransaction(
                 SlotRow.group_id == group_id,
                 SlotRow.start == start,
                 SlotRow.kind == BookingKind.SCHEDULED.value,
+                legacy_slot(),
             )
         )
         if row is None:
@@ -1794,10 +1799,12 @@ class SqlTransaction(
             end=slot.end,
             capacity_snapshot=slot.capacity_snapshot,
             kind=slot.kind.value,
+            capacity_pool_id=slot.capacity_pool_id,
+            occupied_until=slot.occupied_until,
         )
         self._session.add(row)
         await self._session.flush()
-        return Slot(row.id, slot.group_id, slot.start, slot.end, slot.capacity_snapshot, slot.kind)
+        return replace(slot, id=row.id)
 
     async def count_active_bookings(self, slot_id: int) -> int:
         """Return the places taken in the slot: bookings holding one and open proposals."""
@@ -2208,10 +2215,15 @@ class SqlTransaction(
             await self._save_notices(closure.id, closure)
 
     async def find_confirmed_bookings(
-        self, group_id: int, lower: datetime, upper: datetime | None
+        self, group_id: int, lower: datetime, upper: datetime | None, *, include_pool: bool = False
     ) -> list[Booking]:
-        """Return the group's confirmed scheduled bookings with lower <= start < upper."""
-        return await self._scheduled(group_id, lower, upper, {BookingStatus.CONFIRMED})
+        """Return the group's confirmed scheduled bookings with lower <= start < upper.
+
+        Bookings on pool slots only with ``include_pool`` (an emergency closure suspends them).
+        """
+        return await self._scheduled(
+            group_id, lower, upper, {BookingStatus.CONFIRMED}, include_pool=include_pool
+        )
 
     async def find_agenda_bookings(
         self, group_id: int, lower: datetime, upper: datetime
@@ -2225,8 +2237,13 @@ class SqlTransaction(
         lower: datetime,
         upper: datetime | None,
         statuses: Collection[BookingStatus],
+        *,
+        include_pool: bool = False,
     ) -> list[Booking]:
-        """Return the group's scheduled bookings with one of ``statuses``, by start."""
+        """Return the group's scheduled bookings with one of ``statuses``, by start.
+
+        Legacy slots only, unless ``include_pool``.
+        """
         query = (
             select(BookingRow, SlotRow)
             .join(SlotRow, SlotRow.id == BookingRow.slot_id)
@@ -2237,6 +2254,8 @@ class SqlTransaction(
                 SlotRow.start >= lower,
             )
         )
+        if not include_pool:
+            query = query.where(legacy_slot())
         if upper is not None:
             query = query.where(SlotRow.start < upper)
         rows = await self._session.execute(query.order_by(SlotRow.start, BookingRow.id))

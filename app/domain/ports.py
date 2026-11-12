@@ -80,6 +80,8 @@ from app.domain.login_domains import DomainClaim
 from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import HostKeys, OwnCertificate, ParsedChain, ParsedKey
 from app.domain.participant_links import LinkSession
+from app.domain.pool_accounting import Commitment
+from app.domain.pool_staffing import PoolStaffing
 from app.domain.public_address import AddressCheck, AddressKind, InstanceReply
 from app.domain.report_digest import RunStatus, Subscription
 from app.domain.reschedule_proposal import HeldProposal
@@ -835,6 +837,13 @@ class Transaction(Protocol):
     one exception and says why). The save, archive, publish, discard and set methods of those
     objects rely on the immediate write lock of ``locked()`` for their uniqueness pre-checks and
     must not be called from a ``read()`` transaction; nothing in the unit of work stops them.
+
+    Slots (ADR 0122): a slot may draw on a counted pool (``Slot.capacity_pool_id``). The agenda
+    and shortfall queries are the service's *own staffing* and see legacy slots only; lists of
+    bookings and the gates that ask "does this group have any" are the *group's* and see every
+    booking. A caller that acts on a booking whatever supplies its place (an emergency closure)
+    says so with ``include_pool``. ``get_pool_commitments(pool_id, ...)`` and ``get_pool_slot``
+    carry no scope: the pool id must come from a flow of the service, never from request input.
     """
 
     async def list_groups(self, scope: Scope, *, archived: bool = False) -> list[GroupSummary]:
@@ -1672,6 +1681,72 @@ class Transaction(Protocol):
         """
         ...
 
+    async def get_pool_staffing(
+        self, scope: Scope, pool_id: int, from_day: date | None = None
+    ) -> PoolStaffing | None:
+        """Return a counted pool's blocks and exceptions (from ``from_day`` on), each with its id.
+
+        ``None`` for a pool that is missing, outside ``scope`` or legacy, and for a counted pool
+        without a time zone (ADR 0122). Nothing reads it for a booking decision before step 5.
+        """
+        ...
+
+    async def set_pool_timezone(self, scope: Scope, pool_id: int, timezone: str | None) -> bool:
+        """Set a counted pool's time zone (``None`` clears it); ``False`` when no such pool.
+
+        Raises:
+            DomainError: ``invalid_configuration`` (field ``timezone``) for an unknown zone name.
+        """
+        ...
+
+    async def add_pool_rule(self, scope: Scope, pool_id: int, rule: ScheduleRule) -> int | None:
+        """Store a weekly block of a counted pool; return its id, ``None`` when no such pool."""
+        ...
+
+    async def update_pool_rule(
+        self, scope: Scope, pool_id: int, rule_id: int, rule: ScheduleRule
+    ) -> bool:
+        """Replace the pool's block ``rule_id``; ``False`` if the pool has no such block."""
+        ...
+
+    async def delete_pool_rule(self, scope: Scope, pool_id: int, rule_id: int) -> bool:
+        """Delete the pool's block ``rule_id``; ``False`` if the pool has no such block."""
+        ...
+
+    async def add_pool_override(
+        self, scope: Scope, pool_id: int, override: ScheduleOverride
+    ) -> int | None:
+        """Store an exception of a counted pool; return its id, ``None`` when no such pool."""
+        ...
+
+    async def update_pool_override(
+        self, scope: Scope, pool_id: int, override_id: int, override: ScheduleOverride
+    ) -> bool:
+        """Replace the pool's exception ``override_id``; ``False`` if the pool has none such."""
+        ...
+
+    async def delete_pool_override(self, scope: Scope, pool_id: int, override_id: int) -> bool:
+        """Delete the pool's exception ``override_id``; ``False`` if the pool has none such."""
+        ...
+
+    async def get_pool_slot(
+        self, pool_id: int, group_id: int, start: datetime, occupied_until: datetime
+    ) -> Slot | None:
+        """Return the pool slot of one service, start and length (ADR 0122), or ``None``."""
+        ...
+
+    async def get_pool_commitments(
+        self, pool_id: int, lower: datetime, upper: datetime
+    ) -> list[Commitment]:
+        """Return the pool's units held at any moment of ``lower`` to ``upper``.
+
+        Not scoped: ``pool_id`` must come from a flow, never from request input.
+
+        One per place taken in a pool slot: a booking that holds one and an open proposal of a
+        new time. Derived from the bookings, never a second ledger (ADR 0122 point 4).
+        """
+        ...
+
     async def flows_on_pool(self, scope: Scope, pool_id: int) -> PoolFlows:
         """Return the not archived flows (current or draft) that draw on the pool.
 
@@ -1959,11 +2034,15 @@ class Transaction(Protocol):
         ...
 
     async def find_confirmed_bookings(
-        self, group_id: int, lower: datetime, upper: datetime | None
+        self, group_id: int, lower: datetime, upper: datetime | None, *, include_pool: bool = False
     ) -> list[Booking]:
         """Return the group's confirmed scheduled bookings with lower <= start < upper.
 
         ``upper=None`` means no upper bound. For the domain's own use, not for listings.
+        By default only bookings on the service's own (legacy) slots, as the agenda and
+        shortfall callers need; ``include_pool=True`` adds bookings on pool slots (ADR 0122),
+        for the callers that act on a booking whatever supplies its place: an emergency closure
+        suspends them all (ADR 0024, decision P4).
         """
         ...
 

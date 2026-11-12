@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.config_flows import read_usage_of_flows
+from app.adapters.db.legacy_slot import legacy_slot
 from app.adapters.db.models import (
     ApiClientGroupRow,
     BookingRow,
@@ -93,7 +94,7 @@ async def read_usage(
             BookingRow,
             (BookingRow.slot_id == SlotRow.id) & BookingRow.status.in_(_HOLDS_PLACE),
         )
-        .where(SlotRow.start > now)
+        .where(SlotRow.start > now, legacy_slot())
         .group_by(SlotRow.id, OrganisationRow.slug, GroupRow.slug)
         .order_by(SlotRow.start)
     )

@@ -231,6 +231,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `PRODUCT_FOOTER` | bool | `true` | — | `settings.organisation.manage` | "Appointments via OpenPlanner" with the product mark at the foot of the booking pages and in the HTML part of emails (ADR 0060 §6). |
 | `STAFF_DORMANT_AFTER_DAYS` | int | `90` | 14–365 | `settings.organisation.manage` | Days without a login after which a person is marked dormant in the staff list (ADR 0046). |
 | `SHORTFALL_HORIZON_DAYS` | int | `14` | 1–60 | `settings.organisation.manage` | Days ahead the shortfall notice on group pages and the dashboard looks (ADR 0044). |
+| `TREATMENT_BUFFER_MINUTES` | int | `0` | 0–120 | `settings.organisation.manage` | Wrap-up minutes added to every appointment of a shared capacity pool; read when an appointment is admitted and fixed into its commitment (ADR 0122). |
 | `QUEUE_WAIT_WARNING_MINUTES` | int | `8` | 2–60 | `settings.organisation.manage` | Longest wait in an own queue, in minutes, above which a warning alert is raised; one alert per crossing, ended when the wait is back under it (ADR 0061 OV-7). |
 | `QUEUE_WAIT_TARGET_MINUTES` | int | `5` | 1–60 | `settings.organisation.manage` | Target for the longest wait, shown in the queue widget; not above the warning threshold (ADR 0061 OV-7). |
 | `PLANNER_REBOOK_DAYS` | int | `14` | 1–30 | `settings.organisation.manage` | Days after the original start after which an unanswered request to rebook lapses. |
