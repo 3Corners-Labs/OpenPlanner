@@ -401,6 +401,9 @@ class ReadinessReason(StrEnum):
     POOL_ARCHIVED = "pool_archived"
     DURATION = "duration"
     POOL_DOES_NOT_GUARANTEE = "pool_does_not_guarantee"
+    SKILL_UNMAPPED = "skill_unmapped"
+    """A contact-center flow requires a skill without a contact-center code (ADR 0121 step 4b):
+    an unmapped requirement is an incomplete configuration, never dropped from the payload."""
     SUBJECT_UNKNOWN = "subject_unknown"
     KIND_MISSING = "kind_missing"
     DISPATCH_MISSING = "dispatch_missing"
@@ -472,9 +475,16 @@ def _capacity_reason(revision: FlowRevision, pool: CapacityPool | None) -> Readi
 
 
 def _skills_reason(
-    revision: FlowRevision, pool: CapacityPool | None, offered_subjects: Collection[str]
+    revision: FlowRevision,
+    pool: CapacityPool | None,
+    offered_subjects: Collection[str],
+    coded_skills: Collection[int],
 ) -> ReadinessReason | None:
-    """Return why the skills check fails, if it does."""
+    """Return why the skills check fails, if it does.
+
+    A revision that dispatches to the contact center needs a contact-center code for every skill
+    it or a subject requires (``coded_skills`` are the ids that have one).
+    """
     if revision.capacity_pool_id is None or pool is None:
         return ReadinessReason.POOL_MISSING
     if any(code not in offered_subjects for code in revision.subject_skill_ids):
@@ -482,6 +492,10 @@ def _skills_reason(
     for extra in (frozenset[int](), *revision.subject_skill_ids.values()):
         if not guarantees(pool, effective_requirements(revision.required_skill_ids, extra)):
             return ReadinessReason.POOL_DOES_NOT_GUARANTEE
+    if revision.dispatch is DispatchKind.CONTACT_CENTER and revision.all_skill_ids - frozenset(
+        coded_skills
+    ):
+        return ReadinessReason.SKILL_UNMAPPED
     return None
 
 
@@ -552,17 +566,26 @@ def _retention_reason(revision: FlowRevision) -> ReadinessReason | None:
 
 
 def readiness(
-    revision: FlowRevision, pool: CapacityPool | None, *, offered_subjects: Collection[str]
+    revision: FlowRevision,
+    pool: CapacityPool | None,
+    *,
+    offered_subjects: Collection[str],
+    coded_skills: Collection[int] = (),
 ) -> tuple[ReadinessItem, ...]:
     """Return the six checklist items, in order, for activating ``revision``.
 
     ``pool`` is the revision's capacity pool, ``offered_subjects`` the codes of the group's
-    subjects. Values outside the ``BUILT_*`` constants fail for a non-legacy revision.
+    subjects, ``coded_skills`` the ids of the organisation's skills that have a contact-center
+    code (only a contact-center revision with skills reads it). Values outside the ``BUILT_*``
+    constants fail for a non-legacy revision.
     """
     return (
         _item(ReadinessCheck.DATA, _data_reason(revision)),
         _item(ReadinessCheck.CAPACITY, _capacity_reason(revision, pool)),
-        _item(ReadinessCheck.SKILLS, _skills_reason(revision, pool, offered_subjects)),
+        _item(
+            ReadinessCheck.SKILLS,
+            _skills_reason(revision, pool, offered_subjects, coded_skills),
+        ),
         _item(ReadinessCheck.DISPATCH, _dispatch_reason(revision)),
         _item(ReadinessCheck.COMPLETION, _completion_reason(revision)),
         _item(ReadinessCheck.RETENTION, _retention_reason(revision)),

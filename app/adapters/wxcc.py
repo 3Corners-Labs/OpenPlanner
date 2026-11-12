@@ -7,7 +7,10 @@ routing WxCC needs (business address and channel, both required, and a routing v
 The work item goes to the group's business address and channel; the flow behind the entry
 point chooses the queue from ``flowSettings.openplannerGroup``. The routing variables of
 ADR 0081 (mapped subject and attribute codes) go next to it in ``flowSettings``, where the
-flow reads them as flow variables; ``openplannerGroup`` is reserved and always wins.
+flow reads them as flow variables; ``openplannerGroup`` is reserved and always wins. The
+contact-center codes of the skills a booking requires (ADR 0121 step 4b) go in
+``openplannerSkills``, comma-separated, only when it requires any, and also win over a routing
+variable of that name.
 ``workItemData`` carries the booking reference, first name, start time, group name, meeting
 link and kind; nothing else (CLAUDE.md). The asset's schema in Control Hub must define
 exactly these keys (runbook).
@@ -48,6 +51,10 @@ from app.domain.ports import Clock, IntegrationError, RequestLog
 from app.domain.security_log import SecurityLog
 
 ROUTING_KEY = "openplannerGroup"
+SKILLS_KEY = "openplannerSkills"
+"""The flow variable of the contact-center codes of the skills a booking requires (ADR 0121 step
+4b), comma-separated and sorted; absent when it requires none. Written after the routing
+variables of ADR 0081, so none of them can stand in for it."""
 
 BUSINESS_ADDRESS = "business_address"
 """Routing attribute: the business address of the work item asset (ADR 0018)."""
@@ -150,7 +157,11 @@ def task_body(item: ContactCenterTask, alias_id: str, timestamp_ms: int) -> dict
         "destination": {"id": address, "type": "businessAddress"},
         "channelType": "workItem",
         "channel": channel,
-        "flowSettings": {**dict(item.variables), ROUTING_KEY: item.routing_value},
+        "flowSettings": {
+            **dict(item.variables),
+            **({SKILLS_KEY: ",".join(item.skills)} if item.skills else {}),
+            ROUTING_KEY: item.routing_value,
+        },
         "channelParams": {
             "type": "work-item-form",
             "message": {

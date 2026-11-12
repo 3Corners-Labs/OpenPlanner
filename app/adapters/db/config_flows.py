@@ -128,6 +128,11 @@ async def read_catalogue(
                 fields={
                     "labels": json_texts(json.loads(row.labels)),
                     "archived": row.archived_at is not None,
+                    **(
+                        {"contact_center_code": row.contact_center_code}
+                        if row.contact_center_code is not None
+                        else {}
+                    ),
                 },
             )
         )
@@ -402,11 +407,18 @@ async def write_skill(session: AsyncSession, box: SecretBox | None, change: Chan
         return
     if row is None and change.action is not ChangeAction.CREATE:
         raise DomainError(ErrorCode.CONFIGURATION_OBJECT_MISSING, "skill_id")
+    kept = None if row is None else row.contact_center_code
+    contact = (
+        change.values.get("contact_center_code")
+        if "contact_center_code" in _names(change)
+        else kept
+    )
     skill = Skill(
         None if row is None else row.id,
         organisation_id,
         code,
         text_map(change.values.get("labels"), "skill_label"),
+        contact_center_code=None if contact is None else str(contact),
     )
     row = await write_skill_row(session, skill, row)
     if "archived" in _names(change):

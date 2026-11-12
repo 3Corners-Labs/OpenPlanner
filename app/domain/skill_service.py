@@ -37,6 +37,16 @@ ARCHIVED = "skill.archived"
 GRANTS_CHANGED = "staff_skills.changed"
 """Details of the audit events (action ``skills.manage``); the labels are in the audit page."""
 LIMIT_FIELD = "skill_limit"
+KEEP = "\x00keep"
+"""``relabel``'s default for the contact-center code: leave the stored one as it is."""
+
+
+def _code_of(typed: str | None) -> str | None:
+    """Return a typed contact-center code trimmed; blank means not mapped."""
+    stripped = (typed or "").strip()
+    return stripped or None
+
+
 """The field of the refusal when the organisation has as many skills as the platform allows."""
 
 
@@ -226,14 +236,24 @@ class SkillService:
         return stored
 
     async def relabel(
-        self, principal: Principal, slug: str, skill_id: int, label_nl: str, label_en: str
+        self,
+        principal: Principal,
+        slug: str,
+        skill_id: int,
+        label_nl: str,
+        label_en: str,
+        contact_center_code: str | None = KEEP,
     ) -> bool:
-        """Change the labels of a skill, not archived; its code stays. Return whether they changed.
+        """Change the labels and the contact-center code of a skill, not archived; its code stays.
+
+        ``contact_center_code`` blank or ``None`` takes the mapping away (ADR 0121 step 4b);
+        left at ``KEEP`` it stays as stored. Return whether anything changed.
 
         Raises:
             DomainError: ``not_permitted``, ``organisation_not_found``,
-                ``configuration_object_missing`` (also for an archived skill) or
-                ``invalid_configuration`` (``skill_label``).
+                ``configuration_object_missing`` (also for an archived skill),
+                ``invalid_configuration`` (``skill_label``, ``contact_center_code``) or
+                ``slug_taken`` (``contact_center_code`` of another skill).
         """
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.locked() as tx:
@@ -245,8 +265,14 @@ class SkillService:
                 current.code,
                 labels_of(label_nl, label_en),
                 current.archived_at,
+                current.contact_center_code
+                if contact_center_code is KEEP
+                else _code_of(contact_center_code),
             )
-            if changed.labels == current.labels:
+            if (changed.labels, changed.contact_center_code) == (
+                current.labels,
+                current.contact_center_code,
+            ):
                 return False
             await tx.save_skill(scope, changed)
             await self._record(tx, principal, slug, f"{CHANGED},skill:{current.code}")

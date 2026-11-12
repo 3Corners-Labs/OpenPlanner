@@ -58,6 +58,7 @@ kind `webex_cc`; the old column stays the one read for WxCC until the next minor
   "channel": "<work item channel name>",
   "flowSettings": {
     "openplannerGroup": "<routing value of the group>",
+    "openplannerSkills": "<code>,<code>",
     "<variable name>": "<mapped value>"
   },
   "channelParams": {
@@ -90,6 +91,17 @@ participant's labels, form answers and any other booking field never are. The ca
 attributes and a group one subject question, so at most four keys of the fifteen are used.
 `openplannerGroup` is written last and cannot be overwritten. Create a flow variable of type
 string with the same name in the client's flow to read a value.
+
+**Skill codes** (ADR 0121 step 4b): when the booking's flow (or its subject) requires skills,
+`openplannerSkills` carries the contact-center codes of those skills, sorted and joined by
+commas (at most 512 bytes; each code `[A-Za-z0-9_.:-]{1,64}`). The organisation admin sets a
+skill's code on the skill's page under *Skills and capacity*. A booking that requires no skill
+(every legacy flow) sends no such key. A required skill without a code is never left out: the
+dispatch is refused as not ready (`skill_codes`), and a flow that dispatches to the contact
+center cannot be published or activated with an unmapped skill (readiness reason
+`skill_unmapped`). Like `openplannerGroup` the key is written after the routing variables, and
+the mapping form refuses it as a variable name. In the client's flow, test the codes with a
+condition (for example `contains`) or pass them to the skill requirement of *Queue To Agent*.
 
 **Ending a cancelled booking's task** (ADR 0021), v2 first. **Primary:** a Task Messages v2
 snapshot, `POST /v2/tasks/{taskId}/messages` (`cjp:task_write`, beta, `202`), marks the task

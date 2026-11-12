@@ -178,6 +178,18 @@ def is_unknown(error: DomainError) -> bool:
 SKILLS = RefusalTable(
     (
         Rule("skill_code", "admin.skills.error.code_taken", "skill_code", ErrorCode.SLUG_TAKEN),
+        Rule(
+            "contact_center_code",
+            "admin.skills.error.contact_center_code_taken",
+            "contact_center_code",
+            ErrorCode.SLUG_TAKEN,
+        ),
+        Rule(
+            "contact_center_code",
+            "admin.skills.error.contact_center_code",
+            "contact_center_code",
+            ErrorCode.INVALID_CONFIGURATION,
+        ),
         Rule("pool_code", "admin.capacity.error.code_taken", "pool_code", ErrorCode.SLUG_TAKEN),
         Rule("pool_name", "admin.capacity.error.name_taken", "pool_name", ErrorCode.SLUG_TAKEN),
         Rule("skill_limit", "admin.skills.error.limit", SKILL_LIMIT_NOTICE),

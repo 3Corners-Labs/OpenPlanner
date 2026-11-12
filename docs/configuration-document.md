@@ -69,7 +69,9 @@ flags a typo. The planner is the authority: it also checks everything the admin 
 
 ## Skills, capacity pools and flows (ADR 0121)
 
-An organisation may carry `skills` (key `code`, `labels`, `archived`) and `capacity_pools`
+An organisation may carry `skills` (key `code`, `labels`, `archived`, and the optional
+`contact_center_code` of ADR 0121 step 4b: unique within the organisation, null for not mapped,
+kept when a change leaves it out) and `capacity_pools`
 (counted pools: key `code`, `name`, `guaranteed_skills` as codes, `archived`). A group may carry
 `legacy_pool` (the pool that wraps its own staffing: `name`, `guaranteed_skills`, `archived`) and
 `flows` (key `code`, `state`, `default_for`, `current_revision`, `draft_revision`) with their

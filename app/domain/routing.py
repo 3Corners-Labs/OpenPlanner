@@ -30,6 +30,10 @@ REQUIRED_LOCALES = ("nl", "en")
 """Every subject label needs these (CLAUDE.md: nl default, en required)."""
 RESERVED_VARIABLES = frozenset({"openplannerGroup"})
 """Variable names OpenPlanner itself sends to the contact center; a mapping may not take them."""
+RESERVED_FROM_NOW = frozenset({"openplannerSkills"})
+"""Names OpenPlanner took later (ADR 0121 step 4b): a new mapping may not take them, but a stored
+one still loads (``RESERVED_VARIABLES`` is checked when a mapping is built, also on load, and a
+stored name must stay readable under expand/contract, ADR 0116)."""
 SUBJECT_SOURCE = "subject"
 """The mapping source of the group's subjects; the other sources are the attribute keys."""
 ANSWER_PREFIX = "_"

@@ -75,7 +75,14 @@ def _skill_check(
         DomainError: ``invalid_configuration`` with ``skill_code`` or ``skill_label``.
     """
     labels = text_map(merged.get("labels"), "skill_label")
-    Skill(None, 0, text_of(merged, "code"), labels)
+    contact = merged.get("contact_center_code")
+    Skill(
+        None,
+        0,
+        text_of(merged, "code"),
+        labels,
+        contact_center_code=None if contact is None else str(contact),
+    )
     return {**merged, "labels": json_texts(labels)}
 
 
@@ -109,6 +116,16 @@ SKILL = Kind(
             default=False,
             columns=("archived_at",),
             description="Archived skills stay where they are used but are not newly required.",
+        ),
+        text(
+            "contact_center_code",
+            nullable=True,
+            max_length=64,
+            description=(
+                "What the organisation's contact-center flow tests for the skill (ADR 0121 step"
+                " 4b); unique within the organisation. A dispatch sends the codes of the skills a"
+                " booking requires. Null: not mapped; left out of a change: kept as it is."
+            ),
         ),
     ),
     check=_skill_check,

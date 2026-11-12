@@ -16,6 +16,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from datetime import datetime
 
+from app.domain.authorization import Scope
 from app.domain.booking import Booking
 from app.domain.calls import EventKind, TaskState, contact_center_task, meeting_request
 from app.domain.contact_center import ContactCenterTaskRef
@@ -31,6 +32,8 @@ from app.domain.ports import (
     VideoProvider,
 )
 from app.domain.scheduling import Group
+from app.domain.service_flows import requirement_of
+from app.domain.skills import mapped_skill_codes
 
 StartLabel = Callable[[Booking, Group], str]
 
@@ -109,13 +112,42 @@ class CallService:
         if booking.meeting is None:
             raise IntegrationError("meeting_missing", retryable=True)
         task_id = await dispatcher.create_task(
-            contact_center_task(booking, group, start_label=self._start_label(booking, group))
+            contact_center_task(
+                booking,
+                group,
+                start_label=self._start_label(booking, group),
+                skills=await self._skill_codes(booking, group),
+            )
         )
         booking_id, task = _id(booking), ContactCenterTaskRef(task_id, routing.kind)
         async with self._uow.locked() as tx:
             await tx.save_task(booking_id, task)
         await self._integration.record(booking_id, EventKind.TASK_CREATED)
         return _with(booking, contact_center_task=task)
+
+    async def _skill_codes(self, booking: Booking, group: Group) -> tuple[str, ...]:
+        """Return the contact-center codes of the skills ``booking`` requires (ADR 0121 step 4b).
+
+        The requirement is the one of the flow revision recorded on the booking; a booking
+        without a flow, or of a flow without skills (every legacy flow), sends none and reads no
+        skill.
+
+        Raises:
+            DomainError: ``integration_not_ready`` (``skill_codes``) for a required skill
+                without a code: an unmapped requirement is never dropped.
+        """
+        if booking.flow is None:
+            return ()
+        async with self._uow.read() as tx:
+            revision = await tx.flow_revision(booking.flow.flow_id, booking.flow.revision)
+            subject = booking.routing.subject if booking.routing else None
+            required = requirement_of(revision, subject)
+            if not required:
+                return ()
+            summary = await tx.get_group_summary(group.slug)
+            scope = Scope(organisations=frozenset({summary.organisation_slug} if summary else ()))
+            skills = {i: s for i in required if (s := await tx.get_skill(scope, i)) is not None}
+        return mapped_skill_codes(required, skills)
 
     async def diverts(self, booking: Booking, group: Group) -> bool:
         """Put a booking due for dispatch in the own queue while its group is in fallback."""
