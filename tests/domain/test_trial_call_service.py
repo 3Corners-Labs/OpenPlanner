@@ -40,7 +40,9 @@ class Setup:
         self.booking_id = 0
 
     async def booked(self) -> "Setup":
-        receipt = await book(BookingService(self.uow, self.clock, TEST_TOKEN_KEY))
+        receipt = await book(
+            BookingService(self.uow, self.clock, TEST_TOKEN_KEY, treatment_buffer=0)
+        )
         self.token = receipt.management_token
         self.booking_id = receipt.booking.id or 0
         return self
@@ -152,7 +154,9 @@ async def test_without_video_or_with_the_switch_off_nothing_is_offered() -> None
 
 
 async def test_a_cancelled_booking_has_no_trial_call(setup: Setup) -> None:
-    await BookingService(setup.uow, setup.clock, TEST_TOKEN_KEY).cancel(setup.token)
+    await BookingService(setup.uow, setup.clock, TEST_TOKEN_KEY, treatment_buffer=0).cancel(
+        setup.token
+    )
 
     view = await setup.service.open(setup.token)
 
@@ -197,7 +201,9 @@ async def test_a_trial_call_lost_in_a_race_deletes_its_own_meeting(setup: Setup)
 async def test_cancelling_plans_the_removal_of_the_trial_meeting(setup: Setup) -> None:
     await setup.service.open(setup.token)
 
-    cancelled = await BookingService(setup.uow, setup.clock, TEST_TOKEN_KEY).cancel(setup.token)
+    cancelled = await BookingService(
+        setup.uow, setup.clock, TEST_TOKEN_KEY, treatment_buffer=0
+    ).cancel(setup.token)
 
     assert cancelled.status is BookingStatus.CANCELLED
     assert JobType.DELETE_TRIAL_CALL in setup.jobs()

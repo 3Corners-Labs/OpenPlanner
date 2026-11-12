@@ -78,7 +78,7 @@ async def test_a_day_kept_open_follows_the_weekly_rules(uow: InMemoryUnitOfWork)
 
 
 async def test_holidays_close_participant_availability(uow: InMemoryUnitOfWork) -> None:
-    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
 
     slots = await service.availability("demo", MONDAY, TUESDAY)
 
@@ -91,7 +91,7 @@ async def test_holidays_close_participant_availability(uow: InMemoryUnitOfWork) 
 async def test_no_direct_call_on_a_holiday(uow: InMemoryUnitOfWork) -> None:
     # Now is Thursday 1 January 2026, 09:00 in Amsterdam: inside the opening hours.
     uow.state.rules[1].append(ScheduleRule(3, window("09:00", "10:00", offer=Offer.BOTH)))
-    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
     open_before = await service.direct_call_availability("demo") is DirectAvailability.AVAILABLE
 
     uow.state.holidays[64] = Holiday(NATIONAL, NOW.date(), "Nieuwjaarsdag", id=64)
@@ -102,7 +102,7 @@ async def test_no_direct_call_on_a_holiday(uow: InMemoryUnitOfWork) -> None:
 
 async def test_the_group_exception_on_a_holiday_wins(uow: InMemoryUnitOfWork) -> None:
     uow.state.overrides[1] = [ScheduleOverride(MONDAY, window("09:00", "09:30", 1))]
-    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
 
     slots = await service.availability("demo", MONDAY, MONDAY)
 

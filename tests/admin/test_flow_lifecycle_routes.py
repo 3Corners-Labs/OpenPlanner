@@ -70,6 +70,7 @@ async def test_archived_flows_are_behind_the_filter_like_the_skills(
     site: Site, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(service_flows, "RETENTION_BUILT", True)
+    monkeypatch.setattr(service_flows, "ROLLBACK_SAFE", True)  # ADR 0122: the gate too
     await site.login_as(ORG_ADMIN)
     pool = await add_pool(site, "Advies")
     await create(site, capacity_pool_id=str(pool))
@@ -331,6 +332,7 @@ async def test_activation_has_no_disabled_button_but_says_why_not_and_a_refusal_
     page = (await site.client.get(f"{BASE}/advies")).text
     refused = await act(site, "activate")
     monkeypatch.setattr(service_flows, "RETENTION_BUILT", True)  # only the archived pool is left
+    monkeypatch.setattr(service_flows, "ROLLBACK_SAFE", True)  # ADR 0122: the gate too
     other = (await site.client.get(f"{BASE}/leeg")).text
 
     assert "Publiceer eerst het concept." in unpublished
@@ -350,6 +352,7 @@ async def test_a_flow_that_is_ready_is_activated_with_the_constants_patched(
     site: Site, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(service_flows, "RETENTION_BUILT", True)
+    monkeypatch.setattr(service_flows, "ROLLBACK_SAFE", True)  # ADR 0122: the gate too
     await site.login_as(ORG_ADMIN)
     pool = await add_pool(site, "Advies")
     await create(site, capacity_pool_id=str(pool))
@@ -503,6 +506,7 @@ async def test_discarding_the_draft_of_a_published_flow_keeps_the_published_revi
 async def activated(site: Site, monkeypatch: pytest.MonkeyPatch) -> int:
     """Log in, store the flow ``advies``, publish and activate it; return its pool."""
     monkeypatch.setattr(service_flows, "RETENTION_BUILT", True)
+    monkeypatch.setattr(service_flows, "ROLLBACK_SAFE", True)  # ADR 0122: the gate too
     await site.login_as(ORG_ADMIN)
     pool = await add_pool(site, "Advies")
     await create(site, capacity_pool_id=str(pool))
@@ -574,6 +578,7 @@ async def test_archiving_an_active_flow_says_what_happens(
     site: Site, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(service_flows, "RETENTION_BUILT", True)
+    monkeypatch.setattr(service_flows, "ROLLBACK_SAFE", True)  # ADR 0122: the gate too
     await site.login_as(ORG_ADMIN)
     pool = await add_pool(site, "Advies")
     await create(site, capacity_pool_id=str(pool))

@@ -19,7 +19,9 @@ from tests.support.domain import ADA, NOW, SLOT_0900, TEST_TOKEN_KEY, book
 
 async def _booking_id(engine: AsyncEngine) -> int:
     await seed_group(engine, slug="balie")
-    service = BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY)
+    service = BookingService(
+        SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0
+    )
     receipt = await book(service, SLOT_0900)
     assert receipt.booking.id is not None
     return receipt.booking.id
@@ -155,7 +157,7 @@ async def test_direct_calls_are_listed_with_their_status_and_cap(engine: AsyncEn
                 group.id, rule.id or 0, replace(rule, window=replace(rule.window, offer=Offer.BOTH))
             )
     clock = FixedClock(NOW)
-    service = BookingService(uow, clock, TEST_TOKEN_KEY)
+    service = BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
     await book(service, SLOT_0900)  # scheduled: not a direct call
     clock.advance(SLOT_0900 + timedelta(minutes=5) - NOW)
     first = await service.start_direct(group_slug="balie", contact=ADA, locale="nl")

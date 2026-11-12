@@ -154,7 +154,7 @@ async def test_blocks_without_agents_and_labels_are_stored(engine: AsyncEngine) 
 async def test_future_bookings_are_counted_per_group(engine: AsyncEngine) -> None:
     group_id = await seed_group(engine, slug="balie")
     uow = SqlUnitOfWork(engine)
-    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
     receipt = await book(service, SLOT_0900)
 
     async with uow.read() as tx:

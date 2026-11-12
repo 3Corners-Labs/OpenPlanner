@@ -62,7 +62,7 @@ def _service(
     state.groups[1] = group  # type: ignore[assignment]
     state.rules[1] = list(rules)
     uow = InMemoryUnitOfWork(state)
-    return BookingService(uow, FixedClock(now), TEST_TOKEN_KEY), uow
+    return BookingService(uow, FixedClock(now), TEST_TOKEN_KEY, treatment_buffer=0), uow
 
 
 async def test_direct_call_starts_now_in_its_own_slot() -> None:
@@ -158,7 +158,10 @@ async def test_closed_wins_over_full() -> None:
     service, _ = _service(CAPPED)
     await service.start_direct(group_slug="balie", contact=ADA, locale="nl")
     later = BookingService(
-        service._uow, FixedClock(MONDAY_0915 + timedelta(hours=2)), TEST_TOKEN_KEY
+        service._uow,
+        FixedClock(MONDAY_0915 + timedelta(hours=2)),
+        TEST_TOKEN_KEY,
+        treatment_buffer=0,
     )
 
     assert await later.direct_call_availability("balie") is DirectAvailability.UNAVAILABLE

@@ -46,7 +46,9 @@ def contacts(uow: InMemoryUnitOfWork, clock: FixedClock) -> ContactService:
 @pytest.fixture
 def closures(uow: InMemoryUnitOfWork, clock: FixedClock) -> ClosureService:
     admin = AdminService(uow, clock)
-    return ClosureService(uow, clock, admin, BookingService(uow, clock, TEST_TOKEN_KEY))
+    return ClosureService(
+        uow, clock, admin, BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
+    )
 
 
 async def _current(closures: ClosureService, slug: str = "demo") -> Closure:

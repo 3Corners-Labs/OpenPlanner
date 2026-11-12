@@ -17,7 +17,7 @@ async def _short_friday(site: Site) -> None:
     """Book 09:00 on Friday twice, then staff Friday 09:00-10:00 with one agent."""
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     uow = SqlUnitOfWork(app.state.engine)
-    bookings = BookingService(uow, site.clock, TEST_TOKEN_KEY)
+    bookings = BookingService(uow, site.clock, TEST_TOKEN_KEY, treatment_buffer=0)
     for number in range(2):
         await book_confirmed(
             bookings, group_slug="demo", start=FRIDAY_0900, contact=participant(number), locale="nl"

@@ -219,6 +219,7 @@ def test_a_new_flow_cannot_be_activated_before_step_5() -> None:
 
 def test_retention_is_ready_once_it_is_built(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("app.domain.service_flows.RETENTION_BUILT", True)
+    monkeypatch.setattr("app.domain.service_flows.ROLLBACK_SAFE", True)  # ADR 0122: the gate too
     assert reasons(revision(), pool()) == dict.fromkeys(ORDER)
     assert can_activate(readiness(revision(), pool(), offered_subjects=()))
 

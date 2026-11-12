@@ -52,8 +52,10 @@ Configuration of one object, not a setting (like a service's `direct_call_max_co
 | 4 | One staffing route factory shared by the service and the pool tabs (the flows of `pool_staffing_routes.py` and of `group_routes.py` / `planning.py` are duplicated) | | follow-up |
 | 4 | `_week.html` takes its base path from one variable for both tabs | | follow-up |
 | 4 | A zone change shown on the week card, and a notice for the daylight saving gap | | follow-up |
-| 5 | Booking on a pool (dark), the reason that reads `ROLLBACK_SAFE`, concurrency test | | planned |
+| 5 | Booking on a pool (dark), the reason that reads `ROLLBACK_SAFE`, concurrency test | #761 | merged |
 | 5 | Closing and reporting of pool bookings: `ended_slots`, usage closing and the facts skip pool slots until then | | planned |
+| 5 | Must be done before `ROLLBACK_SAFE` opens: the change-request check of the agent API (`ChangeRequestService._free`) judges a requested time on the service's own times, before any booking is matched; a time on the pool of a matched pool booking must be judged on that pool without telling the caller whether anything matched | | follow-up |
+| 5 | Must be done before `ROLLBACK_SAFE` opens: `rollback_not_safe` becomes its own readiness check (title and text), split from the retention check, when ADR 0121 step 5 sets `RETENTION_BUILT` true | | follow-up |
 
 ## Decisions of the product owner (2026-11-11)
 

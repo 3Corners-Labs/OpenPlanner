@@ -43,7 +43,7 @@ async def _setup(video_factory=FakeVideo):  # type: ignore[no-untyped-def]
     state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=1))]
     uow = InMemoryUnitOfWork(state)
     clock = FixedClock(NOW)
-    receipt = await book(BookingService(uow, clock, TEST_TOKEN_KEY))
+    receipt = await book(BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0))
     booking_id = receipt.booking.id or 0
     state.jobs[booking_id] = [
         PlannedJob(JobType.CREATE_VIDEO_ROOM, NOW, None),

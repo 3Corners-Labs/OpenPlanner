@@ -37,7 +37,7 @@ def clock() -> FixedClock:
 
 @pytest.fixture
 def bookings(uow: InMemoryUnitOfWork, clock: FixedClock) -> BookingService:
-    return BookingService(uow, clock, TEST_TOKEN_KEY)
+    return BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
 
 
 @pytest.fixture

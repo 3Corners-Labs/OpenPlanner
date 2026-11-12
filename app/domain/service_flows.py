@@ -11,7 +11,9 @@ under it.
 
 Until ADR 0121 steps 5 and 6 are built, the checklist refuses every value of a non-legacy
 revision that is outside the ``BUILT_*`` constants below (reason ``not_built_yet``), and
-every non-legacy revision while ``RETENTION_BUILT`` is false, so no new flow can be activated.
+every non-legacy revision while ``RETENTION_BUILT`` is false, and then while the rollback gate
+``ROLLBACK_SAFE`` is shut (reason ``rollback_not_safe``, ADR 0122), so no new flow can be
+activated.
 """
 
 from collections.abc import Collection, Iterable, Mapping, Sequence
@@ -117,8 +119,10 @@ This stays false until the release after the last reader-adding step, and until 
 matrix has proven it: activate a flow, book on the pool, roll back to the previous minor, book
 and claim there, and check that no unit was sold twice (A30). Setting it true is a decision.
 
-It is not wired into ``readiness`` yet: step 5 of ADR 0122 adds the reason that reads it, next
-to the booking path that needs it.
+Read when called, never copied (tests flip it with a monkeypatch): ``readiness`` reports
+``rollback_not_safe`` while it is false (ADR 0122 step 5), and
+``flow_resolution.pool_flows_bookable`` keeps every flow on a counted pool out of the booking
+paths.
 """
 
 
@@ -391,6 +395,16 @@ class ReadinessReason(StrEnum):
     NOT_BUILT_YET = "not_built_yet"
     COMPLETION_MISSING = "completion_missing"
     COMPLETION_LEGACY_ONLY = "completion_legacy_only"
+    ROLLBACK_NOT_SAFE = "rollback_not_safe"
+    """The rollback gate ``ROLLBACK_SAFE`` is shut: the previous supported version could not
+    yet account for the pool slots a new flow writes (ADR 0122 decision 12)."""
+
+
+FOLLOWING: frozenset[ReadinessReason] = frozenset(
+    {ReadinessReason.NOT_BUILT_YET, ReadinessReason.ROLLBACK_NOT_SAFE}
+)
+"""The reasons an administrator cannot fix: a part of OpenPlanner that follows in a later
+version. They keep a checklist from being complete, never make it incomplete."""
 
 
 @dataclass(frozen=True)
@@ -507,10 +521,20 @@ def _completion_reason(revision: FlowRevision) -> ReadinessReason | None:
 
 
 def _retention_reason(revision: FlowRevision) -> ReadinessReason | None:
-    """Return why the retention check fails, if it does."""
-    if revision.legacy or RETENTION_BUILT:
+    """Return why the retention check fails, if it does.
+
+    The last point of the checklist covers what happens to a flow's records after the work:
+    their closing and deletion (``RETENTION_BUILT``) and whether the previous version could still
+    account for them after a rollback (``ROLLBACK_SAFE``, ADR 0121 point 9, ADR 0122 decision 12).
+    Both are read when called.
+    """
+    if revision.legacy:
         return None
-    return ReadinessReason.NOT_BUILT_YET
+    if not RETENTION_BUILT:
+        return ReadinessReason.NOT_BUILT_YET
+    if not ROLLBACK_SAFE:
+        return ReadinessReason.ROLLBACK_NOT_SAFE
+    return None
 
 
 def readiness(
@@ -552,13 +576,13 @@ class ReadinessState(StrEnum):
 def readiness_state(items: Sequence[ReadinessItem]) -> ReadinessState:
     """Return where the checklist stands: complete, complete but for parts that follow, or not.
 
-    A point that fails with ``not_built_yet`` cannot be fixed by an administrator; it does not
-    make the checklist incomplete, but it keeps it from being complete.
+    A point that fails for a reason in ``FOLLOWING`` cannot be fixed by an administrator; it
+    does not make the checklist incomplete, but it keeps it from being complete.
     """
     open_items = [item for item in items if not item.ok]
     if not open_items:
         return ReadinessState.COMPLETE
-    if all(item.reason is ReadinessReason.NOT_BUILT_YET for item in open_items):
+    if all(item.reason in FOLLOWING for item in open_items):
         return ReadinessState.COMPLETE_EXCEPT_FOLLOWING
     return ReadinessState.INCOMPLETE
 

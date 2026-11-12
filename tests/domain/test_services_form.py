@@ -44,7 +44,9 @@ def uow() -> InMemoryUnitOfWork:
 
 
 def _service(uow: InMemoryUnitOfWork, region: str = "NL") -> BookingService:
-    return BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, phone_region=lambda _org: region)
+    return BookingService(
+        uow, FixedClock(NOW), TEST_TOKEN_KEY, phone_region=lambda _org: region, treatment_buffer=0
+    )
 
 
 async def _book(service: BookingService, **answers: str) -> object:

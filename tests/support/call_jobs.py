@@ -55,7 +55,9 @@ class Setup:
 
     async def booking(self) -> int:
         """Book and confirm Monday 09:00 in ``balie``; return the booking's id."""
-        receipt = await book(BookingService(self.uow, self.clock, TEST_TOKEN_KEY))
+        receipt = await book(
+            BookingService(self.uow, self.clock, TEST_TOKEN_KEY, treatment_buffer=0)
+        )
         return receipt.booking.id or 0
 
     def events(self, booking_id: int) -> list[EventKind]:

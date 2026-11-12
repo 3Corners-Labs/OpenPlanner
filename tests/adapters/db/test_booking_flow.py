@@ -14,7 +14,9 @@ from tests.support.flows import booking_flow
 
 async def test_a_service_without_flow_rows_books_with_null_columns(engine: AsyncEngine) -> None:
     await seed_group(engine, slug="balie")  # rows written behind the repair, as an old image does
-    service = BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY)
+    service = BookingService(
+        SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0
+    )
 
     receipt = await service.book(group_slug="balie", start=SLOT_0900, contact=ADA, locale="nl")
 
@@ -34,7 +36,7 @@ async def test_the_default_flow_and_its_revision_are_stored_and_kept_by_a_move(
     assert appointment.id is not None
     assert appointment.current is not None
     expected = FlowRef(appointment.id, appointment.current.revision)
-    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
 
     receipt = await service.book(group_slug="balie", start=SLOT_0900, contact=ADA, locale="nl")
     await service.confirm(receipt.management_token)

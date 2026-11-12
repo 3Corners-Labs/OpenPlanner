@@ -127,7 +127,7 @@ async def test_a_national_holiday_closes_every_inheriting_group(engine: AsyncEng
     uow = SqlUnitOfWork(engine)
     clock = FixedClock(NOW)
     holidays = HolidayService(uow, clock, AdminService(uow, clock))
-    booking = BookingService(uow, clock, TEST_TOKEN_KEY)
+    booking = BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
     before = await booking.availability("demo", MONDAY, MONDAY)
 
     calendar = await holidays.create_calendar(SUPER, "nl", "Nationale feestdagen")

@@ -14,6 +14,7 @@ the flows through the scoped port (``app.domain.flow_resolver``).
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from app.domain import service_flows
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.service_flows import (
     FlowRevision,
@@ -43,6 +44,9 @@ class ResolvedFlow:
         interaction_kind: What participant and staff do together; ``None`` only for a revision
             that never chose one (a published revision always has one).
         legacy: Whether the revision is the wrapper of a pre-flow service.
+        capacity_pool_id: The pool the revision draws on (ADR 0122); a booking of a revision
+            that is not legacy is placed on it.
+        duration_minutes: The length of one appointment of the revision.
     """
 
     flow_id: int
@@ -50,6 +54,8 @@ class ResolvedFlow:
     revision: int
     interaction_kind: InteractionKind | None
     legacy: bool = False
+    capacity_pool_id: int | None = None
+    duration_minutes: int | None = None
 
     @property
     def ref(self) -> FlowRef:
@@ -71,8 +77,38 @@ def _resolved(flow: ServiceFlow, live: tuple[int, FlowRevision]) -> ResolvedFlow
     """Return ``flow`` at its revision in effect (``live``, from ``_live``) as a resolved flow."""
     flow_id, revision = live
     return ResolvedFlow(
-        flow_id, flow.code, revision.revision, revision.interaction_kind, revision.legacy
+        flow_id,
+        flow.code,
+        revision.revision,
+        revision.interaction_kind,
+        revision.legacy,
+        revision.capacity_pool_id,
+        revision.duration_minutes,
     )
+
+
+def pool_flows_bookable(mode: IntakeMode) -> bool:
+    """Return whether any flow on a counted pool may take a new booking on the path ``mode`` now.
+
+    The one reader of the rollback gate ``ROLLBACK_SAFE`` on the booking paths (ADR 0122 step 5),
+    read when called: only appointments (on-demand intake on a pool is ADR 0121 step 7), and only
+    while the gate is open. ``False`` lets a caller skip reading flows at all. Moving a booking
+    that already sits on a pool does not ask: it stays on its pool (``pool_booking.Placements``).
+    """
+    return mode is IntakeMode.APPOINTMENT and bool(service_flows.ROLLBACK_SAFE)
+
+
+def gate_allows(flow: ServiceFlow, mode: IntakeMode) -> bool:
+    """Return whether a new booking on the entry path ``mode`` may be made under ``flow`` now.
+
+    A legacy flow (and one without a current revision, which no rule resolves) always may; a
+    flow that is not legacy draws on a counted pool and may when ``pool_flows_bookable``. A flow
+    the gate holds back is, for the participant, exactly a flow that is not active: unknown when
+    named, never the default.
+    """
+    if flow.current is None or flow.current.legacy:
+        return True
+    return pool_flows_bookable(mode)
 
 
 def resolve_default(flows: Iterable[ServiceFlow], mode: IntakeMode) -> ResolvedFlow | None:

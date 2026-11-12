@@ -67,7 +67,7 @@ async def test_answers_are_stored_raised_to_pii_and_purged(engine: AsyncEngine) 
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:
         await tx.save_form(group_id, FormDefinition(2, (TOPIC, PEOPLE)))
-    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
     receipt = await service.book(
         group_slug="balie",
         start=SLOT_0900,

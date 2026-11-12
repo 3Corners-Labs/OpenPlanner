@@ -29,7 +29,7 @@ async def _closed(engine: AsyncEngine) -> tuple[SqlUnitOfWork, BookingService, i
     await seed_group(engine, slug="balie", capacity=2)
     uow = SqlUnitOfWork(engine)
     clock = FixedClock(NOW)
-    bookings = BookingService(uow, clock, TEST_TOKEN_KEY)
+    bookings = BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
     booking_id = (await book(bookings, SLOT_0900)).booking.id or 0
     closures = ClosureService(uow, clock, AdminService(uow, clock), bookings)
     await closures.close_group(ADMIN, "balie", ClosureInput(None, UNTIL, NOTICES))
@@ -104,7 +104,9 @@ async def test_suspended_booking_keeps_its_place_and_data(engine: AsyncEngine) -
 async def test_find_confirmed_bookings_respects_the_bounds(engine: AsyncEngine) -> None:
     await seed_group(engine, slug="balie", capacity=2)
     uow = SqlUnitOfWork(engine)
-    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY), SLOT_0900)
+    receipt = await book(
+        BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0), SLOT_0900
+    )
 
     async with uow.read() as tx:
         group_id = receipt.booking.group_id

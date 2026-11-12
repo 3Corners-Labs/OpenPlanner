@@ -21,7 +21,9 @@ from tests.support.domain import NOW, TEST_TOKEN_KEY, book
 
 async def _booked(engine: AsyncEngine) -> tuple[int, int]:
     group_id = await seed_group(engine)
-    receipt = await book(BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY))
+    receipt = await book(
+        BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
+    )
     return group_id, receipt.booking.id or 0
 
 

@@ -69,7 +69,7 @@ def queue(uow: InMemoryUnitOfWork, clock: FixedClock) -> QueueService:
 async def _book(
     uow: InMemoryUnitOfWork, clock: FixedClock, start: datetime = SLOT_0900, slug: str = "demo"
 ) -> int:
-    bookings = BookingService(uow, clock, TEST_TOKEN_KEY)
+    bookings = BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
     receipt = await book_confirmed(bookings, group_slug=slug, start=start, contact=ADA, locale="nl")
     booking_id = receipt.booking.id or 0
     booking = uow.state.bookings[booking_id]

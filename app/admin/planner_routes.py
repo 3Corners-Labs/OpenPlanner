@@ -161,9 +161,7 @@ async def _move_response(
     clock: Clock = request.app.state.clock
     today = local_day(clock.now(), group.tz)
     bookings: BookingService = request.app.state.booking_service
-    free = await bookings.availability(
-        group.slug, today, today + timedelta(days=MOVE_DAYS), booking.subject
-    )
+    free = await bookings.move_times(booking, today, today + timedelta(days=MOVE_DAYS))
     options = slot_options(
         [s.start for s in free if s.start != booking.start], group.tz, locale.code
     )

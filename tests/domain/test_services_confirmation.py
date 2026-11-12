@@ -48,7 +48,7 @@ def clock() -> FixedClock:
 
 @pytest.fixture
 def service(uow: InMemoryUnitOfWork, clock: FixedClock) -> BookingService:
-    return BookingService(uow, clock, TEST_TOKEN_KEY)
+    return BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
 
 
 def _types(uow: InMemoryUnitOfWork, booking_id: int | None) -> list[JobType]:
@@ -82,7 +82,9 @@ async def test_the_organisations_policy_sets_the_deadline(uow: InMemoryUnitOfWor
             window_hours=2, cutoff_hours=2, reminders=0, min_minutes=15
         )
 
-    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, confirm_policy=policy)
+    service = BookingService(
+        uow, FixedClock(NOW), TEST_TOKEN_KEY, confirm_policy=policy, treatment_buffer=0
+    )
 
     receipt = await book_pending(service)
 

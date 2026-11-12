@@ -132,7 +132,7 @@ async def test_an_edit_by_the_previous_image_to_the_old_columns_wins_over_the_co
 async def _booking_with_task(engine: AsyncEngine) -> tuple[SqlUnitOfWork, int]:
     await seed_group(engine, slug="balie")
     uow = SqlUnitOfWork(engine)
-    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0))
     booking_id = receipt.booking.id or 0
     async with uow.locked() as tx:
         await tx.save_task(booking_id, ContactCenterTaskRef("task-new", WEBEX_CC))

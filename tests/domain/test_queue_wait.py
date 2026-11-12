@@ -50,7 +50,7 @@ def uow() -> InMemoryUnitOfWork:
 
 async def _waiting(uow: InMemoryUnitOfWork, clock: FixedClock) -> int:
     """Book the 09:00 slot and put its participant in the lobby; return the booking id."""
-    bookings = BookingService(uow, clock, TEST_TOKEN_KEY)
+    bookings = BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
     receipt = await book_confirmed(
         bookings, group_slug="demo", start=SLOT_0900, contact=ADA, locale="nl"
     )
@@ -166,7 +166,7 @@ async def test_a_claimed_booking_or_a_contact_center_group_is_never_reported(
     uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
     state = uow
-    bookings = BookingService(state, clock, TEST_TOKEN_KEY)
+    bookings = BookingService(state, clock, TEST_TOKEN_KEY, treatment_buffer=0)
     await book_confirmed(bookings, group_slug="wxcc", start=SLOT_0900, contact=ADA, locale="nl")
     booking_id = await _waiting(state, clock)
     booking = state.state.bookings[booking_id]

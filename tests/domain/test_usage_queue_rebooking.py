@@ -40,7 +40,9 @@ def queue(uow: InMemoryUnitOfWork, clock: FixedClock) -> QueueService:
 
 
 async def _queued_booking(uow: InMemoryUnitOfWork, clock: FixedClock) -> int:
-    receipt = await book(BookingService(uow, clock, b"k" * 32), SLOT_0900, "demo")
+    receipt = await book(
+        BookingService(uow, clock, b"k" * 32, treatment_buffer=0), SLOT_0900, "demo"
+    )
     booking_id = receipt.booking.id or 0
     uow.state.bookings[booking_id] = replace(
         uow.state.bookings[booking_id], meeting=MeetingRef("m", "https://webex/j")

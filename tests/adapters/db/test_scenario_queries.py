@@ -86,7 +86,10 @@ async def test_a_scenario_image_is_kept_on_save_copied_on_start_and_deleted_with
 
     clock = FixedClock(NOW)
     closures = ClosureService(
-        uow, clock, AdminService(uow, clock), BookingService(uow, clock, TEST_TOKEN_KEY)
+        uow,
+        clock,
+        AdminService(uow, clock),
+        BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0),
     )
     start = ClosureInput(None, None, NOTICES, scenario_id=scenario_id)
     await closures.close_group(ADMIN, "balie", start)

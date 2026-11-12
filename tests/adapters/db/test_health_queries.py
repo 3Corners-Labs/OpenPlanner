@@ -81,7 +81,7 @@ async def test_health_and_inbound_events_round_trip(engine: AsyncEngine) -> None
 async def test_stale_tasks_carry_their_organisation_and_group(engine: AsyncEngine) -> None:
     await seed_group(engine, slug="balie")
     uow = SqlUnitOfWork(engine)
-    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0))
     booking_id = receipt.booking.id or 0
     async with uow.locked() as tx:
         await tx.save_task(booking_id, ContactCenterTaskRef("task-1", ContactCenterKind.WEBEX_CC))

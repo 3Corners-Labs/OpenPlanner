@@ -33,7 +33,7 @@ def composer() -> MessageComposer:
 
 
 async def _booking(uow: InMemoryUnitOfWork) -> int:
-    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0))
     return receipt.booking.id or 0
 
 

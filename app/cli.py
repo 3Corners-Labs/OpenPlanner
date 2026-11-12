@@ -1278,7 +1278,11 @@ async def _closures(settings: Settings) -> AsyncIterator[ClosureService]:
         clock = SystemClock()
         live = await _live_settings(settings, uow, clock)
         bookings = BookingService(
-            uow, clock, management_token_key(settings), closure_retention=live.closure_retention
+            uow,
+            clock,
+            management_token_key(settings),
+            closure_retention=live.closure_retention,
+            treatment_buffer=lambda org: live.for_organisation(org).treatment_buffer_minutes,
         )
         yield ClosureService(uow, clock, AdminService(uow, clock), bookings, live.closure_retention)
     finally:

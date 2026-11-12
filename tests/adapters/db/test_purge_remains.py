@@ -21,7 +21,9 @@ from tests.support.domain import NOW, TEST_TOKEN_KEY, book
 
 @pytest.fixture
 def service(engine: AsyncEngine) -> BookingService:
-    return BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY)
+    return BookingService(
+        SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0
+    )
 
 
 async def _booking_with_everything(engine: AsyncEngine, service: BookingService) -> int:

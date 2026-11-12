@@ -161,7 +161,7 @@ class OpenplannerBooking extends HTMLElement {
   async calendar(month, day, focus = 'title') {
     let data;
     try {
-      data = await this.api.availability(month, day, this.subject());
+      data = await this.api.availability(month, day, this.subject(), this.getAttribute('flow'));
     } catch (error) {
       this.unavailable(error);
       return;

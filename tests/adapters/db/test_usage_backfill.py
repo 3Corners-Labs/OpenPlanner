@@ -26,7 +26,9 @@ async def _facts(engine: AsyncEngine) -> list[UsageEventRow]:
 async def _old_bookings(engine: AsyncEngine, count: int = 2) -> None:
     """Book ``count`` slots, then forget the facts live code wrote: they predate reporting."""
     await seed_group(engine, capacity=3)
-    service = BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY)
+    service = BookingService(
+        SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0
+    )
     for start in (SLOT_0900, SLOT_0930)[:count]:
         await book(service, start)
     async with AsyncSession(engine) as session, session.begin():
@@ -96,7 +98,7 @@ async def test_the_automatic_first_run_happens_once(engine: AsyncEngine) -> None
 async def test_a_booking_after_the_cutoff_is_left_to_live_facts(engine: AsyncEngine) -> None:
     await seed_group(engine, capacity=3)
     clock = FixedClock(NOW)
-    service = BookingService(SqlUnitOfWork(engine), clock, TEST_TOKEN_KEY)
+    service = BookingService(SqlUnitOfWork(engine), clock, TEST_TOKEN_KEY, treatment_buffer=0)
     await book(service, SLOT_0900)  # live facts exist from here on
     live = len(await _facts(engine))
 
@@ -122,7 +124,7 @@ async def test_a_cancelled_old_booking_is_a_cancellation_by_the_participant(
 ) -> None:
     await seed_group(engine, capacity=3)
     clock = FixedClock(NOW)
-    service = BookingService(SqlUnitOfWork(engine), clock, TEST_TOKEN_KEY)
+    service = BookingService(SqlUnitOfWork(engine), clock, TEST_TOKEN_KEY, treatment_buffer=0)
     receipt = await book(service, SLOT_0900)
     await service.cancel(receipt.management_token)
     async with AsyncSession(engine) as session, session.begin():
@@ -140,7 +142,9 @@ async def test_a_moved_old_booking_is_one_move_and_the_new_one_no_new_booking(
     engine: AsyncEngine,
 ) -> None:
     await seed_group(engine, capacity=3)
-    service = BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY)
+    service = BookingService(
+        SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0
+    )
     receipt = await book(service, SLOT_0900)
     await service.reschedule(receipt.management_token, SLOT_0930)
     async with AsyncSession(engine) as session, session.begin():
