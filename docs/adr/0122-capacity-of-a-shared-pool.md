@@ -48,7 +48,7 @@ Configuration of one object, not a setting (like a service's `direct_call_max_co
 | 2 | Settings: `treatment_buffer_minutes` in `app/domain/settings_registry.py`; `MAX_BUFFER_MINUTES` moves there or is derived from it, with a test that the two agree | #754 | merged |
 | 3 | Pool time zone and staffing in the configuration package | #759 | merged |
 | 4 | Pool staffing screens, double-counting notice, shortfall list | | planned |
-| 5 | Booking on a pool (dark), the reason that reads `ROLLBACK_SAFE`, concurrency test | #PRNUM | merged |
+| 5 | Booking on a pool (dark), the reason that reads `ROLLBACK_SAFE`, concurrency test | #761 | merged |
 | 5 | Closing and reporting of pool bookings: `ended_slots`, usage closing and the facts skip pool slots until then | | planned |
 
 ## Decisions of the product owner (2026-11-11)
