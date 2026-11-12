@@ -304,6 +304,20 @@ class ServiceFlow:
         return cast(FlowRevision, self.draft or self.current)  # the constructor refuses neither
 
 
+def requirement_of(revision: FlowRevision | None, subject: str | None) -> frozenset[int]:
+    """Return the skills a booking made under ``revision`` about ``subject`` requires.
+
+    The flow's own skills plus the extra skills of the chosen subject (ADR 0121 point 5); a
+    subject the revision does not bind adds nothing, and a booking without a flow requires
+    nothing. The revision is the one recorded on the booking, so a later edit of the flow never
+    changes what an existing booking requires (A23).
+    """
+    if revision is None:
+        return frozenset()
+    extra = revision.subject_skill_ids.get(subject, frozenset()) if subject else frozenset()
+    return effective_requirements(revision.required_skill_ids, extra)
+
+
 def revisions_in_effect(flow: ServiceFlow) -> tuple[FlowRevision, ...]:
     """Return the revisions of ``flow`` that count: the current one and the draft.
 

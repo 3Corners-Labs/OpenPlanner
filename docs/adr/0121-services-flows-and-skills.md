@@ -52,7 +52,9 @@ None in step 1: it changes labels only. The later steps add the following, each 
 | 2f | A stable code for a capacity pool (migration 0110), unique pool names per organisation | #744 | merged |
 | 3a | One flow resolver for the standalone page, the direct page and the widget API; every new booking records its flow and revision (NULL when no active default exists); an optional explicit flow on the pages, the widget attribute and the widget API (additive); the choice screen for several flows follows in step 5 | #747 | merged |
 | 3b | Interval accounting and admission across flows of one pool, staffing of counted pools | | planned |
-| 4 | P4: skill enforcement in the locked claim; pool guarantees; external skill mapping | | planned |
+| 4a | P4: skill enforcement in the locked claim and again at treatment start (`eligibility`, `requirement_of`, `WorkEligibility`), the own queue keeps work an agent may not take visible with the missing skills named (choice S3), error `not_eligible`; pool guarantees stay the readiness subset rule of step 2a; build brief `docs/service-flows-skill-enforcement-design.md` | #762 | merged |
+| 4b | P4: external skill mapping: per organisation a contact-center code per skill, sent as mapped codes only; an unmapped requirement of a contact-center flow is a readiness reason | | planned |
+| 4c | The staff detail's table "what this person may pick up, and why" (screen 5 of the handover) | | planned |
 | 5 | P5: generic request execution without video, optional contact data, watchdog and deletion | | planned |
 | 6 | P6: channel-independent contact-center task contract, reconciliation and fencing | | planned |
 | 7 | P7: immediate intake and check-in on the same pool | | planned |

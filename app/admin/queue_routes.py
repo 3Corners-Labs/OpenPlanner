@@ -2,9 +2,12 @@
 
 Every route needs ``queue.work`` on the group; a group that dispatches to the contact center
 has no queue (404). The list shows the first name only. The meeting link appears only on the
-page of a booking the agent claimed. The list and the claimed booking refresh themselves
-through a fragment that ``static/live-region.js`` polls (ADR 0072); without the script the
-"Refresh" link reloads, and new and waiting rows are announced in a polite live region.
+page of a booking the agent claimed. A row the agent lacks a skill for stays in its place with
+the missing skills named and no *Claim* button (ADR 0121, choice S3); a row the agent holds but
+no longer qualifies for offers *Release* instead of *Open*. The list and the claimed booking
+refresh themselves through a fragment that ``static/live-region.js`` polls (ADR 0072); without
+the script the "Refresh" link reloads, and new and waiting rows are announced in a polite live
+region.
 
     GET  /admin/groups/{slug}/queue                         queue.work
     GET  /admin/groups/{slug}/queue/live?seen=KEY           queue.work  (fragment, 204 if same)
@@ -28,6 +31,7 @@ from app.admin.forms import raise_refusal, redirect_done
 from app.admin.group_routes import group_page
 from app.admin.live import Seen, fragment, key
 from app.admin.pages import Locale, SameOrigin, admin_moment
+from app.admin.skill_inputs import skill_name
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.fallback import FallbackService
@@ -58,6 +62,7 @@ SHOWN_ON_THE_LIST = frozenset(
         ErrorCode.FREE_PICK_NOT_ALLOWED,
         ErrorCode.NOT_CLAIMED,
         ErrorCode.BOOKING_NOT_ACTIVE,
+        ErrorCode.NOT_ELIGIBLE,
     }
 )
 """Refusals that are answered with the list and a message, not an error page."""
@@ -97,6 +102,10 @@ class RowView:
     video_tone: str
     routing: str = ""
     fallback: bool = False
+    eligible: bool = True
+    """The viewer holds every skill the row requires (ADR 0121 point 5)."""
+    missing: str = ""
+    """The skills the viewer lacks for the row, named for the page; empty when it fits."""
 
 
 @dataclass(frozen=True)
@@ -169,12 +178,15 @@ def _row(
         direct=row.direct,
         overdue=row.overdue,
         mine=row.mine,
-        can_claim=view.free_pick and not row.claimed,
-        can_release=view.can_release_any and row.claimed and not row.mine,
+        can_claim=view.free_pick and not row.claimed and row.eligible,
+        can_release=row.claimed
+        and ((view.can_release_any and not row.mine) or (row.mine and not row.eligible)),
         video=locale.gettext(video_key) if video_key else None,
         video_tone=video_tone,
         routing=routing_summary(routing, row.routing, locale.gettext, locale.code),
         fallback=row.fallback,
+        eligible=row.eligible,
+        missing=", ".join(skill_name(skill, locale.code) for skill in row.missing),
     )
 
 
@@ -187,7 +199,20 @@ async def _list_view(
     rows = [_row(r, view, locale, view.group.tz, view.group.routing) for r in view.rows]
     waiting = sum(1 for r in view.rows if r.in_lobby and not r.claimed)
     has_next = view.next_booking_id is not None
-    shown = [(r.id, r.state, r.overdue, r.video, r.mine, r.can_claim, r.can_release) for r in rows]
+    shown = [
+        (
+            r.id,
+            r.state,
+            r.overdue,
+            r.video,
+            r.mine,
+            r.can_claim,
+            r.can_release,
+            r.eligible,
+            r.missing,
+        )
+        for r in rows
+    ]
     return ListView(
         rows,
         has_next,
