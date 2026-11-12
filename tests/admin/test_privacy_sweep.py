@@ -184,6 +184,22 @@ PATHS: dict[str, str] = {
     "/admin/organisations/{org}/capacity/{pool_id}/archive": (
         "/admin/organisations/demo/capacity/{pool}/archive"
     ),
+    # ADR 0122 step 4: the staffing pages of the stored pool, with its block and its exception.
+    "/admin/organisations/{org}/capacity/{pool_id}/staffing": (
+        "/admin/organisations/demo/capacity/{pool}/staffing"
+    ),
+    "/admin/organisations/{org}/capacity/{pool_id}/staffing/{rule_id}": (
+        "/admin/organisations/demo/capacity/{pool}/staffing/{pool_rule}"
+    ),
+    "/admin/organisations/{org}/capacity/{pool_id}/staffing/{rule_id}/split": (
+        "/admin/organisations/demo/capacity/{pool}/staffing/{pool_rule}/split"
+    ),
+    "/admin/organisations/{org}/capacity/{pool_id}/exceptions": (
+        "/admin/organisations/demo/capacity/{pool}/exceptions"
+    ),
+    "/admin/organisations/{org}/capacity/{pool_id}/exceptions/{override_id}": (
+        "/admin/organisations/demo/capacity/{pool}/exceptions/{pool_override}"
+    ),
     "/admin/organisations/{org}/closure/scenarios": "/admin/organisations/demo/closure/scenarios",
     "/admin/organisations/{org}/closure/scenarios/{scenario_id}": (
         "/admin/organisations/demo/closure/scenarios/{org_scenario}"

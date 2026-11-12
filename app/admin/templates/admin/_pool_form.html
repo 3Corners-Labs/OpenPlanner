@@ -1,0 +1,11 @@
+{#- The card of one form of a counted pool's staffing (ADR 0122): heading, lead, and the ``expected`` version that the change must still match, so nobody overwrites what someone else changed. Use as ``{% call card(...) %}`` around the inputs. -#}
+{% macro card(action, heading, lead, expected) -%}
+<form class="card" method="post" action="{{ action }}" novalidate aria-labelledby="edit-heading">
+  <div class="card__header">
+    <h2 id="edit-heading">{{ heading }}</h2>
+    <p class="card__lead">{{ lead }}</p>
+  </div>
+  <input type="hidden" name="expected" value="{{ expected }}">
+  {{ caller() }}
+</form>
+{%- endmacro %}

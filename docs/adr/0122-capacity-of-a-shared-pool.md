@@ -47,7 +47,11 @@ Configuration of one object, not a setting (like a service's `direct_call_max_co
 | 2 | Schema and adapter: migration, rows, `Transaction` methods, `legacy_slot()` predicate, regression test | #754 | merged |
 | 2 | Settings: `treatment_buffer_minutes` in `app/domain/settings_registry.py`; `MAX_BUFFER_MINUTES` moves there or is derived from it, with a test that the two agree | #754 | merged |
 | 3 | Pool time zone and staffing in the configuration package | #759 | merged |
-| 4 | Pool staffing screens, double-counting notice, shortfall list | | planned |
+| 4 | Pool staffing screens: time zone, weekly blocks, exceptions, shortfall list, double-counting notice | #760 | merged |
+| 4 | Double-counting overlap list and the shortfall per service for a reader who may see it | | planned |
+| 4 | One staffing route factory shared by the service and the pool tabs (the flows of `pool_staffing_routes.py` and of `group_routes.py` / `planning.py` are duplicated) | | follow-up |
+| 4 | `_week.html` takes its base path from one variable for both tabs | | follow-up |
+| 4 | A zone change shown on the week card, and a notice for the daylight saving gap | | follow-up |
 | 5 | Booking on a pool (dark), the reason that reads `ROLLBACK_SAFE`, concurrency test | #761 | merged |
 | 5 | Closing and reporting of pool bookings: `ended_slots`, usage closing and the facts skip pool slots until then | | planned |
 | 5 | Must be done before `ROLLBACK_SAFE` opens: the change-request check of the agent API (`ChangeRequestService._free`) judges a requested time on the service's own times, before any booking is matched; a time on the pool of a matched pool booking must be judged on that pool without telling the caller whether anything matched | | follow-up |

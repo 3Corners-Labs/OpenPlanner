@@ -1,0 +1,14 @@
+{#- Change or split one weekly block of a counted pool (ADR 0122 step 4). -#}
+{% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import form_body with context %}
+{% from "admin/_pool_form.html" import card with context %}
+{% block title %}{{ heading }} · {{ row.name }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_organisation_header.html" %}
+{% set current = "" %}
+{% include "admin/_pool_staffing_nav.html" %}
+{% include "_error_summary.html" %}
+{% call card(action, heading, lead, expected) %}
+{{ form_body(fields, button, cancel) }}
+{% endcall %}
+{% endblock %}

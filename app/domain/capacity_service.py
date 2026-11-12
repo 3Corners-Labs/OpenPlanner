@@ -197,7 +197,7 @@ class CapacityService:
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.read() as tx:
             organisation = await organisation_by_slug(tx, slug)
-            pool = await _own_editable_pool(tx, scope, organisation, pool_id)
+            pool = await own_editable_pool(tx, scope, organisation, pool_id)
             line = await _line(tx, scope, pool, await _skills_by_id(tx, scope, organisation.id))
         return PoolPage(organisation, line)
 
@@ -224,7 +224,7 @@ class CapacityService:
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.read() as tx:
             organisation = await organisation_by_slug(tx, slug)
-            pool = await _own_editable_pool(tx, scope, organisation, pool_id)
+            pool = await own_editable_pool(tx, scope, organisation, pool_id)
             line = await _line(tx, scope, pool, await _skills_by_id(tx, scope, organisation.id))
             choices = await organisation_skills(
                 tx, scope, organisation.id, held=pool.guaranteed_skill_ids
@@ -262,7 +262,7 @@ class CapacityService:
             if await _counted(tx, scope, organisation.id) >= value_of(self._max):
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, LIMIT_FIELD)
             stored = await tx.save_capacity_pool(scope, pool)
-            await self._record(tx, principal, slug, f"{CREATED},pool:{_ref(stored)}")
+            await self._record(tx, principal, slug, f"{CREATED},pool:{pool_ref(stored)}")
         return stored
 
     async def update(
@@ -278,7 +278,7 @@ class CapacityService:
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.locked() as tx:
             organisation = await organisation_by_slug(tx, slug)
-            current = await _own_editable_pool(tx, scope, organisation, pool_id)
+            current = await own_editable_pool(tx, scope, organisation, pool_id)
             changed = CapacityPool(
                 current.id,
                 current.organisation_id,
@@ -292,7 +292,7 @@ class CapacityService:
             if changed == current:
                 return False
             await tx.save_capacity_pool(scope, changed)
-            await self._record(tx, principal, slug, f"{CHANGED},pool:{_ref(current)}")
+            await self._record(tx, principal, slug, f"{CHANGED},pool:{pool_ref(current)}")
         return True
 
     async def archive(self, principal: Principal, slug: str, pool_id: int) -> None:
@@ -307,16 +307,16 @@ class CapacityService:
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.locked() as tx:
             organisation = await organisation_by_slug(tx, slug)
-            pool = await _own_editable_pool(tx, scope, organisation, pool_id, archived_ok=True)
+            pool = await own_editable_pool(tx, scope, organisation, pool_id, archived_ok=True)
             if pool.archived_at is not None:
                 return
             now = self._clock.now()
             await tx.archive_capacity_pool(scope, pool_id, now)
-            await self._record(tx, principal, slug, f"{ARCHIVED},pool:{_ref(pool)}", now)
+            await self._record(tx, principal, slug, f"{ARCHIVED},pool:{pool_ref(pool)}", now)
 
 
-def _ref(pool: CapacityPool) -> str:
-    """Return how an audit event names a pool: its code, never a name.
+def pool_ref(pool: CapacityPool) -> str:
+    """Return how an audit event names a pool: its code, never a name (shared with pool staffing).
 
     The id is used only for a counted pool stored without a code (a row from before migration
     0110); a code is stable and carries no personal data, an id is the only other handle.
@@ -324,7 +324,7 @@ def _ref(pool: CapacityPool) -> str:
     return pool.code if pool.code is not None else str(pool.id)
 
 
-async def _own_editable_pool(
+async def own_editable_pool(
     tx: Transaction,
     scope: Scope,
     organisation: Organisation,

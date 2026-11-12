@@ -1288,6 +1288,113 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             404, 403, 403, 404, 403, 403, 403
         ),
     },
+    # ADR 0122 step 4: the staffing pages of a counted pool (capacity.manage, organisation level,
+    # reading too). A pool that does not exist, or is another organisation's, answers 404 to
+    # whoever may ask, and so does a block or an exception of it.
+    "GET /admin/organisations/{org}/capacity/{pool_id}/staffing": {
+        "/admin/organisations/demo/capacity/999999/staffing": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/capacity/999999/staffing": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/capacity/{pool_id}/staffing": {
+        "/admin/organisations/demo/capacity/999999/staffing": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/capacity/999999/staffing": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/capacity/{pool_id}/timezone": {
+        "/admin/organisations/demo/capacity/999999/timezone": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/capacity/999999/timezone": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "GET /admin/organisations/{org}/capacity/{pool_id}/staffing/{rule_id}": {
+        "/admin/organisations/demo/capacity/999999/staffing/999999": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/capacity/999999/staffing/999999": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/capacity/{pool_id}/staffing/{rule_id}": {
+        "/admin/organisations/demo/capacity/999999/staffing/999999": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/capacity/999999/staffing/999999": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "GET /admin/organisations/{org}/capacity/{pool_id}/staffing/{rule_id}/split": {
+        "/admin/organisations/demo/capacity/999999/staffing/999999/split": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/capacity/999999/staffing/999999/split": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/capacity/{pool_id}/staffing/{rule_id}/split": {
+        "/admin/organisations/demo/capacity/999999/staffing/999999/split": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/capacity/999999/staffing/999999/split": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/capacity/{pool_id}/staffing/{rule_id}/delete": {
+        "/admin/organisations/demo/capacity/999999/staffing/999999/delete": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/capacity/999999/staffing/999999/delete": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "GET /admin/organisations/{org}/capacity/{pool_id}/exceptions": {
+        "/admin/organisations/demo/capacity/999999/exceptions": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/capacity/999999/exceptions": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/capacity/{pool_id}/exceptions": {
+        "/admin/organisations/demo/capacity/999999/exceptions": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/capacity/999999/exceptions": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "GET /admin/organisations/{org}/capacity/{pool_id}/exceptions/{override_id}": {
+        "/admin/organisations/demo/capacity/999999/exceptions/999999": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/capacity/999999/exceptions/999999": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/capacity/{pool_id}/exceptions/{override_id}": {
+        "/admin/organisations/demo/capacity/999999/exceptions/999999": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/capacity/999999/exceptions/999999": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "POST /admin/organisations/{org}/capacity/{pool_id}/exceptions/{override_id}/delete": {
+        "/admin/organisations/demo/capacity/999999/exceptions/999999/delete": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/capacity/999999/exceptions/999999/delete": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
     # The skills of a person on the staff page: skills.manage in the organisation, and the
     # person must be one the viewer may see (staff.view); an unknown or foreign person is 404.
     "POST /admin/staff/{member_id}/skills/{org}": {

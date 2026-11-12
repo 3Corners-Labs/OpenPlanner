@@ -125,6 +125,7 @@
           {% else %}
           <ul class="row-actions">
             <li><a href="/admin/organisations/{{ organisation.slug }}/capacity/{{ row.id }}">{{ _("admin.edit") }}<span class="visually-hidden"> {{ row.name }}</span></a></li>
+            <li><a href="/admin/organisations/{{ organisation.slug }}/capacity/{{ row.id }}/staffing">{{ _("admin.pool_staffing.page_staffing") }}<span class="visually-hidden"> {{ row.name }}</span></a></li>
             <li><a href="/admin/organisations/{{ organisation.slug }}/capacity/{{ row.id }}/archive">{{ _("admin.action.archive") }}<span class="visually-hidden"> {{ row.name }}</span></a></li>
           </ul>
           {% endif %}
@@ -143,7 +144,7 @@
 <form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/capacity" novalidate aria-labelledby="add-pool-heading">
   <div class="card__header">
     <h2 id="add-pool-heading">{{ _("admin.capacity.add") }}</h2>
-    <p class="card__lead">{{ _("admin.capacity.staffing_later") }}</p>
+    <p class="card__lead">{{ _("admin.capacity.staffing_where") }}</p>
   </div>
   <div class="form-grid">
     {% for f in pool_fields %}{{ field(f) }}{% endfor %}

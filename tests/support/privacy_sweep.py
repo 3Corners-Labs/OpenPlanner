@@ -11,7 +11,7 @@ such a site.
 import re
 from collections.abc import MutableMapping
 from dataclasses import replace
-from datetime import UTC, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
 import httpx
@@ -25,7 +25,7 @@ from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.form_fields import FieldDefinition, FieldType, FormDefinition
 from app.domain.planning import PlanningService
 from app.domain.routing import GroupRouting, Subject
-from app.domain.scheduling import DispatchKind, ScheduleOverride, TimeWindow
+from app.domain.scheduling import DispatchKind, ScheduleOverride, ScheduleRule, TimeWindow
 from app.domain.service_flows import FlowState, ServiceFlow
 from app.domain.services import BookingService, ContactInput
 from app.domain.skills import Skill
@@ -134,6 +134,8 @@ class Fixture:
         self.org_scenario_id = 0
         self.skill_id = 0
         self.pool_id = 0
+        self.pool_rule_id = 0
+        self.pool_override_id = 0
         self.role_id = 0
         self.member_id = 0
         self.client_id = ""
@@ -149,6 +151,8 @@ class Fixture:
             "{scenario}": self.scenario_id,
             "{org_scenario}": self.org_scenario_id,
             "{skill}": self.skill_id,
+            "{pool_rule}": self.pool_rule_id,
+            "{pool_override}": self.pool_override_id,
             "{pool}": self.pool_id,
             "{role}": self.role_id,
             "{member}": self.member_id,
@@ -299,6 +303,20 @@ async def mark(site: Site, monkeypatch: pytest.MonkeyPatch) -> Fixture:
             ),
         )
         found.skill_id, found.pool_id = skill.id or 0, pool.id or 0
+        everything = Scope(everything=True)  # ADR 0122 step 4: the pool's staffing pages
+        await tx.set_pool_timezone(everything, found.pool_id, "Europe/Amsterdam")
+        found.pool_rule_id = (
+            await tx.add_pool_rule(
+                everything, found.pool_id, ScheduleRule(0, TimeWindow(time(9), time(12), 2))
+            )
+            or 0
+        )
+        found.pool_override_id = (
+            await tx.add_pool_override(
+                everything, found.pool_id, ScheduleOverride(date(2026, 1, 12), None)
+            )
+            or 0
+        )
         group = await tx.get_group("demo")  # ADR 0121 step 2d: a draft flow for the flow pages
         assert group is not None
         await tx.save_group_routing(  # ... that offers a subject, for its page of extra skills

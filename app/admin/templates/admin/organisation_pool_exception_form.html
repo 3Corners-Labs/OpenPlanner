@@ -1,0 +1,17 @@
+{#- Change one exception of a counted pool (ADR 0122 step 4). -#}
+{% extends "admin/layout.html" %}
+{% from "admin/_pool_form.html" import card with context %}
+{% block title %}{{ heading }} · {{ row.name }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_organisation_header.html" %}
+{% set current = "" %}
+{% include "admin/_pool_staffing_nav.html" %}
+{% include "_error_summary.html" %}
+{% call card(action, heading, lead, expected) %}
+{% include "admin/_exception_inputs.html" %}
+<div class="form-actions">
+  <button type="submit" class="button">{{ button }}</button>
+  <a href="{{ cancel }}">{{ _("admin.cancel") }}</a>
+</div>
+{% endcall %}
+{% endblock %}

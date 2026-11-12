@@ -57,7 +57,14 @@ from app.domain.images import ImageFile, ImageText
 from app.domain.ports import Transaction
 from app.domain.reschedule_proposal import HeldProposal
 from app.domain.routing import GroupRouting, Subject
-from app.domain.scheduling import Group, PhoneMode
+from app.domain.scheduling import (
+    Group,
+    Offer,
+    PhoneMode,
+    ScheduleOverride,
+    ScheduleRule,
+    TimeWindow,
+)
 from app.domain.service_flows import (
     CompletionPolicy,
     DispatchKind,
@@ -204,6 +211,11 @@ class FlowExamples:
         skill_archive: Its archive page.
         pool_edit: The edit page of the seeded counted pool ``advice``.
         pool_archive: Its archive page.
+        pool_staffing: The staffing page of that pool (ADR 0122 step 4): zone, week, shortfalls.
+        pool_exceptions: Its exceptions page.
+        pool_block_edit: The change form of its seeded weekly block.
+        pool_block_split: The split form of that block.
+        pool_exception_edit: The change form of its seeded exception.
         flow_subject: The page that chooses the extra skills of the subject of the draft flow
             ``subject-review`` of the service ``demo-flows``.
     """
@@ -212,6 +224,11 @@ class FlowExamples:
     skill_archive: str
     pool_edit: str
     pool_archive: str
+    pool_staffing: str
+    pool_exceptions: str
+    pool_block_edit: str
+    pool_block_split: str
+    pool_exception_edit: str
     flow_subject: str
 
 
@@ -362,11 +379,17 @@ async def seed_flow_examples(engine: AsyncEngine) -> FlowExamples:
         demo = await seeded_group(tx, DEMO_SLUG)
         ids = await _flow_examples(tx, demo)
         await _subject_flow_example(tx, await seeded_group(tx, FLOW_GROUP_SLUG), ids)
+    pool_path = f"/admin/organisations/{DEMO_SLUG}/capacity/{ids.pool}"
     return FlowExamples(
         skill_edit=f"/admin/organisations/{DEMO_SLUG}/skills/{ids.general}",
         skill_archive=f"/admin/organisations/{DEMO_SLUG}/skills/{ids.general}/archive",
         pool_edit=f"/admin/organisations/{DEMO_SLUG}/capacity/{ids.pool}",
         pool_archive=f"/admin/organisations/{DEMO_SLUG}/capacity/{ids.pool}/archive",
+        pool_staffing=f"{pool_path}/staffing",
+        pool_exceptions=f"{pool_path}/exceptions",
+        pool_block_edit=f"{pool_path}/staffing/{ids.rule}",
+        pool_block_split=f"{pool_path}/staffing/{ids.rule}/split",
+        pool_exception_edit=f"{pool_path}/exceptions/{ids.override}",
         flow_subject=(
             f"/admin/groups/{FLOW_GROUP_SLUG}/flows/{FLOW_EXAMPLE_SUBJECT_FLOW}"
             f"/subjects/{FLOW_EXAMPLE_SUBJECT}"
@@ -398,6 +421,8 @@ class _FlowIds:
     general: int
     english: int
     pool: int
+    rule: int
+    override: int
 
 
 async def _flow_examples(tx: Transaction, demo: Group) -> _FlowIds:
@@ -431,6 +456,7 @@ async def _flow_examples(tx: Transaction, demo: Group) -> _FlowIds:
             ),
         )
     pool = pools[FLOW_EXAMPLE_POOL]
+    rule, override = await _pool_staffing_example(tx, pool.id or 0)
     existing = {f.code for f in await tx.list_service_flows(everything, demo.id)}
     if FLOW_EXAMPLE_FLOW not in existing:
         revision = FlowRevision(
@@ -451,7 +477,27 @@ async def _flow_examples(tx: Transaction, demo: Group) -> _FlowIds:
             None, demo.id, FLOW_EXAMPLE_FLOW, FlowState.DRAFT, frozenset(), None, revision
         )
         await tx.save_draft(everything, flow)
-    return _FlowIds(general.id or 0, skills[FLOW_EXAMPLE_SKILLS[1][0]].id or 0, pool.id or 0)
+    english = skills[FLOW_EXAMPLE_SKILLS[1][0]].id or 0
+    return _FlowIds(general.id or 0, english, pool.id or 0, rule, override)
+
+
+async def _pool_staffing_example(tx: Transaction, pool_id: int) -> tuple[int, int]:
+    """Give the example pool a time zone, a weekly block and a closed day once; return the ids.
+
+    The staffing pages of the pool (ADR 0122 step 4) are checked with something on them. The
+    exception lies a month ahead of the day the seed runs; it is read back when it exists.
+    """
+    everything = Scope(everything=True)
+    if await tx.get_pool_staffing(everything, pool_id) is None:
+        await tx.set_pool_timezone(everything, pool_id, "Europe/Amsterdam")
+        block = TimeWindow(time(9), time(12), 2, "Balie", Offer.BOTH)
+        await tx.add_pool_rule(everything, pool_id, ScheduleRule(0, block))
+        closed = ScheduleOverride(date.today() + timedelta(days=30), None)
+        await tx.add_pool_override(everything, pool_id, closed)
+    staffing = await tx.get_pool_staffing(everything, pool_id)
+    if staffing is None or not staffing.rules or not staffing.overrides:
+        raise ValueError("the example pool has no staffing to point the page checks at")
+    return staffing.rules[0].id or 0, staffing.overrides[0].id or 0
 
 
 async def _subject_flow_example(tx: Transaction, group: Group, ids: _FlowIds) -> None:

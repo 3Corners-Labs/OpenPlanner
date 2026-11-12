@@ -303,6 +303,7 @@ same commit and rollback behaviour as the SQL one.
 | Slot calculation (time zones, daylight saving), the start-time grid of a run of blocks (`grid_on`) | `app/domain/availability.py` |
 | Counted capacity pools: staffing as UTC segments, interval accounting (admission, start, earliest start, shortfalls; ADR 0122) | `app/domain/pool_staffing.py`, `app/domain/pool_accounting.py` |
 | Persistence of a counted pool's staffing and of the pool on a slot, kept out of a service's own slot queries (ADR 0122 step 2) | `app/adapters/db/pool_staffing.py`, `app/adapters/db/legacy_slot.py` |
+| The staffing screens of a counted pool: time zone, weekly blocks, exceptions, shortfalls ahead (ADR 0122 step 4; the week and exception views and inputs are shared with a service's staffing tab) | `app/domain/pool_planning.py`, `app/admin/pool_staffing_routes.py`, `app/admin/pool_staffing_views.py`, `app/admin/staffing_views.py` |
 | Appointments of a flow on a counted pool: the pool's grid, admission inside the write lock, the pool slot; chosen per booking path by `Placements` (a new booking only while the rollback gate `ROLLBACK_SAFE` is open; an existing booking by its own slot); free starts computed once per scene (ADR 0122 step 5) | `app/domain/pool_booking.py`, `app/domain/pool_availability.py` |
 | Bookings, contact validation | `app/domain/booking.py` |
 | Book, cancel, reschedule (use cases) | `app/domain/services.py` |

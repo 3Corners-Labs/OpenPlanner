@@ -12,7 +12,7 @@
 <form class="card" method="post" action="/admin/organisations/{{ organisation.slug }}/capacity/{{ row.id }}" novalidate aria-labelledby="edit-heading">
   <div class="card__header">
     <h2 id="edit-heading">{{ row.name }}</h2>
-    <p class="card__lead">{{ _("admin.capacity.staffing_later") }}</p>
+    <p class="card__lead">{{ _("admin.capacity.staffing_edit_lead") }} <a href="{{ staffing_path }}">{{ _("admin.pool_staffing.page_staffing") }}</a></p>
   </div>
   <div class="form-grid">
     {% for f in fields %}{{ field(f) }}{% endfor %}
