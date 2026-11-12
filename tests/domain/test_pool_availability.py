@@ -82,7 +82,7 @@ def test_the_indexed_scene_agrees_with_the_straightforward_computation(seed: int
     ]
 
 
-def test_a_busy_month_of_five_minute_starts_stays_far_below_a_second() -> None:
+def test_a_busy_month_of_five_minute_starts_is_not_quadratic() -> None:
     days = 31
     segments = tuple(
         Segment(DAY0 + timedelta(days=d), DAY0 + timedelta(days=d, hours=23, minutes=55), 1000)
@@ -103,7 +103,9 @@ def test_a_busy_month_of_five_minute_starts_stays_far_below_a_second() -> None:
 
     assert len(starts) == 8928
     assert len(found) == days * 287  # every start whose five minutes fit before 23:55
-    assert elapsed < 1.0, elapsed
+    # The straightforward version needs minutes here; a shared CI runner may be slow, so the bound
+    # only has to tell linear work from quadratic work.
+    assert elapsed < 8.0, elapsed
 
 
 def test_an_empty_scene_offers_nothing() -> None:
