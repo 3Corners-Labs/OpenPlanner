@@ -123,7 +123,9 @@ CAPACITY_POOL = Kind(
     ),
     check=_pool_check,
     archive=("archived", True),
-    derived=frozenset({"capacity_pools.mode"}),
+    # ``timezone`` belongs to the pool's staffing (ADR 0122): it travels with the staffing tables
+    # in step 3 and is not part of the document before that.
+    derived=frozenset({"capacity_pools.mode", "capacity_pools.timezone"}),
     description="A counted capacity pool, addressed by its code within the organisation.",
 )
 

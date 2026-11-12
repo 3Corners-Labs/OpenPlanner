@@ -12,8 +12,8 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.db.legacy_slot import legacy_slot
 from app.adapters.db.config_flows import read_usage_of_flows
+from app.adapters.db.legacy_slot import legacy_slot
 from app.adapters.db.models import (
     ApiClientGroupRow,
     BookingRow,
