@@ -45,7 +45,7 @@ None in step 1: it changes labels only. The later steps add the following, each 
 | 1 | P1: *Group* is shown as *Dienst / Service* in both catalogues; technical identities unchanged | #712 | merged |
 | 2a | Domain rules (skills, capacity pools, service flows and the readiness checklist) and the permissions `skills.manage` and `capacity.manage` | #734 | merged |
 | 2b | Tables, migration and backfill of legacy pools and flows; persistence port and adapter | #738 | merged |
-| 2b-ii | Skills, pools and flows in the configuration package (export and import) | #PRNUM | merged |
+| 2b-ii | Skills, pools and flows in the configuration package (export and import) | #755 | merged |
 | 2c | Screens: skill catalogue, capacity pools, skill grants on staff | #743 | merged |
 | 2d | Screens: flows tab and flow editor (draft and validate) | | planned |
 | 2e | A service created later, by the portal or by a configuration import, and a service that starts offering the direct call get their legacy pool and default flows from one domain rule; an idempotent repair covers services created by an older image during a rollback | #742 | merged |
