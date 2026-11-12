@@ -164,7 +164,7 @@ async def test_a_direct_call_needs_a_block_that_offers_its_subject(
     uow.state.rules[1].append(
         ScheduleRule(3, TimeWindow(time(9), time(10), 1, offer=Offer.BOTH, subjects=("move",)))
     )
-    bookings = BookingService(uow, FixedClock(NOW), b"k" * 32)
+    bookings = BookingService(uow, FixedClock(NOW), b"k" * 32, treatment_buffer=0)
     with pytest.raises(DomainError) as refused:
         await bookings.start_direct(group_slug="demo", contact=answers("general"), locale="nl")
     assert refused.value.code is ErrorCode.DIRECT_CALL_UNAVAILABLE

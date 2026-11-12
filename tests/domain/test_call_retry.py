@@ -31,7 +31,9 @@ async def _setup(alert_per_hour: int = 50) -> tuple[InMemoryUnitOfWork, CallRetr
     state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=1))]
     uow = InMemoryUnitOfWork(state)
     clock = FixedClock(NOW)
-    receipt = await book(BookingService(uow, clock, TEST_TOKEN_KEY), slug="demo")
+    receipt = await book(
+        BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0), slug="demo"
+    )
     booking_id = receipt.booking.id or 0
     uow.state.jobs[booking_id] = []  # the first attempts ran and failed
     thresholds = {CHANGES_ALERT: alert_per_hour}

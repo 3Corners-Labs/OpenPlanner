@@ -278,7 +278,7 @@ def _direct_site() -> tuple[BookingService, InMemoryUnitOfWork]:
     from datetime import UTC, datetime
 
     clock = FixedClock(datetime(2026, 1, 5, 8, 15, tzinfo=UTC))
-    return BookingService(uow, clock, TEST_TOKEN_KEY), uow
+    return BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0), uow
 
 
 async def test_leaving_a_direct_call_writes_the_wait_and_it_is_not_repeated() -> None:

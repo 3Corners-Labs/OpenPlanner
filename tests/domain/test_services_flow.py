@@ -46,7 +46,7 @@ async def _with_flows(uow: InMemoryUnitOfWork) -> dict[str, FlowRef]:
 
 
 def _service(uow: InMemoryUnitOfWork, now: datetime = NOW) -> BookingService:
-    return BookingService(uow, FixedClock(now), TEST_TOKEN_KEY)
+    return BookingService(uow, FixedClock(now), TEST_TOKEN_KEY, treatment_buffer=0)
 
 
 async def test_a_booking_records_the_default_flow_of_the_appointment_path() -> None:

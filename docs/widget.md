@@ -117,7 +117,7 @@ Load the script once per page; place one element per group where its calendar be
 | `organisation` | yes | Your organisation's slug, as shown in the code on the Insluiten page |
 | `group` | yes | The group's slug (the last part of `/g/{slug}`) |
 | `lang` | no | `nl` or `en`. Without it: the nearest `lang` attribute of an ancestor, then `<html lang>`, then `nl` |
-| `subject` | no | A subject code of the group (ADR 0081). The calendar then shows only the times of staffing blocks that offer it, and the form has the subject chosen. A code the group does not have is ignored |
+| `subject` | no | A subject code of the group (ADR 0081). The calendar then shows only the times of staffing blocks that offer it, and the form has the subject chosen. A code the group does not have is ignored. For a `flow` on a shared capacity pool the subject does not narrow the times: a pool's blocks carry no subjects (ADR 0122) |
 | `flow` | no | The code of a service flow of the group (ADR 0121). The times shown are that flow's and the booking is made under it. Without it, the group's default flow is used. A code that does not resolve (unknown, not active, or not offered for appointments) makes the widget show its "not available here" state when it loads; there is no fallback to the default flow |
 | `heading-level` | no | Level of the widget's headings, 2–6 (default 2), so they fit your page outline; sub-headings are one level lower |
 

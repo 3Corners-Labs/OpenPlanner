@@ -51,7 +51,9 @@ def clock() -> FixedClock:
 
 @pytest.fixture
 def service(uow: InMemoryUnitOfWork, clock: FixedClock) -> BookingService:
-    return BookingService(uow, clock, TEST_TOKEN_KEY, phone_region=lambda _org: "NL")
+    return BookingService(
+        uow, clock, TEST_TOKEN_KEY, phone_region=lambda _org: "NL", treatment_buffer=0
+    )
 
 
 async def test_name_phone_and_answers_are_corrected_and_the_email_stays(

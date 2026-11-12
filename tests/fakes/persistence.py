@@ -1010,6 +1010,9 @@ class InMemoryTransaction(PoolStaffingStore):
             None,
         )
 
+    async def get_slot_by_id(self, slot_id: int) -> Slot | None:
+        return self.state.slots.get(slot_id)
+
     async def add_slot(self, slot: Slot) -> Slot:
         stored = replace(slot, id=self._new_id())
         self.state.slots[stored.id or 0] = stored

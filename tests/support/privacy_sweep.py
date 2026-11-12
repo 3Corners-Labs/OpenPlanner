@@ -238,7 +238,7 @@ async def mark(site: Site, monkeypatch: pytest.MonkeyPatch) -> Fixture:
         )
         await tx.save_form(group_id, FormDefinition(form.version + 1, (*form.fields, note)))
         await tx.save_release_check(ReleaseCheck(NOW, RELEASE))
-    service = BookingService(uow, site.clock, TEST_TOKEN_KEY)
+    service = BookingService(uow, site.clock, TEST_TOKEN_KEY, treatment_buffer=0)
 
     async def book(number: int, start: datetime) -> int:
         receipt = await book_confirmed(

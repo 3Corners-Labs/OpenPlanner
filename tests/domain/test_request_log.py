@@ -86,7 +86,9 @@ async def test_a_booking_found_through_a_public_page_gets_its_organisation() -> 
     state = two_organisations()
     state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=1))]
     uow = InMemoryUnitOfWork(state)
-    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY), slug="demo")
+    receipt = await book(
+        BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0), slug="demo"
+    )
     with trace_scope():
         bind_level(None, "demo")
         bind_booking(receipt.booking.id)

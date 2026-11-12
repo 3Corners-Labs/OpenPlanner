@@ -19,7 +19,9 @@ EMAIL_JOBS = {JobType.SEND_CONFIRMATION, JobType.SEND_REMINDER}
 
 async def booked(engine: AsyncEngine) -> SqlJobQueue:
     await seed_group(engine)
-    await book(BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY))
+    await book(
+        BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
+    )
     return SqlJobQueue(engine)
 
 

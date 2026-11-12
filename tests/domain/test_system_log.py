@@ -23,7 +23,7 @@ def uow() -> InMemoryUnitOfWork:
 
 
 async def test_a_booking_event_lands_on_the_bookings_group(uow: InMemoryUnitOfWork) -> None:
-    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0))
     booking_id = receipt.booking.id
 
     await SystemLog(uow, FixedClock(NOW)).record(

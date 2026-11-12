@@ -37,7 +37,7 @@ async def booking_id(database_url: str) -> int:
     engine = create_engine(database_url)
     await seed_group(engine, slug="balie")
     uow = SqlUnitOfWork(engine)
-    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0))
     booking_id = receipt.booking.id or 0
     async with uow.locked() as tx:
         await tx.save_meeting(booking_id, MeetingRef("meeting-1", "https://site.webex.com/m/1"))

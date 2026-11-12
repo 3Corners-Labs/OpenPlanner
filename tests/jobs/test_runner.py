@@ -60,7 +60,7 @@ def composer() -> MessageComposer:
 
 
 async def booking_id(uow: InMemoryUnitOfWork) -> int:
-    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0))
     return receipt.booking.id or 0
 
 
@@ -533,7 +533,9 @@ async def test_without_the_setting_the_product_footer_stays(
 
 
 async def _pending_id(uow: InMemoryUnitOfWork) -> int:
-    receipt = await book_pending(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
+    receipt = await book_pending(
+        BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
+    )
     return receipt.booking.id or 0
 
 
@@ -569,7 +571,7 @@ async def test_a_confirmed_booking_does_not_lapse(
 async def test_the_request_to_confirm_goes_only_while_it_is_pending(
     uow: InMemoryUnitOfWork, composer: MessageComposer
 ) -> None:
-    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
     receipt = await book_pending(service)
     bid = receipt.booking.id or 0
     request = job(bid, JobType.SEND_CONFIRM_REQUEST, pinned=None)

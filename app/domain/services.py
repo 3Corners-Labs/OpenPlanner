@@ -12,8 +12,8 @@ booking and its jobs commit together or not at all (CLAUDE.md architecture rules
     reschedule ─► locked tx ─► cancel old (jobs: purge only) ─► _place new in the SAME group
 
 A flow on a counted pool (ADR 0122, only while the rollback gate ``ROLLBACK_SAFE`` is open)
-takes its times and its place from the pool instead: ``_reserve_for`` is the one switch, to
-``app.domain.pool_booking``; a booking already on a pool is moved on that pool.
+takes its times and its place from the pool instead: ``pool_booking.Placements`` is the one
+switch; a booking that exists is judged by its own slot, so one on a pool is moved on it.
 
 A participant's new booking awaits confirmation by email link (ADR 0056): it holds its place but
 gets no meeting, reminders or task until confirmed; its deadline ``confirm_by`` follows the
@@ -87,14 +87,21 @@ from app.domain.job_plan import (
     plan_for_suspension,
 )
 from app.domain.participant_links import PublicRef
-from app.domain.pool_booking import PoolBookings, PoolTarget, pool_target
+from app.domain.pool_booking import (
+    FreeTimes,
+    LegacyPlacement,
+    OwnTimes,
+    Placement,
+    Placements,
+    PoolBookings,
+)
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.rebooking import DEFAULT_REACH, Reach, may_take, search_window, suggested
 from app.domain.reschedule_proposal import HeldProposal
 from app.domain.routing import ANSWER_PREFIX as ROUTING_PREFIX
 from app.domain.routing import RoutingChoice
 from app.domain.scheduling import Group, open_for_direct
-from app.domain.service_flows import IntakeMode, pool_booking_open
+from app.domain.service_flows import IntakeMode
 from app.domain.system_log import SystemLog
 from app.domain.tokens import (
     MIN_KEY_BYTES,
@@ -193,7 +200,8 @@ class BookingService:
         previous_token_key: bytes | None = None,
         closure_retention: ClosureRetentionOf = default_closure_retention,
         reach: Reach | Callable[[int], Reach] = DEFAULT_REACH,
-        treatment_buffer: int | Callable[[int], int] = 0,
+        *,
+        treatment_buffer: int | Callable[[int], int],
     ) -> None:
         """Store the collaborators.
 
@@ -210,7 +218,8 @@ class BookingService:
                 ``reschedule_search_days``, ``reschedule_time_tolerance_minutes``), per
                 organisation id when it is a function.
             treatment_buffer: The wrap-up added to an appointment on a counted pool (ADR 0122,
-                ``treatment_buffer_minutes``), per organisation id when it is a function.
+                ``treatment_buffer_minutes``), per organisation id when it is a function;
+                required, so no wiring forgets the organisation's setting.
         """
         if len(token_key) < MIN_KEY_BYTES:
             raise ValueError(f"the token key must be at least {MIN_KEY_BYTES} bytes")
@@ -223,7 +232,10 @@ class BookingService:
         self._phone_region = phone_region
         self._closure_retention = closure_retention
         self._reach = reach
-        self._pools = PoolBookings(clock, treatment_buffer)
+        self._placements = Placements(
+            LegacyPlacement(self._free_slots, self._reserve),
+            PoolBookings(clock, treatment_buffer=treatment_buffer),
+        )
 
     async def get_group(self, group_slug: str) -> Group:
         """Return the group behind a booking page.
@@ -274,18 +286,17 @@ class BookingService:
         subject: str | None = None,
         *,
         flow: str | None = None,
-        made_under: FlowRef | None = None,
     ) -> list[AvailableSlot]:
         """Return the bookable slots of a group between two local dates (inclusive).
 
         With ``subject`` only the slots whose blocks offer it (ADR 0081 point 4); a code the
         group does not have is ignored, so a crafted query shows the plain agenda.
 
-        The slots of the flow a booking would be made under (``flow``, else the default of the
-        appointment path) or, for moving a booking, of the revision it was made under
-        (``made_under``): a flow on a counted pool offers the pool's times (ADR 0122), every
-        other one the service's own. While the rollback gate is shut no flow is read for a new
-        booking, and the answer is the service's own times as before.
+        The slots of the flow a new booking would be made under (``flow``, else the default of
+        the appointment path): a flow on a counted pool offers the pool's times (ADR 0122),
+        every other one the service's own. While the rollback gate is shut no flow is read, and
+        the answer is the service's own times as before. The times a booking can move to are
+        ``move_times``.
 
         Raises:
             DomainError: ``group_not_found``, ``invalid_range`` or ``flow_not_available``.
@@ -294,12 +305,73 @@ class BookingService:
         async with self._uow.read() as tx:
             group = await self._group(tx, group_slug)
             known = subject if group.routing.subject(subject) else None
-            target = (
-                await self._pools.target_of_ref(tx, made_under)
-                if made_under is not None
-                else await self._new_target(tx, group, flow)
+            placement = await self._placements.for_new(tx, group, flow)
+            return await placement.free(tx, group, first_day, last_day, known)
+
+    async def own_times(
+        self, group_slug: str, first_day: date, last_day: date, subject: str | None = None
+    ) -> list[AvailableSlot]:
+        """Return the service's own free slots, as ``availability`` does without a flow lookup.
+
+        Raises:
+            DomainError: ``group_not_found`` or ``invalid_range``.
+        """
+        validate_range(first_day, last_day)
+        async with self._uow.read() as tx:
+            group = await self._group(tx, group_slug)
+            known = subject if group.routing.subject(subject) else None
+            return await self._free_slots(tx, group, first_day, last_day, known)
+
+    async def move_times(
+        self, booking: Booking, first_day: date, last_day: date
+    ) -> list[AvailableSlot]:
+        """Return the times ``booking`` can move to between two local dates (inclusive).
+
+        From the same source the move itself uses (``Placements.of_booking``): the booking's own
+        slot, so a booking on a pool is offered its pool's times and one on the service's own
+        staffing the service's own, whatever flow is the default now. For the booking's subject
+        (ADR 0081). The caller has checked who may see the booking.
+
+        Raises:
+            DomainError: ``group_not_found`` (also for an archived group) or ``invalid_range``.
+        """
+        validate_range(first_day, last_day)
+        async with self._uow.read() as tx:
+            group = await self._group_by_id(tx, booking.group_id)
+            if group.is_archived:
+                raise DomainError(ErrorCode.GROUP_NOT_FOUND)
+            known = booking.subject if group.routing.subject(booking.subject) else None
+            placement = await self._placements.of_booking(tx, booking)
+            return await placement.free(tx, group, first_day, last_day, known)
+
+    async def free_times(
+        self,
+        group_slug: str,
+        subject: str | None = None,
+        *,
+        flow: str | None = None,
+        booking: Booking | None = None,
+    ) -> FreeTimes:
+        """Return the free times a calendar reads window by window: a new booking's or a move's.
+
+        For the service's own staffing every window is read as ``availability`` reads it; for a
+        pool the pool, its staffing and its commitments are loaded once for the whole booking
+        window, so a calendar does not load them again per window (ADR 0122).
+
+        Raises:
+            DomainError: ``group_not_found`` or ``flow_not_available``.
+        """
+        async with self._uow.read() as tx:
+            group = await self._group(tx, group_slug)
+            placement: Placement = (
+                await self._placements.of_booking(tx, booking)
+                if booking is not None
+                else await self._placements.for_new(tx, group, flow)
             )
-            return await self._free(tx, group, first_day, last_day, known, target)
+            times = await self._placements.window_times(tx, group, placement)
+        if times is not None:
+            return times
+        return OwnTimes(lambda first, last: self.own_times(group_slug, first, last, subject))
 
     async def suggestions(self, management_token: str | PublicRef) -> list[datetime]:
         """Return the free times the reschedule page marks as suggested (ADR 0057 point 8).
@@ -322,36 +394,10 @@ class BookingService:
             window = search_window(group, [old_day], reach, self._clock.now())
             if window is None:
                 return []
-            target = await self._pools.target_of_booking(tx, booking)
-            free = await self._free(tx, group, *window, booking.subject, target)
+            placement = await self._placements.of_booking(tx, booking)
+            free = await placement.free(tx, group, *window, booking.subject)
         held = {proposal.start} if proposal is not None else set()
         return suggested(group, booking.start, [s.start for s in free], reach, held)
-
-    async def _new_target(
-        self, tx: Transaction, group: Group, flow: str | None
-    ) -> PoolTarget | None:
-        """Return the pool a new booking of ``group`` under ``flow`` would draw on, if any.
-
-        Nothing is read while the rollback gate is shut: every flow that resolves then is a
-        legacy one (``gate_allows``), so the service's own times are the answer.
-        """
-        if not pool_booking_open():
-            return None
-        return pool_target(await resolve_flow(tx, group.id, IntakeMode.APPOINTMENT, flow))
-
-    async def _free(
-        self,
-        tx: Transaction,
-        group: Group,
-        first_day: date,
-        last_day: date,
-        subject: str | None,
-        target: PoolTarget | None,
-    ) -> list[AvailableSlot]:
-        """Return the bookable slots on the service's own staffing, or on ``target``'s pool."""
-        if target is None:
-            return await self._free_slots(tx, group, first_day, last_day, subject)
-        return await self._pools.free_slots(tx, group, target, first_day, last_day)
 
     async def _free_slots(
         self,
@@ -413,7 +459,8 @@ class BookingService:
             details = await self._contact(tx, group, contact)
             routing = _routing(group, contact)
             now = self._clock.now()
-            slot = await self._reserve_for(tx, group, start, routing, pool_target(resolved))
+            placement = self._placements.for_resolved(resolved)
+            slot = await placement.reserve(tx, group, start, routing)
             if not await _address_allows(tx, group, details, slot.start, now):
                 return await self._refuse(
                     tx, group, slot, details, locale, routing, resolved.ref if resolved else None
@@ -782,7 +829,7 @@ class BookingService:
             raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
         if new_start == old.start:
             raise DomainError(ErrorCode.SAME_SLOT)
-        target = await self._pools.target_of_booking(tx, old)
+        placement = await self._placements.of_booking(tx, old)
         now = self._clock.now()
         await booking_changes.answer_proposal(tx, old, now, new_start)  # ADR 0057: frees the hold
         await tx.save_booking(old.cancel(now))
@@ -809,7 +856,7 @@ class BookingService:
             confirmed_at=old.confirmed_at,
             routing=old.routing,
             flow=old.flow,  # ADR 0121: a move keeps the flow the booking was made under
-            target=target,
+            placement=placement,
         )
 
     async def _direct_open(
@@ -910,13 +957,13 @@ class BookingService:
         confirmed_at: datetime | None = None,
         routing: RoutingChoice | None = None,
         flow: FlowRef | None = None,
-        target: PoolTarget | None = None,
+        placement: Placement,
     ) -> BookingReceipt:
         """Reserve a place at ``start`` and store the booking with its jobs.
 
         ``routing`` is the participant's subject and attribute codes (ADR 0081); a slot whose
-        blocks do not offer the subject is unavailable for it (point 4). ``target`` places it on
-        a counted pool instead of the service's own staffing (ADR 0122).
+        blocks do not offer the subject is unavailable for it (point 4). ``placement`` is the
+        service's own staffing or a counted pool (ADR 0122): the one of the booking moved.
 
         ``pending`` places it awaiting confirmation with its own ``confirm_by`` (a participant's
         new booking, or a moved one that was still pending, ADR 0056); otherwise it is placed
@@ -929,7 +976,7 @@ class BookingService:
             DomainError: ``group_not_found`` for an archived group (ADR 0084), the window,
                 schedule, closure, capacity and address errors of a booking.
         """
-        slot = await self._reserve_for(tx, group, start, routing, target)
+        slot = await placement.reserve(tx, group, start, routing)
         if not await _address_allows(tx, group, contact, slot.start, self._clock.now()):
             raise DomainError(ErrorCode.BOOKING_LIMIT_REACHED)
         return await self._store(
@@ -1045,23 +1092,6 @@ class BookingService:
         await tx.replace_jobs(_id(booking), plan_for_refusal(now=now))
         return BookingReceipt(booking, secrets.token_urlsafe(32))
 
-    async def _reserve_for(
-        self,
-        tx: Transaction,
-        group: Group,
-        start: datetime,
-        routing: RoutingChoice | None,
-        target: PoolTarget | None,
-    ) -> Slot:
-        """Return the reserved slot at ``start``: on the service's own staffing, or on a pool.
-
-        The one switch between the two models (``_reserve`` and ``PoolBookings.reserve``), so a
-        booking, a move and a held proposal never land on the other one.
-        """
-        if target is None:
-            return await self._reserve(tx, group, start, routing)
-        return await self._pools.reserve(tx, group, target, start)
-
     async def _reserve(
         self, tx: Transaction, group: Group, start: datetime, routing: RoutingChoice | None
     ) -> Slot:
@@ -1132,8 +1162,8 @@ class BookingService:
             raise DomainError(ErrorCode.SAME_SLOT)
         if not may_take(group, start, now):
             raise DomainError(ErrorCode.BOOKING_LOCKED)
-        target = await self._pools.target_of_booking(tx, booking)
-        slot = await self._reserve_for(tx, group, start, booking.routing, target)
+        placement = await self._placements.of_booking(tx, booking)
+        slot = await placement.reserve(tx, group, start, booking.routing)
         return await booking_changes.hold_proposal(
             tx,
             booking,

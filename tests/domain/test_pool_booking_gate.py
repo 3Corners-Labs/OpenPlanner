@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.flow_resolution import gate_allows
+from app.domain.flow_resolution import gate_allows, pool_flows_bookable
 from app.domain.scheduling import Organisation, ScheduleRule
 from app.domain.service_flows import (
     FOLLOWING,
@@ -24,7 +24,6 @@ from app.domain.service_flows import (
     ReadinessState,
     can_activate,
     can_publish,
-    pool_booking_open,
     readiness,
     readiness_state,
 )
@@ -93,7 +92,7 @@ async def _trace(uow: InMemoryUnitOfWork) -> list[Any]:
     seen.append(full.value.code)
     moved = await service.reschedule(first.management_token, SLOT_0930)
     seen.append(await service.suggestions(moved.management_token))
-    seen.append(await service.availability("balie", MONDAY, MONDAY, made_under=moved.booking.flow))
+    seen.append(await service.move_times(moved.booking, MONDAY, MONDAY))
     await service.cancel(second.management_token)
     seen.append(await service.availability("balie", MONDAY, MONDAY))
     seen.append(
@@ -135,7 +134,7 @@ async def test_every_path_of_the_service_is_the_same_with_a_pool_flow_beside_it(
 async def test_with_the_gate_shut_the_pool_flow_cannot_be_named_and_nothing_is_stored() -> None:
     uow = await _uow(True)
     service = _service(uow)
-    assert pool_booking_open() is False
+    assert pool_flows_bookable(IntakeMode.APPOINTMENT) is False
 
     for call in (
         service.flow_for("balie", IntakeMode.APPOINTMENT, "advies"),

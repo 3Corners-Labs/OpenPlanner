@@ -20,7 +20,8 @@ from datetime import UTC, date, datetime, timedelta, tzinfo
 from urllib.parse import urlencode
 
 from app.domain.availability import MAX_RANGE_DAYS, AvailableSlot
-from app.domain.flow_resolution import FlowRef
+from app.domain.booking import Booking
+from app.domain.pool_booking import FreeTimes
 from app.domain.routing import GroupRouting
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
@@ -312,32 +313,23 @@ def _times(group: Group, day: date, slots: list[AvailableSlot], locale: RequestL
 
 @dataclass(frozen=True)
 class _Source:
-    """Whose free slots the picker reads: the group's, for a subject, a flow or a booking.
+    """Where the picker reads its free slots from, once per page, and the start to leave out.
 
-    ``made_under`` is the revision of a booking being moved (from the domain, never from the
-    request): a booking on a counted pool is shown the pool's times (ADR 0122).
+    ``times`` comes from ``BookingService.free_times``: a new booking's (for a subject and a
+    flow) or a moved booking's (from its own slot, ADR 0122), so a calendar shows exactly the
+    times the booking or the move would accept, and a pool is loaded once per page.
     """
 
-    service: BookingService
+    times: FreeTimes
     group: Group
     exclude: datetime | None
-    subject: str | None
-    flow: str | None
-    made_under: FlowRef | None
 
 
 async def _free(source: _Source, first: date, last: date) -> list[AvailableSlot]:
     """Return the free slots between two local dates, without the excluded start."""
     if last < first:
         return []
-    slots = await source.service.availability(
-        source.group.slug,
-        first,
-        last,
-        source.subject,
-        flow=source.flow,
-        made_under=source.made_under,
-    )
+    slots = await source.times.between(first, last)
     return [slot for slot in slots if slot.start != source.exclude]
 
 
@@ -417,7 +409,7 @@ async def picker(
     day: str | None = None,
     exclude: datetime | None = None,
     slot_filter: SlotFilter | None = None,
-    made_under: FlowRef | None = None,
+    booking: Booking | None = None,
 ) -> PickerView:
     """Build the picker for ``group``, clamped to today … the booking horizon.
 
@@ -431,8 +423,8 @@ async def picker(
         day: Requested day (``YYYY-MM-DD``), from a day link.
         exclude: A start time not to offer (the booking that is being moved).
         slot_filter: Which slots fit the participant; all of them when ``None``.
-        made_under: The revision of the booking being moved, so that a booking on a counted
-            pool is shown the pool's times (ADR 0122); ``None`` for a new booking.
+        booking: The booking being moved: its times come from its own slot, a pool's for a
+            booking on a counted pool (ADR 0122); ``None`` for a new booking.
     """
     slot_filter = slot_filter or SlotFilter()
     today = local_day(now, group.tz)
@@ -442,7 +434,10 @@ async def picker(
     def href(*params: tuple[str, str]) -> str:
         return f"{base}?{urlencode([*slot_filter.query(), *params])}"
 
-    source = _Source(service, group, exclude, slot_filter.subject, slot_filter.flow, made_under)
+    readable = await service.free_times(
+        group.slug, slot_filter.subject, flow=slot_filter.flow, booking=booking
+    )
+    source = _Source(readable, group, exclude)
     window = await _free(source, today, _window_end(today, last))
     first_slot = await _first_free(source, window, today, last, slot_filter)
     requested_day = _parse_day(day)

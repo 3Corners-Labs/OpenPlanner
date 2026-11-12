@@ -23,7 +23,7 @@ async def _two_bookings(engine: AsyncEngine) -> tuple[SqlUnitOfWork, int, int]:
     await seed_group(engine, slug="balie", capacity=2)
     await seed_group(engine, slug="elders")
     uow = SqlUnitOfWork(engine)
-    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
     purged = (await book(service, SLOT_0900)).booking.id or 0
     holding = (await book(service, SLOT_0930)).booking.id or 0
     async with uow.locked() as tx:

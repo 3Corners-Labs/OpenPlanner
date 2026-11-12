@@ -14,6 +14,7 @@ the flows through the scoped port (``app.domain.flow_resolver``).
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from app.domain import service_flows
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.service_flows import (
     FlowRevision,
@@ -21,7 +22,6 @@ from app.domain.service_flows import (
     IntakeMode,
     InteractionKind,
     ServiceFlow,
-    pool_booking_open,
 )
 
 
@@ -87,18 +87,28 @@ def _resolved(flow: ServiceFlow, live: tuple[int, FlowRevision]) -> ResolvedFlow
     )
 
 
+def pool_flows_bookable(mode: IntakeMode) -> bool:
+    """Return whether any flow on a counted pool may take a new booking on the path ``mode`` now.
+
+    The one reader of the rollback gate ``ROLLBACK_SAFE`` on the booking paths (ADR 0122 step 5),
+    read when called: only appointments (on-demand intake on a pool is ADR 0121 step 7), and only
+    while the gate is open. ``False`` lets a caller skip reading flows at all. Moving a booking
+    that already sits on a pool does not ask: it stays on its pool (``pool_booking.Placements``).
+    """
+    return mode is IntakeMode.APPOINTMENT and bool(service_flows.ROLLBACK_SAFE)
+
+
 def gate_allows(flow: ServiceFlow, mode: IntakeMode) -> bool:
     """Return whether a new booking on the entry path ``mode`` may be made under ``flow`` now.
 
-    A legacy flow (and one without a current revision, which no rule resolves) always may. A
-    flow that is not legacy draws on a counted pool: only for appointments (on-demand intake on a
-    pool is ADR 0121 step 7), and only while the rollback gate is open
-    (``service_flows.pool_booking_open``). A flow the gate holds back is, for the participant,
-    exactly a flow that is not active: unknown when named, never the default.
+    A legacy flow (and one without a current revision, which no rule resolves) always may; a
+    flow that is not legacy draws on a counted pool and may when ``pool_flows_bookable``. A flow
+    the gate holds back is, for the participant, exactly a flow that is not active: unknown when
+    named, never the default.
     """
     if flow.current is None or flow.current.legacy:
         return True
-    return mode is IntakeMode.APPOINTMENT and pool_booking_open()
+    return pool_flows_bookable(mode)
 
 
 def resolve_default(flows: Iterable[ServiceFlow], mode: IntakeMode) -> ResolvedFlow | None:

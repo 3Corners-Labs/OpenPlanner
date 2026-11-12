@@ -78,7 +78,7 @@ async def _booking_scenario() -> list[UsageFact]:
     """Booking changes, calls, the poll's events, rebooking, messages and the slot closing."""
     uow = InMemoryUnitOfWork(three_groups())
     clock = FixedClock(NOW)
-    bookings = BookingService(uow, clock, TEST_TOKEN_KEY)
+    bookings = BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
     closures = ClosureService(uow, clock, AdminService(uow, clock), bookings)
     integration = IntegrationService(uow, clock, AdminService(uow, clock))
     admin = AdminService(uow, clock, alert_thresholds=ALERT_THRESHOLDS)
@@ -173,7 +173,12 @@ async def _queue_scenario() -> list[UsageFact]:
     state.next_id = 100
     uow = InMemoryUnitOfWork(state)
     clock = FixedClock(NOW)
-    receipt = await book(BookingService(uow, clock, TEST_TOKEN_KEY), SLOT_0900, "demo", _person(8))
+    receipt = await book(
+        BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0),
+        SLOT_0900,
+        "demo",
+        _person(8),
+    )
     booking_id = receipt.booking.id or 0
     uow.state.bookings[booking_id] = replace(
         uow.state.bookings[booking_id], meeting=MeetingRef("m", LINK)
@@ -192,7 +197,7 @@ async def _direct_scenario() -> list[UsageFact]:
     state.rules[1] = [ScheduleRule(weekday=0, window=window("09:00", "10:00", 2, Offer.BOTH))]
     uow = InMemoryUnitOfWork(state)
     clock = FixedClock(datetime(2026, 1, 5, 8, 15, tzinfo=UTC))
-    service = BookingService(uow, clock, TEST_TOKEN_KEY)
+    service = BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
     receipt = await service.start_direct(group_slug="balie", contact=_person(9), locale="nl")
     integration = IntegrationService(uow, clock, AdminService(uow, clock))
     await integration.record(receipt.booking.id or 0, EventKind.TASK_CREATED)

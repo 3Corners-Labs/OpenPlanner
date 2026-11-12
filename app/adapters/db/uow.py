@@ -1791,6 +1791,23 @@ class SqlTransaction(
             return None
         return Slot(row.id, row.group_id, row.start, row.end, row.capacity_snapshot)
 
+    # slot-scope: all
+    async def get_slot_by_id(self, slot_id: int) -> Slot | None:
+        """Return one slot by id, legacy or pool (the slot of a stored booking, ADR 0122)."""
+        row = await self._session.get(SlotRow, slot_id)
+        if row is None:
+            return None
+        return Slot(
+            row.id,
+            row.group_id,
+            row.start,
+            row.end,
+            row.capacity_snapshot,
+            BookingKind(row.kind),
+            row.capacity_pool_id,
+            row.occupied_until,
+        )
+
     async def add_slot(self, slot: Slot) -> Slot:
         """Insert a slot and return it with its ID."""
         row = SlotRow(

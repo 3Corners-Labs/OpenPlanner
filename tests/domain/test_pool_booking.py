@@ -16,6 +16,8 @@ from app.domain.closure import Closure
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holidays import Holiday, HolidayCalendar
 from app.domain.job_plan import JobType
+from app.domain.pool_availability import PoolTarget
+from app.domain.pool_booking import PoolBookings
 from app.domain.scheduling import Offer, Organisation, ScheduleOverride, ScheduleRule
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
@@ -401,9 +403,7 @@ async def test_a_booking_on_a_pool_moves_on_its_pool_even_with_the_gate_shut(
     moved = await service.reschedule(first.management_token, AT_0940)
 
     assert uow.state.slots[moved.booking.slot_id].capacity_pool_id == flow.pool_id
-    picker_times = await service.availability(
-        "balie", MONDAY, MONDAY, made_under=first.booking.flow
-    )
+    picker_times = await service.move_times(moved.booking, MONDAY, MONDAY)
     assert AT_0900 in [s.start for s in picker_times]
 
 
@@ -454,3 +454,82 @@ async def test_fall_back_the_repeated_hour_is_offered_once() -> None:
     for n, start in enumerate(starts):
         await _book(service, start, n)
     assert await service.availability("balie", sunday, sunday, flow="advies") == []
+
+
+# --- one source per page: the calendar's times, loaded once (review findings 1 and 2) --------
+
+
+async def test_a_calendar_reads_a_pool_once_and_shows_what_availability_shows() -> None:
+    uow, _ = await _world()
+    service = _service(uow)
+    expected = await service.availability("balie", MONDAY, MONDAY, flow="advies")
+
+    times = await service.free_times("balie", flow="advies")
+    await _book(service, AT_0900, 1)  # after loading: the calendar of this page keeps its scene
+
+    assert await times.between(MONDAY, MONDAY) == expected
+    assert (await service.free_times("balie", flow="advies")) is not times
+
+
+async def test_a_calendar_of_the_services_own_times_reads_them_as_availability_does() -> None:
+    uow, _ = await _world()
+    service = _service(uow)
+
+    times = await service.free_times("balie", flow="appointment")
+
+    own = await service.availability("balie", MONDAY, MONDAY, flow="appointment")
+    assert await times.between(MONDAY, MONDAY) == own
+
+
+async def test_a_move_calendar_of_a_pool_booking_shows_the_pools_times() -> None:
+    uow, _ = await _world()
+    service = _service(uow)
+    receipt = await _book(service, AT_0900, 1)
+
+    times = await service.free_times("balie", booking=receipt.booking)
+
+    assert [s.start for s in await times.between(MONDAY, MONDAY)] == [
+        s.start for s in await service.availability("balie", MONDAY, MONDAY, flow="advies")
+    ]
+
+
+async def test_a_booking_whose_slot_cannot_be_read_is_never_put_on_own_staffing() -> None:
+    uow, _ = await _world()
+    service = _service(uow)
+    receipt = await _book(service, AT_0900, 1)
+    del uow.state.slots[receipt.booking.slot_id]
+
+    with pytest.raises(DomainError) as error:
+        await service.move_times(receipt.booking, MONDAY, MONDAY)
+    assert _code(error) is ErrorCode.SLOT_UNAVAILABLE
+
+
+async def test_move_times_refuse_an_archived_service() -> None:
+    uow, _ = await _world()
+    service = _service(uow)
+    receipt = await _book(service, AT_0900, 1)
+    uow.state.groups[1] = replace(uow.state.groups[1], archived_at=NOW)
+
+    with pytest.raises(DomainError) as error:
+        await service.move_times(receipt.booking, MONDAY, MONDAY)
+    assert _code(error) is ErrorCode.GROUP_NOT_FOUND
+
+
+async def test_a_day_beyond_the_horizon_offers_nothing_on_the_pool() -> None:
+    uow, _ = await _world()
+    far = MONDAY + timedelta(days=91)
+
+    assert await _service(uow).availability("balie", far, far, flow="advies") == []
+
+
+async def test_the_pool_reservation_refuses_a_naive_start_and_an_archived_service() -> None:
+    uow, flow = await _world()
+    pools = PoolBookings(FixedClock(NOW), treatment_buffer=0)
+    target = PoolTarget(flow.pool_id, 20)
+    async with uow.locked() as tx:
+        with pytest.raises(ValueError, match="aware"):
+            await pools.reserve(tx, make_group(id=1), target, AT_0900.replace(tzinfo=None))
+        archived = make_group(id=1, archived_at=NOW)
+        with pytest.raises(DomainError) as error:
+            await pools.reserve(tx, archived, target, AT_0900)
+    assert _code(error) is ErrorCode.GROUP_NOT_FOUND

@@ -14,7 +14,9 @@ from tests.support.domain import NOW, TEST_TOKEN_KEY, book
 
 async def _booking_id(engine: AsyncEngine) -> int:
     await seed_group(engine)
-    receipt = await book(BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY))
+    receipt = await book(
+        BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
+    )
     return receipt.booking.id or 0
 
 

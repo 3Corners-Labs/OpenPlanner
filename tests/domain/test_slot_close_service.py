@@ -54,7 +54,7 @@ async def _booked(
     contact: ContactInput = ADA,
     **call: object,
 ) -> int:
-    bookings = BookingService(uow, clock, TEST_TOKEN_KEY)
+    bookings = BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
     receipt = await book_confirmed(
         bookings, group_slug="demo", start=start, contact=contact, locale="nl"
     )

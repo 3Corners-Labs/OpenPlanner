@@ -45,7 +45,7 @@ async def test_rows_become_a_day_count_and_take_their_events_along(engine: Async
     await seed_group(engine, capacity=2)
     clock = FixedClock(NOW)
     uow = SqlUnitOfWork(engine)
-    service = BookingService(uow, clock, TEST_TOKEN_KEY)
+    service = BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
     first = await _purged(engine, service, SLOT_0900)
     await _purged(engine, service, SLOT_0930)
     group_id = (await book(service, SLOT_0900)).booking.group_id  # a live row, not purged
@@ -72,7 +72,7 @@ async def test_a_later_run_adds_to_the_same_day(engine: AsyncEngine) -> None:
     await seed_group(engine, capacity=2)
     clock = FixedClock(NOW)
     uow = SqlUnitOfWork(engine)
-    service = BookingService(uow, clock, TEST_TOKEN_KEY)
+    service = BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
     rollup = BookingRowRollup(uow, clock, lambda: TERM)
     await _purged(engine, service)
     later = await _purged(engine, service)
@@ -95,7 +95,7 @@ async def test_a_row_with_an_open_job_or_data_stays(engine: AsyncEngine) -> None
     await seed_group(engine, capacity=2)
     clock = FixedClock(NOW)
     uow = SqlUnitOfWork(engine)
-    service = BookingService(uow, clock, TEST_TOKEN_KEY)
+    service = BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
     holding = (await book(service, SLOT_0900)).booking.id or 0  # still has its data and jobs
     busy = await _purged(engine, service, SLOT_0930)
     async with engine.begin() as conn:

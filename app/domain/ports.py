@@ -1453,6 +1453,14 @@ class Transaction(Protocol):
         """Store a new slot and return it with its ID."""
         ...
 
+    async def get_slot_by_id(self, slot_id: int) -> Slot | None:
+        """Return the slot with ``slot_id``, legacy or pool, with its pool and occupied end.
+
+        For the booking path only: the id comes from a stored booking, never from a request
+        (ADR 0122: a booking that exists is placed by its own slot).
+        """
+        ...
+
     async def count_active_bookings(self, slot_id: int) -> int:
         """Return the places taken in the slot: bookings that hold one and open proposals."""
         ...

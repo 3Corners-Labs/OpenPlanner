@@ -59,7 +59,7 @@ def assert_one_purge_at_the_retention_moment(uow: InMemoryUnitOfWork) -> set[Boo
 async def test_every_transition_leaves_one_purge_at_the_retention_moment(
     uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
-    bookings = BookingService(uow, clock, TEST_TOKEN_KEY)
+    bookings = BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
     closures = ClosureService(uow, clock, AdminService(uow, clock), bookings)
     seen: set[BookingStatus] = set()
 

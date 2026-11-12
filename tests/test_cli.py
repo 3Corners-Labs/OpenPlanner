@@ -582,7 +582,10 @@ async def test_purge_overdue_counts_per_group_and_purges(migrated: Settings) -> 
     try:
         await seed_group(engine, slug="balie")
         await book(
-            BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY), SLOT_0900
+            BookingService(
+                SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0
+            ),
+            SLOT_0900,
         )
     finally:
         await engine.dispose()

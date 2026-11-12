@@ -47,7 +47,7 @@ async def _book(site: Site, slug: str, contact: ContactInput = ADA) -> int:
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     uow = SqlUnitOfWork(app.state.engine)
     receipt = await book_confirmed(
-        BookingService(uow, site.clock, TEST_TOKEN_KEY),
+        BookingService(uow, site.clock, TEST_TOKEN_KEY, treatment_buffer=0),
         group_slug=slug,
         start=FRIDAY_0900,
         contact=contact,

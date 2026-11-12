@@ -120,20 +120,10 @@ matrix has proven it: activate a flow, book on the pool, roll back to the previo
 and claim there, and check that no unit was sold twice (A30). Setting it true is a decision.
 
 Read when called, never copied (tests flip it with a monkeypatch): ``readiness`` reports
-``rollback_not_safe`` while it is false (ADR 0122 step 5), and ``pool_booking_open`` keeps every
-flow on a counted pool out of the booking paths (``app.domain.flow_resolver``).
+``rollback_not_safe`` while it is false (ADR 0122 step 5), and
+``flow_resolution.pool_flows_bookable`` keeps every flow on a counted pool out of the booking
+paths.
 """
-
-
-def pool_booking_open() -> bool:
-    """Return whether new appointments may be offered and booked on a counted pool.
-
-    The one reader of ``ROLLBACK_SAFE`` outside ``readiness``. Moving a booking that already sits
-    on a pool does not ask: it stays on its pool whatever the gate says, because only an image
-    that holds the pool accounting may run against a database that has pool slots (ADR 0122,
-    design section 5.2), and a move into the service's own staffing would sell a unit twice.
-    """
-    return bool(ROLLBACK_SAFE)
 
 
 @dataclass(frozen=True)

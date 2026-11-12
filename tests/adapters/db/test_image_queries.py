@@ -26,7 +26,7 @@ async def _closure(engine: AsyncEngine) -> tuple[SqlUnitOfWork, Closure]:
     await seed_group(engine, slug="balie")
     uow = SqlUnitOfWork(engine)
     clock = FixedClock(NOW)
-    bookings = BookingService(uow, clock, TEST_TOKEN_KEY)
+    bookings = BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
     closures = ClosureService(uow, clock, AdminService(uow, clock), bookings)
     ends = NOW + timedelta(days=1)
     await closures.close_group(ADMIN, "balie", ClosureInput(None, ends, NOTICES))

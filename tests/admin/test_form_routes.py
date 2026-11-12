@@ -248,7 +248,7 @@ async def test_the_booking_page_shows_the_answers_with_their_labels(site: Site) 
     await _post(site, PAGE, TOPIC)
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     receipt = await BookingService(
-        SqlUnitOfWork(app.state.engine), site.clock, TEST_TOKEN_KEY
+        SqlUnitOfWork(app.state.engine), site.clock, TEST_TOKEN_KEY, treatment_buffer=0
     ).book(
         group_slug="demo",
         start=FRIDAY_0900,

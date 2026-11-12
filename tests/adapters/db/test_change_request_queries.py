@@ -16,7 +16,9 @@ from tests.support.domain import ADA, NOW, SLOT_0900, SLOT_0930, TEST_TOKEN_KEY,
 async def test_a_request_is_stored_found_replaced_and_pruned(engine: AsyncEngine) -> None:
     await seed_group(engine, capacity=1)
     uow = SqlUnitOfWork(engine)
-    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY), contact=ADA)
+    receipt = await book(
+        BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0), contact=ADA
+    )
     booking = receipt.booking
     booking_id = booking.id or 0
     expires = NOW + timedelta(hours=1)

@@ -28,7 +28,7 @@ def _service() -> tuple[BookingService, InMemoryUnitOfWork]:
     state.groups[1] = GROUP
     state.rules[1] = list(RULES)
     uow = InMemoryUnitOfWork(state)
-    return BookingService(uow, FixedClock(MONDAY_0915), TEST_TOKEN_KEY), uow
+    return BookingService(uow, FixedClock(MONDAY_0915), TEST_TOKEN_KEY, treatment_buffer=0), uow
 
 
 async def _started() -> tuple[BookingService, InMemoryUnitOfWork, str, int]:
@@ -118,7 +118,7 @@ async def test_a_token_cancels_only_its_own_call() -> None:
     state.groups[1] = make_group(id=1, slug="balie")  # no cap: two calls at once
     state.rules[1] = list(RULES)
     uow = InMemoryUnitOfWork(state)
-    service = BookingService(uow, FixedClock(MONDAY_0915), TEST_TOKEN_KEY)
+    service = BookingService(uow, FixedClock(MONDAY_0915), TEST_TOKEN_KEY, treatment_buffer=0)
     mine = await service.start_direct(group_slug="balie", contact=ADA, locale="nl")
     theirs = await service.start_direct(group_slug="balie", contact=ADA, locale="nl")
 
@@ -138,7 +138,9 @@ async def test_a_scheduled_booking_cannot_be_left_this_way() -> None:
     state.groups[1] = GROUP
     state.rules[1] = list(RULES)
     uow = InMemoryUnitOfWork(state)
-    service = BookingService(uow, FixedClock(MONDAY_0915 - timedelta(days=2)), TEST_TOKEN_KEY)
+    service = BookingService(
+        uow, FixedClock(MONDAY_0915 - timedelta(days=2)), TEST_TOKEN_KEY, treatment_buffer=0
+    )
     receipt = await book(service)
     assert receipt.booking.kind is BookingKind.SCHEDULED
 

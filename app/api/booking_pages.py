@@ -57,10 +57,9 @@ from app.api.participant import participant_page
 from app.api.slot_picker import parse_filter, picker, slot_value
 from app.api.trace import bind_group_from_path
 from app.domain.availability import AvailableSlot
-from app.domain.booking import BookingStatus
+from app.domain.booking import Booking, BookingStatus
 from app.domain.change_request_service import ChangeRequestService
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.flow_resolution import FlowRef
 from app.domain.ports import Clock
 from app.domain.scheduling import Group
 from app.domain.service_flows import IntakeMode
@@ -133,16 +132,18 @@ async def _available(
     subject: str | None = None,
     *,
     flow: str | None = None,
-    made_under: FlowRef | None = None,
+    booking: Booking | None = None,
 ) -> AvailableSlot | None:
     """Return the slot at ``start`` if it can still be booked (for ``subject``, ADR 0081).
 
-    ``flow`` is the checked flow code of the page, ``made_under`` the revision of a booking
-    being moved: a flow on a counted pool is judged on the pool's times (ADR 0122).
+    ``flow`` is the checked flow code of the page; ``booking`` a booking being moved, judged on
+    the times of its own slot (``move_times``, ADR 0122), with its own subject.
     """
     day = local_day(start, group.tz)
-    slots = await service.availability(
-        group.slug, day, day, subject, flow=flow, made_under=made_under
+    slots = (
+        await service.move_times(booking, day, day)
+        if booking is not None
+        else await service.availability(group.slug, day, day, subject, flow=flow)
     )
     for slot in slots:
         if slot.start == start:
@@ -640,10 +641,8 @@ async def _reschedule_response(
         context["suggestions"] = [
             (slot_value(at), slot_label(at, at + length, group, locale)) for at in suggestions
         ]
-    made_under = details.booking.flow  # ADR 0122: a booking on a pool moves on its pool
-    slot = (
-        await _available(service, group, chosen, subject, made_under=made_under) if chosen else None
-    )
+    moving = details.booking  # ADR 0122: its own slot decides where it can move
+    slot = await _available(service, group, chosen, booking=moving) if chosen else None
     if chosen is not None and slot is not None and chosen != details.booking.start:
         context["new_start"] = slot_value(chosen)
         context["new_label"] = slot_label(chosen, slot.end, group, locale)
@@ -659,7 +658,7 @@ async def _reschedule_response(
             day=day,
             exclude=details.booking.start,
             slot_filter=replace(parse_filter(request.query_params.multi_items()), subject=subject),
-            made_under=made_under,
+            booking=moving,
         )
         name = "reschedule.html"
     return await participant_page(request, locale, name, group, context, status_code)

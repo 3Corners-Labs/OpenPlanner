@@ -35,7 +35,7 @@ async def test_overdue_bookings_are_purged_and_their_jobs_dropped(engine: AsyncE
     await seed_group(engine, capacity=2)
     clock = FixedClock(NOW)
     uow = SqlUnitOfWork(engine)
-    service = BookingService(uow, clock, TEST_TOKEN_KEY)
+    service = BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
     confirmed = (await book(service, SLOT_0900)).booking.id or 0
     pending = (await book_pending(service, SLOT_0930, "balie")).booking
     assert pending.status is BookingStatus.PENDING_CONFIRMATION
@@ -59,7 +59,7 @@ async def test_a_second_sweep_finds_nothing(engine: AsyncEngine) -> None:
     await seed_group(engine)
     clock = FixedClock(NOW)
     uow = SqlUnitOfWork(engine)
-    await book(BookingService(uow, clock, TEST_TOKEN_KEY), SLOT_0900)
+    await book(BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0), SLOT_0900)
     clock.advance(SLOT_0900 - NOW + 3 * DAY)
     sweep = RetentionSweep(uow, clock)
 

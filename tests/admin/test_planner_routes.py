@@ -39,7 +39,7 @@ _PARTICIPANTS = itertools.count(1)
 
 async def _book(site: Site, start: datetime = FRIDAY_0900, slug: str = "demo") -> int:
     receipt = await book_confirmed(
-        BookingService(_uow(site), site.clock, TEST_TOKEN_KEY),
+        BookingService(_uow(site), site.clock, TEST_TOKEN_KEY, treatment_buffer=0),
         group_slug=slug,
         start=start,
         contact=participant(next(_PARTICIPANTS)),
@@ -111,7 +111,7 @@ async def test_a_move_into_a_short_slot_needs_the_planners_confirmation(site: Si
 
 
 async def test_a_move_onto_the_same_address_tells_the_planner_why(site: Site) -> None:
-    bookings = BookingService(_uow(site), site.clock, TEST_TOKEN_KEY)
+    bookings = BookingService(_uow(site), site.clock, TEST_TOKEN_KEY, treatment_buffer=0)
     receipts = [
         await book_confirmed(bookings, group_slug="demo", start=start, contact=ADA, locale="nl")
         for start in (FRIDAY_0900, FRIDAY_0930)
@@ -301,7 +301,7 @@ async def test_malformed_bulk_ids_are_rejected(site: Site) -> None:
 
 
 async def _book_pending(site: Site) -> int:
-    bookings = BookingService(_uow(site), site.clock, TEST_TOKEN_KEY)
+    bookings = BookingService(_uow(site), site.clock, TEST_TOKEN_KEY, treatment_buffer=0)
     receipt = await book_pending(
         bookings, FRIDAY_0900, "demo", contact=participant(next(_PARTICIPANTS))
     )

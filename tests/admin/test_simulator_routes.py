@@ -54,7 +54,7 @@ async def _site(settings: Settings) -> AsyncIterator[Booked]:
         await tx.save_group(replace(group, video_host_email=HOST))
     clock = FixedClock(NOW)
     receipt = await book_confirmed(
-        BookingService(uow, clock, TEST_TOKEN_KEY),
+        BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0),
         group_slug="demo",
         start=FRIDAY_0900,
         contact=ADA,

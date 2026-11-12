@@ -24,7 +24,7 @@ async def own_queue(site: Site, *, meeting: bool = True, **changes: object) -> i
         group = replace(summary.group, dispatch_kind=DispatchKind.OPENPLANNER_QUEUE, **changes)
         await tx.save_group(group)
     receipt = await book_confirmed(
-        BookingService(uow, site.clock, TEST_TOKEN_KEY),
+        BookingService(uow, site.clock, TEST_TOKEN_KEY, treatment_buffer=0),
         group_slug="demo",
         start=FRIDAY_0900,
         contact=ADA,

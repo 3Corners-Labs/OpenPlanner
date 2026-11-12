@@ -59,7 +59,7 @@ async def package(engine: AsyncEngine, database_url: str, tmp_path: Path) -> byt
     """A package of an installation with a booking, a sealed credential and a login secret."""
     await seed_demo(engine)
     clock = FixedClock(DOMAIN_NOW)
-    service = BookingService(SqlUnitOfWork(engine), clock, TEST_TOKEN_KEY)
+    service = BookingService(SqlUnitOfWork(engine), clock, TEST_TOKEN_KEY, treatment_buffer=0)
     await book_confirmed(service, group_slug="demo", start=SLOT_0900, contact=PERSON, locale="nl")
     await CredentialStore(engine, SOURCE_BOX).put(
         "webex_service_app", {"t": CLEAR["credential"]}, NOW

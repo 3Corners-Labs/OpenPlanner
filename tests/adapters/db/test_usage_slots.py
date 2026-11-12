@@ -37,7 +37,7 @@ async def test_an_ended_slot_is_closed_once_with_its_outcomes(engine: AsyncEngin
     await seed_group(engine, capacity=3)
     uow = SqlUnitOfWork(engine)
     clock = FixedClock(NOW)
-    service = BookingService(uow, clock, TEST_TOKEN_KEY)
+    service = BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
     closer = SlotCloser(uow, clock, lambda: timedelta(minutes=15))
     await closer.run(clock.now())
     receipt = await book(service, SLOT_0900, contact=participant(1))
@@ -75,7 +75,7 @@ async def test_the_status_columns_of_the_call_survive_a_round_trip(engine: Async
     await seed_group(engine, capacity=3)
     uow = SqlUnitOfWork(engine)
     clock = FixedClock(NOW)
-    receipt = await book(BookingService(uow, clock, TEST_TOKEN_KEY), SLOT_0900)
+    receipt = await book(BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0), SLOT_0900)
     integration = IntegrationService(uow, clock, AdminService(uow, clock))
     booking_id = receipt.booking.id or 0
 
@@ -107,7 +107,7 @@ async def test_the_closing_never_selects_a_purged_column(engine: AsyncEngine) ->
     clock = FixedClock(NOW)
     closer = SlotCloser(uow, clock, lambda: timedelta(minutes=15))
     await closer.run(clock.now())
-    await book(BookingService(uow, clock, TEST_TOKEN_KEY), SLOT_0900)
+    await book(BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0), SLOT_0900)
     clock.advance(timedelta(days=10))
     statements.clear()
 
@@ -128,7 +128,9 @@ async def test_a_rebook_request_keeps_its_time(engine: AsyncEngine) -> None:
 
     await seed_group(engine, capacity=3)
     uow = SqlUnitOfWork(engine)
-    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY), SLOT_0900)
+    receipt = await book(
+        BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0), SLOT_0900
+    )
     async with uow.locked() as tx:
         booking = await tx.get_booking(receipt.booking.id or 0)
         assert booking is not None

@@ -43,7 +43,7 @@ async def _service(  # type: ignore[no-untyped-def]
     state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=1))]
     uow = InMemoryUnitOfWork(state)
     clock = FixedClock(NOW)
-    receipt = await book(BookingService(uow, clock, TEST_TOKEN_KEY))
+    receipt = await book(BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0))
     booking = replace(receipt.booking, meeting=MeetingRef("m-1", "https://site.webex.com/m"))
     integration = IntegrationService(uow, clock, AdminService(uow, clock))
     calls = CallService(

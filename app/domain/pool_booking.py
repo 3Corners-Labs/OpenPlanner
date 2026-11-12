@@ -1,12 +1,22 @@
-"""Appointments on a counted capacity pool: what is offered and how one is placed (ADR 0122 step 5).
+"""Where an appointment is placed: the service's own staffing or a counted pool (ADR 0122 step 5).
 
-A flow that is not the legacy wrapper of a service draws on a counted pool. Its start times are
-the pool's own grid (decision P6): from the start of every run of touching blocks that offer
-appointments (P7), one after another in steps of the appointment length plus the organisation's
-wrap-up (``treatment_buffer_minutes``). A start is offered, and booked, only when
-``admit_appointment`` admits it against the pool's *live* staffing and every commitment that
-overlaps it, of any service of the organisation (P3); nothing is snapshotted for a later
-booking.
+A ``Placement`` answers two questions for one booking decision: which times are free, and which
+slot takes the booking. There are two: ``LegacyPlacement``, the service's own staffing (the
+code of ``BookingService``, unchanged), and ``PoolPlacement``, a counted pool. ``Placements``
+picks one, and is the only place that does:
+
+    new booking or its times ─► Placements.for_new / for_resolved ─► the flow (gate applied)
+    existing booking         ─► Placements.of_booking             ─► the booking's own slot
+
+A booking that exists is judged by its slot (its pool and length were fixed when the slot was
+made); a move never crosses from one model to the other, whatever the rollback gate says.
+
+On a pool the start times are the pool's own grid (decision P6): from the start of every run of
+touching blocks that offer appointments (P7), one after another in steps of the appointment
+length plus the organisation's wrap-up (``treatment_buffer_minutes``). A start is offered, and
+booked, only when ``admit_appointment`` admits it against the pool's *live* staffing and every
+commitment that overlaps it, of any service of the organisation (P3). Subjects do not narrow a
+pool's times: its blocks carry none (P7).
 
     book (pool flow) ─► locked tx ─► window ─► pool of the service's organisation, staffed?
                                      ─► start on the grid? ─► closure of the service?
@@ -23,15 +33,12 @@ closure of its service keeps its unit (decision P4).
 The pool slot carries ``occupied_until`` = start + length + wrap-up, fixed when it is created;
 the booking itself ends at start + length, so the deletion of its personal data (``slot.end``
 plus 24 hours) is not moved by the wrap-up. A pool slot carries no personal data.
-
-Reachable only through a flow that ``flow_resolution.gate_allows``, which holds every pool flow
-back while ``ROLLBACK_SAFE`` is false, and through a move of a booking that already sits on a
-pool (``target_of_booking``): such a booking stays on its pool whatever the gate says.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from typing import Protocol
 
 from app.domain.authorization import PUBLIC_READ
 from app.domain.availability import (
@@ -45,14 +52,11 @@ from app.domain.booking import Booking, BookingKind, Slot
 from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.closure import covering
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.flow_resolution import FlowRef, ResolvedFlow
+from app.domain.flow_resolution import ResolvedFlow, pool_flows_bookable
+from app.domain.flow_resolver import resolve_flow
 from app.domain.holidays import closures
-from app.domain.pool_accounting import (
-    AdmissionOutcome,
-    Commitment,
-    admit_appointment,
-    interval_end,
-)
+from app.domain.pool_accounting import AdmissionOutcome, admit_appointment, interval_end
+from app.domain.pool_availability import PoolScene, PoolTarget, resolved_target, slot_target
 from app.domain.pool_staffing import (
     Intake,
     PoolStaffing,
@@ -62,40 +66,63 @@ from app.domain.pool_staffing import (
     with_closed_days,
 )
 from app.domain.ports import Clock, Transaction
+from app.domain.routing import RoutingChoice
 from app.domain.scheduling import Group, windows_on
-from app.domain.service_flows import FlowRevision
+from app.domain.service_flows import IntakeMode
 from app.domain.tunable import value_for
 
 
+class Placement(Protocol):
+    """Where the bookings of one decision go: free times, and the slot that takes one."""
+
+    async def free(
+        self,
+        tx: Transaction,
+        group: Group,
+        first_day: date,
+        last_day: date,
+        subject: str | None,
+    ) -> list[AvailableSlot]:
+        """Return the bookable slots between two local dates of ``group``."""
+        ...
+
+    async def reserve(
+        self, tx: Transaction, group: Group, start: datetime, routing: RoutingChoice | None
+    ) -> Slot:
+        """Return the slot at ``start`` with a place for one more booking (inside ``locked()``)."""
+        ...
+
+
 @dataclass(frozen=True)
-class PoolTarget:
-    """What an appointment of a pool flow draws on: the pool and the appointment's length."""
+class LegacyPlacement:
+    """The service's own staffing: ``BookingService``'s own free slots and reservation."""
 
-    pool_id: int
-    duration_minutes: int
+    free_slots: Callable[
+        [Transaction, Group, date, date, str | None], Awaitable[list[AvailableSlot]]
+    ]
+    reserve_slot: Callable[[Transaction, Group, datetime, RoutingChoice | None], Awaitable[Slot]]
 
+    async def free(
+        self,
+        tx: Transaction,
+        group: Group,
+        first_day: date,
+        last_day: date,
+        subject: str | None,
+    ) -> list[AvailableSlot]:
+        """Return the service's own free slots (for ``subject``, ADR 0081)."""
+        return await self.free_slots(tx, group, first_day, last_day, subject)
 
-def pool_target(revision: ResolvedFlow | FlowRevision | None) -> PoolTarget | None:
-    """Return what a booking under ``revision`` draws on; ``None`` for a legacy one or none.
-
-    A revision that is not legacy always has a pool and a length once it is published (the
-    readiness checklist and ``check_flow_references``); one without either is refused rather than
-    placed on the service's own staffing, which would sell a unit twice.
-
-    Raises:
-        DomainError: ``slot_unavailable`` for a revision that is not legacy but lacks its pool or
-            its length.
-    """
-    if revision is None or revision.legacy:
-        return None
-    if revision.capacity_pool_id is None or revision.duration_minutes is None:
-        raise DomainError(ErrorCode.SLOT_UNAVAILABLE)
-    return PoolTarget(revision.capacity_pool_id, revision.duration_minutes)
+    async def reserve(
+        self, tx: Transaction, group: Group, start: datetime, routing: RoutingChoice | None
+    ) -> Slot:
+        """Reserve a place in the service's own slot at ``start``."""
+        return await self.reserve_slot(tx, group, start, routing)
 
 
 @dataclass(frozen=True)
 class _Pool:
-    """A pool loaded for one booking decision: its staffing, its closed days and the wrap-up."""
+    """A pool loaded for one decision: its staffing, its closed days and the wrap-up."""
 
     pool: CapacityPool
     staffing: PoolStaffing
@@ -133,34 +160,8 @@ class _Pool:
         return supply_between(self.staffing, self.closed_days, lower, upper)
 
 
-def offered(
-    pool_starts: Sequence[datetime],
-    supply: Supply,
-    commitments: Sequence[Commitment],
-    target: PoolTarget,
-    buffer_minutes: int,
-) -> list[AvailableSlot]:
-    """Return the starts that admission lets through, each with its places left.
-
-    ``capacity`` is the fewest units staffed for appointments over the slot's interval,
-    ``remaining`` the fewest free units (``admit_appointment``); the slot ends after the
-    appointment's length, without the wrap-up.
-    """
-    length = timedelta(minutes=target.duration_minutes)
-    result: list[AvailableSlot] = []
-    for start in pool_starts:
-        admission = admit_appointment(
-            supply, commitments, start, target.duration_minutes, buffer_minutes
-        )
-        if admission.admitted:
-            until = interval_end(start, target.duration_minutes, buffer_minutes)
-            units = lowest_units(supply, start, until, Intake.APPOINTMENT)
-            result.append(AvailableSlot(start, start + length, units, admission.free))
-    return result
-
-
 class PoolBookings:
-    """The pool side of ``BookingService``: offer and place appointments of a pool flow.
+    """Offer and place appointments on a counted pool (the pool side of ``BookingService``).
 
     Args:
         clock: Current time.
@@ -169,24 +170,43 @@ class PoolBookings:
             every admission and fixed into the slot's ``occupied_until``.
     """
 
-    def __init__(self, clock: Clock, treatment_buffer: int | Callable[[int], int] = 0) -> None:
+    def __init__(self, clock: Clock, *, treatment_buffer: int | Callable[[int], int]) -> None:
         """Store the collaborators."""
-        self._clock = clock
+        self.clock = clock
         self._treatment_buffer = treatment_buffer
 
-    async def target_of_booking(self, tx: Transaction, booking: Booking) -> PoolTarget | None:
-        """Return the pool a stored booking draws on, from the revision it was made under.
+    async def scene(
+        self,
+        tx: Transaction,
+        group: Group,
+        target: PoolTarget,
+        lower: datetime,
+        upper: datetime,
+    ) -> PoolScene | None:
+        """Load what availability needs for starts in ``lower`` to ``upper``, in one go.
 
-        ``None`` for a booking without a flow, under a legacy revision, or under a revision that
-        cannot be read. Not gated: a booking on a pool is moved on its pool (see the module).
+        Only starts inside the service's booking window and outside its closures are kept;
+        ``None`` when the pool offers nothing (not a counted pool of the service's organisation,
+        archived, or without a time zone).
         """
-        return await self.target_of_ref(tx, booking.flow)
-
-    async def target_of_ref(self, tx: Transaction, ref: FlowRef | None) -> PoolTarget | None:
-        """Return the pool the revision ``ref`` draws on; see ``target_of_booking``."""
-        if ref is None:
+        now = self.clock.now()
+        earliest, latest = booking_window(group, now)
+        lower, upper = max(lower, earliest), min(upper, latest + timedelta(microseconds=1))
+        if lower >= upper:
             return None
-        return pool_target(await tx.flow_revision(ref.flow_id, ref.revision))
+        loaded = await self._load(tx, group, target, lower, upper)
+        if loaded is None:
+            return None
+        shut = await tx.get_closures(group.id, now)
+        starts = [
+            start for start in loaded.starts(target, lower, upper) if covering(shut, start) is None
+        ]
+        if not starts:
+            return None
+        reach = starts[-1] + loaded.step(target)
+        commitments = await tx.get_pool_commitments(loaded.id, starts[0], reach)
+        supply = loaded.supply(starts[0], reach)
+        return PoolScene(target, loaded.buffer_minutes, starts, supply, commitments)
 
     async def free_slots(
         self,
@@ -200,31 +220,15 @@ class PoolBookings:
 
         The dates are the service's (the page's calendar); the grid is the pool's, in the pool's
         time zone, so a pool in another zone works. Notice, horizon and closures are the
-        service's. An unstaffed pool, a pool without a time zone and one that is not a counted
-        pool of the service's organisation offer nothing.
+        service's.
 
         Raises:
             DomainError: ``invalid_range``.
         """
         validate_range(first_day, last_day)
         lower, upper = utc_bounds(group, first_day, last_day)
-        now = self._clock.now()
-        loaded = await self._load(tx, group, target, lower, upper)
-        if loaded is None:
-            return []
-        earliest, latest = booking_window(group, now)
-        shut = await tx.get_closures(group.id, now)
-        starts = [
-            start
-            for start in loaded.starts(target, lower, upper)
-            if earliest <= start <= latest and covering(shut, start) is None
-        ]
-        if not starts:
-            return []
-        reach = starts[-1] + loaded.step(target)
-        commitments = await tx.get_pool_commitments(loaded.id, starts[0], reach)
-        supply = loaded.supply(starts[0], reach)
-        return offered(starts, supply, commitments, target, loaded.buffer_minutes)
+        found = await self.scene(tx, group, target, lower, upper)
+        return [] if found is None else found.offered(lower, upper)
 
     async def reserve(
         self, tx: Transaction, group: Group, target: PoolTarget, start: datetime
@@ -237,16 +241,16 @@ class PoolBookings:
         the pool's grid, a closure of the service, room (here: the admission sweep).
 
         Raises:
-            DomainError: ``outside_booking_window``, ``slot_unavailable`` (not on the grid, the
-                pool not staffed over the whole interval, or not a counted pool of the
-                organisation), ``group_closed`` or ``slot_full``.
+            DomainError: ``group_not_found``, ``outside_booking_window``, ``slot_unavailable``
+                (not on the grid, the pool not staffed over the whole interval, or not a counted
+                pool of the organisation), ``group_closed`` or ``slot_full``.
             ValueError: If ``start`` is naive.
         """
         if start.tzinfo is None:
             raise ValueError("start must be timezone-aware")
         if group.is_archived:
             raise DomainError(ErrorCode.GROUP_NOT_FOUND)
-        now = self._clock.now()
+        now = self.clock.now()
         earliest, latest = booking_window(group, now)
         if not earliest <= start <= latest:
             raise DomainError(ErrorCode.OUTSIDE_BOOKING_WINDOW)
@@ -263,10 +267,9 @@ class PoolBookings:
         admission = admit_appointment(
             supply, commitments, start, target.duration_minutes, loaded.buffer_minutes
         )
-        if admission.outcome is AdmissionOutcome.NOT_STAFFED:
-            raise DomainError(ErrorCode.SLOT_UNAVAILABLE)
-        if not admission.admitted:
-            raise DomainError(ErrorCode.SLOT_FULL)
+        if not admission.admitted:  # not staffed cannot happen on the grid; kept as a guard
+            staffed = admission.outcome is not AdmissionOutcome.NOT_STAFFED
+            raise DomainError(ErrorCode.SLOT_FULL if staffed else ErrorCode.SLOT_UNAVAILABLE)
         slot = await tx.get_pool_slot(loaded.id, group.id, start, until)
         if slot is not None:
             return slot
@@ -315,3 +318,138 @@ class PoolBookings:
             else frozenset[date]()
         )
         return _Pool(pool, staffing, closed, buffer)
+
+
+@dataclass(frozen=True)
+class PoolPlacement:
+    """A counted pool: its grid and the admission sweep. Subjects do not narrow it (P7)."""
+
+    pools: PoolBookings
+    target: PoolTarget
+
+    async def free(
+        self,
+        tx: Transaction,
+        group: Group,
+        first_day: date,
+        last_day: date,
+        subject: str | None,
+    ) -> list[AvailableSlot]:
+        """Return the pool's free starts; ``subject`` is ignored, a pool's blocks carry none."""
+        return await self.pools.free_slots(tx, group, self.target, first_day, last_day)
+
+    async def reserve(
+        self, tx: Transaction, group: Group, start: datetime, routing: RoutingChoice | None
+    ) -> Slot:
+        """Reserve a unit of the pool at ``start``; ``routing`` does not narrow a pool."""
+        return await self.pools.reserve(tx, group, self.target, start)
+
+
+class Placements:
+    """The one choice between the service's own staffing and a pool, for every booking path.
+
+    Args:
+        legacy: The service's own staffing.
+        pools: The pool side.
+    """
+
+    def __init__(self, legacy: LegacyPlacement, pools: PoolBookings) -> None:
+        """Store the two."""
+        self.legacy = legacy
+        self.pools = pools
+
+    def for_resolved(self, resolved: ResolvedFlow | None) -> Placement:
+        """Return the placement of a new booking under ``resolved`` (the resolver's answer).
+
+        The resolver has applied the rollback gate already (``gate_allows``).
+
+        Raises:
+            DomainError: ``slot_unavailable`` for a pool flow without its pool or length.
+        """
+        target = resolved_target(resolved)
+        return self.legacy if target is None else PoolPlacement(self.pools, target)
+
+    async def for_new(self, tx: Transaction, group: Group, flow: str | None) -> Placement:
+        """Return the placement a new booking of ``group`` under ``flow`` would get.
+
+        While no pool flow can be booked (``pool_flows_bookable``) nothing is read: every flow
+        that resolves then is a legacy one.
+
+        Raises:
+            DomainError: ``flow_not_available`` for a ``flow`` that does not resolve (gate open).
+        """
+        if not pool_flows_bookable(IntakeMode.APPOINTMENT):
+            return self.legacy
+        return self.for_resolved(await resolve_flow(tx, group.id, IntakeMode.APPOINTMENT, flow))
+
+    async def window_times(
+        self, tx: Transaction, group: Group, placement: Placement
+    ) -> "SceneTimes | None":
+        """Return a pool placement's free times loaded once for the whole booking window.
+
+        ``None`` for the service's own staffing, which a calendar reads window by window as
+        before (``OwnTimes``).
+        """
+        if not isinstance(placement, PoolPlacement):
+            return None
+        earliest, latest = booking_window(group, self.pools.clock.now())
+        scene = await self.pools.scene(
+            tx, group, placement.target, earliest, latest + timedelta(microseconds=1)
+        )
+        return SceneTimes(group, scene)
+
+    async def of_booking(self, tx: Transaction, booking: Booking) -> Placement:
+        """Return the placement of a stored booking: the one of its own slot.
+
+        Never the flow: a booking keeps the pool and length its slot was made with, and a
+        booking without a flow on the service's own slot stays there even when the service's
+        default flow has since become a pool flow. Not gated: a booking on a pool is moved on
+        its pool.
+
+        Raises:
+            DomainError: ``slot_unavailable`` when the booking's slot cannot be read.
+        """
+        slot = await tx.get_slot_by_id(booking.slot_id)
+        if slot is None:
+            raise DomainError(ErrorCode.SLOT_UNAVAILABLE)
+        target = slot_target(slot)
+        return self.legacy if target is None else PoolPlacement(self.pools, target)
+
+
+class FreeTimes(Protocol):
+    """The free times one page reads, window by window, from one source."""
+
+    async def between(self, first_day: date, last_day: date) -> list[AvailableSlot]:
+        """Return the free slots between two local dates (inclusive)."""
+        ...
+
+
+@dataclass(frozen=True)
+class SceneTimes:
+    """Free times of a pool flow read from one scene loaded for a whole booking window."""
+
+    group: Group
+    loaded: PoolScene | None
+
+    async def between(self, first_day: date, last_day: date) -> list[AvailableSlot]:
+        """Return the scene's free starts between two local dates of the service.
+
+        Raises:
+            DomainError: ``invalid_range``.
+        """
+        validate_range(first_day, last_day)
+        if self.loaded is None:
+            return []
+        lower, upper = utc_bounds(self.group, first_day, last_day)
+        return self.loaded.offered(lower, upper)
+
+
+@dataclass(frozen=True)
+class OwnTimes:
+    """Free times of the service's own staffing, each window read by ``read`` as before."""
+
+    read: Callable[[date, date], Awaitable[list[AvailableSlot]]]
+
+    async def between(self, first_day: date, last_day: date) -> list[AvailableSlot]:
+        """Return the service's own free slots between two local dates (inclusive)."""
+        return await self.read(first_day, last_day)

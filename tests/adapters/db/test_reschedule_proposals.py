@@ -31,7 +31,7 @@ async def test_an_open_proposal_takes_its_place_until_it_is_released(engine: Asy
     await seed_group(engine, capacity=1)
     uow = SqlUnitOfWork(engine)
     clock = FixedClock(NOW)
-    bookings = BookingService(uow, clock, TEST_TOKEN_KEY)
+    bookings = BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
     receipt = await book(bookings, contact=ADA)
     booking_id = receipt.booking.id or 0
     async with uow.locked() as tx:
@@ -80,7 +80,7 @@ async def test_an_unconfirmed_booking_leaves_neither_a_proposal_nor_a_new_slot(
     """
     await seed_group(engine, capacity=1)
     uow = SqlUnitOfWork(engine)
-    bookings = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+    bookings = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
     pending = (await book_pending(bookings, contact=ADA)).booking
 
     async def propose() -> None:

@@ -15,7 +15,9 @@ from tests.support.domain import NOW, TEST_TOKEN_KEY, book
 
 async def test_a_correction_keeps_the_email_status_and_routing(engine: AsyncEngine) -> None:
     await seed_group(engine)
-    receipt = await book(BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY))
+    receipt = await book(
+        BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
+    )
     booking_id = receipt.booking.id or 0
     async with engine.begin() as conn:
         await conn.execute(

@@ -47,7 +47,7 @@ def uow() -> InMemoryUnitOfWork:
 
 @pytest.fixture
 def service(uow: InMemoryUnitOfWork) -> BookingService:
-    return BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+    return BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
 
 
 async def test_availability_lists_free_slots(service: BookingService) -> None:
@@ -318,8 +318,12 @@ async def test_receipt_repr_hides_the_token(service: BookingService) -> None:
 
 
 async def test_booking_window_boundaries_are_inclusive(uow: InMemoryUnitOfWork) -> None:
-    earliest = BookingService(uow, FixedClock(SLOT_0900 - timedelta(minutes=60)), TEST_TOKEN_KEY)
-    latest = BookingService(uow, FixedClock(SLOT_0930 - timedelta(days=60)), TEST_TOKEN_KEY)
+    earliest = BookingService(
+        uow, FixedClock(SLOT_0900 - timedelta(minutes=60)), TEST_TOKEN_KEY, treatment_buffer=0
+    )
+    latest = BookingService(
+        uow, FixedClock(SLOT_0930 - timedelta(days=60)), TEST_TOKEN_KEY, treatment_buffer=0
+    )
 
     await book(earliest)
     await book(latest, SLOT_0930)
@@ -328,7 +332,7 @@ async def test_booking_window_boundaries_are_inclusive(uow: InMemoryUnitOfWork) 
 async def test_slot_day_is_taken_in_the_group_time_zone(uow: InMemoryUnitOfWork) -> None:
     # Open Tuesday 00:00-01:00 Amsterdam, which is Monday 23:00 UTC.
     uow.state.rules[1] = [ScheduleRule(weekday=1, window=window("00:00", "01:00", 1))]
-    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
 
     receipt = await book(service, datetime(2026, 1, 5, 23, 0, tzinfo=UTC))
 
@@ -391,8 +395,8 @@ async def test_purged_booking_cannot_be_rescheduled(
 async def test_booking_cannot_be_moved_from_the_change_lead(
     uow: InMemoryUnitOfWork, now: datetime
 ) -> None:
-    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
-    late = BookingService(uow, FixedClock(now), TEST_TOKEN_KEY)
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0))
+    late = BookingService(uow, FixedClock(now), TEST_TOKEN_KEY, treatment_buffer=0)
 
     with pytest.raises(DomainError) as excinfo:
         await late.reschedule(receipt.management_token, SLOT_0930)
@@ -415,8 +419,8 @@ async def test_booking_cannot_be_moved_from_the_change_lead(
 async def test_booking_cannot_be_cancelled_from_the_start(
     uow: InMemoryUnitOfWork, now: datetime
 ) -> None:
-    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
-    late = BookingService(uow, FixedClock(now), TEST_TOKEN_KEY)
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0))
+    late = BookingService(uow, FixedClock(now), TEST_TOKEN_KEY, treatment_buffer=0)
 
     with pytest.raises(DomainError) as excinfo:
         await late.cancel(receipt.management_token)
@@ -430,9 +434,12 @@ async def test_booking_can_be_cancelled_after_the_change_lead_and_dispatch(
     uow: InMemoryUnitOfWork, minutes_before: int
 ) -> None:
     """ADR 0069: no cancel-lock before the start; the task is ended by the job (ADR 0021)."""
-    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0))
     late = BookingService(
-        uow, FixedClock(SLOT_0900 - timedelta(minutes=minutes_before)), TEST_TOKEN_KEY
+        uow,
+        FixedClock(SLOT_0900 - timedelta(minutes=minutes_before)),
+        TEST_TOKEN_KEY,
+        treatment_buffer=0,
     )
 
     details = await late.find(receipt.management_token)
@@ -449,9 +456,12 @@ async def test_booking_can_be_cancelled_after_the_change_lead_and_dispatch(
 async def test_booking_can_be_moved_until_just_before_the_change_lead(
     uow: InMemoryUnitOfWork,
 ) -> None:
-    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0))
     just_before = BookingService(
-        uow, FixedClock(SLOT_0900 - timedelta(minutes=60, seconds=1)), TEST_TOKEN_KEY
+        uow,
+        FixedClock(SLOT_0900 - timedelta(minutes=60, seconds=1)),
+        TEST_TOKEN_KEY,
+        treatment_buffer=0,
     )
 
     moved = await just_before.reschedule(receipt.management_token, SLOT_0930)
@@ -471,8 +481,10 @@ async def test_both_kinds_can_still_cancel_a_day_ahead_and_after_the_lead(
 ) -> None:
     """The product owner's case: a Monday booking is not locked from Friday on."""
     uow.state.groups[1] = make_group(id=1, slug="balie", dispatch_kind=kind)
-    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
-    sunday = BookingService(uow, FixedClock(SLOT_0900 - timedelta(days=1)), TEST_TOKEN_KEY)
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0))
+    sunday = BookingService(
+        uow, FixedClock(SLOT_0900 - timedelta(days=1)), TEST_TOKEN_KEY, treatment_buffer=0
+    )
 
     details = await sunday.find(receipt.management_token)
 
@@ -488,8 +500,10 @@ async def test_dispatch_job_follows_the_groups_dispatch_lead(uow: InMemoryUnitOf
         min_notice_minutes=60,
         participant_change_lead_minutes=15,
     )
-    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY))
-    at_lead = BookingService(uow, FixedClock(SLOT_0900 - timedelta(minutes=15)), TEST_TOKEN_KEY)
+    receipt = await book(BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0))
+    at_lead = BookingService(
+        uow, FixedClock(SLOT_0900 - timedelta(minutes=15)), TEST_TOKEN_KEY, treatment_buffer=0
+    )
 
     with pytest.raises(DomainError, match="booking_locked"):
         await at_lead.reschedule(receipt.management_token, SLOT_0930)
@@ -537,7 +551,7 @@ async def test_an_archived_group_is_not_found_in_public(
 
 def test_token_key_must_be_long_enough(uow: InMemoryUnitOfWork) -> None:
     with pytest.raises(ValueError, match="32 bytes"):
-        BookingService(uow, FixedClock(NOW), b"short")
+        BookingService(uow, FixedClock(NOW), b"short", treatment_buffer=0)
 
 
 async def test_own_queue_team_gets_an_invite_and_its_withdrawal(uow: InMemoryUnitOfWork) -> None:
@@ -547,7 +561,7 @@ async def test_own_queue_team_gets_an_invite_and_its_withdrawal(uow: InMemoryUni
         dispatch_kind=DispatchKind.OPENPLANNER_QUEUE,
         calendar_invite_address="team-balie@example.org",
     )
-    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+    service = BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
     receipt = await book(service)
     booking_id = receipt.booking.id or 0
     planned = [j.type for j in uow.state.jobs[booking_id]]
@@ -568,7 +582,7 @@ def _limit_service(uow: InMemoryUnitOfWork, limit: int) -> BookingService:
     """Return a service for group 1 with capacity 3 and ``limit`` bookings per address."""
     uow.state.groups[1] = make_group(id=1, slug="balie", max_bookings_per_email=limit)
     uow.state.rules[1] = [ScheduleRule(weekday=0, window=window("09:00", "12:00", 3))]
-    return BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY)
+    return BookingService(uow, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
 
 
 async def test_the_same_address_in_the_same_slot_is_refused(uow: InMemoryUnitOfWork) -> None:
@@ -606,7 +620,9 @@ async def test_the_limit_counts_only_this_group_and_the_future(
 
     assert (await book_pending(service, SLOT_0930)).booking.status is BookingStatus.REFUSED
 
-    later = BookingService(uow, FixedClock(SLOT_0930 + timedelta(minutes=1)), TEST_TOKEN_KEY)
+    later = BookingService(
+        uow, FixedClock(SLOT_0930 + timedelta(minutes=1)), TEST_TOKEN_KEY, treatment_buffer=0
+    )
     uow.state.groups[1] = make_group(
         id=1,
         slug="balie",

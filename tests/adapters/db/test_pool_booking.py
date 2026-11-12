@@ -16,15 +16,27 @@ from sqlalchemy import func, select
 from app.adapters.db.engine import BEGIN_MODE_OPTION, create_engine
 from app.adapters.db.models import BookingRow, SlotRow
 from app.adapters.db.uow import SqlUnitOfWork
+from app.domain.closure import Closure
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.scheduling import ScheduleRule
+from app.domain.service_flows import FlowState
 from app.domain.services import BookingService
+from app.domain.usage import ActorClass
 from tests.fakes.clock import FixedClock
-from tests.support.domain import MONDAY, NOW, TEST_TOKEN_KEY, make_group, participant
-from tests.support.flow_world import World
-from tests.support.pool_flows import PoolFlow, add_pool_flow, block, open_gate, seed_pool_flow
+from tests.support.domain import MONDAY, NOW, TEST_TOKEN_KEY, make_group, participant, window
+from tests.support.flow_world import EVERYTHING, World
+from tests.support.pool_flows import (
+    PoolFlow,
+    add_counted_pool,
+    add_pool_flow,
+    block,
+    open_gate,
+    seed_pool_flow,
+)
 
 AT_0900 = datetime(2026, 1, 5, 8, 0, tzinfo=UTC)
 PATIENT_MS = 60_000
+NOTICES = {"nl": "Gesloten.", "en": "Closed."}
 
 
 @pytest.fixture(autouse=True)
@@ -162,3 +174,69 @@ async def test_a11_two_bookings_racing_for_the_last_unit_never_overbook(
     finally:
         await check.dispose()
     assert (bookings, pool_slots) == (1, 1)
+
+
+# --- the times of a move come from the booking's own slot (review finding 1) ------------------
+
+
+async def test_a_booking_without_a_flow_moves_on_own_times_when_the_default_is_a_pool(
+    world: World,
+) -> None:
+    """A booking made before any flow existed (flow NULL) is on the service's own staffing; the
+    default flow has since become a pool flow. Its move must show the service's own times."""
+    desk = await _desk(world)
+    async with world.uow.locked() as tx:
+        await tx.add_schedule_rule(desk, ScheduleRule(0, window("09:00", "10:00", 2)))
+        for legacy in await tx.list_service_flows(EVERYTHING, desk):
+            await tx.set_flow_state(EVERYTHING, legacy.id, FlowState.ARCHIVED)
+    service = _service(world.uow)
+    receipt = await service.book(
+        group_slug="desk", start=AT_0900, contact=participant(1), locale="nl"
+    )
+    await service.confirm(receipt.management_token)
+    assert receipt.booking.flow is None
+    pool_id = await add_counted_pool(world.uow, world.acme, [block()])
+    await add_pool_flow(world.uow, desk, pool_id, code="pool", default=True)
+    async with world.uow.read() as tx:
+        booking = await tx.get_booking(receipt.booking.id or 0)
+    assert booking is not None
+
+    own = [s.start for s in await service.move_times(booking, MONDAY, MONDAY)]
+    moved = await service.reschedule(receipt.management_token, AT_0900 + timedelta(minutes=30))
+
+    assert own == [AT_0900, AT_0900 + timedelta(minutes=30)]
+    async with world.uow.read() as tx:
+        slot = await tx.get_slot_by_id(moved.booking.slot_id)
+    assert slot is not None
+    assert slot.capacity_pool_id is None  # stayed on the service's own staffing
+
+
+async def test_staff_move_a_pool_booking_suspended_by_a_closure_to_a_pool_time(
+    world: World,
+) -> None:
+    made = await _one_service(world, units=1)
+    service = _service(world.uow)
+    receipt = await _book(service, "desk", "advies", 1)
+    confirmed = await service.confirm(receipt.management_token)
+    group_id = confirmed.group_id
+    async with world.uow.locked() as tx:
+        closure = await tx.add_closure(
+            Closure(None, group_id, AT_0900, AT_0900 + timedelta(hours=1), NOTICES, NOW)
+        )
+        await tx.save_booking(confirmed.suspend(closure.id or 0))
+        held = await tx.get_booking(confirmed.id or 0)
+    assert held is not None
+
+    times = [s.start for s in await service.move_times(held, MONDAY, MONDAY)]
+    later = AT_0900 + timedelta(minutes=60)  # 10:00, after the closure, on the 30-minute grid
+    async with world.uow.locked() as tx:
+        group = await tx.get_group_by_id(group_id)
+        assert group is not None
+        moved = await service.relocate(tx, held, group, later, actor=ActorClass.CLOSURE)
+
+    assert AT_0900 not in times  # inside the closure
+    assert later in times
+    async with world.uow.read() as tx:
+        slot = await tx.get_slot_by_id(moved.booking.slot_id)
+    assert slot is not None
+    assert slot.capacity_pool_id == made.pool_id

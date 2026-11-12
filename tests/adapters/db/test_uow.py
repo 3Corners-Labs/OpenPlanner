@@ -32,7 +32,9 @@ from tests.support.domain import (
 
 @pytest.fixture
 def service(engine: AsyncEngine) -> BookingService:
-    return BookingService(SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY)
+    return BookingService(
+        SqlUnitOfWork(engine), FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0
+    )
 
 
 @asynccontextmanager
@@ -177,7 +179,8 @@ async def test_concurrent_bookings_on_separate_connections(
     blocker = create_engine(database_url)
     try:
         services = [
-            BookingService(SqlUnitOfWork(e), FixedClock(NOW), TEST_TOKEN_KEY) for e in engines
+            BookingService(SqlUnitOfWork(e), FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0)
+            for e in engines
         ]
         async with hold_write_lock(blocker):
             pending = [asyncio.ensure_future(book(s)) for s in services]

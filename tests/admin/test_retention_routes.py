@@ -12,9 +12,9 @@ FRIDAY_0900 = datetime(2026, 1, 2, 8, 0, tzinfo=UTC)  # demo group: open weekday
 
 async def _book(site: Site) -> None:
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    await BookingService(SqlUnitOfWork(app.state.engine), site.clock, TEST_TOKEN_KEY).book(
-        group_slug="demo", start=FRIDAY_0900, contact=ADA, locale="nl"
-    )
+    await BookingService(
+        SqlUnitOfWork(app.state.engine), site.clock, TEST_TOKEN_KEY, treatment_buffer=0
+    ).book(group_slug="demo", start=FRIDAY_0900, contact=ADA, locale="nl")
 
 
 async def test_a_booking_past_its_purge_moment_needs_attention(site: Site) -> None:
