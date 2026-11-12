@@ -12,8 +12,11 @@ previous image, which only writes NULL pools, it stays exactly as strict. ``uq_s
 the bookings of one service, pool, start and length share a slot row, as legacy bookings share
 one, and ``ix_slots_pool_start`` serves the load query of a pool.
 
-The two ``slots`` columns are added with a plain ``ALTER TABLE ADD COLUMN`` (no table rebuild);
-the foreign key is written inline, which SQLite allows for a column that defaults to NULL.
+The two ``slots`` columns are added with a plain ``ALTER TABLE ADD COLUMN`` (no table rebuild).
+``capacity_pool_id`` has no database foreign key, like ``bookings.flow_id`` (migration 0109):
+SQLite cannot add a named constraint to an existing table without rebuilding ``slots``, which is
+referenced by ``bookings``; a pool is archived, never deleted, and a pool slot is only written by
+the booking path of ADR 0122 step 5, which reads the pool in the same transaction.
 
 Downgrade drops what was added and restores the old index, and refuses while a slot carries a
 pool: the bookings on it would lose their pool, and the restored unique index could then fail
@@ -103,10 +106,7 @@ def upgrade() -> None:
     """Add the zone, the staffing tables, the two slot columns and the indexes."""
     op.add_column("capacity_pools", sa.Column("timezone", sa.String(length=64), nullable=True))
     _create_staffing_tables()
-    op.execute(
-        "ALTER TABLE slots ADD COLUMN capacity_pool_id INTEGER "
-        "REFERENCES capacity_pools (id) ON DELETE RESTRICT"
-    )
+    op.add_column("slots", sa.Column("capacity_pool_id", sa.Integer(), nullable=True))
     op.add_column("slots", sa.Column("occupied_until", UTCDateTime(), nullable=True))
     op.drop_index("uq_slots_group_start_scheduled", table_name="slots")
     op.create_index(

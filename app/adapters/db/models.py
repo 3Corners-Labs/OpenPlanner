@@ -569,9 +569,9 @@ class SlotRow(Base):
     kind: Mapped[str] = mapped_column(String(16), server_default=text("'scheduled'"))
     # ADR 0122 step 2: NULL for every legacy slot; the pool a slot of a non-legacy flow draws on,
     # and the end of its appointment plus the wrap-up, fixed at creation.
-    capacity_pool_id: Mapped[int | None] = mapped_column(
-        ForeignKey("capacity_pools.id", ondelete="RESTRICT")
-    )
+    # No database foreign key, like ``bookings.flow_id`` (migration 0109): SQLite cannot add a named
+    # one without rebuilding ``slots``, and a pool is archived, never deleted.
+    capacity_pool_id: Mapped[int | None] = mapped_column(Integer)
     occupied_until: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     # Backstop for the write lock: one legacy scheduled slot per group and start. Direct calls

@@ -110,6 +110,10 @@ STATE_TABLES = frozenset(
         "flow_revision_skills",
         "subject_flows",
         "subject_flow_skills",
+        # ADR 0122 step 2: a counted pool's staffing is configuration in kind, not yet carried by
+        # a package; step 3 moves these two into CONFIGURATION_TABLES with their export and import.
+        "pool_staffing_rules",
+        "pool_staffing_overrides",
         "wallboard_links",
         "staff_refused_entitlements",
         "update_requests",

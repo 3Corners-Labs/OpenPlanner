@@ -144,6 +144,7 @@ SETTING_LABELS: dict[str, str] = {
     "product_footer": "settings.field.product_footer.label",
     "staff_dormant_after_days": "settings.field.staff_dormant_after_days.label",
     "shortfall_horizon_days": "settings.field.shortfall_horizon_days.label",
+    "treatment_buffer_minutes": "settings.field.treatment_buffer_minutes.label",
     "planner_changes_alert_per_hour": "settings.field.planner_changes_alert_per_hour.label",
     "contact_reveals_alert_per_hour": "settings.field.contact_reveals_alert_per_hour.label",
     "planner_rebook_days": "settings.field.planner_rebook_days.label",

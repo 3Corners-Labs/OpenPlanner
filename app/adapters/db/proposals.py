@@ -20,7 +20,7 @@ _HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
 _AWAITING = BookingStatus.AWAITING_REBOOK.value
 
 
-def _open(owner: type[BookingRow]) -> tuple[ColumnElement[bool], ...]:
+def open_proposal(owner: type[BookingRow]) -> tuple[ColumnElement[bool], ...]:
     """Return the conditions of an open proposal, its booking joined as ``owner``."""
     return (RescheduleProposalRow.released_at.is_(None), owner.status == _AWAITING)
 
@@ -38,7 +38,7 @@ def places_taken() -> ColumnElement[int]:
     held = (
         select(func.count(RescheduleProposalRow.id))
         .join(owner, owner.id == RescheduleProposalRow.booking_id)
-        .where(RescheduleProposalRow.slot_id == SlotRow.id, *_open(owner))
+        .where(RescheduleProposalRow.slot_id == SlotRow.id, *open_proposal(owner))
         .correlate(SlotRow)
         .scalar_subquery()
     )
@@ -92,7 +92,7 @@ class ProposalQueries:
         row = await self._session.scalar(
             select(RescheduleProposalRow)
             .join(BookingRow, BookingRow.id == RescheduleProposalRow.booking_id)
-            .where(RescheduleProposalRow.booking_id == booking_id, *_open(BookingRow))
+            .where(RescheduleProposalRow.booking_id == booking_id, *open_proposal(BookingRow))
             .order_by(RescheduleProposalRow.id.desc())
             .limit(1)
         )
@@ -109,7 +109,7 @@ class ProposalQueries:
                 BookingRow.group_id == group_id,
                 RescheduleProposalRow.start >= lower,
                 RescheduleProposalRow.start < upper,
-                *_open(BookingRow),
+                *open_proposal(BookingRow),
             )
             .order_by(RescheduleProposalRow.start, RescheduleProposalRow.id)
         )

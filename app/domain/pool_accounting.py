@@ -37,14 +37,16 @@ from enum import StrEnum
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.pool_staffing import Intake, Supply, check_interval, lowest_units, require_aware
 from app.domain.scheduling import MAX_SLOT_MINUTES, valid_slot_minutes
+from app.domain.settings_registry import BY_KEY
 
-MAX_BUFFER_MINUTES = 120
-"""Upper bound of ``treatment_buffer_minutes`` (ADR 0122 settings); fixed here as the bound."""
+MAX_BUFFER_MINUTES = int(BY_KEY["treatment_buffer_minutes"].maximum or 0)
+"""Upper bound of ``treatment_buffer_minutes``: the bound of the setting in the registry."""
 MAX_SPAN = timedelta(minutes=MAX_SLOT_MINUTES + MAX_BUFFER_MINUTES)
 """The longest a commitment can last; bounds how far back an adapter must look for overlaps."""
 
 CommitmentKey = tuple[str, int]
-"""``("booking", id)`` for an appointment, ``("request", id)`` for on-demand work."""
+"""``("booking", id)`` for an appointment, ``("proposal", id)`` for an open proposal of a new time
+(ADR 0057), ``("request", id)`` for on-demand work."""
 
 _Live = tuple[datetime, datetime | None]
 """``(start, until)`` of a commitment in force; ``until`` is ``None`` for an overrun."""

@@ -181,6 +181,8 @@ class Slot:
 
     ``capacity_snapshot`` is the capacity at creation; later schedule edits do not change it.
     A direct call has its own slot (``kind`` direct) that takes no scheduled capacity.
+    A slot of a non-legacy flow carries the counted pool it draws on and ``occupied_until``, its
+    end plus the wrap-up fixed at creation (ADR 0122); both are ``None`` for every legacy slot.
     """
 
     id: int | None
@@ -189,6 +191,8 @@ class Slot:
     end: datetime
     capacity_snapshot: int
     kind: BookingKind = BookingKind.SCHEDULED
+    capacity_pool_id: int | None = None
+    occupied_until: datetime | None = None
 
 
 @dataclass(frozen=True)

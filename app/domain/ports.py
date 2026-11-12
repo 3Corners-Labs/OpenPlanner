@@ -80,6 +80,8 @@ from app.domain.login_domains import DomainClaim
 from app.domain.maintenance import MaintenanceState
 from app.domain.own_certificate import HostKeys, OwnCertificate, ParsedChain, ParsedKey
 from app.domain.participant_links import LinkSession
+from app.domain.pool_accounting import Commitment
+from app.domain.pool_staffing import PoolStaffing
 from app.domain.public_address import AddressCheck, AddressKind, InstanceReply
 from app.domain.report_digest import RunStatus, Subscription
 from app.domain.reschedule_proposal import HeldProposal
@@ -1669,6 +1671,66 @@ class Transaction(Protocol):
         """Archive a pool; ``configuration_object_in_use`` while a flow not archived draws on it.
 
         A flow draws on it by its current or its draft revision.
+        """
+        ...
+
+    async def get_pool_staffing(
+        self, scope: Scope, pool_id: int, from_day: date | None = None
+    ) -> PoolStaffing | None:
+        """Return a counted pool's blocks and exceptions (from ``from_day`` on), each with its id.
+
+        ``None`` for a pool that is missing, outside ``scope`` or legacy, and for a counted pool
+        without a time zone (ADR 0122). Nothing reads it for a booking decision before step 5.
+        """
+        ...
+
+    async def set_pool_timezone(self, scope: Scope, pool_id: int, timezone: str | None) -> bool:
+        """Set a counted pool's time zone (``None`` clears it); ``False`` when no such pool."""
+        ...
+
+    async def add_pool_rule(self, scope: Scope, pool_id: int, rule: ScheduleRule) -> int | None:
+        """Store a weekly block of a counted pool; return its id, ``None`` when no such pool."""
+        ...
+
+    async def update_pool_rule(
+        self, scope: Scope, pool_id: int, rule_id: int, rule: ScheduleRule
+    ) -> bool:
+        """Replace the pool's block ``rule_id``; ``False`` if the pool has no such block."""
+        ...
+
+    async def delete_pool_rule(self, scope: Scope, pool_id: int, rule_id: int) -> bool:
+        """Delete the pool's block ``rule_id``; ``False`` if the pool has no such block."""
+        ...
+
+    async def add_pool_override(
+        self, scope: Scope, pool_id: int, override: ScheduleOverride
+    ) -> int | None:
+        """Store an exception of a counted pool; return its id, ``None`` when no such pool."""
+        ...
+
+    async def update_pool_override(
+        self, scope: Scope, pool_id: int, override_id: int, override: ScheduleOverride
+    ) -> bool:
+        """Replace the pool's exception ``override_id``; ``False`` if the pool has none such."""
+        ...
+
+    async def delete_pool_override(self, scope: Scope, pool_id: int, override_id: int) -> bool:
+        """Delete the pool's exception ``override_id``; ``False`` if the pool has none such."""
+        ...
+
+    async def get_pool_slot(
+        self, pool_id: int, group_id: int, start: datetime, occupied_until: datetime
+    ) -> Slot | None:
+        """Return the pool slot of one service, start and length (ADR 0122), or ``None``."""
+        ...
+
+    async def get_pool_commitments(
+        self, pool_id: int, lower: datetime, upper: datetime
+    ) -> list[Commitment]:
+        """Return the pool's units held at any moment of ``lower`` to ``upper``.
+
+        One per place taken in a pool slot: a booking that holds one and an open proposal of a
+        new time. Derived from the bookings, never a second ledger (ADR 0122 point 4).
         """
         ...
 

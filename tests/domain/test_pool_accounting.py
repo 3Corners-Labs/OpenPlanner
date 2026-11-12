@@ -24,6 +24,7 @@ from app.domain.pool_accounting import (
 )
 from app.domain.pool_staffing import Intake, PoolStaffing, Segment, Supply, supply_between
 from app.domain.scheduling import MAX_CAPACITY, Offer, ScheduleRule, TimeWindow
+from app.domain.settings_registry import BY_KEY, SettingClass
 
 ADMITTED = AdmissionOutcome.ADMITTED
 FULL = AdmissionOutcome.FULL
@@ -822,3 +823,11 @@ def test_earliest_start_is_a_forecast_on_planned_ends_not_a_promise_of_check_sta
     assert earliest_start(pool, running, at("10:10"), 20, 0, at("12:00")) == at("10:30")
     # If it runs over, check_start at 10:30 refuses: the forecast is not a reservation.
     assert not check_start(pool, running, at("10:30"), 20, 0, intake=Intake.ON_DEMAND).may_start
+
+
+def test_the_buffer_bound_is_the_bound_of_the_registered_setting() -> None:
+    spec = BY_KEY["treatment_buffer_minutes"]
+
+    assert spec.class_ is SettingClass.ORGANISATION
+    assert (spec.default, spec.minimum, spec.maximum) == (0, 0, MAX_BUFFER_MINUTES)
+    assert MAX_BUFFER_MINUTES == 120

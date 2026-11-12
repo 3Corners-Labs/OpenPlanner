@@ -307,6 +307,10 @@ class Settings(BaseSettings):
     # ADR 0044: how many days ahead the shortfall summary (group page, dashboard) looks.
     # Class D organisation (ADR 0042, settings registry).
     shortfall_horizon_days: int = Field(default=14, ge=1, le=60)
+    # ADR 0122: wrap-up minutes added to every appointment of a shared capacity pool, read at
+    # admission and fixed into the commitment's end. Class D organisation (settings registry);
+    # first read by the booking path of ADR 0122 step 5.
+    treatment_buffer_minutes: int = Field(default=0, ge=0, le=120)
     # ADR 0044: changes by one planner per hour above which a system event warns (never
     # blocks). Class C platform (ADR 0042, settings registry).
     planner_changes_alert_per_hour: int = Field(default=50, ge=5, le=1000)
