@@ -200,6 +200,7 @@ class RoutingService:
                 ``invalid_configuration`` naming ``mapping``, ``variable_name`` (also for a name
                 OpenPlanner sends itself, ``RESERVED_FROM_NOW``) or ``variable_value``.
         """
+
         def change(routing: GroupRouting, _: frozenset[str]) -> tuple[GroupRouting, str] | None:
             if name in RESERVED_FROM_NOW:
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, "variable_name")

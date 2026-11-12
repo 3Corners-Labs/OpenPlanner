@@ -11,11 +11,11 @@ organisation, and an archived one, answer like a missing one.
     POST /admin/organisations/{org}/skills                       skills.manage      add a skill
     GET  /admin/organisations/{org}/skills/{skill_id}            skills.manage      edit the labels
     POST /admin/organisations/{org}/skills/{skill_id}            skills.manage      save it
+    GET  /admin/organisations/{org}/skills/{skill_id}/archive    skills.manage      confirmation
+    POST /admin/organisations/{org}/skills/{skill_id}/archive    skills.manage      archive it
 
 The page of one skill also carries its contact-center code (ADR 0121 step 4b): what the
 organisation's contact-center flow tests for the skill; blank means not mapped.
-    GET  /admin/organisations/{org}/skills/{skill_id}/archive    skills.manage      confirmation
-    POST /admin/organisations/{org}/skills/{skill_id}/archive    skills.manage      archive it
 
 The list has the archived skills behind ``?skills=archived``. There is no delete: a skill that
 anything refers to stays. The code is fixed after creation.

@@ -37,6 +37,7 @@ ARCHIVED = "skill.archived"
 GRANTS_CHANGED = "staff_skills.changed"
 """Details of the audit events (action ``skills.manage``); the labels are in the audit page."""
 LIMIT_FIELD = "skill_limit"
+"""The field of the refusal when the organisation has as many skills as the platform allows."""
 KEEP = "\x00keep"
 """``relabel``'s default for the contact-center code: leave the stored one as it is."""
 
@@ -45,9 +46,6 @@ def _code_of(typed: str | None) -> str | None:
     """Return a typed contact-center code trimmed; blank means not mapped."""
     stripped = (typed or "").strip()
     return stripped or None
-
-
-"""The field of the refusal when the organisation has as many skills as the platform allows."""
 
 
 @dataclass(frozen=True)
