@@ -12,14 +12,17 @@ from app.domain.admin import AdminService
 from app.domain.audit import Outcome
 from app.domain.authorization import Permission, Role, Target
 from app.domain.configuration_changes import ConfigurationSnapshot, RuleContext, Usage
-from app.domain.configuration_document import Scope
+from app.domain.configuration_document import Scope, parse_document
 from app.domain.configuration_document_service import Actor, ConfigurationDocumentService
 from app.domain.configuration_tree import Entity
+from app.domain.configuration_v1 import FORMATS
 from app.domain.configuration_values import Secret
 from app.domain.errors import DomainError, ErrorCode
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import SUPER, principal
+from tests.support.flow_documents import installation, skill
+from tests.support.flow_documents import organisation as flow_organisation
 
 NOW = datetime(2026, 11, 8, 12, 0, tzinfo=UTC)
 HOST = Actor.host()
@@ -203,6 +206,18 @@ async def test_more_changes_than_the_limit_are_refused_unwritten() -> None:
 
     assert error.value.code is ErrorCode.CONFIGURATION_TOO_MANY_CHANGES
     assert unit.state.applied_configuration == []
+
+
+async def test_the_preview_of_more_changes_than_the_limit_refuses_and_offers_no_apply() -> None:
+    data = {
+        "format": "openplanner.config/v1",
+        "organisations": [{"slug": f"o{n}", "name": "O"} for n in range(3)],
+    }
+
+    result = await build(uow(), changes=2).plan(HOST, encoded(data), None)
+
+    assert not result.ok
+    assert [r.code for r in result.refusals] == [ErrorCode.CONFIGURATION_TOO_MANY_CHANGES]
 
 
 async def test_a_document_of_another_scope_than_the_route_allows_is_refused() -> None:
@@ -517,3 +532,103 @@ async def test_a_plain_export_applies_again_and_changes_nothing_the_second_time(
     assert plan.ok
     assert not plan.sealed
     assert plan.changes == ()
+
+
+async def test_a_plan_that_archives_needs_the_reviewed_hash_as_one_that_deletes_does() -> None:
+    root = installation(
+        flow_organisation("acme", skills=(skill("passport"),)), flow_organisation("beta")
+    )
+    unit = InMemoryUnitOfWork()
+    unit.state.configuration = ConfigurationSnapshot(
+        root, Usage(kept={"skill": frozenset({("acme", "passport")})}), 0
+    )
+    data = {
+        "format": "openplanner.config/v1",
+        "mode": "replace",
+        "scope": {"organisation": "acme"},
+        "organisations": [{"slug": "acme", "skills": []}],
+    }
+    service = build(unit)
+    plan = await service.plan(HOST, encoded(data), None)
+
+    with pytest.raises(DomainError) as missing:
+        await service.apply(HOST, encoded(data), None, None)
+    with pytest.raises(DomainError) as wrong:
+        await service.apply(HOST, encoded(data), None, "0" * 64)
+    result = await service.apply(HOST, encoded(data), None, plan.digest)
+
+    assert [line.split(":")[0] for line in plan.lines()] == ["archive skill acme/passport"]
+    assert missing.value.code is ErrorCode.CONFIGURATION_PLAN_STALE
+    assert wrong.value.code is ErrorCode.CONFIGURATION_PLAN_STALE
+    assert result.applied
+    assert [c.action.value for c in unit.state.applied_configuration[0]] == ["archive"]
+
+
+async def test_an_import_that_cannot_be_reviewed_may_confirm_an_archive_as_it_may_a_delete() -> (
+    None
+):
+    root = installation(flow_organisation("acme", skills=(skill("passport"),)))
+    unit = InMemoryUnitOfWork()
+    unit.state.configuration = ConfigurationSnapshot(
+        root, Usage(kept={"skill": frozenset({("acme", "passport")})}), 0
+    )
+    service = build(unit)
+    document = parse_document(
+        {
+            "format": "openplanner.config/v1",
+            "mode": "replace",
+            "scope": {"organisation": "acme"},
+            "organisations": [{"slug": "acme", "skills": []}],
+        },
+        FORMATS,
+    )
+
+    with pytest.raises(DomainError) as refused:
+        await service.apply_document(HOST, document, None)
+    confirmed = await service.apply_document(HOST, document, None, confirmed=True)
+
+    assert refused.value.code is ErrorCode.CONFIGURATION_PLAN_STALE
+    assert confirmed.applied
+
+
+async def test_an_export_names_a_counted_pool_that_has_no_code_and_writes_nothing() -> None:
+    unit = uow(organisation(), usage=Usage(unaddressable=frozenset({"acme/17"})))
+
+    with pytest.raises(DomainError) as refused:
+        await build(unit).export(HOST, Scope(), None, secrets=False)
+
+    assert (refused.value.code, refused.value.field) == (
+        ErrorCode.CONFIGURATION_POOL_WITHOUT_CODE,
+        "acme/17",
+    )
+    assert unit.state.audit == []
+
+
+async def test_an_organisations_export_is_not_stopped_by_another_organisations_pool() -> None:
+    unit = uow(organisation(), usage=Usage(unaddressable=frozenset({"beta/17"})))
+
+    document = await build(unit).export(HOST, Scope("acme"), None, secrets=False)
+
+    assert b"acme" in document
+
+
+async def test_an_organisations_export_names_only_its_own_pool_without_a_code() -> None:
+    unit = uow(organisation(), usage=Usage(unaddressable=frozenset({"beta/17", "acme/9"})))
+
+    with pytest.raises(DomainError) as refused:
+        await build(unit).export(HOST, Scope("acme"), None, secrets=False)
+
+    assert (refused.value.code, refused.value.field) == (
+        ErrorCode.CONFIGURATION_POOL_WITHOUT_CODE,
+        "acme/9",
+    )
+
+
+async def test_the_plan_of_an_organisation_counts_only_its_own_pools_left_out() -> None:
+    unit = uow(organisation(), usage=Usage(unaddressable=frozenset({"beta/17", "acme/9"})))
+    data = {"format": "openplanner.config/v1", "scope": {"organisation": "acme"}}
+
+    scoped = await build(unit).plan(HOST, encoded(data), None)
+    platform = await build(unit).plan(HOST, encoded({"format": "openplanner.config/v1"}), None)
+
+    assert (scoped.left_out, platform.left_out) == (1, 2)

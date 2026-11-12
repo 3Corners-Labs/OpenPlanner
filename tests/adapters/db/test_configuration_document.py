@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.configuration_json import JsonCodec
@@ -17,15 +18,20 @@ from app.adapters.configuration_seal import PassphraseSealing
 from app.adapters.crypto import SecretBox
 from app.adapters.db.config_clients import read_api_clients
 from app.adapters.db.engine import create_engine
+from app.adapters.db.models import CapacityPoolRow, GroupRow, ServiceFlowRow
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.admin import AdminService
 from app.domain.authorization import Role
 from app.domain.configuration_changes import RuleContext
-from app.domain.configuration_document import Scope
+from app.domain.configuration_document import Scope, parse_document
 from app.domain.configuration_document_service import Actor, ConfigurationDocumentService
+from app.domain.configuration_plan import Plan, plan_document
+from app.domain.configuration_v1 import FORMATS, V1
 from app.domain.errors import DomainError, ErrorCode
 from tests.fakes.clock import FixedClock
-from tests.support.config_seed import seed
+from tests.support.config_seed import give_default_flows, seed
+from tests.support.configuration import allow
+from tests.support.configuration_parts import opened
 from tests.support.database import migrated_database
 from tests.support.principals import principal
 
@@ -65,6 +71,16 @@ def body(document: bytes) -> dict[str, object]:
 
 @pytest.fixture
 async def source(database_url: str) -> AsyncEngine:
+    engine = create_engine(database_url, busy_timeout_ms=200)
+    await seed(engine)
+    await give_default_flows(engine, NOW)  # every service has its flows, as since step 2e
+    yield engine  # type: ignore[misc]
+    await engine.dispose()
+
+
+@pytest.fixture
+async def bare(database_url: str) -> AsyncEngine:
+    """The seeded installation as it was before step 2e: no service has a pool or a flow."""
     engine = create_engine(database_url, busy_timeout_ms=200)
     await seed(engine)
     yield engine  # type: ignore[misc]
@@ -253,3 +269,124 @@ async def test_an_export_without_secrets_survives_a_secret_that_cannot_be_opened
 
     assert json.loads(exported)["format"] == "openplanner.config/v1"
     assert b"sealed" not in exported
+
+
+# --- ADR 0121 step 2e: a group gets its legacy pool and default flows ----------------
+
+
+async def apply_whole(engine: AsyncEngine, data: dict[str, object]) -> Plan:
+    """Plan a document against the stored installation and apply it through ``apply_configuration``.
+
+    The whole path, not the writers one by one: step 2e's rule runs there, after every change.
+    """
+    async with SqlUnitOfWork(engine, None).locked() as tx:
+        snapshot = await tx.read_configuration(NOW, frozenset(), secrets=False)
+        plan = plan_document(
+            opened(parse_document({"format": V1.name, **data}, FORMATS)),
+            snapshot.root,
+            usage=snapshot.usage,
+            may_change=allow,
+            context=RuleContext(now=NOW),
+            settings_version=snapshot.version,
+        )
+        if plan.ok:
+            await tx.apply_configuration(plan.changes)
+    return plan
+
+
+async def flows_by_group(engine: AsyncEngine) -> dict[str, list[tuple[str, str]]]:
+    """Return each group's flows as ``(code, state)`` and the number of pools, by slug."""
+    async with AsyncSession(engine) as session:
+        rows = (
+            await session.execute(
+                select(GroupRow.slug, ServiceFlowRow.code, ServiceFlowRow.state)
+                .join(ServiceFlowRow, ServiceFlowRow.group_id == GroupRow.id)
+                .order_by(GroupRow.slug, ServiceFlowRow.id)
+            )
+        ).all()
+    found: dict[str, list[tuple[str, str]]] = {}
+    for slug, code, state in rows:
+        found.setdefault(slug, []).append((code, state))
+    return found
+
+
+async def count_of(engine: AsyncEngine, table: type) -> int:
+    """Return the number of rows of ``table``."""
+    async with AsyncSession(engine) as session:
+        return int(await session.scalar(select(func.count()).select_from(table)) or 0)
+
+
+async def test_an_imported_group_gets_its_pool_and_flows_and_loses_them_when_deleted(
+    bare: AsyncEngine,
+) -> None:
+    rules = [
+        {"weekday": 2, "opens": "10:00", "closes": "12:00", "capacity": 2, "offer": "both"},
+    ]
+    data = {
+        "organisations": [
+            {
+                "slug": "acme",
+                "groups": [
+                    {
+                        "slug": "balie",
+                        "name": "Balie",
+                        "timezone": "Europe/Amsterdam",
+                        "slot_minutes": 30,
+                    },
+                    {
+                        "slug": "direct",
+                        "name": "Direct",
+                        "timezone": "Europe/Amsterdam",
+                        "slot_minutes": 30,
+                        "schedule_rules": rules,
+                    },
+                ],
+            }
+        ]
+    }
+
+    plan = await apply_whole(bare, data)
+
+    assert plan.ok, plan.refusals
+    found = await flows_by_group(bare)
+    assert found["balie"] == [("appointment", "active")]
+    assert found["direct"] == [("appointment", "active"), ("direct", "active")]
+    pools_before = await count_of(bare, CapacityPoolRow)
+    gone = {
+        "organisations": [
+            {
+                "slug": "acme",
+                "groups": [
+                    {"slug": "balie", "action": "delete"},
+                    {"slug": "direct", "action": "delete"},
+                ],
+            }
+        ]
+    }
+    assert (await apply_whole(bare, gone)).ok
+    assert await count_of(bare, CapacityPoolRow) == pools_before - 2
+    assert "balie" not in await flows_by_group(bare)
+
+
+async def test_a_change_of_the_rules_gives_an_existing_group_the_direct_flow(
+    bare: AsyncEngine,
+) -> None:
+    assert await flows_by_group(bare) == {}
+    rules = [{"weekday": 3, "opens": "08:00", "closes": "09:00", "capacity": 1, "offer": "direct"}]
+    data = {
+        "organisations": [{"slug": "acme", "groups": [{"slug": "loket", "schedule_rules": rules}]}]
+    }
+
+    assert (await apply_whole(bare, data)).ok
+
+    assert await flows_by_group(bare) == {
+        "loket": [("appointment", "active"), ("direct", "active")]
+    }
+
+
+async def test_a_change_that_leaves_the_rules_alone_writes_no_flows(bare: AsyncEngine) -> None:
+    data = {"organisations": [{"slug": "acme", "groups": [{"slug": "loket", "name": "Nieuw"}]}]}
+
+    assert (await apply_whole(bare, data)).ok
+
+    assert await flows_by_group(bare) == {}

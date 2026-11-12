@@ -18,10 +18,11 @@ under. A legacy revision comes into existence only through ``FlowTemplate.revisi
 stored pool.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 
 from app.domain.capacity import CapacityPool, PoolMode
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.routing import MAX_LABEL_LENGTH
 from app.domain.scheduling import DispatchKind as GroupDispatchKind
 from app.domain.service_flows import (
@@ -37,6 +38,11 @@ APPOINTMENT_CODE = "appointment"
 """The code of the legacy flow that takes appointments."""
 DIRECT_CODE = "direct"
 """The code of the legacy flow that takes direct calls."""
+LEGACY_INTAKE: Mapping[str, IntakeMode] = {
+    APPOINTMENT_CODE: IntakeMode.APPOINTMENT,
+    DIRECT_CODE: IntakeMode.ON_DEMAND,
+}
+"""The entry path of each legacy flow: the only two codes a legacy revision may have."""
 
 
 @dataclass(frozen=True)
@@ -151,9 +157,9 @@ def default_flow_set(
         None, organisation_id, label, PoolMode.LEGACY_GROUP, frozenset(), None, group_id
     )
     state = FlowState.ARCHIVED if archived else FlowState.ACTIVE
-    offered = [(APPOINTMENT_CODE, IntakeMode.APPOINTMENT)]
+    offered = [(APPOINTMENT_CODE, LEGACY_INTAKE[APPOINTMENT_CODE])]
     if offers_direct:
-        offered.append((DIRECT_CODE, IntakeMode.ON_DEMAND))
+        offered.append((DIRECT_CODE, LEGACY_INTAKE[DIRECT_CODE]))
     flows = tuple(
         FlowTemplate(
             code, state, frozenset({intake}), intake, label, slot_minutes, flow_dispatch(dispatch)
@@ -184,3 +190,54 @@ def missing_defaults(
             flow = replace(flow, default_for=flow.default_for - held)
         created.append(flow)
     return DefaultFlowSet(wanted.group_id, None if pool_exists else wanted.pool, tuple(created))
+
+
+def check_legacy_shape(
+    flow_code: str, revision: FlowRevision, pool: CapacityPool | None, group_id: int
+) -> None:
+    """Refuse a revision marked ``legacy`` that is not the wrapper this module writes.
+
+    The flag skips the readiness tests of what is built, so a revision may carry it only as the
+    wrapper of a pre-flow group: on the flow ``appointment`` or ``direct`` of ``group_id``, as
+    revision 1, video opened and observed by the legacy completion, with no skills and no subject
+    skills, the entry path of that code, drawing on the legacy pool of ``group_id`` itself and
+    published. Labels, length and dispatch are a snapshot of when the wrapper was made and may
+    differ from the service's settings now. A code carries at most one such revision, because a
+    flow's code is unique in its group and the revision is number 1.
+
+    Args:
+        flow_code: The code of the flow the revision belongs to.
+        revision: The revision as built (its ``flow_id`` is whatever the caller gave it).
+        pool: The pool the revision draws on, ``None`` when there is none.
+        group_id: The group the flow belongs to.
+
+    Raises:
+        DomainError: ``invalid_configuration`` (field ``legacy``).
+    """
+    intake = LEGACY_INTAKE.get(flow_code)
+    if (
+        intake is None
+        or pool is None
+        or pool.id is None
+        or pool.mode is not PoolMode.LEGACY_GROUP
+        or pool.group_id != group_id
+        or revision.revision != 1
+        or revision.intake_modes != frozenset({intake})
+        or revision.duration_minutes is None
+        or revision.dispatch is None
+        or revision.published_at is None
+    ):
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "legacy")
+    expected = replace(
+        legacy_revision(
+            labels=revision.labels,
+            intake_mode=intake,
+            duration_minutes=revision.duration_minutes,
+            capacity_pool_id=pool.id,
+            dispatch=revision.dispatch,
+        ),
+        flow_id=revision.flow_id,
+        published_at=revision.published_at,
+    )
+    if expected != revision:
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "legacy")

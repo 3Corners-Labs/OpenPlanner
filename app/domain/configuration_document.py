@@ -238,11 +238,18 @@ def _read_keys(coll: Collection, raw: object, parent: str) -> tuple[Entity, ...]
 
 
 def _read_key(kind: Kind, raw: Mapping[object, object], position: str) -> tuple[str, ...]:
-    """Read the natural key of an object; its path is its position until it is known."""
+    """Read the natural key of an object; its path is its position until it is known.
+
+    A key part is text in the tree; a key field of type integer is a whole number in the
+    document (a revision number) and is carried as its decimal text.
+    """
     parts: list[str] = []
     for name in kind.key:
         value = raw.get(name)
         spec = kind.field(name)
+        if spec.type is FieldType.INTEGER:
+            parts.append(str(_read_integer(spec, value, f"{position}.{name}")))
+            continue
         if not isinstance(value, str) or not value:
             raise _invalid(f"{position}.{name}")
         parts.append(_key_text(spec, value, f"{position}.{name}"))
@@ -513,7 +520,10 @@ def _write_collection(coll: Collection, entities: tuple[Entity, ...], plain: boo
 
 def _write_entity(kind: Kind, entity: Entity, plain: bool) -> dict[str, Json]:
     """Write one object: its key, its action unless it is an upsert, fields, collections."""
-    out: dict[str, Json] = dict(zip(kind.key, entity.key, strict=True))
+    out: dict[str, Json] = {
+        name: int(part) if kind.field(name).type is FieldType.INTEGER else part
+        for name, part in zip(kind.key, entity.key, strict=True)
+    }
     if entity.action is not Action.UPSERT:
         out["action"] = entity.action.value
     for spec in kind.value_fields:

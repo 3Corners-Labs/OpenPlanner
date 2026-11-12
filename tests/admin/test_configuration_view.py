@@ -68,3 +68,48 @@ def test_claim_values_and_the_webex_tokens_warn() -> None:
 
 def test_a_plan_without_changes_cannot_be_applied() -> None:
     assert not plan_view(Plan((), (), "abc"), _).can_apply
+
+
+def test_an_archive_is_its_own_row_with_the_field_it_marks_and_a_warning_that_is_no_delete() -> (
+    None
+):
+    plan = Plan(
+        (
+            change("skill", ChangeAction.ARCHIVE, ("acme", "passport"), "archived"),
+            change("service_flow", ChangeAction.ARCHIVE, ("acme", "balie", "advies"), "state"),
+        ),
+        (),
+        "abc",
+    )
+
+    view = plan_view(plan, _)
+
+    assert [(r.action, r.label, r.fields) for r in view.changes] == [
+        ("archive", "admin.configuration.action.archive", "archived"),
+        ("archive", "admin.configuration.action.archive", "state"),
+    ]
+    assert view.deletes == 0
+    assert view.warnings == ("admin.configuration.warning.archives",)
+    assert view.can_apply
+
+
+def test_a_plan_with_too_many_changes_is_explained_and_offers_no_apply() -> None:
+    plan = Plan(
+        (change("group", ChangeAction.UPDATE, ("a", "b"), "name"),),
+        (Refusal("", ErrorCode.CONFIGURATION_TOO_MANY_CHANGES),),
+        "abc",
+    )
+
+    view = plan_view(plan, _)
+
+    assert not view.can_apply
+    assert [r.message for r in view.refusals] == ["admin.form.error.configuration_too_many_changes"]
+
+
+def test_pools_without_a_code_are_a_warning_with_their_own_count() -> None:
+    plan = Plan((change("group", ChangeAction.UPDATE, ("a", "b"), "name"),), (), "abc", left_out=2)
+
+    view = plan_view(plan, _)
+
+    assert view.warnings == ("admin.configuration.warning.pools_without_code",)
+    assert view.counts == {"admin.configuration.warning.pools_without_code": 2}

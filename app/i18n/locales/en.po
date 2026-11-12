@@ -8971,6 +8971,15 @@ msgstr "This alert target already exists."
 msgid "admin.form.error.configuration_capacity_below_booked"
 msgstr "The capacity is lower than the number of places already booked."
 
+msgid "admin.form.error.configuration_revision_published"
+msgstr "A published revision is history and cannot be changed or removed. Add a new revision instead."
+
+msgid "admin.form.error.configuration_draft_flow_in_use"
+msgstr "A flow that was never published cannot be archived while something still refers to it. Discard its draft in the portal first, then leave the flow out again."
+
+msgid "admin.form.error.configuration_pool_without_code"
+msgstr "A capacity pool has no code, so it cannot be addressed in a document. Archive it and add it again in the portal, which gives it a code."
+
 msgid "admin.settings.package.title"
 msgstr "SQLite package (old format)"
 
@@ -11627,14 +11636,23 @@ msgstr "Update"
 msgid "admin.configuration.action.delete"
 msgstr "Delete"
 
+msgid "admin.configuration.action.archive"
+msgstr "Archive"
+
 msgid "admin.configuration.warning.deletes"
 msgstr "Note: this plan deletes {count} object(s). That cannot be undone."
+
+msgid "admin.configuration.warning.archives"
+msgstr "Note: skills, capacity pools and flows that something still refers to are archived, not deleted. Nobody loses a skill they hold, and bookings keep their flow."
 
 msgid "admin.configuration.warning.claims"
 msgstr "Note: this plan changes a claim value (the key of an organisation or service, or a role's claim value). People who match the old value lose access until the identity provider sends the new value."
 
 msgid "admin.configuration.warning.webex"
 msgstr "Note: this plan replaces the tokens of the Webex Service App. The installation the document came from can no longer connect."
+
+msgid "admin.configuration.warning.pools_without_code"
+msgstr "Note: {count} capacity pool(s) of this scope have no code (an older image created them) and are left out of the document, so this plan does not show or change them. A pool you create here may not take one of their names. Archive them and add them again in the portal to give them a code."
 
 msgid "details.title"
 msgstr "Change your details"
@@ -12400,6 +12418,9 @@ msgstr "This code is already used by a pool of your organisation. Choose another
 
 msgid "admin.capacity.error.name_taken"
 msgstr "Another pool of your organisation already has this name. Choose another name."
+
+msgid "admin.capacity.error.skill_in_use"
+msgstr "A flow that is not archived still requires one of the skills you removed, so the pool must keep guaranteeing it. Change or archive that flow first."
 
 msgid "admin.skills.limit_reached"
 msgstr "The maximum of {count} skills is reached. Archive a skill you no longer use to add a new one."

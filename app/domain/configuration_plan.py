@@ -18,7 +18,7 @@ hash.
 import copy
 import hashlib
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import NamedTuple
 
 from app.domain.authorization import LEVELS, Level, Permission, Target
@@ -41,7 +41,7 @@ from app.domain.configuration_schema import (
     Shape,
 )
 from app.domain.configuration_tree import Action, Address, Entity, path_of
-from app.domain.configuration_values import Value, canonical_json
+from app.domain.configuration_values import Json, Value, canonical_json
 from app.domain.errors import DomainError, ErrorCode
 
 _MISSING = object()
@@ -60,12 +60,16 @@ class Plan:
         sealed: Whether the document held sealed secrets, so a caller knows to ask for the
             passphrase again at the apply. Set by ``ConfigurationDocumentService.plan`` only; the
             plan inside an apply result leaves it ``False``.
+        left_out: How many objects of the document's scope the installation holds that a
+            document cannot address (counted pools without a code) and the plan therefore
+            leaves alone; a preview warns about them.
     """
 
     changes: tuple[Change, ...]
     refusals: tuple[Refusal, ...]
     digest: str
     sealed: bool = False
+    left_out: int = 0
 
     @property
     def ok(self) -> bool:
@@ -105,6 +109,7 @@ def plan_document(
     may_change: MayChange,
     context: RuleContext,
     settings_version: int,
+    max_changes: int | None = None,
 ) -> Plan:
     """Plan ``document`` against ``current`` without writing anything.
 
@@ -115,11 +120,16 @@ def plan_document(
         may_change: Whether the actor holds a permission on a target (the matrix).
         context: What the rules need from outside the document.
         settings_version: The configuration's version the plan is computed against.
+        max_changes: The most changes one apply may hold. A plan with more is never applied, so
+            the rules across objects, which read everything the plan touches, are not run on it
+            (the plan refuses itself with ``configuration_too_many_changes``).
 
     Returns:
         The plan: changes, refusals and the plan hash.
     """
-    return _Planner(document, current, usage, may_change, context).run(settings_version)
+    return _Planner(document, current, usage, may_change, context, max_changes).run(
+        settings_version
+    )
 
 
 class _Planner:
@@ -132,8 +142,10 @@ class _Planner:
         usage: Usage,
         may_change: MayChange,
         context: RuleContext,
+        max_changes: int | None = None,
     ) -> None:
         """Keep the inputs of the run."""
+        self._max_changes = max_changes
         self._document = document
         self._current = current
         self._usage = usage
@@ -162,16 +174,22 @@ class _Planner:
             self._usage,
             self._context,
         )
-        for rule in self._document.schema.integrity:
-            self._refusals.extend(rule(resolution))
         changes = tuple(self._writes) + tuple(self._deletes)
+        if self._max_changes is None or len(changes) <= self._max_changes:
+            for rule in self._document.schema.integrity:
+                self._refusals.extend(rule(resolution))
+        else:
+            # The rules across objects are not run on a plan that is never applied, so the plan
+            # says so itself: a preview refuses it and offers no apply.
+            self._refusals.append(Refusal("", ErrorCode.CONFIGURATION_TOO_MANY_CHANGES))
         effect = "\n".join(
             f"{c.action.value} {c.kind} {'/'.join(c.address)} {','.join(c.fields)}" for c in changes
         )
         digest = hashlib.sha256(
             f"{self._document.digest}:{settings_version}:{effect}".encode()
         ).hexdigest()
-        return Plan(changes, tuple(self._refusals), digest)
+        left_out = len(self._usage.unaddressable_in(self._document.scope.organisation))
+        return Plan(changes, tuple(self._refusals), digest, left_out=left_out)
 
     def _refuse(self, path: str, code: ErrorCode, field: str | None = None) -> None:
         """Record one refusal."""
@@ -196,12 +214,17 @@ class _Planner:
         if self._document.mode is Mode.REPLACE and coll.shape is not Shape.SINGLE:
             listed = {wanted.key for wanted in desired}
             for key, entity in existing.items():
-                if key in listed or (
-                    place.root and not self._in_scope(coll.kind, key, None, entity)
+                if (
+                    key in listed
+                    or coll.kind.retain_omitted
+                    or (place.root and not self._in_scope(coll.kind, key, None, entity))
                 ):
                     continue
-                if self._delete(coll, entity, path_of(place.path, coll.name, key), place):
+                kept = self._delete(coll, entity, path_of(place.path, coll.name, key), place)
+                if kept is None:
                     result.pop(key, None)
+                else:
+                    result[key] = kept
         return tuple(result.values())
 
     def _in_scope(
@@ -236,7 +259,7 @@ class _Planner:
                 return None
             for name in wanted.children:
                 self._refuse(path_of(wanted.path, name, ()), ErrorCode.INVALID_CONFIGURATION)
-            return current if not self._delete(coll, current, wanted.path, place) else None
+            return self._delete(coll, current, wanted.path, place)
         if wanted.action is Action.CREATE and current is not None:
             self._refuse(wanted.path, ErrorCode.CONFIGURATION_OBJECT_EXISTS)
             return current
@@ -398,19 +421,43 @@ class _Planner:
                 self._refuse(change.path, ErrorCode.NOT_PERMITTED)
                 return
 
-    def _delete(self, coll: Collection, entity: Entity, path: str, above: _Place) -> bool:
-        """Delete an object with what it holds; refuse it while something refers to it."""
+    def _delete(self, coll: Collection, entity: Entity, path: str, above: _Place) -> Entity | None:
+        """Remove an object with what it holds; return what is left of it, ``None`` when gone.
+
+        An object something refers to is refused, or archived instead when its kind says so
+        (``Kind.archive``); an object that only holds history (``Usage.kept``) is archived
+        instead of deleted; an object that is archived already stays as it is, without a change.
+        """
         kind = coll.kind
         if not kind.deletable:
             self._refuse(path, ErrorCode.INVALID_CONFIGURATION)
-            return False
+            return entity
         if self._in_use(kind, entity, above.address):
-            self._refuse(path, ErrorCode.CONFIGURATION_OBJECT_IN_USE)
-            return False
+            if kind.archive is None:
+                self._refuse(path, ErrorCode.CONFIGURATION_OBJECT_IN_USE)
+                return entity
+            return self._archive(kind, kind.archive, entity, path, above)
+        if kind.archive is not None and above.address + entity.key in self._usage.kept.get(
+            kind.name, frozenset()
+        ):
+            return self._archive(kind, kind.archive, entity, path, above)
         wanted = Entity(kind.name, entity.key, Action.DELETE, {}, {}, path)
         here = self._place(kind, wanted, dict(entity.fields), above)
         self._emit(kind, wanted, here, ChangeAction.DELETE, (), {})
-        return True
+        return None
+
+    def _archive(
+        self, kind: Kind, archive: tuple[str, Json], entity: Entity, path: str, above: _Place
+    ) -> Entity:
+        """Mark an object archived instead of deleting it; return it as it is afterwards."""
+        name, value = archive
+        if entity.fields.get(name) == value:
+            return entity
+        fields = {**entity.fields, name: value}
+        wanted = Entity(kind.name, entity.key, Action.UPSERT, {}, {}, path)
+        here = self._place(kind, wanted, dict(entity.fields), above)
+        self._emit(kind, wanted, here, ChangeAction.ARCHIVE, (name,), fields)
+        return replace(entity, fields=fields)
 
     def _in_use(self, kind: Kind, entity: Entity, above: Address) -> bool:
         """Whether something outside the configuration refers to the object or what it holds."""
@@ -458,7 +505,7 @@ def permissions_of(
     permissions: set[Permission] = set()
     if action is ChangeAction.CREATE:
         own = kind.create_permission or base
-    elif action is ChangeAction.DELETE:
+    elif action in (ChangeAction.DELETE, ChangeAction.ARCHIVE):
         own = kind.delete_permission or base
     else:
         own = None

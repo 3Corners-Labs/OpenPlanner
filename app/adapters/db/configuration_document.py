@@ -12,6 +12,7 @@ from dataclasses import replace
 from datetime import datetime
 from typing import Protocol
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.crypto import SecretBox
@@ -19,6 +20,7 @@ from app.adapters.db import (
     config_alerts,
     config_channels,
     config_clients,
+    config_flows,
     config_group,
     config_login,
     config_organisation,
@@ -27,8 +29,11 @@ from app.adapters.db import (
 )
 from app.adapters.db.config_common import Writer
 from app.adapters.db.config_usage import read_usage
-from app.domain.configuration_changes import Change, ConfigurationSnapshot
+from app.adapters.db.models import GroupRow
+from app.adapters.db.service_flows import ensure_default_flows_in
+from app.domain.configuration_changes import Change, ChangeAction, ConfigurationSnapshot
 from app.domain.configuration_tree import Entity
+from app.domain.configuration_v1_names import GROUP_KIND
 from app.domain.errors import DomainError, ErrorCode
 
 WRITERS: dict[str, Writer] = {
@@ -38,6 +43,7 @@ WRITERS: dict[str, Writer] = {
     **config_login.WRITERS,
     **config_channels.WRITERS,
     **config_scenarios.WRITERS,
+    **config_flows.WRITERS,
     **config_group.WRITERS,
     **config_clients.WRITERS,
 }
@@ -60,6 +66,17 @@ class _Transaction(Protocol):
 def _present(children: dict[str, tuple[Entity, ...]]) -> dict[str, tuple[Entity, ...]]:
     """Return the collections that hold something: an absent one is untouched by a document."""
     return {name: members for name, members in children.items() if members}
+
+
+def _groups_to_complete(changes: Sequence[Change]) -> list[str]:
+    """Return the slugs of the groups a plan created or whose weekly rules it replaced, in order."""
+    found: dict[str, None] = {}
+    for change in changes:
+        if change.kind == GROUP_KIND and (
+            change.action is ChangeAction.CREATE or "schedule_rules" in change.fields
+        ):
+            found[change.key[0]] = None
+    return list(found)
 
 
 class ConfigurationDocumentQueries:
@@ -85,6 +102,8 @@ class ConfigurationDocumentQueries:
         channels = await config_channels.read_channels(session, box)
         by_organisation, by_group = await config_scenarios.read_scenarios(session)
         groups = await config_group.read_groups(session)
+        catalogue, unaddressable, hidden_names = await config_flows.read_catalogue(session)
+        flows = await config_flows.read_flows(session)
         clients = await config_clients.read_api_clients(session, box)
         platform = replace(
             platform,
@@ -99,6 +118,7 @@ class ConfigurationDocumentQueries:
                         {
                             **group.children,
                             "closure_scenarios": by_group.get((slug, group.key[0]), ()),
+                            **flows.get((slug, group.key[0]), {}),
                         }
                     ),
                 )
@@ -110,6 +130,7 @@ class ConfigurationDocumentQueries:
                 "identity_providers": providers.get(slug, ()),
                 "closure_scenarios": by_organisation.get(slug, ()),
                 "alert_targets": alerts.get(slug, ()),
+                **catalogue.get(slug, {}),
                 "groups": own_groups,
             }
             tree.append(replace(organisation, children=_present(children)))
@@ -120,6 +141,7 @@ class ConfigurationDocumentQueries:
             ),
         )
         usage = await read_usage(session, now, locked_settings)
+        usage = replace(usage, unaddressable=unaddressable, hidden_pool_names=hidden_names)
         return ConfigurationSnapshot(
             root,
             usage,
@@ -134,10 +156,18 @@ class ConfigurationDocumentQueries:
         Raises:
             DomainError: ``invalid_configuration`` for a kind nothing can write.
         """
-        for change in changes:
+        for change in config_flows.order_flow_changes(changes):
             writer = WRITERS.get(change.kind)
             if writer is None:
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, change.kind)
             await writer(self._session, self._box, change)
+        # ADR 0121 step 2e, the one place the rule runs for a document: after every change above,
+        # so a group's own legacy pool and flows from the document are written first and the rule
+        # adds only what the group still lacks (a document without flows yields the default set).
+        # ``write_group`` does not call it, because it runs before those flows exist.
+        for slug in _groups_to_complete(changes):
+            group_id = await self._session.scalar(select(GroupRow.id).where(GroupRow.slug == slug))
+            if group_id is not None:
+                await ensure_default_flows_in(self._session, group_id)
         await config_login.ensure_signing_keys(self._session, self._box)
         return await self.bump_settings_version()

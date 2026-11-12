@@ -28,9 +28,13 @@ CONFIGURATION_TABLES = frozenset(
         "api_client_groups",
         "api_clients",
         "api_settings",
+        "capacity_pool_skills",
+        "capacity_pools",
         "channel_settings",
         "closure_images",
         "closure_scenarios",
+        "flow_revision_skills",
+        "flow_revisions",
         "group_contact_center",
         "group_contacts",
         "group_form_fields",
@@ -58,7 +62,11 @@ CONFIGURATION_TABLES = frozenset(
         "roles",
         "schedule_overrides",
         "schedule_rules",
+        "service_flows",
         "settings_version",
+        "skills",
+        "subject_flow_skills",
+        "subject_flows",
     }
 )
 """The tables a package carries: everything an admin configured, nothing that happened."""
@@ -99,17 +107,7 @@ STATE_TABLES = frozenset(
         "slots",
         "staff",
         "staff_memberships",
-        "staff_skills",
-        # ADR 0121 step 2b: configuration in kind, but not yet carried by a package. Step 2b-ii
-        # moves these eight into CONFIGURATION_TABLES together with their export and import.
-        "skills",
-        "capacity_pools",
-        "capacity_pool_skills",
-        "service_flows",
-        "flow_revisions",
-        "flow_revision_skills",
-        "subject_flows",
-        "subject_flow_skills",
+        "staff_skills",  # who holds which skill: per person, like ``staff`` (ADR 0121 2b-ii)
         # ADR 0122 step 2: a counted pool's staffing is configuration in kind, not yet carried by
         # a package; step 3 moves these two into CONFIGURATION_TABLES with their export and import.
         "pool_staffing_rules",

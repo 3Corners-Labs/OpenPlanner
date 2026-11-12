@@ -10,9 +10,10 @@ from datetime import UTC, date, datetime, time
 from hashlib import sha256
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
+from app.adapters.crypto import SecretBox
 from app.adapters.db.config_clients import WRITERS as CLIENT_WRITERS
 from app.adapters.db.config_clients import read_api_clients
 from app.adapters.db.config_group import WRITERS as GROUP_WRITERS
@@ -20,6 +21,7 @@ from app.adapters.db.config_group import read_groups
 from app.adapters.db.models import (
     ApiClientGroupRow,
     ApiClientRow,
+    FlowRevisionRow,
     GroupContactsRow,
     GroupFormFieldRow,
     GroupHolidayCalendarRow,
@@ -33,6 +35,8 @@ from app.adapters.db.models import (
     ScheduleOverrideRow,
     ScheduleRuleRow,
 )
+from app.adapters.db.service_flows import ensure_default_flows_in
+from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.configuration_changes import Change, ChangeAction, RuleContext, Usage
 from app.domain.configuration_document import parse_document
 from app.domain.configuration_plan import Plan, plan_document
@@ -188,9 +192,18 @@ async def installation(session: AsyncSession) -> Entity:
 
 
 async def apply_document(
-    engine: AsyncEngine, data: dict[str, Any], usage: Usage | None = None
+    engine: AsyncEngine,
+    data: dict[str, Any],
+    usage: Usage | None = None,
+    *,
+    whole_apply: bool = False,
 ) -> Plan:
-    """Plan a document against the stored installation and, when it is clean, write it."""
+    """Plan a document against the stored installation and, when it is clean, write it.
+
+    The changes go through the writers one by one; with ``whole_apply`` they go through the
+    transaction's ``apply_configuration``, which also completes each group with its legacy pool
+    and flows (ADR 0121 step 2e).
+    """
     async with AsyncSession(engine) as session, session.begin():
         document = opened(parse_document({"format": V1.name, **data}, FORMATS))
         plan = plan_document(
@@ -201,11 +214,14 @@ async def apply_document(
             context=RuleContext(now=NOW),
             settings_version=1,
         )
-        if plan.ok:
+        if plan.ok and not whole_apply:
             for planned in plan.changes:
                 writer = {**GROUP_WRITERS, **CLIENT_WRITERS}[planned.kind]
                 await writer(session, None, planned)
-        return plan
+    if plan.ok and whole_apply:
+        async with SqlUnitOfWork(engine, SecretBox(b"a" * 32)).locked() as tx:
+            await tx.apply_configuration(plan.changes)
+    return plan
 
 
 async def reread(engine: AsyncEngine) -> dict[str, tuple[Entity, ...]]:
@@ -224,3 +240,19 @@ def change(
     """Return a planned change as the planner hands it to a writer."""
     key = address[-2:] if kind == "group_text" else address[-1:]
     return planned(kind, address, action, values, fields, key=key)
+
+
+async def give_default_flows(engine: AsyncEngine, at: datetime) -> None:
+    """Give every group its legacy pool and default flows, as step 2e does, published at ``at``.
+
+    The rule stamps the real time; a fixture that compares exports or runs under a fixed clock
+    needs a time it controls.
+    """
+    async with AsyncSession(engine) as session, session.begin():
+        for group_id in await session.scalars(select(GroupRow.id)):
+            await ensure_default_flows_in(session, group_id)
+        await session.execute(
+            update(FlowRevisionRow)
+            .where(FlowRevisionRow.published_at > at, FlowRevisionRow.published_by.is_(None))
+            .values(published_at=at)
+        )
