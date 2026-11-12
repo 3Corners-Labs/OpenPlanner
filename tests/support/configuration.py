@@ -221,6 +221,7 @@ def plan(
     context: RuleContext | None = None,
     version: int = 1,
     fmt: Format = FORMAT,
+    max_changes: int | None = None,
 ) -> Plan:
     """Plan a document written as a dictionary against ``current``."""
     return plan_document(
@@ -230,6 +231,7 @@ def plan(
         may_change=may_change,
         context=context or RuleContext(),
         settings_version=version,
+        max_changes=max_changes,
     )
 
 

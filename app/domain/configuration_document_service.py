@@ -12,6 +12,7 @@ key and action, never a value.
 
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, replace
+from datetime import datetime
 from hashlib import sha256
 from typing import Protocol
 
@@ -227,6 +228,11 @@ class ConfigurationDocumentService:
             )
         if secrets and not snapshot.secrets_available:
             raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "settings_key")
+        unaddressable = snapshot.usage.unaddressable_in(scope.organisation)
+        if unaddressable:
+            # A counted pool without a code cannot be named in a document (ADR 0121 step 2f). Only
+            # those of the organisations the export covers stop it, and only those are named.
+            raise DomainError(ErrorCode.CONFIGURATION_POOL_WITHOUT_CODE, min(unaddressable))
         document = Document(
             format=V1.name,
             mode=Mode.MERGE,
@@ -301,7 +307,7 @@ class ConfigurationDocumentService:
         """Apply a document: plan again inside the write lock, then write all or nothing.
 
         ``plan_hash`` is the hash of the plan the caller reviewed. It is required when the
-        plan deletes anything, and refused when it is not the plan's.
+        plan deletes or archives anything, and refused when it is not the plan's.
 
         Raises:
             DomainError: As ``plan``; ``configuration_plan_stale`` when the hash is missing
@@ -352,7 +358,9 @@ class ConfigurationDocumentService:
                 elif not plan.changes:
                     result = ApplyResult(plan, snapshot.version)
                 else:
-                    version = await tx.apply_configuration(_enriched(plan.changes, issuers))
+                    version = await tx.apply_configuration(
+                        _enriched(plan.changes, issuers, self._clock.now())
+                    )
                     for change in plan.changes:
                         await tx.add_audit_event(self._event(actor, plan, change))
                     result = ApplyResult(plan, version)
@@ -410,17 +418,20 @@ class ConfigurationDocumentService:
                 context, now=self._clock.now(), settings={**context.settings, **portal}
             ),
             settings_version=snapshot.version,
+            max_changes=self._max_changes(),
         )
 
     def _problem(
         self, plan: Plan, first: Plan, plan_hash: str | None, *, confirmed: bool = False
     ) -> ErrorCode | None:
         """Return why an otherwise valid plan may not be written, or ``None``."""
-        if plan.refusals:
-            return None
         if len(plan.changes) > self._max_changes():
             return ErrorCode.CONFIGURATION_TOO_MANY_CHANGES
-        deletes = any(c.action is ChangeAction.DELETE for c in plan.changes)
+        if plan.refusals:
+            return None
+        # An archive is a delete the object's kind turns into a keep: it needs the same reviewed
+        # hash, because it takes the object out of use (ADR 0121 2b-ii).
+        deletes = any(c.action in (ChangeAction.DELETE, ChangeAction.ARCHIVE) for c in plan.changes)
         if plan.digest != first.digest:
             return ErrorCode.CONFIGURATION_PLAN_STALE
         if plan_hash is None and deletes and not confirmed:
@@ -452,8 +463,16 @@ class ConfigurationDocumentService:
         return issuers, (*plan.refusals, *refusals) if refusals else ()
 
     async def _refused(self, actor: Actor, document: Document, plan: Plan) -> ApplyResult:
-        """Audit a refused apply and return its plan."""
-        await self._record_refusal(actor, document, plan.refusals[0].code)
+        """Audit a refused apply and return its plan; a plan with too many changes raises.
+
+        Raises:
+            DomainError: ``configuration_too_many_changes``, which is a limit of the apply and
+                not a flaw of one object.
+        """
+        code = plan.refusals[0].code
+        await self._record_refusal(actor, document, code)
+        if any(r.code is ErrorCode.CONFIGURATION_TOO_MANY_CHANGES for r in plan.refusals):
+            raise DomainError(ErrorCode.CONFIGURATION_TOO_MANY_CHANGES)
         return ApplyResult(plan, None)
 
     async def _record_refusal(self, actor: Actor, document: Document, code: ErrorCode) -> None:
@@ -512,12 +531,16 @@ def _confined(root: Entity, scope: Scope) -> Entity:
     return replace(root, children={name: members for name, members in children.items() if members})
 
 
-def _enriched(changes: tuple[Change, ...], issuers: Mapping[str, str]) -> tuple[Change, ...]:
-    """Put the fetched issuers into the values of the provider changes that need one."""
+def _enriched(
+    changes: tuple[Change, ...], issuers: Mapping[str, str], at: datetime
+) -> tuple[Change, ...]:
+    """Put the fetched issuers into the provider changes that need one, and the time into all."""
     out: list[Change] = []
     for change in changes:
         issuer = issuers.get("/".join(change.address)) if change.kind == ISSUER_KIND else None
         out.append(
-            replace(change, values={**change.values, "issuer": issuer}) if issuer else change
+            replace(change, values={**change.values, "issuer": issuer}, at=at)
+            if issuer
+            else replace(change, at=at)
         )
     return tuple(out)

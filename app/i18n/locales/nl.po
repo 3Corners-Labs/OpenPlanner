@@ -8981,6 +8981,15 @@ msgstr "Dit alarmdoel bestaat al."
 msgid "admin.form.error.configuration_capacity_below_booked"
 msgstr "De capaciteit is lager dan het aantal plaatsen dat al is geboekt."
 
+msgid "admin.form.error.configuration_revision_published"
+msgstr "Een gepubliceerde revisie is historie en kan niet worden gewijzigd of verwijderd. Voeg een nieuwe revisie toe."
+
+msgid "admin.form.error.configuration_draft_flow_in_use"
+msgstr "Een flow die nooit is gepubliceerd kan niet worden gearchiveerd zolang er nog iets naar verwijst. Verwijder eerst het concept in het portaal en laat de flow daarna opnieuw weg."
+
+msgid "admin.form.error.configuration_pool_without_code"
+msgstr "Een capaciteitspool heeft geen code en kan daarom niet in een document worden benoemd. Archiveer de pool en voeg hem opnieuw toe in het portaal, dat hem een code geeft."
+
 msgid "admin.settings.package.title"
 msgstr "SQLite-pakket (oud formaat)"
 
@@ -11637,14 +11646,23 @@ msgstr "Wijzigen"
 msgid "admin.configuration.action.delete"
 msgstr "Verwijderen"
 
+msgid "admin.configuration.action.archive"
+msgstr "Archiveren"
+
 msgid "admin.configuration.warning.deletes"
 msgstr "Let op: dit plan verwijdert {count} object(en). Dat kan niet ongedaan worden gemaakt."
+
+msgid "admin.configuration.warning.archives"
+msgstr "Let op: vaardigheden, capaciteitspools en flows waar nog iets naar verwijst worden gearchiveerd, niet verwijderd. Niemand verliest een vaardigheid die hij heeft en boekingen houden hun flow."
 
 msgid "admin.configuration.warning.claims"
 msgstr "Let op: dit plan wijzigt een claimwaarde (de sleutel van een organisatie of dienst, of de claimwaarde van een rol). Wie op de oude waarde matcht, verliest toegang totdat de identiteitsprovider de nieuwe waarde stuurt."
 
 msgid "admin.configuration.warning.webex"
 msgstr "Let op: dit plan vervangt de tokens van de Webex Service App. De installatie waar het document vandaan komt, kan daardoor geen verbinding meer maken."
+
+msgid "admin.configuration.warning.pools_without_code"
+msgstr "Let op: {count} capaciteitspool(s) van dit bereik hebben geen code (een oudere image maakte ze aan) en blijven buiten het document, dus dit plan toont of wijzigt ze niet. Een pool die u hier aanmaakt mag niet de naam van een van hen krijgen. Archiveer ze en voeg ze opnieuw toe in het portaal om ze een code te geven."
 
 msgid "details.title"
 msgstr "Gegevens aanpassen"
@@ -12410,6 +12428,9 @@ msgstr "Deze code is al in gebruik bij een pool van uw organisatie. Kies een and
 
 msgid "admin.capacity.error.name_taken"
 msgstr "Een andere pool van uw organisatie heeft al deze naam. Kies een andere naam."
+
+msgid "admin.capacity.error.skill_in_use"
+msgstr "Een flow die niet is gearchiveerd vereist nog een van de vaardigheden die u hebt verwijderd, dus de pool moet die blijven garanderen. Wijzig of archiveer eerst die flow."
 
 msgid "admin.skills.limit_reached"
 msgstr "Het maximum van {count} vaardigheden is bereikt. Archiveer een vaardigheid die u niet meer gebruikt om een nieuwe toe te voegen."

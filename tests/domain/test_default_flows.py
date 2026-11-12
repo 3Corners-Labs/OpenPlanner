@@ -5,20 +5,30 @@ from datetime import time
 
 import pytest
 
-from app.domain.capacity import PoolMode
+from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.default_flows import (
     APPOINTMENT_CODE,
     DIRECT_CODE,
     DefaultFlowSet,
     StoredFlow,
+    check_legacy_shape,
     default_flow_set,
     flow_dispatch,
     missing_defaults,
     stored_flow,
 )
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.scheduling import DispatchKind, Offer, TimeWindow
+from app.domain.service_flows import (
+    CompletionPolicy,
+    FlowRevision,
+    FlowState,
+    HandlingAction,
+    IntakeMode,
+    InteractionKind,
+)
 from app.domain.service_flows import DispatchKind as FlowDispatch
-from app.domain.service_flows import FlowState, IntakeMode
+from tests.support.domain import NOW
 
 
 def wanted(
@@ -211,3 +221,88 @@ def test_a_revision_is_built_on_the_stored_pool() -> None:
 def test_an_empty_set_is_empty() -> None:
     assert DefaultFlowSet(7, None, ()).empty
     assert not replace(DefaultFlowSet(7, None, ()), flows=wanted().flows).empty
+
+
+# --- the legacy flag is accepted only as the wrapper this module writes ---------------------
+
+LEGACY = f"{ErrorCode.INVALID_CONFIGURATION.value}:legacy"
+
+
+def wrapper(code: str = APPOINTMENT_CODE, **changes: object) -> tuple[FlowRevision, CapacityPool]:
+    """Return revision 1 of the wrapper of group 7 and the stored legacy pool it draws on."""
+    template = next(
+        f
+        for f in default_flow_set(7, 3, "Balie", 20, DispatchKind.CONTACT_CENTER, True, False).flows
+        if f.code == code
+    )
+    pool = CapacityPool(9, 3, "Balie", PoolMode.LEGACY_GROUP, frozenset(), None, 7)
+    revision = replace(template.revision(9), published_at=NOW, flow_id=4)
+    return replace(revision, **changes), pool
+
+
+def refused(
+    code: str, revision: FlowRevision, pool: CapacityPool | None, group: int = 7
+) -> str | None:
+    """Return the field the shape check refuses, ``None`` when it passes."""
+    try:
+        check_legacy_shape(code, revision, pool, group)
+    except DomainError as error:
+        return f"{error.code.value}:{error.field}"
+    return None
+
+
+def test_the_wrapper_of_each_legacy_code_has_the_legacy_shape() -> None:
+    for code in (APPOINTMENT_CODE, DIRECT_CODE):
+        revision, pool = wrapper(code)
+
+        assert refused(code, revision, pool) is None
+
+
+def test_a_snapshot_may_differ_from_what_the_service_says_now() -> None:
+    revision, pool = wrapper(labels={"nl": "Oud", "en": "Old"}, duration_minutes=45)
+
+    assert refused(APPOINTMENT_CODE, revision, pool) is None
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"interaction_kind": InteractionKind.TELEPHONE},
+        {"handling_action": HandlingAction.CALL},
+        {"completion": CompletionPolicy.OPERATOR},
+        {"required_skill_ids": frozenset({1})},
+        {"subject_skill_ids": {"id": frozenset()}},
+        {"intake_modes": frozenset({IntakeMode.ON_DEMAND})},
+        {"revision": 2},
+        {"published_at": None},
+        {"location_id": 3},
+    ],
+)
+def test_a_revision_that_is_not_the_wrapper_is_no_legacy_revision(
+    changes: dict[str, object],
+) -> None:
+    revision, pool = wrapper(**changes)
+
+    assert refused(APPOINTMENT_CODE, revision, pool) == LEGACY
+
+
+def test_only_the_two_legacy_codes_have_a_wrapper() -> None:
+    revision, pool = wrapper()
+
+    assert refused("advies", revision, pool) == LEGACY
+
+
+def test_the_wrapper_draws_on_the_legacy_pool_of_its_own_group() -> None:
+    revision, pool = wrapper()
+
+    assert refused(APPOINTMENT_CODE, revision, pool, group=8) == LEGACY
+    assert refused(APPOINTMENT_CODE, revision, replace(pool, group_id=8)) == LEGACY
+    assert (
+        refused(
+            APPOINTMENT_CODE,
+            revision,
+            replace(pool, mode=PoolMode.COUNTED, group_id=None, code="x"),
+        )
+        == LEGACY
+    )
+    assert refused(APPOINTMENT_CODE, revision, None) == LEGACY

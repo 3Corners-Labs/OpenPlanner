@@ -40,13 +40,18 @@ async def create(
     return await site.client.post(page, data=data, headers=SAME_ORIGIN)
 
 
-async def draw_on(site: Site, pool: int, code: str = "draft-one") -> None:
-    """Store a draft flow of the demo group that draws on ``pool``."""
+async def draw_on(
+    site: Site, pool: int, code: str = "draft-one", requires: frozenset[int] = frozenset()
+) -> None:
+    """Store a draft flow of the demo group that draws on ``pool`` and requires ``requires``."""
     async with site_uow(site).locked() as tx:
         group = await tx.get_group("demo")
         assert group is not None
         draft = revision(
-            flow_id=None, capacity_pool_id=pool, labels={"nl": "Concept", "en": "Draft"}
+            flow_id=None,
+            capacity_pool_id=pool,
+            required_skill_ids=requires,
+            labels={"nl": "Concept", "en": "Draft"},
         )
         flow = replace(
             make_flow(code, FlowState.DRAFT, None, frozenset(), None, draft), group_id=group.id
@@ -55,17 +60,18 @@ async def draw_on(site: Site, pool: int, code: str = "draft-one") -> None:
 
 
 async def legacy_pool(site: Site) -> int:
-    """Return the legacy pool of the demo group, which every group has since ADR 0121 step 2e."""
-    async with site_uow(site).locked() as tx:
+    """Return the id of the legacy pool of the demo group, which every service has (step 2e)."""
+    async with site_uow(site).read() as tx:
         group = await tx.get_group("demo")
         organisation = await tx.get_organisation("demo")
         assert group is not None
         assert organisation is not None
-        await tx.ensure_default_flows(group.id)
-        pools = await tx.list_capacity_pools(EVERYTHING, organisation.id)
-    found = [pool for pool in pools if pool.group_id == group.id]
-    assert len(found) == 1
-    assert found[0].mode is PoolMode.LEGACY_GROUP
+        found = [
+            pool
+            for pool in await tx.list_capacity_pools(EVERYTHING, organisation.id)
+            if pool.group_id == group.id
+        ]
+    assert [pool.mode for pool in found] == [PoolMode.LEGACY_GROUP]
     assert found[0].id is not None
     return found[0].id
 
@@ -165,6 +171,33 @@ async def test_a_pool_is_changed_and_an_archived_skill_it_has_stays_shown(site: 
     assert "Fresh" in page
     details = [e.detail for e in await audit_log(site) if e.action == "capacity.manage"]
     assert [d.split(",")[0] for d in details] == ["capacity_pool.created", "capacity_pool.changed"]
+
+
+async def test_a_pool_cannot_stop_guaranteeing_a_skill_a_flow_on_it_still_requires(
+    site: Site,
+) -> None:
+    await site.login_as(ORG_ADMIN)
+    passport = await add_skill(site, "passport", "Passport", "Passport")
+    pool = await add_pool(site, "Loket", (passport,))
+    await draw_on(site, pool, requires=frozenset({passport}))
+
+    refused = await site.client.post(
+        f"{PAGE}/{pool}", data={"pool_name": "Loket"}, headers=SAME_ORIGIN
+    )
+    english = await site.client.post(
+        f"{PAGE}/{pool}?lang=en", data={"pool_name": "Loket"}, headers=SAME_ORIGIN
+    )
+    kept = await site.client.post(
+        f"{PAGE}/{pool}",
+        data={"pool_name": "Loket", f"skill-{passport}": "on"},
+        headers=SAME_ORIGIN,
+    )
+
+    assert refused.status_code == 422
+    assert 'href="#guaranteed_skill_ids"' in refused.text
+    assert "vereist nog een van de vaardigheden die u hebt verwijderd" in refused.text
+    assert "still requires one of the skills you removed" in english.text
+    assert kept.headers["location"] == f"{LIST}?done=unchanged#capacity"
 
 
 async def test_a_pool_with_a_flow_on_it_cannot_be_archived_and_the_flow_is_named(

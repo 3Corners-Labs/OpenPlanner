@@ -49,6 +49,11 @@ async def test_a_group_with_a_client_grant_is_in_use_and_a_bare_one_is_not(
         usage = await read_usage(session, NOW, frozenset({"smtp_password"}))
 
     assert usage.in_use == {"group": frozenset({("acme", "helpdesk")})}
+    assert usage.kept == {
+        "skill": frozenset(),
+        "capacity_pool": frozenset(),
+        "service_flow": frozenset(),
+    }
     assert usage.future_bookings == frozenset()
     assert usage.slot_loads == {}
     assert usage.locked_settings == frozenset({"smtp_password"})

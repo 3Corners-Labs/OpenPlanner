@@ -14,13 +14,13 @@ revision that is outside the ``BUILT_*`` constants below (reason ``not_built_yet
 every non-legacy revision while ``RETENTION_BUILT`` is false, so no new flow can be activated.
 """
 
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from typing import Final
 
-from app.domain.capacity import CapacityPool, guarantees
+from app.domain.capacity import CapacityPool, PoolMode, guarantees
 from app.domain.errors import DomainError, ErrorCode, missing_object, outside_organisation
 from app.domain.routing import SUBJECT_CODE, validate_labels
 from app.domain.scheduling import valid_slot_minutes
@@ -252,6 +252,69 @@ class ServiceFlow:
             raise _invalid("published_at")
 
 
+def revisions_in_effect(flow: ServiceFlow) -> tuple[FlowRevision, ...]:
+    """Return the revisions of ``flow`` that count: the current one and the draft.
+
+    The one definition of "in effect" for what a flow draws on and requires: nothing in an older
+    revision counts (ADR 0121 point 3). The SQL twin is ``flow_usage.REVISION_IN_EFFECT``.
+    """
+    return tuple(revision for revision in (flow.current, flow.draft) if revision is not None)
+
+
+def draws_on_pool(flow: ServiceFlow, pool_id: int) -> bool:
+    """Return whether ``flow`` draws on the pool: not archived, and a revision in effect names it.
+
+    The one definition of "drawn on by a flow" that a pool is archived and edited by; the SQL
+    twin is ``CapacityPoolQueries.flows_on_pool``.
+    """
+    return flow.state is not FlowState.ARCHIVED and any(
+        revision.capacity_pool_id == pool_id for revision in revisions_in_effect(flow)
+    )
+
+
+def skills_required_on_pool(flows: Iterable[ServiceFlow], pool_id: int) -> frozenset[int]:
+    """Return the skills the flows drawing on the pool require, for the flow or a subject.
+
+    Only a revision in effect that names the pool counts, in a flow that is not archived. The SQL
+    twin is ``flow_usage.skills_required_on_pool``.
+    """
+    return frozenset().union(
+        *(
+            revision.all_skill_ids
+            for flow in flows
+            if flow.state is not FlowState.ARCHIVED
+            for revision in revisions_in_effect(flow)
+            if revision.capacity_pool_id == pool_id
+        )
+    )
+
+
+def check_revision_editable(published_at: datetime | None, field: str = "revision") -> None:
+    """Refuse changing or removing a revision that is published: it is history.
+
+    The one home of "a published revision is immutable". ``published_at`` is the stored
+    revision's, ``None`` for one that is new or still a draft. A document, the writer of a
+    document and the portal's save all call it.
+
+    Raises:
+        DomainError: ``configuration_revision_published`` naming ``field``.
+    """
+    if published_at is not None:
+        raise DomainError(ErrorCode.CONFIGURATION_REVISION_PUBLISHED, field)
+
+
+def check_combination(kind: InteractionKind | None, action: HandlingAction | None) -> None:
+    """Refuse a handling action that the interaction kind's row of the closed table does not allow.
+
+    Nothing is refused while either is still open (a draft).
+
+    Raises:
+        DomainError: ``invalid_configuration`` (field ``handling_action``).
+    """
+    if kind is not None and action is not None and action not in COMBINATIONS[kind].actions:
+        raise _invalid("handling_action")
+
+
 class ReadinessCheck(StrEnum):
     """The six checks of the readiness checklist, in display order."""
 
@@ -445,6 +508,7 @@ def check_flow_references(
     already_required: frozenset[int],
     subject_codes: Collection[str],
     *,
+    group_id: int,
     already_pool_id: int | None = None,
 ) -> None:
     """Refuse a revision that refers to what its group's organisation does not offer.
@@ -452,7 +516,8 @@ def check_flow_references(
     ``pool`` is the revision's capacity pool as loaded (``None`` when there is none with that
     id), ``skills`` every skill it names (for the flow or a subject) by id as loaded,
     ``already_required`` the skills the revision it is based on requires, ``already_pool_id``
-    that revision's pool, and ``subject_codes`` the codes of the group's subjects. An archived
+    that revision's pool, ``group_id`` the group the flow belongs to (a legacy pool serves only
+    its own group's flows) and ``subject_codes`` the codes of the group's subjects. An archived
     pool or skill may stay where it is but is not newly chosen (A28). The location is a plain
     number until locations are built, so a revision names none.
 
@@ -467,6 +532,8 @@ def check_flow_references(
             raise missing_object("capacity_pool_id")
         if pool.organisation_id != group_organisation_id:
             raise outside_organisation("capacity_pool_id")
+        if pool.mode is PoolMode.LEGACY_GROUP and pool.group_id != group_id:
+            raise _invalid("capacity_pool_id")
         if pool.archived_at is not None and revision.capacity_pool_id != already_pool_id:
             raise _invalid("capacity_pool_id")
     if any(code not in subject_codes for code in revision.subject_skill_ids):

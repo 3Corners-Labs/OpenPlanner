@@ -340,7 +340,7 @@ async def test_an_imported_group_gets_its_pool_and_flows_and_loses_them_when_del
         ]
     }
 
-    plan = await apply_document(engine, data)
+    plan = await apply_document(engine, data, whole_apply=True)
 
     assert plan.ok, plan.refusals
     found = await flows_by_group(engine)
@@ -358,7 +358,7 @@ async def test_an_imported_group_gets_its_pool_and_flows_and_loses_them_when_del
             }
         ]
     }
-    assert (await apply_document(engine, gone)).ok
+    assert (await apply_document(engine, gone, whole_apply=True)).ok
     assert await count_of(engine, CapacityPoolRow) == pools_before - 2
     assert "balie" not in await flows_by_group(engine)
 
@@ -372,7 +372,7 @@ async def test_a_change_of_the_rules_gives_an_existing_group_the_direct_flow(
         "organisations": [{"slug": "acme", "groups": [{"slug": "loket", "schedule_rules": rules}]}]
     }
 
-    assert (await apply_document(seeded, data)).ok
+    assert (await apply_document(seeded, data, whole_apply=True)).ok
 
     assert await flows_by_group(seeded) == {
         "loket": [("appointment", "active"), ("direct", "active")]
@@ -382,7 +382,7 @@ async def test_a_change_of_the_rules_gives_an_existing_group_the_direct_flow(
 async def test_a_change_that_leaves_the_rules_alone_writes_no_flows(seeded: AsyncEngine) -> None:
     data = {"organisations": [{"slug": "acme", "groups": [{"slug": "loket", "name": "Nieuw"}]}]}
 
-    assert (await apply_document(seeded, data)).ok
+    assert (await apply_document(seeded, data, whole_apply=True)).ok
 
     assert await flows_by_group(seeded) == {}
 

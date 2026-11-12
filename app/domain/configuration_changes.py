@@ -26,11 +26,14 @@ class ChangeAction(StrEnum):
         CREATE: The object is added.
         UPDATE: Some of its fields change.
         DELETE: It is removed, with everything it holds.
+        ARCHIVE: It is kept but marked archived, because something still refers to it (a kind
+            that declares ``Kind.archive``); never a deletion, and reversible by a document.
     """
 
     CREATE = "create"
     UPDATE = "update"
     DELETE = "delete"
+    ARCHIVE = "archive"
 
 
 @dataclass(frozen=True)
@@ -64,6 +67,9 @@ class Change:
         permissions: What the admin screens of these fields require.
         organisation: The slug of the organisation it belongs to, if any.
         group: The slug of the group it belongs to, if any.
+        at: When the apply happens, from the service's clock; the writers stamp what a change
+            archives with it, so the time is the portal's and a test can fix it. ``None`` in a
+            plan, set by the service just before it writes.
     """
 
     kind: str
@@ -76,6 +82,7 @@ class Change:
     permissions: frozenset[Permission] = frozenset()
     organisation: str | None = None
     group: str | None = None
+    at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -129,16 +136,43 @@ class Usage:
     Attributes:
         in_use: Per kind, the objects (by address) that something outside the configuration
             refers to: a booking, a closure or a shortfall acceptance. They are not deleted.
+        kept: Per kind, the objects (by address) that a document archives instead of deleting
+            when it removes them, because they hold history or grants (a skill a person holds
+            or a revision requires, a pool a revision draws on, a flow with a published
+            revision). Unlike ``in_use`` it does not make what holds them in use: a group is
+            deleted with its flows, which are history inside it. Only a kind that declares
+            ``Kind.archive`` is kept; for any other kind this is ignored.
         future_bookings: The groups (by address) with a future booking that holds a place;
             their time grid is frozen.
         slot_loads: Per group (by address), its future slots and what is booked on them.
         locked_settings: The settings the environment locks (ADR 0042), by registry key.
+        unaddressable: Objects of the installation that a document cannot address and so cannot
+            carry, named ``organisation/id`` (a counted capacity pool whose code is missing); an
+            export refuses while there is one, for the organisations it covers.
+        hidden_pool_names: The names of those pools that are not archived, by organisation slug.
+            They are absent from the tree, so a plan checks the name of a pool it creates against
+            them too (pool names are unique within an organisation).
     """
 
     in_use: Mapping[str, frozenset[Address]] = field(default_factory=dict)
+    kept: Mapping[str, frozenset[Address]] = field(default_factory=dict)
     future_bookings: frozenset[Address] = frozenset()
     slot_loads: Mapping[Address, tuple[SlotLoad, ...]] = field(default_factory=dict)
     locked_settings: frozenset[str] = frozenset()
+    unaddressable: frozenset[str] = frozenset()
+    hidden_pool_names: Mapping[str, frozenset[str]] = field(default_factory=dict)
+
+    def unaddressable_in(self, organisation: str | None) -> frozenset[str]:
+        """Return the unaddressable objects of one organisation, or of all for ``None``.
+
+        An export or a plan of an organisation concerns only its own, and must neither be
+        stopped by nor name another organisation's.
+        """
+        if organisation is None:
+            return self.unaddressable
+        return frozenset(
+            name for name in self.unaddressable if name.split("/", 1)[0] == organisation
+        )
 
 
 @dataclass(frozen=True)

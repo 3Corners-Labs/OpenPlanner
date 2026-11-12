@@ -171,6 +171,7 @@ async def test_a_plan_that_deletes_carries_the_warning_and_a_danger_button(site:
     extra = json.loads(json.dumps(groups[0]))
     extra["slug"] = "tijdelijk"
     extra["name"] = "Tijdelijk"
+    del extra["flows"], extra["legacy_pool"]  # the copy gets its own, as any new service does
     created = await plan(
         site,
         {
