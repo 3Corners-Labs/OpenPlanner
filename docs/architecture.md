@@ -302,7 +302,8 @@ same commit and rollback behaviour as the SQL one.
 | Staffing blocks (formerly opening hours, ADR 0027), groups | `app/domain/scheduling.py` |
 | Slot calculation (time zones, daylight saving), the start-time grid of a run of blocks (`grid_on`) | `app/domain/availability.py` |
 | Counted capacity pools: staffing as UTC segments, interval accounting (admission, start, earliest start, shortfalls; ADR 0122) | `app/domain/pool_staffing.py`, `app/domain/pool_accounting.py` |
-| Persistence of a counted pool's staffing and of the pool on a slot, kept out of a service's own slot queries (ADR 0122 step 2; nothing reads it for a booking decision yet) | `app/adapters/db/pool_staffing.py`, `app/adapters/db/legacy_slot.py` |
+| Persistence of a counted pool's staffing and of the pool on a slot, kept out of a service's own slot queries (ADR 0122 step 2) | `app/adapters/db/pool_staffing.py`, `app/adapters/db/legacy_slot.py` |
+| Appointments of a flow on a counted pool: the pool's grid, admission inside the write lock, the pool slot; reached through `BookingService._reserve_for` only while the rollback gate `ROLLBACK_SAFE` is open (ADR 0122 step 5) | `app/domain/pool_booking.py` |
 | Bookings, contact validation | `app/domain/booking.py` |
 | Book, cancel, reschedule (use cases) | `app/domain/services.py` |
 | Emergency closure, bookings on hold (ADR 0024) | `app/domain/closure.py`, `app/domain/closure_service.py`, `app/admin/closure_routes.py`, `app/admin/closure_image_routes.py`, `app/web/closure_labels.py` |

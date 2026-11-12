@@ -25,7 +25,7 @@ with an `Origin` must come from the organisation's allowed origins, else
 |---|---|---|
 | GET | `/api/v1/widget/texts` | `200` the texts for loading and "not available" (any origin, `Access-Control-Allow-Origin: *`) |
 | GET | `/api/v1/widget/{org}/{group}/?flow=` | `200` name, intro, standalone page URL, closure notice, contact fields, honeypot name, texts; `422 flow_not_available` for an explicit `flow` that does not resolve |
-| GET | `/api/v1/widget/{org}/{group}/availability?month=YYYY-MM&day=YYYY-MM-DD` | `200` month grid, free times of the day, first free moment |
+| GET | `/api/v1/widget/{org}/{group}/availability?month=YYYY-MM&day=YYYY-MM-DD&flow=` | `200` month grid, free times of the day, first free moment; `422 flow_not_available` for an explicit `flow` that does not resolve |
 | POST | `/api/v1/widget/{org}/{group}/bookings` | `201 {"status": "booked", "start", "end", "label", "message"}`; `400` honeypot, `409` slot taken or group closed, `413`, `422 invalid_request` or `invalid_contact` with `field` or `flow_not_available`, `429 rate_limited` |
 | OPTIONS | `/api/v1/widget/{org}/{group}/bookings` | `204` CORS preflight for allowed origins (not in the spec) |
 
@@ -35,6 +35,9 @@ path is used, as before. A value that is not a flow code (`^[a-z0-9][a-z0-9-]{0,
 `422 invalid_request` in the body (`422 flow_not_available` in the query); a code that does not resolve (unknown, another group's, not active, or not
 offered for appointments) is `422 flow_not_available`. There is no fallback to the default flow.
 Every new booking records the flow and revision it was made under; moving it keeps them.
+The availability query takes the same optional `flow`: a flow on a counted capacity pool shows
+the pool's times (ADR 0122). Until the rollback gate of ADR 0122 opens, no such flow resolves,
+so the answer is the group's own times as before.
 
 While maintenance mode is on (ADR 0038), the group, availability and booking routes answer
 `503 {"error": "maintenance"}` with `Retry-After`, readable by an allowed origin; `/texts` and

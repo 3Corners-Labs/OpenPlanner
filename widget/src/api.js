@@ -54,7 +54,8 @@ export function createApi(origin, organisation, group, lang) {
       return response.json();
     },
     group: (flow) => call('/', { flow }),
-    availability: (month, day, subject) => call('/availability', { month, day, subject }),
+    availability: (month, day, subject, flow) =>
+      call('/availability', { month, day, subject, flow }),
     book: (details) =>
       call('/bookings', {}, {
         method: 'POST',

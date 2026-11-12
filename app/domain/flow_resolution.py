@@ -21,6 +21,7 @@ from app.domain.service_flows import (
     IntakeMode,
     InteractionKind,
     ServiceFlow,
+    pool_booking_open,
 )
 
 
@@ -43,6 +44,9 @@ class ResolvedFlow:
         interaction_kind: What participant and staff do together; ``None`` only for a revision
             that never chose one (a published revision always has one).
         legacy: Whether the revision is the wrapper of a pre-flow service.
+        capacity_pool_id: The pool the revision draws on (ADR 0122); a booking of a revision
+            that is not legacy is placed on it.
+        duration_minutes: The length of one appointment of the revision.
     """
 
     flow_id: int
@@ -50,6 +54,8 @@ class ResolvedFlow:
     revision: int
     interaction_kind: InteractionKind | None
     legacy: bool = False
+    capacity_pool_id: int | None = None
+    duration_minutes: int | None = None
 
     @property
     def ref(self) -> FlowRef:
@@ -71,8 +77,28 @@ def _resolved(flow: ServiceFlow, live: tuple[int, FlowRevision]) -> ResolvedFlow
     """Return ``flow`` at its revision in effect (``live``, from ``_live``) as a resolved flow."""
     flow_id, revision = live
     return ResolvedFlow(
-        flow_id, flow.code, revision.revision, revision.interaction_kind, revision.legacy
+        flow_id,
+        flow.code,
+        revision.revision,
+        revision.interaction_kind,
+        revision.legacy,
+        revision.capacity_pool_id,
+        revision.duration_minutes,
     )
+
+
+def gate_allows(flow: ServiceFlow, mode: IntakeMode) -> bool:
+    """Return whether a new booking on the entry path ``mode`` may be made under ``flow`` now.
+
+    A legacy flow (and one without a current revision, which no rule resolves) always may. A
+    flow that is not legacy draws on a counted pool: only for appointments (on-demand intake on a
+    pool is ADR 0121 step 7), and only while the rollback gate is open
+    (``service_flows.pool_booking_open``). A flow the gate holds back is, for the participant,
+    exactly a flow that is not active: unknown when named, never the default.
+    """
+    if flow.current is None or flow.current.legacy:
+        return True
+    return mode is IntakeMode.APPOINTMENT and pool_booking_open()
 
 
 def resolve_default(flows: Iterable[ServiceFlow], mode: IntakeMode) -> ResolvedFlow | None:

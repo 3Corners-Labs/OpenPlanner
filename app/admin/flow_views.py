@@ -142,6 +142,7 @@ REASON_TEXTS: Mapping[ReadinessReason, str] = {
     ReadinessReason.NOT_BUILT_YET: "admin.flows.reason.not_built_yet",
     ReadinessReason.COMPLETION_MISSING: "admin.flows.reason.completion_missing",
     ReadinessReason.COMPLETION_LEGACY_ONLY: "admin.flows.reason.completion_legacy_only",
+    ReadinessReason.ROLLBACK_NOT_SAFE: "admin.flows.reason.rollback_not_safe",
 }
 """One sentence per reason a check fails."""
 
@@ -330,12 +331,13 @@ def readiness_view(
         if item.ok or reason is None:
             word, sentence, missing = _("admin.flows.ready_word.ok"), "", False
         else:
-            follows = reason is ReadinessReason.NOT_BUILT_YET
+            follows = reason in flows.FOLLOWING
             word = _(
                 "admin.flows.ready_word.follows" if follows else "admin.flows.ready_word.missing"
             )
             key = REASON_TEXTS[reason]
-            sentence, missing = _(NOT_BUILT_TEXTS.get(item.code, key) if follows else key), True
+            built_later = reason is ReadinessReason.NOT_BUILT_YET
+            sentence, missing = _(NOT_BUILT_TEXTS.get(item.code, key) if built_later else key), True
         lacking = (
             _("admin.flows.reason.missing_skills", skills=", ".join(missing_skills))
             if reason is ReadinessReason.POOL_DOES_NOT_GUARANTEE and missing_skills
@@ -381,7 +383,7 @@ def activation_view(page: FlowPage, locale: RequestLocale) -> ActivationView | N
         return ActivationView(True, _("admin.flows.activate_ready"))
     if page.activation is None:
         return ActivationView(False, _("admin.flows.activate_publish_first"))
-    follows = any(item.reason is ReadinessReason.NOT_BUILT_YET for item in page.activation)
+    follows = any(item.reason in flows.FOLLOWING for item in page.activation)
     return ActivationView(
         False,
         _("admin.flows.activate_not_built" if follows else "admin.flows.activate_not_ready"),

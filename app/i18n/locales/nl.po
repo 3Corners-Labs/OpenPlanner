@@ -13089,6 +13089,9 @@ msgstr "Kies wat een verzoek afrondt."
 msgid "admin.flows.reason.completion_legacy_only"
 msgstr "Deze afronding is alleen voor bestaande diensten en kan niet worden gekozen."
 
+msgid "admin.flows.reason.rollback_not_safe"
+msgstr "Activeren wacht tot ook de vorige versie van OpenPlanner afspraken op een gedeelde capaciteitspool kan bijhouden. Dat volgt in een latere versie."
+
 msgid "admin.flows.summary.none"
 msgstr "Niet ingesteld"
 

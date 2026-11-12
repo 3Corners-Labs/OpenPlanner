@@ -27,6 +27,7 @@ def booking_service(
         previous_token_key=management_token_key_previous(settings),
         closure_retention=live.closure_retention,
         reach=lambda org: reach(live.for_organisation(org)),
+        treatment_buffer=lambda org: live.for_organisation(org).treatment_buffer_minutes,
     )
 
 

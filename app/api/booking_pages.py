@@ -60,6 +60,7 @@ from app.domain.availability import AvailableSlot
 from app.domain.booking import BookingStatus
 from app.domain.change_request_service import ChangeRequestService
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.flow_resolution import FlowRef
 from app.domain.ports import Clock
 from app.domain.scheduling import Group
 from app.domain.service_flows import IntakeMode
@@ -126,11 +127,24 @@ def _manage_url(public_ref: str, status: str) -> str:
 
 
 async def _available(
-    service: BookingService, group: Group, start: datetime, subject: str | None = None
+    service: BookingService,
+    group: Group,
+    start: datetime,
+    subject: str | None = None,
+    *,
+    flow: str | None = None,
+    made_under: FlowRef | None = None,
 ) -> AvailableSlot | None:
-    """Return the slot at ``start`` if it can still be booked (for ``subject``, ADR 0081)."""
+    """Return the slot at ``start`` if it can still be booked (for ``subject``, ADR 0081).
+
+    ``flow`` is the checked flow code of the page, ``made_under`` the revision of a booking
+    being moved: a flow on a counted pool is judged on the pool's times (ADR 0122).
+    """
     day = local_day(start, group.tz)
-    for slot in await service.availability(group.slug, day, day, subject):
+    slots = await service.availability(
+        group.slug, day, day, subject, flow=flow, made_under=made_under
+    )
+    for slot in slots:
         if slot.start == start:
             return slot
     return None
@@ -280,7 +294,7 @@ async def booking_form(
     parsed = parse_start(start)
     chosen = group.routing.subject(subject)
     code = chosen.code if chosen else None
-    slot = await _available(service, group, parsed, code) if parsed else None
+    slot = await _available(service, group, parsed, code, flow=chosen_flow) if parsed else None
     if parsed is None or slot is None:
         again = [("status", "unavailable")] + ([("flow", chosen_flow)] if chosen_flow else [])
         return RedirectResponse(f"/g/{group.slug}?{urlencode(again)}", status_code=303)
@@ -311,7 +325,7 @@ async def book(request: Request, slug: str, locale: Locale, _: SameOrigin) -> Re
             flow=chosen_flow,
         )
     except DomainError as error:
-        slot = await _available(service, group, start)
+        slot = await _available(service, group, start, flow=chosen_flow)
         contact = await load_contact_form(service, group, _clock(request).now())
         context = _book_context(
             contact, start, slot, locale, contact.errors(error, locale), values, chosen_flow
@@ -626,7 +640,10 @@ async def _reschedule_response(
         context["suggestions"] = [
             (slot_value(at), slot_label(at, at + length, group, locale)) for at in suggestions
         ]
-    slot = await _available(service, group, chosen, subject) if chosen else None
+    made_under = details.booking.flow  # ADR 0122: a booking on a pool moves on its pool
+    slot = (
+        await _available(service, group, chosen, subject, made_under=made_under) if chosen else None
+    )
     if chosen is not None and slot is not None and chosen != details.booking.start:
         context["new_start"] = slot_value(chosen)
         context["new_label"] = slot_label(chosen, slot.end, group, locale)
@@ -642,6 +659,7 @@ async def _reschedule_response(
             day=day,
             exclude=details.booking.start,
             slot_filter=replace(parse_filter(request.query_params.multi_items()), subject=subject),
+            made_under=made_under,
         )
         name = "reschedule.html"
     return await participant_page(request, locale, name, group, context, status_code)

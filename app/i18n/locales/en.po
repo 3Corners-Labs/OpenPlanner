@@ -13076,6 +13076,9 @@ msgstr "Choose what completes a request."
 msgid "admin.flows.reason.completion_legacy_only"
 msgstr "This completion is only for existing services and cannot be chosen."
 
+msgid "admin.flows.reason.rollback_not_safe"
+msgstr "Activation waits until the previous version of OpenPlanner can also keep track of appointments on a shared capacity pool. This follows in a later version."
+
 msgid "admin.flows.summary.none"
 msgstr "Not set"
 

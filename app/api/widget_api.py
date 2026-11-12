@@ -433,17 +433,22 @@ async def availability(
     month: str | None = None,
     day: str | None = None,
     subject: Annotated[str | None, Query(max_length=40)] = None,
+    flow: Annotated[str | None, Query(max_length=40)] = None,
 ) -> WidgetAvailability:
     """Return a month (``YYYY-MM``) and the free times of a day (``YYYY-MM-DD``).
 
     Without parameters: the month of the first free day, and that day. A day outside today …
     the booking horizon, or a malformed value, is ignored as on the standalone page. With
     ``subject`` (the host page's ``subject`` attribute, ADR 0081) only the times of staffing
-    blocks that offer it; a code the group does not have is ignored.
+    blocks that offer it; a code the group does not have is ignored. With ``flow`` (the host
+    page's ``flow`` attribute, ADR 0121) the times of that flow: a flow on a counted pool shows
+    the pool's times (ADR 0122); a flow that does not resolve is ``flow_not_available`` (422).
     """
     found = _group(request)
+    service = _booking_service(request)
+    chosen = await checked_flow(service, found.slug, IntakeMode.APPOINTMENT, flow)
     view = await picker(
-        _booking_service(request),
+        service,
         found,
         request.app.state.clock.now(),
         locale,
@@ -451,7 +456,7 @@ async def availability(
         month=month,
         day=day,
         # Only a code of the group goes into the filter, so the answer never echoes the query.
-        slot_filter=SlotFilter(subject=subject_filter(subject, found.routing)),
+        slot_filter=SlotFilter(subject=subject_filter(subject, found.routing), flow=chosen),
     )
     return _availability(view, locale)
 

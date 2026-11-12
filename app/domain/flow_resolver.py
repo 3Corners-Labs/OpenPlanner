@@ -8,7 +8,12 @@ booking keeps the flow it was made under (``Booking.flow``).
 
 from app.domain.authorization import PUBLIC_READ
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.flow_resolution import ResolvedFlow, resolve_default, resolve_explicit
+from app.domain.flow_resolution import (
+    ResolvedFlow,
+    gate_allows,
+    resolve_default,
+    resolve_explicit,
+)
 from app.domain.ports import Transaction, UnitOfWork
 from app.domain.routing import SUBJECT_CODE
 from app.domain.service_flows import IntakeMode
@@ -31,13 +36,20 @@ async def resolve_flow(
     (an administrator archived it); the service's own settings decide what is offered. Both
     cases record NULL: the column cannot tell "no flow rows" from "default archived" (ADR 0121).
 
+    A flow on a counted pool takes part only while the rollback gate is open, and only for
+    appointments (``gate_allows``, ADR 0122 step 5); otherwise it counts as not active.
+
     Raises:
         DomainError: ``flow_not_available`` for an explicit code that does not resolve,
             ``flow_default_ambiguous`` when the schema's unique index failed.
     """
     if code is not None and not SUBJECT_CODE.fullmatch(code):
         raise DomainError(ErrorCode.FLOW_NOT_AVAILABLE, "flow")
-    flows = await tx.list_service_flows(PUBLIC_READ, group_id)
+    flows = [
+        flow
+        for flow in await tx.list_service_flows(PUBLIC_READ, group_id)
+        if gate_allows(flow, mode)
+    ]
     if code is not None:
         return resolve_explicit(flows, code, mode)
     return resolve_default(flows, mode)

@@ -105,6 +105,7 @@ async def active_flow(
 ) -> int:
     """Store the flow ``advies``, publish and activate it; the checklist is let through."""
     monkeypatch.setattr(flows, "RETENTION_BUILT", True)
+    monkeypatch.setattr(flows, "ROLLBACK_SAFE", True)  # ADR 0122: the gate too
     await person(uow, ORG_ADMIN.subject)
     _, pool = await seed(uow)
     await service.create(ORG_ADMIN, "demo", "advies", draft(pool))
@@ -324,6 +325,7 @@ async def test_a_flow_that_is_ready_is_activated_and_archived(
     service: FlowService, uow: InMemoryUnitOfWork, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(flows, "RETENTION_BUILT", True)
+    monkeypatch.setattr(flows, "ROLLBACK_SAFE", True)  # ADR 0122: the gate too
     await person(uow, ORG_ADMIN.subject)
     _, pool = await seed(uow)
     await service.create(ORG_ADMIN, "demo", "advies", draft(pool))
@@ -415,6 +417,7 @@ async def test_the_draft_of_an_active_flow_is_published_only_when_it_is_in_order
     service: FlowService, uow: InMemoryUnitOfWork, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(flows, "RETENTION_BUILT", True)
+    monkeypatch.setattr(flows, "ROLLBACK_SAFE", True)  # ADR 0122: the gate too
     await person(uow, ORG_ADMIN.subject)
     _, pool = await seed(uow)
     await service.create(ORG_ADMIN, "demo", "advies", draft(pool))
@@ -506,6 +509,7 @@ async def test_a_second_active_default_is_refused_when_the_flow_is_activated(
     service: FlowService, uow: InMemoryUnitOfWork, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(flows, "RETENTION_BUILT", True)
+    monkeypatch.setattr(flows, "ROLLBACK_SAFE", True)  # ADR 0122: the gate too
     await person(uow, ORG_ADMIN.subject)
     _, pool = await seed(uow)
     default = frozenset({IntakeMode.APPOINTMENT})
