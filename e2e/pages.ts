@@ -90,6 +90,8 @@ export function islandVariants(): { title: string; path: string; user?: TestUser
 function variants(pages: PageUnderTest[]): { title: string; path: string }[] {
   return pages.flatMap((page) => {
     const path = page.path.replace(/^\{(\w+)\}$/, (_, name: string) => fixture(name));
+    // A placeholder the resolver does not take (it names a whole path) must not reach the browser as text.
+    if (/[{}]/.test(path)) throw new Error(`unresolved placeholder in "${page.path}" of pages.json`);
     return page.locales.map((locale) => {
       const separator = path.includes('?') ? '&' : '?';
       return { title: `${page.name} [${locale}]`, path: `${path}${separator}lang=${locale}` };

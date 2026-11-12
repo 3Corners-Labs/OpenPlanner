@@ -19,6 +19,11 @@ pages of CL-2 are these. On the demo team's next weekday it adds bookings awaiti
 confirmation (ADR 0056), one awaiting a new time (ADR 0057) and a confirmed one, so the agenda
 of that day (``demo_agenda``) shows every action a planner has on a booking, whatever the date.
 
+``seed_flow_examples`` adds what the flow pages need (ADR 0121 step 2d): two skills, a counted
+pool and draft flows, one of them in a service of its own with a subject; the same command
+that writes the closure examples (``seed-closures``) calls it and merges its paths into the
+same fixture file.
+
 Used by ``python -m app.cli seed-demo`` and by tests. Idempotent: existing groups are left
 untouched.
 """
@@ -42,14 +47,28 @@ from app.adapters.db.models import (
 from app.adapters.db.seed_usage import usage_example_cells
 from app.adapters.db.service_flows import ensure_default_flows_in
 from app.adapters.db.uow import SqlUnitOfWork
+from app.domain.authorization import Scope
 from app.domain.booking import Booking, BookingStatus, ChangeReason, Contact, Slot
+from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.closure import Closure
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.form_fields import Classification, FieldDefinition, FieldType, FormDefinition
 from app.domain.images import ImageFile, ImageText
 from app.domain.ports import Transaction
 from app.domain.reschedule_proposal import HeldProposal
+from app.domain.routing import GroupRouting, Subject
 from app.domain.scheduling import Group, PhoneMode
+from app.domain.service_flows import (
+    CompletionPolicy,
+    DispatchKind,
+    FlowRevision,
+    FlowState,
+    HandlingAction,
+    IntakeMode,
+    InteractionKind,
+    ServiceFlow,
+)
+from app.domain.skills import Skill
 from app.domain.tokens import derive_token, hash_token, new_token_salt
 
 DEMO_SLUG = "demo"
@@ -174,6 +193,26 @@ class ClosureExamples:
     trial_page: str
     journeys: dict[str, JourneyExample]
     demo_agenda: str
+
+
+@dataclass(frozen=True)
+class FlowExamples:
+    """Paths of the example skills, pool and flows of the demo organisation (ADR 0121 step 2d).
+
+    Attributes:
+        skill_edit: The edit page of the seeded skill ``general-advice`` (ADR 0121 step 2c).
+        skill_archive: Its archive page.
+        pool_edit: The edit page of the seeded counted pool ``advice``.
+        pool_archive: Its archive page.
+        flow_subject: The page that chooses the extra skills of the subject of the draft flow
+            ``subject-review`` of the service ``demo-flows``.
+    """
+
+    skill_edit: str
+    skill_archive: str
+    pool_edit: str
+    pool_archive: str
+    flow_subject: str
 
 
 async def seed_demo(engine: AsyncEngine) -> bool:
@@ -306,6 +345,147 @@ async def seed_closure_examples(
         trial_page=f"/b/{token}/test",
         journeys=journeys,
         demo_agenda=_agenda_path(demo, demo_day),
+    )
+
+
+async def seed_flow_examples(engine: AsyncEngine) -> FlowExamples:
+    """Add the demo organisation's skills, counted pool and draft flows; return their pages.
+
+    Needs ``seed_demo`` first. Idempotent: what exists is kept, so every run returns the same
+    paths. The page checks of the flows (``e2e/pages.json``) name them in braces.
+
+    Args:
+        engine: The database.
+    """
+    await _seed_group(engine, DEMO_SLUG, "Demo-acme", FLOW_GROUP_SLUG, "Demo: flows")
+    async with SqlUnitOfWork(engine).locked() as tx:
+        demo = await seeded_group(tx, DEMO_SLUG)
+        ids = await _flow_examples(tx, demo)
+        await _subject_flow_example(tx, await seeded_group(tx, FLOW_GROUP_SLUG), ids)
+    return FlowExamples(
+        skill_edit=f"/admin/organisations/{DEMO_SLUG}/skills/{ids.general}",
+        skill_archive=f"/admin/organisations/{DEMO_SLUG}/skills/{ids.general}/archive",
+        pool_edit=f"/admin/organisations/{DEMO_SLUG}/capacity/{ids.pool}",
+        pool_archive=f"/admin/organisations/{DEMO_SLUG}/capacity/{ids.pool}/archive",
+        flow_subject=(
+            f"/admin/groups/{FLOW_GROUP_SLUG}/flows/{FLOW_EXAMPLE_SUBJECT_FLOW}"
+            f"/subjects/{FLOW_EXAMPLE_SUBJECT}"
+        ),
+    )
+
+
+FLOW_EXAMPLE_SKILLS = (
+    ("general-advice", "Algemeen advies", "General advice"),
+    ("language-en", "Engels", "English"),
+)
+"""The two skills of the demo organisation (ADR 0121 step 2d), the first guaranteed by the pool."""
+FLOW_EXAMPLE_POOL = "advice"
+"""Code of the demo organisation's counted pool."""
+FLOW_EXAMPLE_FLOW = "document-review"
+"""Code of the demo service's draft flow: no conversation, on that pool."""
+FLOW_GROUP_SLUG = "demo-flows"
+"""The service whose draft flow offers a subject with an extra skill (``flow_subject``)."""
+FLOW_EXAMPLE_SUBJECT_FLOW = "subject-review"
+"""Code of that draft flow."""
+FLOW_EXAMPLE_SUBJECT = "aanvraag"
+"""Code of the subject it offers; its extra skill is the second of ``FLOW_EXAMPLE_SKILLS``."""
+
+
+@dataclass(frozen=True)
+class _FlowIds:
+    """The ids the flow examples are built on, read back from the database."""
+
+    general: int
+    english: int
+    pool: int
+
+
+async def _flow_examples(tx: Transaction, demo: Group) -> _FlowIds:
+    """Add the demo organisation's skills, counted pool and draft flow once; return their ids.
+
+    The ids of ``general-advice`` and of the pool ``advice`` serve the stable pages of the e2e
+    list (they are numbers, so they are read back here instead of being assumed). Idempotent:
+    what exists is kept.
+    """
+    everything = Scope(everything=True)
+    skills = {s.code: s for s in await tx.list_skills(everything, demo.organisation_id)}
+    for code, nl, en in FLOW_EXAMPLE_SKILLS:
+        if code not in skills:
+            skills[code] = await tx.save_skill(
+                everything, Skill(None, demo.organisation_id, code, {"nl": nl, "en": en})
+            )
+    general = skills[FLOW_EXAMPLE_SKILLS[0][0]]
+    pools = {
+        p.code: p for p in await tx.list_capacity_pools(everything, demo.organisation_id) if p.code
+    }
+    if FLOW_EXAMPLE_POOL not in pools:
+        pools[FLOW_EXAMPLE_POOL] = await tx.save_capacity_pool(
+            everything,
+            CapacityPool(
+                None,
+                demo.organisation_id,
+                "Advies",
+                PoolMode.COUNTED,
+                frozenset({general.id or 0}),
+                code=FLOW_EXAMPLE_POOL,
+            ),
+        )
+    pool = pools[FLOW_EXAMPLE_POOL]
+    existing = {f.code for f in await tx.list_service_flows(everything, demo.id)}
+    if FLOW_EXAMPLE_FLOW not in existing:
+        revision = FlowRevision(
+            flow_id=None,
+            revision=1,
+            labels={"nl": "Documentcontrole", "en": "Document review"},
+            intake_modes=frozenset({IntakeMode.APPOINTMENT}),
+            interaction_kind=InteractionKind.NONE,
+            duration_minutes=30,
+            capacity_pool_id=pool.id,
+            required_skill_ids=frozenset(),
+            subject_skill_ids={},
+            dispatch=DispatchKind.OWN_QUEUE,
+            handling_action=HandlingAction.VIEW_REQUEST,
+            completion=CompletionPolicy.OPERATOR,
+        )
+        flow = ServiceFlow(
+            None, demo.id, FLOW_EXAMPLE_FLOW, FlowState.DRAFT, frozenset(), None, revision
+        )
+        await tx.save_draft(everything, flow)
+    return _FlowIds(general.id or 0, skills[FLOW_EXAMPLE_SKILLS[1][0]].id or 0, pool.id or 0)
+
+
+async def _subject_flow_example(tx: Transaction, group: Group, ids: _FlowIds) -> None:
+    """Give ``group`` a subject and a draft flow that offers it with an extra skill, once."""
+    everything = Scope(everything=True)
+    if FLOW_EXAMPLE_SUBJECT_FLOW in {
+        f.code for f in await tx.list_service_flows(everything, group.id)
+    }:
+        return
+    await tx.save_group_routing(
+        group.id,
+        GroupRouting(
+            subjects=(Subject.create(FLOW_EXAMPLE_SUBJECT, {"nl": "Aanvraag", "en": "Request"}),)
+        ),
+    )
+    revision = FlowRevision(
+        flow_id=None,
+        revision=1,
+        labels={"nl": "Aanvraagcontrole", "en": "Request review"},
+        intake_modes=frozenset({IntakeMode.APPOINTMENT}),
+        interaction_kind=InteractionKind.NONE,
+        duration_minutes=30,
+        capacity_pool_id=ids.pool,
+        required_skill_ids=frozenset(),
+        subject_skill_ids={FLOW_EXAMPLE_SUBJECT: frozenset({ids.english})},
+        dispatch=DispatchKind.OWN_QUEUE,
+        handling_action=HandlingAction.VIEW_REQUEST,
+        completion=CompletionPolicy.OPERATOR,
+    )
+    await tx.save_draft(
+        everything,
+        ServiceFlow(
+            None, group.id, FLOW_EXAMPLE_SUBJECT_FLOW, FlowState.DRAFT, frozenset(), None, revision
+        ),
     )
 
 

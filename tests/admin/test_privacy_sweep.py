@@ -169,6 +169,16 @@ PATHS: dict[str, str] = {
     "/admin/organisations/{org}/skills/{skill_id}/archive": (
         "/admin/organisations/demo/skills/{skill}/archive"
     ),
+    # ADR 0121 step 2d: the flows of the demo service; the sweep stores one draft flow, ``sweep``.
+    "/admin/groups/{slug}/flows": "/admin/groups/demo/flows",
+    "/admin/groups/{slug}/flows/new": "/admin/groups/demo/flows/new",
+    "/admin/groups/{slug}/flows/{code}": "/admin/groups/demo/flows/sweep",
+    "/admin/groups/{slug}/flows/{code}/subjects/{subject}": (
+        "/admin/groups/demo/flows/sweep/subjects/sweep"
+    ),
+    "/admin/groups/{slug}/flows/{code}/discard": "/admin/groups/demo/flows/sweep/discard",
+    "/admin/groups/{slug}/flows/{code}/archive": "/admin/groups/demo/flows/sweep/archive",
+    "/admin/groups/{slug}/flows/{code}/delete": "/admin/groups/demo/flows/sweep/delete",
     "/admin/organisations/{org}/capacity": "/admin/organisations/demo/capacity",
     "/admin/organisations/{org}/capacity/{pool_id}": "/admin/organisations/demo/capacity/{pool}",
     "/admin/organisations/{org}/capacity/{pool_id}/archive": (

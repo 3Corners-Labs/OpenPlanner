@@ -12,7 +12,7 @@ of objects instead of rows:
   ``skills_required_on_pool``. It decides whether a pool may be archived and which skills it must
   keep guaranteeing.
 * *referred to by any revision ever written* (``skills_referred_to``, ``pools_referred_to``,
-  ``flows_in_use``): the wider question that decides whether a configuration document deletes an
+  ``flows_kept``): the wider question that decides whether a configuration document deletes an
   object or archives it. History keeps every revision, so a skill or pool an old revision names,
   a person holds or a pool guarantees cannot be removed without losing history or grants.
 """
@@ -88,13 +88,20 @@ def pools_referred_to() -> Select[int | None]:
     )
 
 
-def flows_in_use() -> CompoundSelect[tuple[int | None]]:
+def flows_with_bookings() -> Select[int | None]:
+    """Return the ids of the flows a booking refers to: the one definition of that question."""
+    return select(BookingRow.flow_id).where(BookingRow.flow_id.is_not(None))
+
+
+def flows_kept() -> CompoundSelect[tuple[int | None]]:
     """Return the ids of the flows a document archives instead of deleting.
 
-    A flow that has any published revision is history, and one a booking was made under is
-    referred to; only a flow with nothing but a draft and no booking may be deleted.
+    A flow that is or was active (state active or archived: a flow reaches active only by
+    activation and never returns to draft) is history, and one a booking refers to is referred
+    to; only a flow in state draft that no booking refers to may be deleted
+    (``service_flows.check_flow_delete``).
     """
     return union(
-        select(BookingRow.flow_id).where(BookingRow.flow_id.is_not(None)),
-        select(FlowRevisionRow.flow_id).where(FlowRevisionRow.published_at.is_not(None)),
+        flows_with_bookings(),
+        select(ServiceFlowRow.id).where(ServiceFlowRow.state != FlowState.DRAFT.value),
     )

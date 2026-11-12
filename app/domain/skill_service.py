@@ -21,7 +21,7 @@ from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 
-from app.domain.admin import AdminService, record_change
+from app.domain.admin import AdminService
 from app.domain.authorization import Permission, Principal, Scope, scope_for
 from app.domain.errors import DomainError, ErrorCode, missing_object
 from app.domain.organisations import organisation_by_slug, own_object
@@ -148,6 +148,19 @@ class SkillService:
     def max_skills(self) -> int:
         """The platform's limit of skills not archived per organisation."""
         return value_of(self._max)
+
+    async def _record(
+        self,
+        tx: Transaction,
+        principal: Principal,
+        slug: str,
+        detail: str,
+        at: datetime | None = None,
+    ) -> None:
+        """Audit a change of the organisation in the transaction that made it."""
+        await self._admin.record_change(
+            tx, at or self._clock.now(), principal, _PERMISSION, slug, None, detail
+        )
 
     async def catalogue(
         self, principal: Principal, slug: str, *, archived: bool = False
@@ -325,17 +338,6 @@ class SkillService:
             detail = ",".join([GRANTS_CHANGED, f"staff:{member_id}", *changes])
             await self._record(tx, principal, slug, detail, now)
         return True
-
-    async def _record(
-        self,
-        tx: Transaction,
-        principal: Principal,
-        slug: str,
-        detail: str,
-        at: datetime | None = None,
-    ) -> None:
-        """Audit a change of the skills in the transaction that made it (codes and numbers)."""
-        await record_change(tx, at or self._clock.now(), principal, _PERMISSION, slug, None, detail)
 
 
 async def _own_active_skill(

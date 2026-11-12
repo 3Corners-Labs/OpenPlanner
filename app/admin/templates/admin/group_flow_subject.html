@@ -1,0 +1,20 @@
+{#- The extra skills of one offered subject of a flow's draft (ADR 0121 step 2d): a form with the organisation's skills as checkboxes, saved into the draft. No script. -#}
+{% extends "admin/layout.html" %}
+{% from "admin/_skill_checkboxes.html" import skill_checkboxes with context %}
+{% block title %}{{ heading }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% set base = "/admin/groups/" ~ summary.group.slug ~ "/flows" %}
+{% include "admin/_group_header.html" %}
+<p><a href="{{ back }}">{{ _("admin.flows.back_to_flow") }}</a></p>
+<h2 class="section-title" id="subject-form-heading">{{ heading }}</h2>
+<p><code>{{ code }}</code> {{ name }}</p>
+{% include "_error_summary.html" %}
+<form class="card" method="post" action="{{ base }}/{{ code }}/subjects/{{ subject_code }}" novalidate aria-labelledby="subject-form-heading">
+  <p class="card__lead">{{ _("admin.flows.subject_lead") }}</p>
+  {{ skill_checkboxes(skill_choices, skills_field, _("admin.flows.extra_skills"), skills_error) }}
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.flows.subject_save") }}</button>
+    <a href="{{ back }}">{{ _("admin.cancel") }}</a>
+  </div>
+</form>
+{% endblock %}

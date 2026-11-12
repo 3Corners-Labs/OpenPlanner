@@ -1,0 +1,19 @@
+{#- Inputs of the flow editor (ADR 0121 step 2d): a select with a visible label, a hint and an error linked with aria-describedby, and a checkbox with its label. A choice that is not built yet is listed, marked in words and disabled. -#}
+{% from "_error_message.html" import error_message %}
+{% macro select_input(s) -%}
+<div class="field{% if s.error %} field--error{% endif %}">
+  <label for="{{ s.name }}">{{ s.label }}</label>
+  <select id="{{ s.name }}" name="{{ s.name }}"{% if s.error or s.hint %} aria-describedby="{% if s.hint %}{{ s.name }}-hint{% endif %}{% if s.hint and s.error %} {% endif %}{% if s.error %}{{ s.name }}-error{% endif %}"{% endif %}{% if s.error %} aria-invalid="true"{% endif %}>
+    {%- for option in s.options %}
+    <option value="{{ option.value }}"{% if option.selected %} selected{% endif %}{% if option.disabled %} disabled{% endif %}>{{ option.label }}</option>
+    {%- endfor %}
+  </select>
+  {%- if s.hint %}
+  <p class="hint" id="{{ s.name }}-hint">{{ s.hint }}</p>
+  {%- endif %}
+  {{ error_message(s.error, s.name ~ "-error") }}
+</div>
+{%- endmacro %}
+{% macro checkbox(c, described_by=none) -%}
+<div class="choice__option"><input type="checkbox" id="{{ c.name }}" name="{{ c.name }}" value="yes"{% if c.checked %} checked{% endif %}{% if c.disabled %} disabled{% endif %}{% if described_by %} aria-describedby="{{ described_by }}"{% endif %}><label for="{{ c.name }}">{{ c.label }}</label></div>
+{%- endmacro %}

@@ -138,8 +138,9 @@ class Usage:
             refers to: a booking, a closure or a shortfall acceptance. They are not deleted.
         kept: Per kind, the objects (by address) that a document archives instead of deleting
             when it removes them, because they hold history or grants (a skill a person holds
-            or a revision requires, a pool a revision draws on, a flow with a published
-            revision). Unlike ``in_use`` it does not make what holds them in use: a group is
+            or a revision requires, a pool a revision draws on, a flow that is or was active
+            or that a booking refers to; a flow in state draft that no booking refers to is
+            deleted). Unlike ``in_use`` it does not make what holds them in use: a group is
             deleted with its flows, which are history inside it. Only a kind that declares
             ``Kind.archive`` is kept; for any other kind this is ignored.
         future_bookings: The groups (by address) with a future booking that holds a place;

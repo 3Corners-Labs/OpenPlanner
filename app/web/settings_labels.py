@@ -170,6 +170,7 @@ SETTING_LABELS: dict[str, str] = {
     "max_capacity_pools_per_organisation": (
         "settings.field.max_capacity_pools_per_organisation.label"
     ),
+    "max_flows_per_service": "settings.field.max_flows_per_service.label",
     "phone_default_region": "settings.field.phone_default_region.label",
     "booking_confirm_window_hours": "settings.field.booking_confirm_window_hours.label",
     "booking_confirm_cutoff_hours": "settings.field.booking_confirm_cutoff_hours.label",

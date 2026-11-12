@@ -112,7 +112,7 @@ from app.adapters.db.maintenance import checkpoint_wal
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
 from app.adapters.db.rotation import rotation_status
 from app.adapters.db.sealed import rekey_database
-from app.adapters.db.seed import DEMO_SLUG, seed_closure_examples, seed_demo
+from app.adapters.db.seed import DEMO_SLUG, seed_closure_examples, seed_demo, seed_flow_examples
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.db.updates import last_running_version
 from app.adapters.db.upgrade_fixture import (
@@ -258,9 +258,11 @@ async def _seed_closures(settings: Settings) -> tuple[str, bool]:
         examples = await seed_closure_examples(
             engine, SystemClock().now(), management_token_key(settings)
         )
+        flows = await seed_flow_examples(engine)
     finally:
         await engine.dispose()
-    return json.dumps(dataclasses.asdict(examples), indent=2) + "\n", True
+    paths = dataclasses.asdict(examples) | dataclasses.asdict(flows)
+    return json.dumps(paths, indent=2) + "\n", True
 
 
 async def _seed_upgrade_fixture(settings: Settings, bookings: int) -> tuple[str, bool]:

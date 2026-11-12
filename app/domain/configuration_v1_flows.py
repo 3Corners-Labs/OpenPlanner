@@ -10,9 +10,10 @@ Revisions are history. A document carries every revision of a flow with its ``pu
 and the flow says which is the current one and which is the draft; ``published_by`` is a staff
 id, staff are state, and it is therefore not carried. A published revision is never changed or
 removed by a document, a draft may be replaced, and a ``replace`` document never trims the
-revisions it leaves out (``Kind.retain_omitted``). A flow that has a published revision, or that
-a booking refers to, is archived, not deleted, when a ``replace`` document leaves it out or a
-document deletes it (``Kind.archive``); only a flow with nothing but a draft is deleted.
+revisions it leaves out (``Kind.retain_omitted``). A flow that is or was active, or that a
+booking refers to, is archived, not deleted, when a ``replace`` document leaves it out or a
+document deletes it (``Kind.archive``); a flow in state draft was never active and is deleted
+with its revisions unless a booking refers to it (then the document is refused).
 
 The checks here are those of one object (the closed table of interaction kind and handling
 action, the labels, the normal form of lists); ``revision_of`` is the one mapping of a document

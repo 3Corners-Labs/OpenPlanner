@@ -207,6 +207,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `MAX_SUBJECTS_PER_GROUP` | int | `20` | 1–100 | `settings.platform.manage` | Subjects a group may give participants to choose from at most (ADR 0081). |
 | `MAX_SKILLS_PER_ORGANISATION` | int | `100` | 10–500 | `settings.platform.manage` | Skills an organisation may keep in its catalogue at most, archived ones not counted (ADR 0121). |
 | `MAX_CAPACITY_POOLS_PER_ORGANISATION` | int | `50` | 5–200 | `settings.platform.manage` | Counted capacity pools an organisation may keep at most, archived ones and the pools of existing services not counted (ADR 0121). |
+| `MAX_FLOWS_PER_SERVICE` | int | `20` | 3–100 | `settings.platform.manage` | Flows a service may keep at most, archived ones and the existing flows of a service not counted (ADR 0121). |
 | `BOOKING_CONFIRM_MIN_MINUTES` | int | `15` | 5–120 | `settings.platform.manage` | Less time to confirm than this: confirm until the change deadline, no reminder. |
 | `PARTICIPANT_LINK_SESSION_HOURS` | int | `24` | 20–168 | `settings.platform.manage` | Hours after its last use that a participant's browser may still use a booking it opened from the emailed link (ADR 0093); the email link always works again. |
 

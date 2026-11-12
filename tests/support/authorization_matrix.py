@@ -1417,4 +1417,96 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/groups/demo/closure/contacts": statuses(308, 308, 308, 403, 403, 403, 403),
         "/admin/groups/andere-team/closure/contacts": statuses(308, 403, 403, 308, 403, 403, 403),
     },
+    # ADR 0121 step 2d: the flows of a service, a sub-tab of its settings (group.edit). The
+    # allowed POST with an empty form is refused (422); a flow code that does not exist answers
+    # 404 to whoever may ask, the existing (legacy) flow `appointment` too.
+    "GET /admin/groups/{slug}/flows": {
+        "/admin/groups/demo/flows": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/flows": statuses(200, 403, 403, 200, 403, 403, 403),
+    },
+    "GET /admin/groups/{slug}/flows/new": {
+        "/admin/groups/demo/flows/new": statuses(200, 200, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/flows/new": statuses(200, 403, 403, 200, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/flows": {
+        "/admin/groups/demo/flows": statuses(422, 422, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/flows": statuses(422, 403, 403, 422, 403, 403, 403),
+    },
+    "GET /admin/groups/{slug}/flows/{code}": {
+        "/admin/groups/demo/flows/nope": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/demo/flows/appointment": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/flows/nope": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/flows/{code}": {
+        "/admin/groups/demo/flows/nope": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/demo/flows/appointment": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/flows/nope": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/flows/{code}/prepare": {
+        "/admin/groups/demo/flows/nope/prepare": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/demo/flows/appointment/prepare": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/flows/nope/prepare": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/flows/{code}/publish": {
+        "/admin/groups/demo/flows/nope/publish": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/demo/flows/appointment/publish": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/flows/nope/publish": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "GET /admin/groups/{slug}/flows/{code}/discard": {
+        "/admin/groups/demo/flows/nope/discard": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/demo/flows/appointment/discard": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/flows/nope/discard": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/flows/{code}/discard": {
+        "/admin/groups/demo/flows/nope/discard": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/demo/flows/appointment/discard": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/flows/nope/discard": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/flows/{code}/activate": {
+        "/admin/groups/demo/flows/nope/activate": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/demo/flows/appointment/activate": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/flows/nope/activate": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "GET /admin/groups/{slug}/flows/{code}/subjects/{subject}": {
+        "/admin/groups/demo/flows/nope/subjects/x": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/demo/flows/appointment/subjects/x": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/flows/nope/subjects/x": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/flows/{code}/subjects/{subject}": {
+        "/admin/groups/demo/flows/nope/subjects/x": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/demo/flows/appointment/subjects/x": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/groups/andere-team/flows/nope/subjects/x": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "GET /admin/groups/{slug}/flows/{code}/archive": {
+        "/admin/groups/demo/flows/nope/archive": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/demo/flows/appointment/archive": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/flows/nope/archive": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/flows/{code}/archive": {
+        "/admin/groups/demo/flows/nope/archive": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/demo/flows/appointment/archive": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/flows/nope/archive": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "GET /admin/groups/{slug}/flows/{code}/delete": {
+        "/admin/groups/demo/flows/nope/delete": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/demo/flows/appointment/delete": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/flows/nope/delete": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
+    "POST /admin/groups/{slug}/flows/{code}/delete": {
+        "/admin/groups/demo/flows/nope/delete": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/demo/flows/appointment/delete": statuses(404, 404, 403, 403, 403, 403, 403),
+        "/admin/groups/andere-team/flows/nope/delete": statuses(404, 403, 403, 404, 403, 403, 403),
+    },
 }
