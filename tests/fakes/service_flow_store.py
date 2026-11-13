@@ -212,7 +212,13 @@ class ServiceFlowStore:
             (o.organisation_id, o.code) == (skill.organisation_id, skill.code) and o.id != skill.id
             for o in self.state.skills.values()
         )
-        check_skill_save(skill, stored, taken)
+        code_taken = skill.contact_center_code is not None and any(
+            (o.organisation_id, o.contact_center_code)
+            == (skill.organisation_id, skill.contact_center_code)
+            and o.id != skill.id
+            for o in self.state.skills.values()
+        )
+        check_skill_save(skill, stored, taken, same_contact_center_code_exists=code_taken)
         kept = replace(skill, id=skill.id or self._new_id(), archived_at=None)
         if stored is not None:
             kept = replace(kept, archived_at=stored.archived_at)

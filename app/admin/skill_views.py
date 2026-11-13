@@ -24,6 +24,7 @@ class SkillRowView:
     pools: int
     flows: int
     archived: bool
+    contact_center_code: str = ""
 
 
 def skill_row(line: SkillLine, locale: RequestLocale) -> SkillRowView:
@@ -38,6 +39,7 @@ def skill_row(line: SkillLine, locale: RequestLocale) -> SkillRowView:
         line.usage.pools,
         line.usage.flows,
         skill.archived,
+        skill.contact_center_code or "",
     )
 
 
@@ -56,6 +58,21 @@ def label_fields(form: FormData, locale: RequestLocale, line: SkillLine | None) 
         )
         for code, text in texts.items()
     ]
+
+
+def contact_center_field(form: FormData, locale: RequestLocale, line: SkillLine) -> Field:
+    """Return the input of the skill's contact-center code (ADR 0121 step 4b); blank: not mapped."""
+    _ = locale.gettext
+    stored = line.skill.contact_center_code or ""
+    return Field(
+        "contact_center_code",
+        _("admin.skills.contact_center_code"),
+        value=form.values.get("contact_center_code", stored),
+        hint=_("admin.skills.contact_center_code_hint"),
+        error=form.error_for("contact_center_code"),
+        required=False,
+        attributes={"maxlength": "64", "spellcheck": "false", "autocapitalize": "none"},
+    )
 
 
 def code_field(form: FormData, locale: RequestLocale, line: SkillLine | None) -> Field:

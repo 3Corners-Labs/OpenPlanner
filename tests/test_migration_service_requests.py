@@ -24,8 +24,8 @@ ITEM = "INSERT INTO work_items (request_id, state, assigned_at) VALUES (?, ?, ?)
 
 @pytest.fixture
 def old_database(alembic_config: Config, tmp_path: Path) -> Path:
-    """Return a database at 0111 with an organisation, a group and a published flow."""
-    command.upgrade(alembic_config, "0111")
+    """Return a database at 0112 with an organisation, a group and a published flow."""
+    command.upgrade(alembic_config, "0112")
     path = tmp_path / "migrate.db"
     with closing(sqlite3.connect(path)) as database:
         database.execute(
@@ -90,7 +90,7 @@ def test_downgrade_drops_the_tables_and_upgrading_again_works(
         database.execute(ITEM, (1, "assigned", AT))
         database.commit()
 
-    command.downgrade(alembic_config, "0111")
+    command.downgrade(alembic_config, "0112")
 
     assert not {"service_requests", "work_items", "request_personal_data"} & tables(old_database)
     command.upgrade(alembic_config, "head")
@@ -109,6 +109,6 @@ def test_downgrade_refuses_while_a_record_holds_personal_data(
         database.commit()
 
     with pytest.raises(RuntimeError, match="request-level personal data exists"):
-        command.downgrade(alembic_config, "0111")
+        command.downgrade(alembic_config, "0112")
 
     assert "request_personal_data" in tables(old_database)

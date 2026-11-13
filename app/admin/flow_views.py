@@ -135,6 +135,7 @@ REASON_TEXTS: Mapping[ReadinessReason, str] = {
     ReadinessReason.POOL_ARCHIVED: "admin.flows.reason.pool_archived",
     ReadinessReason.DURATION: "admin.flows.reason.duration",
     ReadinessReason.POOL_DOES_NOT_GUARANTEE: "admin.flows.reason.pool_does_not_guarantee",
+    ReadinessReason.SKILL_UNMAPPED: "admin.flows.reason.skill_unmapped",
     ReadinessReason.SUBJECT_UNKNOWN: "admin.flows.reason.subject_unknown",
     ReadinessReason.KIND_MISSING: "admin.flows.reason.kind_missing",
     ReadinessReason.DISPATCH_MISSING: "admin.flows.reason.dispatch_missing",

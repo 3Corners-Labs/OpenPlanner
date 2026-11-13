@@ -2482,6 +2482,22 @@
           "type": "string",
           "maxLength": 40
         },
+        "contact_center_code": {
+          "allOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          ],
+          "description": "What the organisation's contact-center flow tests for the skill (ADR 0121 step 4b); unique within the organisation. A dispatch sends the codes of the skills a booking requires. Null: not mapped; left out of a change: kept as it is."
+        },
         "labels": {
           "allOf": [
             {
