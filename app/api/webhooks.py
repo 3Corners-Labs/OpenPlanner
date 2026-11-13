@@ -38,6 +38,7 @@ from app.domain.connection_health import InboundEvent, Platform
 from app.domain.integration import EventOutcome, IntegrationService
 from app.domain.integration_health import IntegrationHealthService
 from app.domain.ports import Clock
+from app.domain.webhook_replay import scope_of
 from app.web.webhook_gate import (
     Delivery,
     alias_address,
@@ -78,7 +79,8 @@ async def webex(request: Request, delivery: WebexDelivery) -> Response:
             event.kind,
             delivery.now,
             event_key=event.event_key,
-            replay=delivery.replay,
+            scope=scope_of(delivery.address.organisation_id),
+            body_identity=delivery.body_identity,
         )
         log.info(
             "webhook.webex",
@@ -136,7 +138,8 @@ async def _record_task_event(
             delivery.now,
             event.detail,
             event_key=event.event_key,
-            replay=delivery.replay,
+            scope=scope_of(delivery.address.organisation_id),
+            body_identity=delivery.body_identity,
             origin=event.origin,
             provider=inbound.kind,
             source=inbound.source,

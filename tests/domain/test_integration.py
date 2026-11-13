@@ -27,7 +27,6 @@ from app.domain.job_plan import JobStatus, JobType, PlannedJob
 from app.domain.request_log import REQUEST_EVENT
 from app.domain.webhook_replay import (
     INSTALLATION_SCOPE,
-    ReplayContext,
     body_identity,
     replay_key,
     scope_of,
@@ -183,10 +182,20 @@ async def test_events_are_correlated_by_meeting_and_task(
 ) -> None:
     recorded, unknown = EventOutcome.RECORDED, EventOutcome.UNKNOWN
     started = EventKind.MEETING_STARTED
-    assert await service.record_meeting_event("meeting-1_I_42", started, NOW) is recorded
+    assert (
+        await service.record_meeting_event(
+            "meeting-1_I_42", started, NOW, scope=INSTALLATION_SCOPE, body_identity=""
+        )
+        is recorded
+    )
     connected = EventKind.TASK_CONNECTED
     assert await service.record_task_event("task-1", connected, NOW, **WXCC) is recorded
-    assert await service.record_meeting_event("unknown", started, NOW) is unknown
+    assert (
+        await service.record_meeting_event(
+            "unknown", started, NOW, scope=INSTALLATION_SCOPE, body_identity=""
+        )
+        is unknown
+    )
     assert await service.record_task_event("unknown", EventKind.TASK_ENDED, NOW, **WXCC) is unknown
 
     assert [e.kind for e in uow.state.booking_events[123]] == [
@@ -313,9 +322,15 @@ async def test_a_replayed_webex_event_changes_the_counts_once(
 ) -> None:
     joined = EventKind.GUEST_JOINED
 
-    first = await service.record_meeting_event("meeting-1", joined, NOW, event_key="k1")
-    replay = await service.record_meeting_event("meeting-1", joined, NOW, event_key="k1")
-    other = await service.record_meeting_event("meeting-1", joined, NOW, event_key="k2")
+    first = await service.record_meeting_event(
+        "meeting-1", joined, NOW, event_key="k1", scope=INSTALLATION_SCOPE, body_identity=""
+    )
+    replay = await service.record_meeting_event(
+        "meeting-1", joined, NOW, event_key="k1", scope=INSTALLATION_SCOPE, body_identity=""
+    )
+    other = await service.record_meeting_event(
+        "meeting-1", joined, NOW, event_key="k2", scope=INSTALLATION_SCOPE, body_identity=""
+    )
 
     assert (first, replay, other) == (
         EventOutcome.RECORDED,
@@ -330,7 +345,12 @@ async def test_events_of_unknown_meetings_are_not_remembered(
     service: IntegrationService, uow: InMemoryUnitOfWork
 ) -> None:
     outcome = await service.record_meeting_event(
-        "someone-elses-meeting", EventKind.GUEST_JOINED, NOW, event_key="k1"
+        "someone-elses-meeting",
+        EventKind.GUEST_JOINED,
+        NOW,
+        event_key="k1",
+        scope=INSTALLATION_SCOPE,
+        body_identity="",
     )
 
     assert outcome is EventOutcome.UNKNOWN
@@ -341,28 +361,55 @@ async def test_remembered_events_are_forgotten_after_the_retention(
     service: IntegrationService, uow: InMemoryUnitOfWork
 ) -> None:
     later = NOW + WEBHOOK_MEMORY + timedelta(minutes=1)
-    await service.record_meeting_event("meeting-1", EventKind.GUEST_JOINED, NOW, event_key="old")
+    await service.record_meeting_event(
+        "meeting-1",
+        EventKind.GUEST_JOINED,
+        NOW,
+        event_key="old",
+        scope=INSTALLATION_SCOPE,
+        body_identity="",
+    )
 
-    await service.record_meeting_event("meeting-1", EventKind.GUEST_JOINED, later, event_key="new")
+    await service.record_meeting_event(
+        "meeting-1",
+        EventKind.GUEST_JOINED,
+        later,
+        event_key="new",
+        scope=INSTALLATION_SCOPE,
+        body_identity="",
+    )
 
     assert set(uow.state.webhook_events) == {
         ("webex", replay_key("webex", INSTALLATION_SCOPE, "new"))
     }
 
 
-ACME, DEMO = ReplayContext(scope_of(1)), ReplayContext(scope_of(2))
+ACME, DEMO = scope_of(1), scope_of(2)
+JOINED = EventKind.GUEST_JOINED
+
+
+async def _meeting(
+    service: IntegrationService,
+    *,
+    scope: str = INSTALLATION_SCOPE,
+    body: str = "",
+    key: str = "",
+    at: datetime = NOW,
+) -> EventOutcome:
+    """Record a guest joining ``meeting-1`` as a delivery at ``scope`` would."""
+    return await service.record_meeting_event(
+        "meeting-1", JOINED, at, event_key=key, scope=scope, body_identity=body
+    )
 
 
 async def test_the_same_event_at_two_organisations_is_two_events(
     service: IntegrationService, uow: InMemoryUnitOfWork
 ) -> None:
     """ADR 0124 point 7: delivered to two organisations it is two events; twice to one, a replay."""
-    joined = EventKind.GUEST_JOINED
-
-    first = await service.record_meeting_event("meeting-1", joined, NOW, event_key="k", replay=ACME)
-    other = await service.record_meeting_event("meeting-1", joined, NOW, event_key="k", replay=DEMO)
-    again = await service.record_meeting_event("meeting-1", joined, NOW, event_key="k", replay=ACME)
-    bare = await service.record_meeting_event("meeting-1", joined, NOW, event_key="k")
+    first = await _meeting(service, scope=ACME, key="k")
+    other = await _meeting(service, scope=DEMO, key="k")
+    again = await _meeting(service, scope=ACME, key="k")
+    bare = await _meeting(service, key="k")
 
     assert (first, other, again, bare) == (
         EventOutcome.RECORDED,
@@ -376,15 +423,13 @@ async def test_the_same_event_at_two_organisations_is_two_events(
 async def test_an_event_without_an_identifier_is_remembered_by_its_verified_body(
     service: IntegrationService, uow: InMemoryUnitOfWork
 ) -> None:
-    joined = EventKind.GUEST_JOINED
-    same = ReplayContext(scope_of(1), body_identity(b'{"signed":"body"}'))
-    other = ReplayContext(scope_of(1), body_identity(b'{"signed":"other"}'))
-    elsewhere = ReplayContext(scope_of(2), same.body_identity)
+    same = body_identity(b'{"signed":"body"}')
+    other = body_identity(b'{"signed":"other"}')
 
-    first = await service.record_meeting_event("meeting-1", joined, NOW, replay=same)
-    replay = await service.record_meeting_event("meeting-1", joined, NOW, replay=same)
-    different = await service.record_meeting_event("meeting-1", joined, NOW, replay=other)
-    moved = await service.record_meeting_event("meeting-1", joined, NOW, replay=elsewhere)
+    first = await _meeting(service, scope=ACME, body=same)
+    replay = await _meeting(service, scope=ACME, body=same)
+    different = await _meeting(service, scope=ACME, body=other)
+    moved = await _meeting(service, scope=DEMO, body=same)
 
     assert (first, replay, different, moved) == (
         EventOutcome.RECORDED,
@@ -398,29 +443,40 @@ async def test_an_event_without_an_identifier_is_remembered_by_its_verified_body
 async def test_an_event_with_neither_identifier_nor_body_always_counts(
     service: IntegrationService,
 ) -> None:
-    joined = EventKind.GUEST_JOINED
-
-    one = await service.record_meeting_event("meeting-1", joined, NOW)
-    two = await service.record_meeting_event("meeting-1", joined, NOW)
-
-    assert (one, two) == (EventOutcome.RECORDED, EventOutcome.RECORDED)
+    assert (await _meeting(service), await _meeting(service)) == (
+        EventOutcome.RECORDED,
+        EventOutcome.RECORDED,
+    )
 
 
 async def test_an_event_remembered_before_the_upgrade_is_still_a_replay(
     service: IntegrationService, uow: InMemoryUnitOfWork
 ) -> None:
     """ADR 0116: the old shape (the adapter's digest under the platform) is read until 0.7.0."""
-    joined = EventKind.GUEST_JOINED
     uow.state.webhook_events[("webex", "k-before")] = NOW - timedelta(days=1)
 
-    replay = await service.record_meeting_event(
-        "meeting-1", joined, NOW, event_key="k-before", replay=ACME
-    )
-    fresh = await service.record_meeting_event(
-        "meeting-1", joined, NOW, event_key="k-after", replay=ACME
-    )
+    replay = await _meeting(service, scope=ACME, key="k-before")
+    fresh = await _meeting(service, scope=ACME, key="k-after")
 
     assert (replay, fresh) == (EventOutcome.DUPLICATE, EventOutcome.RECORDED)
+
+
+async def test_an_event_remembered_in_the_old_shape_is_a_replay_at_every_address(
+    service: IntegrationService, uow: InMemoryUnitOfWork
+) -> None:
+    """By design: the old key has no organisation, so it hides the event wherever it returns.
+
+    A narrower reading would let an event remembered before the upgrade be replayed once at an
+    organisation's address. Release 0.7.0 removes the reading with the port method.
+    """
+    uow.state.webhook_events[("webex", "k-before")] = NOW - timedelta(days=1)
+
+    at_acme = await _meeting(service, scope=ACME, key="k-before")
+    at_demo = await _meeting(service, scope=DEMO, key="k-before")
+    at_installation = await _meeting(service, key="k-before")
+
+    assert (at_acme, at_demo, at_installation) == (EventOutcome.DUPLICATE,) * 3
+    assert len(uow.state.webhook_events) == 1  # nothing new was remembered
 
 
 async def test_the_old_shape_is_not_looked_for_under_a_body_identity(
@@ -429,11 +485,7 @@ async def test_the_old_shape_is_not_looked_for_under_a_body_identity(
     identity = body_identity(b"{}")
     uow.state.webhook_events[("webex", identity)] = NOW
 
-    outcome = await service.record_meeting_event(
-        "meeting-1", EventKind.GUEST_JOINED, NOW, replay=ReplayContext(scope_of(1), identity)
-    )
-
-    assert outcome is EventOutcome.RECORDED
+    assert await _meeting(service, scope=ACME, body=identity) is EventOutcome.RECORDED
 
 
 async def test_day_overview_covers_the_25_hour_day_when_clocks_go_back(
@@ -507,7 +559,9 @@ def _kinds(uow: InMemoryUnitOfWork) -> list[EventKind]:
 async def test_a_guest_entering_the_trial_call_is_on_the_timeline_not_in_the_call_status(
     service: IntegrationService, trial_uow: InMemoryUnitOfWork
 ) -> None:
-    outcome = await service.record_meeting_event(TRIAL_ROOM, EventKind.GUEST_JOINED, NOW)
+    outcome = await service.record_meeting_event(
+        TRIAL_ROOM, EventKind.GUEST_JOINED, NOW, scope=INSTALLATION_SCOPE, body_identity=""
+    )
 
     assert outcome is EventOutcome.RECORDED
     assert _kinds(trial_uow) == [EventKind.TRIAL_ENTERED]
@@ -518,8 +572,12 @@ async def test_a_guest_entering_the_trial_call_is_on_the_timeline_not_in_the_cal
 async def test_someone_leaving_the_trial_call_is_on_the_timeline(
     service: IntegrationService, trial_uow: InMemoryUnitOfWork
 ) -> None:
-    await service.record_meeting_event(TRIAL_ROOM, EventKind.GUEST_JOINED, NOW)
-    await service.record_meeting_event(TRIAL_ROOM, EventKind.PARTICIPANT_LEFT, NOW)
+    await service.record_meeting_event(
+        TRIAL_ROOM, EventKind.GUEST_JOINED, NOW, scope=INSTALLATION_SCOPE, body_identity=""
+    )
+    await service.record_meeting_event(
+        TRIAL_ROOM, EventKind.PARTICIPANT_LEFT, NOW, scope=INSTALLATION_SCOPE, body_identity=""
+    )
 
     assert _kinds(trial_uow) == [EventKind.TRIAL_ENTERED, EventKind.TRIAL_LEFT]
     assert trial_uow.state.call_status[123].participants == 0
@@ -528,7 +586,9 @@ async def test_someone_leaving_the_trial_call_is_on_the_timeline(
 async def test_a_host_in_the_trial_call_is_noted_because_nobody_from_the_team_should_be_there(
     service: IntegrationService, trial_uow: InMemoryUnitOfWork
 ) -> None:
-    await service.record_meeting_event(TRIAL_ROOM, EventKind.HOST_JOINED, NOW)
+    await service.record_meeting_event(
+        TRIAL_ROOM, EventKind.HOST_JOINED, NOW, scope=INSTALLATION_SCOPE, body_identity=""
+    )
 
     (event,) = trial_uow.state.booking_events[123]
     assert (event.kind, event.detail) == (EventKind.TRIAL_ENTERED, "host")
@@ -538,8 +598,12 @@ async def test_a_host_in_the_trial_call_is_noted_because_nobody_from_the_team_sh
 async def test_the_trial_meetings_start_and_end_are_ignored(
     service: IntegrationService, trial_uow: InMemoryUnitOfWork
 ) -> None:
-    started = await service.record_meeting_event(TRIAL_ROOM, EventKind.MEETING_STARTED, NOW)
-    ended = await service.record_meeting_event(TRIAL_ROOM, EventKind.MEETING_ENDED, NOW)
+    started = await service.record_meeting_event(
+        TRIAL_ROOM, EventKind.MEETING_STARTED, NOW, scope=INSTALLATION_SCOPE, body_identity=""
+    )
+    ended = await service.record_meeting_event(
+        TRIAL_ROOM, EventKind.MEETING_ENDED, NOW, scope=INSTALLATION_SCOPE, body_identity=""
+    )
 
     assert (started, ended) == (EventOutcome.IGNORED, EventOutcome.IGNORED)
     assert _kinds(trial_uow) == []
@@ -551,8 +615,12 @@ async def test_an_instance_id_and_a_replay_of_a_trial_event_count_once(
 ) -> None:
     joined = EventKind.GUEST_JOINED
 
-    first = await service.record_meeting_event(f"{TRIAL_ROOM}_I_9", joined, NOW, event_key="t1")
-    replay = await service.record_meeting_event(TRIAL_ROOM, joined, NOW, event_key="t1")
+    first = await service.record_meeting_event(
+        f"{TRIAL_ROOM}_I_9", joined, NOW, event_key="t1", scope=INSTALLATION_SCOPE, body_identity=""
+    )
+    replay = await service.record_meeting_event(
+        TRIAL_ROOM, joined, NOW, event_key="t1", scope=INSTALLATION_SCOPE, body_identity=""
+    )
 
     assert (first, replay) == (EventOutcome.RECORDED, EventOutcome.DUPLICATE)
     assert _kinds(trial_uow) == [EventKind.TRIAL_ENTERED]
@@ -564,7 +632,9 @@ async def test_a_closed_trial_call_no_longer_matches(
     booking = trial_uow.state.bookings[123]
     trial_uow.state.bookings[123] = replace(booking, trial=None)
 
-    outcome = await service.record_meeting_event(TRIAL_ROOM, EventKind.GUEST_JOINED, NOW)
+    outcome = await service.record_meeting_event(
+        TRIAL_ROOM, EventKind.GUEST_JOINED, NOW, scope=INSTALLATION_SCOPE, body_identity=""
+    )
 
     assert outcome is EventOutcome.UNKNOWN
     assert _kinds(trial_uow) == []
@@ -573,7 +643,9 @@ async def test_a_closed_trial_call_no_longer_matches(
 async def test_the_appointments_own_meeting_still_counts_the_participant(
     service: IntegrationService, trial_uow: InMemoryUnitOfWork
 ) -> None:
-    await service.record_meeting_event("meeting-1", EventKind.GUEST_JOINED, NOW)
+    await service.record_meeting_event(
+        "meeting-1", EventKind.GUEST_JOINED, NOW, scope=INSTALLATION_SCOPE, body_identity=""
+    )
 
     assert _kinds(trial_uow) == [EventKind.GUEST_JOINED]
     assert trial_uow.state.call_status[123].participants == 1

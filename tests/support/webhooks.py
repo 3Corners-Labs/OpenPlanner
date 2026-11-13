@@ -7,11 +7,18 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.adapters.webhooks import WXCC_INBOUND
+from app.domain.webhook_replay import INSTALLATION_SCOPE
 
 SECRET = "webhook-secret"
 """The webhook secret that WxCC and the application share in the tests."""
-WXCC: dict[str, Any] = {"provider": WXCC_INBOUND.kind, "source": WXCC_INBOUND.source}
-"""The platform arguments of ``record_task_event`` for a WxCC event, as the route passes them."""
+WXCC: dict[str, Any] = {
+    "provider": WXCC_INBOUND.kind,
+    "source": WXCC_INBOUND.source,
+    "scope": INSTALLATION_SCOPE,
+    "body_identity": "",
+}
+"""The arguments of ``record_task_event`` for a WxCC event at the installation's address with no
+body to identify it by, as the route passes them."""
 NOW = datetime(2026, 1, 5, 8, 0, tzinfo=UTC)
 """When a webhook is sent unless a test says otherwise: Monday 5 January 09:00 Amsterdam."""
 

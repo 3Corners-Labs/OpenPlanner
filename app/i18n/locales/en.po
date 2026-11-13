@@ -13766,14 +13766,26 @@ msgstr "Without appointment"
 msgid "admin.queue.recovery.complete"
 msgstr "Complete"
 
-msgid "admin.channels.cc_inbound_enabled"
-msgstr "Handle events from the platform"
-
-msgid "admin.channels.cc_inbound_enabled_hint"
-msgstr "Switch this off to pause the address: the platform still gets its 204 and keeps its subscription, but verified events are dropped and not remembered. After resuming, missed states are brought back by the periodic check of the tasks, not at once."
-
 msgid "admin.source.paused_chip"
 msgstr "Paused"
 
 msgid "admin.source.paused_text"
-msgstr "This address is paused: deliveries are accepted and dropped, and the platform keeps its subscription. Switch events on again on this card to resume; the periodic check of the tasks then catches up on missed states."
+msgstr "This address is paused: deliveries are accepted and dropped, and the platform keeps its subscription. The last event on the status screens stands still while it lasts. Resume to handle events again; the periodic check of the tasks then catches up on missed states."
+
+msgid "admin.channels.cc_pause_title"
+msgstr "Pause deliveries"
+
+msgid "admin.channels.cc_pause_lead"
+msgstr "Pause this address, for example while you change the platform's flows. The platform still gets its 204 and keeps its subscription, but verified events are dropped and not remembered. A call that does not check out is refused as always."
+
+msgid "admin.channels.cc_pause"
+msgstr "Pause deliveries"
+
+msgid "admin.channels.cc_resume"
+msgstr "Resume deliveries"
+
+msgid "admin.done.contact_center_paused"
+msgstr "Deliveries are paused."
+
+msgid "admin.done.contact_center_resumed"
+msgstr "Deliveries are resumed."

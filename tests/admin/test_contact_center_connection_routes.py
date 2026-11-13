@@ -1,7 +1,6 @@
 """The organisation's own contact-center connection on its *Kanalen* page (ADR 0032 points 9–10)."""
 
 import json
-import re
 from dataclasses import replace
 
 import httpx
@@ -527,65 +526,82 @@ def _handler(site: Site) -> _Handler:
     return handler
 
 
-async def _save_pause(site: Site, value: str | None) -> httpx.Response:
-    """Save the card with only the pause changed (secrets blank: kept); ``None``: no field sent."""
-    data = FORM | {"cc_client_secret": "", "cc_refresh_token": ""}
-    if value is not None:
-        data["cc_inbound_enabled"] = value
-    return await site.client.post(f"{PAGE}/contact-center", data=data, headers=SAME_ORIGIN)
+async def _pause(site: Site, state: str, org: str = "demo") -> httpx.Response:
+    """Press the card's button: ``off`` pauses the deliveries, ``on`` resumes them."""
+    return await site.client.post(
+        f"/admin/organisations/{org}/channels/contact-center/inbound",
+        data={"inbound": state},
+        headers=SAME_ORIGIN,
+    )
 
 
-def _ticked(page: str) -> bool:
-    return bool(re.search(r'<input type="checkbox" id="cc_inbound_enabled"[^>]* checked', page))
-
-
-async def test_the_card_offers_the_pause_as_a_labelled_checkbox_that_is_on_by_default(
-    site: Site,
-) -> None:
+async def test_the_card_offers_a_button_that_pauses_and_one_that_resumes(site: Site) -> None:
     await _connect(site)
 
-    page = (await site.client.get(PAGE)).text
+    running = (await site.client.get(PAGE)).text
+    await _pause(site, "off")
+    paused = (await site.client.get(PAGE)).text
 
-    assert _ticked(page)
-    assert (
-        '<label for="cc_inbound_enabled">Gebeurtenissen van het platform verwerken</label>' in page
-    )
-    assert 'name="cc_inbound_enabled" value="no"' in page  # sent when the box is not ticked
-    assert "Gepauzeerd" not in page
+    assert 'name="inbound" value="off"' in running
+    assert "Bezorgingen pauzeren</button>" in running
+    assert "Gepauzeerd" not in running
+    assert 'name="inbound" value="on"' in paused
+    assert "Bezorgingen hervatten</button>" in paused
+    assert 'name="inbound" value="off"' not in paused
+    assert "Gepauzeerd" in paused
+    assert "Dit adres is gepauzeerd" in paused
+    assert "laatste gebeurtenis" in paused  # the status screens stand still while paused
+    assert "cc_inbound_enabled" not in running  # no field of the connection's form
 
 
-async def test_pausing_on_the_card_keeps_the_secret_registers_nothing_and_shows_a_finding(
+async def test_pausing_keeps_the_secret_registers_nothing_and_is_audited_by_name(
     site: Site,
 ) -> None:
     await _connect(site)
     registrar = _registrar(site)
     before = await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC)
 
-    saved = await _save_pause(site, "no")
-
-    assert "done=contact_center_saved" in saved.headers["location"]
-    assert registrar.registered == []
-    assert await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC) == before
-    page = (await site.client.get(PAGE)).text
-    assert "Dit adres is gepauzeerd" in page
-    assert not _ticked(page)
-    audit = await site_app(site).state.admin_service.audit_log(SUPER)
-    newest = next(e.event.detail for e in audit if e.event.detail.startswith("contact_center"))
-    assert newest == "contact_center_connection.save,kind:webex_cc,inbound_enabled"
-    resumed = await _save_pause(site, "yes")
-    assert "done=contact_center_saved" in resumed.headers["location"]
-    assert "Dit adres is gepauzeerd" not in (await site.client.get(PAGE)).text
-
-
-async def test_a_form_without_the_pause_field_leaves_the_pause_as_it_is(site: Site) -> None:
-    await _connect(site)
-    await _save_pause(site, "no")
-
-    await _save_pause(site, None)
-
+    paused = await _pause(site, "off")
+    pressed_twice = await _pause(site, "off")  # a stale tab: the state wanted, not a toggle
     stored = await _connections(site).get(1)
+    resumed = await _pause(site, "on")
+
+    assert "done=contact_center_paused" in paused.headers["location"]
+    assert "done=contact_center_paused" in pressed_twice.headers["location"]
+    assert "done=contact_center_resumed" in resumed.headers["location"]
     assert stored is not None
     assert not stored.inbound_enabled
+    assert registrar.registered == []
+    assert await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC) == before
+    audit = await site_app(site).state.admin_service.audit_log(SUPER)
+    details = [e.event.detail for e in audit if e.event.detail.startswith("contact_center")]
+    assert details[:2] == [  # newest first
+        "contact_center_connection.resume",
+        "contact_center_connection.pause",
+    ]
+    assert details.count("contact_center_connection.pause") == 1
+
+
+async def test_the_pause_button_is_refused_without_the_right_or_a_state_or_a_connection(
+    site: Site,
+) -> None:
+    await _connect(site)
+    handler = _handler(site)
+
+    await site.login_as(ORG_ADMIN)
+    refused = await _pause(site, "off")
+    await site.login_as(SUPER)
+    no_state = await _pause(site, "toggle")
+    no_connection = await _pause(site, "off", org="andere")
+    stored = await _connections(site).get(1)
+
+    assert refused.status_code == 403
+    assert no_state.status_code == 422
+    assert "done=contact_center_refused" in no_connection.headers["location"]
+    assert stored is not None
+    assert stored.inbound_enabled
+    assert (await _call_from(site, SUPPLIER)).status_code == 204
+    assert handler.handled == 1  # nothing was paused
 
 
 async def test_a_paused_address_verifies_first_then_drops_the_event_and_remembers_nothing(
@@ -594,12 +610,12 @@ async def test_a_paused_address_verifies_first_then_drops_the_event_and_remember
     """A pause is no way to get an unsigned 204, and a redelivery after resuming is handled."""
     await _connect(site)
     handler = _handler(site)
-    await _save_pause(site, "no")
+    await _pause(site, "off")
 
     with structlog.testing.capture_logs() as logs:
         paused = await _call_from(site, SUPPLIER)
         forged = await _call_from(site, SUPPLIER, secret="x" * 43)
-    await _save_pause(site, "yes")
+    await _pause(site, "on")
     resumed = await _call_from(site, SUPPLIER)
 
     assert (paused.status_code, paused.content) == (204, b"")
@@ -614,7 +630,8 @@ async def test_a_paused_address_verifies_first_then_drops_the_event_and_remember
 
 async def test_a_paused_address_still_refuses_what_any_address_refuses(site: Site) -> None:
     await _connect(site)
-    await _save_networks(site, SUPPLIER_RANGE, cc_inbound_enabled="no")
+    await _save_networks(site, SUPPLIER_RANGE)
+    await _pause(site, "off")
     handler = _handler(site)
 
     outside = await _call_from(site, STRANGER)

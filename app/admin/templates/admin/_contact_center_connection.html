@@ -15,7 +15,16 @@
   {% if cc.stored %}
   <h3 id="contact-center-sources-heading">{{ _("admin.source.title") }}</h3>
   <p><span class="chip chip--{{ cc.sources.chip }}">{{ _("admin.source.finding") }}</span> {{ cc.sources.text }}</p>
-  {% if cc.paused %}<p role="status"><span class="chip chip--warning">{{ cc.paused.chip }}</span> {{ cc.paused.text }}</p>{% endif %}
+  <h3>{{ _("admin.channels.cc_pause_title") }}</h3>
+  <form method="post" action="/admin/organisations/{{ organisation.slug }}/channels/contact-center/inbound">
+    {% if cc.paused %}
+    <p role="status"><span class="chip chip--warning">{{ cc.pause_chip }}</span> {{ cc.pause_text }}</p>
+    <button type="submit" name="inbound" value="on" class="button button--secondary">{{ _("admin.channels.cc_resume") }}</button>
+    {% else %}
+    <p>{{ _("admin.channels.cc_pause_lead") }}</p>
+    <button type="submit" name="inbound" value="off" class="button button--secondary">{{ _("admin.channels.cc_pause") }}</button>
+    {% endif %}
+  </form>
   {% if cc.sources.faults %}<p role="alert"><span class="chip chip--danger">{{ _("admin.source.refused") }}</span> {{ _("admin.source.fault.card") }}</p>{% endif %}
   <h3>{{ _("admin.channels.cc_webhook") }}</h3>
   <p>{{ _("admin.channels.cc_webhook_lead") }}</p>

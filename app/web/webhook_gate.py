@@ -57,7 +57,7 @@ from app.domain.inbound_gate import MAX_BODY_BYTES, Refusal, accepts_content_typ
 from app.domain.networks import NetworkList
 from app.domain.ports import Clock
 from app.domain.security_log import WEBHOOK_REJECTED
-from app.domain.webhook_replay import ReplayContext, body_identity, scope_of
+from app.domain.webhook_replay import body_identity
 from app.domain.webhook_sources import check_source, source_list_that_applies
 from app.web.caller import caller_of, client_address
 from app.web.protection import (
@@ -132,14 +132,14 @@ class Delivery[W: InboundWebhook]:
         address: The address it came in at.
         payload: The body as a JSON object.
         now: The time the gate used, for the route to reuse.
-        replay: What the replay memory needs: the address's scope and the identity of the
-            verified body (ADR 0124 point 7).
+        body_identity: The identity of the verified body, for an event without an identifier
+            of its own (``app.domain.webhook_replay``, ADR 0124 point 7).
     """
 
     address: Address[W]
     payload: dict[str, Any]
     now: datetime
-    replay: ReplayContext = ReplayContext()
+    body_identity: str
 
 
 class WebhookRefused(Exception):  # noqa: N818 - reads as an outcome, like HTTPException
@@ -278,9 +278,7 @@ def webhook_gate[W: InboundWebhook](
             # Verified, so a stranger cannot get a 204 this way; dropped before any handling.
             log.info("webhook.paused", source=source, organisation=organisation)
             raise WebhookPaused
-        return Delivery(
-            address, payload, now, ReplayContext(scope_of(address.organisation_id), identity)
-        )
+        return Delivery(address, payload, now, identity)
 
     setattr(gate, GATE_MARKER, True)
     return gate

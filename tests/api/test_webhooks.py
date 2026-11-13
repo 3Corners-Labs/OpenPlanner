@@ -355,12 +355,19 @@ async def test_a_signed_body_without_an_id_sent_twice_is_one_event(
     other = _without_an_id(wxcc_body("task:ended", at=NOW))
     other_headers = {"x-webexcc-signature": sign(other), "x-webexcc-timestamp": timestamp(other)}
 
-    first = await client.post("/webhooks/wxcc", content=body, headers=headers)
+    with structlog.testing.capture_logs() as first_logs:
+        first = await client.post("/webhooks/wxcc", content=body, headers=headers)
     _, _, once = await _status(database_url, booking_id)
-    replay = await client.post("/webhooks/wxcc", content=body, headers=headers)
+    with structlog.testing.capture_logs() as replay_logs:
+        replay = await client.post("/webhooks/wxcc", content=body, headers=headers)
     different = await client.post("/webhooks/wxcc", content=other, headers=other_headers)
 
     assert (first.status_code, replay.status_code, different.status_code) == (204, 204, 204)
+    outcomes = [
+        [e["outcome"] for e in logs if e["event"] == "webhook.contact_center"]
+        for logs in (first_logs, replay_logs)
+    ]
+    assert outcomes == [["recorded"], ["duplicate"]]  # a replay is traceable in the log
     assert (await _status(database_url, booking_id))[2] == once + 1  # only the other one counts
     engine = create_engine(database_url)
     async with SqlUnitOfWork(engine).read() as tx:

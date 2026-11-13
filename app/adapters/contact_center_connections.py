@@ -98,8 +98,8 @@ class SealedConnections:
 
         A new connection gets its webhook secret at once, so its address works from the start;
         a changed API host or client id gets a new one, so a subscription the previous tenant
-        still holds no longer verifies (CC-4d). Changing the allowed networks or the pause alone
-        touches neither the secret nor anything else of the record.
+        still holds no longer verifies (CC-4d). Changing the allowed networks alone touches
+        neither the secret nor anything else of the record.
         """
         record = dict(await self._record(organisation_id) or {})
         moved = (record.get("api_base_url"), record.get("client_id")) != (
@@ -113,8 +113,6 @@ class SealedConnections:
         }
         if change.allowed_networks is not None:
             record["allowed_networks"] = list(change.allowed_networks)
-        if change.inbound_enabled is not None:
-            record["inbound_enabled"] = change.inbound_enabled
         if change.client_secret is not None:
             record["client_secret"] = change.client_secret
         if change.refresh_token is not None:
@@ -122,6 +120,14 @@ class SealedConnections:
         if moved or not record.get("webhook_secret"):
             # Another tenant (host or client): the old tenant's subscription must stop verifying.
             record |= {"webhook_secret": new_webhook_secret(), "webhook_secret_at": now.isoformat()}
+        await self._store.put(contact_center_credential_name(organisation_id), record, now)
+
+    async def set_inbound_enabled(self, organisation_id: int, enabled: bool, now: datetime) -> None:
+        """Pause or resume the address (ADR 0124 point 9): that one field, nothing else."""
+        record = await self._record(organisation_id)
+        if record is None:
+            return
+        record["inbound_enabled"] = enabled
         await self._store.put(contact_center_credential_name(organisation_id), record, now)
 
     async def rotate_webhook_secret(self, organisation_id: int, now: datetime) -> None:

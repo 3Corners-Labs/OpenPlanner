@@ -311,21 +311,32 @@ event's identity (`app/domain/webhook_replay.py`):
 - Keys are kept 30 days (`WEBHOOK_MEMORY`, a fixed rule, not a setting).
 
 Before this step the remembered key was the adapter's digest alone, under the platform's code.
-It is still read: an event remembered by that older key counts as seen, so a redelivery across
-the upgrade is still a replay. Nothing is rewritten and no migration was needed (ADR 0116); the
-old reading may go in 0.7.0, when every such key is older than the memory.
+It is still read, installation-wide on purpose: an event remembered by that older key counts as
+seen wherever it comes back, so a redelivery across the upgrade is still a replay, and no
+pre-upgrade event can be replayed once at an organisation's address. Nothing is rewritten and no
+migration was needed (ADR 0116); release 0.7.0 removes the reading, when every such key is older
+than the memory.
+
+The same platform event delivered at an installation-wide address and at an organisation's own
+address is two events: the timeline gets a second row for it and the state stays as it was. That
+can only happen while the installation-wide contact-center addresses exist (ADR 0032 point 11),
+for example while a subscription at the old address and one at the organisation's own address
+are both still registered.
 
 ### A paused connection (ADR 0124 point 9)
 
-An organisation's connection can be paused on its card (*Kanalen*, `inbound_enabled`, a field of
-the sealed connection record; a record without it is on). A paused address passes **every** check
+An organisation's connection can be paused with a button of its own on its card (*Kanalen*,
+*Pause deliveries* and *Resume deliveries*; `inbound_enabled`, a field of the sealed connection
+record that only this action changes; a record without it is on). A paused address passes **every** check
 above, the signature included: a call that is refused for any reason is refused as for any other
 address, and an unsigned call never gets a `204` from a pause. Only then the verified event is
 dropped: the answer is `204` (the platform keeps its subscription), nothing is handled, nothing is
 remembered (so a redelivery after resuming is handled), the event is not noted as the platform's
 latest, and one log line `webhook.paused` with the platform's code and the organisation's slug is
 written. Pausing or resuming changes neither the webhook secret nor the registration at the
-platform. Resuming does not replay what was dropped: the periodic reconcile of the open tasks
+platform, and is audited by name (`contact_center_connection.pause` and `.resume`), only when
+the state changes. The button says which state it wants, so a stale page that presses *Pause*
+twice pauses and never toggles. Resuming does not replay what was dropped: the periodic reconcile of the open tasks
 (`task_reconcile_interval_minutes`, ADR 0082) catches up on states a missed event left behind.
 The installation-wide addresses have no connection and no pause.
 

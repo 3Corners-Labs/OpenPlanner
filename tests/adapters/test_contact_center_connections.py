@@ -218,29 +218,34 @@ async def test_a_record_made_before_the_pause_reads_as_on() -> None:
     assert shown.inbound_enabled
 
 
-async def test_the_pause_lives_in_the_record_and_changes_nothing_else() -> None:
+async def test_the_pause_changes_that_one_field_of_the_record_and_nothing_else() -> None:
     secrets = FakeSecrets()
     connections = SealedConnections(secrets)
     await connections.save(1, CHANGE, NOW)
     before = dict(secrets.values["contact-center:1"])
-    pause = ConnectionChange(WXCC, CHANGE.api_base_url, "client", inbound_enabled=False)
 
-    await connections.save(1, pause, NOW + timedelta(days=1))
+    await connections.set_inbound_enabled(1, False, NOW + timedelta(days=1))
 
     assert secrets.values["contact-center:1"] == before | {"inbound_enabled": False}
     paused = await connections.get(1)
     assert paused is not None
     assert not paused.inbound_enabled
-    # a save that does not send the field keeps the pause; one that sends it resumes
+    # a save of the connection's other fields keeps the pause
     await connections.save(1, ConnectionChange(WXCC, CHANGE.api_base_url, "client"), NOW)
     kept = await connections.get(1)
-    await connections.save(
-        1, ConnectionChange(WXCC, CHANGE.api_base_url, "client", inbound_enabled=True), NOW
-    )
+    await connections.set_inbound_enabled(1, True, NOW)
     resumed = await connections.get(1)
     assert kept is not None
     assert resumed is not None
     assert (kept.inbound_enabled, resumed.inbound_enabled) == (False, True)
+
+
+async def test_pausing_without_a_connection_stores_nothing() -> None:
+    secrets = FakeSecrets()
+
+    await SealedConnections(secrets).set_inbound_enabled(1, False, NOW)
+
+    assert secrets.values == {}
 
 
 @pytest.mark.parametrize("stored", ["no", 0, None, "false"])

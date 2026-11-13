@@ -7,7 +7,6 @@ the service in ``test_integration.py``.
 from app.domain.webhook_replay import (
     INSTALLATION_SCOPE,
     body_identity,
-    legacy_key,
     replay_key,
     scope_of,
 )
@@ -41,8 +40,3 @@ def test_a_body_identity_is_a_digest_that_cannot_meet_an_event_identifier() -> N
 def test_every_address_has_its_own_scope() -> None:
     assert len({scope_of(None), scope_of(1), scope_of(2)}) == 3
     assert scope_of(None) == INSTALLATION_SCOPE
-
-
-def test_the_old_shape_is_the_bare_digest_and_empty_without_one() -> None:
-    assert legacy_key("abc") == "abc"
-    assert legacy_key("") == ""

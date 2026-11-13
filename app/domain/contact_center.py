@@ -312,12 +312,13 @@ class ConnectionChange:
     """What an administrator submits for the organisation's connection.
 
     A ``None`` secret keeps the stored one (write-only fields render empty); so does ``None``
-    allowed networks and ``None`` ``inbound_enabled`` (the pause, ADR 0124 point 9). The networks
-    are given as the text typed, one per line or comma separated (``allowed_networks_text``, an
-    ``InitVar`` as the route has the text): ``__post_init__`` parses it once, with the rule of
-    ``app.domain.source_networks``, into ``allowed_networks``, the tuple that everything after it
-    uses. An empty text clears the list, so the installation's default applies again. A tuple
-    given directly is checked by the same rule.
+    allowed networks. The networks are given as the text typed, one per line or comma separated
+    (``allowed_networks_text``, an ``InitVar`` as the route has the text): ``__post_init__`` parses
+    it once, with the rule of ``app.domain.source_networks``, into ``allowed_networks``, the tuple
+    that everything after it uses. An empty text clears the list, so the installation's default
+    applies again. A tuple given directly is checked by the same rule. The pause (ADR 0124
+    point 9) is not part of this form: it is its own action
+    (``ContactCenterConnectionService.set_inbound``).
 
     Raises:
         DomainError: ``invalid_configuration`` naming the refused field.
@@ -330,7 +331,6 @@ class ConnectionChange:
     refresh_token: str | None = None
     allowed_networks: tuple[str, ...] | None = None
     allowed_networks_text: InitVar[str | None] = None
-    inbound_enabled: bool | None = None
 
     def __post_init__(self, allowed_networks_text: str | None) -> None:
         """Validate every field and drop a trailing slash; secrets are checked for shape only."""
@@ -371,7 +371,7 @@ class Registration(StrEnum):
     """A secret is missing; the address is registered once the connection is complete."""
     UNTOUCHED = "untouched"
     """The connection has its webhook secret and nothing the subscription depends on changed
-    (only the allowed networks or the pause), so it was left as it was (ADR 0124 points 3, 9)."""
+    (only the allowed networks), so it was left as it was (ADR 0124 point 3)."""
     REFUSED = "refused"
     """The platform refused (rights, address or secret); the reason is in the request log."""
     FAILED = "failed"

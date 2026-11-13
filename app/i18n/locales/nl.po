@@ -13779,14 +13779,26 @@ msgstr "Zonder afspraak"
 msgid "admin.queue.recovery.complete"
 msgstr "Afronden"
 
-msgid "admin.channels.cc_inbound_enabled"
-msgstr "Gebeurtenissen van het platform verwerken"
-
-msgid "admin.channels.cc_inbound_enabled_hint"
-msgstr "Zet dit uit om het adres te pauzeren: het platform krijgt nog steeds antwoord 204 en houdt zijn aanmelding, maar geverifieerde gebeurtenissen worden weggegooid en niet onthouden. Bij hervatten worden gemiste toestanden bijgewerkt door de periodieke controle van de taken, niet direct."
-
 msgid "admin.source.paused_chip"
 msgstr "Gepauzeerd"
 
 msgid "admin.source.paused_text"
-msgstr "Dit adres is gepauzeerd: bezorgingen worden geaccepteerd en weggegooid, en het platform houdt zijn aanmelding. Zet gebeurtenissen weer aan op deze kaart om te hervatten; de controle van de taken haalt gemiste toestanden daarna in."
+msgstr "Dit adres is gepauzeerd: bezorgingen worden geaccepteerd en weggegooid, en het platform houdt zijn aanmelding. De laatste gebeurtenis op de statusschermen staat stil zolang het duurt. Hervat om gebeurtenissen weer te verwerken; de periodieke controle van de taken haalt gemiste toestanden daarna in."
+
+msgid "admin.channels.cc_pause_title"
+msgstr "Bezorgingen pauzeren"
+
+msgid "admin.channels.cc_pause_lead"
+msgstr "Pauzeer dit adres bijvoorbeeld terwijl u de flows van het platform wijzigt. Het platform krijgt nog steeds antwoord 204 en houdt zijn aanmelding, maar geverifieerde gebeurtenissen worden weggegooid en niet onthouden. Een aanroep die niet klopt wordt geweigerd als altijd."
+
+msgid "admin.channels.cc_pause"
+msgstr "Bezorgingen pauzeren"
+
+msgid "admin.channels.cc_resume"
+msgstr "Bezorgingen hervatten"
+
+msgid "admin.done.contact_center_paused"
+msgstr "De bezorgingen zijn gepauzeerd."
+
+msgid "admin.done.contact_center_resumed"
+msgstr "De bezorgingen zijn hervat."

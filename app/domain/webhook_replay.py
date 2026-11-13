@@ -14,13 +14,13 @@ depend on which secret verified the call, and it is asked for only after the sig
 The memory's table is the one of ADR 0010 (``webhook_events``: source and key, 64 characters);
 only the key's derivation changed, so no migration was needed (ADR 0116: a persisted name is
 renamed by writing the new one and reading both). Before this release the key was the adapter's
-event digest itself, under the platform's code. ``LEGACY_READ`` keeps that shape readable for an
-event remembered before the upgrade, so a redelivery across it is still a replay. Memory lasts
-``WEBHOOK_MEMORY`` (30 days), so release 0.7.0 may drop the reading and ``legacy_key``.
+event digest itself, under the platform's code. ``IntegrationService`` still reads that shape
+(``webhook_event_seen``), so an event remembered before the upgrade is a replay wherever it comes
+back. Memory lasts ``WEBHOOK_MEMORY`` (30 days), so release 0.7.0 removes that reading together
+with the port method.
 """
 
 import hashlib
-from dataclasses import dataclass
 from datetime import timedelta
 
 WEBHOOK_MEMORY = timedelta(days=30)
@@ -30,29 +30,7 @@ the replay protection, not a setting (ADR 0124 point 7)."""
 INSTALLATION_SCOPE = "installation"
 """The scope of an address that belongs to no organisation (the installation-wide ones)."""
 
-LEGACY_READ = True
-"""Whether a key remembered in the shape before ADR 0124 step 3a still counts. Release 0.7.0 may
-set it aside: by then every such key is older than ``WEBHOOK_MEMORY``."""
-
 _SEPARATOR = "\x1f"
-
-
-@dataclass(frozen=True)
-class ReplayContext:
-    """What the memory needs to know about a delivery besides the event itself.
-
-    Attributes:
-        scope: Whose address the event came in at (``scope_of``).
-        body_identity: The identity of the verified body (``body_identity``); used only for an
-            event that has no identifier of its own. Empty: there is none to use.
-    """
-
-    scope: str = INSTALLATION_SCOPE
-    body_identity: str = ""
-
-
-INSTALLATION_REPLAY = ReplayContext()
-"""A delivery at an installation-wide address, with no body identity (a caller that has none)."""
 
 
 def scope_of(organisation_id: int | None) -> str:
@@ -68,12 +46,3 @@ def body_identity(body: bytes) -> str:
 def replay_key(source: str, scope: str, identity: str) -> str:
     """Return the key that is remembered for ``identity`` at ``scope`` of platform ``source``."""
     return hashlib.sha256(_SEPARATOR.join((source, scope, identity)).encode()).hexdigest()
-
-
-def legacy_key(event_key: str) -> str:
-    """Return the key as it was stored before step 3a: the adapter's digest itself.
-
-    Empty when there is nothing to read (no identifier of the event's own, or the old shape is
-    no longer read).
-    """
-    return event_key if LEGACY_READ else ""

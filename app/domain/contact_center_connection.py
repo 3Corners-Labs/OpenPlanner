@@ -9,9 +9,10 @@ one minor (point 11, ADR 0116).
 
     view(org)   ─► OrganisationConnection | None
     save(org)   ─► audit ─► sealed record ─► register the address  (a blank secret keeps one;
-                                              not when only the allowed networks or the
-                                              pause changed)
+                                              not when only the allowed networks changed)
     rotate(org) ─► audit ─► new webhook secret ─► register again     (CC-4d)
+    set_inbound ─► audit ─► the one field of the sealed record  (the pause, ADR 0124 point 9;
+                            no secret, no registration)
     remove(org) ─► audit ─► record deleted
 
 Registering tells the platform to send the organisation's events to its own address, signed
@@ -40,17 +41,17 @@ PERMISSION = Permission.INTEGRATIONS_MANAGE
 AUDIT_KEY = "contact_center_connection"
 NETWORKS_AUDIT = "allowed_networks"
 """The audit names the field that changed, never the networks (as it does for the secrets)."""
-PAUSE_AUDIT = "inbound_enabled"
-"""The audit names the pause by its field, when it changes; never as a value in a log."""
+PAUSE_AUDIT = {True: "resume", False: "pause"}
+"""The audit action of setting the pause (``contact_center_connection.pause`` or ``.resume``),
+written only when the state changes; never a value."""
 
 
-def _subscription_unchanged(stored: OrganisationConnection, change: ConnectionChange) -> bool:
-    """Whether a saved change leaves everything the subscription at the platform depends on.
+def _only_networks_changed(stored: OrganisationConnection, change: ConnectionChange) -> bool:
+    """Whether a saved change differs from the stored connection in its allowed networks only.
 
-    The kind, the API host, the client and the secrets are as they were, so whatever else
-    differs (the allowed networks, the pause: who may call and whether it is handled, both
-    decided here at the gate) needs nothing at the platform. Whether the webhook secret exists
-    is asked separately (``save``): a record without one is not left alone.
+    Nothing the registration at the platform depends on changed then: the kind, the API host,
+    the client and the secrets are as they were. Whether the webhook secret exists is asked
+    separately (``save``): a record without one is not left alone.
     """
     return (stored.kind, stored.api_base_url, stored.client_id) == (
         change.kind,
@@ -168,10 +169,9 @@ class ContactCenterConnectionService:
     ) -> Registration:
         """Store the connection; audited by the names of the fields sent, never their values.
 
-        A change of the allowed networks or of the pause alone (ADR 0124 points 3 and 9) on a
-        connection that has its webhook secret is stored and audited, makes no new webhook secret
-        and does not register the address again (``Registration.UNTOUCHED``): a pause must not
-        cost the subscription. A record without a secret takes the
+        A change of the allowed networks alone (ADR 0124 point 3) on a connection that has its
+        webhook secret is stored and audited, makes no new webhook secret and does not register
+        the address again (``Registration.UNTOUCHED``). A record without a secret takes the
         normal path: the secret is made and the address registered.
 
         Raises:
@@ -187,20 +187,13 @@ class ContactCenterConnectionService:
         networks_changed = change.allowed_networks is not None and NetworkList(
             change.allowed_networks
         ) != (stored.allowed_networks if stored else NetworkList())
-        pause_changed = change.inbound_enabled is not None and change.inbound_enabled != (
-            stored.inbound_enabled if stored else True
-        )
-        sent = [
-            *change.secrets_sent,
-            *([NETWORKS_AUDIT] if networks_changed else []),
-            *([PAUSE_AUDIT] if pause_changed else []),
-        ]
+        sent = [*change.secrets_sent, *([NETWORKS_AUDIT] if networks_changed else [])]
         detail = ",".join([f"{AUDIT_KEY}.save", f"kind:{change.kind.value}", *sent])
         # Asked before the save: the save makes a secret for a record that has none.
         leave_alone = (
-            (networks_changed or pause_changed)
+            networks_changed
             and stored is not None
-            and _subscription_unchanged(stored, change)
+            and _only_networks_changed(stored, change)
             and await connections.webhook_secret(organisation_id, stored.kind) is not None
         )
         await self._audit(principal, organisation, detail)
@@ -209,6 +202,33 @@ class ContactCenterConnectionService:
             # The subscription depends on the secret, the host and the client, not on who may call.
             return Registration.UNTOUCHED
         return await self._register(principal, organisation_id, organisation)
+
+    async def set_inbound(self, principal: Principal, organisation: str, *, enabled: bool) -> bool:
+        """Pause or resume the organisation's webhook address (ADR 0124 point 9).
+
+        The state wanted is given, never toggled, so a stale page that presses the same button
+        twice does the same thing twice. Audited by name (``contact_center_connection.pause`` or
+        ``.resume``), and only when the state changes. It never makes a secret and never
+        registers: the platform keeps its subscription and gets its 204 either way.
+
+        Returns:
+            Whether the state changed.
+
+        Raises:
+            DomainError: ``not_permitted``, ``organisation_not_found``, ``integration_not_ready``
+                (no settings key) and ``invalid_configuration`` naming ``connection`` when the
+                organisation has no connection.
+        """
+        organisation_id = await self._authorize(principal, organisation)
+        connections = self._ready()
+        stored = await connections.get(organisation_id)
+        if stored is None:
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}connection")
+        if stored.inbound_enabled == enabled:
+            return False
+        await self._audit(principal, organisation, f"{AUDIT_KEY}.{PAUSE_AUDIT[enabled]}")
+        await connections.set_inbound_enabled(organisation_id, enabled, self._clock.now())
+        return True
 
     async def rotate_webhook_secret(self, principal: Principal, organisation: str) -> Registration:
         """Generate a new webhook secret; the old one stops verifying at once.

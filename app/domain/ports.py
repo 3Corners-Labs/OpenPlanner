@@ -561,6 +561,10 @@ class ContactCenterConnections(Protocol):
         """Generate a new webhook secret for an existing connection, replacing the old one."""
         ...
 
+    async def set_inbound_enabled(self, organisation_id: int, enabled: bool, now: datetime) -> None:
+        """Pause or resume the address of an existing connection; nothing else of it changes."""
+        ...
+
     async def delete(self, organisation_id: int) -> None:
         """Remove the organisation's connection and its secrets."""
         ...

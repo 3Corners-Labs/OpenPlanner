@@ -37,13 +37,7 @@ from app.domain.lookups import group_booking
 from app.domain.ports import REASON_LIMIT, Clock, ProbeRegistry, Transaction, UnitOfWork
 from app.domain.request_log import REQUEST_EVENT
 from app.domain.staff_usage import StaffUsage
-from app.domain.webhook_replay import (
-    INSTALLATION_REPLAY,
-    WEBHOOK_MEMORY,
-    ReplayContext,
-    legacy_key,
-    replay_key,
-)
+from app.domain.webhook_replay import WEBHOOK_MEMORY, replay_key
 
 WEBEX_SOURCE = "webex"
 
@@ -179,9 +173,14 @@ class IntegrationService:
         detail: str = "",
         *,
         event_key: str = "",
-        replay: ReplayContext = INSTALLATION_REPLAY,
+        scope: str,
+        body_identity: str,
     ) -> EventOutcome:
         """Record a meeting event once per event (``event_key``, else its body's identity).
+
+        ``scope`` is the memory's scope of the address the event came in at
+        (``webhook_replay.scope_of``) and ``body_identity`` the identity of its verified body
+        (``""`` when there is no delivery, so no body to identify it by).
 
         Webex may report an instance id (``<meetingId>_I_<n>``); it is matched on the series.
         Keys are only remembered for OpenPlanner's meetings: org-owned webhooks also report
@@ -203,7 +202,7 @@ class IntegrationService:
                     return EventOutcome.IGNORED
                 detail = "host" if kind is EventKind.HOST_JOINED else detail
                 kind = TRIAL_MEETING_EVENTS[kind]
-            if not await _claim(tx, WEBEX_SOURCE, event_key, replay, at):
+            if not await _claim(tx, WEBEX_SOURCE, event_key, scope, body_identity, at):
                 return EventOutcome.DUPLICATE
             await self._record(tx, booking.id, kind, at, detail)
         return EventOutcome.RECORDED
@@ -216,7 +215,8 @@ class IntegrationService:
         detail: str = "",
         *,
         event_key: str = "",
-        replay: ReplayContext = INSTALLATION_REPLAY,
+        scope: str,
+        body_identity: str,
         origin: str = "",
         provider: ContactCenterKind,
         source: str,
@@ -252,7 +252,7 @@ class IntegrationService:
             if booking is not None and booking.id is not None:
                 if kind is EventKind.TASK_CREATED:
                     return EventOutcome.IGNORED
-                if not await _claim(tx, source, event_key, replay, at):
+                if not await _claim(tx, source, event_key, scope, body_identity, at):
                     return EventOutcome.DUPLICATE
                 await self._record(tx, booking.id, kind, at, detail)
                 recorded = booking.id
@@ -335,21 +335,23 @@ class IntegrationService:
 
 
 async def _claim(
-    tx: Transaction, source: str, event_key: str, replay: ReplayContext, at: datetime
+    tx: Transaction, source: str, event_key: str, scope: str, body_identity: str, at: datetime
 ) -> bool:
     """Remember the event of ``source``; ``False`` when it was seen before (a replay).
 
     The event is identified by its ``event_key`` or, without one, by its verified body
-    (``ReplayContext.body_identity``), at the address's scope: another organisation's address is
-    another event. Without either there is nothing to remember and the event always counts. An
-    event remembered before ADR 0124 step 3a under its bare ``event_key`` still counts as seen.
-    Keys older than ``WEBHOOK_MEMORY`` are forgotten in the same transaction.
+    (``body_identity``), at the address's ``scope``: another organisation's address is another
+    event. Without either there is nothing to remember and the event always counts. Keys older
+    than ``WEBHOOK_MEMORY`` are forgotten in the same transaction.
     """
-    identity = event_key or replay.body_identity
+    identity = event_key or body_identity
     if not identity:
         return True
     await tx.forget_webhook_events(at - WEBHOOK_MEMORY)
-    old = legacy_key(event_key)
-    if old and await tx.webhook_event_seen(source, old):
+    # The shape before ADR 0124 step 3a was the bare ``event_key``. It is read installation-wide
+    # on purpose: an event remembered before the upgrade is a replay wherever it comes back, while
+    # a narrower reading would let a pre-upgrade event at an organisation's address be replayed
+    # once. Release 0.7.0 removes this check together with the port method.
+    if event_key and await tx.webhook_event_seen(source, event_key):
         return False
-    return await tx.claim_webhook_event(source, replay_key(source, replay.scope, identity), at)
+    return await tx.claim_webhook_event(source, replay_key(source, scope, identity), at)
