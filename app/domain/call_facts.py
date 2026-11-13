@@ -26,7 +26,14 @@ from datetime import datetime
 
 from app.domain.booking import BookingKind
 from app.domain.booking_facts import BookingFacts, keyed
-from app.domain.calls import CallState, CallStatus, EventKind, TaskState
+from app.domain.calls import (
+    CONVERSATION_OPEN,
+    MESSAGING_NOT_CONFIGURED,
+    CallState,
+    CallStatus,
+    EventKind,
+    TaskState,
+)
 from app.domain.direct_leave import DETAIL_AGENT, DETAIL_WAITING
 from app.domain.usage import ActorClass, FactKind, UsageFact
 
@@ -39,6 +46,8 @@ FAILURE_CODES: frozenset[str] = frozenset(
         "unreachable",
         "unexpected_response",
         "meeting_missing",
+        MESSAGING_NOT_CONFIGURED,
+        CONVERSATION_OPEN,
         "other",
     }
 )

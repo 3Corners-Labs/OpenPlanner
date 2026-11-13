@@ -27,6 +27,7 @@ its own retention period.
 
 from collections.abc import Awaitable, Callable, Collection
 from datetime import datetime, timedelta
+from functools import partial
 from time import perf_counter
 from typing import Protocol
 
@@ -73,6 +74,7 @@ from app.jobs.calls import CALL_JOBS, STALE, CallJobs
 from app.jobs.messages import MESSAGE_KINDS, MessageComposer
 from app.logging import tracer
 from app.web.call_labels import agent_start_label
+from app.web.conversation_opening import conversation_opening
 
 log = structlog.get_logger()
 
@@ -152,6 +154,8 @@ class JobRunner:
         request_work: The request work of new flows (ADR 0121 step 6b); with it, a dispatch
             job of request work goes to ``RequestDispatch`` and ``requests`` fences attempts.
         reconcile_minutes: ``contact_center_reconcile_minutes`` (class C), read when called.
+        conversation_enabled: ``embedded_call_enabled`` (class C), read when called: a routing's
+            conversation task is made only while it is on (ADR 0123 step 7a).
         after_purge: Called once after a round that ran ``purge_pii`` jobs (the worker passes
             the WAL checkpoint, WP-A3); a failure is logged and never fails the round.
     """
@@ -176,6 +180,7 @@ class JobRunner:
         organisations: OrganisationDispatchers | None = None,
         request_work: RequestWork | None = None,
         reconcile_minutes: Callable[[], int] | None = None,
+        conversation_enabled: Callable[[], bool] | None = None,
     ) -> None:
         """Store the collaborators and decide which job types this worker can handle."""
         self._queue = queue
@@ -203,6 +208,8 @@ class JobRunner:
                 agent_start_label,
                 fallback,
                 organisations,
+                partial(conversation_opening, composer.translator),
+                conversation_enabled,
             )
             if integration is not None
             else None

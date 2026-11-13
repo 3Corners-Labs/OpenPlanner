@@ -474,6 +474,7 @@ GROUP = Kind(
                 "group_contact_center.kind",
                 "group_contact_center.routing_value",
                 "group_contact_center.attributes",
+                "group_contact_center.task_kind",
             ),
             description="The platform the group dispatches to, its routing value and attributes.",
         ),

@@ -99,7 +99,14 @@ PURGED_FIELDS: tuple[str, ...] = (
 """Every column the purge sets to NULL: ``DATA_FIELDS``, ``DERIVED_FIELDS`` and
 ``ROUTING_FIELDS``. The purge works from this list, so there is no second one to drift (ADR 0102
 point 13). What the purge does is
-*delete fields from the appointment*; it does not make the booking anonymous."""
+*delete fields from the appointment*; it does not make the booking anonymous.
+
+Deliberately not on it: ``contact_center_task_kind`` and ``contact_center_attempt_kind`` (ADR
+0123 step 7a, ``form`` or ``conversation``: what a task was made as and what the latest create
+was tried as) and ``contact_center_kind`` (the platform). Each is a word of a closed list
+that finds nothing at the provider and says nothing about the participant, and the kind of a
+task is kept so that a later step knows a conversation without asking the platform. The task's
+*id* is what finds the record again, and that is purged."""
 
 USAGE_FIELDS: tuple[str, ...] = (
     "kind",

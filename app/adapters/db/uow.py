@@ -185,7 +185,7 @@ from app.domain.channel_settings import (
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import CheckArea, CheckStatus, Finding, GroupCheck
 from app.domain.closure import Closure
-from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef, TaskKind
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -436,6 +436,7 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         else None,
         trial_count=row.trial_count,
         contact_center_task=task_of(row),
+        attempted_task_kind=TaskKind(row.contact_center_attempt_kind or TaskKind.FORM),
         kind=BookingKind(slot.kind),
         closure_id=row.closure_id,
         change_reason=ChangeReason(row.change_reason) if row.change_reason else None,
@@ -1409,6 +1410,17 @@ class SqlTransaction(
         """Store the booking's contact-center task (the old column too, ADR 0116)."""
         await self._session.execute(
             update(BookingRow).where(BookingRow.id == booking_id).values(**task_columns(task))
+        )
+
+    async def save_task_attempt(self, booking_id: int, task_kind: TaskKind | None) -> None:
+        """Store the kind a create is tried as, before the answer; ``None`` clears it.
+
+        Only the attempt's own column: the kind of a stored task is written with the task.
+        """
+        await self._session.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id)
+            .values(contact_center_attempt_kind=task_kind.value if task_kind else None)
         )
 
     async def get_booking_by_meeting(self, meeting_id: str) -> Booking | None:

@@ -1266,6 +1266,8 @@ a quick tunnel that does not do that cannot be used with a list. Do not set
 | `ORG_DIGITAL_CONTACT_LIMIT_EXCEEDED` | WxCC's limit of active digital contacts | wait or raise the limit with Cisco |
 | `unauthorized` | the Service App token was refused | renew the tokens (section 1) |
 | `meeting_missing` (retrying) | the work item waits for the meeting | check Webex reachability and the host account |
+| `messaging_not_configured` on a task | the contact center refused a conversation task: the messaging feature or channel is not set up for the organisation (ADR 0123 step 7a); no work item is made instead | have the contact-center administrator switch the feature on and create the messaging channel and asset, then check the service's channel name; or set the service's task kind back to *Work item* |
+| `conversation_open` on a task | the contact center holds an open conversation for this appointment already | end it in Agent Desktop, then dispatch again |
 | `end_not_possible` `rejected_403` | End Task v1 refused: no `cjp:user` | the task was marked cancelled through v2; end it in Agent Desktop, or add `cjp:user` (section 1) |
 | `end_not_possible` other code | WxCC refused End Task (e.g. the task already ended) | check the task in Agent Desktop |
 

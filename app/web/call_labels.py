@@ -1,7 +1,13 @@
 """Call wording shared by web and worker: the agent's start time, admin labels and failure hints."""
 
 from app.domain.booking import Booking, BookingKind
-from app.domain.calls import CallState, EventKind, TaskState
+from app.domain.calls import (
+    CONVERSATION_OPEN,
+    MESSAGING_NOT_CONFIGURED,
+    CallState,
+    EventKind,
+    TaskState,
+)
 from app.domain.job_plan import JobStatus, JobType
 from app.domain.scheduling import Group
 from app.i18n.dates import format_clock, format_day_compact, local_day
@@ -69,6 +75,8 @@ FAILURE_HINTS: dict[tuple[EventKind, str], str] = {
     (EventKind.MEETING_FAILED, "rejected_403"): "call.hint.meeting.rejected_403",
     (EventKind.MEETING_FAILED, "rejected_404"): "call.hint.meeting.rejected_404",
     (EventKind.TASK_FAILED, "meeting_missing"): "call.hint.task.meeting_missing",
+    (EventKind.TASK_FAILED, MESSAGING_NOT_CONFIGURED): "call.hint.task.messaging_not_configured",
+    (EventKind.TASK_FAILED, CONVERSATION_OPEN): "call.hint.task.conversation_open",
 }
 """What to check after a failure with a known meaning for that kind of event."""
 

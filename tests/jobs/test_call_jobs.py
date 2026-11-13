@@ -6,7 +6,7 @@ import pytest
 
 from app.domain.audit import Outcome
 from app.domain.calls import CallState, EventKind, TaskState
-from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef, TaskKind
 from app.domain.job_plan import JobType
 from app.domain.ports import IntegrationError
 from app.domain.scheduling import DispatchKind
@@ -15,7 +15,7 @@ from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
 from tests.fakes.jobs import FakeQueue, job
 from tests.support.call_jobs import WIRED, Setup, group_uow
-from tests.support.domain import NOW, SLOT_0900, TEST_TOKEN_KEY
+from tests.support.domain import NOW, SLOT_0900, TEST_TOKEN_KEY, webex_routing
 
 
 @pytest.fixture
@@ -347,3 +347,32 @@ async def test_a_cleanup_bound_to_an_older_trial_leaves_the_newer_one(setup: Set
 
     assert setup.video.deleted == []
     assert setup.uow.state.bookings[bid].trial is not None
+
+
+async def test_a_bad_opening_text_fails_the_dispatch_once_with_its_code() -> None:
+    """ADR 0123 step 7a: a catalogue mistake is not retried and is shown with its code."""
+    broken = Translator(
+        {
+            "nl": {
+                "message.conversation.opening_video": "{reference} {email}",
+                "message.conversation.opening": "{reference} {email}",
+            }
+        }
+    )
+    setup = Setup(
+        group_uow(
+            video_host_email="host@example.nl",
+            contact_center=webex_routing(task_kind=TaskKind.CONVERSATION),
+        )
+    )
+    bid = await setup.booking()
+    await setup.runner(FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])).run_due()
+    queue = FakeQueue([job(bid, JobType.DISPATCH_CONTACT_CENTER_TASK)])
+
+    await setup.runner(queue, translator=broken, conversation_enabled=lambda: True).run_due()
+
+    assert queue.failed == [(1, "integration_not_ready")]
+    assert queue.retried == []
+    assert setup.dispatcher.items == []
+    events = setup.uow.state.booking_events[bid]
+    assert (events[-1].kind, events[-1].detail) == (EventKind.TASK_FAILED, "integration_not_ready")

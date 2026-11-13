@@ -23,6 +23,19 @@ task has no such key, so the body of every existing flow is byte for byte what i
 (``tests/adapters/wxcc_task_bodies.json``). A task of a kind not carried is refused before
 anything is sent.
 
+A conversation task (ADR 0123 point 8, ``TaskKind.CONVERSATION``) is a ``customMessaging`` task
+instead of a work item: Create Task v2 with the same business address, channel and flow settings
+(routing variables, skills, interaction), the booking reference as the participant's identifier
+(WxCC allows one open conversation per identifier and address, so one per appointment) and the
+first message as a text. ``append_message`` adds the participant's later messages with Task
+Messages v2, the message identifier being the ``aliasId`` so a retry is not a second message.
+The first message is composed at the edge from the catalogue and holds only the fields CLAUDE.md
+allows in an outbound payload; ``conversation_body`` is the one place that puts it in a request.
+WxCC answers 403 while its messaging feature or channel is not set up for the organisation and
+refuses a second open conversation for the same identifier: the first is read as
+``messaging_not_configured`` (its status kept as the reason, since a 403 has more than one
+cause), the second as ``conversation_open``, never a form task instead.
+
 A cancelled booking's task is first marked with a Task Messages v2 append
 (``cjp:task_write``) that sets ``kind`` to ``cancelled`` with only the booking reference, so
 the agent sees it without the first name or the meeting link; then End Task v1 (``cjp:user``;
@@ -48,18 +61,32 @@ from app.adapters.webex_auth import (
     WebexTokens,
 )
 from app.domain import calls
-from app.domain.calls import ContactCenterTask, TaskSnapshot, TaskState
+from app.domain.calls import (
+    CONVERSATION_OPEN,
+    MESSAGE_TEXT_MAX_LENGTH,
+    MESSAGING_NOT_CONFIGURED,
+    ContactCenterTask,
+    ParticipantMessage,
+    TaskSnapshot,
+    TaskState,
+)
 from app.domain.contact_center import (
     AttributeSpec,
     ContactCenterCapabilities,
     ContactCenterKind,
     ContactCenterRouting,
+    ContactCenterTaskRef,
     ProviderDescriptor,
+    TaskKind,
     uncarried,
 )
 from app.domain.interaction import InteractionKind
 from app.domain.ports import Clock, IntegrationError, RequestLog
 from app.domain.security_log import SecurityLog
+
+CONVERSATION_CHANNEL_TYPE = "customMessaging"
+"""WxCC's name of a conversation task: the ``channelType`` of Create Task v2 and the
+``mediaType`` of Task Messages v2."""
 
 ROUTING_KEY = "openplannerGroup"
 SKILLS_KEY = "openplannerSkills"
@@ -87,14 +114,18 @@ DESCRIPTOR = ProviderDescriptor(
     routing_value_label_key="admin.field.wxcc_routing_value",
     routing_value_hint_key="admin.field.wxcc_routing_value_hint",
     capabilities=ContactCenterCapabilities(
-        interaction_kinds=frozenset({InteractionKind.VIDEO, InteractionKind.NONE}), skills=True
+        interaction_kinds=frozenset({InteractionKind.VIDEO, InteractionKind.NONE}),
+        skills=True,
+        task_kinds=frozenset({TaskKind.FORM, TaskKind.CONVERSATION}),
     ),
 )
 """What a group needs for WxCC (ADR 0032 point 4) and what WxCC carries (ADR 0121 step 6); the
 limits are WxCC's (``flowSettings`` values up to 512 bytes), fixed by the platform and so
 constants, not settings. Video and ``none`` are carried (``none`` since ADR 0121 step 6b: a work
 item with an empty ``meetingLink``); a telephone interaction would need the participant's number,
-which never leaves OpenPlanner."""
+which never leaves OpenPlanner. The conversation (a ``customMessaging`` task) is carried since
+ADR 0123 step 7a; whether an organisation's tenant has the messaging feature is not known here:
+WxCC answers 403 when it has not."""
 
 PROBE_KIND = calls.PROBE_KIND
 """``kind`` of the group check's probe work item (ADR 0082 point 2), defined in the domain."""
@@ -163,36 +194,51 @@ def channel_and_address(routing: ContactCenterRouting | None) -> tuple[str, str]
     return mapping.complete if mapping else None
 
 
+def _flow_settings(item: ContactCenterTask) -> dict[str, str]:
+    """Return the ``flowSettings`` of ``item``: routing variables, skills, interaction, route.
+
+    The one place they are built, so a work item and a conversation task carry the same.
+    """
+    return {
+        **{
+            name: value
+            for name, value in item.variables
+            if name not in (SKILLS_KEY, INTERACTION_KEY)
+        },
+        **({SKILLS_KEY: ",".join(item.skills)} if item.skills else {}),
+        **(
+            {INTERACTION_KEY: item.interaction.value}
+            if item.interaction is not InteractionKind.VIDEO
+            else {}
+        ),
+        ROUTING_KEY: item.routing_value,
+    }
+
+
 def task_body(item: ContactCenterTask, alias_id: str, timestamp_ms: int) -> dict[str, Any]:
     """Return the Create Task v2 request for ``item``, a task of a complete WxCC routing.
 
+    A work item for ``TaskKind.FORM``, a ``customMessaging`` task for ``TaskKind.CONVERSATION``.
+
     Raises:
-        IntegrationError: ``not_ready`` (not retryable) when the routing lacks an attribute or
-            the task is one WxCC does not carry (``DESCRIPTOR.capabilities``).
+        IntegrationError: ``not_ready`` (not retryable) when the routing lacks an attribute, the
+            task is one WxCC does not carry (``DESCRIPTOR.capabilities``) or a conversation has
+            no first message.
     """
     pair = channel_and_address(item.routing)
-    if pair is None or uncarried(DESCRIPTOR.capabilities, item.interaction, bool(item.skills)):
+    if pair is None or uncarried(
+        DESCRIPTOR.capabilities, item.interaction, bool(item.skills), item.task_kind
+    ):
         raise IntegrationError("not_ready", retryable=False)
     channel, address = pair
+    if item.task_kind is TaskKind.CONVERSATION:
+        return conversation_body(item, channel, address, alias_id, timestamp_ms)
     return {
         "origin": {"id": item.reference, "name": item.first_name},
         "destination": {"id": address, "type": "businessAddress"},
         "channelType": "workItem",
         "channel": channel,
-        "flowSettings": {
-            **{
-                name: value
-                for name, value in item.variables
-                if name not in (SKILLS_KEY, INTERACTION_KEY)
-            },
-            **({SKILLS_KEY: ",".join(item.skills)} if item.skills else {}),
-            **(
-                {INTERACTION_KEY: item.interaction.value}
-                if item.interaction is not InteractionKind.VIDEO
-                else {}
-            ),
-            ROUTING_KEY: item.routing_value,
-        },
+        "flowSettings": _flow_settings(item),
         "channelParams": {
             "type": "work-item-form",
             "message": {
@@ -209,6 +255,73 @@ def task_body(item: ContactCenterTask, alias_id: str, timestamp_ms: int) -> dict
             },
         },
     }
+
+
+def conversation_body(
+    item: ContactCenterTask, channel: str, address: str, alias_id: str, timestamp_ms: int
+) -> dict[str, Any]:
+    """Return the Create Task v2 request that opens a conversation for ``item``.
+
+    The booking reference is the participant's identifier and the first name its display name;
+    the first message is the text composed at the edge. Nothing else of the booking is sent:
+    its fields are the ones of ``ContactCenterTask`` and no more.
+
+    Raises:
+        IntegrationError: ``not_ready`` (not retryable) for a blank or too long first message.
+    """
+    text = item.first_message
+    if not text.strip() or len(text) > MESSAGE_TEXT_MAX_LENGTH:
+        raise IntegrationError("not_ready", retryable=False)
+    return {
+        "origin": {"id": item.reference, "name": item.first_name},
+        "destination": {"id": address, "type": "businessAddress"},
+        "channelType": CONVERSATION_CHANNEL_TYPE,
+        "channel": channel,
+        "flowSettings": _flow_settings(item),
+        "channelParams": {
+            "type": "text",
+            "message": {"aliasId": alias_id, "text": text, "timestamp": timestamp_ms},
+        },
+    }
+
+
+def append_body(message: ParticipantMessage, timestamp_ms: int) -> dict[str, Any]:
+    """Return the Task Messages v2 request that appends ``message`` to a conversation.
+
+    ``message.message_id`` is the ``aliasId``: WxCC takes the same one twice as one message.
+    """
+    return {
+        "mediaType": CONVERSATION_CHANNEL_TYPE,
+        "channelParams": {
+            "type": "text",
+            "message": {
+                "aliasId": message.message_id,
+                "text": message.text,
+                "timestamp": timestamp_ms,
+            },
+        },
+    }
+
+
+def messaging_refusal(error: IntegrationError) -> IntegrationError:
+    """Return the domain error for WxCC's refusal of a conversation request.
+
+    A 403 is read as ``messaging_not_configured`` and a 409 as ``conversation_open`` (an open
+    conversation exists for the participant identifier). A 403 has more than one cause (the
+    feature or channel is not set up, or the service app lacks the right), so the platform's
+    status stays on the error as its reason, shown under the event next to the code, and
+    nothing else of the answer: the request carries the first name and the meeting link, and a
+    platform's description of an error may echo them. Every other error is returned as it is.
+    None is retryable, and none is ever answered by creating a form task.
+    """
+    code = {"rejected_403": MESSAGING_NOT_CONFIGURED, "rejected_409": CONVERSATION_OPEN}.get(
+        error.code
+    )
+    if code is None:
+        return error
+    return IntegrationError(
+        code, retryable=False, reason=f"HTTP {error.code.removeprefix('rejected_')}"
+    )
 
 
 def cancellation_body(reference: str, alias_id: str, timestamp_ms: int) -> dict[str, Any]:
@@ -245,13 +358,44 @@ class WxccTasks:
         """Create the work item and return its task id."""
         timestamp = int(self._clock.now().timestamp() * 1000)
         body = task_body(task, str(uuid.uuid4()), timestamp)
-        response = await self._client.request(
-            "POST", f"{self._base}/v2/tasks", json=body, ok=(200, 201, 202)
-        )
+        try:
+            response = await self._client.request(
+                "POST", f"{self._base}/v2/tasks", json=body, ok=(200, 201, 202)
+            )
+        except IntegrationError as error:
+            if task.task_kind is TaskKind.CONVERSATION:
+                raise messaging_refusal(error) from error
+            raise
         task_id = response.json().get("data", {}).get("id")
         if not isinstance(task_id, str):
             raise IntegrationError("unexpected_response", retryable=False)
         return task_id
+
+    async def append_message(self, task: ContactCenterTaskRef, message: ParticipantMessage) -> None:
+        """Append the participant's message (``POST /v2/tasks/{taskId}/messages``).
+
+        Accepted (202) is not delivered: WxCC confirms through its events (ADR 0123 step 7b).
+
+        Raises:
+            IntegrationError: ``not_ready`` (not retryable) for a task that is not a WxCC
+                conversation; ``messaging_not_configured`` and ``conversation_open`` as for
+                ``create_task``; otherwise WxCC's refusal or unreachability.
+        """
+        if (
+            task.kind is not ContactCenterKind.WEBEX_CC
+            or task.task_kind is not TaskKind.CONVERSATION
+        ):
+            raise IntegrationError("not_ready", retryable=False)
+        timestamp = int(self._clock.now().timestamp() * 1000)
+        try:
+            await self._client.request(
+                "POST",
+                self._task_url("v2", task.id, "messages"),
+                json=append_body(message, timestamp),
+                ok=(200, 202),
+            )
+        except IntegrationError as error:
+            raise messaging_refusal(error) from error
 
     async def end_task(self, task_id: str) -> None:
         """End the task (``POST /v1/tasks/{taskId}/end``)."""

@@ -212,6 +212,7 @@ FLOWS: dict[str, Flow] = {
     "## Flow: video meetings, work items and direct calls (WP5/WP6)": Flow(
         (PUBLIC, WEBHOOK, JOB, DENIED, CHANGE)
     ),
+    "## Flow: the conversation task at the contact center (ADR 0123 point 8, step 7a)": Flow(ADMIN),
     "## Flow: own queue (ADR 0043)": Flow(ADMIN),
     "## Flow: requests and work items (ADR 0121 step 5)": Flow(ADMIN),
     "## Flow: immediate intake and check-in (ADR 0121 step 7)": Flow((PUBLIC, DENIED, CHANGE)),

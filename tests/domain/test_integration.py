@@ -55,7 +55,9 @@ def test_meeting_request_carries_no_personal_data() -> None:
 def test_work_item_carries_only_first_name_and_meeting_link() -> None:
     booking = make_booking(meeting=MeetingRef("m-1", "https://site.webex.com/meet/abc"))
 
-    item = contact_center_task(booking, GROUP, start_label="5 jan 2026, 09:00")
+    item = contact_center_task(
+        booking, GROUP, start_label="5 jan 2026, 09:00", conversation_enabled=False
+    )
 
     assert item.reference == "OP-000123"
     assert item.first_name == "Ada"
@@ -74,17 +76,18 @@ def test_task_needs_a_complete_routing() -> None:
         replace(GROUP, contact_center=webex_routing(channel=None)),
     ):
         with pytest.raises(DomainError, match="integration_not_ready: contact_center"):
-            contact_center_task(booking, group, start_label="x")
+            contact_center_task(booking, group, start_label="x", conversation_enabled=False)
 
 
 def test_work_item_needs_a_meeting_and_contact_data() -> None:
     with pytest.raises(DomainError, match="integration_not_ready: meeting"):
-        contact_center_task(make_booking(), GROUP, start_label="x")
+        contact_center_task(make_booking(), GROUP, start_label="x", conversation_enabled=False)
     with pytest.raises(DomainError, match="integration_not_ready: contact"):
         contact_center_task(
             make_booking(meeting=MeetingRef("m", "https://x.webex.com/m"), contact=None),
             GROUP,
             start_label="x",
+            conversation_enabled=False,
         )
 
 

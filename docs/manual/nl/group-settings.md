@@ -360,6 +360,26 @@ De waarde die de flow in Webex Contact Center gebruikt om de wachtrij te kiezen.
 veld leeg, dan stuurt het portaal het webadres van de groep mee. Vul alleen iets anders in als
 de flow een andere waarde verwacht.
 
+<!-- field: contact_center_task_kind -->
+### Soort taak in het contactcenter
+
+Wat een boeking of aanvraag bij het contactcenter wordt. **Werkitem** is de standaard: de
+medewerker ziet de velden van de boeking en de vergaderlink in het agent desktop. **Gesprek** maakt
+in plaats daarvan een berichtentaak: de medewerker beantwoordt de deelnemer in een gesprek in het
+agent desktop, en het eerste bericht noemt de afspraak (referentie, voornaam, tijd, de naam van de
+dienst en de vergaderlink). De keuze **Gesprek** verschijnt alleen op een installatie waar de host
+de gesprekspagina heeft aangezet (de platforminstelling *embedded_call_enabled*), en vraagt de
+berichtenfunctie en een berichtenkanaal in het beheer van het contactcenter; zonder die weigert het
+contactcenter de taak, zegt de tijdlijn dat, en komt er geen werkitem voor in de plaats. Het
+contactcenter bewaart zelf een transcript van een gesprek; de verwijdering van OpenPlanner
+reikt daar niet. Een andere keuze geldt alleen voor nieuwe taken; bestaande taken houden het soort
+waarmee ze zijn gemaakt.
+
+De keuze **Gesprek** geldt alleen zolang de gesprekspagina voor de installatie aanstaat: zolang
+die uit staat maakt een dienst die op Gesprek staat werkitems, en het formulier zegt dat naast
+de keuze. Dat geldt ook voor een soort die via een configuratie-import binnenkwam: de import
+laat het staan en het gaat gelden zodra de schakelaar aangaat.
+
 <!-- field: wxcc_sample_flow -->
 ### Voorbeeldflow om te importeren
 

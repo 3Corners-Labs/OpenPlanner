@@ -268,6 +268,7 @@ async def run_worker(
                 organisations=wired.organisations,
                 request_work=work,
                 reconcile_minutes=lambda: live.settings.contact_center_reconcile_minutes,
+                conversation_enabled=lambda: live.settings.embedded_call_enabled,
                 integration=integration,
                 fallback=fallback,
                 retention=lambda: live.settings.event_retention,

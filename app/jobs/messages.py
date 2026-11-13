@@ -379,6 +379,11 @@ class MessageComposer:
         self._base_url = public_base_url.rstrip("/")
         self._environment = create_environment([TEMPLATE_DIR])
 
+    @property
+    def translator(self) -> Translator:
+        """The application translator, for texts composed elsewhere from the same catalogue."""
+        return self._translator
+
     async def refresh(self) -> None:
         """Bring the organisations' own texts up to date before a message is composed."""
         await self._translator.refresh()

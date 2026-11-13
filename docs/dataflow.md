@@ -295,6 +295,24 @@ web ──HTTPS GET /meetings/{id}, /meetingParticipants?meetingId=──> Webex
 | Service App tokens | `integration_credentials` (AES-256-GCM) | Webex | rotated automatically | sent only to Webex |
 | Last webhook listing and delivery test (registration ids, events, host account filters, target URLs without query, statuses, outcome codes) | `integration_reports` | Webex, WxCC, the self-test | replaced by the next check | no; shown read-only on **Koppelingen** |
 
+### A conversation task instead of a work item (ADR 0123 point 8, step 7a)
+
+A group whose routing has the task kind `conversation` (default `form`, the work item above) sends a `customMessaging` task instead. Nothing sends one until the call page exists to show the chat: the choice is offered only while the platform switch `embedded_call_enabled` is on.
+
+```
+worker/web ──HTTPS──> WxCC Create Task v2 (channelType customMessaging): booking reference (the participant's identifier, one conversation per appointment), first name, the same flow variables as a work item (route, routing variables, skill codes, interaction kind), and as the first text message: the booking reference, first name, start (text), group name and, for a video task, the meeting link, composed from a fixed catalogue text in the organisation's language
+WxCC ──task id──> OpenPlanner (bookings.contact_center_task_id, with the kind the task was made with in bookings.contact_center_task_kind)
+worker/web ──HTTPS──> WxCC Task Messages v2 (mediaType customMessaging), when a later step has a participant message to append: the message identifier (aliasId) and the text the participant wrote
+```
+
+| Data item | Where | Source | Retention | Leaves the system |
+|---|---|---|---|---|
+| The routing's task kind | `group_contact_center.task_kind` | the group's settings | until changed; no personal data | no |
+| The kind a task was created with | `bookings.contact_center_task_kind` | the dispatch | with the booking row; a kind is no personal data and is not purged | no |
+| The first message | not stored: composed at dispatch from the catalogue and the allowed fields | the booking | not kept by OpenPlanner | to WxCC, as the conversation's first text (no other field of the booking: no surname, address, phone number, form answer or note) |
+| A participant's later message (from step 7b) | stored only from step 7b; nothing sends one in 7a | the participant | step 7b states it and puts it on the list of `app/domain/privacy.py` | to WxCC as the text of an appended message |
+| The conversation's transcript | **at the contact center**: it keeps the transcript and the thread per participant identifier and business address, and masks card numbers | the contact center | the contact center's own; **OpenPlanner's purge does not reach it** (the follow-up ADR of step 7b states the retention; a question to the supplier, `docs/research/call-page-on-the-meetings-sdk.md`) | no |
+
 ## Own queue (ADR 0043)
 
 A group with dispatch kind `openplanner_queue` sends nothing to a contact center. Its agents

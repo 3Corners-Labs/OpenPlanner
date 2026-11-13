@@ -98,6 +98,15 @@ def test_the_purge_clears_the_personal_fields_and_the_provider_links() -> None:
     assert len(PURGED_FIELDS) == len(set(PURGED_FIELDS))
 
 
+def test_the_kind_of_a_task_is_deliberately_not_purged() -> None:
+    """A closed-list word that finds nothing at the provider: the task's id is what is purged."""
+    kept = {"contact_center_task_kind", "contact_center_attempt_kind", "contact_center_kind"}
+
+    assert kept.isdisjoint(PURGED_FIELDS)
+    assert kept.isdisjoint(PII_FIELDS)
+    assert {"contact_center_task_id", "wxcc_task_id"} <= set(PURGED_FIELDS)
+
+
 def test_the_request_record_uses_the_booking_names_so_one_list_masks_both() -> None:
     """ADR 0121 decision D1: the request-level record is a subset of the list, by name."""
     assert REQUEST_DATA_FIELDS == ("first_name", "last_name", "email", "phone", "form_answers")

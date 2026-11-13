@@ -49,7 +49,7 @@ from app.domain.connection_health import (
     RequestSample,
     StaleTask,
 )
-from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef, TaskKind
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -820,7 +820,15 @@ class InMemoryTransaction(ServiceRequestStore):
 
     async def save_task(self, booking_id: int, task: ContactCenterTaskRef) -> None:
         booking = self.state.bookings[booking_id]
-        self.state.bookings[booking_id] = replace(booking, contact_center_task=task)
+        self.state.bookings[booking_id] = replace(
+            booking, contact_center_task=task, attempted_task_kind=TaskKind.FORM
+        )
+
+    async def save_task_attempt(self, booking_id: int, task_kind: TaskKind | None) -> None:
+        booking = self.state.bookings[booking_id]
+        self.state.bookings[booking_id] = replace(
+            booking, attempted_task_kind=task_kind or TaskKind.FORM
+        )
 
     async def get_booking_by_meeting(self, meeting_id: str) -> Booking | None:
         return next(

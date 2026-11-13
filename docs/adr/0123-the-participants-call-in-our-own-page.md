@@ -1,7 +1,8 @@
 # 0123. The participant's call in our own page, on the Webex Meetings SDK
 
-Status: accepted, partly built (2026-11-13), requested by the product owner. Steps 1 and 2 are built: the
-page exists as a shell behind the feature switch, without a call (see *Build status*); the ADR
+Status: accepted, partly built (2026-11-13), requested by the product owner. Steps 1, 2 and 7a are built: the
+page exists as a shell behind the feature switch, without a call, and the contact-center contract
+has a conversation task that nothing sends yet (see *Build status*); the ADR
 merged together with step 1 (ADR 0119). Extends ADR 0017 (video through the Webex
 Meetings API), ADR 0071 (trial call) and ADR 0075 (`join_client` gets a third value). It is the
 separate ADR that ADR 0045 (*Later*) and ADR 0075 (*Consequences*, issue #162) point to. Amends
@@ -415,8 +416,8 @@ the pseudonym key, which is the existing bootstrap key material, not a new secre
 | 3 | Design: mock-ups of every state of point 10, the chat side bar included, in two organisations' themes, approved by the product owner (point 15) | | planned |
 | 4 | The way in: device check with camera, microphone and speaker test, the token endpoint with its abuse cases, connecting with retry, the lobby, the failure state with `embedded_call_webex_option`; behind `embedded_call_enabled`. The script tag carries the manifest's checksum as subresource integrity, and the page does not offer the call when the placed file's checksum is missing or differs from the manifest (the service-app check reports it); the policy of step 2 is run against the real file for the first time (no `wasm-unsafe-eval`, no blob worker, no further host). First, on the lab site: what a guest token can do, and the rename at the purge (points 6 and 7). With it: the rename job, `embedded_call_token_per_booking_per_hour`, the data flow, the threat model with its abuse cases, and the runbook entry for an SDK that stops working | | planned |
 | 5 | In the call: the control bar, device change, sharing a screen both ways, the recording and connection notices, closed captions (point 12), the ended and failed states; the data flow and threat model for the call | | planned |
-| 6 | `join_client = embedded` on the service's settings form with the checks of point 17 (the group check's guest finding for a group that uses the call page), `call_client(service, flow)`, meetings without chat, the trial call on the same page, the configuration package, the manual topic | | planned |
-| 7a | Chat, the contract: the task kind `conversation` in the channel-independent task contract and in the Webex Contact Center adapter (create, append), its capability, `contact_center.task_kind` on the service's routing, fake and recorded fixture | | planned |
+| 6 | `join_client = embedded` on the service's settings form with the checks of point 17 (the group check's guest finding for a group that uses the call page), `call_client(service, flow)`, meetings without chat, the trial call on the same page, the configuration package, the manual topic. Here the rule "`conversation` only for a service that uses the call page" is enforced, replacing the platform switch `embedded_call_enabled` that step 7a uses to offer the choice | | planned |
+| 7a | Chat, the contract: the task kind `conversation` in the channel-independent task contract and in the Webex Contact Center adapter (create, append), its capability, `contact_center.task_kind` on the service's routing, fake and recorded fixture. In force only while the platform switch is on; a conversation is ended without the work item's cancellation mark | #827 | merged |
 | 7b | Chat, inbound: the message deliveries and the task-message events through the gate of ADR 0124; `call_messages`, the privacy list and the purge; `embedded_call_chat_max_chars` and `embedded_call_chat_per_minute`; the data flow and the threat model for the chat | | planned |
 | 7c | Chat, the side bar on the call page: sending, polling, the staff member's name, the closed state; `embedded_call_chat_poll_seconds` | | planned |
 | 7d | The chain check of point 17 in the portal for the conversation task | | planned |
