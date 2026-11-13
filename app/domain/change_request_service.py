@@ -294,13 +294,19 @@ class ChangeRequestService:
         """Return the first match the participant could change now, to ``start`` if given.
 
         A move is judged on the booking's own slot (``BookingService.may_move_to``), so a
-        booking on a pool is asked only about a free time of its pool.
+        booking on a pool is asked only about a free time of its pool. A refusal while judging
+        counts as "cannot move", never as an error: the answer must not tell a match apart.
         """
         for booking in matches:
             if not _may_change(booking, group, start, now):
                 continue
-            if start is None or await self._bookings.may_move_to(tx, booking, group, start):
+            if start is None:
                 return booking
+            try:
+                if await self._bookings.may_move_to(tx, booking, group, start):
+                    return booking
+            except DomainError:
+                continue
         return None
 
 

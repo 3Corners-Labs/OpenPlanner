@@ -64,7 +64,13 @@ from app.domain.pool_accounting import (
     check_start,
     interval_end,
 )
-from app.domain.pool_availability import PoolScene, PoolTarget, resolved_target, slot_target
+from app.domain.pool_availability import (
+    PoolScene,
+    PoolTarget,
+    resolved_target,
+    revision_target,
+    slot_target,
+)
 from app.domain.pool_staffing import (
     Intake,
     PoolStaffing,
@@ -512,14 +518,10 @@ class Placements:
         if not pool_flows_bookable(IntakeMode.APPOINTMENT):
             return found
         targets: list[PoolTarget] = []
+        # Every flow of the service, whatever its state (``PUBLIC_READ`` filters none out).
         for flow in await tx.list_service_flows(PUBLIC_READ, group.id):
-            current = flow.current
-            if current is None or current.legacy:
-                continue
-            if current.capacity_pool_id is None or current.duration_minutes is None:
-                continue
-            target = PoolTarget(current.capacity_pool_id, current.duration_minutes)
-            if target not in targets:
+            target = revision_target(flow.current)
+            if target is not None and target not in targets:
                 targets.append(target)
         return found + [PoolPlacement(self.pools, target) for target in targets]
 
