@@ -159,6 +159,14 @@ where Webex's webhooks are not set up and nobody opened the agenda, a join canno
 exists only when it had a booking, so hours nobody booked are not in utilisation. Slots that ended
 before the upgrade are not closed afterwards, and `completed` and `no_show` cannot be backfilled.
 
+An appointment of a flow on a counted pool (ADR 0122) has no meeting to observe: its outcome is
+the operator's explicit *Complete* (`completed`), or `no_show` where the booking was marked so;
+work that expired unstarted has no outcome. It counts as not picked up when, at closing, nobody
+had claimed it or started it. Its places belong to a pool that several services share, so it adds
+nothing to utilisation, fill or idle capacity (C1 to C3) and no shortfall (C5): a pool's shortage
+is on the pool's own page. Work completed more than two hours after the appointment's end (work
+in recovery, among others) is closed without its outcome.
+
 ## Duration buckets
 
 The same ten buckets for every duration; a signed duration (a host who was early) uses the mirrored set.
