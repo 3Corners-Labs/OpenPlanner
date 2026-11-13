@@ -1,7 +1,31 @@
 {#- The claimed booking's status (ADR 0043, 0072): where the participant is, whether the video
-    link is ready, and the actions. Rendered inside queue_claimed.html and on its own for
-    static/live-region.js, which swaps it in while ``poll`` is set. -#}
+    link is ready, and the actions. Request work of a flow without video (ADR 0121 step 5) has
+    no meeting: it shows where the work stands and *Start* or *Complete* instead. Rendered inside
+    queue_claimed.html and on its own for static/live-region.js, which swaps it in while
+    ``poll`` is set. -#}
 <div data-live-fragment{% if poll %} data-poll="{{ poll }}" data-poll-seconds="{{ poll_seconds }}"{% endif %}>
+  {% if claimed.work %}
+  <p data-live-status>{{ _("admin.queue.work.no_video") }}{% if claimed.work.sentence %} {{ claimed.work.sentence }}{% endif %}</p>
+  {% if claimed.work.conflict %}<div class="alert alert--warning"><p>{{ _("admin.queue.work.conflict") }}</p></div>{% endif %}
+  <div class="form-actions">
+    {% if claimed.work.can_start %}
+    <form method="post" action="/admin/groups/{{ summary.group.slug }}/queue/{{ claimed.booking.booking_id }}/start">
+      <button type="submit" class="button">{{ _("admin.queue.work.start") }}</button>
+    </form>
+    {% endif %}
+    {% if claimed.work.can_complete %}
+    <form method="post" action="/admin/groups/{{ summary.group.slug }}/queue/{{ claimed.booking.booking_id }}/complete">
+      <button type="submit" class="button">{{ _("admin.queue.work.complete") }}</button>
+    </form>
+    {% endif %}
+    {% if claimed.work.can_start %}
+    <form method="post" action="/admin/groups/{{ summary.group.slug }}/queue/{{ claimed.booking.booking_id }}/release">
+      <button type="submit" class="button button--secondary">{{ _("admin.queue.release") }}</button>
+    </form>
+    {% endif %}
+    {% if poll %}<a class="button button--ghost" href="/admin/groups/{{ summary.group.slug }}/queue/{{ claimed.booking.booking_id }}">{{ _("admin.queue.refresh") }}</a>{% endif %}
+  </div>
+  {% else %}
   <p><span class="chip{% if claimed.participant_tone %} chip--{{ claimed.participant_tone }}{% endif %}" data-live-status>{{ claimed.participant }}</span></p>
   {% if claimed.booking.video == "failed" %}
   <div class="alert alert--error">
@@ -20,4 +44,5 @@
     </form>
     {% if poll %}<a class="button button--ghost" href="/admin/groups/{{ summary.group.slug }}/queue/{{ claimed.booking.booking_id }}">{{ _("admin.queue.refresh") }}</a>{% endif %}
   </div>
+  {% endif %}
 </div>

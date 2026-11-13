@@ -88,7 +88,7 @@ WorkItemState:  assigned → in_progress → completed | recovery_required → c
 - **Start** (`QueueService.start`, locked): the holder of the claim, eligible again (`WorkEligibility`, A35), the booking still confirmed and the lease not expired; then `check_start(supply, commitments, now, duration, buffer, intake=APPOINTMENT, own_key=("booking", id))` on the booking's pool: `REFUSED` is the error `start_refused`, `OVERRUN_CONFLICT` starts with `start_conflict` recorded (P8), `MAY_START` starts. The duration is the booking's own (`slot.end - slot.start`), the buffer is the slot's (`occupied_until - end`), both fixed when it was booked (A23).
 - **Complete** (`QueueService.complete`, locked): the holder of the claim, or, for `recovery_required`, anyone who may view the service's bookings (the supervisor rule of `release`). The work item ends (`completed`), the request becomes `completed` with `resolved_at`, the occupation is released and the booking's status becomes `completed`: explicit evidence (A27), not an observation of a meeting.
 - **Release** (existing, extended): a work item that has not started ends `released` and the request returns to `queued`. A started one cannot be released (`request_in_progress`); it can only be completed, so a running treatment never disappears from the pool unnoticed.
-- **Cancellation of the booking.** Any path, including an older image, only changes the booking's status. The watchdog round sees a request whose booking no longer holds a place: not started becomes `cancelled` (its work item `cancelled`, the claim cleared); started stays as it is (the treatment really occupies someone) until completed or the watchdog deadline.
+- **Cancellation of the booking.** Any path, including an older image, only changes the booking's status. The watchdog round sees a request whose booking has ended (cancelled, refused, completed, no-show): not started becomes `cancelled` (its work item `cancelled`, the claim cleared); started stays as it is (the treatment really occupies someone) until completed or the watchdog deadline. A booking on hold (suspended, awaiting a new time or confirmation) pauses the request instead: only a lease ends, and the deadline follows the booking's end when it goes ahead again (R10).
 
 ### 3.1 The watchdog (`watchdog_at`)
 
@@ -108,9 +108,9 @@ WorkItemState:  assigned → in_progress → completed | recovery_required → c
 |---|---|
 | Personal data on the booking of an appointment request | the booking's existing purge moment (`purge_pii`, `retention.purge_moment`): slot end + 24 h and the holds of `retention.py`. Unchanged, and earlier than the watchdog bound for every default |
 | The work item's `assigned_to` of an appointment request | together with the booking's purge (`purge_personal_data` empties it in the same transaction) |
-| The request-level record and `assigned_to` of a request without an appointment | `min(resolved_at, watchdog_at) + 24 h` (`data_deletion_at`); a request still in `recovery_required` is deleted at `watchdog_at + 24 h` all the same: occupancy is kept, data is not (A34) |
+| The request-level record and `assigned_to` of a request without an appointment, also when no record was collected | `min(resolved_at, watchdog_at) + 24 h` (`data_deletion_at`); a request still in `recovery_required` is deleted at `watchdog_at + 24 h` all the same: occupancy is kept, data is not (A34) |
 
-The nightly retention sweep counts and deletes overdue request-level records like overdue bookings, with the same grace (`PURGE_GRACE`) and backlog alert (`BACKLOG_AGE`); the retention overview counts them per service. The deletion is idempotent and leaves the request, its states and its times (no personal data) for reporting.
+The nightly retention sweep counts and deletes overdue request-level records like overdue bookings, with the same grace (`PURGE_GRACE`) and backlog alert (`BACKLOG_AGE`). Showing them as separate counts on the retention overview is follow-up row 5d: until a writer exists (step 7) there is nothing to count. The deletion is idempotent and leaves the request, its states and its times (no personal data) for reporting.
 
 ## 4. The personal-data resolver
 
@@ -152,7 +152,7 @@ No new screen, tab or setting topic.
 |---|---|---|
 | *Start* and *Complete* on a claimed request of a flow without video, instead of the meeting link; the recorded overrun conflict; *Complete* for a supervisor on a row in `recovery_required` | service → Agenda → Queue (exists, `wide`), the claimed item's page and its live fragment | `queue.work` (start, complete by the holder); `bookings.view` (supervisor completion), as `release` |
 | The two settings | organisation → Settings (existing class D form, rendered from the registry) | the registry's class D permission |
-| Request-level records holding data, overdue | the retention overview (exists) as two more counts per service | `retention.view` |
+| Request-level records holding data, overdue | the retention overview (exists) as two more counts per service: follow-up row 5d, with the first writer (step 7) | `retention.view` |
 
 No manual topic changes (existing topics wait for the next major release; a test requires none for these elements).
 
@@ -179,12 +179,14 @@ No manual topic changes (existing topics wait for the next major release; a test
 | R6 | How is the request-level record deleted? | The row is deleted and the request's state says `deleted`; nothing is set to an empty value |
 | R7 | Does a booking cancelled during treatment end the work? | No: the treatment holds a unit until it is completed or the watchdog marks it for recovery |
 | R8 | The flow choice screen for the participant (step 3a: "follows in step 5") | Not in step 5: follow-up row 5c; one flow per entry path keeps the demonstration |
+| R9 | Where does a supervisor find work in recovery? Its booking has ended, so the queue (which shows bookings until their end) no longer lists it | The holder completes it from the claimed page, which stays open to them; a supervisor may complete it by the same action. A list and an alert are follow-up row 5e, to be built before `ROLLBACK_SAFE` opens: until completed, the work keeps a unit occupied as an overrun |
+| R10 | What does the watchdog do with a booking that is on hold (suspended by a closure, awaiting a new time, awaiting confirmation)? | Nothing but end an expired lease: the request stays open, no deadline runs, and when the booking goes ahead again the deadline follows its current end (`booking_phase`, the deadline computed from the booking each round). Only a booking that really ended (cancelled, refused, completed, no-show) cancels unstarted work (independent review of #766/#767) |
 
 ## 10. Pull requests
 
 | PR | Content | Acceptance |
 |---|---|---|
 | 5a (decision PR: CLAUDE.md and `privacy.py`) | This brief; `app/domain/service_requests.py` (states, transitions, watchdog, deletion moments, lease, resolver); `privacy.py` lists; migration 0113 and rows; `Transaction` methods and the SQL adapter `app/adapters/db/service_requests.py`; the occupation in `get_pool_commitments`; `assigned_to` in the booking purge; the fake store; CLAUDE.md privacy sentence; `docs/dataflow.md`, `docs/threat-model.md`; ADR 0121 rows 5a, 5b, 5c | A15 (one request per appointment), A20 (domain), A33, A34 (domain), the deletion list |
-| 5b (build, stacked on 5a) | Claim makes the request and its work item with a lease; start, complete, release in `QueueService` and the queue pages; the watchdog round in the worker (lease expiry, cancellation, expiry, recovery); the sweep and the overview for request-level records; settings `assignment_start_lease_minutes` and `request_unresolved_hours`; `RETENTION_BUILT = True` and the rollback point split into its own readiness check (ADR 0122 follow-up); i18n nl/en; `docs/architecture.md`, `docs/settings.md` | A19, A25, A27, A33, A34, A35 end to end with the gate opened in tests |
+| 5b (build, stacked on 5a) | Claim makes the request and its work item with a lease; start, complete, release in `QueueService` and the queue pages; the watchdog round in the worker (lease expiry, cancellation, expiry, recovery, deletion of records); the nightly sweep for request-level records; settings `assignment_start_lease_minutes` and `request_unresolved_hours`; `RETENTION_BUILT = True` and the rollback point split into its own readiness check (ADR 0122 follow-up); i18n nl/en; `docs/architecture.md`, `docs/settings.md` | A19, A25, A27, A33, A34, A35 end to end with the gate opened in tests |
 
 5b stacks on 5a: both touch the ADR's build status, `docs/adr-status.md` and the new domain module. Its pull request targets 5a's branch without auto-merge until 5a has merged and GitHub has retargeted it to `main`.

@@ -100,6 +100,7 @@ from app.domain.service_requests import (
     HandlingState,
     RequestPersonalData,
     ServiceRequest,
+    UnclaimedBooking,
     WorkItem,
     WorkItemState,
 )
@@ -1780,6 +1781,31 @@ class Transaction(Protocol):
         """
         ...
 
+    async def get_service_request(self, request_id: int) -> ServiceRequest | None:
+        """Return a request by id; not scoped: for the worker's watchdog round only."""
+        ...
+
+    async def open_request_ids(self) -> list[int]:
+        """Return the ids of every request the watchdog still watches, in id order.
+
+        Queued, assigned and in progress: not terminal and not marked for recovery.
+        """
+        ...
+
+    async def unclaimed_pool_bookings(self, ended_before: datetime) -> list[UnclaimedBooking]:
+        """Return confirmed pool bookings with a flow, ended before the moment, without request.
+
+        The watchdog makes an ``expired`` request for each one past its deadline (A33).
+        """
+        ...
+
+    async def requests_holding_data(self) -> list[ServiceRequest]:
+        """Return every request without a booking that still holds personal data.
+
+        Its request-level record, or an agent's pseudonym on one of its work items.
+        """
+        ...
+
     async def get_active_work_item(self, request_id: int) -> WorkItem | None:
         """Return the request's one active work item, or ``None``."""
         ...
@@ -1804,7 +1830,7 @@ class Transaction(Protocol):
         ...
 
     async def update_service_request(self, request: ServiceRequest, seen: HandlingState) -> bool:
-        """Write the request's handling and times if its handling is still ``seen``.
+        """Write the request's handling, ``resolved_at`` and ``watchdog_at`` if still ``seen``.
 
         Returns ``False`` when another transaction changed it first (nothing written).
         """
@@ -1824,8 +1850,8 @@ class Transaction(Protocol):
     async def delete_request_personal_data(self, request_id: int, now: datetime) -> bool:
         """Delete the request-level record and mark the request ``deleted`` (decision D1).
 
-        Also empties the pseudonym on the request's work items. Returns ``False`` when the
-        request held no record (nothing written): idempotent.
+        Also empties the pseudonyms on the request's work items, with or without a record.
+        Returns ``False`` when there was nothing to remove: idempotent.
         """
         ...
 

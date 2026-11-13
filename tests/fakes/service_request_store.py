@@ -10,6 +10,7 @@ the fake's ``State`` (``requests``, ``work_items``, ``request_data``).
 from dataclasses import replace
 from datetime import datetime
 
+from app.domain.booking import BookingStatus
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.pool_accounting import Commitment
 from app.domain.service_requests import (
@@ -17,6 +18,7 @@ from app.domain.service_requests import (
     PersonalDataState,
     RequestPersonalData,
     ServiceRequest,
+    UnclaimedBooking,
     WorkItem,
     WorkItemState,
 )
@@ -30,7 +32,8 @@ class ServiceRequestStore(PoolStaffingStore):
         self, pool_id: int, lower: datetime, upper: datetime
     ) -> list[Commitment]:
         held = await super().get_pool_commitments(pool_id, lower, upper)
-        for item in sorted(self.state.work_items.values(), key=lambda i: (i.started_at, i.id)):
+        started = [i for i in self.state.work_items.values() if i.started_at is not None]
+        for item in sorted(started, key=lambda i: (i.started_at, i.id)):
             request = self.state.requests[item.request_id]
             found = item.commitment(request.key) if item.pool_id == pool_id else None
             if found is not None and found.start < upper:
@@ -39,6 +42,47 @@ class ServiceRequestStore(PoolStaffingStore):
 
     async def get_request_of_booking(self, booking_id: int) -> ServiceRequest | None:
         return next((r for r in self.state.requests.values() if r.booking_id == booking_id), None)
+
+    async def get_service_request(self, request_id: int) -> ServiceRequest | None:
+        return self.state.requests.get(request_id)
+
+    async def open_request_ids(self) -> list[int]:
+        return sorted(
+            key
+            for key, request in self.state.requests.items()
+            if not request.terminal and request.handling is not HandlingState.RECOVERY_REQUIRED
+        )
+
+    async def unclaimed_pool_bookings(self, ended_before: datetime) -> list[UnclaimedBooking]:
+        found = []
+        for booking_id, booking in sorted(self.state.bookings.items()):
+            slot = self.state.slots.get(booking.slot_id)
+            group = self.state.groups.get(booking.group_id)
+            if (
+                slot is None
+                or group is None
+                or slot.capacity_pool_id is None
+                or booking.flow is None
+                or booking.status is not BookingStatus.CONFIRMED
+                or not slot.end < ended_before
+                or await self.get_request_of_booking(booking_id) is not None
+            ):
+                continue
+            found.append(
+                UnclaimedBooking(
+                    booking_id, group.organisation_id, group.id, booking.flow, slot.end
+                )
+            )
+        return found
+
+    async def requests_holding_data(self) -> list[ServiceRequest]:
+        named = {i.request_id for i in self.state.work_items.values() if i.assigned_to}
+        return [
+            r
+            for key, r in sorted(self.state.requests.items())
+            if r.booking_id is None
+            and (r.personal_data is PersonalDataState.PRESENT or key in named)
+        ]
 
     async def get_active_work_item(self, request_id: int) -> WorkItem | None:
         return next(
@@ -76,7 +120,10 @@ class ServiceRequestStore(PoolStaffingStore):
         if stored is None or stored.handling is not seen:
             return False
         self.state.requests[request.id or 0] = replace(
-            stored, handling=request.handling, resolved_at=request.resolved_at
+            stored,
+            handling=request.handling,
+            resolved_at=request.resolved_at,
+            watchdog_at=request.watchdog_at,
         )
         return True
 
@@ -93,14 +140,17 @@ class ServiceRequestStore(PoolStaffingStore):
         return self.state.request_data.get(request_id)
 
     async def delete_request_personal_data(self, request_id: int, now: datetime) -> bool:
+        named = any(
+            i.request_id == request_id and i.assigned_to for i in self.state.work_items.values()
+        )
+        self._forget_agents(request_id)
         if self.state.request_data.pop(request_id, None) is None:
-            return False
+            return named
         self.state.requests[request_id] = replace(
             self.state.requests[request_id],
             personal_data=PersonalDataState.DELETED,
             data_deleted_at=now,
         )
-        self._forget_agents(request_id)
         return True
 
     def _forget_agents(self, request_id: int) -> None:

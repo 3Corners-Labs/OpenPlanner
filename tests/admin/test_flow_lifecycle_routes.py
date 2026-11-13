@@ -47,7 +47,7 @@ async def test_the_page_speaks_english_with_the_names_of_both_languages(site: Si
     assert "Not active yet" in editor
     assert "How does a request come in?" in editor
     assert "By appointment" in editor
-    assert "of 6 points in order." in editor
+    assert "of 7 points in order." in editor
     assert "Save draft" in editor
     assert "Participants see this name. The name does not determine how the flow works." in editor
     assert "These follow the saved contact channel. Save the draft after a change." in editor
@@ -178,7 +178,7 @@ async def test_the_subjects_are_offered_and_their_extra_skills_are_chosen_on_a_p
     assert saved.status_code == 303
     assert saved.headers["location"] == f"{BASE}/advies?done=flow_subject_saved#subjects"
     page = (await site.client.get(f"{BASE}/advies")).text
-    assert "5 van 6 punten in orde." in page  # the pool guarantees what the flow needs
+    assert "6 van 7 punten in orde." in page  # the pool guarantees what the flow needs
     row = page.split('id="offer_contract"')[1].split("</tr>")[0]
     assert "Engels" in row
     again = await site.client.get(f"{BASE}/advies/subjects/contract")
@@ -256,7 +256,7 @@ async def test_a_pool_that_does_not_guarantee_the_skills_is_a_missing_point_on_t
     page = (await site.client.get(f"{BASE}/advies")).text
 
     assert "De capaciteitspool garandeert niet alle vaardigheden" in page
-    assert "4 van 6 punten in orde." in page
+    assert "5 van 7 punten in orde." in page
 
 
 async def test_the_checklist_says_every_state_in_words_and_which_part_follows(
@@ -275,15 +275,16 @@ async def test_the_checklist_says_every_state_in_words_and_which_part_follows(
     page = (await site.client.get(f"{BASE}/advies")).text
 
     checklist = page.split('<ol class="checklist">')[1].split("</ol>")[0]
-    assert checklist.count('class="checklist__item"') == 6
-    assert checklist.count("<span>Volgt</span>") == 1  # retention is not built
+    assert checklist.count('class="checklist__item"') == 7
+    assert checklist.count("<span>Volgt</span>") == 1  # the rollback gate
     # No pool (capacity and skills), and the service has no contact-center routing: something the
     # administrator can fix, named before what follows (ADR 0121 step 6). The dispatch sentence
     # of ``not_built_yet`` is pinned in ``tests/admin/test_flow_views.py``.
     assert checklist.count("<span>Ontbreekt</span>") == 3
-    assert checklist.count("<span>In orde</span>") == 2
+    assert checklist.count("<span>In orde</span>") == 3  # retention is built (step 5b)
     assert "nog niet met een contactcenter verbonden" in checklist
-    assert "Het automatisch afsluiten en verwijderen van gegevens" in checklist
+    assert "Activeren wacht tot ook de vorige versie van OpenPlanner" in checklist
+    assert "Terugrollen naar de vorige versie" in checklist
     assert "Dit onderdeel van OpenPlanner volgt" not in checklist
     assert "Kies een capaciteitspool." in checklist
     assert "Het concept is nog niet volledig" in page

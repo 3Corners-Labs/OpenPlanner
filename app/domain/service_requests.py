@@ -27,13 +27,13 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from enum import StrEnum
 
-from app.domain.booking import Contact
+from app.domain.booking import BookingStatus, Contact
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.flow_resolution import FlowRef
 from app.domain.form_fields import Answers
 from app.domain.job_plan import PURGE_AFTER
 from app.domain.pool_accounting import Commitment, CommitmentKey
-from app.domain.service_flows import IntakeMode
+from app.domain.service_flows import FlowRevision, IntakeMode, InteractionKind
 
 
 class HandlingState(StrEnum):
@@ -234,6 +234,25 @@ class ServiceRequest:
         return ("request", self.id or 0)
 
 
+@dataclass(frozen=True)
+class UnclaimedBooking:
+    """A confirmed booking on a counted pool that has no request yet: what the watchdog needs.
+
+    Attributes:
+        booking_id: The booking.
+        organisation_id: Its service's organisation, whose watchdog hours apply.
+        group_id: Its service.
+        flow: The flow and revision it was made under.
+        end: The end of the appointment.
+    """
+
+    booking_id: int
+    organisation_id: int
+    group_id: int
+    flow: FlowRef
+    end: datetime
+
+
 def watchdog_deadline(anchor: datetime, unresolved_hours: int) -> datetime:
     """Return the watchdog moment: ``anchor`` (reservation end or acceptance) plus the hours."""
     return anchor + timedelta(hours=unresolved_hours)
@@ -411,50 +430,103 @@ class WatchdogOutcome:
     clear_claim: bool
 
 
+class BookingPhase(StrEnum):
+    """What a request's booking means for its handling (the reservation's own state)."""
+
+    ACTIVE = "active"
+    """Confirmed: the appointment goes ahead (and every request without a booking)."""
+    PAUSED = "paused"
+    """On hold: suspended by a closure, awaiting a new time or awaiting confirmation. The
+    request stays open and waits; its deadline follows the booking when it goes ahead again."""
+    ENDED = "ended"
+    """Cancelled, refused, completed or no-show: unstarted work ends."""
+
+
+_PAUSED = frozenset(
+    {BookingStatus.SUSPENDED, BookingStatus.AWAITING_REBOOK, BookingStatus.PENDING_CONFIRMATION}
+)
+
+
+def booking_phase(status: BookingStatus | None) -> BookingPhase:
+    """Return the phase of a request whose booking has ``status`` (``None``: no booking)."""
+    if status is None or status is BookingStatus.CONFIRMED:
+        return BookingPhase.ACTIVE
+    return BookingPhase.PAUSED if status in _PAUSED else BookingPhase.ENDED
+
+
+def is_request_work(revision: FlowRevision | None) -> bool:
+    """Return whether bookings of ``revision`` are request work: not legacy and without video.
+
+    The one rule of the queue (``RequestWork.handles``) and of the watchdog's unclaimed
+    bookings, so a video flow never gets a request (or a false ``expired`` one).
+    """
+    return (
+        revision is not None
+        and not revision.legacy
+        and revision.interaction_kind is not InteractionKind.VIDEO
+    )
+
+
 def watchdog_outcome(
-    request: ServiceRequest, item: WorkItem | None, *, holds_place: bool, now: datetime
+    request: ServiceRequest,
+    item: WorkItem | None,
+    *,
+    phase: BookingPhase = BookingPhase.ACTIVE,
+    now: datetime,
+    deadline: datetime | None = None,
 ) -> WatchdogOutcome | None:
     """Return what the watchdog round changes for ``request`` at ``now``, or ``None``.
 
-    ``item`` is the request's active work item, ``holds_place`` whether its booking still holds
-    a place (always true without a booking). In this order:
+    ``item`` is the request's active work item, ``phase`` its booking's (``booking_phase``) and
+    ``deadline`` the watchdog moment as of now: the booking's current end plus the hours, so a
+    booking that went ahead again at another time moves it (``None``: ``watchdog_at``). The
+    answer carries the deadline in ``watchdog_at``. In this order:
 
     * a terminal request, or one in ``recovery_required``, is left alone;
-    * not started, and the booking no longer holds a place (cancelled by any path, an older
-      image included): ``cancelled``;
-    * past ``watchdog_at``: started work becomes ``recovery_required`` and keeps its unit
-      (A34), anything else ``expired`` (A33);
+    * started work past the deadline becomes ``recovery_required`` and keeps its unit (A34),
+      whatever the booking does (the treatment really occupies someone, design R7);
+    * not started and the booking ended (cancelled by any path, an older image included):
+      ``cancelled``;
+    * not started, the booking going ahead and past the deadline: ``expired`` (A33); while the
+      booking is on hold (suspended, awaiting a new time or confirmation) no deadline runs and
+      the request waits for it;
     * claimed, not started and the lease is over: back to ``queued`` (``lease_expired``).
     """
     if request.terminal or request.handling is HandlingState.RECOVERY_REQUIRED:
         return None
+    due = deadline or request.watchdog_at
+    current = replace(request, watchdog_at=due)
     started = item is not None and item.state is WorkItemState.IN_PROGRESS
-    if not holds_place and not started:
+    if started and item is not None:
+        if now < due:
+            return None
+        recovering = replace(item, state=WorkItemState.RECOVERY_REQUIRED)
+        return WatchdogOutcome(
+            _resolved(current, HandlingState.RECOVERY_REQUIRED, now), recovering, False
+        )
+    if phase is BookingPhase.ENDED:
         ended = _ended(item, WorkItemState.CANCELLED, now) if item else None
-        return WatchdogOutcome(_resolved(request, HandlingState.CANCELLED, now), ended, True)
-    if now >= request.watchdog_at:
-        if started and item is not None:
-            recovering = replace(item, state=WorkItemState.RECOVERY_REQUIRED)
-            return WatchdogOutcome(
-                _resolved(request, HandlingState.RECOVERY_REQUIRED, now), recovering, False
-            )
+        return WatchdogOutcome(_resolved(current, HandlingState.CANCELLED, now), ended, True)
+    if phase is BookingPhase.ACTIVE and now >= due:
         ended = _ended(item, WorkItemState.EXPIRED, now) if item else None
-        return WatchdogOutcome(_resolved(request, HandlingState.EXPIRED, now), ended, True)
+        return WatchdogOutcome(_resolved(current, HandlingState.EXPIRED, now), ended, True)
     if item is not None and item.lease_over(now):
-        back, expired = release(request, item, now=now, state=WorkItemState.LEASE_EXPIRED)
+        back, expired = release(current, item, now=now, state=WorkItemState.LEASE_EXPIRED)
         return WatchdogOutcome(back, expired, True)
     return None
 
 
 def data_deletion_at(request: ServiceRequest) -> datetime | None:
-    """Return when the request-level record must be deleted, or ``None`` when it has none.
+    """Return when a request without a booking loses its personal data, or ``None`` with one.
 
     ``min(resolved_at, watchdog_at) + 24 h`` (fixed, ADR 0121 settings): a request that is still
     being handled at its watchdog deadline loses its data all the same; its unit stays held
-    (A34). A request with a booking keeps its data on the booking, whose own purge moment
-    applies (``retention.purge_moment``).
+    (A34). It covers the request-level record and the agents' pseudonyms on its work items,
+    so it applies whether or not a record was collected. A request with a booking keeps its data
+    on the booking, whose own purge moment applies (``retention.purge_moment``) and also empties
+    the pseudonyms.
     """
-    if request.booking_id is not None or request.personal_data is not PersonalDataState.PRESENT:
+    if request.booking_id is not None:
         return None
     anchor = min(request.resolved_at or request.watchdog_at, request.watchdog_at)
     return anchor + PURGE_AFTER

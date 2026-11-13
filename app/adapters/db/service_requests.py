@@ -13,25 +13,31 @@ work item that has not ended holds one unit of its pool, keyed like the booking'
 
 from datetime import datetime
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.form_fields import answers_from_json, answers_json
 from app.adapters.db.models import (
+    BookingRow,
+    GroupRow,
     RequestPersonalDataRow,
     ServiceRequestRow,
+    SlotRow,
     WorkItemRow,
 )
+from app.domain.booking import BookingStatus
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.flow_resolution import FlowRef
 from app.domain.pool_accounting import Commitment
 from app.domain.service_flows import IntakeMode
 from app.domain.service_requests import (
     ACTIVE_ITEM,
+    TERMINAL,
     HandlingState,
     PersonalDataState,
     RequestPersonalData,
     ServiceRequest,
+    UnclaimedBooking,
     WorkItem,
     WorkItemState,
 )
@@ -39,6 +45,13 @@ from app.domain.service_requests import (
 _ACTIVE = sorted(state.value for state in ACTIVE_ITEM)
 """The stored values of an active work item; ``models.ACTIVE_WORK_ITEM`` is the index's twin
 (a test keeps the two equal)."""
+
+_WATCHED = sorted(
+    state.value
+    for state in HandlingState
+    if state not in TERMINAL and state is not HandlingState.RECOVERY_REQUIRED
+)
+"""The handling states the watchdog round still looks at."""
 
 
 def request_of(row: ServiceRequestRow) -> ServiceRequest:
@@ -140,6 +153,77 @@ class ServiceRequestQueries:
         )
         return request_of(row) if row is not None else None
 
+    async def get_service_request(self, request_id: int) -> ServiceRequest | None:
+        """Return a request by id, or ``None``."""
+        row = await self._session.get(ServiceRequestRow, request_id)
+        return request_of(row) if row is not None else None
+
+    async def open_request_ids(self) -> list[int]:
+        """Return the ids of the requests the watchdog still watches."""
+        found = await self._session.scalars(
+            select(ServiceRequestRow.id)
+            .where(ServiceRequestRow.handling.in_(_WATCHED))
+            .order_by(ServiceRequestRow.id)
+        )
+        return list(found)
+
+    async def unclaimed_pool_bookings(self, ended_before: datetime) -> list[UnclaimedBooking]:
+        """Return confirmed pool bookings with a flow, ended before the moment, without request."""
+        found = await self._session.execute(
+            select(
+                BookingRow.id,
+                GroupRow.organisation_id,
+                BookingRow.group_id,
+                BookingRow.flow_id,
+                BookingRow.flow_revision,
+                SlotRow.end,
+            )
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .join(GroupRow, GroupRow.id == BookingRow.group_id)
+            .outerjoin(ServiceRequestRow, ServiceRequestRow.booking_id == BookingRow.id)
+            .where(
+                SlotRow.capacity_pool_id.is_not(None),
+                SlotRow.end < ended_before,
+                BookingRow.status == BookingStatus.CONFIRMED.value,
+                BookingRow.flow_id.is_not(None),
+                BookingRow.flow_revision.is_not(None),
+                ServiceRequestRow.id.is_(None),
+            )
+            .order_by(BookingRow.id)
+        )
+        return [
+            UnclaimedBooking(booking_id, organisation_id, group_id, FlowRef(flow, revision), end)
+            for booking_id, organisation_id, group_id, flow, revision, end in found
+            if flow is not None and revision is not None
+        ]
+
+    async def requests_holding_data(self) -> list[ServiceRequest]:
+        """Return the requests without a booking that still hold personal data.
+
+        A request-level record, or an agent's pseudonym on one of its work items: a flow that
+        collected nothing still names who took the work.
+        """
+        pseudonym = (
+            select(WorkItemRow.id)
+            .where(
+                WorkItemRow.request_id == ServiceRequestRow.id,
+                WorkItemRow.assigned_to.is_not(None),
+            )
+            .exists()
+        )
+        found = await self._session.scalars(
+            select(ServiceRequestRow)
+            .where(
+                ServiceRequestRow.booking_id.is_(None),
+                or_(
+                    ServiceRequestRow.personal_data == PersonalDataState.PRESENT.value,
+                    pseudonym,
+                ),
+            )
+            .order_by(ServiceRequestRow.id)
+        )
+        return [request_of(row) for row in found]
+
     async def get_active_work_item(self, request_id: int) -> WorkItem | None:
         """Return the request's one active work item, or ``None``."""
         row = await self._session.scalar(
@@ -200,11 +284,15 @@ class ServiceRequestQueries:
         return item_of(row)
 
     async def update_service_request(self, request: ServiceRequest, seen: HandlingState) -> bool:
-        """Write handling and ``resolved_at`` if the stored handling is still ``seen``."""
+        """Write handling, ``resolved_at`` and ``watchdog_at`` if the handling is still ``seen``."""
         result = await self._session.execute(
             update(ServiceRequestRow)
             .where(ServiceRequestRow.id == request.id, ServiceRequestRow.handling == seen.value)
-            .values(handling=request.handling.value, resolved_at=request.resolved_at)
+            .values(
+                handling=request.handling.value,
+                resolved_at=request.resolved_at,
+                watchdog_at=request.watchdog_at,
+            )
         )
         return bool(getattr(result, "rowcount", 0))
 
@@ -233,18 +321,23 @@ class ServiceRequestQueries:
         )
 
     async def delete_request_personal_data(self, request_id: int, now: datetime) -> bool:
-        """Delete the record's row, mark the request ``deleted`` and empty the pseudonyms."""
+        """Empty the pseudonyms; delete the record's row and mark the request ``deleted``.
+
+        Returns whether anything was removed (a record or a pseudonym): idempotent.
+        """
+        agents = await self._session.execute(
+            update(WorkItemRow)
+            .where(WorkItemRow.request_id == request_id, WorkItemRow.assigned_to.is_not(None))
+            .values(assigned_to=None)
+        )
         result = await self._session.execute(
             delete(RequestPersonalDataRow).where(RequestPersonalDataRow.request_id == request_id)
         )
-        if not getattr(result, "rowcount", 0):
-            return False
-        await self._session.execute(
-            update(ServiceRequestRow)
-            .where(ServiceRequestRow.id == request_id)
-            .values(personal_data=PersonalDataState.DELETED.value, data_deleted_at=now)
-        )
-        await self._session.execute(
-            update(WorkItemRow).where(WorkItemRow.request_id == request_id).values(assigned_to=None)
-        )
-        return True
+        if getattr(result, "rowcount", 0):
+            await self._session.execute(
+                update(ServiceRequestRow)
+                .where(ServiceRequestRow.id == request_id)
+                .values(personal_data=PersonalDataState.DELETED.value, data_deleted_at=now)
+            )
+            return True
+        return bool(getattr(agents, "rowcount", 0))

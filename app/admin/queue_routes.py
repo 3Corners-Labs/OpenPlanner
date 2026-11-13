@@ -16,6 +16,12 @@ region.
     GET  /admin/groups/{slug}/queue/{booking_id}            queue.work  (claimer only)
     GET  /admin/groups/{slug}/queue/{booking_id}/live       queue.work  (fragment, claimer only)
     POST /admin/groups/{slug}/queue/{booking_id}/release    queue.work  (claimer, group admin)
+    POST /admin/groups/{slug}/queue/{booking_id}/start      queue.work  (claimer; request work)
+    POST /admin/groups/{slug}/queue/{booking_id}/complete   queue.work  (claimer; a group admin
+                                                                         for work in recovery)
+
+Request work (ADR 0121 step 5): a booking of a flow without video on a counted pool has no
+meeting; its page offers *Start* and then *Complete* instead of the meeting link.
 """
 
 from collections.abc import Awaitable
@@ -37,7 +43,9 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.fallback import FallbackService
 from app.domain.own_queue import ParticipantState, VideoState
 from app.domain.queue_service import ClaimedBooking, QueueRow, QueueService, QueueView
+from app.domain.request_work import Work
 from app.domain.routing import GroupRouting
+from app.domain.service_requests import HandlingState, WorkItemState
 from app.i18n import BoundGettext
 from app.i18n.dates import format_clock
 from app.web.errors import ERROR_KEYS
@@ -63,6 +71,10 @@ SHOWN_ON_THE_LIST = frozenset(
         ErrorCode.NOT_CLAIMED,
         ErrorCode.BOOKING_NOT_ACTIVE,
         ErrorCode.NOT_ELIGIBLE,
+        ErrorCode.LEASE_EXPIRED,
+        ErrorCode.START_REFUSED,
+        ErrorCode.REQUEST_IN_PROGRESS,
+        ErrorCode.REQUEST_NOT_STARTED,
     }
 )
 """Refusals that are answered with the list and a message, not an error page."""
@@ -120,6 +132,18 @@ class ListView:
 
 
 @dataclass(frozen=True)
+class WorkView:
+    """Request work on the claimed page: where it stands and what may be done (ADR 0121 step 5)."""
+
+    state: str
+    sentence: str
+    can_start: bool
+    can_complete: bool
+    conflict: bool
+    recovery: bool
+
+
+@dataclass(frozen=True)
 class ClaimedView:
     """The claimed booking's status fragment: participant state, video state, poll key."""
 
@@ -130,6 +154,7 @@ class ClaimedView:
     video: str | None
     key: str
     polling: bool
+    work: WorkView | None = None
 
 
 def _service(request: Request) -> QueueService:
@@ -181,7 +206,7 @@ def _row(
         can_claim=view.free_pick and not row.claimed and row.eligible,
         can_release=row.claimed
         and ((view.can_release_any and not row.mine) or (row.mine and not row.eligible)),
-        video=locale.gettext(video_key) if video_key else None,
+        video=locale.gettext(video_key) if video_key and not row.without_video else None,
         video_tone=video_tone,
         routing=routing_summary(routing, row.routing, locale.gettext, locale.code),
         fallback=row.fallback,
@@ -283,8 +308,47 @@ async def _claimed(
     return RedirectResponse(f"{_url(slug)}/{claimed.booking_id}", status_code=303)
 
 
+def _work_view(work: Work, locale: RequestLocale, tz: tzinfo) -> WorkView:
+    """Write request work out: a sentence for its state, and the one action it allows."""
+    _ = locale.gettext
+    item = work.item
+    handling = work.request.handling
+    if item is not None and item.state is WorkItemState.ASSIGNED and item.lease_until:
+        moment = format_clock(item.lease_until, tz, locale.code)
+        sentence = _("admin.queue.work.assigned", time=moment)
+    elif item is not None and item.started_at and handling is HandlingState.IN_PROGRESS:
+        sentence = _(
+            "admin.queue.work.in_progress", time=format_clock(item.started_at, tz, locale.code)
+        )
+    elif handling is HandlingState.RECOVERY_REQUIRED:
+        sentence = _("admin.queue.work.recovery")
+    else:
+        sentence = ""
+    started = item is not None and item.started
+    return WorkView(
+        state=handling.value,
+        sentence=sentence,
+        can_start=item is not None and item.state is WorkItemState.ASSIGNED,
+        can_complete=started and item is not None and item.active,
+        conflict=item is not None and item.start_conflict,
+        recovery=handling is HandlingState.RECOVERY_REQUIRED,
+    )
+
+
 def _claimed_view(booking: ClaimedBooking, locale: RequestLocale, tz: tzinfo) -> ClaimedView:
     """Write the claimed booking out; polling stops once nothing can change any more."""
+    if booking.work is not None:
+        work = _work_view(booking.work, locale, tz)
+        return ClaimedView(
+            booking=booking,
+            time=format_clock(booking.start, tz, locale.code),
+            participant="",
+            participant_tone="",
+            video=None,
+            key=key(work.state, work.can_start, work.can_complete),
+            polling=True,
+            work=work,
+        )
     participant_key, participant_tone = PARTICIPANT_LABELS[booking.participant]
     video_key, _tone = VIDEO_LABELS[booking.video]
     return ClaimedView(
@@ -446,3 +510,27 @@ async def release(
             raise
         return await _list(request, locale, context, slug, error.code)
     return redirect_done(_url(slug), "released")
+
+
+@router.post("/groups/{slug}/queue/{booking_id}/start", response_class=HTMLResponse)
+async def start(
+    request: Request, locale: Locale, slug: str, booking_id: int, _: SameOrigin, context: WorkQueue
+) -> Response:
+    """Start the treatment of claimed request work (ADR 0121 step 5)."""
+    attempt = _service(request).start(context.principal, slug, booking_id)
+    return await _claimed(request, locale, context, slug, attempt)
+
+
+@router.post("/groups/{slug}/queue/{booking_id}/complete", response_class=HTMLResponse)
+async def complete(
+    request: Request, locale: Locale, slug: str, booking_id: int, _: SameOrigin, context: WorkQueue
+) -> Response:
+    """Complete request work: its unit of the pool is released (ADR 0121 step 5)."""
+    try:
+        await _service(request).complete(context.principal, slug, booking_id)
+    except DomainError as error:
+        raise_refusal(error)
+        if error.code not in SHOWN_ON_THE_LIST:
+            raise
+        return await _list(request, locale, context, slug, error.code)
+    return redirect_done(_url(slug), "completed")

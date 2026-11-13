@@ -10,6 +10,11 @@ purges directly instead of planning another job:
                          still the same booking state? ─► purge ─► drop its pending jobs
                     ─► system event ``retention.sweep`` (counts only)
 
+The request-level records of requests without an appointment (ADR 0121 decision D1) are swept
+the same way: one past ``data_deletion_at`` plus the grace is deleted and counted with the
+bookings (overdue, purged, backlog), so the alert covers both. The watchdog round deletes them on
+time; the sweep is the net under it.
+
 It is idempotent: a purged booking is no candidate any more. A booking under an open-ended
 closure is purged at the maximum after its original slot (``closure_max_retention_days``,
 ADR 0102), the same moment the job plan and the overview use. Before that moment the sweep tells
@@ -28,15 +33,18 @@ from app.domain.closure_retention import (
     default_closure_retention,
     is_capped,
 )
-from app.domain.job_plan import JobType
+from app.domain.job_plan import PURGE_AFTER, JobType
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.retention import (
+    BACKLOG_AGE,
+    PURGE_GRACE,
     DueBooking,
     candidates_before,
     is_backlog,
     is_overdue,
     purge_moment,
 )
+from app.domain.service_requests import ServiceRequest, data_deletion_at
 from app.domain.system_log import SystemLog
 
 _PURGED = "purged"
@@ -135,7 +143,7 @@ class RetentionSweep:
         self._announced: set[tuple[int, int, date]] = set()
 
     async def run(self, *, dry_run: bool = False) -> SweepResult:
-        """Purge every overdue booking; with ``dry_run`` only count them per group."""
+        """Purge every overdue booking and record; with ``dry_run`` only count them per group."""
         now = self._clock.now()
         async with self._uow.read() as tx:
             found = await tx.due_for_purge(candidates_before(now))
@@ -144,26 +152,29 @@ class RetentionSweep:
                 for d in found
                 if is_overdue(d.candidate, now, self._retention_of(d.candidate.organisation_id))
             ]
+            records = [r for r in await tx.requests_holding_data() if _record_overdue(r, now)]
             per_group: dict[str, int] = {}
-            for due in overdue:
-                group = await tx.get_group_by_id(due.candidate.group_id)
+            for group_id in [d.candidate.group_id for d in overdue] + [r.group_id for r in records]:
+                group = await tx.get_group_by_id(group_id)
                 slug = group.slug if group is not None else "unknown"
                 per_group[slug] = per_group.get(slug, 0) + 1
         backlog = sum(
             1
             for d in overdue
             if is_backlog(d.candidate, now, self._retention_of(d.candidate.organisation_id))
-        )
+        ) + sum(1 for r in records if _record_backlog(r, now))
+        total = len(overdue) + len(records)
         if dry_run:
-            return SweepResult(len(overdue), 0, 0, backlog, per_group)
+            return SweepResult(total, 0, 0, backlog, per_group)
         notices = await self._announce(closure_notices(found, now, self._retention_of))
-        if not overdue:
+        if not total:
             return SweepResult(0, 0, 0, backlog, per_group, notices)
         outcomes = [await self._purge(due) for due in overdue]
+        outcomes += [await self._delete_record(r.id or 0) for r in records]
         purged = outcomes.count(_PURGED)
         errors = sorted({o for o in outcomes if o not in (_PURGED, _CHANGED)})
         failed = sum(1 for o in outcomes if o in errors)
-        result = SweepResult(len(overdue), purged, failed, backlog, per_group, notices)
+        result = SweepResult(total, purged, failed, backlog, per_group, notices)
         await self._events.record(
             SWEPT,
             Outcome.FAILURE if failed else Outcome.SUCCESS,
@@ -225,3 +236,24 @@ class RetentionSweep:
         except Exception as exc:  # one booking must not stop the others; the event reports it
             return type(exc).__name__
         return _PURGED
+
+    async def _delete_record(self, request_id: int) -> str:
+        """Delete one overdue request-level record; ``_CHANGED`` when it went meanwhile."""
+        try:
+            async with self._uow.locked() as tx:
+                deleted = await tx.delete_request_personal_data(request_id, self._clock.now())
+        except Exception as exc:  # one record must not stop the others; the event reports it
+            return type(exc).__name__
+        return _PURGED if deleted else _CHANGED
+
+
+def _record_overdue(request: ServiceRequest, now: datetime) -> bool:
+    """Return whether a request-level record is past its deletion moment and the grace."""
+    moment = data_deletion_at(request)
+    return moment is not None and moment + PURGE_GRACE < now
+
+
+def _record_backlog(request: ServiceRequest, now: datetime) -> bool:
+    """Return whether a record held data ``BACKLOG_AGE`` after its retention began."""
+    moment = data_deletion_at(request)
+    return moment is not None and moment + (BACKLOG_AGE - PURGE_AFTER) < now

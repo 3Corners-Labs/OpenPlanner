@@ -9,11 +9,11 @@ A published flow is changed by a *draft* revision next to its current one (``Ser
 publishing the draft makes it the current revision and the old one stays for the bookings made
 under it.
 
-Until ADR 0121 steps 5 and 6 are built, the checklist refuses every value of a non-legacy
-revision that is outside the ``BUILT_*`` constants below (reason ``not_built_yet``), and
-every non-legacy revision while ``RETENTION_BUILT`` is false, and then while the rollback gate
-``ROLLBACK_SAFE`` is shut (reason ``rollback_not_safe``, ADR 0122), so no new flow can be
-activated.
+Until ADR 0121 step 6 is built, the checklist refuses every value of a non-legacy revision
+that is outside the ``BUILT_*`` constants below (reason ``not_built_yet``). The watchdog and the
+deletion exist since step 5b (``RETENTION_BUILT``); every non-legacy revision is still refused
+by its own point while the rollback gate ``ROLLBACK_SAFE`` is shut (reason
+``rollback_not_safe``, ADR 0122), so no new flow can be activated.
 """
 
 from collections.abc import Collection, Iterable, Mapping, Sequence
@@ -95,8 +95,9 @@ BUILT_ACTIONS: frozenset[HandlingAction] = frozenset(
     {HandlingAction.OPEN_VIDEO, HandlingAction.VIEW_REQUEST, HandlingAction.CALL}
 )
 """Handling actions a new flow may use; assigning a workstation needs locations, not built."""
-RETENTION_BUILT = False
-"""Whether the watchdog and deletion of ADR 0121 point 7 exist; step 5 sets it true.
+RETENTION_BUILT = True
+"""Whether the watchdog and deletion of ADR 0121 point 7 exist: true since step 5b (the round
+``app.domain.request_watch``, the deletion of the request-level record).
 
 Each later step of ADR 0121 widens exactly these five constants and nothing else here. A
 legacy revision skips all five tests.
@@ -419,7 +420,7 @@ def check_combination(kind: InteractionKind | None, action: HandlingAction | Non
 
 
 class ReadinessCheck(StrEnum):
-    """The six checks of the readiness checklist, in display order."""
+    """The seven checks of the readiness checklist, in display order."""
 
     DATA = "data"
     CAPACITY = "capacity"
@@ -427,6 +428,9 @@ class ReadinessCheck(StrEnum):
     DISPATCH = "dispatch"
     COMPLETION = "completion"
     RETENTION = "retention"
+    ROLLBACK = "rollback"
+    """Whether the previous supported version can account for what the flow writes (ADR 0122
+    decision 12); its own point since ADR 0121 step 5b."""
 
 
 class ReadinessReason(StrEnum):
@@ -626,18 +630,23 @@ def _completion_reason(revision: FlowRevision) -> ReadinessReason | None:
 def _retention_reason(revision: FlowRevision) -> ReadinessReason | None:
     """Return why the retention check fails, if it does.
 
-    The last point of the checklist covers what happens to a flow's records after the work:
-    their closing and deletion (``RETENTION_BUILT``) and whether the previous version could still
-    account for them after a rollback (``ROLLBACK_SAFE``, ADR 0121 point 9, ADR 0122 decision 12).
-    Both are read when called.
+    It covers what happens to a flow's records after the work: their closing and deletion
+    (``RETENTION_BUILT``, ADR 0121 point 7), read when called.
     """
-    if revision.legacy:
+    if revision.legacy or RETENTION_BUILT:
         return None
-    if not RETENTION_BUILT:
-        return ReadinessReason.NOT_BUILT_YET
-    if not ROLLBACK_SAFE:
-        return ReadinessReason.ROLLBACK_NOT_SAFE
-    return None
+    return ReadinessReason.NOT_BUILT_YET
+
+
+def _rollback_reason(revision: FlowRevision) -> ReadinessReason | None:
+    """Return why the rollback check fails, if it does.
+
+    Whether the previous supported version could still account for the flow's records after a
+    rollback (``ROLLBACK_SAFE``, ADR 0121 point 9, ADR 0122 decision 12), read when called.
+    """
+    if revision.legacy or ROLLBACK_SAFE:
+        return None
+    return ReadinessReason.ROLLBACK_NOT_SAFE
 
 
 def readiness(
@@ -648,7 +657,7 @@ def readiness(
     coded_skills: Collection[int] = (),
     carrier: ContactCenterCapabilities | None = None,
 ) -> tuple[ReadinessItem, ...]:
-    """Return the six checklist items, in order, for activating ``revision``.
+    """Return the seven checklist items, in order, for activating ``revision``.
 
     ``pool`` is the revision's capacity pool, ``offered_subjects`` the codes of the group's
     subjects, ``coded_skills`` the ids of the organisation's skills that have a contact-center
@@ -667,6 +676,7 @@ def readiness(
         _item(ReadinessCheck.DISPATCH, _dispatch_reason(revision, carrier)),
         _item(ReadinessCheck.COMPLETION, _completion_reason(revision)),
         _item(ReadinessCheck.RETENTION, _retention_reason(revision)),
+        _item(ReadinessCheck.ROLLBACK, _rollback_reason(revision)),
     )
 
 

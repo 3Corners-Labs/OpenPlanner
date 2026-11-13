@@ -93,7 +93,7 @@ from app.jobs.runner import JobRunner
 from app.jobs.usage import backfill_usage, close_slots, roll_up_usage
 from app.keys import management_token_key, management_token_key_previous
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
-from app.service_wiring import booking_service, planner_service
+from app.service_wiring import booking_service, planner_service, request_watch
 from app.web.alert_text import alert_composer
 from app.web.digest_text import compose_digest
 from app.web.fallback_text import SpaceTexts
@@ -316,6 +316,7 @@ async def run_worker(
         ).run,
         prune_requests,
         planner.run_automatic,
+        request_watch(uow, clock, live).run,
     )
     # ADR 0117: usage facts into the hourly table, and the retention of both.
     usage = UsageRollup(

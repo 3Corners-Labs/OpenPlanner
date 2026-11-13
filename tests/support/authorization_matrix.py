@@ -1510,6 +1510,13 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/groups/{slug}/queue/{booking_id}/release": {
         "/admin/groups/demo/queue/999999/release": statuses(404, 404, 404, 403, 403, 404, 403),
     },
+    # ADR 0121 step 5b: start and complete request work, queue.work like the claim.
+    "POST /admin/groups/{slug}/queue/{booking_id}/start": {
+        "/admin/groups/demo/queue/999999/start": statuses(404, 404, 404, 403, 403, 404, 403),
+    },
+    "POST /admin/groups/{slug}/queue/{booking_id}/complete": {
+        "/admin/groups/demo/queue/999999/complete": statuses(404, 404, 404, 403, 403, 404, 403),
+    },
     # A group's own contact block (*Messages › Contact*, ADR 0047 step 4): closure.manage,
     # like the rest of its closure page; the old path redirects with the same permission.
     "GET /admin/groups/{slug}/contact": {

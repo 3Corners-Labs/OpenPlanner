@@ -402,11 +402,11 @@ def test_a_time_without_an_offset_is_not_a_publication_time() -> None:
 
 def test_a_document_cannot_bring_a_flow_live_that_the_readiness_checklist_refuses() -> None:
     data = document_json()
-    advies(data)["state"] = "active"  # a telephone flow on the own queue is built, retention is not
+    advies(data)["state"] = "active"  # a telephone flow on the own queue is built, the gate is shut
 
     result = plan(data, empty_flows())
 
-    assert (FLOW, ErrorCode.INVALID_CONFIGURATION, "readiness_retention") in refusals(result)
+    assert (FLOW, ErrorCode.INVALID_CONFIGURATION, "readiness_rollback") in refusals(result)
 
 
 def test_a_flow_may_only_change_state_as_the_lifecycle_allows() -> None:
