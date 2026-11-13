@@ -161,8 +161,8 @@ def _json_object(body: bytes) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
-async def _inspect[W: InboundWebhook](
-    request: Request, address: Address[W]
+async def _inspect(
+    request: Request, address: Address[InboundWebhook]
 ) -> Refusal | tuple[dict[str, Any], datetime]:
     """Run the checks of an address that exists, up to the shape; no limit is counted here.
 
@@ -185,12 +185,13 @@ async def _inspect[W: InboundWebhook](
     return payload, now
 
 
-_GATES: list[object] = []
+GATE_MARKER = "is_webhook_gate"
+"""The attribute ``webhook_gate`` sets on the dependency it returns; the route sweep reads it."""
 
 
 def is_webhook_gate(call: object) -> bool:
     """Return whether ``call`` was made by ``webhook_gate``: what the route sweep looks for."""
-    return any(call is gate for gate in _GATES)
+    return getattr(call, GATE_MARKER, False) is True
 
 
 def webhook_gate[W: InboundWebhook](
@@ -227,7 +228,7 @@ def webhook_gate[W: InboundWebhook](
         payload, now = inspected
         return Delivery(address, payload, now)
 
-    _GATES.append(gate)
+    setattr(gate, GATE_MARKER, True)
     return gate
 
 

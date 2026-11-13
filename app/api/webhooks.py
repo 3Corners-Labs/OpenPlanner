@@ -1,9 +1,10 @@
 """Inbound webhooks from Webex and the contact-center platforms (ADR 0010, 0017, 0018, 0032).
 
 Authenticated by signature, not by an admin session. Every route here is a declaration: it
-depends on a ``WebhookGate`` (``app.web.webhook_gate``, ADR 0124) that checks the address, the
-rate, the content type, the size, the signature and the time, and hands the route a verified
-``Delivery``; a route verifies nothing itself, and a test fails for one without the gate. The
+depends on a gate made by ``webhook_gate(resolver)`` (``app.web.webhook_gate``, ADR 0124) that
+checks the address, the content type, the size, the signature, the time and the limits, and hands
+the route a verified ``Delivery``; a route verifies nothing itself, and a test fails for one
+without a gate. The
 secret is configured per installation (``WEBEX_WEBHOOK_SECRET``, ``WXCC_WEBHOOK_SECRET``) or per
 organisation's connection; without it the endpoint does not exist (404). A contact-center
 platform's check and parsing come from its adapter (``contact_centers.INBOUND``); a kind without

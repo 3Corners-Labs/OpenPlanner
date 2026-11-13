@@ -5,9 +5,10 @@ from collections.abc import Iterator
 import pytest
 from fastapi import APIRouter
 from fastapi.routing import APIRoute
+from starlette.routing import Mount
 
 from app.admin.audit_routes import ACTION_REASON_LABELS
-from app.config import Settings
+from app.config import AGENT_API_PREFIX, Settings
 from app.domain.inbound_gate import Refusal
 from app.domain.security_log import INVALID_SIGNATURE, WEBHOOK_REJECTED
 from app.i18n.po import load_catalogues
@@ -88,10 +89,21 @@ def test_the_limits_come_from_the_settings_in_one_place(settings: Settings) -> N
     assert limits.reports == f"{changed.reporting_api_rate_per_minute}/minute"
 
 
+MOUNTS_TODAY = {"/static", AGENT_API_PREFIX}
+"""The sub-applications the application mounts today: the static files and, when switched on,
+the machine API. Their routes are not seen as ``APIRoute``s of the application, so the sweep
+cannot look inside them; a new mount must be named here on purpose."""
+
+
+def _webhook_path(path: str) -> bool:
+    return path == "/webhooks" or path.startswith("/webhooks/")
+
+
 def test_every_webhook_route_goes_through_the_gate(settings: Settings) -> None:
-    """ADR 0124 point 1: a ``/webhooks/`` route without the gate fails here, like an admin route
+    """ADR 0124 point 1: a ``/webhooks`` route without the gate fails here, like an admin route
     without a permission fails the authorisation sweep."""
-    routes = [r for r in all_routes(create_app(settings).routes) if r.path.startswith("/webhooks/")]
+    app = create_app(settings)
+    routes = [r for r in all_routes(app.routes) if _webhook_path(r.path)]
 
     assert {r.path for r in routes} == {
         "/webhooks/webex",
@@ -103,6 +115,20 @@ def test_every_webhook_route_goes_through_the_gate(settings: Settings) -> None:
         gates = [call for call in dependency_calls(route) if is_webhook_gate(call)]
         assert len(gates) == 1, route.path
         assert route.methods == {"POST"}, route.path
+
+
+def test_no_webhook_route_can_hide_in_a_mount(settings: Settings) -> None:
+    """The sweep sees ``APIRoute``s only: a mounted sub-application would hide its routes."""
+    mounts = {r.path for r in create_app(settings).routes if isinstance(r, Mount)}
+
+    assert mounts <= MOUNTS_TODAY, f"a new mount hides its routes from the sweep: {mounts}"
+    assert not any(_webhook_path(path) for path in mounts)
+
+
+def test_the_sweep_catches_a_route_at_exactly_webhooks() -> None:
+    assert _webhook_path("/webhooks")
+    assert _webhook_path("/webhooks/x")
+    assert not _webhook_path("/webhooks-other")
 
 
 def test_the_sweep_sees_a_route_without_the_gate() -> None:

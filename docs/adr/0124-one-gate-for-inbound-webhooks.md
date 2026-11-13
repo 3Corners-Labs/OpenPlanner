@@ -60,7 +60,9 @@ installation with several organisations.
    limits (point 5); otherwise 429. (i) The event was not seen before (point 7); otherwise 204,
    counted as a duplicate. (j) The event is about something this organisation's connection
    created; otherwise 204, counted as unknown (point 12). Every refusal answers with an empty
-   body. The limits come after the signature on purpose: see point 5.
+   body. The limits come after the signature on purpose: see point 5. Step 1 builds (a),
+   (c) to (h) and the replay check as it was; (b), the replay per organisation of (i) and
+   the count of (j) come with their steps (*Build status*).
 3. **Source networks.** A connection carries a list of allowed networks (IPv4 and IPv6, at most
    32, written as CIDR), edited by the organisation's administrator next to the connection's
    other fields. The installation has a default list per platform, set by the superuser; a
@@ -103,9 +105,11 @@ installation with several organisations.
      get 429 instead of 404. It never refuses a call to an address that exists.
    All three go through the common limiter and its settings; a refusal is 429 with
    `Retry-After` and no page. A bucket key uses the caller's address as the server derived it;
-   from step 2 an IPv6 caller counts by its /64, in the one helper every limiter uses. The
-   refusals of the two stranger-fed buckets leave an event that is held back when repeated,
-   and no log line per call.
+   from step 2 an IPv6 caller counts by its /64, in the one helper every limiter uses. A
+   refusal that a full bucket turns into 429, and a refusal for an address that does not exist,
+   leave an event that is held back when repeated and no log line per call; a refused call that
+   still had room is logged with its reason as before, and its bucket is the ceiling of those
+   lines.
 6. **The size limit holds before and while reading.** 64 KiB stays the limit, as a constant: a
    real event is a few kilobytes. The bundled proxy applies the same limit to `/webhooks/*`.
 7. **Replays, per organisation.** The remembered key includes the platform and the
