@@ -126,6 +126,22 @@ async def test_valid_tokens_and_other_addresses_are_unaffected(demo_settings: Se
     assert elsewhere.status_code == 404
 
 
+async def test_an_ipv6_caller_rotating_addresses_in_its_64_keeps_one_bucket(
+    demo_settings: Settings,
+) -> None:
+    """Abuse case (ADR 0124 step 2a): a /64 gives many addresses, not many buckets."""
+    async with limited_site(demo_settings) as site:
+        statuses = []
+        for n in range(1, BOUND + 2):
+            async with site.client(f"2001:db8:1:2::{n:x}") as client:
+                statuses.append((await hit(client, "GET", f"/b/guess{n}")).status_code)
+        async with site.client("2001:db8:1:3::1") as elsewhere:
+            other_64 = (await hit(elsewhere, "GET", "/b/guess0")).status_code
+
+    assert statuses == [404] * BOUND + [429]
+    assert other_64 == 404
+
+
 async def test_the_off_switch_turns_the_bound_off(demo_settings: Settings) -> None:
     async with limited_site(demo_settings, enabled=False) as site, site.client() as client:
         statuses = [(await hit(client, "GET", f"/b/guess{n}")).status_code for n in range(8)]

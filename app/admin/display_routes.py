@@ -21,6 +21,7 @@ from app.admin.pages import Locale, templates
 from app.admin.wallboard_routes import board_context, wallboard_service
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.wallboard_link import Refusal, WallboardLink
+from app.web.caller import client_address
 from app.web.cookies import CookieSpec, cookie_for, set_cookie
 from app.web.protection import limiter, unknown_link_limit
 from app.web.security_policy import PageKind
@@ -50,14 +51,6 @@ def display_cookie(request: Request) -> CookieSpec:
     return cookie_for(request.app.state.settings.public_base_url, COOKIE_BASE, PLAIN_PATH)
 
 
-def client_address(request: Request) -> str:
-    """Return the client address as the trusted proxy chain resolved it (ADR 0086).
-
-    The same value the rate limiter keys on; never a raw ``X-Forwarded-For`` header.
-    """
-    return request.client.host if request.client else ""
-
-
 def _refused(request: Request, locale: Locale, error: DomainError) -> HTMLResponse:
     """Return the plain page of a refused request, 403, with the words for its code."""
     message = MESSAGES.get(error.field or "", MESSAGES[Refusal.LINK.value])
@@ -79,7 +72,7 @@ async def _session(request: Request) -> WallboardLink:
     secret = request.cookies.get(display_cookie(request).name, "")
     if not secret or len(secret) > 128:
         raise DomainError(ErrorCode.NOT_PERMITTED, Refusal.LINK.value)
-    return await link_service(request).session(secret, client_address(request))
+    return await link_service(request).session(secret, client_address(request) or "")
 
 
 @router.get("/start/{token}", response_model=None)
@@ -89,7 +82,7 @@ async def start(request: Request, locale: Locale, token: str) -> Response:
     if len(token) > 128:
         return _refused(request, locale, DomainError(ErrorCode.NOT_PERMITTED, Refusal.LINK.value))
     try:
-        opened = await link_service(request).exchange(token, client_address(request))
+        opened = await link_service(request).exchange(token, client_address(request) or "")
     except DomainError as error:
         if error.code is not ErrorCode.NOT_PERMITTED:
             raise

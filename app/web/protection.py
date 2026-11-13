@@ -6,9 +6,11 @@ Forms carry no CSRF token. The primary signal is Fetch Metadata: browsers send
 audited download, is refused (``RejectedRequest``) and becomes a security event (ADR 0053); an
 audited download that the browser loads in advance (prefetch, prerender) is refused without one.
 
-Rate limits use slowapi, keyed by client IP (behind a proxy, uvicorn's ``--proxy-headers``
-supplies the real address). slowapi buckets per request path, so links that match no booking
-get a bound of their own, one bucket per address whatever the path (``count_unknown_link``).
+Rate limits use slowapi, keyed by caller (``caller_of``): the client IP as uvicorn derived it
+(behind a proxy, ``--proxy-headers`` supplies the real address), an IPv6 caller by its /64 so
+that rotating addresses within it never gives a fresh bucket (ADR 0124 step 2a). slowapi
+buckets per request path, so links that match no booking get a bound of their own, one bucket
+per address whatever the path (``count_unknown_link``).
 """
 
 from dataclasses import dataclass, fields
@@ -18,10 +20,10 @@ import structlog
 from fastapi import Request
 from limits import parse
 from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 from app.config import Settings
 from app.domain.security_log import CROSS_SITE, ORIGIN_MISMATCH
+from app.web.caller import caller_of
 from app.web.route_dependencies import dependency_calls
 
 log = structlog.get_logger()
@@ -157,7 +159,7 @@ class RateLimits:
 
 
 LIMITS = RateLimits()
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=caller_of)
 
 
 def _adopt(limits: RateLimits) -> None:
@@ -212,7 +214,7 @@ def count_unknown_link(request: Request) -> bool:
     if not limiter.enabled:
         return False
     item = parse(unknown_link_limit())
-    return not limiter.limiter.hit(item, "unknown-management-link", get_remote_address(request))
+    return not limiter.limiter.hit(item, "unknown-management-link", caller_of(request))
 
 
 def asset_limit() -> str:
