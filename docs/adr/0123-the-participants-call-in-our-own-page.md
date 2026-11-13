@@ -357,14 +357,21 @@ What constrains the answer:
     on the channel in their profile, and their recent sessions were actually logged in to it. It
     extends the chain check that exists for work items, and, like it, never creates work a staff
     member sees.
-18. **Five conditions before a production group uses it.** Cisco's written answer on which
+18. **Six conditions before a production group uses it.** Cisco's written answer on which
     licence covers the published package and whether a page may leave the Webex name out; Cisco's
     answer on the licence and cost of guests; the DPIA updated for point 16. Until then
     `embedded_call_enabled` stays off on production installations (*Settings*). The licence
     exception for the package is recorded in `docs/dependencies.md` with that answer. Two more:
     the contact center's retention and deletion of conversation transcripts is known and in the
     DPIA before chat is switched on; and the manual accessibility pass of step 8 is done before
-    a service hides the supplier's app (point 11, open decision O8). The switch can be locked
+    a service hides the supplier's app (point 11, open decision O8). And a sixth (product owner,
+    2026-11-14): a guest's token can do more than join. On the lab tenant a guest wrote to an
+    account whose address it knew, and the message arrived
+    (`docs/research/call-page-on-the-meetings-sdk.md`, section 16); our server can neither
+    withdraw a token nor narrow what it may do. So before a production group uses the page,
+    either the supplier gives a way to deny messaging to these guests (a narrower token, or a
+    policy of the organisation) and the lab check shows it holds, or the organisation accepts
+    the risk in writing. The switch can be locked
     off from the environment like every platform setting (ADR 0042), and switching it on is an
     audited change.
 19. **Not in this decision.** The staff side: the staff member opens the meeting from the task as
@@ -415,8 +422,8 @@ the pseudonym key, which is the existing bootstrap key material, not a new secre
 | 2 | The call page as a kind of page: the closed kinds of page with `CALL_CSP` and the permissions for the one route, and the tests that no other page can get them; the route as a shell behind the feature switch; the vendored SDK's place without the file: manifest, size gate and checksum for a placed file, the test that it is not committed, the Renovate manager, the pins check, the SBOM component for a file that is shipped; the recorded exception in `no-third-parties.spec.ts`; `docs/dependencies.md` | #806 | merged |
 | 2b | The SDK file itself, after the supplier's written answer on its licence (point 3): the file with its checksum in the manifest, in the repository and the image; the weekly check that fails when the published package has an advisory for that version; the SBOM entry in the image | | planned |
 | 3 | Design: mock-ups of every state of point 10, the chat side bar included, in two organisations' themes, approved by the product owner (point 15) The set of sixteen states in `docs/mockups/call-page/`, approved on 2026-11-13 with three changes that the build makes (its `README.md`) | #830 | merged |
-| 4a | The way in, the server side: first, on the lab site, what a guest token can do, and the rename at the purge (points 6 and 7). Then the token endpoint `POST /b/m/{ref}/call/token` with its limits and its abuse cases, `embedded_call_token_per_booking_per_hour`, the mark on the booking that a guest was minted (migration 0117), the rename job `rename_guest` that the purge adds (under the current and the previous key), the data flow and the threat model with its abuse cases. It is dark behind `embedded_call_enabled` alone until step 6 gives a service its `join_client`; the rule "only for a service that uses the call page" is enforced there. The lab checks of points 6 and 7 ran on 2026-11-13 (`docs/research/call-page-on-the-meetings-sdk.md` section 16): the rename works; whether a guest can write to a staff member whose address it knows is not tried and is a named risk of this step, open in the threat model | #PENDING | merged |
-| 4b | The way in, the page: device check with camera, microphone and speaker test, connecting with retry, the lobby, the failure state with `embedded_call_webex_option`; behind `embedded_call_enabled`. The script tag carries the manifest's checksum as subresource integrity, and the page does not offer the call when the placed file's checksum is missing or differs from the manifest (the service-app check reports it); the policy of step 2 is run against the real file for the first time (no `wasm-unsafe-eval`, no blob worker, no further host). With it: the runbook entry for an SDK that stops working, and the open check of step 4a's named risk (a guest writing to a staff member), with an account whose owner agreed | | planned |
+| 4a | The way in, the server side: first, on the lab site, what a guest token can do, and the rename at the purge (points 6 and 7). Then the token endpoint `POST /b/m/{ref}/call/token` with its limits and its abuse cases, `embedded_call_token_per_booking_per_hour`, the mark on the booking that a guest was minted (migration 0117), the rename job `rename_guest` that the purge adds (under the current and the previous key), the data flow and the threat model with its abuse cases. It is dark behind `embedded_call_enabled` alone until step 6 gives a service its `join_client`; the rule "only for a service that uses the call page" is enforced there. The lab checks of points 6 and 7 ran on 2026-11-13 (`docs/research/call-page-on-the-meetings-sdk.md` section 16): the rename works; a guest can write to any account whose address it knows, which is a named risk of this step in the threat model and the sixth condition of point 18 | #PENDING | merged |
+| 4b | The way in, the page: device check with camera, microphone and speaker test, connecting with retry, the lobby, the failure state with `embedded_call_webex_option`; behind `embedded_call_enabled`. The script tag carries the manifest's checksum as subresource integrity, and the page does not offer the call when the placed file's checksum is missing or differs from the manifest (the service-app check reports it); the policy of step 2 is run against the real file for the first time (no `wasm-unsafe-eval`, no blob worker, no further host). With it: the runbook entry for an SDK that stops working | | planned |
 | 5 | In the call: the control bar, device change, sharing a screen both ways, the recording and connection notices, closed captions (point 12), the ended and failed states; the data flow and threat model for the call | | planned |
 | 6 | `join_client = embedded` on the service's settings form with the checks of point 17 (the group check's guest finding for a group that uses the call page), `call_client(service, flow)`, meetings without chat, the trial call on the same page, the configuration package, the manual topic. Here the rule "`conversation` only for a service that uses the call page" is enforced, replacing the platform switch `embedded_call_enabled` that step 7a uses to offer the choice and that alone keeps the token endpoint of step 4a dark until then | | planned |
 | 7a | Chat, the contract: the task kind `conversation` in the channel-independent task contract and in the Webex Contact Center adapter (create, append), its capability, `contact_center.task_kind` on the service's routing, fake and recorded fixture. In force only while the platform switch is on; a conversation is ended without the work item's cancellation mark | #827 | merged |
@@ -425,7 +432,7 @@ the pseudonym key, which is the existing bootstrap key material, not a new secre
 | 7d | The chain check of point 17 in the portal for the conversation task | | planned |
 | 8 | The end-to-end gates with the test double; the manual accessibility pass in `docs/a11y-audit.md` | | planned |
 | 9 | Phones: iOS Safari and Android Chrome verified on a host with a public certificate, then no longer sent to the redirect (point 11) | | planned |
-| 10 | `docs/architecture.md`; the five conditions of point 18 recorded | | planned |
+| 10 | `docs/architecture.md`; the six conditions of point 18 recorded | | planned |
 | 11 | The staff member's video inside the agent desktop (point 19): a decision of its own | | follow-up |
 | 12 | `join_client` and the task kind on the flow revision, with the first video flow of ADR 0121 | | planned |
 

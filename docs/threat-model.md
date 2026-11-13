@@ -944,10 +944,12 @@ at the video platform.** A guest token can create rooms and webhooks of its own,
 keeps it for hours: a participant who takes it from the page, which the page cannot prevent, holds
 it until it expires, and a new token does not withdraw an earlier one (lab tenant, 2026-11-13,
 `docs/research/call-page-on-the-meetings-sdk.md` section 16). It cannot look up people, list the
-organisation, create meetings or read recordings. Whether it can write to a staff member whose
-address it knows was not tried on the lab tenant (the test would send a message to a real
-account); it is open until it is tried with an account whose owner agreed, and the build table of
-ADR 0123 (step 4b) carries the check. What limits it today: the token is handed out only for a
+organisation, create meetings or read recordings. It **can write to any account whose address it
+knows**, staff included: on the lab tenant one message from a test guest to an account whose
+owner agreed was accepted and arrived (2026-11-14). Our server can neither withdraw a token nor
+narrow what it may do, so ADR 0123 point 18 makes it a condition before production: the supplier
+gives a way to deny messaging to these guests, shown to hold on the lab tenant, or the
+organisation accepts the risk in writing. What limits it today: the token is handed out only for a
 confirmed booking inside its join window, only to the participant's own session, at most the
 number of times of `embedded_call_token_per_booking_per_hour` an hour per booking and the common
 read limit per address, and nothing links it to a name but the participant's first name or the
