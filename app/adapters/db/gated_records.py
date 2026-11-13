@@ -46,9 +46,9 @@ from app.domain.booking import Booking, BookingKind, BookingStatus, Slot
 from app.domain.flow_resolution import FlowRef
 from app.domain.immediate_intake import new_access, new_intake_key
 from app.domain.ports import Transaction
+from app.domain.request_work import write_work
 from app.domain.scheduling import Group
 from app.domain.service_requests import (
-    HandlingState,
     RequestPersonalData,
     ServiceRequest,
     appointment_request,
@@ -56,6 +56,7 @@ from app.domain.service_requests import (
     on_demand_request,
     start,
 )
+from app.domain.settings_registry import lookup
 from app.domain.tokens import derive_token, hash_token, new_token_salt
 
 AT = time(10)
@@ -64,8 +65,20 @@ LENGTH = timedelta(minutes=30)
 """The in-person flow's length (``demonstration.FLOWS``)."""
 AGENT = "gated-records"
 """The pseudonymous agent of the started work; no staff member stands behind it."""
-UNRESOLVED_HOURS = 24
-"""The watchdog of the records: the default of ``request_unresolved_hours``."""
+
+
+def _default(key: str) -> int:
+    """Return the registry default of the class D setting ``key`` (no organisation chose one)."""
+    spec = lookup(key)
+    if spec is None or not isinstance(spec.default, int):  # pragma: no cover - registered
+        raise LookupError(key)
+    return spec.default
+
+
+UNRESOLVED_HOURS = _default("request_unresolved_hours")
+"""The watchdog of the records."""
+LEASE_MINUTES = _default("assignment_start_lease_minutes")
+"""The lease of the claim before the start."""
 
 
 @dataclass(frozen=True)
@@ -170,14 +183,13 @@ async def _started(
 ) -> int:
     """Claim and start the booking's request: work in treatment on a unit of the pool."""
     request = await _request(tx, group, ids, booking, now)
-    assigned, item = claim(request, None, now=now, agent=AGENT, lease_minutes=5)
-    await tx.update_service_request(assigned, HandlingState.QUEUED)
+    assigned, item = claim(request, None, now=now, agent=AGENT, lease_minutes=LEASE_MINUTES)
+    await write_work(tx, request, None, assigned, None)
     held = await tx.add_work_item(item)
     begun, working = start(
         assigned, held, now=now, pool_id=ids.shared_pool, planned_until=now + LENGTH, conflict=False
     )
-    await tx.update_work_item(working, held.state)
-    await tx.update_service_request(begun, assigned.handling)
+    await write_work(tx, assigned, held, begun, working)
     return request.id or 0
 
 
@@ -187,7 +199,7 @@ async def _attempt(
     """Open a contact-center attempt on the booking's request."""
     request = await _request(tx, group, ids, booking, now)
     assigned, item = attempts.open_attempt(request, None, now=now)
-    await tx.update_service_request(assigned, HandlingState.QUEUED)
+    await write_work(tx, request, None, assigned, None)
     await tx.add_work_item(item)
     return request.id or 0
 

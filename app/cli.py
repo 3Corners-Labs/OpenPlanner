@@ -271,6 +271,7 @@ async def _seed_closures(settings: Settings) -> tuple[str, bool]:
     finally:
         await engine.dispose()
     paths = dataclasses.asdict(examples) | dataclasses.asdict(flows)
+    paths["immediate_form"] = IMMEDIATE_FORM  # e2e/requests.ts (G06)
     return json.dumps(paths, indent=2) + "\n", True
 
 

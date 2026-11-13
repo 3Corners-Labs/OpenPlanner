@@ -18,17 +18,16 @@ import { writeFileSync } from 'node:fs';
 import { chromium, type Browser, type FullConfig } from '@playwright/test';
 
 import { loginAs } from './keycloak';
-import { REQUEST_COOKIE, SETUP_FILE, setUpNeeded, type SetUp } from './pages';
+import { fixture, REQUEST_COOKIE, SETUP_FILE, setUpNeeded, type SetUp } from './pages';
 
-/** The immediate form of the document review (app/adapters/db/demonstration_stack.py). */
-const IMMEDIATE_FORM = '/g/demo/direct?flow=documentcontrole&lang=nl';
 const QUEUE = '/admin/groups/demo/queue';
 
 /** Send the immediate form in a fresh context; return the request's path and the cookie value. */
 async function ask(browser: Browser, baseURL: string, firstName: string): Promise<{ path: string; cookie: string }> {
   const context = await browser.newContext({ baseURL, locale: 'nl-NL' });
   const page = await context.newPage();
-  await page.goto(IMMEDIATE_FORM);
+  // The immediate form of the document review, as seed-closures reports it (fixtures.json).
+  await page.goto(`${fixture('immediate_form')}&lang=nl`);
   await page.locator('input[name="first_name"]').fill(firstName);
   await page.locator('input[name="last_name"]').fill('Voorbeeld');
   await page.locator('input[name="email"]').fill(`${firstName.toLowerCase()}@voorbeeld.nl`);

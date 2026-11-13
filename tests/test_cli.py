@@ -440,6 +440,7 @@ async def test_seed_closures_prints_the_example_pages_as_json(migrated: Settings
     assert paths["closed_group"] == "/g/demo-gesloten"
     assert paths["planned_closure"] == "/g/demo-gepland/closure"
     assert paths["suspended_booking"].startswith("/b/")
+    assert paths["immediate_form"] == "/g/demo/direct?flow=documentcontrole"
     # The e2e stack runs only this command: it carries the demonstration of ADR 0121 too (G06).
     engine = create_engine(migrated.database_url)
     try:

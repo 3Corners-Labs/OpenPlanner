@@ -168,6 +168,7 @@ rollback() {
   cli seed-demo >/dev/null
   cli seed-gated-records >"$work/gated.json"
   day="$("${PY[@]}" -c 'import json,sys; print(json.load(open(sys.argv[1]))["day"])' "$work/gated.json")"
+  cli upgrade-check --save "$work/before.json" >/dev/null
   # One file: fold the write-ahead log in before the image's account opens it.
   "${PY[@]}" -c "import sqlite3,sys; sqlite3.connect(sys.argv[1]).execute('PRAGMA wal_checkpoint(TRUNCATE)')" "$work/$name"
   unset DATABASE_URL
@@ -190,11 +191,23 @@ rollback() {
     return 1
   fi
   echo "$image booked on /g/demo on $day next to the gated records"
-  # The invariants of the database the previous image left (compared with itself: its own
-  # booking adds a live booking, so a comparison with the state before would count it).
+  # No table lost a row (the gated records survived the previous image) and every invariant
+  # holds; the one finding expected is the live booking the previous image just made.
   export DATABASE_URL="sqlite+aiosqlite:///$work/$name"
-  cli upgrade-check --save "$work/after.json" --compare "$work/after.json"
+  local live expected report
+  live="$("${PY[@]}" -c 'import json,sys; print(json.load(open(sys.argv[1]))["live_with_data"])' "$work/before.json")"
+  expected="FAIL live bookings with personal data: $live before, $((live + 1)) after"
+  report="$(cli upgrade-check --compare "$work/before.json" || true)"
   unset DATABASE_URL
+  echo "$report"
+  if grep '^FAIL' <<<"$report" | grep -qvxF "$expected"; then
+    echo "::error::the database broke an invariant after $image ran on the gated records" >&2
+    return 1
+  fi
+  if ! grep -qxF "$expected" <<<"$report"; then
+    echo "::error::the booking $image made is not in the database" >&2
+    return 1
+  fi
 }
 
 budget() {
