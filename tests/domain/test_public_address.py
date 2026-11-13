@@ -128,6 +128,9 @@ def test_forwarded_headers_are_honoured_when_the_app_took_the_visitors_address()
         ("::1", PeerClass.LOOPBACK),
         ("172.18.0.1", PeerClass.PRIVATE),
         ("10.1.2.3", PeerClass.PRIVATE),
+        ("::ffff:127.0.0.1", PeerClass.LOOPBACK),  # written as IPv6, the same peer as its IPv4 form
+        ("::ffff:10.0.0.1", PeerClass.PRIVATE),
+        ("::ffff:8.8.8.8", PeerClass.PUBLIC),
         ("8.8.8.8", PeerClass.PUBLIC),
         ("not an address", PeerClass.PUBLIC),
         (None, PeerClass.PUBLIC),

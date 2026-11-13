@@ -39,6 +39,12 @@ def test_internet_addresses_are_public(address: str) -> None:
     assert is_public(address)
 
 
+@pytest.mark.parametrize("address", ["", "not an address", "10.0.0.0/8"])
+def test_garbage_is_not_an_answer_but_an_error(address: str) -> None:
+    with pytest.raises(ValueError, match="IP address"):
+        is_public(address)
+
+
 async def test_the_request_goes_to_the_checked_address_with_the_name_for_tls() -> None:
     seen: list[httpx.Request] = []
 
