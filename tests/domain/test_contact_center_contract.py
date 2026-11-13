@@ -76,8 +76,9 @@ def _reason(
 VIDEO = {"interaction_kind": InteractionKind.VIDEO, "handling_action": HandlingAction.OPEN_VIDEO}
 
 
-def test_webex_contact_center_declares_video_and_skills_only() -> None:
-    assert WEBEX == ContactCenterCapabilities(frozenset({InteractionKind.VIDEO}), skills=True)
+def test_webex_contact_center_declares_video_none_and_skills() -> None:
+    carried = frozenset({InteractionKind.VIDEO, InteractionKind.NONE})  # ``none`` since 6b
+    assert WEBEX == ContactCenterCapabilities(carried, skills=True)
 
 
 def test_a_descriptor_that_declares_nothing_carries_nothing() -> None:
@@ -90,7 +91,7 @@ def test_a_descriptor_that_declares_nothing_carries_nothing() -> None:
 
 def test_uncarried_names_the_interaction_first_then_the_skills() -> None:
     assert uncarried(WEBEX, InteractionKind.VIDEO, skills=True) is None
-    assert uncarried(WEBEX, InteractionKind.NONE, skills=True) == INTERACTION_KIND
+    assert uncarried(WEBEX, InteractionKind.TELEPHONE, skills=True) == INTERACTION_KIND
     assert uncarried(VIDEO_ONLY_NO_SKILLS, InteractionKind.VIDEO, skills=False) is None
     assert uncarried(VIDEO_ONLY_NO_SKILLS, InteractionKind.VIDEO, skills=True) == SKILL_CODES
 
@@ -108,7 +109,7 @@ def test_a_contact_center_flow_without_a_routing_is_not_ready() -> None:
 
 @pytest.mark.parametrize(
     "kind",
-    [InteractionKind.TELEPHONE, InteractionKind.IN_PERSON, InteractionKind.NONE],
+    [InteractionKind.TELEPHONE, InteractionKind.IN_PERSON],
 )
 def test_a_flow_whose_interaction_the_platform_cannot_carry_is_not_ready(
     kind: InteractionKind,
@@ -116,7 +117,6 @@ def test_a_flow_whose_interaction_the_platform_cannot_carry_is_not_ready(
     action = {
         InteractionKind.TELEPHONE: HandlingAction.CALL,
         InteractionKind.IN_PERSON: HandlingAction.VIEW_REQUEST,
-        InteractionKind.NONE: HandlingAction.VIEW_REQUEST,
     }[kind]
     reason = _reason(ReadinessCheck.DISPATCH, WEBEX, interaction_kind=kind, handling_action=action)
     assert reason is ReadinessReason.INTERACTION_NOT_CARRIED
@@ -165,7 +165,7 @@ def test_a_task_the_platform_cannot_carry_is_refused_before_it_is_built() -> Non
     booking = make_booking(meeting=MEETING)
 
     with pytest.raises(DomainError) as excinfo:
-        contact_center_task(booking, GROUP, start_label="x", interaction=InteractionKind.NONE)
+        contact_center_task(booking, GROUP, start_label="x", interaction=InteractionKind.TELEPHONE)
 
     assert (excinfo.value.code, excinfo.value.field) == (
         ErrorCode.INTEGRATION_NOT_READY,
@@ -206,9 +206,10 @@ def _contact_center_document(routing: object) -> dict[str, object]:
     third = advies(data)["revisions"][2]
     third.update(
         published_at=published(3),
-        interaction_kind="video",
-        handling_action="open_video",
+        interaction_kind="none",
+        handling_action="view_request",
         dispatch="contact_center",
+        completion="provider_event",
     )
     advies(data)["current_revision"], advies(data)["draft_revision"] = 3, None
     if routing is not None:

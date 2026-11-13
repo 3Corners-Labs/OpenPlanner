@@ -63,6 +63,8 @@ from app.domain.ports import (
     UnitOfWork,
     VideoProvider,
 )
+from app.domain.request_dispatch import RequestDispatch
+from app.domain.request_work import RequestWork
 from app.domain.system_log import EventRetention, SystemLog
 from app.domain.tunable import value_of
 from app.i18n import DEFAULT_LOCALE
@@ -147,6 +149,9 @@ class JobRunner:
             (``agent_change_requests_enabled``, ADR 0023 step 2): its messages show the
             appointment code, and a change request's message goes out only while it is on.
             ``None`` is off. The worker passes it only where the deployment runs the API.
+        request_work: The request work of new flows (ADR 0121 step 6b); with it, a dispatch
+            job of request work goes to ``RequestDispatch`` and ``requests`` fences attempts.
+        reconcile_minutes: ``contact_center_reconcile_minutes`` (class C), read when called.
         after_purge: Called once after a round that ran ``purge_pii`` jobs (the worker passes
             the WAL checkpoint, WP-A3); a failure is logged and never fails the round.
     """
@@ -169,6 +174,8 @@ class JobRunner:
         after_purge: Callable[[], Awaitable[None]] | None = None,
         fallback: FallbackService | None = None,
         organisations: OrganisationDispatchers | None = None,
+        request_work: RequestWork | None = None,
+        reconcile_minutes: Callable[[], int] | None = None,
     ) -> None:
         """Store the collaborators and decide which job types this worker can handle."""
         self._queue = queue
@@ -187,22 +194,35 @@ class JobRunner:
         self._types: set[JobType] = {JobType.PURGE_PII, *LAPSES}
         if senders is not None:
             self._types |= set(MESSAGE_KINDS) | TEAM_INVITES
-        self._calls = (
-            CallJobs(
+        calls = (
+            CallService(
                 uow,
-                CallService(
-                    uow,
-                    integration,
-                    video,
-                    dispatchers or {},
-                    agent_start_label,
-                    fallback,
-                    organisations,
-                ),
+                integration,
+                video,
+                dispatchers or {},
+                agent_start_label,
+                fallback,
+                organisations,
             )
             if integration is not None
             else None
         )
+        self.requests = (
+            RequestDispatch(
+                uow,
+                request_work,
+                clock,
+                task_of=calls.task_for,
+                dispatcher_of=calls.dispatcher_of,
+                integration=integration,
+                window_minutes=reconcile_minutes,
+                fallback=fallback,
+            )
+            if calls is not None and integration is not None and request_work and reconcile_minutes
+            else None
+        )
+        """Dispatches request work and fences attempts in doubt (ADR 0121 step 6b), if wired."""
+        self._calls = CallJobs(uow, calls, self.requests) if calls is not None else None
         if self._calls is not None:
             self._types |= self._calls.types
 

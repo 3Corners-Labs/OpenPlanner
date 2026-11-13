@@ -16,10 +16,12 @@ link and kind; nothing else (CLAUDE.md). The asset's schema in Control Hub must 
 exactly these keys (runbook).
 
 The adapter declares what it carries on the channel-independent task contract (ADR 0121 step
-6): the interaction kind ``video`` (the work item carries the host join URL) and skill codes.
-The interaction kind itself is not sent while it is the only one, so the body of every existing
-flow is byte for byte what it was (``tests/adapters/wxcc_task_bodies.json``); a task of
-another kind is refused before anything is sent.
+6): the interaction kinds ``video`` (the work item carries the host join URL) and ``none`` (a work
+item without a meeting, step 6b), and skill codes. A task of another kind is sent with an empty
+``meetingLink`` and its kind in the reserved flow variable ``openplannerInteraction``; a video
+task has no such key, so the body of every existing flow is byte for byte what it was
+(``tests/adapters/wxcc_task_bodies.json``). A task of a kind not carried is refused before
+anything is sent.
 
 A cancelled booking's task is first marked with a Task Messages v2 append
 (``cjp:task_write``) that sets ``kind`` to ``cancelled`` with only the booking reference, so
@@ -65,6 +67,10 @@ SKILLS_KEY = "openplannerSkills"
 4b), comma-separated and sorted; absent when it requires none. Written after the routing
 variables of ADR 0081, so none of them can stand in for it."""
 
+INTERACTION_KEY = "openplannerInteraction"
+"""The flow variable of a task's interaction kind (ADR 0121 step 6b), written only for a kind
+other than ``video`` and after the routing variables, so none of them can stand in for it."""
+
 BUSINESS_ADDRESS = "business_address"
 """Routing attribute: the business address of the work item asset (ADR 0018)."""
 CHANNEL = "channel"
@@ -81,14 +87,14 @@ DESCRIPTOR = ProviderDescriptor(
     routing_value_label_key="admin.field.wxcc_routing_value",
     routing_value_hint_key="admin.field.wxcc_routing_value_hint",
     capabilities=ContactCenterCapabilities(
-        interaction_kinds=frozenset({InteractionKind.VIDEO}), skills=True
+        interaction_kinds=frozenset({InteractionKind.VIDEO, InteractionKind.NONE}), skills=True
     ),
 )
 """What a group needs for WxCC (ADR 0032 point 4) and what WxCC carries (ADR 0121 step 6); the
 limits are WxCC's (``flowSettings`` values up to 512 bytes), fixed by the platform and so
-constants, not settings. Only video is carried: a work item without a meeting link (``none``)
-needs a change of the asset schema and the client's flow (ADR 0121 step 6b), and a telephone
-interaction would need the participant's number, which never leaves OpenPlanner."""
+constants, not settings. Video and ``none`` are carried (``none`` since ADR 0121 step 6b: a work
+item with an empty ``meetingLink``); a telephone interaction would need the participant's number,
+which never leaves OpenPlanner."""
 
 PROBE_KIND = calls.PROBE_KIND
 """``kind`` of the group check's probe work item (ADR 0082 point 2), defined in the domain."""
@@ -174,8 +180,17 @@ def task_body(item: ContactCenterTask, alias_id: str, timestamp_ms: int) -> dict
         "channelType": "workItem",
         "channel": channel,
         "flowSettings": {
-            **{name: value for name, value in item.variables if name != SKILLS_KEY},
+            **{
+                name: value
+                for name, value in item.variables
+                if name not in (SKILLS_KEY, INTERACTION_KEY)
+            },
             **({SKILLS_KEY: ",".join(item.skills)} if item.skills else {}),
+            **(
+                {INTERACTION_KEY: item.interaction.value}
+                if item.interaction is not InteractionKind.VIDEO
+                else {}
+            ),
             ROUTING_KEY: item.routing_value,
         },
         "channelParams": {

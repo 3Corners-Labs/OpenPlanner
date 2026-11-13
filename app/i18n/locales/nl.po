@@ -9883,6 +9883,9 @@ msgstr "Taakstatus nalopen elke (minuten)"
 msgid "settings.field.task_reconcile_after_minutes.label"
 msgstr "Taak nalopen na stilte van (minuten)"
 
+msgid "settings.field.contact_center_reconcile_minutes.label"
+msgstr "Onzekere contactcentertaak opgeven na (minuten)"
+
 msgid "settings.field.integration_health_window_minutes.label"
 msgstr "Venster voor de gezondheid van koppelingen (minuten)"
 
@@ -13109,6 +13112,9 @@ msgstr "De capaciteitspool garandeert niet alle vaardigheden die deze flow of ee
 
 msgid "admin.flows.reason.skill_unmapped"
 msgstr "Deze flow verdeelt naar het contactcenter, maar een vaardigheid die hij of een van de onderwerpen vraagt heeft nog geen code in het contactcenter. Geef die vaardigheid een code onder Vaardigheden en capaciteit."
+
+msgid "admin.flows.reason.completion_not_for_dispatch"
+msgstr "Deze manier van afronden past niet bij de verdeling. Werk in de eigen wachtrij wordt in OpenPlanner afgerond; werk in het contactcenter is af zodra het contactcenter de taak als beëindigd meldt."
 
 msgid "admin.flows.reason.contact_center_missing"
 msgstr "Deze flow verdeelt naar het contactcenter, maar deze dienst is nog niet met een contactcenter verbonden. Vul de contactcenterroutering van de dienst in, of laat de flow de eigen wachtrij gebruiken."

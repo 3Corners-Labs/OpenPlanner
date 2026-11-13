@@ -9870,6 +9870,9 @@ msgstr "Reconcile task states every (minutes)"
 msgid "settings.field.task_reconcile_after_minutes.label"
 msgstr "Reconcile a task after silence of (minutes)"
 
+msgid "settings.field.contact_center_reconcile_minutes.label"
+msgstr "Give up an uncertain contact-center task after (minutes)"
+
 msgid "settings.field.integration_health_window_minutes.label"
 msgstr "Window for connection health (minutes)"
 
@@ -13096,6 +13099,9 @@ msgstr "The capacity pool does not guarantee every skill that this flow or one o
 
 msgid "admin.flows.reason.skill_unmapped"
 msgstr "This flow sends work to the contact center, but a skill that it or one of its subjects requires has no contact-center code yet. Give that skill a code under Skills and capacity."
+
+msgid "admin.flows.reason.completion_not_for_dispatch"
+msgstr "This way of completing does not fit the dispatch. Work in the own queue is completed in OpenPlanner; work at the contact center is completed when the contact center reports the task ended."
 
 msgid "admin.flows.reason.contact_center_missing"
 msgstr "This flow sends work to the contact center, but this service is not connected to a contact center yet. Fill in the service's contact center routing, or let the flow use the own queue."

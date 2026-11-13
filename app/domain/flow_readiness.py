@@ -82,6 +82,9 @@ class ReadinessReason(StrEnum):
     NOT_BUILT_YET = "not_built_yet"
     COMPLETION_MISSING = "completion_missing"
     COMPLETION_LEGACY_ONLY = "completion_legacy_only"
+    COMPLETION_NOT_FOR_DISPATCH = "completion_not_for_dispatch"
+    """The completion does not belong to the dispatch: the operator completes own-queue work,
+    the platform's event contact-center work (``COMPLETION_OF``, ADR 0121 step 6b)."""
     ROLLBACK_NOT_SAFE = "rollback_not_safe"
     """The rollback gate ``ROLLBACK_SAFE`` is shut: the previous supported version could not
     yet account for the pool slots a new flow writes (ADR 0122 decision 12)."""
@@ -244,6 +247,9 @@ def _completion_reason(revision: FlowRevision) -> ReadinessReason | None:
         return ReadinessReason.COMPLETION_LEGACY_ONLY
     if completion not in flows.BUILT_COMPLETION:
         return ReadinessReason.NOT_BUILT_YET
+    dispatch = revision.dispatch
+    if dispatch is not None and flows.COMPLETION_OF.get(dispatch) is not completion:
+        return ReadinessReason.COMPLETION_NOT_FOR_DISPATCH
     return None
 
 

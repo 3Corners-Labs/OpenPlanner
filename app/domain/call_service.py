@@ -18,7 +18,13 @@ from datetime import datetime
 
 from app.domain.authorization import Scope
 from app.domain.booking import Booking
-from app.domain.calls import EventKind, TaskState, contact_center_task, meeting_request
+from app.domain.calls import (
+    ContactCenterTask,
+    EventKind,
+    TaskState,
+    contact_center_task,
+    meeting_request,
+)
 from app.domain.contact_center import ContactCenterTaskRef
 from app.domain.contact_center_dispatch import DispatcherChoice
 from app.domain.fallback import FallbackService
@@ -26,6 +32,7 @@ from app.domain.integration import IntegrationService
 from app.domain.interaction import InteractionKind
 from app.domain.job_plan import JobType
 from app.domain.ports import (
+    ContactCenterDispatcher,
     ContactCenterDispatchers,
     IntegrationError,
     OrganisationDispatchers,
@@ -99,8 +106,12 @@ class CallService:
         The task goes to the dispatcher of the group's platform; a group whose platform has
         no dispatcher configured is skipped like a group without a contact center.
 
+        The interaction kind is read before the meeting is waited for: only a video task waits
+        for one (ADR 0121 step 6b).
+
         Raises:
-            IntegrationError: ``meeting_missing`` (retryable) while the meeting is not there.
+            IntegrationError: ``meeting_missing`` (retryable) while a video task's meeting is
+                not there.
         """
         routing = group.contact_center
         if routing is None or not group.dispatch_enabled or booking.contact_center_task:
@@ -110,23 +121,38 @@ class CallService:
             return booking
         if await self.diverts(booking, group):
             return booking
-        if booking.meeting is None:
-            raise IntegrationError("meeting_missing", retryable=True)
-        interaction, skills = await self._flow_terms(booking, group)
-        task_id = await dispatcher.create_task(
-            contact_center_task(
-                booking,
-                group,
-                start_label=self._start_label(booking, group),
-                skills=skills,
-                interaction=interaction,
-            )
-        )
+        task_id = await dispatcher.create_task(await self.task_for(booking, group))
         booking_id, task = _id(booking), ContactCenterTaskRef(task_id, routing.kind)
         async with self._uow.locked() as tx:
             await tx.save_task(booking_id, task)
         await self._integration.record(booking_id, EventKind.TASK_CREATED)
         return _with(booking, contact_center_task=task)
+
+    async def task_for(self, booking: Booking, group: Group) -> ContactCenterTask:
+        """Return the neutral task of ``booking``: its flow's interaction kind and skill codes.
+
+        Raises:
+            IntegrationError: ``meeting_missing`` (retryable) while a video task's meeting is
+                not there.
+            DomainError: ``integration_not_ready`` (``skill_codes``, ``interaction_kind``, ...).
+        """
+        interaction, skills = await self._flow_terms(booking, group)
+        if interaction is InteractionKind.VIDEO and booking.meeting is None:
+            raise IntegrationError("meeting_missing", retryable=True)
+        return contact_center_task(
+            booking,
+            group,
+            start_label=self._start_label(booking, group),
+            skills=skills,
+            interaction=interaction,
+        )
+
+    async def dispatcher_of(self, group: Group) -> ContactCenterDispatcher | None:
+        """Return the dispatcher of the group's contact-center platform, ``None`` without one."""
+        routing = group.contact_center
+        if routing is None or not routing.complete:
+            return None
+        return await self._dispatchers.for_organisation(group.organisation_id, routing.kind)
 
     async def _flow_terms(
         self, booking: Booking, group: Group

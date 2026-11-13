@@ -36,6 +36,14 @@ ADDRESS = re.compile(r"[^\s@'\"]+@[^\s@'\"]+")
 """An email address in Webex's error text (the group's host); masked before logging."""
 
 
+NOT_SENT = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
+"""Transport errors raised before a request left OpenPlanner: its outcome is known (nothing
+happened). Any other transport error may come after the platform received the request, so its
+outcome is unknown (``IntegrationError.ambiguous``, ADR 0121 step 6b)."""
+GATEWAY_TIMEOUT = 504
+"""A gateway gave up waiting: the platform may still have done the request (ambiguous)."""
+
+
 class TokenStore(Protocol):
     """Where tokens are kept (``CredentialStore``; a fake in tests)."""
 
@@ -253,7 +261,9 @@ class AuthorizedClient:
                 await self._report(
                     RequestRecord(method, path, 0, "unreachable", "", _ms(started), platform)
                 )
-                raise IntegrationError("unreachable", retryable=True) from exc
+                raise IntegrationError(
+                    "unreachable", retryable=True, ambiguous=not isinstance(exc, NOT_SENT)
+                ) from exc
             if response.status_code == 401 and attempt == 0:
                 await self._report(
                     _record(method, path, response, "unauthorized", started, platform)
@@ -330,7 +340,9 @@ def http_failure(response: httpx.Response, *, explain: bool = False) -> Integrat
     if status == 429:
         return IntegrationError("rate_limited", retryable=True, reason=reason)
     if status >= 500:
-        return IntegrationError("server_error", retryable=True, reason=reason)
+        return IntegrationError(
+            "server_error", retryable=True, reason=reason, ambiguous=status == GATEWAY_TIMEOUT
+        )
     return IntegrationError(f"rejected_{status}", retryable=False, reason=reason)
 
 

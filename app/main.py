@@ -134,6 +134,7 @@ from app.domain.proxy_watch import ProxyHeaderWatch
 from app.domain.queue_service import QueueService
 from app.domain.readiness import ReadinessService
 from app.domain.report_digest_service import DigestAdmin
+from app.domain.request_dispatch import AttemptEvents
 from app.domain.request_log import RequestEvents
 from app.domain.roles import RoleService
 from app.domain.routing_service import RoutingService
@@ -677,6 +678,8 @@ def create_app(
             settings.app_version,
             probes=ProbeReports(ReportStore(app.state.engine)),
             staff_usage=staff_usage,
+            # ADR 0121 step 6b: task events move the contact-center attempts of request work.
+            work=AttemptEvents(request_work(clock, app.state.live_settings)),
         )
         # ADR 0082 points 5 and 7: the last inbound webhooks and the health of the connections.
         app.state.health_service = IntegrationHealthService(

@@ -100,14 +100,14 @@ def test_the_combination_table_is_closed() -> None:
     assert set(COMBINATIONS) == set(InteractionKind)
 
 
-def test_what_is_built_is_exactly_what_the_steps_before_6_allow() -> None:
+def test_what_is_built_is_exactly_what_the_steps_up_to_6b_allow() -> None:
     assert BUILT_KINDS == {
         InteractionKind.TELEPHONE,
         InteractionKind.IN_PERSON,
         InteractionKind.NONE,
     }
-    assert BUILT_DISPATCH == {DispatchKind.OWN_QUEUE}
-    assert BUILT_COMPLETION == {CompletionPolicy.OPERATOR}
+    assert BUILT_DISPATCH == {DispatchKind.OWN_QUEUE, DispatchKind.CONTACT_CENTER}
+    assert BUILT_COMPLETION == {CompletionPolicy.OPERATOR, CompletionPolicy.PROVIDER_EVENT}
     assert BUILT_ACTIONS == {
         HandlingAction.OPEN_VIDEO,
         HandlingAction.VIEW_REQUEST,
@@ -367,7 +367,11 @@ def test_completion_reasons() -> None:
     old = revision(completion=CompletionPolicy.LEGACY_VIDEO_OBSERVATION)
     assert reasons(old, pool())[co] is R.COMPLETION_LEGACY_ONLY
     event = revision(completion=CompletionPolicy.PROVIDER_EVENT)
-    assert reasons(event, pool())[co] is R.NOT_BUILT_YET
+    assert reasons(event, pool())[co] is R.COMPLETION_NOT_FOR_DISPATCH  # own queue
+    routed = revision(
+        completion=CompletionPolicy.PROVIDER_EVENT, dispatch=DispatchKind.CONTACT_CENTER
+    )
+    assert reasons(routed, pool())[co] is None
     assert reasons(legacy(), pool())[co] is None
     assert reasons(legacy(completion=CompletionPolicy.PROVIDER_EVENT), pool())[co] is None
     assert reasons(legacy(completion=None), pool())[co] is R.COMPLETION_MISSING
@@ -886,8 +890,6 @@ def test_a_draft_that_is_wrong_in_itself_is_refused_and_one_that_is_incomplete_p
             "interaction_kind": InteractionKind.VIDEO,
             "handling_action": HandlingAction.OPEN_VIDEO,
         },
-        "dispatch": {"dispatch": DispatchKind.CONTACT_CENTER},
-        "completion": {"completion": CompletionPolicy.PROVIDER_EVENT},
         "handling_action": {
             "interaction_kind": InteractionKind.IN_PERSON,
             "handling_action": HandlingAction.ASSIGN_WORKSTATION,
@@ -920,12 +922,6 @@ def test_a_draft_that_is_wrong_in_itself_is_refused_and_one_that_is_incomplete_p
                 "interaction_kind": InteractionKind.VIDEO,
                 "handling_action": HandlingAction.OPEN_VIDEO,
             },
-        ),
-        ("BUILT_DISPATCH", DispatchKind.CONTACT_CENTER, {"dispatch": DispatchKind.CONTACT_CENTER}),
-        (
-            "BUILT_COMPLETION",
-            CompletionPolicy.PROVIDER_EVENT,
-            {"completion": CompletionPolicy.PROVIDER_EVENT},
         ),
         (
             "BUILT_ACTIONS",

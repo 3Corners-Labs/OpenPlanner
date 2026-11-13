@@ -861,6 +861,18 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=120,
     ),
     S(
+        "contact_center_reconcile_minutes",
+        K.INT,
+        10,
+        _C,
+        T.OPERATIONS,
+        "A task for request work whose creation at the contact center had an unknown outcome "
+        "is given up this long after it was sent: the request goes to the own queue, and a "
+        "task that turns up later is ended (ADR 0121 step 6b).",
+        minimum=2,
+        maximum=120,
+    ),
+    S(
         "integration_health_window_minutes",
         K.INT,
         15,

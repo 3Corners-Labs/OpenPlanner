@@ -555,8 +555,6 @@ async def test_a_draft_that_is_only_incomplete_is_saved_but_a_wrong_value_is_ref
     wrong = {
         "labels": ({"nl": "x", "en": ""}, "labels"),
         "duration_minutes": (7, "duration_minutes"),
-        "dispatch": (flows.DispatchKind.CONTACT_CENTER, "dispatch"),
-        "completion": (flows.CompletionPolicy.PROVIDER_EVENT, "completion"),
         "handling_action": (flows.HandlingAction.ASSIGN_WORKSTATION, "handling_action"),
     }
     for change, (value, field) in wrong.items():

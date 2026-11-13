@@ -86,10 +86,22 @@ BUILT_KINDS: frozenset[InteractionKind] = frozenset(
     {InteractionKind.TELEPHONE, InteractionKind.IN_PERSON, InteractionKind.NONE}
 )
 """Interaction kinds a new (non-legacy) flow may use; step 5 of ADR 0121 adds video."""
-BUILT_DISPATCH: frozenset[DispatchKind] = frozenset({DispatchKind.OWN_QUEUE})
-"""Dispatch kinds a new flow may use; step 6b of ADR 0121 adds the contact center."""
-BUILT_COMPLETION: frozenset[CompletionPolicy] = frozenset({CompletionPolicy.OPERATOR})
-"""Completion policies a new flow may use; step 6b of ADR 0121 adds the provider event."""
+BUILT_DISPATCH: frozenset[DispatchKind] = frozenset(
+    {DispatchKind.OWN_QUEUE, DispatchKind.CONTACT_CENTER}
+)
+"""Dispatch kinds a new flow may use; the contact center since ADR 0121 step 6b."""
+BUILT_COMPLETION: frozenset[CompletionPolicy] = frozenset(
+    {CompletionPolicy.OPERATOR, CompletionPolicy.PROVIDER_EVENT}
+)
+"""Completion policies a new flow may use; the platform's event since ADR 0121 step 6b.
+
+Each dispatch has its own: ``COMPLETION_OF``."""
+COMPLETION_OF: Mapping[DispatchKind, CompletionPolicy] = {
+    DispatchKind.OWN_QUEUE: CompletionPolicy.OPERATOR,
+    DispatchKind.CONTACT_CENTER: CompletionPolicy.PROVIDER_EVENT,
+}
+"""What completes the work of a new flow, by its dispatch (ADR 0121 step 6b, choice E2): the
+operator in the own queue, the platform's event at the contact center."""
 BUILT_ACTIONS: frozenset[HandlingAction] = frozenset(
     {HandlingAction.OPEN_VIDEO, HandlingAction.VIEW_REQUEST, HandlingAction.CALL}
 )

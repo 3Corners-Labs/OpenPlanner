@@ -356,6 +356,9 @@ def test_the_active_work_item_states() -> None:
         WorkItemState.ASSIGNED,
         WorkItemState.IN_PROGRESS,
         WorkItemState.RECOVERY_REQUIRED,
+        WorkItemState.DISPATCHING,  # the contact-center attempts of step 6b
+        WorkItemState.DISPATCHED,
+        WorkItemState.RECONCILIATION_REQUIRED,
     }
 
 

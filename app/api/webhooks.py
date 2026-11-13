@@ -190,6 +190,7 @@ async def _verified(
             clock.now(),
             event.detail,
             event_key=event.event_key,
+            origin=event.origin,
             provider=handling.kind,
             source=handling.source,
             organisation_id=organisation_id,

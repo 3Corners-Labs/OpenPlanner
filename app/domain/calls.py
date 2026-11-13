@@ -435,6 +435,7 @@ def contact_center_task(
     ``start_label`` is the start time as the agent reads it (formatted at the edge), ``skills``
     the mapped codes of the skills it requires (``skills.mapped_skill_codes``), ``interaction``
     the interaction kind of the flow revision recorded on it (video for a booking without one).
+    Only a video task needs a meeting; any other kind carries no meeting link (step 6b).
 
     Raises:
         DomainError: ``integration_not_ready`` naming what is missing (``contact_center``,
@@ -445,7 +446,8 @@ def contact_center_task(
     gap = uncarried(routing.descriptor.capabilities, interaction, bool(skills))
     if gap is not None:
         raise DomainError(ErrorCode.INTEGRATION_NOT_READY, gap)
-    if booking.meeting is None or booking.meeting.link is None:
+    link = booking.meeting.link if booking.meeting else None
+    if interaction is InteractionKind.VIDEO and link is None:
         raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "meeting")
     if booking.contact is None:
         raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "contact")
@@ -454,7 +456,7 @@ def contact_center_task(
         first_name=booking.contact.first_name,
         start_label=start_label,
         group_name=group.name,
-        meeting_link=booking.meeting.link,
+        meeting_link=link if interaction is InteractionKind.VIDEO and link else "",
         kind=booking.kind.value,
         routing=routing,
         routing_value=group.routing_value,

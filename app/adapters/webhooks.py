@@ -49,6 +49,9 @@ class ParsedEvent:
     detail: str = ""
     event_key: str = ""
     """Identifies one delivery's event for deduplication; empty when there is nothing to key on."""
+    origin: str = ""
+    """The id OpenPlanner sent as the task's origin (a booking reference), if the event carries
+    it: matches a late task to its attempt (ADR 0121 step 6b). The name beside it is never read."""
 
 
 def event_body(payload: dict[str, Any]) -> bytes:
@@ -152,7 +155,19 @@ def parse_wxcc(payload: dict[str, Any]) -> ParsedEvent | None:
     if not isinstance(task_id, str):
         return None
     key = _wxcc_key(payload, task_id)
-    return ParsedEvent(task_id, kind, str(reason or "")[:128], event_key=key)
+    return ParsedEvent(task_id, kind, str(reason or "")[:128], event_key=key, origin=_origin(data))
+
+
+def _origin(data: dict[str, Any]) -> str:
+    """Return the origin id of a task event (``origin`` or ``origin.id``), at most 32 characters.
+
+    Only the id is read: Create Task sends ``{"id": reference, "name": first name}``, and the
+    name is personal data that OpenPlanner never takes back.
+    """
+    found = data.get("origin")
+    if isinstance(found, dict):
+        found = found.get("id")
+    return found[:32] if isinstance(found, str) else ""
 
 
 def _wxcc_key(payload: dict[str, Any], task_id: str) -> str:

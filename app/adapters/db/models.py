@@ -2121,11 +2121,18 @@ REQUEST_HANDLING = (
 
 WORK_ITEM_STATES = (
     "('assigned', 'in_progress', 'recovery_required', 'completed', 'released', "
-    "'lease_expired', 'expired', 'cancelled')"
+    "'lease_expired', 'expired', 'cancelled', 'dispatching', 'dispatched', "
+    "'reconciliation_required', 'fenced', 'failed')"
 )
-"""The stored values of ``work_items.state`` (``WorkItemState``)."""
+"""The stored values of ``work_items.state`` (``WorkItemState``; the last five since 0114)."""
 
-ACTIVE_WORK_ITEM = "state IN ('assigned', 'in_progress', 'recovery_required')"
+WORK_CHANNELS = "('own_queue', 'contact_center')"
+"""The stored values of ``work_items.channel`` (``WorkChannel``, migration 0114)."""
+
+ACTIVE_WORK_ITEM = (
+    "state IN ('assigned', 'in_progress', 'recovery_required', 'dispatching', 'dispatched', "
+    "'reconciliation_required')"
+)
 """The predicate of a request's one active work item (``ACTIVE_ITEM``)."""
 
 
@@ -2178,10 +2185,12 @@ class ServiceRequestRow(Base):
 class WorkItemRow(Base):
     """One attempt of staff to handle a request, and the pool unit it occupies once started.
 
-    At most one active work item per request (``uq_work_items_active``). ``assigned_to`` is the
-    agent's pseudonym, emptied with the request's personal data. Started (``pool_id`` and
-    ``planned_until`` set) and not ended (``ended_at`` NULL), the row is a commitment of its pool
-    (``get_pool_commitments``); setting ``ended_at`` releases it, exactly once.
+    At most one active work item per request (``uq_work_items_active``): the fence between the
+    own queue and the contact center, whose side ``channel`` names (ADR 0121 step 6b).
+    ``assigned_to`` is the agent's pseudonym, emptied with the request's personal data.
+    Started (``pool_id`` and ``planned_until`` set) and not ended (``ended_at`` NULL), the row
+    is a commitment of its pool (``get_pool_commitments``); setting ``ended_at`` releases it,
+    exactly once.
     """
 
     __tablename__ = "work_items"
@@ -2199,9 +2208,11 @@ class WorkItemRow(Base):
     planned_until: Mapped[datetime | None] = mapped_column(UTCDateTime())
     start_conflict: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    channel: Mapped[str] = mapped_column(String(16), server_default=text("'own_queue'"))
 
     __table_args__ = (
         CheckConstraint(f"state IN {WORK_ITEM_STATES}", name="state"),
+        CheckConstraint(f"channel IN {WORK_CHANNELS}", name="channel"),
         Index(
             "uq_work_items_active",
             "request_id",

@@ -432,3 +432,16 @@ def stored_id(booking: Booking) -> int:
     if booking.id is None:
         raise ValueError("booking has not been stored")
     return booking.id
+
+
+_REFERENCE = re.compile(r"^OP-([0-9]{6,12})$")
+
+
+def booking_id_of(reference: str) -> int | None:
+    """Return the booking id a reference (``Booking.reference``) names, ``None`` for another.
+
+    For matching a contact-center task by the reference OpenPlanner sent as its origin (ADR
+    0121 step 6b); a string of any other shape names no booking.
+    """
+    found = _REFERENCE.fullmatch(reference)
+    return int(found.group(1)) if found else None

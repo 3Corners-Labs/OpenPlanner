@@ -32,12 +32,14 @@ from app.domain.pool_accounting import Commitment
 from app.domain.service_flows import IntakeMode
 from app.domain.service_requests import (
     ACTIVE_ITEM,
+    IN_DOUBT,
     TERMINAL,
     HandlingState,
     PersonalDataState,
     RequestPersonalData,
     ServiceRequest,
     UnclaimedBooking,
+    WorkChannel,
     WorkItem,
     WorkItemState,
 )
@@ -86,6 +88,7 @@ def item_of(row: WorkItemRow) -> WorkItem:
         planned_until=row.planned_until,
         start_conflict=row.start_conflict,
         ended_at=row.ended_at,
+        channel=WorkChannel(row.channel),
     )
 
 
@@ -101,6 +104,7 @@ def _item_values(item: WorkItem) -> dict[str, object]:
         "planned_until": item.planned_until,
         "start_conflict": item.start_conflict,
         "ended_at": item.ended_at,
+        "channel": item.channel.value,
     }
 
 
@@ -233,6 +237,25 @@ class ServiceRequestQueries:
         )
         return item_of(row) if row is not None else None
 
+    async def work_items_of(self, request_id: int) -> list[WorkItem]:
+        """Return every work item of a request, oldest first."""
+        rows = await self._session.scalars(
+            select(WorkItemRow).where(WorkItemRow.request_id == request_id).order_by(WorkItemRow.id)
+        )
+        return [item_of(row) for row in rows]
+
+    async def work_items_in_doubt(self) -> list[WorkItem]:
+        """Return the contact-center attempts whose create's outcome is unknown, oldest first."""
+        rows = await self._session.scalars(
+            select(WorkItemRow)
+            .where(
+                WorkItemRow.channel == WorkChannel.CONTACT_CENTER.value,
+                WorkItemRow.state.in_(sorted(state.value for state in IN_DOUBT)),
+            )
+            .order_by(WorkItemRow.id)
+        )
+        return [item_of(row) for row in rows]
+
     async def add_service_request(
         self, request: ServiceRequest, data: RequestPersonalData | None = None
     ) -> ServiceRequest:
@@ -299,7 +322,7 @@ class ServiceRequestQueries:
     async def update_work_item(self, item: WorkItem, seen: WorkItemState) -> bool:
         """Write the work item if its stored state is still ``seen``."""
         values = _item_values(item)
-        del values["assigned_to"], values["assigned_at"]  # fixed at the claim
+        del values["assigned_to"], values["assigned_at"], values["channel"]  # fixed at the claim
         result = await self._session.execute(
             update(WorkItemRow)
             .where(WorkItemRow.id == item.id, WorkItemRow.state == seen.value)

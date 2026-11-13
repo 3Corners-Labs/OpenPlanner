@@ -270,8 +270,6 @@ def test_a_revision_names_one_pool_not_two() -> None:
 
 UNBUILT = [
     ({"interaction_kind": "video", "handling_action": "open_video"}, "interaction_kind"),
-    ({"dispatch": "contact_center"}, "dispatch"),
-    ({"completion": "provider_event"}, "completion"),
     ({"interaction_kind": "in_person", "handling_action": "assign_workstation"}, "handling_action"),
 ]
 """A choice ADR 0121 has not built, with the field the screens' own rule blames."""

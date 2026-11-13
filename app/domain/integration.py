@@ -11,6 +11,7 @@ and only a booking of that group (ADR 0014).
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from enum import StrEnum
+from typing import Protocol
 
 from app.domain.admin import AdminService, require
 from app.domain.audit import AuditEvent, AuditFilter
@@ -38,6 +39,28 @@ WEBHOOK_MEMORY = timedelta(days=30)
 """How long a Webex event key is remembered; older keys are forgotten on the next event."""
 
 WEBEX_SOURCE = "webex"
+
+
+class TaskWork(Protocol):
+    """The request work behind a contact-center task (ADR 0121 step 6b), inside the lock."""
+
+    async def on_task_event(
+        self, tx: Transaction, booking: Booking, kind: EventKind, at: datetime
+    ) -> None:
+        """Apply a platform event of ``booking``'s task to its contact-center attempt."""
+        ...
+
+    async def adopt(
+        self,
+        tx: Transaction,
+        origin: str,
+        task_id: str,
+        provider: ContactCenterKind,
+        at: datetime,
+        organisation_id: int | None = None,
+    ) -> tuple[Booking, object] | None:
+        """Match an unknown task to an attempt by its origin; ``None`` when it is not ours."""
+        ...
 
 
 REQUEST_LIMIT = 100
@@ -95,14 +118,19 @@ class IntegrationService:
         version: str = "",
         probes: ProbeRegistry | None = None,
         staff_usage: StaffUsage | None = None,
+        work: TaskWork | None = None,
     ) -> None:
-        """Store the collaborators; ``staff_usage`` adds a team member's usage facts."""
+        """Store the collaborators; ``staff_usage`` adds a team member's usage facts.
+
+        ``work`` applies task events to the request work of new flows (ADR 0121 step 6b).
+        """
         self._uow = uow
         self._clock = clock
         self._admin = admin
         self._version = version
         self._probes = probes
         self._staff_usage = staff_usage
+        self._work = work
 
     @property
     def staff_usage(self) -> StaffUsage | None:
@@ -169,6 +197,7 @@ class IntegrationService:
         detail: str = "",
         *,
         event_key: str = "",
+        origin: str = "",
         provider: ContactCenterKind,
         source: str,
         organisation_id: int | None = None,
@@ -185,9 +214,16 @@ class IntegrationService:
         creation when it got the id. An unknown task may be the group check's probe (ADR
         0082): its event is noted for the check and the outcome is ``PROBE``. Like a Webex
         event, a replayed or redelivered WxCC event is ``DUPLICATE`` (ADR 0082 point 5).
+
+        With request work (ADR 0121 step 6b) the event also moves the booking's contact-center
+        attempt, and an unknown task whose ``origin`` names an attempt in doubt or a fenced one
+        is matched to it (adopted, or ended at the platform).
         """
         async with self._uow.locked() as tx:
             booking = await tx.get_booking_by_task(task_id, provider)
+            if booking is None and self._work is not None and origin:
+                late = await self._work.adopt(tx, origin, task_id, provider, at, organisation_id)
+                booking = late[0] if late is not None else None
             if booking is not None and organisation_id is not None:
                 group = await tx.get_group_by_id(booking.group_id)
                 if group is None or group.organisation_id != organisation_id:
@@ -198,6 +234,8 @@ class IntegrationService:
                 if not await _claim(tx, source, event_key, at):
                     return EventOutcome.DUPLICATE
                 await self._record(tx, booking.id, kind, at, detail)
+                if self._work is not None:
+                    await self._work.on_task_event(tx, booking, kind, at)
                 return EventOutcome.RECORDED
         # Outside the write lock: the registry writes in a transaction of its own.
         if self._probes is not None and await self._probes.note(task_id, kind, at):

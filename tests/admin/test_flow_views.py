@@ -145,20 +145,6 @@ OPTIONS: list[tuple[str, StrEnum, Any]] = [
         lambda locale: views.kind_views(empty_draft(), locale),
     ),
     (
-        "BUILT_DISPATCH",
-        DispatchKind.CONTACT_CENTER,
-        lambda locale: (
-            views.dispatch_select(empty_draft(), FormData({}, locale.gettext), locale).options
-        ),
-    ),
-    (
-        "BUILT_COMPLETION",
-        CompletionPolicy.PROVIDER_EVENT,
-        lambda locale: (
-            views.completion_select(empty_draft(), FormData({}, locale.gettext), locale).options
-        ),
-    ),
-    (
         "BUILT_ACTIONS",
         HandlingAction.ASSIGN_WORKSTATION,
         lambda locale: (

@@ -277,12 +277,14 @@ async def test_the_checklist_says_every_state_in_words_and_which_part_follows(
     checklist = page.split('<ol class="checklist">')[1].split("</ol>")[0]
     assert checklist.count('class="checklist__item"') == 7
     assert checklist.count("<span>Volgt</span>") == 1  # the rollback gate
-    # No pool (capacity and skills), and the service has no contact-center routing: something the
-    # administrator can fix, named before what follows (ADR 0121 step 6). The dispatch sentence
-    # of ``not_built_yet`` is pinned in ``tests/admin/test_flow_views.py``.
-    assert checklist.count("<span>Ontbreekt</span>") == 3
-    assert checklist.count("<span>In orde</span>") == 3  # retention is built (step 5b)
+    # No pool (capacity and skills), no contact-center routing on the service, and the operator's
+    # completion does not fit contact-center work: what the administrator can fix is named
+    # before what follows (ADR 0121 step 6). The dispatch sentence of ``not_built_yet`` is pinned
+    # in ``tests/admin/test_flow_views.py``.
+    assert checklist.count("<span>Ontbreekt</span>") == 4
+    assert checklist.count("<span>In orde</span>") == 2  # data, and retention (step 5b)
     assert "nog niet met een contactcenter verbonden" in checklist
+    assert "past niet bij de verdeling" in checklist
     assert "Activeren wacht tot ook de vorige versie van OpenPlanner" in checklist
     assert "Terugrollen naar de vorige versie" in checklist
     assert "Dit onderdeel van OpenPlanner volgt" not in checklist
