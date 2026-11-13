@@ -114,18 +114,38 @@ kinds, and whether it routes on skills); a descriptor that declares nothing carr
 
 | Platform | Interaction kinds | Skills |
 |---|---|---|
-| Webex Contact Center | `video` | yes (`openplannerSkills`) |
+| Webex Contact Center | `video`, `none` (since step 6b) | yes (`openplannerSkills`) |
 
 A task the platform does not carry is refused before it is built (`integration_not_ready`,
 field `interaction_kind` or `skill_codes`) and again by the adapter (`not_ready`), so nothing is
 sent; and a flow that dispatches to the contact center is not ready while its service has no
 complete routing (`contact_center_missing`), while the platform cannot take the flow's contact
 channel (`interaction_not_carried`) or, for a flow with skills, cannot route on skills
-(`skills_not_carried`). The interaction kind is not sent to Webex Contact Center while `video` is
-the only kind it carries: the body of every existing flow stays byte for byte what it was
-(`tests/adapters/wxcc_task_bodies.json`, recorded before the contract; a deliberate change of the
-body re-records that file in the same PR). A telephone interaction never adds the participant's
-phone number to a payload.
+(`skills_not_carried`). A task of another kind than `video` (`none`: work without a
+meeting) carries an empty `meetingLink` and its kind in the reserved flow variable
+`openplannerInteraction`, written after the routing variables (the mapping form refuses the
+name); a video task has no such key, so the body of every existing flow stays byte for byte what
+it was (`tests/adapters/wxcc_task_bodies.json`, recorded before the contract; a deliberate change
+of the body re-records that file in the same PR). The asset schema keeps its six keys; the
+client's flow reads `openplannerInteraction` to route work without a meeting. A telephone
+interaction never adds the participant's phone number to a payload.
+
+**Request work at the contact center** (ADR 0121 step 6b). A booking of a new flow on a counted
+pool whose flow dispatches to the contact center is sent by the dispatch job as an *attempt*: a
+work item of channel `contact_center`. One active work item per request is the fence, so the own
+queue and the contact center never hold the same request: the dispatch job skips work the own
+queue holds (`own_queue`) and a claim of work the contact center holds is refused
+(`already_claimed`). The task id is kept on the booking as for every task. A create that may have
+reached the platform but got no answer (a read timeout, a broken connection, a `504`) is never
+retried: the attempt waits in `reconciliation_required`. A task event whose task OpenPlanner does
+not know and whose `origin` (the booking reference sent as `origin.id`; the name beside it is
+never read) names that booking adopts the task as the attempt's own. After
+`contact_center_reconcile_minutes` (class C, default 10) the attempt is fenced: the request goes
+to the own queue, the team is told through the fallback (ADR 0082), and a task that turns up
+later is marked cancelled and ended by the end-task job. Task events on an attempt:
+`task:connected` starts the treatment (a unit of the booking's pool), `task:ended` completes the
+request and the booking, `task:failed` puts the request back in the own queue. Whether Webex
+Contact Center's task events carry the origin is still to be seen on the test host.
 
 **Ending a cancelled booking's task** (ADR 0021), v2 first. **Primary:** a Task Messages v2
 snapshot, `POST /v2/tasks/{taskId}/messages` (`cjp:task_write`, beta, `202`), marks the task
