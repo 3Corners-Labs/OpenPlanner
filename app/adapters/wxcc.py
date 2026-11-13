@@ -309,18 +309,18 @@ def messaging_refusal(error: IntegrationError) -> IntegrationError:
     A 403 is read as ``messaging_not_configured`` and a 409 as ``conversation_open`` (an open
     conversation exists for the participant identifier). A 403 has more than one cause (the
     feature or channel is not set up, or the service app lacks the right), so the platform's
-    status stays on the error as its reason, shown under the event next to the code. Every
-    other error is returned as it is. None is retryable, and none is ever answered by creating
-    a form task.
+    status stays on the error as its reason, shown under the event next to the code, and
+    nothing else of the answer: the request carries the first name and the meeting link, and a
+    platform's description of an error may echo them. Every other error is returned as it is.
+    None is retryable, and none is ever answered by creating a form task.
     """
     code = {"rejected_403": MESSAGING_NOT_CONFIGURED, "rejected_409": CONVERSATION_OPEN}.get(
         error.code
     )
     if code is None:
         return error
-    status = f"HTTP {error.code.removeprefix('rejected_')}"
     return IntegrationError(
-        code, retryable=False, reason=f"{status}: {error.reason}" if error.reason else status
+        code, retryable=False, reason=f"HTTP {error.code.removeprefix('rejected_')}"
     )
 
 

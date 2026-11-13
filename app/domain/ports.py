@@ -1377,11 +1377,13 @@ class Transaction(Protocol):
         """Store the booking's contact-center task: its id and the platform that holds it."""
         ...
 
-    async def save_task_attempt(self, booking_id: int, task_kind: TaskKind) -> None:
-        """Store the kind a create of the booking's task is about to be tried as (step 7a).
+    async def save_task_attempt(self, booking_id: int, task_kind: TaskKind | None) -> None:
+        """Store the kind the latest create is about to be tried as (step 7a); ``None`` clears.
 
         Written before the platform answers, so that a task found afterwards without an answer
-        (adoption) is given the kind it was created as, not one guessed from the routing.
+        (adoption) is given the kind of the latest attempt, not one read from the routing. It
+        is cleared when a task is stored (``save_task``) and when an attempt fails for good.
+        Never touches the kind of a stored task.
         """
         ...
 

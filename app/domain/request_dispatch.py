@@ -210,7 +210,10 @@ class AttemptEvents:
             return None
         if not await self._ours(tx, booking, request, provider, organisation_id):
             return None
-        # The kind comes from the create that made the task (stored before it was tried).
+        # The kind of the latest attempt, stored before it was tried. The platform's task carries
+        # only the booking's reference, no attempt id, so which attempt an orphan belongs to
+        # cannot be told; the latest attempt is the safest reading (a form when none is stored,
+        # as before the step), and it is the only attempt that can still be in doubt.
         task = ContactCenterTaskRef(task_id, provider, booking.attempted_task_kind)
         items = [
             i
@@ -362,7 +365,7 @@ class RequestDispatch:
                     stored_id(booking), EventKind.INTEGRATION_ERROR, detail=IN_DOUBT_SKIP
                 )
                 return IN_DOUBT_SKIP
-            await self._fail(opened)
+            await self._fail(opened, stored_id(booking))
             raise
         task = built.ref(task_id)
         async with self._uow.locked() as tx:
@@ -397,10 +400,15 @@ class RequestDispatch:
             await tx.save_task_attempt(stored_id(booking), task_kind)
         return _Write(new_request, new_request, stored, stored.state)
 
-    async def _fail(self, opened: _Write) -> None:
-        """End the attempt ``failed`` and queue the request again."""
+    async def _fail(self, opened: _Write, booking_id: int) -> None:
+        """End the attempt ``failed``, queue the request again and forget the attempt's kind.
+
+        A final failure made no task, so there is nothing left for adoption to label.
+        """
         now = self._clock.now()
         await self._settle(opened, lambda r, i: attempts.failed(r, i, now=now))
+        async with self._uow.locked() as tx:
+            await tx.save_task_attempt(booking_id, None)
 
     async def _settle(
         self,

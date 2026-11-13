@@ -466,6 +466,15 @@ class ParticipantMessage:
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, "text")
 
 
+class OpeningTextError(ValueError):
+    """The catalogue's first-message text of a conversation cannot be used (ADR 0123 step 7a).
+
+    A mistake in the shipped catalogue (a placeholder outside the allow-list, a malformed text),
+    found by a test; raised by the edge's function that composes the text and turned by the
+    call service into the refusal ``integration_not_ready`` (``opening_message``).
+    """
+
+
 MESSAGING_NOT_CONFIGURED = "messaging_not_configured"
 """``IntegrationError`` code: the platform refused a conversation because its messaging feature
 or channel is not set up for the organisation (a 403). Never a reason to send a form task."""
@@ -498,7 +507,7 @@ def contact_center_task(
     start_label: str,
     skills: tuple[str, ...] = (),
     interaction: InteractionKind = InteractionKind.VIDEO,
-    conversation_enabled: bool = False,
+    conversation_enabled: bool,
 ) -> ContactCenterTask:
     """Return the contact-center task to dispatch for ``booking``.
 

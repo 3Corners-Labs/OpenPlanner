@@ -21,6 +21,7 @@ from app.domain.booking import Booking
 from app.domain.calls import (
     ContactCenterTask,
     EventKind,
+    OpeningTextError,
     TaskState,
     contact_center_task,
     meeting_request,
@@ -174,7 +175,11 @@ class CallService:
         async with self._uow.read() as tx:
             organisation = await tx.get_organisation_by_id(group.organisation_id)
         locale = organisation.default_locale if organisation else None
-        return replace(task, first_message=self._opening(locale, task))
+        try:
+            text = self._opening(locale, task)
+        except OpeningTextError as error:  # a catalogue mistake: never retried, shown with its code
+            raise DomainError(ErrorCode.INTEGRATION_NOT_READY, OPENING_MESSAGE) from error
+        return replace(task, first_message=text)
 
     async def dispatcher_of(self, group: Group) -> ContactCenterDispatcher | None:
         """Return the dispatcher of the group's contact-center platform, ``None`` without one."""

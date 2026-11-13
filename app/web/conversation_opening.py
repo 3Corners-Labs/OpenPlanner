@@ -8,7 +8,7 @@ first name, the start label, the group's name and the host join link. The names 
 It is not an editable block: an administrator cannot add a field to it.
 """
 
-from app.domain.calls import ContactCenterTask
+from app.domain.calls import ContactCenterTask, OpeningTextError
 from app.domain.message_texts import CONVERSATION_OPENING_PLACEHOLDERS, used_placeholders
 from app.i18n import DEFAULT_LOCALE, Translator
 
@@ -27,15 +27,16 @@ def conversation_opening(
     The values are those of the neutral task, which holds nothing else of the booking.
 
     Raises:
-        ValueError: If the catalogue text of the language uses a placeholder outside
-            ``CONVERSATION_OPENING_PLACEHOLDERS``: a mistake in the catalogue, found by a test,
-            never worked around at run time (the text is fixed, not an administrator's).
+        OpeningTextError: If the catalogue text of the language uses a placeholder outside
+            ``CONVERSATION_OPENING_PLACEHOLDERS`` or is malformed: a mistake in the catalogue,
+            found by a test, never worked around at run time (the text is fixed, not an
+            administrator's). The dispatch refuses it as not ready.
     """
     language = locale or DEFAULT_LOCALE
     key = OPENING_WITH_LINK if task.meeting_link else OPENING_WITHOUT_LINK
     names = used_placeholders(translator.lookup(language, key))
     if names is None or not names <= CONVERSATION_OPENING_PLACEHOLDERS:
-        raise ValueError(f"the text {key!r} uses a placeholder the first message may not")
+        raise OpeningTextError(f"the text {key!r} uses a placeholder the first message may not")
     return translator.gettext(
         language,
         key,

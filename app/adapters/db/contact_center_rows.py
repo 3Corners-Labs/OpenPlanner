@@ -20,7 +20,8 @@ The task kind (ADR 0123 step 7a) is newer than the previous image, which never r
 it, so it has no old column to keep in step: ``group_contact_center.task_kind`` holds a routing's
 kind for every platform (the form where the group has no such row) and
 ``bookings.contact_center_task_kind`` the kind a task was created with (NULL: a form, as every
-task before the step).
+task before the step) and ``bookings.contact_center_attempt_kind`` the kind the latest create was
+tried as (NULL: a form; cleared with a stored task or a failed attempt).
 """
 
 from collections.abc import Sequence
@@ -112,6 +113,7 @@ def task_columns(task: ContactCenterTaskRef) -> dict[str, Any]:
         "contact_center_kind": task.kind.value,
         "wxcc_task_id": task.id if task.kind is LEGACY_KIND else None,
         "contact_center_task_kind": task.task_kind.value,
+        "contact_center_attempt_kind": None,  # the create is answered: nothing left to adopt
     }
 
 

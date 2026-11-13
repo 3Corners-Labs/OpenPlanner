@@ -326,23 +326,51 @@ async def test_a_task_stored_before_the_step_reads_as_a_form(engine: AsyncEngine
     assert booking.contact_center_task.task_kind is TaskKind.FORM
 
 
-async def test_the_kind_a_create_is_tried_as_is_stored_before_the_answer(
+async def test_the_kind_a_create_is_tried_as_is_stored_in_its_own_column(
     engine: AsyncEngine,
 ) -> None:
-    """ADR 0123 step 7a: adoption reads it back; a booking without a task has no task."""
-    uow, booking_id = await _booking_with_task(engine)
-    async with engine.begin() as connection:
-        await connection.execute(
-            update(BookingRow).values(
-                wxcc_task_id=None, contact_center_task_id=None, contact_center_kind=None
-            )
-        )
+    """ADR 0123 step 7a: adoption reads the attempt's column; the task's own kind is not touched."""
+    uow, booking_id = await _booking_with_task(engine)  # a stored form task
     async with uow.locked() as tx:
         await tx.save_task_attempt(booking_id, TaskKind.CONVERSATION)
 
     async with uow.read() as tx:
         booking = await tx.get_booking(booking_id)
+    async with engine.connect() as connection:
+        columns = (
+            await connection.execute(
+                select(BookingRow.contact_center_task_kind, BookingRow.contact_center_attempt_kind)
+            )
+        ).one()
 
     assert booking is not None
-    assert booking.contact_center_task is None
     assert booking.attempted_task_kind is TaskKind.CONVERSATION
+    assert booking.contact_center_task is not None
+    assert booking.contact_center_task.task_kind is TaskKind.FORM  # not relabelled by an attempt
+    assert tuple(columns) == ("form", "conversation")
+
+
+async def test_storing_a_task_clears_the_attempt_and_clearing_it_leaves_the_task(
+    engine: AsyncEngine,
+) -> None:
+    uow, booking_id = await _booking_with_task(engine)
+    async with uow.locked() as tx:
+        await tx.save_task_attempt(booking_id, TaskKind.CONVERSATION)
+        await tx.save_task(
+            booking_id, ContactCenterTaskRef("task-2", WEBEX_CC, TaskKind.CONVERSATION)
+        )
+    async with engine.connect() as connection:
+        stored = (await connection.execute(select(BookingRow.contact_center_attempt_kind))).scalar()
+    assert stored is None  # the create was answered: nothing left to adopt
+
+    async with uow.locked() as tx:
+        await tx.save_task_attempt(booking_id, TaskKind.CONVERSATION)
+        await tx.save_task_attempt(booking_id, None)  # a final failure
+    async with uow.read() as tx:
+        booking = await tx.get_booking(booking_id)
+
+    assert booking is not None
+    assert booking.attempted_task_kind is TaskKind.FORM  # NULL is a form
+    assert booking.contact_center_task == ContactCenterTaskRef(
+        "task-2", WEBEX_CC, TaskKind.CONVERSATION
+    )

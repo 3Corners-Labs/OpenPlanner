@@ -173,7 +173,9 @@ MEETING = MeetingRef("m-1", "https://site.webex.com/meet/abc")
 
 
 def test_a_task_names_its_interaction_and_a_booking_without_a_flow_is_video() -> None:
-    task = contact_center_task(make_booking(meeting=MEETING), GROUP, start_label="x")
+    task = contact_center_task(
+        make_booking(meeting=MEETING), GROUP, start_label="x", conversation_enabled=False
+    )
 
     assert task.interaction is InteractionKind.VIDEO
 
@@ -182,7 +184,13 @@ def test_a_task_the_platform_cannot_carry_is_refused_before_it_is_built() -> Non
     booking = make_booking(meeting=MEETING)
 
     with pytest.raises(DomainError) as excinfo:
-        contact_center_task(booking, GROUP, start_label="x", interaction=InteractionKind.TELEPHONE)
+        contact_center_task(
+            booking,
+            GROUP,
+            start_label="x",
+            interaction=InteractionKind.TELEPHONE,
+            conversation_enabled=False,
+        )
 
     assert (excinfo.value.code, excinfo.value.field) == (
         ErrorCode.INTEGRATION_NOT_READY,

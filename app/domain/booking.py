@@ -275,7 +275,9 @@ class Booking:
     """The task at the contact center and its platform (ADR 0032); purged with the contact."""
     attempted_task_kind: TaskKind = TaskKind.FORM
     """The kind the latest create of a task was tried as (ADR 0123 step 7a), stored before the
-    platform answers, so that a task found later is adopted with the kind it was made as."""
+    platform answers and cleared with a stored task or a failed attempt; a form when none is
+    pending. Adoption gives an orphan this kind: the platform's task carries no attempt id, so
+    the latest attempt is all there is to go by."""
     kind: BookingKind = BookingKind.SCHEDULED
     closure_id: int | None = None
     change_reason: ChangeReason | None = None

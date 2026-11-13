@@ -13,7 +13,7 @@ import pytest
 from app.domain.admin import AdminService
 from app.domain.booking import MeetingRef
 from app.domain.call_service import CallService
-from app.domain.calls import ContactCenterTask
+from app.domain.calls import ContactCenterTask, OpeningTextError
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef, TaskKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import IntegrationService
@@ -206,3 +206,18 @@ async def test_a_form_task_whose_mark_fails_for_a_retry_is_not_ended_yet() -> No
         await calls.end_task(booking, CONVERSATION_GROUP)
 
     assert dispatcher.ended == []
+
+
+async def test_a_bad_opening_text_is_a_refusal_of_the_dispatch_not_an_error() -> None:
+    def broken(locale: str | None, task: ContactCenterTask) -> str:
+        raise OpeningTextError("a placeholder outside the list")
+
+    dispatcher = FakeDispatcher()
+    _, calls, booking = await _service(dispatcher, opening=broken)
+
+    with pytest.raises(DomainError) as refused:
+        await calls.ensure_task(booking, CONVERSATION_GROUP)
+
+    assert refused.value.code is ErrorCode.INTEGRATION_NOT_READY
+    assert refused.value.field == "opening_message"
+    assert dispatcher.items == []

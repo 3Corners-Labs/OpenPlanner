@@ -73,8 +73,6 @@ from app.admin.routing_inputs import (
     ROUTING_HINTS,
     ROUTING_LABELS,
     ROUTING_VALUE_FIELD,
-    routing_with_task_kind,
-    with_task_kind_field,
 )
 from app.admin.shortfalls import group_shortfalls
 from app.admin.staffing_views import (
@@ -91,6 +89,7 @@ from app.admin.staffing_views import (
     split_fields,
     week,
 )
+from app.admin.task_kind_input import routing_with_task_kind, with_task_kind_field
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
 from app.domain.contact_center import ContactCenterRouting

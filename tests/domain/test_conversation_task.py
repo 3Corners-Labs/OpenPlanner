@@ -89,6 +89,7 @@ def test_a_task_is_of_the_routings_kind() -> None:
         replace(group, contact_center=webex_routing()),
         start_label="x",
         interaction=InteractionKind.NONE,
+        conversation_enabled=False,
     )
     assert form.task_kind is TaskKind.FORM
 

@@ -53,7 +53,9 @@ def test_an_existing_routing_is_a_form_and_nothing_else_changes(
         assert database.execute(
             "SELECT kind, routing_value, task_kind FROM group_contact_center"
         ).fetchall() == [("webex_cc", "team", "form")]
-    assert "contact_center_task_kind" in _columns(old_database, "bookings")
+    assert {"contact_center_task_kind", "contact_center_attempt_kind"} <= set(
+        _columns(old_database, "bookings")
+    )
 
 
 def test_downgrade_refuses_while_a_conversation_routing_exists(
@@ -73,3 +75,4 @@ def test_downgrade_refuses_while_a_conversation_routing_exists(
     command.downgrade(alembic_config, "0115")
     assert "task_kind" not in _columns(old_database, "group_contact_center")
     assert "contact_center_task_kind" not in _columns(old_database, "bookings")
+    assert "contact_center_attempt_kind" not in _columns(old_database, "bookings")

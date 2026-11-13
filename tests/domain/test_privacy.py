@@ -100,7 +100,7 @@ def test_the_purge_clears_the_personal_fields_and_the_provider_links() -> None:
 
 def test_the_kind_of_a_task_is_deliberately_not_purged() -> None:
     """A closed-list word that finds nothing at the provider: the task's id is what is purged."""
-    kept = {"contact_center_task_kind", "contact_center_kind"}
+    kept = {"contact_center_task_kind", "contact_center_attempt_kind", "contact_center_kind"}
 
     assert kept.isdisjoint(PURGED_FIELDS)
     assert kept.isdisjoint(PII_FIELDS)

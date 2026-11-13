@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.domain.calls import ContactCenterTask
+from app.domain.calls import ContactCenterTask, OpeningTextError
 from app.domain.contact_center import TaskKind
 from app.domain.message_texts import CONVERSATION_OPENING_PLACEHOLDERS, used_placeholders
 from app.i18n import CATALOGUE_DIR, DEFAULT_LOCALE, Translator, load_catalogues
@@ -84,14 +84,14 @@ def test_a_catalogue_text_with_a_placeholder_outside_the_list_is_refused() -> No
         "nl": {OPENING_WITH_LINK: "{reference} {email}", OPENING_WITHOUT_LINK: "{reference}"}
     }
 
-    with pytest.raises(ValueError, match="placeholder"):
+    with pytest.raises(OpeningTextError):
         conversation_opening(Translator(catalogues), "nl", TASK)
 
 
 def test_a_malformed_catalogue_text_is_refused() -> None:
     catalogues = {"nl": {OPENING_WITH_LINK: "{reference", OPENING_WITHOUT_LINK: "{reference}"}}
 
-    with pytest.raises(ValueError, match="placeholder"):
+    with pytest.raises(OpeningTextError):
         conversation_opening(Translator(catalogues), "nl", TASK)
 
 

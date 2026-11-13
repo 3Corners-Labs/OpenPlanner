@@ -8,7 +8,12 @@ nothing it knew.
   work item, the default) or ``conversation`` (a messaging task). Every existing row is a form.
 * ``bookings.contact_center_task_kind``: the kind a task was created with, so a later step
   knows a conversation without asking the platform. NULL is a form, which every task before
-  this step is; the column is nullable so that no row of the large table is written.
+  this step is; the column is nullable so that no row of the large table is written. Written
+  only when a task reference is stored.
+* ``bookings.contact_center_attempt_kind``: the kind the latest create was tried as, stored
+  before the platform answers so that a task found afterwards is adopted with it. NULL is a
+  form (what adoption did before this step). Cleared when a task is stored and when an attempt
+  fails for good; written by nothing else.
 
 Downgrade drops both. It refuses while a conversation exists, whether as a routing or as a
 task: without the columns a conversation task would be read as a work item.
@@ -29,7 +34,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    """Add the routing's task kind (default ``form``) and the task's own (nullable)."""
+    """Add the routing's task kind (default ``form``), the task's own and the attempt's."""
     with op.batch_alter_table("group_contact_center") as batch:
         batch.add_column(
             sa.Column(
@@ -38,6 +43,9 @@ def upgrade() -> None:
         )
     with op.batch_alter_table("bookings") as batch:
         batch.add_column(sa.Column("contact_center_task_kind", sa.String(length=16), nullable=True))
+        batch.add_column(
+            sa.Column("contact_center_attempt_kind", sa.String(length=16), nullable=True)
+        )
 
 
 def downgrade() -> None:
@@ -55,6 +63,7 @@ def downgrade() -> None:
             "their kind"
         )
     with op.batch_alter_table("bookings") as batch:
+        batch.drop_column("contact_center_attempt_kind")
         batch.drop_column("contact_center_task_kind")
     with op.batch_alter_table("group_contact_center") as batch:
         batch.drop_column("task_kind")

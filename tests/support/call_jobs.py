@@ -1,5 +1,7 @@
 """The job runner on fake video and contact-centre adapters, for the call job tests (ADR 0018)."""
 
+from collections.abc import Callable
+
 from app.domain.admin import AdminService
 from app.domain.calls import EventKind
 from app.domain.integration import IntegrationService
@@ -39,9 +41,21 @@ class Setup:
         self.dispatcher = FakeDispatcher()
         self.integration = IntegrationService(uow, self.clock, AdminService(uow, self.clock))
 
-    def runner(self, queue: FakeQueue) -> JobRunner:
-        """Return a job runner that takes its jobs from ``queue`` and calls the fakes."""
-        composer = MessageComposer(Translator(load_catalogues()), TEST_TOKEN_KEY, "http://x")
+    def runner(
+        self,
+        queue: FakeQueue,
+        *,
+        translator: Translator | None = None,
+        conversation_enabled: Callable[[], bool] | None = None,
+    ) -> JobRunner:
+        """Return a job runner that takes its jobs from ``queue`` and calls the fakes.
+
+        ``translator`` replaces the catalogue and ``conversation_enabled`` is the platform
+        switch of ADR 0123 step 7a (off when not given).
+        """
+        composer = MessageComposer(
+            translator or Translator(load_catalogues()), TEST_TOKEN_KEY, "http://x"
+        )
         return JobRunner(
             queue,
             self.uow,
@@ -51,6 +65,7 @@ class Setup:
             video=self.video,
             dispatchers=webex_cc(self.dispatcher),
             integration=self.integration,
+            conversation_enabled=conversation_enabled,
         )
 
     async def booking(self) -> int:

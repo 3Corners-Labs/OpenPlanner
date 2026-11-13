@@ -23,6 +23,7 @@ from app.adapters.wxcc import (
     SKILLS_KEY,
     WxccTasks,
     append_body,
+    messaging_refusal,
     task_body,
 )
 from app.domain.calls import (
@@ -328,3 +329,29 @@ async def test_an_append_refused_for_missing_messaging_is_the_same_domain_error(
         await tasks.append_message(REF, ParticipantMessage("m1", "Hallo"))
 
     assert error.value.code == MESSAGING_NOT_CONFIGURED
+
+
+@pytest.mark.parametrize("status", [403, 409])
+async def test_only_the_status_reaches_the_error_never_the_platforms_description(
+    status: int,
+) -> None:
+    """The request holds the first name and the link; a description of the error may echo them."""
+    body = {"error": {"description": "Zoë https://site.webex.com/m/1 refused", "key": "x"}}
+    tasks = _tasks(lambda request: httpx.Response(status, json=body))
+
+    with pytest.raises(IntegrationError) as created:
+        await tasks.create_task(CONVERSATION)
+    with pytest.raises(IntegrationError) as appended:
+        await tasks.append_message(REF, ParticipantMessage("m1", "Hallo"))
+
+    for error in (created.value, appended.value):
+        assert error.reason == f"HTTP {status}"
+        for echoed in ("Zoë", "site.webex.com", "refused"):
+            assert echoed not in f"{error.reason} {error!s} {error!r} {error.args}"
+
+
+def test_a_reason_of_the_platform_is_dropped_too() -> None:
+    """Even a reason an adapter had put on the error (a request without personal data)."""
+    refused = IntegrationError("rejected_403", retryable=False, reason="Zoë at https://x.nl")
+
+    assert messaging_refusal(refused).reason == "HTTP 403"
