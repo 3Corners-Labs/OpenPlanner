@@ -19,6 +19,7 @@ from starlette.responses import HTMLResponse
 from app.logging import tracer
 from app.web.locale import LANG_PARAM, RequestLocale
 from app.web.protection import is_action
+from app.web.security_policy import CALL_POLICY, POLICIES, PageKind, Policy
 from app.web.static_assets import ASSETS
 from app.web.widgets import OVERVIEW_PATH
 
@@ -41,22 +42,6 @@ class FragmentResponse(HTMLResponse):
     portal's *pages* (navigation homes, manual topics) leave them out: a fragment is part of
     the page it belongs to, never a screen of its own.
     """
-
-
-HTML_CSP = (
-    "default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; "
-    "base-uri 'none'; frame-ancestors 'none'"
-)
-"""No scripts, no inline styles, no framing. Relaxed per page only when a feature needs it.
-Fonts only from our own origin: an organisation's uploaded fonts (ADR 0041)."""
-
-SCRIPT_CSP = (
-    "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; "
-    "img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; "
-    "frame-ancestors 'none'"
-)
-"""Participant pages (ADR 0020): own scripts only, which may fetch the same pages; still no
-inline scripts or styles, so injected markup cannot run."""
 
 
 @dataclass(frozen=True)
@@ -195,14 +180,15 @@ def render(
     context: Mapping[str, object] | None = None,
     *,
     frame: Mapping[str, object] | None = None,
-    scripts: bool = False,
+    kind: PageKind = PageKind.DOCUMENT,
 ) -> HTMLResponse:
-    """Render template ``name`` in the request's locale.
+    """Render template ``name`` in the request's locale as a page of ``kind``.
 
     The template receives the page's ``context``; then ``frame``, what a wrapper gives every
     page of its kind (the admin portal's menu and profile menu, ``app.admin.pages.page``);
     then ``_`` (bound gettext), ``locale``, ``languages``, ``environment`` and
-    ``product_footer``. ``scripts=True`` allows the page's own scripts (``SCRIPT_CSP``).
+    ``product_footer``. ``kind`` alone decides the page's ``Content-Security-Policy`` and
+    ``Permissions-Policy`` (``PageKind.SCRIPTED`` allows the page's own scripts).
 
     Raises:
         ValueError: a name of ``context`` or ``frame`` that a later layer sets as well (a
@@ -210,6 +196,34 @@ def render(
             showed the environment bar's ``EnvironmentNotice`` as the environment, and a
             booking's "back to the agenda" link pointed at the booking itself.
     """
+    return _render(templates, request, name, locale, context, frame, POLICIES[kind])
+
+
+def render_call_page(
+    templates: Jinja2Templates,
+    request: Request,
+    name: str,
+    locale: RequestLocale,
+    context: Mapping[str, object] | None = None,
+) -> HTMLResponse:
+    """Render template ``name`` as the call page, with the call page's policy (ADR 0123).
+
+    The only function that applies ``CALL_POLICY``; ``tests/web/test_page_kinds.py`` lists by
+    syntax tree the modules that may name it. Otherwise as ``render``.
+    """
+    return _render(templates, request, name, locale, context, None, CALL_POLICY)
+
+
+def _render(
+    templates: Jinja2Templates,
+    request: Request,
+    name: str,
+    locale: RequestLocale,
+    context: Mapping[str, object] | None,
+    frame: Mapping[str, object] | None,
+    policy: Policy,
+) -> HTMLResponse:
+    """Render ``name`` and set the headers of ``policy``: the body of both public functions."""
     own: dict[str, object] = {
         "_": locale.gettext,
         "locale": locale.code,
@@ -224,7 +238,8 @@ def render(
     started = perf_counter()
     response = templates.TemplateResponse(request, name, {**page, **shared, **own})
     tracer.trace("template.render", template=name, ms=int((perf_counter() - started) * 1000))
-    response.headers["content-security-policy"] = SCRIPT_CSP if scripts else HTML_CSP
+    response.headers["content-security-policy"] = policy.csp
+    response.headers["permissions-policy"] = policy.permissions
     response.headers["cache-control"] = "no-store"
     locale.apply_to(request, response)
     return response

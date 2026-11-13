@@ -1,6 +1,10 @@
+import json
+import re
+from pathlib import Path
+
 import pytest
 
-from scripts.check_pins import ROOT, check_lines, files
+from scripts.check_pins import ROOT, _python_groups, check_lines, check_vendor, files
 
 SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1"
 
@@ -114,3 +118,58 @@ def test_repository_has_no_untracked_pins() -> None:
         for violation in check_lines(str(path), path.read_text(encoding="utf-8").splitlines())
     ]
     assert violations == []
+
+
+RENOVATE = json.loads((ROOT / "renovate.json").read_text(encoding="utf-8"))
+VENDOR_MANAGER = next(m for m in RENOVATE["customManagers"] if m.get("depNameTemplate") == "webex")
+"""The manager of ``renovate.json`` that reads the call page's manifest."""
+
+
+def _vendor_root(
+    tmp_path: Path, *, pattern: str | None = None, checksum_of: str | None = None
+) -> Path:
+    """A repository with a manifest and the real Renovate manager for it."""
+    folder = tmp_path / "app/web/static/vendor/webex"
+    folder.mkdir(parents=True)
+    manifest: dict[str, object] = {
+        "name": "webex",
+        "version": "3.13.0",
+        "source": "npm package webex",
+        "file": "meetings.min.js",
+    }
+    if checksum_of:
+        manifest["checksum"] = {"version": checksum_of, "sha256": "ab" * 32}
+    (folder / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    manager = {
+        **VENDOR_MANAGER,
+        "managerFilePatterns": [pattern or VENDOR_MANAGER["managerFilePatterns"][0]],
+    }
+    (tmp_path / "renovate.json").write_text(json.dumps({"customManagers": [manager]}))
+    return tmp_path
+
+
+def test_a_vendored_manifest_read_by_a_custom_manager_is_tracked(tmp_path: Path) -> None:
+    assert list(check_vendor(_vendor_root(tmp_path))) == []
+
+
+def test_the_manager_captures_the_top_level_version_not_the_checksums(tmp_path: Path) -> None:
+    root = _vendor_root(tmp_path, checksum_of="3.12.0")
+    text = (root / "app/web/static/vendor/webex/manifest.json").read_text()
+    pattern = _python_groups(VENDOR_MANAGER["matchStrings"][0])
+
+    captured = [found["currentValue"] for found in re.finditer(pattern, text)]
+
+    assert captured == ["3.13.0"]
+    assert list(check_vendor(root)) == []
+
+
+def test_a_vendored_manifest_no_manager_matches_is_not_tracked(tmp_path: Path) -> None:
+    root = _vendor_root(tmp_path, pattern="/^somewhere/else\\.json$/")
+
+    assert [v.reason for v in check_vendor(root)] == [
+        "version no custom manager of renovate.json reads"
+    ]
+
+
+def test_the_vendored_manifest_of_this_repository_is_tracked() -> None:
+    assert list(check_vendor(ROOT)) == []

@@ -59,6 +59,8 @@ DECISION_FILES = frozenset(
         "app/domain/authorization.py",
         "scripts/decision_gate.py",
         "scripts/adr_tables.py",
+        "scripts/vendor.py",
+        "scripts/vendor_sbom.py",
         "scripts/release-audit.sh",
         "scripts/check-release-audit.sh",
     }

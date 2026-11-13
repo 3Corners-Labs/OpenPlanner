@@ -116,6 +116,8 @@ def test_every_decision_path_and_the_release_title_are_named() -> None:
         "Makefile",
         "app/domain/authorization.py",
         "scripts/check-release-audit.sh",
+        "scripts/vendor.py",
+        "scripts/vendor_sbom.py",
         "docs/adr/0099-example.md",
         "app/domain/booking.py",
         "pyproject.toml",
@@ -133,6 +135,8 @@ def test_every_decision_path_and_the_release_title_are_named() -> None:
         "app/domain/authorization.py changed",
         "docs/adr/0099-example.md changed outside its Status line and Build status table",
         "scripts/check-release-audit.sh changed",
+        "scripts/vendor.py changed",
+        "scripts/vendor_sbom.py changed",
     ]
 
 
