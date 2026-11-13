@@ -20,6 +20,16 @@ outcome is therefore *derived from the call*, and only where the call was observ
     scheduled, no guest seen                   ``no_show``
     direct, guest seen and host joined         ``completed``; any other direct call: no outcome
 
+A slot of a counted pool (ADR 0122) is closed too, with its own rule: its outcome is the
+operator's explicit evidence (A27), never an observation of a meeting. Its capacity belongs to a
+pool that several services share, not to the service, so it writes no ``slot.closed`` and no
+``slot.shortfall`` (a pool's shortage is listed on the pool's own page):
+
+    pool booking completed by an operator        ``completed``
+    pool booking marked as a no show             ``no_show``
+    any other pool booking                       no outcome (expiry is not evidence of absence)
+    confirmed, and nobody claimed or started it  ``call.not_picked_up``
+
 A guest is *seen* when a guest-joined event or a poll showed someone besides the host in the
 meeting, or two people were in it at once. ``no_show`` means that no join was observed. Where
 Webex's webhooks are not set up and nobody opened the agenda, a join cannot be seen; the
@@ -29,7 +39,7 @@ had a booking, so hours nobody booked are not in C1 to C3.
 Pure Python, no I/O: ``slot_close_service`` loads the ended slots and stores the facts.
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -66,6 +76,14 @@ the meeting, or two people were in it at once. `no_show` therefore means that no
 where Webex's webhooks are not set up and nobody opened the agenda, a join cannot be seen. A slot
 exists only when it had a booking, so hours nobody booked are not in utilisation. Slots that ended
 before the upgrade are not closed afterwards, and `completed` and `no_show` cannot be backfilled.
+
+An appointment of a flow on a counted pool (ADR 0122) has no meeting to observe: its outcome is
+the operator's explicit *Complete* (`completed`), or `no_show` where the booking was marked so;
+work that expired unstarted has no outcome. It counts as not picked up when, at closing, nobody
+had claimed it or started it. Its places belong to a pool that several services share, so it adds
+nothing to utilisation, fill or idle capacity (C1 to C3) and no shortfall (C5): a pool's shortage
+is on the pool's own page. Work completed more than two hours after the appointment's end (work
+in recovery, among others) is closed without its outcome.
 """
 """The rule of ``outcome_of`` in words, as published in ``docs/reporting.md``."""
 
@@ -87,6 +105,8 @@ class ClosedBooking:
         start: The slot start.
         claimed: Whether an agent of the own queue claimed it.
         call: Its aggregated call status.
+        work_started: Whether work of its request started (ADR 0121: a claimed treatment or a
+            contact-center attempt that connected).
     """
 
     status: BookingStatus
@@ -95,6 +115,7 @@ class ClosedBooking:
     start: datetime
     claimed: bool
     call: CallStatus
+    work_started: bool = False
 
 
 @dataclass(frozen=True)
@@ -109,6 +130,8 @@ class EndedSlot:
         end: The slot end.
         capacity: The capacity snapshot of the slot.
         bookings: Every booking in it, whatever its status.
+        pool_id: The counted pool the slot draws on (ADR 0122), ``None`` for the service's
+            own (legacy) slot.
     """
 
     slot_id: int
@@ -118,6 +141,17 @@ class EndedSlot:
     end: datetime
     capacity: int
     bookings: tuple[ClosedBooking, ...]
+    pool_id: int | None = None
+
+    @property
+    def pooled(self) -> bool:
+        """Whether the slot draws on a counted pool rather than the service's own staffing."""
+        return self.pool_id is not None
+
+    @property
+    def counts_capacity(self) -> bool:
+        """Whether the slot's places are the service's own: a scheduled slot, not of a pool."""
+        return self.kind is BookingKind.SCHEDULED and not self.pooled
 
 
 @dataclass(frozen=True)
@@ -199,6 +233,29 @@ def outcome_of(booking: ClosedBooking, kind: BookingKind) -> UsageOutcome | None
     return None
 
 
+def pool_outcome_of(booking: ClosedBooking) -> UsageOutcome | None:
+    """Return how a pool booking ended: only from the explicit evidence of its status (A27).
+
+    The operator's *Complete* sets the booking to ``completed``; nothing is derived from a
+    meeting or from work that expired unstarted.
+    """
+    if booking.status is BookingStatus.COMPLETED:
+        return UsageOutcome.COMPLETED
+    if booking.status is BookingStatus.NO_SHOW:
+        return UsageOutcome.NO_SHOW
+    return None
+
+
+def pool_not_picked_up(booking: ClosedBooking) -> bool:
+    """Return whether nobody picked up a pool booking before its slot closed (metric Q6).
+
+    A pool booking always reaches a queue (the own queue or a contact-center attempt), so it
+    counts when it is still confirmed and nobody claimed it or started its work.
+    """
+    picked_up = booking.claimed or booking.work_started
+    return booking.status is BookingStatus.CONFIRMED and not picked_up
+
+
 def not_picked_up(booking: ClosedBooking, dispatch: DispatchKind, limit: timedelta) -> bool:
     """Return whether nobody picked ``booking`` up within ``limit`` of its start (metric Q6).
 
@@ -240,19 +297,21 @@ def closing_facts(
 ) -> list[UsageFact]:
     """Return the facts that closing ``slot`` writes.
 
+    A pool slot writes only the facts of its bookings, by the pool rule (see the module).
+
     Args:
         slot: The ended slot.
         organisation_id: The group's organisation.
         dispatch: How the group's bookings reach staff.
         not_picked_up_limit: The group's ``not_picked_up_minutes``.
-        staffing: The agenda's view of a scheduled slot; ``None`` for a direct slot or a slot
-            the staffing does not know.
+        staffing: The agenda's view of a scheduled slot; ``None`` for a direct slot, a pool
+            slot or a slot the staffing does not know.
     """
     facts: list[UsageFact] = []
     slot_facts = BookingFacts(
         organisation_id, slot.group_id, slot.kind, dispatch, None, slot.start, slot.start
     )
-    if slot.kind is BookingKind.SCHEDULED:
+    if slot.counts_capacity:
         booked = sum(1 for b in slot.bookings if counts(b))
         facts.append(
             keyed(
@@ -271,9 +330,10 @@ def closing_facts(
                     booked=staffing.booked,
                 )
             )
+    judge = _judge(slot, dispatch, not_picked_up_limit)
     for booking in slot.bookings:
         b = _facts_of(booking, organisation_id, slot.group_id, slot.kind, dispatch)
-        outcome = outcome_of(booking, slot.kind)
+        outcome, unanswered = judge(booking)
         if outcome is not None:
             facts.append(
                 keyed(
@@ -284,9 +344,20 @@ def closing_facts(
                     outcome=outcome,
                 )
             )
-        if not_picked_up(booking, dispatch, not_picked_up_limit):
+        if unanswered:
             facts.append(keyed(FactKind.CALL_NOT_PICKED_UP, b, slot.start))
     return facts
+
+
+Judgement = Callable[[ClosedBooking], tuple[UsageOutcome | None, bool]]
+"""How one booking of a closed slot ended, and whether it was left unanswered."""
+
+
+def _judge(slot: EndedSlot, dispatch: DispatchKind, limit: timedelta) -> Judgement:
+    """Return the rule that judges the bookings of ``slot``: the pool's or the service's own."""
+    if slot.pooled:
+        return lambda b: (pool_outcome_of(b), pool_not_picked_up(b))
+    return lambda b: (outcome_of(b, slot.kind), not_picked_up(b, dispatch, limit))
 
 
 def in_order(slots: Sequence[EndedSlot]) -> list[EndedSlot]:

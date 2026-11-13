@@ -43,6 +43,7 @@ reach has no row for it.
 | P | Unchanged: every path of a service is the same with a pool flow beside it | `tests/domain/test_pool_booking_gate.py::test_every_path_of_the_service_is_the_same_with_a_pool_flow_beside_it` |
 | P | Gated: a pool flow cannot be named and nothing is stored while the gate is shut | `tests/domain/test_pool_booking_gate.py::test_with_the_gate_shut_the_pool_flow_cannot_be_named_and_nothing_is_stored` |
 | P | Gated: a pool flow made the default is ignored while the gate is shut | `tests/domain/test_pool_booking_gate.py::test_a_pool_flow_made_the_default_is_ignored_while_the_gate_is_shut` |
+| P | Intended (gated): a pool slot is closed for the reports by the pool rule (explicit outcome only, no capacity of the service), the legacy slot beside it as before | `tests/adapters/db/test_legacy_slot.py::test_the_closing_of_ended_slots_closes_the_pool_slot_as_a_pool_slot` |
 | R | Unchanged: a legacy booking gets no request and is never watched | `tests/domain/test_request_watch.py::test_a_legacy_booking_is_never_watched` |
 
 ### Direct call (start now, ADR 0072)

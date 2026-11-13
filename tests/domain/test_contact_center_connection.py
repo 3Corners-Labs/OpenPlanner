@@ -198,6 +198,51 @@ async def test_saving_and_rotating_register_the_address_and_audit_the_outcome(
     assert await service.view(SUPER, "demo") is not None  # the change itself stays
 
 
+async def test_an_organisations_webhook_address_exists_with_its_connection(
+    service: ContactCenterConnectionService,
+) -> None:
+    await service.save(SUPER, "demo", change())
+
+    target = await service.webhook_target("demo", WXCC)
+
+    assert target.found
+    assert (target.organisation_id, target.secret, target.organisation) == (
+        1,
+        "secret-of-1",  # gitleaks:allow (test value)
+        "demo",
+    )
+
+
+async def test_a_webhook_address_without_a_connection_names_an_organisation_that_exists(
+    service: ContactCenterConnectionService,
+) -> None:
+    target = await service.webhook_target("andere", WXCC)
+
+    assert not target.found
+    assert target.organisation == "andere"
+
+
+async def test_a_slug_of_an_organisation_that_does_not_exist_is_never_returned(
+    service: ContactCenterConnectionService,
+) -> None:
+    for slug in ("nobody", "Not-A-Slug", "", "x" * 200, "demo/../andere"):
+        target = await service.webhook_target(slug, WXCC)
+        assert not target.found, slug
+        assert target.organisation is None, slug
+
+
+async def test_without_a_settings_key_no_webhook_address_exists(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    service = ContactCenterConnectionService(
+        uow, clock, AdminService(uow, clock), None, lambda: None
+    )
+
+    target = await service.webhook_target("demo", WXCC)
+
+    assert (target.found, target.organisation) == (False, None)
+
+
 async def test_without_a_registrar_nothing_is_registered(
     service: ContactCenterConnectionService,
 ) -> None:

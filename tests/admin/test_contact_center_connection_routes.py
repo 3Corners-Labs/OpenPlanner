@@ -6,6 +6,7 @@ from dataclasses import replace
 from app.adapters.contact_center_connections import SealedConnections
 from app.adapters.webhooks import sign_wxcc
 from app.domain.contact_center import ContactCenterKind, Registration
+from app.web.protection import RateLimits, configure_rate_limits
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.fakes.integrations import FakeOrganisationDispatchers
 from tests.support.admin_site import site_app
@@ -143,3 +144,78 @@ async def test_the_organisations_address_verifies_with_its_own_secret(site: Site
             other, content=body, headers=sign_wxcc(body, secret, stamp)
         )
         assert response.status_code == 404, other
+
+
+async def test_a_refusal_at_an_organisations_address_names_the_organisation_and_only_a_real_one(
+    site: Site,
+) -> None:
+    """ADR 0124 point 10: the slug is public; a slug the caller made up is never written."""
+    await _connect(site)
+    secret = await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC)
+    assert secret is not None
+    stamp = int(site.clock.now().timestamp() * 1000)
+    body = _event(stamp)
+    forged = sign_wxcc(body, "x" * 43, stamp)
+
+    for address in (
+        "/webhooks/contact-center/webex_cc/demo",  # a wrong signature
+        "/webhooks/contact-center/webex_cc/andere",  # exists, no connection
+        "/webhooks/contact-center/webex_cc/nobody",  # does not exist
+    ):
+        response = await site.client.post(address, content=body, headers=forged)
+        assert response.content == b""
+    refused = await site.client.post(
+        "/webhooks/contact-center/webex_cc/demo",
+        content=body,
+        headers=sign_wxcc(body, secret, stamp) | {"content-type": "text/plain"},
+    )
+    assert (refused.status_code, refused.content) == (415, b"")
+
+    log = await site_app(site).state.admin_service.audit_log(SUPER)
+    refusals = sorted(
+        (
+            e.event.reason,
+            ",".join(k for k in e.event.detail.split(",") if not k.startswith("client:")),
+        )
+        for e in log
+        if e.event.action == "webhook.rejected"
+    )
+    assert refusals == [
+        ("content_type", "source:wxcc,organisation:demo"),
+        ("invalid_signature", "source:wxcc,organisation:demo"),
+        ("unknown_address", "source:wxcc"),  # "nobody" does not exist: its slug is not written
+        ("unknown_address", "source:wxcc,organisation:andere"),
+    ]
+    assert "nobody" not in str(refusals)
+
+
+async def test_forged_calls_to_an_organisation_never_lock_its_signed_calls_out(site: Site) -> None:
+    """ADR 0124 point 5: a customer of the same supplier cannot use up an organisation's budget."""
+    await _connect(site)
+    secret = await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC)
+    assert secret is not None
+    stamp = int(site.clock.now().timestamp() * 1000)
+    body = _event(stamp)
+    address = "/webhooks/contact-center/webex_cc/demo"
+    configure_rate_limits(RateLimits(webhooks="3/minute"), enabled=True)
+    try:
+        forged = [
+            (
+                await site.client.post(
+                    address, content=body, headers=sign_wxcc(body, "x" * 43, stamp)
+                )
+            )
+            for _ in range(5)
+        ]
+        signed = await site.client.post(
+            address, content=body, headers=sign_wxcc(body, secret, stamp)
+        )
+        other_organisation = await site.client.post(
+            "/webhooks/contact-center/webex_cc/andere", content=body
+        )
+    finally:
+        configure_rate_limits(RateLimits(), enabled=False)
+
+    assert [r.status_code for r in forged] == [401, 401, 401, 429, 429]
+    assert signed.status_code == 204
+    assert other_organisation.status_code == 404

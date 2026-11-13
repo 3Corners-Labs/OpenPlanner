@@ -65,8 +65,11 @@ server). The updates page shows these events, filtered on the milestones, with w
 
 After commit, each audit, system and security event is written once to stdout as the record
 above plus `"log_type": "audit"`, for the log platform to route; diagnostic events stay inside
-the installation. Security events (`event.category = security`): `webhook.rejected` (reason
-`invalid_signature`, detail `source:webex` or `source:wxcc`) and `webex.token_refresh`
+the installation. Security events (`event.category = security`): `webhook.rejected` (reason one of
+`unknown_address`, `network`, `source_unknown`, `rate`, `content_type`, `too_large`, `invalid_signature`,
+`stale`, `malformed`, ADR 0124; detail `source:webex`, `source:wxcc` or `source:unknown`, with
+`organisation:<slug>` at an organisation's own address; `invalid_signature` is the name that
+stayed from before ADR 0124, when it was the only reason) and `webex.token_refresh`
 (reason `unauthorized` or `unreachable`, detail `status:<n>` or an exception type), at most one
 per kind per window, with `suppressed:<n>` for the ones held back. Shipping is described in
 `docs/runbook.md`.

@@ -18,20 +18,45 @@ the change.
 """
 
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from app.domain.admin import AdminService, record_change
 from app.domain.authorization import Permission, Principal
 from app.domain.contact_center import (
     CONNECTION_FIELD,
     ConnectionChange,
+    ContactCenterKind,
     OrganisationConnection,
     Registration,
 )
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.ports import Clock, ConnectionRegistrar, ContactCenterConnections, UnitOfWork
+from app.domain.scheduling import is_slug
 
 PERMISSION = Permission.INTEGRATIONS_MANAGE
 AUDIT_KEY = "contact_center_connection"
+
+
+@dataclass(frozen=True)
+class WebhookTarget:
+    """Where an organisation's own webhook address stands: found, or missing.
+
+    Attributes:
+        organisation_id: The organisation's id; ``None`` when the address does not exist.
+        secret: The webhook secret its events are signed with; ``None`` when missing.
+        organisation: The organisation's slug, set only when that organisation exists (and has
+            no connection); ``None`` when it does not, so a slug a caller made up is never
+            handed on.
+    """
+
+    organisation_id: int | None = None
+    secret: str | None = None
+    organisation: str | None = None
+
+    @property
+    def found(self) -> bool:
+        """Whether the address exists: an organisation connected to the platform, with a secret."""
+        return self.organisation_id is not None and self.secret is not None
 
 
 class ContactCenterConnectionService:
@@ -77,6 +102,31 @@ class ContactCenterConnectionService:
         if self._connections is None:
             return None
         return await self._connections.get(organisation_id)
+
+    async def webhook_target(self, slug: str, kind: ContactCenterKind) -> WebhookTarget:
+        """Return whether an organisation's own webhook address exists (ADR 0032 point 10).
+
+        It exists when ``slug`` names an organisation that is connected to ``kind`` with a
+        webhook secret. No permission is asked: the caller is a platform, authenticated by the
+        signature that this secret verifies.
+
+        Args:
+            slug: The organisation's slug as it came in the address; any text.
+            kind: The platform.
+
+        Returns:
+            The organisation's id and secret when the address exists. Otherwise ``found`` is
+            false, and ``organisation`` names the slug only when that organisation exists.
+        """
+        if self._connections is None or not is_slug(slug):
+            return WebhookTarget()
+        organisation_id = await self._admin.organisation_id(slug)
+        if organisation_id is None:
+            return WebhookTarget()
+        secret = await self._connections.webhook_secret(organisation_id, kind)
+        if secret is None:
+            return WebhookTarget(organisation=slug)
+        return WebhookTarget(organisation_id, secret, slug)
 
     async def save(
         self, principal: Principal, organisation: str, change: ConnectionChange

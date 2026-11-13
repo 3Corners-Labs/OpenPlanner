@@ -1,0 +1,396 @@
+"""The inbound webhook gate (ADR 0124): refusals answer empty and leave a trace with a reason."""
+
+from collections.abc import AsyncIterator
+from pathlib import Path
+
+import httpx
+import pytest
+import structlog.testing
+from pydantic import SecretStr
+
+from app.adapters.db.engine import create_engine
+from app.adapters.db.uow import SqlUnitOfWork
+from app.config import Settings
+from app.domain.authorization import Scope
+from app.web.protection import limiter
+from tests.conftest import app_client
+from tests.fakes.clock import FixedClock
+from tests.support.database import migrated_database
+from tests.support.domain import NOW
+from tests.support.webhooks import SECRET, sign, timestamp, wxcc_body
+
+JSON = "application/json"
+
+
+@pytest.fixture
+def database_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    return migrated_database(tmp_path, monkeypatch, "webhook-gate")
+
+
+def _configured(settings: Settings, database_url: str, **update: object) -> Settings:
+    return settings.model_copy(
+        update={
+            "database_url": database_url,
+            "webex_webhook_secret": SecretStr(SECRET),
+            "wxcc_webhook_secret": SecretStr(SECRET),
+            **update,
+        }
+    )
+
+
+@pytest.fixture
+async def client(settings: Settings, database_url: str) -> AsyncIterator[httpx.AsyncClient]:
+    async with app_client(_configured(settings, database_url), FixedClock(NOW)) as client:
+        yield client
+
+
+async def _refusals(database_url: str) -> list[tuple[str, str]]:
+    """Return the ``(reason, first detail key)`` of every refusal event, sorted."""
+    engine = create_engine(database_url)
+    async with SqlUnitOfWork(engine).read() as tx:
+        entries = await tx.list_audit_events(Scope(everything=True))
+    await engine.dispose()
+    return sorted(
+        (e.event.reason, e.event.detail.split(",")[0])
+        for e in entries
+        if e.event.action == "webhook.rejected"
+    )
+
+
+def _wxcc_headers(body: bytes) -> dict[str, str]:
+    return {"x-webexcc-signature": sign(body), "x-webexcc-timestamp": timestamp(body)}
+
+
+async def test_a_wrong_content_type_is_a_415_before_the_body_is_read(
+    client: httpx.AsyncClient, database_url: str
+) -> None:
+    body = wxcc_body("task:connected", at=NOW)
+
+    for content_type in ("text/plain", "application/x-www-form-urlencoded", "application/xml"):
+        response = await client.post(
+            "/webhooks/wxcc",
+            content=body,
+            headers=_wxcc_headers(body) | {"content-type": content_type},
+        )
+        assert (response.status_code, response.content) == (415, b""), content_type
+    for content_type in (f"{JSON}; charset=utf-8", "application/cloudevents+json"):
+        accepted = await client.post(
+            "/webhooks/wxcc",
+            content=body,
+            headers=_wxcc_headers(body) | {"content-type": content_type},
+        )
+        assert accepted.status_code == 204, content_type
+
+    assert await _refusals(database_url) == [("content_type", "source:wxcc")]
+
+
+async def test_a_call_without_a_content_type_passes_and_the_signature_decides(
+    client: httpx.AsyncClient,
+) -> None:
+    """The video platform's real deliveries were never observed: a missing header must not break."""
+    body = b"{}"
+    wxcc = wxcc_body("task:connected", at=NOW)
+
+    signed = await client.post(
+        "/webhooks/webex", content=body, headers={"x-spark-signature": sign(body, "sha1")}
+    )
+    signed_cc = await client.post("/webhooks/wxcc", content=wxcc, headers=_wxcc_headers(wxcc))
+    forged = await client.post(
+        "/webhooks/webex", content=body, headers={"x-spark-signature": "bad"}
+    )
+
+    assert (signed.status_code, signed_cc.status_code, forged.status_code) == (204, 204, 401)
+
+
+async def test_an_oversized_declared_length_is_refused_without_reading(
+    client: httpx.AsyncClient, database_url: str
+) -> None:
+    response = await client.post("/webhooks/webex", content=b"x" * (65 * 1024))
+
+    assert (response.status_code, response.content) == (413, b"")
+    assert await _refusals(database_url) == [("too_large", "source:webex")]
+
+
+async def test_a_body_sent_slowly_without_a_length_is_cut_off_at_the_limit(
+    client: httpx.AsyncClient, database_url: str
+) -> None:
+    """ADR 0124 point 6: a chunked body is capped while it is read, not after."""
+    sent = 0
+
+    async def trickle() -> AsyncIterator[bytes]:
+        nonlocal sent
+        for _ in range(100):
+            sent += 1
+            yield b"x" * 16 * 1024
+
+    response = await client.post("/webhooks/webex", content=trickle())
+
+    assert (response.status_code, response.content) == (413, b"")
+    assert sent < 10  # the limit is passed after 5 chunks; the rest is never read
+    assert await _refusals(database_url) == [("too_large", "source:webex")]
+
+
+async def test_a_body_exactly_at_the_limit_is_read(client: httpx.AsyncClient) -> None:
+    body = b"[" + b" " * (64 * 1024 - 2) + b"]"
+    assert len(body) == 64 * 1024
+
+    response = await client.post(
+        "/webhooks/webex", content=body, headers={"x-spark-signature": sign(body, "sha1")}
+    )
+
+    assert response.status_code == 400  # verified, read in full, and not an object
+
+
+async def test_every_refusal_leaves_its_reason_and_a_flood_is_one_event_each(
+    client: httpx.AsyncClient, database_url: str
+) -> None:
+    """ADR 0124 point 10: reason and platform, deduplicated per window and caller."""
+    stale = wxcc_body("task:connected", at=NOW.replace(hour=7))
+    not_an_object = b"[1]"
+    for _ in range(20):
+        await client.post("/webhooks/webex", content=b"{}", headers={"x-spark-signature": "bad"})
+        await client.post("/webhooks/webex", content=b"{}", headers={"content-type": "text/plain"})
+        await client.post("/webhooks/webex", content=b"x" * (65 * 1024))
+        await client.post(
+            "/webhooks/webex",
+            content=not_an_object,
+            headers={"x-spark-signature": sign(not_an_object, "sha1")},
+        )
+        await client.post("/webhooks/wxcc", content=stale, headers=_wxcc_headers(stale))
+        await client.post("/webhooks/contact-center/genesys", content=b"{}")
+        await client.post("/webhooks/contact-center/webex_cc/nobody", content=b"{}")
+
+    assert await _refusals(database_url) == [
+        ("content_type", "source:webex"),
+        ("invalid_signature", "source:webex"),
+        ("malformed", "source:webex"),
+        ("stale", "source:wxcc"),
+        ("too_large", "source:webex"),
+        ("unknown_address", "source:unknown"),
+        ("unknown_address", "source:wxcc"),
+    ]
+
+
+async def test_an_address_without_a_secret_leaves_a_trace_too(
+    settings: Settings, database_url: str
+) -> None:
+    async with app_client(settings.model_copy(update={"database_url": database_url})) as client:
+        for path in ("/webhooks/wxcc", "/webhooks/contact-center/webex_cc", "/webhooks/webex"):
+            response = await client.post(path, content=b"{}")
+            assert (response.status_code, response.content) == (404, b""), path
+
+    assert await _refusals(database_url) == [
+        ("unknown_address", "source:webex"),
+        ("unknown_address", "source:wxcc"),
+    ]
+
+
+async def test_a_refusal_event_holds_nothing_from_the_request(
+    client: httpx.AsyncClient, database_url: str
+) -> None:
+    looks_like_a_secret = "0123456789abcdef" * 4  # gitleaks:allow (test value)
+    await client.post(
+        "/webhooks/webex",
+        content=b'{"email": "ada@example.org"}',
+        headers={"x-spark-signature": looks_like_a_secret, "user-agent": "ada-agent"},
+    )
+
+    engine = create_engine(database_url)
+    async with SqlUnitOfWork(engine).read() as tx:
+        entries = await tx.list_audit_events(Scope(everything=True))
+    await engine.dispose()
+    assert entries
+    text = " ".join(f"{e.event.reason} {e.event.detail} {e.event.actor}" for e in entries)
+    for forbidden in (looks_like_a_secret, "ada", "127.0.0.1", "testserver", SECRET):
+        assert forbidden not in text
+
+
+@pytest.fixture
+async def limited_client(settings: Settings, database_url: str) -> AsyncIterator[httpx.AsyncClient]:
+    limited = _configured(
+        settings, database_url, rate_limit_enabled=True, rate_limit_webhook_per_minute=60
+    )
+    async with app_client(limited, FixedClock(NOW)) as client:
+        yield client
+
+
+async def test_the_webhook_limit_is_a_setting_with_a_machine_answer(
+    limited_client: httpx.AsyncClient, database_url: str
+) -> None:
+    """ADR 0124 point 5: 429 with ``Retry-After``, an empty body and the reason ``rate``."""
+    for _ in range(60):
+        refused = await limited_client.post(
+            "/webhooks/webex", content=b"{}", headers={"x-spark-signature": "bad"}
+        )
+        assert refused.status_code == 401
+
+    over = await limited_client.post(
+        "/webhooks/webex", content=b"{}", headers={"x-spark-signature": "bad"}
+    )
+    other_platform = await limited_client.post(
+        "/webhooks/wxcc", content=b"{}", headers={"x-webexcc-signature": "bad"}
+    )
+
+    assert (over.status_code, over.content) == (429, b"")
+    assert over.headers["retry-after"] == "60"
+    assert "html" not in over.headers.get("content-type", "")
+    assert other_platform.status_code == 401  # its own bucket
+    assert ("rate", "source:webex") in await _refusals(database_url)
+
+
+def _unknown(index: int) -> str:
+    return f"/webhooks/contact-center/webex_cc/made-up-{index}"
+
+
+async def test_probing_made_up_addresses_is_a_404_up_to_the_limit_then_a_429(
+    limited_client: httpx.AsyncClient, database_url: str
+) -> None:
+    """ADR 0124 point 5: the bucket decides between 404 and 429 for addresses that do not exist."""
+    for index in range(60):
+        response = await limited_client.post(_unknown(index), content=b"{}")
+        assert response.status_code == 404
+
+    over = await limited_client.post(_unknown(60), content=b"{}")
+    again = await limited_client.post("/webhooks/contact-center/genesys", content=b"{}")
+
+    assert (over.status_code, over.content, over.headers["retry-after"]) == (429, b"", "60")
+    assert again.status_code == 429
+    assert ("rate", "source:unknown") in await _refusals(database_url)
+
+
+async def test_a_full_bucket_for_unknown_addresses_never_locks_a_real_address_out(
+    limited_client: httpx.AsyncClient,
+) -> None:
+    """A customer of the same supplier fills the bucket for unknown addresses from the shared
+    address to lock real organisations out: it must not work."""
+    for index in range(61):
+        await limited_client.post(_unknown(index), content=b"{}")
+    assert (await limited_client.post(_unknown(99), content=b"{}")).status_code == 429
+
+    body = b"{}"
+    signed = await limited_client.post(
+        "/webhooks/webex", content=body, headers={"x-spark-signature": sign(body, "sha1")}
+    )
+
+    assert signed.status_code == 204
+
+
+async def test_made_up_slugs_never_open_a_bucket_of_their_own(
+    limited_client: httpx.AsyncClient,
+) -> None:
+    for index in range(20):
+        await limited_client.post(_unknown(index), content=b"{}")
+
+    keys = [str(key) for key in limiter.limiter.storage.storage]  # type: ignore[attr-defined]
+    assert [k for k in keys if "made-up" in k] == []
+    assert len([k for k in keys if "webhook-unknown" in k]) == 1
+
+
+async def test_a_flood_writes_no_log_line_per_call_but_a_forged_signature_still_does(
+    limited_client: httpx.AsyncClient,
+) -> None:
+    """The security event is the trace of a rate or unknown-address flood, not a line per call."""
+    with structlog.testing.capture_logs() as forged:
+        await limited_client.post(
+            "/webhooks/webex", content=b"{}", headers={"x-spark-signature": "x"}
+        )
+    with structlog.testing.capture_logs() as flood:
+        for index in range(62):
+            await limited_client.post(_unknown(index), content=b"{}")
+
+    assert [e for e in flood if e["event"] == "webhook.rejected"] == []
+    assert [e["reason"] for e in forged if e["event"] == "webhook.rejected"] == [
+        "invalid_signature"
+    ]
+
+
+async def test_forged_calls_never_use_up_the_budget_of_the_authentic_ones(
+    limited_client: httpx.AsyncClient,
+) -> None:
+    """THE abuse case (ADR 0124 point 5): a customer of the same supplier fills the bucket of
+    refused calls from the shared address; a correctly signed call is still accepted."""
+    for _ in range(60):
+        forged = await limited_client.post(
+            "/webhooks/webex", content=b"{}", headers={"x-spark-signature": "bad"}
+        )
+        assert forged.status_code == 401
+    over = await limited_client.post(
+        "/webhooks/webex", content=b"{}", headers={"x-spark-signature": "bad"}
+    )
+    assert (over.status_code, over.content) == (429, b"")
+
+    body = b"{}"
+    headers = {"x-spark-signature": sign(body, "sha1")}
+    wxcc = wxcc_body("task:connected", at=NOW)
+    signed = await limited_client.post("/webhooks/webex", content=body, headers=headers)
+    signed_cc = await limited_client.post(
+        "/webhooks/wxcc", content=wxcc, headers=_wxcc_headers(wxcc)
+    )
+
+    assert (signed.status_code, signed_cc.status_code) == (204, 204)
+
+
+async def test_every_kind_of_refused_call_counts_against_the_refused_bucket(
+    limited_client: httpx.AsyncClient,
+) -> None:
+    """Content type, size, signature and shape share one bucket; over it the answer is 429."""
+    not_an_object = b"[1]"
+    refused = (
+        {"content": b"{}", "headers": {"content-type": "text/plain"}},
+        {"content": b"x" * (65 * 1024), "headers": {}},
+        {"content": b"{}", "headers": {"x-spark-signature": "bad"}},
+        {"content": not_an_object, "headers": {"x-spark-signature": sign(not_an_object, "sha1")}},
+    )
+    statuses = [
+        (await limited_client.post("/webhooks/webex", **call)).status_code for call in refused * 15
+    ]
+
+    assert statuses[:4] == [415, 413, 401, 400]
+    assert statuses[60:] == []  # sixty refusals in all
+    over = await limited_client.post(
+        "/webhooks/webex", content=b"{}", headers={"x-spark-signature": "x"}
+    )
+    assert over.status_code == 429
+
+
+async def test_verified_calls_beyond_the_limit_are_a_429(limited_client: httpx.AsyncClient) -> None:
+    """The supplier itself sending too much: the bucket of verified calls (installation address)."""
+    body = b"{}"
+    headers = {"x-spark-signature": sign(body, "sha1")}
+    for _ in range(60):
+        assert (
+            await limited_client.post("/webhooks/webex", content=body, headers=headers)
+        ).status_code == 204
+
+    over = await limited_client.post("/webhooks/webex", content=body, headers=headers)
+    wxcc = wxcc_body("task:connected", at=NOW)
+    other = await limited_client.post("/webhooks/wxcc", content=wxcc, headers=_wxcc_headers(wxcc))
+
+    assert (over.status_code, over.content, over.headers["retry-after"]) == (429, b"", "60")
+    assert other.status_code == 204  # its own platform, its own bucket
+
+
+async def test_a_forwarded_header_cannot_change_the_caller_the_buckets_see(
+    limited_client: httpx.AsyncClient,
+) -> None:
+    for index in range(60):
+        forged = await limited_client.post(
+            "/webhooks/webex",
+            content=b"{}",
+            headers={"x-spark-signature": "bad", "x-forwarded-for": f"198.51.100.{index}"},
+        )
+        assert forged.status_code == 401
+
+    over = await limited_client.post(
+        "/webhooks/webex",
+        content=b"{}",
+        headers={
+            "x-spark-signature": "bad",
+            "x-forwarded-for": "203.0.113.99",
+            "forwarded": "for=203.0.113.98",
+        },
+    )
+    keys = [str(key) for key in limiter.limiter.storage.storage]  # type: ignore[attr-defined]
+
+    assert over.status_code == 429  # still the one bucket of the server-derived address
+    assert [k for k in keys if "198.51.100" in k or "203.0.113" in k] == []

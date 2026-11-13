@@ -24,9 +24,9 @@ the PR that did it.
 
 | Item | What | Source | Blocks | Owner | Status |
 |---|---|---|---|---|---|
-| G01 | Interval accounting across the flows of one pool and staffing of counted pools: built by ADR 0122 steps 1 to 5; the row of ADR 0121 is closed against ADR 0122 once G03 is done (assumption of step 8: nothing else is meant by it) | 0121/3b | yes | build | planned |
+| G01 | Interval accounting across the flows of one pool and staffing of counted pools: built by ADR 0122 steps 1 to 5; the row of ADR 0121 is closed against ADR 0122 once G03 is done (assumption of step 8: nothing else is meant by it) | 0121/3b | yes | build | done (#807) |
 | G02 | The double-counting overlap list and the shortfall per service for a reader who may see it (the notice where numbers are typed exists) | 0122/4 | no | build | planned |
-| G03 | Closing and reporting of pool bookings: `ended_slots`, usage closing and the facts skip pool slots until then, so a pool booking would never close | 0122/5 | yes | build | planned |
+| G03 | Closing and reporting of pool bookings: `ended_slots`, usage closing and the facts skip pool slots until then, so a pool booking would never close. Built: a pool slot is closed by the pool rule of `app/domain/slot_close.py` | 0122/5 | yes | build | done (#807) |
 | G04 | The agent API's change-request check judges a requested time on the pool of a matched pool booking, without telling the caller whether anything matched | 0122/5 | yes | build | done (#808) |
 | G05 | A list of work in recovery for supervisors, and an alert while any exists (design R9) | 0121/5e | yes | build | follow-up |
 | G06 | The participant's immediate pages and the claimed request's page in `e2e/pages.json` (axe, Lighthouse, keyboard). Not reachable while the gate is shut: the pages render an immediate form only for an active pool flow, which the flow resolver refuses while `ROLLBACK_SAFE` is `False`, and the e2e stack has no switch that opens it (a protection is never a setting). So the entries land in the PR that opens the gate, seeded from G08's fixture, and that PR runs with `ci:full` | 0121/32 | yes | build | follow-up |
@@ -64,6 +64,7 @@ the PR that did it.
 | G38 | `_week.html` takes its base path from one variable for both tabs | 0122/4 | no | build | follow-up |
 | G39 | A zone change shown on the week card, and a notice for the daylight saving gap | 0122/4 | no | build | follow-up |
 | G40 | The older queue routes answer refusals through the shared `or_list` helper, as the routes of step 7 do (code quality of #781); the claimed booking's live fragment keeps its own handler, as it answers with a fragment, not the list | step 8 | no | build | done (#786) |
+| G41 | Utilisation of a counted pool in the reports (C1 to C3 per pool), and the outcome of work completed after its slot was closed (work in recovery among it) | 0122/5 | no | build | follow-up |
 
 ## Not on this list, on purpose
 
