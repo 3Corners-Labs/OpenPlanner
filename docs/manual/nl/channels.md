@@ -104,12 +104,13 @@ een taak die via de vorige koppeling is gemaakt, wordt niet meer via de nieuwe a
 
 Gebruik de knop **Bezorgingen pauzeren** op de kaart om het webhookadres van deze organisatie te
 **pauzeren**, bijvoorbeeld terwijl u de flows van het platform wijzigt. Het is een knop op zich,
-geen veld van het formulier hierboven; **Bezorgingen hervatten** zet het terug. Een gepauzeerd adres controleert elke aanroep nog net
-als voorheen (netwerk, handtekening, tijd): een aanroep die geweigerd zou worden, wordt geweigerd.
-Een aanroep die klopt krijgt het gebruikelijke `204`, zodat het platform zijn aanmelding houdt en
-die niet uitzet, maar de gebeurtenis wordt weggegooid: er wordt niets bij de boeking vastgelegd en
-niets onthouden, dus de herbezorging door het platform nadat u hervat is, wordt wel verwerkt. De
-kaart toont een melding *Gepauzeerd* zolang het duurt, en de *laatste gebeurtenis* op de statusschermen staat stil. Pauzeren of hervatten verandert het
+geen veld van het formulier hierboven; **Bezorgingen hervatten** zet het terug. Een gepauzeerd adres
+controleert elke aanroep nog net als voorheen (netwerk, handtekening, tijd): een aanroep die
+geweigerd zou worden, wordt geweigerd. Een aanroep die klopt krijgt het gebruikelijke `204`, zodat
+het platform zijn aanmelding houdt en die niet uitzet, maar de gebeurtenis wordt weggegooid: er
+wordt niets bij de boeking vastgelegd en niets onthouden, dus de herbezorging door het platform
+nadat u hervat is, wordt wel verwerkt. De kaart toont een melding *Gepauzeerd* zolang het duurt, en
+de *laatste gebeurtenis* op de statusschermen staat stil. Pauzeren of hervatten verandert het
 webhookgeheim en de aanmelding bij het platform niet.
 
 Hervatten speelt wat is weggegooid niet opnieuw af. De toestanden van de open taken worden

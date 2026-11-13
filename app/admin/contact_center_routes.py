@@ -168,8 +168,6 @@ async def connection_view(
         "secret_made": moment_label(made, tz, locale.code) if made else "",
         "sources": sources,
         "paused": stored is not None and not stored.inbound_enabled,
-        "pause_chip": _("admin.source.paused_chip"),
-        "pause_text": _("admin.source.paused_text"),
     }
 
 

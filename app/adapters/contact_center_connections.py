@@ -123,7 +123,11 @@ class SealedConnections:
         await self._store.put(contact_center_credential_name(organisation_id), record, now)
 
     async def set_inbound_enabled(self, organisation_id: int, enabled: bool, now: datetime) -> None:
-        """Pause or resume the address (ADR 0124 point 9): that one field, nothing else."""
+        """Pause or resume the address (ADR 0124 point 9): that one field, nothing else.
+
+        Nothing happens for an organisation whose record went away in the meantime, as for
+        ``rotate_webhook_secret``.
+        """
         record = await self._record(organisation_id)
         if record is None:
             return

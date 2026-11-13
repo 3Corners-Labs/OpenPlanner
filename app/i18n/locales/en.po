@@ -13773,7 +13773,7 @@ msgid "admin.source.paused_text"
 msgstr "This address is paused: deliveries are accepted and dropped, and the platform keeps its subscription. The last event on the status screens stands still while it lasts. Resume to handle events again; the periodic check of the tasks then catches up on missed states."
 
 msgid "admin.channels.cc_pause_title"
-msgstr "Pause deliveries"
+msgstr "Deliveries"
 
 msgid "admin.channels.cc_pause_lead"
 msgstr "Pause this address, for example while you change the platform's flows. The platform still gets its 204 and keeps its subscription, but verified events are dropped and not remembered. A call that does not check out is refused as always."

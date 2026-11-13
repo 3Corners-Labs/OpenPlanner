@@ -103,12 +103,13 @@ previous connection is not ended through the new one.
 
 Use the **Pause deliveries** button on the card to **pause** this organisation's webhook address,
 for example while you change the platform's flows. It is a button of its own, not a field of the
-form above; **Resume deliveries** puts it back. A paused address still checks every call exactly as before
-(network, signature, time): a call that would be refused is refused. A call that checks out gets
-the usual `204`, so the platform keeps its subscription and does not switch it off, but its event
-is dropped: nothing is recorded on the booking and nothing is remembered, so the platform's
-redelivery after you resume is handled. The card shows a *Paused* note while it lasts, and the *last event* on the status screens stands still. Pausing or
-resuming changes neither the webhook secret nor the registration at the platform.
+form above; **Resume deliveries** puts it back. A paused address still checks every call exactly as
+before (network, signature, time): a call that would be refused is refused. A call that checks out
+gets the usual `204`, so the platform keeps its subscription and does not switch it off, but its
+event is dropped: nothing is recorded on the booking and nothing is remembered, so the platform's
+redelivery after you resume is handled. The card shows a *Paused* note while it lasts, and the *last
+event* on the status screens stands still. Pausing or resuming changes neither the webhook secret
+nor the registration at the platform.
 
 Resuming does not replay what was dropped. The states of the open tasks are brought back by the
 periodic check of the tasks (it runs on a schedule and cannot be started from the card), so a

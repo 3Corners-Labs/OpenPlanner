@@ -13786,7 +13786,7 @@ msgid "admin.source.paused_text"
 msgstr "Dit adres is gepauzeerd: bezorgingen worden geaccepteerd en weggegooid, en het platform houdt zijn aanmelding. De laatste gebeurtenis op de statusschermen staat stil zolang het duurt. Hervat om gebeurtenissen weer te verwerken; de periodieke controle van de taken haalt gemiste toestanden daarna in."
 
 msgid "admin.channels.cc_pause_title"
-msgstr "Bezorgingen pauzeren"
+msgstr "Bezorgingen"
 
 msgid "admin.channels.cc_pause_lead"
 msgstr "Pauzeer dit adres bijvoorbeeld terwijl u de flows van het platform wijzigt. Het platform krijgt nog steeds antwoord 204 en houdt zijn aanmelding, maar geverifieerde gebeurtenissen worden weggegooid en niet onthouden. Een aanroep die niet klopt wordt geweigerd als altijd."
