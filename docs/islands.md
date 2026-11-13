@@ -42,6 +42,19 @@ through every control, 320 px without sideways scroll (which is also 400 % zoom,
 colours with reduced motion and axe, and no content-security-policy or script error in the console
 (ADR 0118 point 10). A new island sets the flag on the pages that show it before it merges.
 
+## The call page, a third kind of page
+
+Besides the page without scripts and the island page there is one more kind (ADR 0123 point 2):
+the **call page**, `GET /b/m/{ref}/call`, the only page that may load a third-party script, the
+vendored SDK below. It is not an island: it is not an enhancement of a complete page. It is
+selected by `PageKind.CALL` in `render()`, which gives the response `CALL_CSP` (`SCRIPT_CSP` plus
+the call's five hosts in `connect-src`, `media-src` and `worker-src` named, no `unsafe-` token) and a
+`Permissions-Policy` with camera, microphone and screen capture for our own origin. No other route
+can pass that kind (`tests/web/test_page_kinds.py`), the route does not exist while
+`embedded_call_enabled` is off, and the page contacts nobody before the participant's click. The
+call page's own scripts follow the accessibility rules above and the ban on markup sinks. In this
+step the page is a shell without any script.
+
 ## Existing scripts
 
 ### `live-region.js`
@@ -154,3 +167,15 @@ colours with reduced motion and axe, and no content-security-policy or script er
 - **Without the script:** the chart, its table and the day links as the server drew them.
 - **Used by:** the *Usage* pages of an organisation and a group (script CSP on these pages only).
 - **Size:** about 3 KB gzipped.
+
+### `vendor/webex/meetings.min.js`
+
+- **ADR:** 0123 point 3. Not an island and not ours: a vendored third-party file, listed here so that
+  every script under `app/web/static/` has one entry.
+- **Server renders:** nothing yet; the call page of step 2 is a shell without a script tag.
+- **Does:** runs the call for the participant (built in later steps), loaded only after the click that joins.
+- **Without the script:** the page says the call is not available and links back to the join page.
+- **Used by:** the call page only (`CALL_CSP`).
+- **Size:** about 919 KB gzipped, with its own gate of 1.2 MB (`tests/web/test_vendor.py`); exempt from
+  the budgets above. The file is not in the repository until Cisco has answered on the licence
+  (ADR 0123 point 18); the manifest next to it names the version and the checksum.

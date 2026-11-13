@@ -5,7 +5,9 @@ Status: proposed (2026-11-06), requested by the product owner. Partly built: ste
 (admin forms without JavaScript) and the admin-UI and Playwright lines of `CLAUDE.md`; extends
 ADR 0072 §6 (`live-region.js`), ADR 0048 and ADR 0061 §5 (`app/web/charts.py`). It stands on its own
 and can merge before or after ADR 0117 (reporting), which is its first intended user: see also
-ADR 0117 points 10, 19 and 20. The booking widget is out of scope (point 2).
+ADR 0117 points 10, 19 and 20. The booking widget is out of scope (point 2). Amended by ADR 0123:
+its points on the kinds of page (2) and on the script switch (5, `scripts=True` the only switch,
+no third variant) now allow the call page as a third kind of page.
 
 ## Context
 

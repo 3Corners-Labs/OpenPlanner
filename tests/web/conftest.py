@@ -3,6 +3,7 @@ a renderer for one template written in the test."""
 
 from collections.abc import Callable, Mapping
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
@@ -17,7 +18,8 @@ from tests.admin.conftest import admin_db, site  # noqa: F401 - re-exported fixt
 __all__ = ["admin_db", "render_source", "site"]
 
 RenderSource = Callable[..., HTMLResponse]
-"""``(source, context, frame=None)``: render a template written in the test."""
+"""``(source, context, frame=None, **options)``: render a template written in the test; the
+options (``scripts``, ``kind``) go to ``render``."""
 
 
 @pytest.fixture
@@ -30,10 +32,13 @@ def render_source(tmp_path: Path) -> RenderSource:
     )
 
     def rendered(
-        source: str, context: Mapping[str, object], frame: Mapping[str, object] | None = None
+        source: str,
+        context: Mapping[str, object],
+        frame: Mapping[str, object] | None = None,
+        **options: Any,  # noqa: ANN401 - ``scripts`` or ``kind`` of ``render``, passed through
     ) -> HTMLResponse:
         (tmp_path / "page.html").write_text(source)
         templates = create_templates([tmp_path])
-        return render(templates, request, "page.html", locale, context, frame=frame)
+        return render(templates, request, "page.html", locale, context, frame=frame, **options)
 
     return rendered

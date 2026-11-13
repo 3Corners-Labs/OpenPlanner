@@ -7,6 +7,7 @@ the HTML Content-Security-Policy and caching rules are applied in one place.
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from time import perf_counter
 from urllib.parse import urlencode
@@ -57,6 +58,65 @@ SCRIPT_CSP = (
 )
 """Participant pages (ADR 0020): own scripts only, which may fetch the same pages; still no
 inline scripts or styles, so injected markup cannot run."""
+
+
+CALL_CSP = (
+    "default-src 'none'; script-src 'self'; "
+    "connect-src 'self' https://*.wbx2.com wss://*.wbx2.com https://*.webex.com "
+    "wss://*.webex.com https://*.ciscospark.com; "
+    "style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self'; worker-src 'self'; "
+    "form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+)
+"""The call page's policy (ADR 0123 point 4): ``SCRIPT_CSP`` plus the five hosts the call talks
+to in ``connect-src``, and ``media-src`` and ``worker-src`` named. No ``unsafe-`` token, no
+other script, style, font or image origin. The hosts are fixed on purpose, never a setting."""
+
+DEFAULT_PERMISSIONS: dict[str, str] = {
+    "camera": "()",
+    "microphone": "()",
+    "geolocation": "()",
+    "payment": "()",
+    "usb": "()",
+    "display-capture": "()",
+    "interest-cohort": "()",
+}
+"""The ``Permissions-Policy`` of every response: no powerful browser feature (served by
+``app.api.security_headers``)."""
+
+CALL_PERMISSIONS = {
+    **DEFAULT_PERMISSIONS,
+    "camera": "(self)",
+    "microphone": "(self)",
+    "display-capture": "(self)",
+}
+"""The call page's features (ADR 0123 point 4): camera, microphone and sharing a screen for our
+own origin; everything else as the default."""
+
+
+def permissions_policy(features: Mapping[str, str]) -> str:
+    """Return the ``Permissions-Policy`` header value for ``features``."""
+    return ", ".join(f"{name}={value}" for name, value in features.items())
+
+
+class PageKind(StrEnum):
+    """The closed set of kinds of HTML page; each fixes the page's response policy.
+
+    A caller names a kind and never passes a header string, so no route can widen its own
+    policy. ADR 0118 keeps ``DOCUMENT`` and ``SCRIPTED`` as they were; ``CALL`` is the third
+    kind (ADR 0123 point 2) and is used by the one route of the call page only.
+    """
+
+    DOCUMENT = "document"
+    SCRIPTED = "scripted"
+    CALL = "call"
+
+
+POLICIES: dict[PageKind, str] = {
+    PageKind.DOCUMENT: HTML_CSP,
+    PageKind.SCRIPTED: SCRIPT_CSP,
+    PageKind.CALL: CALL_CSP,
+}
+"""The ``Content-Security-Policy`` of each kind of page."""
 
 
 @dataclass(frozen=True)
@@ -196,20 +256,27 @@ def render(
     *,
     frame: Mapping[str, object] | None = None,
     scripts: bool = False,
+    kind: PageKind | None = None,
 ) -> HTMLResponse:
     """Render template ``name`` in the request's locale.
 
     The template receives the page's ``context``; then ``frame``, what a wrapper gives every
     page of its kind (the admin portal's menu and profile menu, ``app.admin.pages.page``);
     then ``_`` (bound gettext), ``locale``, ``languages``, ``environment`` and
-    ``product_footer``. ``scripts=True`` allows the page's own scripts (``SCRIPT_CSP``).
+    ``product_footer``. ``scripts=True`` allows the page's own scripts (``SCRIPT_CSP``) and is
+    shorthand for ``kind=PageKind.SCRIPTED``; ``kind`` names the kind of page, which alone
+    decides the ``Content-Security-Policy`` and, for the call page, the ``Permissions-Policy``.
 
     Raises:
-        ValueError: a name of ``context`` or ``frame`` that a later layer sets as well (a
-            programming error). It would be overwritten without a word: System status once
-            showed the environment bar's ``EnvironmentNotice`` as the environment, and a
-            booking's "back to the agenda" link pointed at the booking itself.
+        ValueError: ``scripts`` and ``kind`` both given, or a name of ``context`` or ``frame``
+            that a later layer sets as well (a programming error). It would be overwritten
+            without a word: System status once showed the environment bar's
+            ``EnvironmentNotice`` as the environment, and a booking's "back to the agenda" link
+            pointed at the booking itself.
     """
+    if kind is not None and scripts:
+        raise ValueError(f"{name}: give the kind of page or scripts=True, not both")
+    kind = kind or (PageKind.SCRIPTED if scripts else PageKind.DOCUMENT)
     own: dict[str, object] = {
         "_": locale.gettext,
         "locale": locale.code,
@@ -224,7 +291,9 @@ def render(
     started = perf_counter()
     response = templates.TemplateResponse(request, name, {**page, **shared, **own})
     tracer.trace("template.render", template=name, ms=int((perf_counter() - started) * 1000))
-    response.headers["content-security-policy"] = SCRIPT_CSP if scripts else HTML_CSP
+    response.headers["content-security-policy"] = POLICIES[kind]
+    if kind is PageKind.CALL:
+        response.headers["permissions-policy"] = permissions_policy(CALL_PERMISSIONS)
     response.headers["cache-control"] = "no-store"
     locale.apply_to(request, response)
     return response

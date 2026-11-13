@@ -97,6 +97,12 @@ dependencies (Renovate's weekly lock file maintenance will show it).
 
 The widget itself has no runtime dependencies: vanilla JavaScript, no framework.
 
+## Vendored front-end file (the call page, ADR 0123)
+
+| File | Purpose | License | Maintenance | Note |
+|---|---|---|---|---|
+| `app/web/static/vendor/webex/meetings.min.js` from the npm package `webex@3.13.0` (`umd/meetings.min.js`) | The browser SDK that runs the participant's call in the call page (ADR 0123) | **Not settled.** The repository says MIT, the npm metadata says "Cisco's General Terms", the published package says "Cisco EULA" | Cisco supports only the latest version and says an older one may stop working after about eighteen months; an upgrade at least once a year is part of running the product (ADR 0123, *Consequences*) | The first front-end library and an exception to the allowed list (ADR 0118 point 6). **The file is not committed and is in no published image** until Cisco's written answer on the licence (ADR 0123 point 18); `.gitignore` lists it, a test fails if it is tracked, and an installation that tries the page places it itself. Its version and checksum are in `app/web/static/vendor/webex/manifest.json`; the checksum is empty until the file is placed. Gates in `tests/web/test_vendor.py`: at most 1.2 MB gzipped (3.7 MB, 919 KB gzipped when measured on 2026-11-12) and a checksum equal to the manifest's. Exempt from the 30 KB and 100 KB budgets of ADR 0118 point 7. It carries about thirty dependencies of its own that a scan of our packages does not see; the CycloneDX entry and the weekly advisory check for this version are still to be built (ADR 0123 point 3), not part of this step. Page loads it only after the participant's click (ADR 0123 point 5) |
+
 ## Containers (production)
 
 | Image | Purpose | License | Maintenance | Note |

@@ -96,6 +96,14 @@ runs:
         format: cyclonedx-json
         output-file: ${{ inputs.sbom-file }}
         upload-artifact: false
+    # ADR 0123 point 3: the vendored front-end file is in no image scan; its manifest is listed
+    # as a component. Only the application's SBOM (the default file name) has vendored files.
+    - name: SBOM (vendored front-end files)
+      if: inputs.sbom-file == 'sbom.cdx.json'
+      shell: bash
+      env:
+        SBOM_FILE: ${{ inputs.sbom-file }}
+      run: python3 scripts/vendor_sbom.py "$SBOM_FILE"
     - name: attest SBOM
       shell: bash
       env:

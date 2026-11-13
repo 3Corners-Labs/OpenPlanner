@@ -15,7 +15,7 @@ from starlette.responses import HTMLResponse
 from app.domain.scheduling import Group
 from app.web.branding import brand_view, branding_service
 from app.web.locale import RequestLocale
-from app.web.templates import create_templates, render
+from app.web.templates import PageKind, create_templates, render
 
 templates = create_templates([Path(__file__).parent / "templates"])
 
@@ -27,12 +27,13 @@ async def participant_page(
     group: Group,
     context: dict[str, object],
     status: int = 200,
+    kind: PageKind = PageKind.SCRIPTED,
 ) -> HTMLResponse:
     """Render a participant page of ``group`` in its organisation's branding and wording.
 
     The organisation's own texts (``app.domain.text_overrides``) replace the shipped ones; a
     template's ``_()`` is bound to the group's organisation here, the one place all participant
-    pages pass.
+    pages pass. ``kind`` is the kind of page (``SCRIPTED`` unless a page is the call page).
     """
     await locale.translator.refresh()
     organisation = await branding_service(request).for_group(group)
@@ -42,7 +43,7 @@ async def participant_page(
         name,
         locale.for_scope(group.organisation_id, group.id),
         {**context, "group": group, "brand": brand_view(organisation)},
-        scripts=True,
+        kind=kind,
     )
     response.status_code = status
     return response

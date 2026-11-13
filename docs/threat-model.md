@@ -201,6 +201,7 @@ which sets its own CSP and `no-store`.
 | JSON, plain text, CSV, errors, anything without its own policy | `default-src 'none'; base-uri 'none'; frame-ancestors 'none'` | `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, HSTS, `Referrer-Policy: same-origin`, `Permissions-Policy` off for camera, microphone, geolocation and more, COOP `same-origin`, COEP `require-corp`, CORP `same-origin` |
 | Admin and public HTML | `HTML_CSP`: `default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'` | `Cache-Control: no-store`, plus all of the above |
 | HTML with own scripts (participant pages with polling, update progress, agenda) | `SCRIPT_CSP`: as `HTML_CSP` plus `script-src 'self'; connect-src 'self'` | Same; no inline script or style anywhere |
+| The call page (`/b/m/{ref}/call`, ADR 0123) | `CALL_CSP`: as `SCRIPT_CSP` plus `connect-src` for five hosts of the call, `media-src 'self'`, `worker-src 'self'`; no `unsafe-` token | `Permissions-Policy` allows camera, microphone and display capture for `self`; every other header as above. The one route that has either change |
 | Widget script (`/widget/v1/openplanner-booking.js`) | The default (the file is not a document) | `Access-Control-Allow-Origin: *`, `Cross-Origin-Resource-Policy: cross-origin` so any host site can load it; no cookie |
 | Widget API | The default | `Access-Control-Allow-Origin` echoes an allowed origin with `Vary: Origin`; the public availability read uses `*` and `public, max-age=300` |
 | Brand assets, theme CSS, fonts | The default | `public, max-age=3600` (static files: versioned URL through `static_url`); same-origin only, uploaded images and fonts served with their validated media type |
@@ -877,6 +878,24 @@ complete without it. The scripts are listed in `docs/islands.md`.
 | An uploaded file used as a script source, because `'self'` trusts the same origin | Uploads are served with the exact media type, `nosniff` and `default-src 'none'`, from a closed list of types with no active content (the uploads section above) | `tests/api/test_brand_assets.py` (media type, `nosniff`), `tests/api/test_health.py` (default `default-src 'none'`) |
 | A script grows into a second framework or a pile of code on a page | A budget of 30 KB per script and 100 KB in all, gzipped; every script has an entry in `docs/islands.md` | `tests/web/test_static.py` (size and listing tests) |
 | Data the person may not see reaches the browser and is hidden there | Scope and suppression happen on the server; ADR 0118 point 8; reports follow ADR 0117 | The scope and suppression tests of each report step |
+
+## Flow: the call page as a third kind of page (ADR 0123 step 2)
+
+One route, `GET /b/m/{ref}/call`, is served as `PageKind.CALL`: `CALL_CSP` and a
+`Permissions-Policy` with camera, microphone and screen capture for our own origin. In this step
+the page is a shell without a script; the way in and the token come in step 4 (its abuse cases
+are added there).
+
+| Abuse case | Control | Test |
+|---|---|---|
+| Another route gets the call page's wider policy or the browser features | The kinds are a closed enum; `render()` takes a kind, never a header string; only `app/api/call_pages.py` names `PageKind.CALL`; the policy constants are named nowhere else | `tests/web/test_page_kinds.py::test_only_the_call_route_can_produce_the_call_page_policy`, `::test_no_route_passes_a_header_string_to_render`, `tests/api/test_call_pages.py::test_no_other_page_carries_the_call_policy` |
+| The call policy is loosened by a later edit (`unsafe-eval`, `blob:` worker, another origin) | The policy is a named constant with fixed hosts, not a setting; the tests pin its directives | `tests/web/test_page_kinds.py::test_the_call_policy_holds_no_unsafe_token_and_no_other_origin`, `::test_the_call_policy_is_the_script_policy_plus_the_call_hosts` |
+| COEP, COOP, CORP, HSTS or the other headers differ on the call route | The middleware adds them as on every response | `tests/api/test_call_pages.py::test_the_call_page_carries_its_own_policy_and_nothing_else_changes` |
+| The vendored SDK file is swapped or grows unnoticed | Its checksum is in the manifest and a test compares them; a size gate of 1.2 MB gzipped; the file is exempt from the island budgets on purpose and only it | `tests/web/test_vendor.py`, `tests/web/test_static.py` (exemption) |
+| The SDK file is committed before the licence answer | `.gitignore` and a test on `git ls-files` | `tests/web/test_vendor.py::test_the_file_is_not_committed_until_the_licence_answer` |
+| The page is reachable, or shows that the feature exists, while it is switched off | While `embedded_call_enabled` is off the route answers `404` exactly as an unknown address, before the booking is looked at | `tests/api/test_call_pages.py::test_the_page_does_not_exist_while_the_feature_is_off` |
+| A browser without the participant's session opens the page | The same session check as the join page; a refusal is the same for a booking that does not exist | `tests/api/test_call_pages.py::test_the_page_needs_the_participants_session` |
+| A public page contacts another origin before the participant clicks | `no-third-parties.spec.ts` keeps failing on every page, and on the call page before the click; the call hosts are allowed after the join click only (a recorded allowance nothing uses yet; not run here) | `e2e/tests/no-third-parties.spec.ts` |
 
 ## Flow: widget script on host websites (ADR 0035, EM-3)
 

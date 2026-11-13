@@ -1,6 +1,9 @@
+import json
+from pathlib import Path
+
 import pytest
 
-from scripts.check_pins import ROOT, check_lines, files
+from scripts.check_pins import ROOT, check_lines, check_vendor, files
 
 SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1"
 
@@ -114,3 +117,35 @@ def test_repository_has_no_untracked_pins() -> None:
         for violation in check_lines(str(path), path.read_text(encoding="utf-8").splitlines())
     ]
     assert violations == []
+
+
+def _vendor_root(tmp_path: Path, *, pattern: str | None = None) -> Path:
+    """A repository with the call page's manifest and a Renovate manager for it."""
+    folder = tmp_path / "app/web/static/vendor/webex"
+    folder.mkdir(parents=True)
+    (folder / "manifest.json").write_text(json.dumps({"name": "webex", "version": "3.13.0"}))
+    manager = {
+        "customType": "regex",
+        "managerFilePatterns": [pattern or "/^app/web/static/vendor/webex/manifest\\.json$/"],
+        "matchStrings": ['"version": "(?<currentValue>[^"]+)"'],
+        "datasourceTemplate": "npm",
+        "depNameTemplate": "webex",
+    }
+    (tmp_path / "renovate.json").write_text(json.dumps({"customManagers": [manager]}))
+    return tmp_path
+
+
+def test_a_vendored_manifest_read_by_a_custom_manager_is_tracked(tmp_path: Path) -> None:
+    assert list(check_vendor(_vendor_root(tmp_path))) == []
+
+
+def test_a_vendored_manifest_no_manager_matches_is_not_tracked(tmp_path: Path) -> None:
+    root = _vendor_root(tmp_path, pattern="/^somewhere/else\\.json$/")
+
+    assert [v.reason for v in check_vendor(root)] == [
+        "version no custom manager of renovate.json reads"
+    ]
+
+
+def test_the_vendored_manifest_of_this_repository_is_tracked() -> None:
+    assert list(check_vendor(ROOT)) == []

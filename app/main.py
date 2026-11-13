@@ -59,6 +59,7 @@ from app.admin.session import session_cookie_for
 from app.api import (
     booking_pages,
     brand_assets,
+    call_pages,
     direct_pages,
     health,
     immediate_pages,
@@ -982,6 +983,7 @@ def create_app(
         pages.router,
         booking_pages.router,
         join_pages.router,
+        call_pages.router,
         trial_pages.router,
         direct_pages.router,
         immediate_pages.router,

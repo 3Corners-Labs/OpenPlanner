@@ -12,6 +12,37 @@ import { expect, test, type Page } from '@playwright/test';
 import { pageVariants } from '../pages';
 
 const APP = new URL(process.env.BASE_URL ?? 'http://127.0.0.1:8000').origin;
+/**
+ * The one recorded exception (ADR 0123 point 5): the call page (`/b/m/{ref}/call`, the route that
+ * is served with CALL_CSP) may contact these hosts AFTER the click that joins, never before it.
+ * Every other page, and the call page before the click, stays under the rule above. Nothing uses
+ * the allowance yet: the step-2 page makes no request at all, and it is not in `pages.json` (it
+ * needs a booking session, like the other `/b/m/` pages). The step that builds the click (step 4)
+ * uses `mayContact(origin, AFTER_JOIN_CLICK)` in its own test and nowhere else.
+ */
+const CALL_HOST_PATTERNS = [
+  /^(https|wss):\/\/([^/]+\.)?wbx2\.com$/,
+  /^(https|wss):\/\/([^/]+\.)?webex\.com$/,
+  /^https:\/\/([^/]+\.)?ciscospark\.com$/,
+];
+type Phase = 'every-page' | 'call-page-before-click' | 'call-page-after-click';
+const AFTER_JOIN_CLICK: Phase = 'call-page-after-click';
+
+/** Whether `origin` may be contacted in `phase`: only the call page after the click may reach the call's hosts. */
+function mayContact(origin: string, phase: Phase): boolean {
+  if (origin === APP) return true;
+  return phase === AFTER_JOIN_CLICK && CALL_HOST_PATTERNS.some((pattern) => pattern.test(origin));
+}
+
+test('the call hosts are allowed after the join click only', () => {
+  const host = 'https://mercury-connection-a.wbx2.com';
+  expect(mayContact(host, 'call-page-after-click')).toBe(true);
+  expect(mayContact(host, 'call-page-before-click')).toBe(false);
+  expect(mayContact(host, 'every-page')).toBe(false);
+  expect(mayContact('https://evil.example', 'call-page-after-click')).toBe(false);
+  expect(mayContact(APP, 'every-page')).toBe(true);
+});
+
 /** Schemes that never leave the browser. */
 const LOCAL_SCHEMES = ['data:', 'blob:', 'about:'];
 

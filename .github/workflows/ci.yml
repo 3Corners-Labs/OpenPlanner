@@ -280,6 +280,9 @@ jobs:
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
           "anchore/syft:${SYFT_VERSION}" docker:openplanner:ci -o cyclonedx-json
           > sbom.cdx.json
+      # ADR 0123 point 3: the vendored front-end file is in no image scan; list its manifest.
+      - name: SBOM (vendored front-end files)
+        run: python3 scripts/vendor_sbom.py sbom.cdx.json
       - name: grype
         run: >-
           docker run --rm -v "$PWD:/work:ro"

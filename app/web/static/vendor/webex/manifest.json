@@ -1,0 +1,9 @@
+{
+  "comment": "The vendored SDK of the call page (ADR 0123 point 3, ADR 0118 point 6). The file is not committed until Cisco's written answer on the licence (ADR 0123 point 18), so sha256 and sha256_of stay empty until the file is placed. Renovate reads version (renovate.json); a version update does not change sha256_of, so tests/web/test_vendor.py fails wherever the file is placed until the file, sha256 and sha256_of are replaced together. make pins and scripts/vendor_sbom.py read this file too.",
+  "name": "webex",
+  "version": "3.13.0",
+  "source": "npm package webex, umd/meetings.min.js",
+  "file": "meetings.min.js",
+  "sha256": "",
+  "sha256_of": ""
+}
