@@ -276,10 +276,13 @@ async def test_the_checklist_says_every_state_in_words_and_which_part_follows(
 
     checklist = page.split('<ol class="checklist">')[1].split("</ol>")[0]
     assert checklist.count('class="checklist__item"') == 6
-    assert checklist.count("<span>Volgt</span>") == 2  # the dispatch and retention are not built
-    assert checklist.count("<span>Ontbreekt</span>") == 2  # no pool: capacity and skills
+    assert checklist.count("<span>Volgt</span>") == 1  # retention is not built
+    # No pool (capacity and skills), and the service has no contact-center routing: something the
+    # administrator can fix, named before what follows (ADR 0121 step 6). The dispatch sentence
+    # of ``not_built_yet`` is pinned in ``tests/admin/test_flow_views.py``.
+    assert checklist.count("<span>Ontbreekt</span>") == 3
     assert checklist.count("<span>In orde</span>") == 2
-    assert "Afhandeling via het contactcenter volgt in een latere versie." in checklist
+    assert "nog niet met een contactcenter verbonden" in checklist
     assert "Het automatisch afsluiten en verwijderen van gegevens" in checklist
     assert "Dit onderdeel van OpenPlanner volgt" not in checklist
     assert "Kies een capaciteitspool." in checklist
