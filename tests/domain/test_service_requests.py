@@ -10,15 +10,16 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from app.domain.booking import Contact
+from app.domain.booking import BookingStatus, Contact
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.flow_resolution import FlowRef
 from app.domain.pool_accounting import Commitment
 from app.domain.scheduling import PhoneMode
-from app.domain.service_flows import IntakeMode
+from app.domain.service_flows import IntakeMode, InteractionKind
 from app.domain.service_requests import (
     ACTIVE_ITEM,
     TERMINAL,
+    BookingPhase,
     HandlingState,
     PersonalDataState,
     RequestPersonalData,
@@ -26,16 +27,19 @@ from app.domain.service_requests import (
     WorkItem,
     WorkItemState,
     appointment_request,
+    booking_phase,
     check_startable,
     claim,
     complete,
     contact_of,
     data_deletion_at,
+    is_request_work,
     release,
     start,
     watchdog_deadline,
     watchdog_outcome,
 )
+from tests.support.service_flows import legacy, revision
 
 T0 = datetime(2026, 3, 2, 9, 0, tzinfo=UTC)
 END = T0 + timedelta(minutes=30)
@@ -256,7 +260,7 @@ def test_a_release_puts_the_request_back_in_the_queue() -> None:
 
 def test_work_in_recovery_is_completed_and_keeps_its_unit_until_then() -> None:
     request, item = started()
-    outcome = watchdog_outcome(request, item, holds_place=True, now=request.watchdog_at)
+    outcome = watchdog_outcome(request, item, now=request.watchdog_at)
     assert outcome is not None
     assert outcome.item is not None
 
@@ -269,16 +273,16 @@ def test_work_in_recovery_is_completed_and_keeps_its_unit_until_then() -> None:
 def test_watchdog_leaves_open_work_alone_before_its_deadline() -> None:
     request, item = started()
 
-    assert watchdog_outcome(request, item, holds_place=True, now=T0 + timedelta(hours=2)) is None
-    assert watchdog_outcome(appointment(), None, holds_place=True, now=T0) is None
+    assert watchdog_outcome(request, item, now=T0 + timedelta(hours=2)) is None
+    assert watchdog_outcome(appointment(), None, now=T0) is None
 
 
 def test_watchdog_expires_work_that_never_started() -> None:
     request, item = claimed()
     deadline = request.watchdog_at
 
-    queued = watchdog_outcome(appointment(), None, holds_place=True, now=deadline)
-    assigned = watchdog_outcome(request, item, holds_place=True, now=deadline)
+    queued = watchdog_outcome(appointment(), None, now=deadline)
+    assigned = watchdog_outcome(request, item, now=deadline)
 
     assert queued is not None
     assert queued.request.handling is HandlingState.EXPIRED
@@ -293,7 +297,7 @@ def test_watchdog_expires_work_that_never_started() -> None:
 def test_watchdog_marks_started_work_for_recovery_and_keeps_the_occupation() -> None:
     request, item = started()
 
-    outcome = watchdog_outcome(request, item, holds_place=True, now=request.watchdog_at)
+    outcome = watchdog_outcome(request, item, now=request.watchdog_at)
 
     assert outcome is not None
     assert outcome.request.handling is HandlingState.RECOVERY_REQUIRED
@@ -302,16 +306,16 @@ def test_watchdog_marks_started_work_for_recovery_and_keeps_the_occupation() -> 
     assert outcome.item.state is WorkItemState.RECOVERY_REQUIRED
     assert outcome.item.ended_at is None
     assert not outcome.clear_claim
-    later = watchdog_outcome(
-        outcome.request, outcome.item, holds_place=True, now=request.watchdog_at + timedelta(1)
-    )
+    later = watchdog_outcome(outcome.request, outcome.item, now=request.watchdog_at + timedelta(1))
     assert later is None
 
 
 def test_watchdog_cancels_unstarted_work_whose_booking_no_longer_holds_a_place() -> None:
     request, item = claimed()
 
-    outcome = watchdog_outcome(request, item, holds_place=False, now=T0 + timedelta(minutes=1))
+    outcome = watchdog_outcome(
+        request, item, phase=BookingPhase.ENDED, now=T0 + timedelta(minutes=1)
+    )
 
     assert outcome is not None
     assert outcome.request.handling is HandlingState.CANCELLED
@@ -323,13 +327,16 @@ def test_watchdog_cancels_unstarted_work_whose_booking_no_longer_holds_a_place()
 def test_a_cancelled_booking_does_not_end_treatment_that_runs() -> None:
     request, item = started()
 
-    assert watchdog_outcome(request, item, holds_place=False, now=T0 + timedelta(minutes=1)) is None
+    assert (
+        watchdog_outcome(request, item, phase=BookingPhase.ENDED, now=T0 + timedelta(minutes=1))
+        is None
+    )
 
 
 def test_watchdog_returns_work_whose_lease_ran_out_to_the_queue() -> None:
     request, item = claimed()
 
-    outcome = watchdog_outcome(request, item, holds_place=True, now=T0 + timedelta(minutes=5))
+    outcome = watchdog_outcome(request, item, now=T0 + timedelta(minutes=5))
 
     assert outcome is not None
     assert outcome.request.handling is HandlingState.QUEUED
@@ -341,7 +348,7 @@ def test_watchdog_returns_work_whose_lease_ran_out_to_the_queue() -> None:
 def test_watchdog_leaves_a_finished_request_alone() -> None:
     done = replace(appointment(), handling=HandlingState.COMPLETED, resolved_at=T0)
 
-    assert watchdog_outcome(done, None, holds_place=False, now=done.watchdog_at) is None
+    assert watchdog_outcome(done, None, phase=BookingPhase.ENDED, now=done.watchdog_at) is None
 
 
 def test_the_active_work_item_states() -> None:
@@ -366,10 +373,14 @@ def test_the_record_is_deleted_a_day_after_the_end_or_the_watchdog_whichever_is_
     assert data_deletion_at(late) == open_request.watchdog_at + timedelta(hours=24)
 
 
-def test_no_record_deletion_moment_for_an_appointment_or_without_a_record() -> None:
+def test_an_appointment_has_no_deletion_moment_of_its_own_and_a_request_without_one_always() -> (
+    None
+):
+    """The booking's purge covers an appointment; without one, the pseudonyms go too (A20)."""
+    deadline = on_demand().watchdog_at + timedelta(hours=24)
     assert data_deletion_at(appointment()) is None
-    assert data_deletion_at(on_demand(personal_data=PersonalDataState.NOT_COLLECTED)) is None
-    assert data_deletion_at(on_demand(personal_data=PersonalDataState.DELETED)) is None
+    assert data_deletion_at(on_demand(personal_data=PersonalDataState.NOT_COLLECTED)) == deadline
+    assert data_deletion_at(on_demand(personal_data=PersonalDataState.DELETED)) == deadline
 
 
 def contact() -> Contact:
@@ -438,3 +449,61 @@ def test_personal_data_stays_out_of_repr() -> None:
         assert secret not in shown
     assert RequestPersonalData().empty
     assert not record.empty
+
+
+def test_a_booking_on_hold_pauses_unstarted_work_and_no_deadline_runs() -> None:
+    request, item = claimed()
+    late = request.watchdog_at + timedelta(days=3)
+
+    waiting = watchdog_outcome(appointment(), None, phase=BookingPhase.PAUSED, now=late)
+    lease = watchdog_outcome(request, item, phase=BookingPhase.PAUSED, now=late)
+
+    assert waiting is None
+    assert lease is not None
+    assert lease.request.handling is HandlingState.QUEUED  # only the lease ends
+
+
+def test_the_deadline_follows_the_booking_when_it_goes_ahead_at_another_time() -> None:
+    moved = END + timedelta(days=7) + timedelta(hours=24)
+
+    before = watchdog_outcome(appointment(), None, now=END + timedelta(days=2), deadline=moved)
+    after = watchdog_outcome(appointment(), None, now=moved, deadline=moved)
+
+    assert before is None
+    assert after is not None
+    assert after.request.handling is HandlingState.EXPIRED
+    assert after.request.watchdog_at == moved
+
+
+def test_started_work_is_marked_for_recovery_even_when_its_booking_ended() -> None:
+    request, item = started()
+
+    outcome = watchdog_outcome(request, item, phase=BookingPhase.ENDED, now=request.watchdog_at)
+
+    assert outcome is not None
+    assert outcome.request.handling is HandlingState.RECOVERY_REQUIRED
+
+
+def test_the_booking_phase_of_each_status() -> None:
+    assert booking_phase(None) is BookingPhase.ACTIVE
+    assert booking_phase(BookingStatus.CONFIRMED) is BookingPhase.ACTIVE
+    for paused in (
+        BookingStatus.SUSPENDED,
+        BookingStatus.AWAITING_REBOOK,
+        BookingStatus.PENDING_CONFIRMATION,
+    ):
+        assert booking_phase(paused) is BookingPhase.PAUSED
+    for ended in (
+        BookingStatus.CANCELLED,
+        BookingStatus.REFUSED,
+        BookingStatus.COMPLETED,
+        BookingStatus.NO_SHOW,
+    ):
+        assert booking_phase(ended) is BookingPhase.ENDED
+
+
+def test_only_a_flow_without_video_that_is_not_legacy_is_request_work() -> None:
+    assert is_request_work(revision(interaction_kind=InteractionKind.NONE))
+    assert not is_request_work(revision(interaction_kind=InteractionKind.VIDEO))
+    assert not is_request_work(legacy())
+    assert not is_request_work(None)

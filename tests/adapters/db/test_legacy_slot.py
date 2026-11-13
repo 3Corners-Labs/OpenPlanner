@@ -62,6 +62,7 @@ ALL_SLOTS = {
     # Pool-specific and the places of a slot.
     "db/pool_staffing.py:get_pool_commitments": "reads pool slots by definition",
     "db/pool_staffing.py:get_pool_slot": "reads pool slots by definition",
+    "db/service_requests.py:unclaimed_pool_bookings": "reads pool slots by definition",
     "db/proposals.py:places_taken": "places in whichever slot the outer query selected",
     "db/legacy_slot.py:legacy_slot": "defines the predicate",
 }

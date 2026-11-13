@@ -8,7 +8,10 @@ from app.adapters.live_settings import LiveSettings
 from app.config import Settings
 from app.domain.admin import AdminService
 from app.domain.planner_service import PlannerService
+from app.domain.pool_booking import PoolBookings
 from app.domain.ports import Clock, UnitOfWork
+from app.domain.request_watch import RequestWatch
+from app.domain.request_work import RequestWork
 from app.domain.services import BookingService
 from app.keys import management_token_key, management_token_key_previous
 from app.policies import confirm_policy, proposal_hours, reach
@@ -49,3 +52,19 @@ def planner_service(
         proposal_hours=lambda org: proposal_hours(live.for_organisation(org)),
         reach=lambda org: reach(live.for_organisation(org)),
     )
+
+
+def request_work(clock: Clock, live: LiveSettings) -> RequestWork:
+    """Return the request work of the own queue with each organisation's lease and hours."""
+    return RequestWork(
+        PoolBookings(
+            clock, treatment_buffer=lambda org: live.for_organisation(org).treatment_buffer_minutes
+        ),
+        lease_minutes=lambda org: live.for_organisation(org).assignment_start_lease_minutes,
+        unresolved_hours=lambda org: live.for_organisation(org).request_unresolved_hours,
+    )
+
+
+def request_watch(uow: UnitOfWork, clock: Clock, live: LiveSettings) -> RequestWatch:
+    """Return the watchdog round of requests with each organisation's hours."""
+    return RequestWatch(uow, clock, lambda org: live.for_organisation(org).request_unresolved_hours)

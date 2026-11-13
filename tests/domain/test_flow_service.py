@@ -289,7 +289,7 @@ async def test_deleting_is_refused_for_an_unknown_flow_and_audited_for_a_denied_
     assert len(uow.state.flows) == 1
 
 
-async def test_activation_is_refused_with_the_checklist_while_something_is_not_built(
+async def test_activation_is_refused_with_the_checklist_while_the_gate_is_shut(
     service: FlowService, uow: InMemoryUnitOfWork
 ) -> None:
     await person(uow, ORG_ADMIN.subject)
@@ -302,7 +302,7 @@ async def test_activation_is_refused_with_the_checklist_while_something_is_not_b
     assert outcome.activated is False
     missing = [i for i in outcome.items if not i.ok]
     assert [(i.code, i.reason) for i in missing] == [
-        (flows.ReadinessCheck.RETENTION, flows.ReadinessReason.NOT_BUILT_YET)
+        (flows.ReadinessCheck.ROLLBACK, flows.ReadinessReason.ROLLBACK_NOT_SAFE)
     ]
     (flow,) = uow.state.flows.values()
     assert flow.state is FlowState.DRAFT

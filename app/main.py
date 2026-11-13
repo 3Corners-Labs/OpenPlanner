@@ -167,7 +167,7 @@ from app.keys import (
     session_secret,
 )
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
-from app.service_wiring import booking_service, planner_service
+from app.service_wiring import booking_service, planner_service, request_work
 from app.web.alert_text import alert_composer
 from app.web.authz_labels import ROLE_LABELS
 from app.web.call_labels import agent_start_label
@@ -668,6 +668,7 @@ def create_app(
             agent_pseudonym_key(settings),
             agent_pseudonym_key_previous(settings),
             staff_usage,
+            request_work(clock, app.state.live_settings),
         )
         app.state.integration_service = IntegrationService(
             uow,

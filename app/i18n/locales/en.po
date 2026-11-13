@@ -1042,6 +1042,9 @@ msgstr "The service has been created. Now set its staffing."
 msgid "admin.done.released"
 msgstr "The appointment was released and is back in the queue."
 
+msgid "admin.done.work_completed"
+msgstr "The work was completed."
+
 msgid "admin.done.removed"
 msgstr "Removed."
 
@@ -6407,6 +6410,12 @@ msgstr "Shortfall look-ahead (days)"
 
 msgid "settings.field.treatment_buffer_minutes.label"
 msgstr "Wrap-up time per appointment on a pool (minutes)"
+
+msgid "settings.field.assignment_start_lease_minutes.label"
+msgstr "Time to start work that was picked up (minutes)"
+
+msgid "settings.field.request_unresolved_hours.label"
+msgstr "Latest handling time of a request after its appointment (hours)"
 
 msgid "settings.field.planner_changes_alert_per_hour.label"
 msgstr "Alert above changes per planner per hour"
@@ -13042,6 +13051,30 @@ msgstr "Completion"
 
 msgid "admin.flows.check.retention"
 msgstr "Retention and deletion"
+
+msgid "admin.queue.work.start"
+msgstr "Start"
+
+msgid "admin.queue.work.complete"
+msgstr "Complete"
+
+msgid "admin.queue.work.assigned"
+msgstr "Picked up: start by {time}, or the work goes back to the queue."
+
+msgid "admin.queue.work.in_progress"
+msgstr "In progress since {time}."
+
+msgid "admin.queue.work.conflict"
+msgstr "Started while a colleague ran over: no unit of the pool is free at this moment. This has been recorded."
+
+msgid "admin.queue.work.recovery"
+msgstr "This work is still not completed after the latest handling time. Complete it as soon as it is done; its unit of the pool stays taken until then."
+
+msgid "admin.queue.work.no_video"
+msgstr "This request has no video call."
+
+msgid "admin.flows.check.rollback"
+msgstr "Rolling back to the previous version"
 
 msgid "admin.flows.reason.labels_invalid"
 msgstr "The name is missing in Dutch or English, or is invalid."
