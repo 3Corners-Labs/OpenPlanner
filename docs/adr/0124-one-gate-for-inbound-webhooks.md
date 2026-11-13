@@ -233,7 +233,7 @@ counts per minute.
 | 0 | ADR proposed; the row in `docs/adr-status.md` | #791 | merged |
 | 1 | The gate, with today's checks moved into it and: the limit as a setting, with separate buckets for verified deliveries, refused calls and calls to addresses that do not exist, and a machine answer, the declared and the streamed size limit, the content type, refusal events with reason, platform and organisation; the route sweep; `docs/webhooks.md` corrected | #791 | merged |
 | 2a | The shared network helper `app/domain/networks.py`, with the machine API's clients and the display links moved onto it; one caller key for every limiter, an IPv6 caller counted by its /64 | #818 | merged |
-| 2b | Source networks: the list per connection and the installation's defaults, refusing on an untrusted proxy chain, `WEBHOOK_SOURCE_NETWORKS_REQUIRED`, the findings | #PRNUM | merged |
+| 2b | Source networks: the list per connection and the installation's defaults, refusing on an untrusted proxy chain, `WEBHOOK_SOURCE_NETWORKS_REQUIRED`, the findings | #821 | merged |
 | 3 | Replays per organisation and by body hash; the pause; the refusal alert and the connection card's status | | planned |
 | 4 | Secret rotation with an overlap | | planned |
 | 5 | The bundled proxy: the webhook rule, the host of its own, `WEBHOOK_PROXY_NETWORKS`, `check-proxy.sh`; the chart's webhook host and network policy | | planned |
