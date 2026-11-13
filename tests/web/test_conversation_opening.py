@@ -5,7 +5,7 @@ import pytest
 from app.domain.calls import ContactCenterTask
 from app.domain.contact_center import TaskKind
 from app.domain.message_texts import CONVERSATION_OPENING_PLACEHOLDERS, used_placeholders
-from app.i18n import CATALOGUE_DIR, Translator, load_catalogues
+from app.i18n import CATALOGUE_DIR, DEFAULT_LOCALE, Translator, load_catalogues
 from app.web.conversation_opening import (
     OPENING_WITH_LINK,
     OPENING_WITHOUT_LINK,
@@ -76,3 +76,26 @@ def test_no_supplier_name_in_the_text(translator: Translator) -> None:
     for locale in REQUIRED_LOCALES:
         for key in (OPENING_WITH_LINK, OPENING_WITHOUT_LINK):
             assert "webex" not in translator.lookup(locale, key).lower()
+
+
+def test_a_catalogue_text_with_a_placeholder_outside_the_list_is_refused() -> None:
+    """A programming error a test catches: the allow-list is enforced where the text is made."""
+    catalogues = {
+        "nl": {OPENING_WITH_LINK: "{reference} {email}", OPENING_WITHOUT_LINK: "{reference}"}
+    }
+
+    with pytest.raises(ValueError, match="placeholder"):
+        conversation_opening(Translator(catalogues), "nl", TASK)
+
+
+def test_a_malformed_catalogue_text_is_refused() -> None:
+    catalogues = {"nl": {OPENING_WITH_LINK: "{reference", OPENING_WITHOUT_LINK: "{reference}"}}
+
+    with pytest.raises(ValueError, match="placeholder"):
+        conversation_opening(Translator(catalogues), "nl", TASK)
+
+
+def test_no_language_is_the_installations_default(translator: Translator) -> None:
+    assert conversation_opening(translator, None, TASK) == conversation_opening(
+        translator, DEFAULT_LOCALE, TASK
+    )

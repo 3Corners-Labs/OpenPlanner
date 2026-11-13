@@ -20,6 +20,7 @@ from app.domain.contact_center import (
     ContactCenterTaskRef,
     ProviderDescriptor,
     TaskKind,
+    task_kind_in_force,
 )
 from app.domain.contact_center_codec import contact_center_from_json, contact_center_to_json
 from app.domain.errors import DomainError, ErrorCode
@@ -34,7 +35,9 @@ BARE = ProviderDescriptor(
     DESCRIPTOR.attributes,
     10,
     "k.value",
-    capabilities=ContactCenterCapabilities(frozenset({InteractionKind.VIDEO})),
+    capabilities=ContactCenterCapabilities(
+        frozenset({InteractionKind.VIDEO}), task_kinds=frozenset({TaskKind.FORM})
+    ),
 )
 
 
@@ -71,7 +74,13 @@ def test_a_task_is_of_the_routings_kind() -> None:
     )
     booking = make_booking(meeting=None)
 
-    task = contact_center_task(booking, group, start_label="x", interaction=InteractionKind.NONE)
+    task = contact_center_task(
+        booking,
+        group,
+        start_label="x",
+        interaction=InteractionKind.NONE,
+        conversation_enabled=True,
+    )
 
     assert task.task_kind is TaskKind.CONVERSATION
     assert task.first_message == ""  # composed at the edge, by the caller
@@ -147,3 +156,55 @@ def test_an_import_of_a_kind_the_platform_does_not_carry_is_refused() -> None:
         contact_center_from_json(value, {"webex_cc": BARE})
 
     assert refused.value.field == "contact_center.task_kind"
+
+
+@pytest.mark.parametrize(
+    ("kind", "enabled", "in_force"),
+    [
+        (TaskKind.FORM, False, TaskKind.FORM),
+        (TaskKind.FORM, True, TaskKind.FORM),
+        (TaskKind.CONVERSATION, False, TaskKind.FORM),
+        (TaskKind.CONVERSATION, True, TaskKind.CONVERSATION),
+    ],
+)
+def test_the_kind_in_force_follows_the_switch(
+    kind: TaskKind, enabled: bool, in_force: TaskKind
+) -> None:
+    assert task_kind_in_force(kind, enabled) is in_force
+
+
+def test_a_task_is_built_as_the_kind_in_force() -> None:
+    group = make_group(
+        id=1,
+        contact_center=webex_routing(task_kind=TaskKind.CONVERSATION),
+        video_host_email="host@example.nl",
+    )
+    booking = make_booking(meeting=None)
+
+    for enabled, expected in ((False, TaskKind.FORM), (True, TaskKind.CONVERSATION)):
+        task = contact_center_task(
+            booking,
+            group,
+            start_label="x",
+            interaction=InteractionKind.NONE,
+            conversation_enabled=enabled,
+        )
+        assert task.task_kind is expected
+
+
+def test_a_reference_is_made_from_the_task_that_was_created() -> None:
+    task = ContactCenterTask(
+        reference="OP-1",
+        first_name="Zoe",
+        start_label="s",
+        group_name="g",
+        meeting_link="",
+        kind="scheduled",
+        routing=webex_routing(task_kind=TaskKind.CONVERSATION),
+        routing_value="demo",
+        task_kind=TaskKind.CONVERSATION,
+    )
+
+    assert task.ref("t-1") == ContactCenterTaskRef(
+        "t-1", ContactCenterKind.WEBEX_CC, TaskKind.CONVERSATION
+    )

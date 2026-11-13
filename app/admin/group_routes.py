@@ -73,9 +73,8 @@ from app.admin.routing_inputs import (
     ROUTING_HINTS,
     ROUTING_LABELS,
     ROUTING_VALUE_FIELD,
-    TASK_KIND_FIELD,
-    TASK_KIND_LABELS,
-    task_kinds_offered,
+    routing_with_task_kind,
+    with_task_kind_field,
 )
 from app.admin.shortfalls import group_shortfalls
 from app.admin.staffing_views import (
@@ -94,7 +93,7 @@ from app.admin.staffing_views import (
 )
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
-from app.domain.contact_center import ContactCenterRouting, TaskKind
+from app.domain.contact_center import ContactCenterRouting
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.planning import (
     GroupSettings,
@@ -213,26 +212,7 @@ INTEGRATION_LABELS: dict[str, str] = {
 }
 
 
-def _form_task_kind(
-    form: FormData, current: ContactCenterRouting | None, *, embedded_call_enabled: bool
-) -> TaskKind:
-    """Return the task kind the form chose; a refused one is an error on its select.
-
-    A form without the select (an older page) keeps the group's kind. A kind that is not
-    offered (``task_kinds_offered``) is refused, with the form kind taken so that the rest of
-    the form is still checked.
-    """
-    kept = current.task_kind if current else TaskKind.FORM
-    if TASK_KIND_FIELD not in form.values:
-        return kept
-    offered = task_kinds_offered(current, embedded_call_enabled=embedded_call_enabled)
-    chosen = form.choice(TASK_KIND_FIELD, {kind.value for kind in offered})
-    return TaskKind(chosen) if chosen is not None else TaskKind.FORM
-
-
-def _form_routing(
-    form: FormData, current: ContactCenterRouting | None, *, embedded_call_enabled: bool
-) -> ContactCenterRouting | None:
+def _form_routing(form: FormData) -> ContactCenterRouting | None:
     """Return the routing the settings form describes, or ``None`` when its inputs are empty.
 
     Raises:
@@ -242,7 +222,6 @@ def _form_routing(
         FORM_KIND,
         form.optional_text(ROUTING_VALUE_FIELD),
         {name: form.optional_text(field) for field, name in ROUTING_ATTRIBUTE_FIELDS.items()},
-        _form_task_kind(form, current, embedded_call_enabled=embedded_call_enabled),
     )
 
 
@@ -492,15 +471,9 @@ async def group(
 
 
 def _settings_fields(
-    form: FormData,
-    current: GroupSettings,
-    _: BoundGettext,
-    task_kinds: tuple[TaskKind, ...] = (TaskKind.FORM,),
+    form: FormData, current: GroupSettings, _: BoundGettext
 ) -> tuple[list[Field], list[Field]]:
-    """Return the planning and the integration inputs, pre-filled with the current values.
-
-    ``task_kinds`` are the kinds of contact-center task the form offers (``task_kinds_offered``).
-    """
+    """Return the planning and the integration inputs, pre-filled with the current values."""
 
     def value(name: str, fallback: object) -> str:
         return form.values.get(name, "" if fallback is None else str(fallback))
@@ -651,20 +624,6 @@ def _settings_fields(
         text("video_host_email", current.video_host_email, "admin.field.video_host_email_hint"),
         *(text(name, routing_inputs[name], ROUTING_HINTS[name]) for name in ROUTING_FIELDS),
         Field(
-            TASK_KIND_FIELD,
-            _(INTEGRATION_LABELS[TASK_KIND_FIELD]),
-            "select",
-            value(
-                TASK_KIND_FIELD,
-                current.contact_center.task_kind.value
-                if current.contact_center
-                else TaskKind.FORM.value,
-            ),
-            hint=_("admin.field.contact_center_task_kind_hint"),
-            error=form.error_for(TASK_KIND_FIELD),
-            options=tuple(Option(kind.value, _(TASK_KIND_LABELS[kind])) for kind in task_kinds),
-        ),
-        Field(
             "trial_call_enabled",
             _("admin.field.trial_call_enabled"),
             "select",
@@ -724,14 +683,13 @@ async def _settings_response(
     ``idp_form`` is the refused IdP value form (ADR 0049 point 4), when that one was sent.
     """
     current = settings_of(context.group.group)
-    planning, integrations = _settings_fields(
+    planning, integrations = _settings_fields(form, current, locale.gettext)
+    integrations = with_task_kind_field(
+        integrations,
         form,
-        current,
-        locale.gettext,
-        task_kinds_offered(
-            current.contact_center,
-            embedded_call_enabled=request.app.state.settings.embedded_call_enabled,
-        ),
+        current.contact_center,
+        embedded_call_enabled=request.app.state.settings.embedded_call_enabled,
+        _=locale.gettext,
     )
     return group_page(
         request,
@@ -824,7 +782,8 @@ async def save_settings(
     fallback = form.choice("dispatch_fallback", {f.value for f in DispatchFallback})
     chosen = (phone, dispatch, embedding, free_pick, trial, join_client, fallback, auto_send)
     try:
-        center = _form_routing(
+        center = routing_with_task_kind(
+            _form_routing(form),
             form,
             context.group.group.contact_center,
             embedded_call_enabled=request.app.state.settings.embedded_call_enabled,

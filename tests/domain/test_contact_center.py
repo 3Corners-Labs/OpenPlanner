@@ -7,9 +7,11 @@ import pytest
 
 from app.domain.contact_center import (
     AttributeSpec,
+    ContactCenterCapabilities,
     ContactCenterKind,
     ContactCenterRouting,
     ProviderDescriptor,
+    TaskKind,
     routing_field,
 )
 from app.domain.errors import DomainError, ErrorCode
@@ -25,6 +27,7 @@ DESCRIPTOR = ProviderDescriptor(
     ),
     routing_value_max_length=8,
     routing_value_label_key="label.routing_value",
+    capabilities=ContactCenterCapabilities(task_kinds=frozenset({TaskKind.FORM})),
 )
 
 

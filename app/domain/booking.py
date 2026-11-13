@@ -20,7 +20,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from app.domain.channels import ChannelKind
-from app.domain.contact_center import ContactCenterTaskRef
+from app.domain.contact_center import ContactCenterTaskRef, TaskKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.flow_resolution import FlowRef
 from app.domain.form_fields import Answers, mailto_href, normalise_email, normalise_phone
@@ -273,6 +273,9 @@ class Booking:
     trial_count: int = 0
     contact_center_task: ContactCenterTaskRef | None = None
     """The task at the contact center and its platform (ADR 0032); purged with the contact."""
+    attempted_task_kind: TaskKind = TaskKind.FORM
+    """The kind the latest create of a task was tried as (ADR 0123 step 7a), stored before the
+    platform answers, so that a task found later is adopted with the kind it was made as."""
     kind: BookingKind = BookingKind.SCHEDULED
     closure_id: int | None = None
     change_reason: ChangeReason | None = None

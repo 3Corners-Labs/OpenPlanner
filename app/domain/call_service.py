@@ -25,7 +25,7 @@ from app.domain.calls import (
     contact_center_task,
     meeting_request,
 )
-from app.domain.contact_center import ContactCenterTaskRef, TaskKind
+from app.domain.contact_center import TaskKind
 from app.domain.contact_center_dispatch import DispatcherChoice
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.fallback import FallbackService
@@ -45,11 +45,13 @@ from app.domain.service_flows import interaction_of, requirement_of
 from app.domain.skills import mapped_skill_codes
 
 StartLabel = Callable[[Booking, Group], str]
-OpeningText = Callable[[str, ContactCenterTask], str]
-"""Composes the first message of a conversation task from a locale and the task (ADR 0123 step
-7a); the catalogue and the translator are the edge's, so the domain is handed the function."""
-DEFAULT_LOCALE = "nl"
-"""The language of the first message when the organisation cannot be read; as everywhere."""
+OpeningText = Callable[[str | None, ContactCenterTask], str]
+"""Composes the first message of a conversation task from the organisation's default language
+(``None`` when it cannot be read: the edge applies the installation's default) and the task
+(ADR 0123 step 7a); the catalogue and the translator are the edge's, so the domain is handed
+the function."""
+ConversationEnabled = Callable[[], bool]
+"""Whether the platform switch ``embedded_call_enabled`` is on now; read at the edge, class C."""
 OPENING_MESSAGE = "opening_message"
 """What a refusal names when a conversation task cannot be given its first message."""
 
@@ -65,6 +67,8 @@ class CallService:
         start_label: Formats the start time for agents.
         opening: Composes the first message of a conversation task (ADR 0123 step 7a); without
             it a conversation task cannot be built and is refused as not ready.
+        conversation_enabled: Whether the platform switch is on; a routing's conversation is in
+            force only while it is (``task_kind_in_force``). Without it, never.
     """
 
     def __init__(
@@ -77,6 +81,7 @@ class CallService:
         fallback: FallbackService | None = None,
         organisations: OrganisationDispatchers | None = None,
         opening: OpeningText | None = None,
+        conversation_enabled: ConversationEnabled | None = None,
     ) -> None:
         """Store the collaborators; ``fallback`` diverts dispatches to the own queue (ADR 0082).
 
@@ -90,6 +95,7 @@ class CallService:
         self._start_label = start_label
         self._fallback = fallback
         self._opening = opening
+        self._conversation_enabled = conversation_enabled or (lambda: False)
 
     @property
     def video_available(self) -> bool:
@@ -135,8 +141,7 @@ class CallService:
             return booking
         built = await self.task_for(booking, group)
         task_id = await dispatcher.create_task(built)
-        booking_id = _id(booking)
-        task = ContactCenterTaskRef(task_id, routing.kind, built.task_kind)
+        booking_id, task = _id(booking), built.ref(task_id)
         async with self._uow.locked() as tx:
             await tx.save_task(booking_id, task)
         await self._integration.record(booking_id, EventKind.TASK_CREATED)
@@ -160,6 +165,7 @@ class CallService:
             start_label=self._start_label(booking, group),
             skills=skills,
             interaction=interaction,
+            conversation_enabled=self._conversation_enabled(),
         )
         if task.task_kind is not TaskKind.CONVERSATION:
             return task
@@ -167,7 +173,7 @@ class CallService:
             raise DomainError(ErrorCode.INTEGRATION_NOT_READY, OPENING_MESSAGE)
         async with self._uow.read() as tx:
             organisation = await tx.get_organisation_by_id(group.organisation_id)
-        locale = organisation.default_locale if organisation else DEFAULT_LOCALE
+        locale = organisation.default_locale if organisation else None
         return replace(task, first_message=self._opening(locale, task))
 
     async def dispatcher_of(self, group: Group) -> ContactCenterDispatcher | None:
@@ -274,7 +280,9 @@ class CallService:
 
         Nothing happens without a task, without a dispatcher for the platform that holds it, or
         once the platform reported it ended or failed. A retry after a successful mark does not
-        mark again.
+        mark again. A conversation task (ADR 0123 step 7a) is never marked: the mark is the work
+        item's cancellation form, which is not a message of a conversation, so it is ended at
+        once and a failed mark can never leave it open with the meeting link in it.
 
         Raises:
             IntegrationError: Retryable failures, so the job tries again.
@@ -289,7 +297,7 @@ class CallService:
         status = await self._integration.status(booking_id)
         if status.task in (TaskState.ENDED, TaskState.FAILED):
             return
-        if status.task is not TaskState.CANCELLED:
+        if task.task_kind is TaskKind.FORM and status.task is not TaskState.CANCELLED:
             try:
                 await dispatcher.mark_cancelled(task_id, booking.reference)
             except IntegrationError as error:

@@ -324,3 +324,25 @@ async def test_a_task_stored_before_the_step_reads_as_a_form(engine: AsyncEngine
     assert booking is not None
     assert booking.contact_center_task is not None
     assert booking.contact_center_task.task_kind is TaskKind.FORM
+
+
+async def test_the_kind_a_create_is_tried_as_is_stored_before_the_answer(
+    engine: AsyncEngine,
+) -> None:
+    """ADR 0123 step 7a: adoption reads it back; a booking without a task has no task."""
+    uow, booking_id = await _booking_with_task(engine)
+    async with engine.begin() as connection:
+        await connection.execute(
+            update(BookingRow).values(
+                wxcc_task_id=None, contact_center_task_id=None, contact_center_kind=None
+            )
+        )
+    async with uow.locked() as tx:
+        await tx.save_task_attempt(booking_id, TaskKind.CONVERSATION)
+
+    async with uow.read() as tx:
+        booking = await tx.get_booking(booking_id)
+
+    assert booking is not None
+    assert booking.contact_center_task is None
+    assert booking.attempted_task_kind is TaskKind.CONVERSATION

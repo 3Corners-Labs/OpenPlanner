@@ -9,7 +9,8 @@ It is not an editable block: an administrator cannot add a field to it.
 """
 
 from app.domain.calls import ContactCenterTask
-from app.i18n import Translator
+from app.domain.message_texts import CONVERSATION_OPENING_PLACEHOLDERS, used_placeholders
+from app.i18n import DEFAULT_LOCALE, Translator
 
 OPENING_WITH_LINK = "message.conversation.opening_video"
 """Catalogue key of the opening of a conversation that carries the meeting link."""
@@ -17,14 +18,26 @@ OPENING_WITHOUT_LINK = "message.conversation.opening"
 """Catalogue key of the opening of a conversation without a meeting (no link)."""
 
 
-def conversation_opening(translator: Translator, locale: str, task: ContactCenterTask) -> str:
-    """Return the first message of the conversation for ``task`` in ``locale``.
+def conversation_opening(
+    translator: Translator, locale: str | None, task: ContactCenterTask
+) -> str:
+    """Return the first message of the conversation for ``task``.
 
+    ``locale`` is the organisation's default language; ``None`` is the installation's default.
     The values are those of the neutral task, which holds nothing else of the booking.
+
+    Raises:
+        ValueError: If the catalogue text of the language uses a placeholder outside
+            ``CONVERSATION_OPENING_PLACEHOLDERS``: a mistake in the catalogue, found by a test,
+            never worked around at run time (the text is fixed, not an administrator's).
     """
+    language = locale or DEFAULT_LOCALE
     key = OPENING_WITH_LINK if task.meeting_link else OPENING_WITHOUT_LINK
+    names = used_placeholders(translator.lookup(language, key))
+    if names is None or not names <= CONVERSATION_OPENING_PLACEHOLDERS:
+        raise ValueError(f"the text {key!r} uses a placeholder the first message may not")
     return translator.gettext(
-        locale,
+        language,
         key,
         reference=task.reference,
         first_name=task.first_name,

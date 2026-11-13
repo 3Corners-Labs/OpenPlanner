@@ -129,13 +129,13 @@ class ContactCenterCapabilities:
     Attributes:
         interaction_kinds: The interaction kinds of a flow the platform can hand to an agent.
         skills: Whether the platform can route on the mapped skill codes (ADR 0121 step 4b).
-        conversation: Whether the platform can hold a conversation task (ADR 0123 step 7a). The
-            form task is the baseline every platform has, so only the conversation is declared.
+        task_kinds: The kinds of task the platform can create (ADR 0123 step 7a): the form (a
+            work item), the conversation, or both.
     """
 
     interaction_kinds: frozenset[InteractionKind] = frozenset()
     skills: bool = False
-    conversation: bool = False
+    task_kinds: frozenset[TaskKind] = frozenset()
 
     def carries(self, interaction: InteractionKind) -> bool:
         """Return whether the platform can hand work of ``interaction`` to an agent."""
@@ -143,7 +143,20 @@ class ContactCenterCapabilities:
 
     def carries_task(self, task_kind: TaskKind) -> bool:
         """Return whether the platform can create a task of ``task_kind``."""
-        return task_kind is TaskKind.FORM or self.conversation
+        return task_kind in self.task_kinds
+
+
+def task_kind_in_force(kind: TaskKind, conversation_enabled: bool) -> TaskKind:
+    """Return the kind of task a routing makes now (ADR 0123 step 7a).
+
+    A routing that holds ``conversation`` makes one only while the platform switch
+    ``embedded_call_enabled`` is on (``conversation_enabled``), because only then can anything
+    show a chat to the participant; while it is off the routing makes a form, as before the
+    step. Pure: the caller passes the switch in from the edge.
+    """
+    if kind is TaskKind.CONVERSATION and not conversation_enabled:
+        return TaskKind.FORM
+    return kind
 
 
 INTERACTION_KIND = "interaction_kind"

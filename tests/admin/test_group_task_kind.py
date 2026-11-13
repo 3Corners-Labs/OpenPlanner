@@ -67,6 +67,15 @@ async def test_a_conversation_submitted_while_the_switch_is_off_is_refused(site:
     assert await _stored(site) is TaskKind.FORM  # nothing saved
 
 
+async def test_no_note_while_the_switch_is_on_or_the_group_holds_the_form(site: Site) -> None:
+    await site.login_as(SUPER)
+
+    assert "maakt hij werkitems" not in (await site.client.get(f"{GROUP}/settings")).text
+    _switch(site, on=True)
+    await _post(site, {**SETTINGS_FORM, FIELD: "conversation"})
+    assert "maakt hij werkitems" not in (await site.client.get(f"{GROUP}/settings")).text
+
+
 async def test_a_kind_that_is_no_kind_is_refused(site: Site) -> None:
     await site.login_as(SUPER)
     _switch(site, on=True)
@@ -105,6 +114,7 @@ async def test_a_conversation_already_held_survives_the_switch_going_off(site: S
     page = (await site.client.get(f"{GROUP}/settings")).text
     assert _options(page) == ["form", "conversation"]
     assert '<option value="conversation" selected' in page
+    assert "maakt hij werkitems" in page  # the note: in force only with the switch
     saved = await _post(site, {**SETTINGS_FORM, "name": "Y", FIELD: "conversation"})
 
     assert saved.headers["location"] == f"{GROUP}/settings?done=saved"  # type: ignore[attr-defined]

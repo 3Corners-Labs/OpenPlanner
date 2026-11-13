@@ -23,7 +23,13 @@ from enum import StrEnum
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from app.domain.booking import Booking
-from app.domain.contact_center import ContactCenterRouting, TaskKind, uncarried
+from app.domain.contact_center import (
+    ContactCenterRouting,
+    ContactCenterTaskRef,
+    TaskKind,
+    task_kind_in_force,
+    uncarried,
+)
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.interaction import InteractionKind
 from app.domain.scheduling import Group, JoinClient
@@ -413,6 +419,14 @@ class ContactCenterTask:
     task_kind: TaskKind = TaskKind.FORM
     first_message: str = field(default="", repr=False)
 
+    def ref(self, task_id: str) -> ContactCenterTaskRef:
+        """Return the reference to the task the platform made of this, kind included.
+
+        The one constructor of a reference to a created task: what is stored with the task is
+        what it was created as, never what the routing says later.
+        """
+        return ContactCenterTaskRef(task_id, self.routing.kind, self.task_kind)
+
 
 MESSAGE_ID_MAX_LENGTH = 64
 """Longest identifier of a conversation message; a fixed rule of the contact-center contract."""
@@ -484,6 +498,7 @@ def contact_center_task(
     start_label: str,
     skills: tuple[str, ...] = (),
     interaction: InteractionKind = InteractionKind.VIDEO,
+    conversation_enabled: bool = False,
 ) -> ContactCenterTask:
     """Return the contact-center task to dispatch for ``booking``.
 
@@ -496,11 +511,14 @@ def contact_center_task(
         DomainError: ``integration_not_ready`` naming what is missing (``contact_center``,
             ``meeting`` or ``contact``) or what the group's platform cannot carry
             (``interaction_kind``, ``skill_codes`` or ``task_kind``, ADR 0121 step 6, ADR 0123
-            step 7a). The task is of the routing's kind; a conversation still lacks its
-            ``first_message``, which the caller composes.
+            step 7a). The task is of the routing's kind in force (``task_kind_in_force``: a
+            conversation only while ``conversation_enabled``, the platform switch the caller
+            passes in); a conversation still lacks its ``first_message``, which the caller
+            composes.
     """
     routing = _complete_routing(group)
-    gap = uncarried(routing.descriptor.capabilities, interaction, bool(skills), routing.task_kind)
+    task_kind = task_kind_in_force(routing.task_kind, conversation_enabled)
+    gap = uncarried(routing.descriptor.capabilities, interaction, bool(skills), task_kind)
     if gap is not None:
         raise DomainError(ErrorCode.INTEGRATION_NOT_READY, gap)
     link = booking.meeting.link if booking.meeting else None
@@ -520,7 +538,7 @@ def contact_center_task(
         variables=tuple(sorted(group.routing.variables(booking.routing).items())),
         skills=skills,
         interaction=interaction,
-        task_kind=routing.task_kind,
+        task_kind=task_kind,
     )
 
 

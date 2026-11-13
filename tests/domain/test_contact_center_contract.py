@@ -54,7 +54,9 @@ from tests.support.service_flows import legacy, pool, revision
 
 FLOW = "organisations[acme].groups[balie].flows[advies]"
 WEBEX = DESCRIPTOR.capabilities
-VIDEO_ONLY_NO_SKILLS = ContactCenterCapabilities(frozenset({InteractionKind.VIDEO}))
+VIDEO_ONLY_NO_SKILLS = ContactCenterCapabilities(
+    frozenset({InteractionKind.VIDEO}), task_kinds=frozenset({TaskKind.FORM})
+)
 CONTACT_CENTER = DispatchKind.CONTACT_CENTER
 
 
@@ -80,7 +82,9 @@ VIDEO = {"interaction_kind": InteractionKind.VIDEO, "handling_action": HandlingA
 
 def test_webex_contact_center_declares_video_none_and_skills() -> None:
     carried = frozenset({InteractionKind.VIDEO, InteractionKind.NONE})  # ``none`` since 6b
-    assert WEBEX == ContactCenterCapabilities(carried, skills=True, conversation=True)
+    assert WEBEX == ContactCenterCapabilities(
+        carried, skills=True, task_kinds=frozenset({TaskKind.FORM, TaskKind.CONVERSATION})
+    )
 
 
 def test_a_descriptor_that_declares_nothing_carries_nothing() -> None:

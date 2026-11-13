@@ -34,3 +34,14 @@ def test_the_hint_says_that_no_work_item_was_made_instead(code: str) -> None:
 def test_a_refused_conversation_is_a_failure_code_of_its_own_in_the_reports(code: str) -> None:
     assert code in FAILURE_CODES
     assert failure_code(code) == code
+
+
+def test_the_hint_of_a_refused_conversation_names_both_known_causes() -> None:
+    """A 403 is not only a missing messaging feature: the service app may lack a permission."""
+    key = failure_hint(EventKind.TASK_FAILED, MESSAGING_NOT_CONFIGURED)
+    catalogues = load_catalogues(CATALOGUE_DIR)
+
+    assert key is not None
+    assert "403" in catalogues["en"][key]
+    assert "service app lacks" in catalogues["en"][key]
+    assert "403" in catalogues["nl"][key]

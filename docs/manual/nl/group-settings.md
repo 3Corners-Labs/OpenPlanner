@@ -375,6 +375,11 @@ contactcenter bewaart zelf een transcript van een gesprek; de verwijdering van O
 reikt daar niet. Een andere keuze geldt alleen voor nieuwe taken; bestaande taken houden het soort
 waarmee ze zijn gemaakt.
 
+De keuze **Gesprek** geldt alleen zolang de gesprekspagina voor de installatie aanstaat: zolang
+die uit staat maakt een dienst die op Gesprek staat werkitems, en het formulier zegt dat naast
+de keuze. Dat geldt ook voor een soort die via een configuratie-import binnenkwam: de import
+laat het staan en het gaat gelden zodra de schakelaar aangaat.
+
 <!-- field: wxcc_sample_flow -->
 ### Voorbeeldflow om te importeren
 

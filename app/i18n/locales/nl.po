@@ -1567,6 +1567,9 @@ msgstr "Soort taak in het contactcenter"
 msgid "admin.field.contact_center_task_kind_hint"
 msgstr "Werkitem: de medewerker ziet de velden en de link in het agent desktop (standaard). Gesprek: een berichtentaak die de medewerker in het agent desktop beantwoordt. Het gesprek kan alleen gekozen worden op een installatie waar de gesprekspagina aanstaat, en vraagt het berichtenkanaal van het contactcenter."
 
+msgid "admin.field.contact_center_task_kind_off"
+msgstr "Deze dienst staat op Gesprek, maar zolang de gesprekspagina op deze installatie niet aanstaat maakt hij werkitems."
+
 msgid "admin.contact_center.task_kind.form"
 msgstr "Werkitem"
 
@@ -1832,7 +1835,7 @@ msgid "call.hint.task.other"
 msgstr "Webex Contact Center nam de taak niet aan. Controleer het entry point en kanaal van de dienst onder Instellingen en de WxCC-inrichting onder Koppelingen; de code is de reden van WxCC."
 
 msgid "call.hint.task.messaging_not_configured"
-msgstr "Het contactcenter weigerde het gesprek: de berichtenfunctie of het berichtenkanaal staat voor deze organisatie niet aan. Controleer het kanaal onder de instellingen van de dienst en het berichtenkanaal in het beheer van het contactcenter. Er is geen werkitem voor in de plaats gemaakt."
+msgstr "Het contactcenter weigerde het gesprek met een 403 (de status staat bij de gebeurtenis). Of de berichtenfunctie of het berichtenkanaal staat voor deze organisatie niet aan, of de service-app heeft de machtiging niet. Controleer het kanaal onder de instellingen van de dienst, het berichtenkanaal in het beheer van het contactcenter en de machtigingen van de service-app. Er is geen werkitem voor in de plaats gemaakt."
 
 msgid "call.hint.task.conversation_open"
 msgstr "Het contactcenter heeft voor deze afspraak al een open gesprek. Sluit het in het agent desktop af en probeer het opnieuw. Er is geen werkitem voor in de plaats gemaakt."

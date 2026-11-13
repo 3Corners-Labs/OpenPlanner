@@ -32,8 +32,9 @@ Messages v2, the message identifier being the ``aliasId`` so a retry is not a se
 The first message is composed at the edge from the catalogue and holds only the fields CLAUDE.md
 allows in an outbound payload; ``conversation_body`` is the one place that puts it in a request.
 WxCC answers 403 while its messaging feature or channel is not set up for the organisation and
-refuses a second open conversation for the same identifier: the first becomes
-``messaging_not_configured``, the second ``conversation_open``, never a form task instead.
+refuses a second open conversation for the same identifier: the first is read as
+``messaging_not_configured`` (its status kept as the reason, since a 403 has more than one
+cause), the second as ``conversation_open``, never a form task instead.
 
 A cancelled booking's task is first marked with a Task Messages v2 append
 (``cjp:task_write``) that sets ``kind`` to ``cancelled`` with only the booking reference, so
@@ -115,7 +116,7 @@ DESCRIPTOR = ProviderDescriptor(
     capabilities=ContactCenterCapabilities(
         interaction_kinds=frozenset({InteractionKind.VIDEO, InteractionKind.NONE}),
         skills=True,
-        conversation=True,
+        task_kinds=frozenset({TaskKind.FORM, TaskKind.CONVERSATION}),
     ),
 )
 """What a group needs for WxCC (ADR 0032 point 4) and what WxCC carries (ADR 0121 step 6); the
@@ -305,16 +306,22 @@ def append_body(message: ParticipantMessage, timestamp_ms: int) -> dict[str, Any
 def messaging_refusal(error: IntegrationError) -> IntegrationError:
     """Return the domain error for WxCC's refusal of a conversation request.
 
-    A 403 means the messaging feature or channel is not set up for the organisation
-    (``messaging_not_configured``); a 409 that an open conversation exists for the participant
-    identifier (``conversation_open``). Every other error is returned as it is. Neither is
-    retryable, and neither is ever answered by creating a form task.
+    A 403 is read as ``messaging_not_configured`` and a 409 as ``conversation_open`` (an open
+    conversation exists for the participant identifier). A 403 has more than one cause (the
+    feature or channel is not set up, or the service app lacks the right), so the platform's
+    status stays on the error as its reason, shown under the event next to the code. Every
+    other error is returned as it is. None is retryable, and none is ever answered by creating
+    a form task.
     """
-    if error.code == "rejected_403":
-        return IntegrationError(MESSAGING_NOT_CONFIGURED, retryable=False, reason=error.reason)
-    if error.code == "rejected_409":
-        return IntegrationError(CONVERSATION_OPEN, retryable=False, reason=error.reason)
-    return error
+    code = {"rejected_403": MESSAGING_NOT_CONFIGURED, "rejected_409": CONVERSATION_OPEN}.get(
+        error.code
+    )
+    if code is None:
+        return error
+    status = f"HTTP {error.code.removeprefix('rejected_')}"
+    return IntegrationError(
+        code, retryable=False, reason=f"{status}: {error.reason}" if error.reason else status
+    )
 
 
 def cancellation_body(reference: str, alias_id: str, timestamp_ms: int) -> dict[str, Any]:

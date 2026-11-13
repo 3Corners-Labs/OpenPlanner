@@ -366,6 +366,7 @@ def create_app(
                 app.state.fallback_service,
                 wired.organisations,
                 partial(conversation_opening, app.state.translator),
+                lambda: app.state.settings.embedded_call_enabled,
             )
             app.state.trial_call_service = TrialCallService(
                 uow, wired.video, app.state.integration_service, clock

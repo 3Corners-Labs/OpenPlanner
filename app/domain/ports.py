@@ -65,6 +65,7 @@ from app.domain.contact_center import (
     ContactCenterTaskRef,
     OrganisationConnection,
     Registration,
+    TaskKind,
 )
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
@@ -1374,6 +1375,14 @@ class Transaction(Protocol):
 
     async def save_task(self, booking_id: int, task: ContactCenterTaskRef) -> None:
         """Store the booking's contact-center task: its id and the platform that holds it."""
+        ...
+
+    async def save_task_attempt(self, booking_id: int, task_kind: TaskKind) -> None:
+        """Store the kind a create of the booking's task is about to be tried as (step 7a).
+
+        Written before the platform answers, so that a task found afterwards without an answer
+        (adoption) is given the kind it was created as, not one guessed from the routing.
+        """
         ...
 
     async def get_booking_by_meeting(self, meeting_id: str) -> Booking | None:

@@ -365,6 +365,11 @@ the contact center refuses the task, the timeline says so and no work item is ma
 The contact center keeps its own transcript of a conversation; the purge of OpenPlanner does not
 reach it. Changing the kind affects new tasks only; tasks that exist keep the kind they were made with.
 
+The kind **Conversation** is in force only while the call page is switched on for the installation:
+while it is off, a service that holds Conversation makes work items, and the form says so next to
+the choice. This holds for a kind that came in through a configuration import as well: the import
+keeps it, and it takes effect when the switch goes on.
+
 <!-- field: wxcc_sample_flow -->
 ### Sample flow to import
 

@@ -1567,6 +1567,9 @@ msgstr "Kind of contact-center task"
 msgid "admin.field.contact_center_task_kind_hint"
 msgstr "Work item: the staff member sees the fields and the link in the agent desktop (the default). Conversation: a messaging task the staff member answers in the agent desktop. The conversation can be chosen only on an installation that has the call page switched on, and needs the messaging channel of the contact center."
 
+msgid "admin.field.contact_center_task_kind_off"
+msgstr "This service holds Conversation, but until the call page is switched on for this installation it makes work items."
+
 msgid "admin.contact_center.task_kind.form"
 msgstr "Work item"
 
@@ -1832,7 +1835,7 @@ msgid "call.hint.task.other"
 msgstr "Webex Contact Center did not accept the task. Check the service's entry point and channel under Settings and the WxCC setup under Integrations; the code is WxCC's reason."
 
 msgid "call.hint.task.messaging_not_configured"
-msgstr "The contact center refused the conversation: its messaging feature or messaging channel is not set up for this organisation. Check the channel under the service's settings and the messaging channel in the contact center's control panel. No work item was made instead."
+msgstr "The contact center refused the conversation with a 403 (the status is shown with the event). Either its messaging feature or messaging channel is not set up for this organisation, or the service app lacks the permission. Check the channel under the service's settings, the messaging channel in the contact center's control panel and the service app's permissions. No work item was made instead."
 
 msgid "call.hint.task.conversation_open"
 msgstr "The contact center already has an open conversation for this appointment. End it in the agent desktop, then try again. No work item was made instead."

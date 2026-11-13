@@ -185,7 +185,9 @@ def test_a_conversation_without_a_usable_first_message_is_refused_before_it_is_s
 
 
 def test_a_platform_that_does_not_declare_the_conversation_is_never_asked_for_one() -> None:
-    without = ContactCenterCapabilities(frozenset({InteractionKind.VIDEO}), skills=True)
+    without = ContactCenterCapabilities(
+        frozenset({InteractionKind.VIDEO}), skills=True, task_kinds=frozenset({TaskKind.FORM})
+    )
 
     assert uncarried(without, InteractionKind.VIDEO, False, TaskKind.CONVERSATION) == "task_kind"
 
@@ -279,6 +281,7 @@ async def test_a_403_is_messaging_not_configured_and_never_a_work_item() -> None
         await _tasks(handler).create_task(CONVERSATION)
 
     assert (error.value.code, error.value.retryable) == (MESSAGING_NOT_CONFIGURED, False)
+    assert error.value.reason == "HTTP 403"  # a 403 has more than one cause: the status stays
     assert [r.url.path for r in seen] == ["/v2/tasks"]  # one request: no second, as a work item
     assert json.loads(seen[0].content)["channelType"] == "customMessaging"
 
@@ -292,6 +295,7 @@ async def test_a_second_open_conversation_is_conversation_open() -> None:
         await tasks.create_task(CONVERSATION)
 
     assert (error.value.code, error.value.retryable) == (CONVERSATION_OPEN, False)
+    assert error.value.reason == "HTTP 409"
 
 
 async def test_other_refusals_of_a_conversation_keep_their_own_codes() -> None:

@@ -154,6 +154,8 @@ class JobRunner:
         request_work: The request work of new flows (ADR 0121 step 6b); with it, a dispatch
             job of request work goes to ``RequestDispatch`` and ``requests`` fences attempts.
         reconcile_minutes: ``contact_center_reconcile_minutes`` (class C), read when called.
+        conversation_enabled: ``embedded_call_enabled`` (class C), read when called: a routing's
+            conversation task is made only while it is on (ADR 0123 step 7a).
         after_purge: Called once after a round that ran ``purge_pii`` jobs (the worker passes
             the WAL checkpoint, WP-A3); a failure is logged and never fails the round.
     """
@@ -178,6 +180,7 @@ class JobRunner:
         organisations: OrganisationDispatchers | None = None,
         request_work: RequestWork | None = None,
         reconcile_minutes: Callable[[], int] | None = None,
+        conversation_enabled: Callable[[], bool] | None = None,
     ) -> None:
         """Store the collaborators and decide which job types this worker can handle."""
         self._queue = queue
@@ -206,6 +209,7 @@ class JobRunner:
                 fallback,
                 organisations,
                 partial(conversation_opening, composer.translator),
+                conversation_enabled,
             )
             if integration is not None
             else None

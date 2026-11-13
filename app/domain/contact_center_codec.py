@@ -78,11 +78,11 @@ def contact_center_to_json(routing: ContactCenterRouting | None) -> dict[str, ob
     """Return the routing as the JSON object a document holds; ``None`` for no routing."""
     if routing is None:
         return None
-    return {
+    document: dict[str, object] = {
         "kind": ContactCenterKind(routing.kind).value,
         "routing_value": routing.routing_value,
         "attributes": dict(routing.attributes),
-        **(
-            {"task_kind": routing.task_kind.value} if routing.task_kind is not TaskKind.FORM else {}
-        ),
     }
+    if routing.task_kind is not TaskKind.FORM:
+        document["task_kind"] = routing.task_kind.value
+    return document

@@ -210,11 +210,8 @@ class AttemptEvents:
             return None
         if not await self._ours(tx, booking, request, provider, organisation_id):
             return None
-        group = await tx.get_group_by_id(booking.group_id)
-        # The kind the group's routing has now: the create that made the task used it, unless
-        # the routing was edited in the minutes between (a task is kept as it was made).
-        task_kind = group.contact_center.task_kind if group and group.contact_center else None
-        task = ContactCenterTaskRef(task_id, provider, task_kind or TaskKind.FORM)
+        # The kind comes from the create that made the task (stored before it was tried).
+        task = ContactCenterTaskRef(task_id, provider, booking.attempted_task_kind)
         items = [
             i
             for i in await tx.work_items_of(request.id or 0)
@@ -353,7 +350,7 @@ class RequestDispatch:
         if self._fallback is not None and await self._fallback.diverts(booking, group):
             return FALLBACK
         built = await self._task_of(booking, group)  # before the attempt: a refusal opens none
-        opened = await self._open(booking, group)
+        opened = await self._open(booking, group, built.task_kind)
         if opened is None:
             return HELD
         try:
@@ -367,7 +364,7 @@ class RequestDispatch:
                 return IN_DOUBT_SKIP
             await self._fail(opened)
             raise
-        task = ContactCenterTaskRef(task_id, group.contact_center.kind, built.task_kind)
+        task = built.ref(task_id)
         async with self._uow.locked() as tx:
             await tx.save_task(stored_id(booking), task)
             current = await tx.get_active_work_item(opened.request.id or 0)
@@ -380,8 +377,12 @@ class RequestDispatch:
         await self._integration.record(stored_id(booking), EventKind.TASK_CREATED)
         return None
 
-    async def _open(self, booking: Booking, group: Group) -> _Write | None:
-        """Open the attempt under the lock; ``None`` when someone holds the request."""
+    async def _open(self, booking: Booking, group: Group, task_kind: TaskKind) -> _Write | None:
+        """Open the attempt under the lock; ``None`` when someone holds the request.
+
+        The kind the create is tried as is stored with the attempt, before the platform
+        answers, so that adoption of a task found later reads it back (ADR 0123 step 7a).
+        """
         now = self._clock.now()
         async with self._uow.locked() as tx:
             request = await self._work.request_of(tx, group, booking, now)
@@ -393,6 +394,7 @@ class RequestDispatch:
             if not await tx.update_service_request(new_request, request.handling):
                 return None
             stored = await tx.add_work_item(item)
+            await tx.save_task_attempt(stored_id(booking), task_kind)
         return _Write(new_request, new_request, stored, stored.state)
 
     async def _fail(self, opened: _Write) -> None:

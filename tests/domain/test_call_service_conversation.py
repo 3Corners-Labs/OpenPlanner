@@ -17,6 +17,7 @@ from app.domain.calls import ContactCenterTask
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef, TaskKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import IntegrationService
+from app.domain.ports import IntegrationError
 from app.domain.scheduling import Organisation, ScheduleRule
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
@@ -37,12 +38,12 @@ CONVERSATION_GROUP = make_group(
 WEBEX_CC = ContactCenterKind.WEBEX_CC
 
 
-def _opening(locale: str, task: ContactCenterTask) -> str:
+def _opening(locale: str | None, task: ContactCenterTask) -> str:
     return f"{locale}: {task.reference} {task.first_name} {task.start_label} {task.meeting_link}"
 
 
 async def _service(  # type: ignore[no-untyped-def]
-    dispatcher: FakeDispatcher, *, opening=_opening, locale: str = "en"
+    dispatcher: FakeDispatcher, *, opening=_opening, locale: str = "en", enabled: bool = True
 ):
     state = State()
     state.organisations[1] = Organisation(1, "Demo", "demo", default_locale=locale)
@@ -60,6 +61,7 @@ async def _service(  # type: ignore[no-untyped-def]
         webex_cc(dispatcher),
         lambda b, g: "label",
         opening=opening,
+        conversation_enabled=lambda: enabled,
     )
     return uow, calls, booking
 
@@ -123,3 +125,84 @@ async def test_a_work_item_needs_no_opening_message() -> None:
 
     assert dispatcher.kinds == [TaskKind.FORM]
     assert done.contact_center_task == ContactCenterTaskRef("task-1", WEBEX_CC, TaskKind.FORM)
+
+
+async def test_a_conversation_is_in_force_only_while_the_switch_is_on() -> None:
+    """The routing holds a conversation; with the switch off the task is a form, as before."""
+    dispatcher = FakeDispatcher()
+    uow, calls, booking = await _service(dispatcher, enabled=False)
+
+    done = await calls.ensure_task(booking, CONVERSATION_GROUP)
+
+    assert dispatcher.kinds == [TaskKind.FORM]
+    [task] = dispatcher.items
+    assert task.first_message == ""
+    assert done.contact_center_task == ContactCenterTaskRef("task-1", WEBEX_CC, TaskKind.FORM)
+    assert uow.state.bookings[booking.id or 0].contact_center_task == done.contact_center_task
+
+
+async def test_the_opening_gets_no_language_when_the_organisation_cannot_be_read() -> None:
+    seen: list[str | None] = []
+
+    def opening(locale: str | None, task: ContactCenterTask) -> str:
+        seen.append(locale)
+        return "text"
+
+    dispatcher = FakeDispatcher()
+    uow, calls, booking = await _service(dispatcher, opening=opening, locale="en")
+    uow.state.organisations.clear()
+
+    await calls.ensure_task(booking, CONVERSATION_GROUP)
+
+    assert seen == [None]  # the edge applies the installation's default
+
+
+async def _held_task(dispatcher: FakeDispatcher, task_kind: TaskKind):  # type: ignore[no-untyped-def]
+    uow, calls, booking = await _service(dispatcher)
+    task = ContactCenterTaskRef("task-1", WEBEX_CC, task_kind)
+    async with uow.locked() as tx:
+        await tx.save_task(booking.id or 0, task)
+    return calls, replace(booking, contact_center_task=task)
+
+
+async def test_a_conversation_is_ended_without_the_work_items_cancellation_form() -> None:
+    dispatcher = FakeDispatcher()
+    calls, booking = await _held_task(dispatcher, TaskKind.CONVERSATION)
+
+    await calls.end_task(booking, CONVERSATION_GROUP)
+
+    assert dispatcher.marked == []
+    assert dispatcher.ended == ["task-1"]
+
+
+async def test_a_conversation_is_ended_even_when_a_mark_would_have_failed() -> None:
+    """A task holding the meeting link is not left open because the form's mark fails."""
+    dispatcher = FakeDispatcher()
+    dispatcher.mark_error = IntegrationError("unreachable", retryable=True)
+    calls, booking = await _held_task(dispatcher, TaskKind.CONVERSATION)
+
+    await calls.end_task(booking, CONVERSATION_GROUP)
+
+    assert dispatcher.ended == ["task-1"]
+
+
+async def test_a_form_task_is_marked_and_then_ended_as_before() -> None:
+    dispatcher = FakeDispatcher()
+    calls, booking = await _held_task(dispatcher, TaskKind.FORM)
+
+    await calls.end_task(booking, CONVERSATION_GROUP)
+
+    assert [task_id for task_id, _ in dispatcher.marked] == ["task-1"]
+    assert dispatcher.ended == ["task-1"]
+
+
+async def test_a_form_task_whose_mark_fails_for_a_retry_is_not_ended_yet() -> None:
+    """Behaviour of a form task is unchanged: a retryable mark failure raises, the job retries."""
+    dispatcher = FakeDispatcher()
+    dispatcher.mark_error = IntegrationError("unreachable", retryable=True)
+    calls, booking = await _held_task(dispatcher, TaskKind.FORM)
+
+    with pytest.raises(IntegrationError):
+        await calls.end_task(booking, CONVERSATION_GROUP)
+
+    assert dispatcher.ended == []
