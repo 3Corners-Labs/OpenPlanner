@@ -2,9 +2,11 @@
 
     bot (machine API, scope bookings:request_change on the group)
         request(caller, group, phone, code, start)
-            ─► switched on? code and phone well-formed? time free? ─► one locked transaction:
-               the group's bookings with that phone number, the one whose code matches and that
-               the participant could still change ─► request row (with or without a booking),
+            ─► switched on? code and phone well-formed? a free time of the service? ─► one
+               locked transaction: the group's bookings with that phone number, the one whose
+               code matches, that the participant could still change and that could move to the
+               time (on its own slot: its pool, or the service's own times) ─► request row
+               (with or without a booking),
                the message to the participant, an audit event ─► the same answer whatever
                matched
         status(caller, id) ─► pending, confirmed or expired; only for the client that asked
@@ -135,13 +137,17 @@ class ChangeRequestService:
     ) -> ChangeRequest:
         """Record a change request: to ``start``, or a cancellation without one.
 
-        The answer is the same whether or not anything matched.
+        The answer is the same whether or not anything matched. A time is first judged on
+        every placement of the service (its own times and the pools of its flows), before any
+        booking is read; the booking that matches is then judged on its own slot, and one that
+        could not move there is recorded as no match, like one past its change deadline
+        (ADR 0122 step 5, gate item G04).
 
         Raises:
             DomainError: ``change_requests_disabled`` (the organisation has not switched them
                 on), ``invalid_contact`` (no valid phone number), ``invalid_appointment_code``
-                or ``slot_unavailable`` (the requested time is not free). None of these depends
-                on a booking.
+                or ``slot_unavailable`` (the requested time is not free anywhere in the
+                service). None of these depends on a booking.
         """
         group = summary.group
         policy = self._policy(group.organisation_id)
@@ -151,14 +157,14 @@ class ChangeRequestService:
         digits = normalise_code(code)
         if digits is None:
             raise DomainError(ErrorCode.INVALID_APPOINTMENT_CODE, "code")
-        if start is not None and not await self._free(group, start):
+        if start is not None and not await self._bookings.offers_somewhere(group, start):
             raise DomainError(ErrorCode.SLOT_UNAVAILABLE)
         now = self._clock.now()
         async with self._uow.locked() as tx:
             candidates = await tx.find_bookings_by_phone(group.id, number)
             # Every candidate's code is checked, so the time does not tell which one matched.
             matches = [b for b in candidates if code_matches(self._keys, b.token_salt, digits)]
-            match = next((b for b in matches if _may_change(b, group, start, now)), None)
+            match = await self._changeable(tx, matches, group, start, now)
             reason = MATCHED if match else NO_MATCH
             previous = await tx.get_latest_change_request(match.id) if match and match.id else None
             target = match
@@ -277,12 +283,25 @@ class ChangeRequestService:
         jobs = plan_for_change_request(now=now, start=booking.start, sms=sms_reachable(booking))
         await tx.add_jobs(booking_id, jobs)
 
-    async def _free(self, group: Group, start: datetime) -> bool:
-        """Return whether ``start`` is a free time of the group, as the availability shows it."""
-        day = group.today(start)
-        return any(
-            s.start == start for s in await self._bookings.availability(group.slug, day, day)
-        )
+    async def _changeable(
+        self,
+        tx: Transaction,
+        matches: list[Booking],
+        group: Group,
+        start: datetime | None,
+        now: datetime,
+    ) -> Booking | None:
+        """Return the first match the participant could change now, to ``start`` if given.
+
+        A move is judged on the booking's own slot (``BookingService.may_move_to``), so a
+        booking on a pool is asked only about a free time of its pool.
+        """
+        for booking in matches:
+            if not _may_change(booking, group, start, now):
+                continue
+            if start is None or await self._bookings.may_move_to(tx, booking, group, start):
+                return booking
+        return None
 
 
 def _may_change(booking: Booking, group: Group, start: datetime | None, now: datetime) -> bool:

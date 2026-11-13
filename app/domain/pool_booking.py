@@ -499,6 +499,30 @@ class Placements:
             return self.legacy
         return self.for_resolved(await resolve_flow(tx, group.id, IntakeMode.APPOINTMENT, flow))
 
+    async def every_placement(self, tx: Transaction, group: Group) -> list[Placement]:
+        """Return every placement a booking of ``group`` may sit on: its own staffing and pools.
+
+        The pools are those of the service's published flows that draw on one (active or
+        archived, as their bookings stay), each pool and length once; none while no pool flow
+        can be booked (``pool_flows_bookable``), so nothing is read then. A booking keeps the
+        pool and length of its own slot (``of_booking``); one made under an older revision of
+        a flow is judged on its own slot, never through this list.
+        """
+        found: list[Placement] = [self.legacy]
+        if not pool_flows_bookable(IntakeMode.APPOINTMENT):
+            return found
+        targets: list[PoolTarget] = []
+        for flow in await tx.list_service_flows(PUBLIC_READ, group.id):
+            current = flow.current
+            if current is None or current.legacy:
+                continue
+            if current.capacity_pool_id is None or current.duration_minutes is None:
+                continue
+            target = PoolTarget(current.capacity_pool_id, current.duration_minutes)
+            if target not in targets:
+                targets.append(target)
+        return found + [PoolPlacement(self.pools, target) for target in targets]
+
     async def window_times(
         self, tx: Transaction, group: Group, placement: Placement
     ) -> "SceneTimes | None":
