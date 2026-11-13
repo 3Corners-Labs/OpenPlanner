@@ -54,6 +54,7 @@ from app.domain.channels import ChannelKind
 from app.domain.contact_center import ConnectionChange, ContactCenterKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.mail_domain import DomainReport, Record, Verdict
+from app.domain.networks import split_entries
 from app.i18n import BoundGettext
 from app.web.errors import FormError
 from app.web.locale import RequestLocale
@@ -536,6 +537,11 @@ async def save_contact_center(
                 form.text("cc_client_id"),
                 client_secret=form.values.get("cc_client_secret") or None,
                 refresh_token=form.values.get("cc_refresh_token") or None,
+                allowed_networks=(
+                    tuple(split_entries(form.values["cc_allowed_networks"]))
+                    if "cc_allowed_networks" in form.values
+                    else None
+                ),
             )
             outcome = await connection_service(request).save(context.principal, org, change)
         except DomainError as error:

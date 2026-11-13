@@ -6,8 +6,10 @@ address and its secret; the gate then admits the call and hands the route a veri
 ``Delivery``, or refuses it before the route runs. No route verifies anything itself, and a test
 fails for a ``/webhooks/`` route without a gate (``is_webhook_gate``).
 
-    call ─► address exists ─► content type ─► size ─► signature ─► time ─► shape ─► the limits
-              404 / 429         415            413      401         401      400       429
+    call ─► address exists ─► source network ─► content type ─► size ─► signature ─► time ─► shape
+              404 / 429         403              415            413      401         401      400
+          ─► the limits
+              429
 
 The limits come last for an address that exists, so a call that cannot sign never uses up the
 budget of the authentic ones (ADR 0124 point 5): a call refused for any reason before them counts
@@ -19,7 +21,11 @@ exists.
 Every refusal answers with an empty body and the status of its reason
 (``app.domain.inbound_gate``), and is reported through ``app.web.security_events.report`` with
 the reason, the platform and, for an organisation's address, the organisation's slug. The slug
-of an organisation that does not exist is never written: it comes from the caller. The replay
+of an organisation that does not exist is never written: it comes from the caller. The source
+network (``app.domain.webhook_sources``, point 3 and 4) is checked first: a list that applies and a
+caller outside it is ``network``, one whose address cannot be trusted (decided for this call,
+never from a standing state) is ``source_unknown``; both
+answer 403 and count as refused calls. The replay
 check stays with the domain's event key (ADR 0124 point 7 is a later step). The caller's address
 is the one the server derived (``--proxy-headers``), counted by its /64 when it is IPv6
 (``caller_of``); nothing is read from a forwarded header here.
@@ -42,11 +48,13 @@ from app.adapters.webhooks import (
     ContactCenterWebhook,
     InboundWebhook,
 )
+from app.config import Settings
 from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.inbound_gate import MAX_BODY_BYTES, Refusal, accepts_content_type
 from app.domain.ports import Clock
 from app.domain.security_log import WEBHOOK_REJECTED
-from app.web.caller import caller_of
+from app.domain.webhook_sources import check_source, networks_that_apply
+from app.web.caller import caller_of, client_address
 from app.web.protection import (
     webhook_retry_after,
     within_refused_limit,
@@ -55,6 +63,7 @@ from app.web.protection import (
 )
 from app.web.request_body import read_capped
 from app.web.security_events import report
+from app.web.webhook_sources import contact_center_networks, proxy_chain, video_networks
 
 log = structlog.get_logger()
 
@@ -79,12 +88,15 @@ class Address[W: InboundWebhook]:
         organisation_id: The organisation whose own connection this is; ``None`` for an
             address of the installation.
         organisation: That organisation's slug, public and no personal data.
+        networks: The list of allowed source networks that governs this address (the
+            connection's own, else the installation's default for the platform); empty: none.
     """
 
     inbound: W
     secret: str
     organisation_id: int | None = None
     organisation: str | None = None
+    networks: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -166,9 +178,22 @@ async def _inspect(
 ) -> Refusal | tuple[dict[str, Any], datetime]:
     """Run the checks of an address that exists, up to the shape; no limit is counted here.
 
+    The source network comes first (ADR 0124 point 3): a caller from outside the list, or whose
+    address cannot be trusted while a list applies, is not read at all. Both refusals answer
+    alike, and no forwarded header is read here: the address is the one the server derived.
+
     Returns:
         The reason of the first check that fails, else the payload and the time used.
     """
+    settings: Settings = request.app.state.settings
+    source = check_source(
+        client_address(request),
+        address.networks,
+        required=settings.webhook_source_networks_required,
+        chain=proxy_chain(request),
+    )
+    if source is not None:
+        return source
     if not accepts_content_type(request.headers.get("content-type")):
         return Refusal.CONTENT_TYPE
     body = await read_capped(request, MAX_BODY_BYTES)
@@ -217,7 +242,6 @@ def webhook_gate[W: InboundWebhook](
         address = found
         source, organisation = address.inbound.source, address.organisation
         bucket = organisation or INSTALLATION
-        # Seam: the source network (ADR 0124 point 3) is checked here, before the limits.
         inspected = await _inspect(request, address)
         if isinstance(inspected, Refusal):
             if not within_refused_limit(source, bucket, caller):
@@ -237,7 +261,11 @@ async def webex_address(request: Request) -> Address[InboundWebhook] | Unresolve
     secret = WEBEX_INBOUND.secret(request.app.state.settings)
     if secret is None:
         return Unresolved(WEBEX_INBOUND.source)
-    return Address(WEBEX_INBOUND, secret.get_secret_value())
+    return Address(
+        WEBEX_INBOUND,
+        secret.get_secret_value(),
+        networks=video_networks(request.app.state.settings),
+    )
 
 
 def _installation(
@@ -252,7 +280,11 @@ def _installation(
     secret = handling.secret(request.app.state.settings)
     if secret is None:
         return Unresolved(handling.source)
-    return Address(handling, secret.get_secret_value())
+    return Address(
+        handling,
+        secret.get_secret_value(),
+        networks=contact_center_networks(request.app.state.settings),
+    )
 
 
 async def installation_address(
@@ -282,4 +314,7 @@ async def organisation_address(
     target = await service.webhook_target(org, handling.kind)
     if not target.found or target.secret is None:
         return Unresolved(handling.source, target.organisation)
-    return Address(handling, target.secret, target.organisation_id, target.organisation)
+    networks = networks_that_apply(
+        target.allowed_networks, contact_center_networks(request.app.state.settings)
+    )
+    return Address(handling, target.secret, target.organisation_id, target.organisation, networks)

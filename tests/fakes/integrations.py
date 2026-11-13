@@ -254,6 +254,11 @@ class FakeContactCenterConnections:
             has_client_secret=bool(change.client_secret) or bool(old and old.has_client_secret),
             has_refresh_token=bool(change.refresh_token) or bool(old and old.has_refresh_token),
             webhook_secret_at=old.webhook_secret_at if old else now,
+            allowed_networks=(
+                change.allowed_networks
+                if change.allowed_networks is not None
+                else (old.allowed_networks if old else ())
+            ),
         )
 
     async def rotate_webhook_secret(self, organisation_id: int, now: datetime) -> None:

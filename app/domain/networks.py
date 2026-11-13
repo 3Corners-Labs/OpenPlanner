@@ -29,6 +29,11 @@ can rotate within it. A fixed rule, not a setting."""
 IPV4_PIN_PREFIX = 32
 """Prefix of the network an IPv4 address pins to (the address itself)."""
 
+MAX_NETWORKS = 32
+"""The most networks one list of allowed webhook source networks holds, a connection's or an
+installation's default (ADR 0124 point 3). A fixed rule: a longer list is a sign that the wrong
+tool is being used. Lives here, a leaf, so the connection's own change can validate with it."""
+
 UNKNOWN_CALLER = "unknown"
 """The key (and the pseudonym) of a caller without an address."""
 

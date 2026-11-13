@@ -81,16 +81,21 @@ installation with several organisations.
    refusal for its network from one for an unknown source: both are 403 with an empty body.
 4. **The address is only as good as the proxy chain.** The gate takes the caller's address as
    the server derived it from the trusted proxy (`FORWARDED_ALLOW_IPS`) and reads no forwarded
-   header itself. When an allow-list applies and the address cannot be trusted (the proxy
-   watch of ADR 0086 reports forwarded headers from an untrusted hop, or the caller appears to
-   be the proxy itself), the gate refuses with the reason `source_unknown`: a restriction that
-   cannot be evaluated is not passed. System status says what to repair. An address without a
-   list is not affected. The cases, each with its test: `FORWARDED_ALLOW_IPS` is `*` or wider
-   than single hosts (every address could be spoofed); the caller's address is one of the
-   trusted proxies, or a loopback or private address while the public address is not (a hop
-   that did not hand the caller on); a chain of more than one proxy where a hop is not
-   trusted. The PROXY protocol, where a load balancer uses it, ends at the proxy; the
-   application never speaks it.
+   header for it. When an allow-list applies and the address held for a call cannot be the
+   caller's, the gate refuses with the reason `source_unknown`: a restriction that cannot be
+   evaluated is not passed. An address without a list is not affected. The cases, each decided
+   for the one call at hand and each with its test: `FORWARDED_ALLOW_IPS` is `*` or wider than
+   single hosts (every address could be spoofed); the caller's address is one of the trusted
+   proxies, or a loopback or private address while the public address is not (a hop that did
+   not hand the caller on); the call itself carries forwarded headers that the server did not
+   use because its sender is not a trusted proxy (the address held is that hop, as in a chain
+   of proxies where one is not trusted); the call has no usable address. Nothing that an
+   earlier call did decides a later one: the proxy watch of ADR 0086, which remembers that
+   forwarded headers once came from an untrusted sender, stays a finding on System status and
+   refuses nothing, because a mark that lasts would let any stranger who reaches the
+   application around its proxy switch every list off with one request (revised 2026-11-13,
+   found while building step 2b). The PROXY protocol, where a load balancer uses it, ends at
+   the proxy; the application never speaks it.
 5. **Limits that a stranger cannot turn against an organisation.** A supplier sends from
    addresses it shares among all its customers, and any customer can make those addresses call
    ours. So a call that fails a check never counts against the deliveries that pass:
@@ -228,7 +233,7 @@ counts per minute.
 | 0 | ADR proposed; the row in `docs/adr-status.md` | #791 | merged |
 | 1 | The gate, with today's checks moved into it and: the limit as a setting, with separate buckets for verified deliveries, refused calls and calls to addresses that do not exist, and a machine answer, the declared and the streamed size limit, the content type, refusal events with reason, platform and organisation; the route sweep; `docs/webhooks.md` corrected | #791 | merged |
 | 2a | The shared network helper `app/domain/networks.py`, with the machine API's clients and the display links moved onto it; one caller key for every limiter, an IPv6 caller counted by its /64 | #818 | merged |
-| 2b | Source networks: the list per connection and the installation's defaults, refusing on an untrusted proxy chain, `WEBHOOK_SOURCE_NETWORKS_REQUIRED`, the findings | | planned |
+| 2b | Source networks: the list per connection and the installation's defaults, refusing on an untrusted proxy chain, `WEBHOOK_SOURCE_NETWORKS_REQUIRED`, the findings | #PRNUM | merged |
 | 3 | Replays per organisation and by body hash; the pause; the refusal alert and the connection card's status | | planned |
 | 4 | Secret rotation with an overlap | | planned |
 | 5 | The bundled proxy: the webhook rule, the host of its own, `WEBHOOK_PROXY_NETWORKS`, `check-proxy.sh`; the chart's webhook host and network policy | | planned |

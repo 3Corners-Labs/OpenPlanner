@@ -188,3 +188,47 @@ async def test_the_login_redirect_uri_is_the_public_address_whatever_the_host_he
     await site.client.get("/admin/login", headers={"host": "evil.example"})
 
     assert site.idp.redirect_uris == [f"{PUBLIC}/admin/callback"]
+
+
+async def test_the_source_networks_of_the_webhook_addresses_are_never_a_silent_state(
+    site: Site,
+) -> None:
+    """ADR 0124 point 3: not restricted, restricted to N networks, or a required list missing."""
+    _settings(site, forwarded_allow_ips="10.0.0.5")
+    await site.login_as(SUPER)
+    open_part = await _part(site)
+    _settings(
+        site,
+        forwarded_allow_ips="10.0.0.5",
+        webhook_source_networks_video="8.8.8.0/24, 2001:4860:4860::/48",
+    )
+    restricted = await _part(site)
+    _settings(site, forwarded_allow_ips="10.0.0.5", webhook_source_networks_required=True)
+    required = await _part(site)
+
+    assert open_part.count("Niet beperkt: elke bron mag dit adres aanroepen") == 2
+    assert "Videoplatform" in open_part
+    assert "Contactcenter (standaard)" in open_part
+    assert "Beperkt tot 2 netwerk(en), uit de standaardlijst van de installatie" in restricted
+    assert restricted.count("Niet beperkt") == 1  # the contact-center default is still open
+    # the video list set above still applies: only the contact-center default is missing
+    assert required.count("Een lijst is verplicht en ontbreekt") == 1
+
+
+async def test_a_list_that_the_gate_would_refuse_says_what_to_repair(site: Site) -> None:
+    """ADR 0124 point 4: a list with a proxy chain that cannot be trusted is shown as refused."""
+    lists = {"webhook_source_networks_video": "8.8.8.0/24"}
+    _settings(site, forwarded_allow_ips="*", **lists)
+    await site.login_as(SUPER)
+    wide = await _part(site)
+    _settings(site, forwarded_allow_ips="10.0.0.5", **lists)
+    sound = await _part(site)
+    _app(site).state.proxy_watch.observe("10.0.0.9")
+    sighted = await _part(site)
+
+    assert "FORWARDED_ALLOW_IPS * is of een breder netwerk dan één host" in wide
+    assert "Geweigerd" in wide
+    assert "Geweigerd" not in sound
+    # the sighting of the proxy watch stays its own finding and refuses nothing at the gate
+    assert "Geweigerd" not in sighted
+    assert "negeerde ze" in sighted

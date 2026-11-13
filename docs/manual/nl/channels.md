@@ -100,6 +100,31 @@ scherm dat; controleer de rechten van de Service App (cjp:config_write) en maak 
 nieuw webhookgeheim. Koppel of ontkoppel een organisatie als er geen taken open staan:
 een taak die via de vorige koppeling is gemaakt, wordt niet meer via de nieuwe afgesloten.
 
+<!-- field: cc_allowed_networks -->
+### Toegestane bronnetwerken
+
+De netwerken waarvandaan de webhooks van het contactcenter naar het adres van deze organisatie
+mogen komen, één per regel in CIDR-notatie (bijvoorbeeld `203.0.113.0/24`; een enkel adres mag ook),
+hooguit 32. Vraag de leverancier van het contactcenter om zijn actuele reeksen. De lijst **vervangt**
+voor deze koppeling de standaardlijst van de installatie; leeg betekent dat de standaardlijst van de
+installatie geldt, en zonder standaardlijst mag elke bron aanroepen.
+
+De kaart zegt altijd in welke van drie standen het adres staat: *niet beperkt* (elke bron mag
+aanroepen; de handtekening beslist nog steeds), *beperkt tot N netwerken* (uit de eigen lijst van
+deze koppeling of de standaardlijst van de installatie) of *een lijst is verplicht en ontbreekt* (de
+host eist een lijst, dus het adres accepteert geen enkele aanroep tot er een is). Een lijst is een
+extra laag, niet het slot: de reeksen van de leverancier worden door al zijn klanten gedeeld, dus
+elke aanroep uit de lijst moet nog steeds een juiste handtekening dragen, en een verouderde lijst
+weigert de leverancier zelf. Houd de lijst bij als de leverancier nieuwe reeksen aankondigt.
+
+Een lijst kan alleen worden beoordeeld zolang de proxy voor OpenPlanner het adres van de aanroeper
+goed doorgeeft. Als het proxyvertrouwen `FORWARDED_ALLOW_IPS` `*` is of breder dan één host, zegt de
+kaart dat in rood en worden aanroepen naar dit adres geweigerd tot de host het herstelt. Een
+enkele aanroep waarvan het adres niet te vertrouwen is (doorgestuurde headers die zijn peer niet
+mocht sturen) wordt op zichzelf geweigerd; het herstel
+staat in het runbook, *Webhooks refused for their network*. Alleen de lijst opslaan verandert het webhookgeheim en de
+aanmelding bij het platform niet.
+
 ## Wat wordt vastgelegd
 
 Elke wijziging komt in het auditlog met de namen van de gewijzigde velden, nooit de waarden.

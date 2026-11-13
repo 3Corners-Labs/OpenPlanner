@@ -13670,3 +13670,57 @@ msgstr "Naam van de deelnemer voor de medewerker in het gesprek (voornaam of eig
 
 msgid "settings.field.embedded_call_staff_name.label"
 msgstr "Naam van de medewerker voor de deelnemer in het gesprek (accountnaam of eigen woord)"
+
+msgid "settings.field.webhook_source_networks_video.label"
+msgstr "Netwerken waarvandaan de webhooks van het videoplatform mogen komen (CIDR, kommagescheiden of één per regel, hooguit 32; leeg: elke bron)"
+
+msgid "settings.field.webhook_source_networks_contact_center.label"
+msgstr "Standaardnetwerken waarvandaan webhooks van het contactcenter mogen komen (CIDR, kommagescheiden of één per regel, hooguit 32; leeg: elke bron)"
+
+msgid "admin.channels.cc_allowed_networks"
+msgstr "Toegestane bronnetwerken"
+
+msgid "admin.channels.cc_allowed_networks_hint"
+msgstr "De netwerken waarvandaan de webhooks van het platform naar dit adres mogen komen, één per regel (CIDR, bijvoorbeeld 203.0.113.0/24), hooguit {maximum}. Leeg: de standaardlijst van de installatie geldt. Dit is een extra laag: de handtekening houdt een vreemde buiten, en een verouderde lijst weigert het platform zelf."
+
+msgid "admin.form.error.cc_allowed_networks"
+msgstr "Vul netwerken in als CIDR, één per regel, hooguit 32."
+
+msgid "admin.done.contact_center_saved"
+msgstr "Opgeslagen. Het webhookgeheim en de aanmelding bij het platform zijn ongewijzigd gelaten."
+
+msgid "admin.source.title"
+msgstr "Bronnetwerken"
+
+msgid "admin.source.finding"
+msgstr "Bron"
+
+msgid "admin.source.refused"
+msgstr "Geweigerd"
+
+msgid "admin.source.state.unrestricted"
+msgstr "Niet beperkt: elke bron mag dit adres aanroepen. De handtekening beslist nog steeds."
+
+msgid "admin.source.state.required_missing"
+msgstr "Een lijst is verplicht en ontbreekt: dit adres accepteert geen enkele aanroep. Stel hier toegestane netwerken in, of de standaardlijst van de installatie."
+
+msgid "admin.source.state.restricted_own"
+msgstr "Beperkt tot {count} netwerk(en), uit de eigen lijst van deze koppeling."
+
+msgid "admin.source.state.restricted_default"
+msgstr "Beperkt tot {count} netwerk(en), uit de standaardlijst van de installatie."
+
+msgid "admin.source.fault.wide_trust"
+msgstr "Aanroepen worden geweigerd (bron onbekend) zolang FORWARDED_ALLOW_IPS * is of een breder netwerk dan één host noemt: elke peer kan dan elk adres opgeven. Zet het alleen op het eigen adres van de proxy."
+
+msgid "admin.settings.address.sources.title"
+msgstr "Bronnetwerken van webhooks"
+
+msgid "admin.settings.address.sources.intro"
+msgstr "Waarvandaan de webhookadressen van de hele installatie aanroepen accepteren. De eigen lijst van een organisatie staat op de kaart van haar koppeling. Een lijst is een extra laag; de handtekening houdt een vreemde buiten. Een adres met een lijst weigert ook een aanroep waarvan het adres niet te vertrouwen is: een aanroep met doorgestuurde headers die zijn peer niet mocht sturen, de proxy zelf, of een loopback- of privéadres terwijl het publieke adres publiek is. Dat wordt per aanroep beslist en staat als weigering in de gebeurtenissen, niet hier."
+
+msgid "admin.settings.address.sources.video"
+msgstr "Videoplatform"
+
+msgid "admin.settings.address.sources.contact_center"
+msgstr "Contactcenter (standaard)"

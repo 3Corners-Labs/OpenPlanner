@@ -33,6 +33,7 @@ from urllib.parse import urlsplit
 
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.interaction import InteractionKind
+from app.domain.networks import MAX_NETWORKS, parse_networks
 
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 _ATTRIBUTE_NAME = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
@@ -289,6 +290,8 @@ class OrganisationConnection:
         has_client_secret: Whether a client secret is stored.
         has_refresh_token: Whether a refresh token is stored.
         webhook_secret_at: When the webhook secret was generated; ``None`` before the first.
+        allowed_networks: The networks the platform's webhooks may come from (ADR 0124 point 3),
+            canonical CIDR; empty: the installation's default applies. Not secret.
     """
 
     kind: ContactCenterKind
@@ -297,13 +300,15 @@ class OrganisationConnection:
     has_client_secret: bool
     has_refresh_token: bool
     webhook_secret_at: datetime | None
+    allowed_networks: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
 class ConnectionChange:
     """What an administrator submits for the organisation's connection.
 
-    A ``None`` secret keeps the stored one (write-only fields render empty).
+    A ``None`` secret keeps the stored one (write-only fields render empty); so does ``None``
+    allowed networks. An empty tuple clears the list: the installation's default applies again.
 
     Raises:
         DomainError: ``invalid_configuration`` naming the refused field.
@@ -314,6 +319,7 @@ class ConnectionChange:
     client_id: str
     client_secret: str | None = None
     refresh_token: str | None = None
+    allowed_networks: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:
         """Validate every field and drop a trailing slash; secrets are checked for shape only."""
@@ -326,6 +332,16 @@ class ConnectionChange:
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}client_secret")
         if self.refresh_token is not None and not _secret_shape(self.refresh_token):
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}refresh_token")
+        if self.allowed_networks is not None:
+            object.__setattr__(
+                self,
+                "allowed_networks",
+                parse_networks(
+                    self.allowed_networks,
+                    maximum=MAX_NETWORKS,
+                    field=f"{CONNECTION_FIELD}allowed_networks",
+                ),
+            )
 
     @property
     def secrets_sent(self) -> tuple[str, ...]:
@@ -365,6 +381,9 @@ class Registration(StrEnum):
     """The platform signs the organisation's events with its current secret now."""
     NOT_READY = "not_ready"
     """A secret is missing; the address is registered once the connection is complete."""
+    UNTOUCHED = "untouched"
+    """Nothing the subscription depends on changed (only the allowed networks), so it was left
+    as it was (ADR 0124 point 3)."""
     REFUSED = "refused"
     """The platform refused (rights, address or secret); the reason is in the request log."""
     FAILED = "failed"

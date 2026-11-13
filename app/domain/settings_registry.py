@@ -1501,6 +1501,36 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=6000,
     ),
     S(
+        "webhook_source_networks_video",
+        K.STRING,
+        "",
+        _C,
+        T.RATE_LIMITS,
+        "The networks (CIDR, comma or line separated, at most 32) the video platform's webhooks "
+        "may come from. Empty means any source, shown as a finding; a defence in depth, the "
+        "signature is what stops a stranger (ADR 0124 point 3).",
+    ),
+    S(
+        "webhook_source_networks_contact_center",
+        K.STRING,
+        "",
+        _C,
+        T.RATE_LIMITS,
+        "The default networks (CIDR, comma or line separated, at most 32) contact-center "
+        "webhooks may come from; a connection's own list replaces it. Empty means any source, "
+        "shown as a finding (ADR 0124 point 3).",
+    ),
+    S(
+        "webhook_source_networks_required",
+        K.BOOL,
+        False,
+        _B,
+        T.SWITCHES,
+        "Whether an inbound webhook address without allowed networks refuses every call. Class B "
+        "because whether a list is mandatory is a protection, and a protection is not switched "
+        "off from the portal (ADR 0124 point 3).",
+    ),
+    S(
         "rate_limit_agent_tokens",
         K.RATE,
         "10/minute",

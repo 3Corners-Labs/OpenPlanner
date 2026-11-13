@@ -233,6 +233,24 @@ def forwarded_state(
     return Forwarded.HONOURED if wanted == scheme else Forwarded.IGNORED
 
 
+def address_is_public(url: str) -> bool:
+    """Return whether the host of ``url`` is a public address or name, not an internal one.
+
+    An IP literal is public when it is a global address. A name is public unless it is
+    ``localhost``, has no dot, or ends in an internal suffix (``.localhost``, ``.local``,
+    ``.internal``, ``.lan``, ``.test``): a name cannot be resolved here, so it is judged by its
+    shape only. Used to tell whether a caller that is loopback or private can be the supplier.
+    """
+    host = (urlsplit(url).hostname or "").lower()
+    if not host:
+        return False
+    parsed = address_of(host)
+    if parsed is not None:
+        return parsed.is_global
+    internal = (".localhost", ".local", ".internal", ".lan", ".test")
+    return "." in host and host != "localhost" and not host.endswith(internal)
+
+
 class PeerClass(StrEnum):
     """What kind of address a peer is: the only thing about it that is ever shown."""
 

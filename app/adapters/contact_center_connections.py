@@ -3,9 +3,11 @@
 One AES-256-GCM record per organisation in ``integration_credentials`` under
 ``contact-center:{organisation id}`` (``contact_center_credential_name``), holding the kind,
 the API host, the client id and the three secrets: client secret, refresh token and the
-webhook secret this module generates. Nothing of it is readable in the portal: ``get`` returns
-``OrganisationConnection``, which says only whether a secret is set. ``webhook_secret`` is for
-the webhook route only, outside the domain.
+webhook secret this module generates, and the networks the platform's webhooks may come from
+(``allowed_networks``, not secret, ADR 0124 point 3; a record without the field reads as an
+empty list, so records made before it keep working). Nothing of it is readable in the portal:
+``get`` returns ``OrganisationConnection``, which says only whether a secret is set.
+``webhook_secret`` is for the webhook route only, outside the domain.
 """
 
 import secrets as random
@@ -70,6 +72,7 @@ class SealedConnections:
         if record is None:
             return None
         rotated = record.get("webhook_secret_at")
+        networks = record.get("allowed_networks")
         return OrganisationConnection(
             ContactCenterKind(str(record["kind"])),
             str(record["api_base_url"]),
@@ -77,6 +80,7 @@ class SealedConnections:
             has_client_secret=bool(record.get("client_secret")),
             has_refresh_token=bool(record.get("refresh_token")),
             webhook_secret_at=datetime.fromisoformat(rotated) if isinstance(rotated, str) else None,
+            allowed_networks=tuple(str(n) for n in networks) if isinstance(networks, list) else (),
         )
 
     async def save(self, organisation_id: int, change: ConnectionChange, now: datetime) -> None:
@@ -84,7 +88,8 @@ class SealedConnections:
 
         A new connection gets its webhook secret at once, so its address works from the start;
         a changed API host or client id gets a new one, so a subscription the previous tenant
-        still holds no longer verifies (CC-4d).
+        still holds no longer verifies (CC-4d). Changing the allowed networks alone touches
+        neither the secret nor anything else of the record.
         """
         record = dict(await self._record(organisation_id) or {})
         moved = (record.get("api_base_url"), record.get("client_id")) != (
@@ -96,6 +101,8 @@ class SealedConnections:
             "api_base_url": change.api_base_url,
             "client_id": change.client_id,
         }
+        if change.allowed_networks is not None:
+            record["allowed_networks"] = list(change.allowed_networks)
         if change.client_secret is not None:
             record["client_secret"] = change.client_secret
         if change.refresh_token is not None:
