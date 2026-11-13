@@ -18,8 +18,14 @@ from app.admin.flow_inputs import (
     empty_draft,
 )
 from app.admin.forms import FormData
+from app.domain import flow_readiness as readiness_rules
 from app.domain import service_flows as flows
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.flow_readiness import (
+    ReadinessCheck,
+    ReadinessItem,
+    ReadinessReason,
+)
 from app.domain.service_flows import (
     CompletionPolicy,
     DispatchKind,
@@ -27,10 +33,7 @@ from app.domain.service_flows import (
     HandlingAction,
     IntakeMode,
     InteractionKind,
-    ReadinessCheck,
-    ReadinessItem,
     ReadinessPolicy,
-    ReadinessReason,
 )
 from app.i18n import CATALOGUE_DIR, load_catalogues
 from tests.support.domain import NOW
@@ -241,7 +244,9 @@ def test_a_confirmation_is_allowed_exactly_when_the_lifecycle_says_so(
         draft=revision(revision=2) if has_draft else None,
     )
 
-    view = views.confirm_view(kind, the_flow, flows.flow_actions(the_flow, None), nl_locale())
+    view = views.confirm_view(
+        kind, the_flow, readiness_rules.flow_actions(the_flow, None), nl_locale()
+    )
 
     assert view.allowed is allowed
     assert bool(view.effects) is (allowed and kind is not views.ConfirmKind.DELETE)
@@ -257,7 +262,7 @@ def test_the_confirmations_name_the_flow_as_the_list_shows_it_and_the_draft_by_i
         current=published,
         draft=revision(revision=2, labels={"nl": "Nieuw", "en": "New"}),
     )
-    actions = flows.flow_actions(the_flow, None)
+    actions = readiness_rules.flow_actions(the_flow, None)
     names = {
         kind: views.confirm_view(kind, the_flow, actions, nl_locale()).name
         for kind in views.ConfirmKind

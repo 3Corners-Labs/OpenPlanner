@@ -5,6 +5,7 @@ from dataclasses import replace
 import pytest
 
 from app.domain import audit
+from app.domain import flow_readiness as readiness_rules
 from app.domain import service_flows as flows
 from app.domain.admin import AdminService
 from app.domain.authorization import (
@@ -19,7 +20,10 @@ from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.flow_service import FlowService
 from app.domain.routing import GroupRouting, Subject
-from app.domain.service_flows import FlowState, IntakeMode
+from app.domain.service_flows import (
+    FlowState,
+    IntakeMode,
+)
 from app.domain.skills import Skill
 from app.domain.staff import Membership, StaffMember
 from tests.fakes import clock as fake_clock
@@ -302,7 +306,7 @@ async def test_activation_is_refused_with_the_checklist_while_the_gate_is_shut(
     assert outcome.activated is False
     missing = [i for i in outcome.items if not i.ok]
     assert [(i.code, i.reason) for i in missing] == [
-        (flows.ReadinessCheck.ROLLBACK, flows.ReadinessReason.ROLLBACK_NOT_SAFE)
+        (readiness_rules.ReadinessCheck.ROLLBACK, readiness_rules.ReadinessReason.ROLLBACK_NOT_SAFE)
     ]
     (flow,) = uow.state.flows.values()
     assert flow.state is FlowState.DRAFT
@@ -335,7 +339,7 @@ async def test_a_flow_that_is_ready_is_activated_and_archived(
     archived = await service.archive(ORG_ADMIN, "demo", "advies")
 
     assert outcome.activated is True
-    assert flows.can_activate(outcome.items)
+    assert readiness_rules.can_activate(outcome.items)
     assert archived.state is FlowState.ARCHIVED
     assert details(uow)[-2:] == [
         "flow.activated,flow:advies,revision:1",
@@ -470,7 +474,10 @@ async def test_a_draft_with_only_the_point_that_follows_open_is_published(
     published = await service.publish(ORG_ADMIN, "demo", "advies")
 
     assert page.actions.publish
-    assert flows.readiness_state(page.items) is flows.ReadinessState.COMPLETE_EXCEPT_FOLLOWING
+    assert (
+        readiness_rules.readiness_state(page.items)
+        is readiness_rules.ReadinessState.COMPLETE_EXCEPT_FOLLOWING
+    )
     assert published.current is not None
 
 
@@ -818,7 +825,9 @@ async def test_the_page_judges_the_draft_and_the_activation_the_current_revision
     assert new.judges_draft is True  # a new flow has only its draft
     assert page.activation_revision == 1
     assert page.flow.in_progress is True
-    assert [i.reason for i in page.items if not i.ok][0] is flows.ReadinessReason.KIND_MISSING
+    assert [i.reason for i in page.items if not i.ok][
+        0
+    ] is readiness_rules.ReadinessReason.KIND_MISSING
     assert page.activation is not None
     assert all(i.ok for i in page.activation[:3])
     assert page.actions.activate is False  # retention is not built

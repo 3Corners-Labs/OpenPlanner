@@ -19,6 +19,7 @@ from app.domain.configuration_plan import Plan, plan_document
 from app.domain.configuration_tree import Entity
 from app.domain.configuration_v1 import FORMATS
 from app.domain.configuration_values import Value
+from app.domain.contact_center import ProviderDescriptor
 from app.domain.errors import ErrorCode
 from tests.support.config_roundtrip import document_of
 from tests.support.configuration import allow
@@ -232,14 +233,18 @@ def plan(
     *,
     usage: Usage | None = None,
     may_change: Any = allow,
+    contact_centers: Mapping[str, ProviderDescriptor] | None = None,
 ) -> Plan:
-    """Plan a document against ``current`` as an actor who may do everything."""
+    """Plan a document against ``current`` as an actor who may do everything.
+
+    ``contact_centers`` are the platforms the installation has adapters for (none by default).
+    """
     return plan_document(
         parse(data),
         current,
         usage=usage or Usage(),
         may_change=may_change,
-        context=RuleContext(now=CLOCK),
+        context=RuleContext(now=CLOCK, contact_centers=contact_centers or {}),
         settings_version=1,
     )
 
