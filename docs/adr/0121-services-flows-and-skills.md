@@ -59,7 +59,7 @@ None in step 1: it changes labels only. The later steps add the following, each 
 | 5b | P5, execution: claim with a lease, start (`check_start`), complete and release in the own queue for a flow without video (`app/domain/request_work.py`); the watchdog round and the deletion of request-level records in the worker (`app/domain/request_watch.py`) and in the nightly sweep; settings `assignment_start_lease_minutes` and `request_unresolved_hours`; `RETENTION_BUILT` true and the rollback point as its own readiness check | #767 | merged |
 | 5c | The participant's choice between several flows of a service (the choice screen step 3a left for step 5; design R8) | | follow-up |
 | 5d | The retention overview shows request-level records holding data and overdue as counts of their own (with the first writer, step 7) | | follow-up |
-| 5e | A list of work in recovery for supervisors (its appointment has ended, so the queue no longer lists it; design R9) | | follow-up |
+| 5e | Must be done before `ROLLBACK_SAFE` opens: a list of work in recovery for supervisors, and an alert while any exists (its appointment has ended, so the queue no longer lists it; design R9). Until it is completed, recovery work keeps one unit of its pool occupied as an overrun, which refuses conflicting starts and shows as a shortage | | follow-up |
 | 6 | P6: channel-independent contact-center task contract, reconciliation and fencing | | planned |
 | 7 | P7: immediate intake and check-in on the same pool | | planned |
 | 8 | P8: compatibility matrix, upgrade and rollback proof, documentation | | planned |

@@ -350,12 +350,12 @@ _OPERATIONS = (
         "requests.watched",
         _OPS,
         "info",
-        "changed expired_unclaimed deleted failed",
+        "changed expired_unclaimed deleted failed errors",
         "The watchdog round of requests changed {changed}, expired {expired_unclaimed} "
-        "unclaimed, deleted {deleted} records; {failed} failed.",
+        "unclaimed, deleted {deleted} records; {failed} failed ({errors}).",
         "The worker's round of ADR 0121 step 5 (lease expiry, cancellation, expiry, recovery, "
-        "deletion of request-level records); counts only. A failed request is tried again in "
-        "the next round.",
+        "deletion of request-level records); counts only, and the type names of what failed "
+        "(never a message). A failed request is tried again in the next round.",
     ),
     _e(
         "requests.watch_failed",

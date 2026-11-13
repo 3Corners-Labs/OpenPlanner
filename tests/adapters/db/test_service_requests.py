@@ -212,7 +212,7 @@ async def test_an_overrun_stays_a_commitment_after_its_planned_end(world: World)
 
 async def test_recovery_keeps_the_unit_and_completion_releases_it(world: World) -> None:
     flow, request, item = await started(world)
-    outcome = watchdog_outcome(request, item, holds_place=True, now=request.watchdog_at)
+    outcome = watchdog_outcome(request, item, now=request.watchdog_at)
     assert outcome is not None
     assert outcome.item is not None
     async with world.uow.locked() as tx:
@@ -326,3 +326,40 @@ async def test_the_watchdog_reads_open_requests_unclaimed_pool_bookings_and_held
         assert [r.id for r in await tx.requests_holding_data()] == [held.id]
         assert await tx.get_service_request(done.id or 0) == done
         assert await tx.get_service_request((done.id or 0) + 100) is None
+
+
+async def test_a_pseudonym_without_a_record_is_held_data_and_is_emptied_once(
+    world: World,
+) -> None:
+    """Review finding 1: the pseudonym goes even when the flow collected no record."""
+    flow, booking_id = await pool_booking(world)
+    async with world.uow.locked() as tx:
+        appointment = await tx.add_service_request(request_for(world, flow, booking_id))
+        await tx.add_work_item(claim(appointment, None, now=NOW, agent=AGENT, lease_minutes=5)[1])
+        request = await tx.add_service_request(on_demand(world, flow))
+        await tx.add_work_item(claim(request, None, now=NOW, agent=AGENT, lease_minutes=5)[1])
+    async with world.uow.read() as tx:
+        held = [r.id for r in await tx.requests_holding_data()]
+    assert held == [request.id]  # an appointment's pseudonym goes with its booking's purge
+
+    async with world.uow.locked() as tx:
+        assert await tx.delete_request_personal_data(request.id or 0, NOW)
+        assert not await tx.delete_request_personal_data(request.id or 0, NOW)
+    async with world.uow.read() as tx:
+        item = await tx.get_active_work_item(request.id or 0)
+        kept = await tx.get_service_request(request.id or 0)
+        assert await tx.requests_holding_data() == []
+    assert item is not None
+    assert item.assigned_to is None
+    assert kept is not None
+    assert kept.personal_data is PersonalDataState.NOT_COLLECTED
+
+
+async def test_the_watchdog_moment_is_written_with_the_handling(world: World) -> None:
+    flow, booking_id = await pool_booking(world)
+    async with world.uow.locked() as tx:
+        request = await tx.add_service_request(request_for(world, flow, booking_id))
+        later = replace(request, watchdog_at=request.watchdog_at + timedelta(days=7))
+        assert await tx.update_service_request(later, HandlingState.QUEUED)
+    async with world.uow.read() as tx:
+        assert await tx.get_service_request(request.id or 0) == later

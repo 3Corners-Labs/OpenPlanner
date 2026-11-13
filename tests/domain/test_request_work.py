@@ -15,7 +15,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.queue_service import COMPLETED, STARTED, STARTED_IN_CONFLICT, QueueService
 from app.domain.service_requests import HandlingState, WorkItemState
 from tests.fakes.clock import FixedClock
-from tests.fakes.persistence import InMemoryUnitOfWork
+from tests.fakes.persistence import InMemoryTransaction, InMemoryUnitOfWork
 from tests.support.domain import NOW, SLOT_0900
 from tests.support.request_work import (
     ADMIN,
@@ -258,3 +258,45 @@ async def test_a_supervisor_completes_work_in_recovery(
     await queue.complete(ADMIN, "demo", booking_id)
 
     assert uow.state.requests[request.id or 0].handling is HandlingState.COMPLETED
+
+
+async def test_an_expired_lease_is_reported_before_the_pool_is_asked(
+    queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """Review finding 7: with nobody staffed and the lease over, the answer is the lease."""
+    booking_id = await book(uow, clock)
+    at(clock)
+    await queue.claim(AGENT, "demo", booking_id)
+    uow.state.pool_rules[1] = (POOL, replace(unit_block(0), id=1))
+    at(clock, 5)
+
+    assert await refused(queue.start(AGENT, "demo", booking_id)) is ErrorCode.LEASE_EXPIRED
+
+
+async def test_a_view_reads_each_slot_and_revision_once(
+    queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review finding 4: rows share revisions; the polled view does not read them per row."""
+    for _ in range(3):
+        await book(uow, clock)
+    at(clock)
+    reads = {"slots": 0, "revisions": 0}
+    slot_by_id = InMemoryTransaction.get_slot_by_id
+    flow_revision = InMemoryTransaction.flow_revision
+
+    async def count_slot(self: InMemoryTransaction, slot_id: int) -> object:
+        reads["slots"] += 1
+        return await slot_by_id(self, slot_id)
+
+    async def count_revision(self: InMemoryTransaction, flow_id: int, revision: int) -> object:
+        reads["revisions"] += 1
+        return await flow_revision(self, flow_id, revision)
+
+    monkeypatch.setattr(InMemoryTransaction, "get_slot_by_id", count_slot)
+    monkeypatch.setattr(InMemoryTransaction, "flow_revision", count_revision)
+    view = await queue.view(AGENT, "demo")
+
+    assert len(view.rows) == 3
+    assert all(row.without_video for row in view.rows)
+    assert reads["slots"] == 3  # each booking has its own pool slot in this world
+    assert reads["revisions"] <= 2  # once for the skills' cache, once for the judge

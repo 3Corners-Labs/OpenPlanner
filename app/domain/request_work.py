@@ -19,19 +19,22 @@ from datetime import datetime
 
 from app.domain.booking import Booking, BookingStatus, Slot, stored_id
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.flow_resolution import FlowRef
 from app.domain.pool_accounting import StartOutcome
 from app.domain.pool_booking import PoolBookings
 from app.domain.ports import Transaction
 from app.domain.scheduling import Group
-from app.domain.service_flows import InteractionKind
+from app.domain.service_flows import FlowRevision
 from app.domain.service_requests import (
     HandlingState,
     ServiceRequest,
     WorkItem,
     WorkItemState,
     appointment_request,
+    check_startable,
     claim,
     complete,
+    is_request_work,
     release,
     start,
 )
@@ -78,14 +81,7 @@ class RequestWork:
         Every other booking (no flow, a legacy flow, a service's own slot, a video flow) is the
         queue's work as before: no request, a meeting link, no start or complete.
         """
-        if booking.flow is None or await self.pool_slot(tx, booking) is None:
-            return False
-        revision = await tx.flow_revision(booking.flow.flow_id, booking.flow.revision)
-        return (
-            revision is not None
-            and not revision.legacy
-            and revision.interaction_kind is not InteractionKind.VIDEO
-        )
+        return await WorkJudge(tx).handles(booking)
 
     async def of(self, tx: Transaction, booking: Booking) -> Work | None:
         """Return the request of ``booking`` and its active work item, ``None`` without one."""
@@ -138,6 +134,7 @@ class RequestWork:
             raise DomainError(ErrorCode.NOT_CLAIMED)
         if not booking.is_active:
             raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
+        check_startable(work.item, now)  # an expired lease says so before the pool is asked
         check = await self._pools.check_start_of(tx, group, slot, stored_id(booking), now)
         if check.outcome is StartOutcome.REFUSED:
             raise DomainError(ErrorCode.START_REFUSED)
@@ -195,3 +192,31 @@ class RequestWork:
 def recovering(work: Work | None) -> bool:
     """Return whether the work is marked for recovery (a supervisor may complete it)."""
     return work is not None and work.request.handling is HandlingState.RECOVERY_REQUIRED
+
+
+class WorkJudge:
+    """Whether bookings are request work, reading each slot and flow revision once.
+
+    One per transaction: a queue view judges every row, and rows share slots and revisions,
+    so a polled page reads each of them once instead of twice per row.
+    """
+
+    def __init__(self, tx: Transaction) -> None:
+        """Bind to ``tx`` with empty caches."""
+        self._tx = tx
+        self._pooled: dict[int, bool] = {}
+        self._revisions: dict[FlowRef, FlowRevision | None] = {}
+
+    async def handles(self, booking: Booking) -> bool:
+        """Return whether ``booking`` is request work (``RequestWork.handles``)."""
+        if booking.flow is None:
+            return False
+        if booking.slot_id not in self._pooled:
+            slot = await self._tx.get_slot_by_id(booking.slot_id)
+            self._pooled[booking.slot_id] = slot is not None and slot.capacity_pool_id is not None
+        if not self._pooled[booking.slot_id]:
+            return False
+        if booking.flow not in self._revisions:
+            ref = booking.flow
+            self._revisions[ref] = await self._tx.flow_revision(ref.flow_id, ref.revision)
+        return is_request_work(self._revisions[booking.flow])

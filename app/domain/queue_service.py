@@ -58,7 +58,7 @@ from app.domain.own_queue import (
     works_queue,
 )
 from app.domain.ports import Clock, Transaction, UnitOfWork
-from app.domain.request_work import RequestWork, Work, recovering
+from app.domain.request_work import RequestWork, Work, WorkJudge, recovering
 from app.domain.routing import RoutingChoice
 from app.domain.scheduling import Group, GroupSummary
 from app.domain.skills import Missing, Skill
@@ -218,10 +218,11 @@ class QueueService:
             judge = WorkEligibility(tx, principal, summary.organisation_slug)
             lacking = await _lacking(judge, entries)
             named = {i: await judge.skills(ids) for i, ids in lacking.items() if ids}
+            judge_work = WorkJudge(tx)
             requests = {
                 _id(e.booking)
                 for e in entries
-                if self._work and await self._work.handles(tx, e.booking)
+                if self._work is not None and await judge_work.handles(e.booking)
             }
         me = agent_pseudonyms(self._keys, principal.subject)
         limit = timedelta(minutes=group.not_picked_up_minutes)

@@ -1793,7 +1793,10 @@ class Transaction(Protocol):
         ...
 
     async def requests_holding_data(self) -> list[ServiceRequest]:
-        """Return every request whose request-level record still holds personal data."""
+        """Return every request without a booking that still holds personal data.
+
+        Its request-level record, or an agent's pseudonym on one of its work items.
+        """
         ...
 
     async def get_active_work_item(self, request_id: int) -> WorkItem | None:
@@ -1820,7 +1823,7 @@ class Transaction(Protocol):
         ...
 
     async def update_service_request(self, request: ServiceRequest, seen: HandlingState) -> bool:
-        """Write the request's handling and times if its handling is still ``seen``.
+        """Write the request's handling, ``resolved_at`` and ``watchdog_at`` if still ``seen``.
 
         Returns ``False`` when another transaction changed it first (nothing written).
         """
@@ -1840,8 +1843,8 @@ class Transaction(Protocol):
     async def delete_request_personal_data(self, request_id: int, now: datetime) -> bool:
         """Delete the request-level record and mark the request ``deleted`` (decision D1).
 
-        Also empties the pseudonym on the request's work items. Returns ``False`` when the
-        request held no record (nothing written): idempotent.
+        Also empties the pseudonyms on the request's work items, with or without a record.
+        Returns ``False`` when there was nothing to remove: idempotent.
         """
         ...
 

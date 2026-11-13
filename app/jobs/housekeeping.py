@@ -303,6 +303,7 @@ class Housekeeping:
                 expired_unclaimed=result.expired_unclaimed,
                 deleted=result.deleted,
                 failed=result.failed,
+                errors=",".join(result.errors),
             )
 
     async def _roll_up_bookings(self, now: datetime) -> None:

@@ -76,10 +76,12 @@ class ServiceRequestStore(PoolStaffingStore):
         return found
 
     async def requests_holding_data(self) -> list[ServiceRequest]:
+        named = {i.request_id for i in self.state.work_items.values() if i.assigned_to}
         return [
             r
-            for _, r in sorted(self.state.requests.items())
-            if r.personal_data is PersonalDataState.PRESENT
+            for key, r in sorted(self.state.requests.items())
+            if r.booking_id is None
+            and (r.personal_data is PersonalDataState.PRESENT or key in named)
         ]
 
     async def get_active_work_item(self, request_id: int) -> WorkItem | None:
@@ -118,7 +120,10 @@ class ServiceRequestStore(PoolStaffingStore):
         if stored is None or stored.handling is not seen:
             return False
         self.state.requests[request.id or 0] = replace(
-            stored, handling=request.handling, resolved_at=request.resolved_at
+            stored,
+            handling=request.handling,
+            resolved_at=request.resolved_at,
+            watchdog_at=request.watchdog_at,
         )
         return True
 
@@ -135,14 +140,17 @@ class ServiceRequestStore(PoolStaffingStore):
         return self.state.request_data.get(request_id)
 
     async def delete_request_personal_data(self, request_id: int, now: datetime) -> bool:
+        named = any(
+            i.request_id == request_id and i.assigned_to for i in self.state.work_items.values()
+        )
+        self._forget_agents(request_id)
         if self.state.request_data.pop(request_id, None) is None:
-            return False
+            return named
         self.state.requests[request_id] = replace(
             self.state.requests[request_id],
             personal_data=PersonalDataState.DELETED,
             data_deleted_at=now,
         )
-        self._forget_agents(request_id)
         return True
 
     def _forget_agents(self, request_id: int) -> None:

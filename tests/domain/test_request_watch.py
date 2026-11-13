@@ -19,13 +19,23 @@ from app.domain.service_requests import (
     PersonalDataState,
     RequestPersonalData,
     ServiceRequest,
+    WorkItem,
     WorkItemState,
     watchdog_deadline,
 )
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.domain import NOW, SLOT_0900
-from tests.support.request_work import AGENT, LENGTH, POOL, at, book, queue_of, world
+from tests.support.request_work import (
+    AGENT,
+    LENGTH,
+    POOL,
+    VIDEO_FLOW,
+    at,
+    book,
+    queue_of,
+    world,
+)
 
 END = SLOT_0900 + LENGTH
 DEADLINE = END + timedelta(hours=24)
@@ -169,3 +179,89 @@ async def test_the_sweep_deletes_an_overdue_record_the_round_missed_and_counts_i
     assert (result.overdue, result.purged, result.failed) == (1, 1, 0)
     assert result.per_group == {"demo": 1}
     assert uow.state.requests[request_id].personal_data is PersonalDataState.DELETED
+
+
+async def test_a_booking_on_hold_keeps_its_request_open_and_the_deadline_follows_a_new_time() -> (
+    None
+):
+    """Review finding 2: suspended or awaiting a new time is no cancellation (rebook path)."""
+    uow, clock = world(), FixedClock(NOW)
+    booking_id = await book(uow, clock)
+    queue = queue_of(uow, clock)
+    at(clock)
+    await queue.claim(AGENT, "demo", booking_id)
+    booking = uow.state.bookings[booking_id]
+    uow.state.bookings[booking_id] = replace(booking, status=BookingStatus.AWAITING_REBOOK)
+    clock.advance(DEADLINE + timedelta(days=1) - clock.now())
+
+    await watch(uow, clock).run()
+
+    request = next(iter(uow.state.requests.values()))
+    assert request.handling is HandlingState.QUEUED  # the lease ended; nothing else
+    assert uow.state.bookings[booking_id].claim is None
+
+    # The participant accepts a new time: the booking goes ahead a week later.
+    new_end = clock.now() + timedelta(days=7)
+    uow.state.bookings[booking_id] = replace(
+        uow.state.bookings[booking_id],
+        status=BookingStatus.CONFIRMED,
+        start=new_end - LENGTH,
+        end=new_end,
+    )
+    await watch(uow, clock).run()
+    moved = uow.state.requests[request.id or 0]
+    assert moved.watchdog_at == new_end + timedelta(hours=24)
+    assert moved.handling is HandlingState.QUEUED
+
+    clock.advance(new_end - LENGTH - clock.now())
+    again = await queue.claim(AGENT, "demo", booking_id)
+    assert again.work is not None
+    assert again.work.request.id == request.id
+
+    clock.advance(new_end + timedelta(hours=24) - clock.now())
+    await watch(uow, clock).run()
+    assert uow.state.requests[request.id or 0].handling is HandlingState.EXPIRED
+
+
+async def test_a_video_booking_on_a_pool_never_gets_an_expired_request() -> None:
+    """Review finding 3: the watchdog uses the queue's rule of request work."""
+    uow, clock = world(), FixedClock(NOW)
+    await book(uow, clock, VIDEO_FLOW)
+    clock.advance(DEADLINE + timedelta(days=1) - clock.now())
+
+    result = await watch(uow, clock).run()
+
+    assert result.expired_unclaimed == 0
+    assert uow.state.requests == {}
+
+
+async def test_the_pseudonym_goes_on_time_also_without_a_record() -> None:
+    """Review finding 1: a flow that collected nothing still names who took the work."""
+    uow, clock = world(), FixedClock(NOW)
+    async with uow.locked() as tx:
+        request = await tx.add_service_request(on_demand())
+        await tx.add_work_item(
+            WorkItem(None, request.id or 0, WorkItemState.ASSIGNED, "agent", NOW, None)
+        )
+    clock.advance(watchdog_deadline(NOW, 24) + timedelta(hours=24) - NOW)
+
+    result = await watch(uow, clock).run()
+
+    assert result.deleted == 1
+    assert [i.assigned_to for i in uow.state.work_items.values()] == [None]
+    assert uow.state.requests[request.id or 0].personal_data is PersonalDataState.NOT_COLLECTED
+    assert (await watch(uow, clock).run()).deleted == 0
+
+
+async def test_a_failure_is_counted_with_its_type_name_only() -> None:
+    uow, clock = world(), FixedClock(NOW)
+    await store_record(uow)
+    round_ = watch(uow, clock)
+
+    async def broken(request_id: int, now: object) -> bool:
+        raise ValueError("secret detail")
+
+    round_._watch = broken  # type: ignore[method-assign]
+    result = await round_.run()
+
+    assert (result.failed, result.errors) == (1, ("ValueError",))
