@@ -269,6 +269,11 @@ class FakeContactCenterConnections:
                 if change.allowed_networks is not None
                 else (old.allowed_networks if old else NetworkList())
             ),
+            inbound_enabled=(
+                change.inbound_enabled
+                if change.inbound_enabled is not None
+                else (old.inbound_enabled if old else True)
+            ),
         )
 
     async def rotate_webhook_secret(self, organisation_id: int, now: datetime) -> None:

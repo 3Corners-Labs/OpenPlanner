@@ -199,8 +199,9 @@ and an organisation without that connection answers `404`. Otherwise a contact-c
 `/webhooks/contact-center/webex_cc`; a kind without an adapter answers `404`. The old address
 `/webhooks/wxcc` is an alias of it and stays until the WxCC subscriptions are registered at the
 new one; OpenPlanner still registers at `/webhooks/wxcc` and recognises a subscription at either
-address as its own. Both addresses share the event keys, so an event delivered to both is
-recorded once.
+address as its own. Both addresses are the installation's, so they share the remembered events:
+an event delivered to both is recorded once. An organisation's own address remembers its events
+apart (see *Replays*).
 `WEBHOOK_BASE_URL` is optional and defaults to `PUBLIC_BASE_URL`; it exists so that an https
 tunnel or staging host can receive webhooks while the admin login (OIDC redirect) and the
 links in messages stay on `PUBLIC_BASE_URL`. It must be https in production, and
@@ -234,7 +235,7 @@ POST /webhooks/wxcc    X-WebexCC-Signature: <hex HMAC-SHA256>   X-WebexCC-Timest
 
 Each is sent once signed with the configured secret (expected `204`) and once with a random
 wrong key (expected `401`). The ids match no meeting or task, so the endpoint acknowledges
-them as unknown: nothing is recorded and no dedup key is stored.
+them as unknown: nothing is recorded and no replay key is stored.
 
 ## The gate every inbound webhook passes (ADR 0124)
 
@@ -254,7 +255,8 @@ and the first that fails refuses:
 | 6 | The signed time, where the platform signs one (WxCC), is within 300 seconds | `stale` | 401 |
 | 7 | The body is a JSON object | `malformed` | 400 |
 | 8 | The limits (below) | `rate` | 429 with `Retry-After` |
-| 9 | The event was not seen before (the domain's event key, see below); a replay is acknowledged | | 204 |
+| 9 | The address is not paused (below): a verified event at a paused address is dropped | | 204 |
+| 10 | The event was not seen before (*Replays*, below), asked by the domain after the gate; a replay is acknowledged | | 204 |
 
 The limits come after the checks, so a call that cannot sign never uses up the budget of the
 authentic ones. Both buckets have the value of `rate_limit_webhook_per_minute` (class C, default
@@ -286,8 +288,46 @@ proxy's connection limits are the ceiling.
 passer-by produces them by definition); their trace is the security event, held back when
 repeated. Every other reason also logs `webhook.rejected` once per call.
 
-Every refusal answers with an **empty body**, never the HTML error page. Step 7 runs before step 9
-in the code, because the event key comes from the parsed body.
+Every refusal answers with an **empty body**, never the HTML error page. Step 7 runs before step 10
+in the code, because the event's identifier comes from the parsed body.
+
+### Replays (ADR 0124 point 7)
+
+An event is remembered, so a redelivery or a replay of the same signed body changes nothing. What
+is remembered is a SHA-256 digest of the platform's code, the **scope** of the address and the
+event's identity (`app/domain/webhook_replay.py`):
+
+- The scope is the organisation whose own address the call came in at (`organisation:<id>`), or
+  `installation` for an installation-wide address (`/webhooks/webex`,
+  `/webhooks/contact-center/{kind}` and `/webhooks/wxcc`). The same event id delivered to two
+  organisations is two events; delivered twice to one it is a replay.
+- The identity is the event's identifier from the platform's adapter (Webex: a digest of
+  resource, event, `data.id` and the join and leave time; WxCC: a digest of type, task and the
+  CloudEvent `id`). An event **without** an identifier of its own is identified by the SHA-256 of
+  its verified body: the same signed body twice is a replay by definition.
+- The memory is asked only after the signature held (the gate hands the domain a verified
+  delivery), holds digests and never a body, and the key does not depend on which secret
+  verified the call. A paused address (below) writes nothing.
+- Keys are kept 30 days (`WEBHOOK_MEMORY`, a fixed rule, not a setting).
+
+Before this step the remembered key was the adapter's digest alone, under the platform's code.
+It is still read: an event remembered by that older key counts as seen, so a redelivery across
+the upgrade is still a replay. Nothing is rewritten and no migration was needed (ADR 0116); the
+old reading may go in 0.7.0, when every such key is older than the memory.
+
+### A paused connection (ADR 0124 point 9)
+
+An organisation's connection can be paused on its card (*Kanalen*, `inbound_enabled`, a field of
+the sealed connection record; a record without it is on). A paused address passes **every** check
+above, the signature included: a call that is refused for any reason is refused as for any other
+address, and an unsigned call never gets a `204` from a pause. Only then the verified event is
+dropped: the answer is `204` (the platform keeps its subscription), nothing is handled, nothing is
+remembered (so a redelivery after resuming is handled), the event is not noted as the platform's
+latest, and one log line `webhook.paused` with the platform's code and the organisation's slug is
+written. Pausing or resuming changes neither the webhook secret nor the registration at the
+platform. Resuming does not replay what was dropped: the periodic reconcile of the open tasks
+(`task_reconcile_interval_minutes`, ADR 0082) catches up on states a missed event left behind.
+The installation-wide addresses have no connection and no pause.
 
 ### Source networks (`network`, `source_unknown`)
 
@@ -402,10 +442,11 @@ accounts reach OpenPlanner. Org-owned webhooks need `meeting:admin_schedule_read
 admin or Compliance Officer. Verification: HMAC-SHA1 of the raw body
 with the secret, hex, compared in constant time with `X-Spark-Signature`. Events for unknown
 meetings are ignored. Webex signs no event time, so replays are caught by **deduplication**:
-each event's key, a SHA-256 of `resource`, `event`, `data.id` and `data.joinedTime`/`leftTime`
-(a participant keeps its `data.id` across leave and rejoin), is stored in `webhook_events` in
-the same transaction as the event; a key seen before is acknowledged (204) and ignored. Keys
-are kept 30 days and only for OpenPlanner's own meetings. The payload's meeting id can be an instance id
+each event's identity, a SHA-256 of `resource`, `event`, `data.id` and `data.joinedTime`/`leftTime`
+(a participant keeps its `data.id` across leave and rejoin), is remembered with its address's
+scope in `webhook_events` in the same transaction as the event (*Replays*, above); an event seen
+before is acknowledged (204) and ignored. An event without a `data.id` is identified by its
+verified body. Keys are kept 30 days and only for OpenPlanner's own meetings. The payload's meeting id can be an instance id
 (`<meetingId>_I_<…>`); it is matched on the series id. Participant names and emails are never
 stored: only counts, whether a host/cohost joined, and times (ADR 0010).
 
@@ -449,14 +490,12 @@ agent's host role comes from `allowAnyUserToBeCoHost` (ADR 0017). `task:failed` 
 admins on the booking's timeline.
 
 Deduplication and last event (ADR 0082 point 5): every verified WxCC event of a booking's task is
-keyed by a SHA-256 digest of its type, `data.taskId` and the CloudEvent `id`, stored in
-`webhook_events` for 30 days like the Webex keys. A redelivered or replayed event is acknowledged
-with 204, logged with outcome `duplicate` and changes nothing. An event **without** an `id` has
-no key and is not recognised as a replay: it is recorded every time it arrives (a time field
-could be the task's own and would hide a real second event, such as a second `task:connected`
-after a transfer). Within 300 seconds of its signed time a replayed body without an `id` is
-therefore recorded twice; a key from the hash of the verified body is planned (ADR 0124 point 7,
-step 3).
+identified by a SHA-256 digest of its type, `data.taskId` and the CloudEvent `id`, remembered with
+its address's scope in `webhook_events` for 30 days like the Webex keys. A redelivered or replayed
+event is acknowledged with 204, logged with outcome `duplicate` and changes nothing. An event
+**without** an `id` is identified by the SHA-256 of its verified body (ADR 0124 point 7): the
+same signed body twice is a replay, while a real second event, such as a second `task:connected`
+after a transfer, has another signed time in its body and so another hash.
 Every verified webhook of either platform is noted as that platform's last inbound event (time,
 type, outcome), shown on **Koppelingen** and *System status*.
 

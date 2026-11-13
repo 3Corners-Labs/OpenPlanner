@@ -18,7 +18,7 @@ from app.admin.authz import AdminContext
 from app.admin.channel_fields import Manage, channels_url, secret_field, value_of
 from app.admin.forms import Field, FormData, moment_label
 from app.admin.pages import SameOrigin
-from app.admin.source_findings import card_finding
+from app.admin.source_findings import card_finding, pause_finding
 from app.domain.contact_center import ContactCenterKind, OrganisationConnection, Registration
 from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.errors import DomainError
@@ -109,6 +109,18 @@ def _connection_fields(
             required=False,
             attributes={"rows": "4", "autocapitalize": "none", "spellcheck": "false"},
         ),
+        Field(
+            "cc_inbound_enabled",
+            _("admin.channels.cc_inbound_enabled"),
+            "checkbox",
+            value_of(
+                form,
+                "cc_inbound_enabled",
+                "yes" if stored is None or stored.inbound_enabled else "no",
+            ),
+            hint=_("admin.channels.cc_inbound_enabled_hint"),
+            required=False,
+        ),
         secret_field(
             "cc_client_secret",
             _("admin.channels.cc_client_secret"),
@@ -140,8 +152,8 @@ async def connection_view(
 ) -> dict[str, object]:
     """Return the contact-center card (ADR 0032, ADR 0124 point 13).
 
-    It holds the form, the webhook address, when its secret was made and where its webhooks may
-    come from.
+    It holds the form, the webhook address, when its secret was made, where its webhooks may
+    come from and whether the address is paused.
     """
     service = connection_service(request)
     _ = locale.gettext
@@ -164,6 +176,7 @@ async def connection_view(
         "webhook": INBOUND[stored.kind].organisation_url(base, org) if stored else "",
         "secret_made": moment_label(made, tz, locale.code) if made else "",
         "sources": sources,
+        "paused": pause_finding(_, enabled=stored.inbound_enabled if stored else True),
     }
 
 

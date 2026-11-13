@@ -100,6 +100,22 @@ scherm dat; controleer de rechten van de Service App (cjp:config_write) en maak 
 nieuw webhookgeheim. Koppel of ontkoppel een organisatie als er geen taken open staan:
 een taak die via de vorige koppeling is gemaakt, wordt niet meer via de nieuwe afgesloten.
 
+<!-- field: cc_inbound_enabled -->
+### Gebeurtenissen van het platform verwerken (pauze)
+
+Staat standaard aan. Zet het uit om het webhookadres van deze organisatie te **pauzeren**, bijvoorbeeld
+terwijl u de flows van het platform wijzigt. Een gepauzeerd adres controleert elke aanroep nog net
+als voorheen (netwerk, handtekening, tijd): een aanroep die geweigerd zou worden, wordt geweigerd.
+Een aanroep die klopt krijgt het gebruikelijke `204`, zodat het platform zijn aanmelding houdt en
+die niet uitzet, maar de gebeurtenis wordt weggegooid: er wordt niets bij de boeking vastgelegd en
+niets onthouden, dus de herbezorging door het platform nadat u hervat is, wordt wel verwerkt. De
+kaart toont een melding *Gepauzeerd* zolang het duurt. Pauzeren of hervatten verandert het
+webhookgeheim en de aanmelding bij het platform niet.
+
+Hervatten speelt wat is weggegooid niet opnieuw af. De toestanden van de open taken worden
+bijgewerkt door de periodieke controle van de taken (die op een schema draait en niet vanaf de kaart
+te starten is), dus een toestand kan even duren voor hij is ingehaald.
+
 <!-- field: cc_allowed_networks -->
 ### Toegestane bronnetwerken
 

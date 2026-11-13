@@ -9,9 +9,11 @@ secret is configured per installation (``WEBEX_WEBHOOK_SECRET``, ``WXCC_WEBHOOK_
 organisation's connection; without it the endpoint does not exist (404). A contact-center
 platform's check and parsing come from its adapter (``contact_centers.INBOUND``); a kind without
 an adapter is a 404 too. Unknown meetings, tasks and event types, and events seen before
-(replays), are acknowledged and ignored, so the platforms do not retry. Every verified webhook is
-noted as its platform's latest inbound event, for *Koppelingen* and *System status* (ADR 0082
-point 5).
+(replays: per platform and organisation, by the event's identifier or else by the hash of its
+verified body, ADR 0124 point 7), are acknowledged and ignored, so the platforms do not retry. A
+verified event at a paused address is dropped by the gate with the same 204 (point 9) and not
+noted. Every other verified webhook is noted as its platform's latest inbound event, for
+*Koppelingen* and *System status* (ADR 0082 point 5).
 
     POST /webhooks/webex                   meetings started/ended, participants joined/left
     POST /webhooks/contact-center/{kind}/{org}  an organisation's own connection (ADR 0032)
@@ -72,7 +74,11 @@ async def webex(request: Request, delivery: WebexDelivery) -> Response:
     outcome = EventOutcome.IGNORED
     if event is not None:
         outcome = await _service(request).record_meeting_event(
-            event.target_id, event.kind, delivery.now, event_key=event.event_key
+            event.target_id,
+            event.kind,
+            delivery.now,
+            event_key=event.event_key,
+            replay=delivery.replay,
         )
         log.info(
             "webhook.webex",
@@ -130,6 +136,7 @@ async def _record_task_event(
             delivery.now,
             event.detail,
             event_key=event.event_key,
+            replay=delivery.replay,
             origin=event.origin,
             provider=inbound.kind,
             source=inbound.source,

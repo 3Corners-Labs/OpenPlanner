@@ -6,7 +6,9 @@ the API host, the client id and the three secrets: client secret, refresh token 
 webhook secret this module generates, and the networks the platform's webhooks may come from
 (``allowed_networks``, not secret, ADR 0124 point 3; a record without the field reads as an
 empty list, so records made before it keep working; a field that cannot be read reads as an
-unreadable list, never as an empty one). Nothing of it is readable in the portal:
+unreadable list, never as an empty one) and whether the address handles its events
+(``inbound_enabled``, the pause of ADR 0124 point 9; a record without the field reads as on, and
+only a stored ``False`` pauses). Nothing of it is readable in the portal:
 ``get`` returns ``OrganisationConnection``, which says only whether a secret is set.
 ``webhook_secret`` is for the webhook route only, outside the domain.
 """
@@ -88,6 +90,7 @@ class SealedConnections:
             has_refresh_token=bool(record.get("refresh_token")),
             webhook_secret_at=datetime.fromisoformat(rotated) if isinstance(rotated, str) else None,
             allowed_networks=networks,
+            inbound_enabled=record.get("inbound_enabled") is not False,
         )
 
     async def save(self, organisation_id: int, change: ConnectionChange, now: datetime) -> None:
@@ -95,8 +98,8 @@ class SealedConnections:
 
         A new connection gets its webhook secret at once, so its address works from the start;
         a changed API host or client id gets a new one, so a subscription the previous tenant
-        still holds no longer verifies (CC-4d). Changing the allowed networks alone touches
-        neither the secret nor anything else of the record.
+        still holds no longer verifies (CC-4d). Changing the allowed networks or the pause alone
+        touches neither the secret nor anything else of the record.
         """
         record = dict(await self._record(organisation_id) or {})
         moved = (record.get("api_base_url"), record.get("client_id")) != (
@@ -110,6 +113,8 @@ class SealedConnections:
         }
         if change.allowed_networks is not None:
             record["allowed_networks"] = list(change.allowed_networks)
+        if change.inbound_enabled is not None:
+            record["inbound_enabled"] = change.inbound_enabled
         if change.client_secret is not None:
             record["client_secret"] = change.client_secret
         if change.refresh_token is not None:

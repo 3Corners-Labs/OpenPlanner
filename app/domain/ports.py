@@ -1383,6 +1383,10 @@ class Transaction(Protocol):
         """Remember that the event ``key`` from ``source`` was seen; ``False`` if it was before."""
         ...
 
+    async def webhook_event_seen(self, source: str, key: str) -> bool:
+        """Return whether the event ``key`` from ``source`` is remembered; remembers nothing."""
+        ...
+
     async def forget_webhook_events(self, before: datetime) -> int:
         """Forget event keys seen before ``before``; return how many."""
         ...

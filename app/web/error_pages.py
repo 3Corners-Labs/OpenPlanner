@@ -30,7 +30,12 @@ from app.web.locale import resolve_locale
 from app.web.protection import RejectedRequest, count_unknown_link
 from app.web.security_events import report, report_failure
 from app.web.templates import create_templates, render
-from app.web.webhook_gate import WebhookRefused, webhook_refused_response
+from app.web.webhook_gate import (
+    WebhookPaused,
+    WebhookRefused,
+    webhook_paused_response,
+    webhook_refused_response,
+)
 
 templates = create_templates([])
 MANAGEMENT_LINK_PREFIX = "/b/"
@@ -157,5 +162,6 @@ def register_error_pages(app: FastAPI) -> None:
     app.add_exception_handler(RejectedRequest, rejected_request_page)
     app.add_exception_handler(RateLimitExceeded, rate_limited_page)
     app.add_exception_handler(WebhookRefused, webhook_refused_response)
+    app.add_exception_handler(WebhookPaused, webhook_paused_response)
     app.add_exception_handler(RequestValidationError, validation_error_page)
     app.add_exception_handler(DBAPIError, database_error_page)

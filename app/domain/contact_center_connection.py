@@ -9,7 +9,8 @@ one minor (point 11, ADR 0116).
 
     view(org)   ─► OrganisationConnection | None
     save(org)   ─► audit ─► sealed record ─► register the address  (a blank secret keeps one;
-                                              not when only the allowed networks changed)
+                                              not when only the allowed networks or the
+                                              pause changed)
     rotate(org) ─► audit ─► new webhook secret ─► register again     (CC-4d)
     remove(org) ─► audit ─► record deleted
 
@@ -39,14 +40,17 @@ PERMISSION = Permission.INTEGRATIONS_MANAGE
 AUDIT_KEY = "contact_center_connection"
 NETWORKS_AUDIT = "allowed_networks"
 """The audit names the field that changed, never the networks (as it does for the secrets)."""
+PAUSE_AUDIT = "inbound_enabled"
+"""The audit names the pause by its field, when it changes; never as a value in a log."""
 
 
-def _only_networks_changed(stored: OrganisationConnection, change: ConnectionChange) -> bool:
-    """Whether a saved change differs from the stored connection in its allowed networks only.
+def _subscription_unchanged(stored: OrganisationConnection, change: ConnectionChange) -> bool:
+    """Whether a saved change leaves everything the subscription at the platform depends on.
 
-    Nothing the registration at the platform depends on changed then: the kind, the API host,
-    the client and the secrets are as they were. Whether the webhook secret exists is asked
-    separately (``save``): a record without one is not left alone.
+    The kind, the API host, the client and the secrets are as they were, so whatever else
+    differs (the allowed networks, the pause: who may call and whether it is handled, both
+    decided here at the gate) needs nothing at the platform. Whether the webhook secret exists
+    is asked separately (``save``): a record without one is not left alone.
     """
     return (stored.kind, stored.api_base_url, stored.client_id) == (
         change.kind,
@@ -67,12 +71,15 @@ class WebhookTarget:
             handed on.
         allowed_networks: The connection's own list of source networks (ADR 0124 point 3);
             empty: the installation's default applies; unreadable: no call is accepted.
+        inbound_enabled: Whether the address handles its events (ADR 0124 point 9); off: a
+            verified event is dropped.
     """
 
     organisation_id: int | None = None
     secret: str | None = None
     organisation: str | None = None
     allowed_networks: NetworkList = NetworkList()
+    inbound_enabled: bool = True
 
     @property
     def found(self) -> bool:
@@ -149,7 +156,11 @@ class ContactCenterConnectionService:
             return WebhookTarget(organisation=slug)
         shown = await self._connections.get(organisation_id)
         return WebhookTarget(
-            organisation_id, secret, slug, shown.allowed_networks if shown else NetworkList()
+            organisation_id,
+            secret,
+            slug,
+            shown.allowed_networks if shown else NetworkList(),
+            shown.inbound_enabled if shown else True,
         )
 
     async def save(
@@ -157,9 +168,10 @@ class ContactCenterConnectionService:
     ) -> Registration:
         """Store the connection; audited by the names of the fields sent, never their values.
 
-        A change of the allowed networks alone (ADR 0124 point 3) on a connection that has its
-        webhook secret is stored and audited, makes no new webhook secret and does not register
-        the address again (``Registration.UNTOUCHED``). A record without a secret takes the
+        A change of the allowed networks or of the pause alone (ADR 0124 points 3 and 9) on a
+        connection that has its webhook secret is stored and audited, makes no new webhook secret
+        and does not register the address again (``Registration.UNTOUCHED``): a pause must not
+        cost the subscription. A record without a secret takes the
         normal path: the secret is made and the address registered.
 
         Raises:
@@ -175,13 +187,20 @@ class ContactCenterConnectionService:
         networks_changed = change.allowed_networks is not None and NetworkList(
             change.allowed_networks
         ) != (stored.allowed_networks if stored else NetworkList())
-        sent = [*change.secrets_sent, *([NETWORKS_AUDIT] if networks_changed else [])]
+        pause_changed = change.inbound_enabled is not None and change.inbound_enabled != (
+            stored.inbound_enabled if stored else True
+        )
+        sent = [
+            *change.secrets_sent,
+            *([NETWORKS_AUDIT] if networks_changed else []),
+            *([PAUSE_AUDIT] if pause_changed else []),
+        ]
         detail = ",".join([f"{AUDIT_KEY}.save", f"kind:{change.kind.value}", *sent])
         # Asked before the save: the save makes a secret for a record that has none.
         leave_alone = (
-            networks_changed
+            (networks_changed or pause_changed)
             and stored is not None
-            and _only_networks_changed(stored, change)
+            and _subscription_unchanged(stored, change)
             and await connections.webhook_secret(organisation_id, stored.kind) is not None
         )
         await self._audit(principal, organisation, detail)

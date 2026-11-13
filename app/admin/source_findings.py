@@ -1,4 +1,6 @@
-"""What the portal says about where an address's webhooks may come from (ADR 0124 points 3, 4, 13).
+"""What the portal says about an address's webhooks: where they may come from, and a pause.
+
+(ADR 0124 points 3, 4, 9, 13.)
 
 The organisation's connection card and System status say the same thing about the state, in the
 same words, so the judgement is made once here from the pure rule (``app.domain.webhook_sources``):
@@ -7,7 +9,8 @@ same words, so the judgement is made once here from the pure rule (``app.domain.
                                                            required and missing / unreadable
     proxy chain                       ─► ``ChainFault``s ─► what to repair, while a list applies
 
-A finding is never a silent state: an address that any source may call says so, a list that cannot
+A pause (point 9) is a finding too, built here for the card: ``pause_finding``. A finding is
+never a silent state: an address that any source may call says so, a list that cannot
 be read says that every call is refused, and a list the gate cannot evaluate (the chain cannot be
 trusted) says that its calls are refused. The detail of a fault names the host's configuration and
 belongs to System status only; the organisation's card says that deliveries are refused because
@@ -111,3 +114,24 @@ def card_finding(
     if found.state is SourceState.UNREADABLE and not own:
         return replace(found, text=_("admin.source.state.unreadable_default_card"))
     return found
+
+
+@dataclass(frozen=True)
+class PauseFinding:
+    """A paused connection as the card shows it (ADR 0124 point 9).
+
+    Attributes:
+        chip: The chip's word.
+        text: The sentence: deliveries are accepted and dropped, the platform keeps its
+            subscription, and how to resume.
+    """
+
+    chip: str
+    text: str
+
+
+def pause_finding(_: BoundGettext, *, enabled: bool) -> PauseFinding | None:
+    """Return the finding of a paused connection, or ``None`` while it handles its events."""
+    if enabled:
+        return None
+    return PauseFinding(_("admin.source.paused_chip"), _("admin.source.paused_text"))

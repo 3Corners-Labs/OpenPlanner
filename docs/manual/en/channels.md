@@ -99,6 +99,21 @@ says so; check the Service App's rights (cjp:config_write), then make a new webh
 Connect or disconnect an organisation when none of its tasks is open: a task made through the
 previous connection is not ended through the new one.
 
+<!-- field: cc_inbound_enabled -->
+### Handle events from the platform (pause)
+
+On by default. Switch it off to **pause** this organisation's webhook address, for example while
+you change the platform's flows. A paused address still checks every call exactly as before
+(network, signature, time): a call that would be refused is refused. A call that checks out gets
+the usual `204`, so the platform keeps its subscription and does not switch it off, but its event
+is dropped: nothing is recorded on the booking and nothing is remembered, so the platform's
+redelivery after you resume is handled. The card shows a *Paused* note while it lasts. Pausing or
+resuming changes neither the webhook secret nor the registration at the platform.
+
+Resuming does not replay what was dropped. The states of the open tasks are brought back by the
+periodic check of the tasks (it runs on a schedule and cannot be started from the card), so a
+state may take a while to catch up.
+
 <!-- field: cc_allowed_networks -->
 ### Allowed source networks
 

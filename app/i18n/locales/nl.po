@@ -13739,3 +13739,15 @@ msgstr "De eigen lijst van deze koppeling is niet te lezen, dus dit adres accept
 
 msgid "admin.source.state.unreadable_default_card"
 msgstr "De standaardlijst van de installatie is niet te lezen, dus dit adres accepteert geen enkele aanroep. Vraag de platformbeheerder, of stel op deze kaart een eigen lijst in."
+
+msgid "admin.channels.cc_inbound_enabled"
+msgstr "Gebeurtenissen van het platform verwerken"
+
+msgid "admin.channels.cc_inbound_enabled_hint"
+msgstr "Zet dit uit om het adres te pauzeren: het platform krijgt nog steeds antwoord 204 en houdt zijn aanmelding, maar geverifieerde gebeurtenissen worden weggegooid en niet onthouden. Bij hervatten worden gemiste toestanden bijgewerkt door de periodieke controle van de taken, niet direct."
+
+msgid "admin.source.paused_chip"
+msgstr "Gepauzeerd"
+
+msgid "admin.source.paused_text"
+msgstr "Dit adres is gepauzeerd: bezorgingen worden geaccepteerd en weggegooid, en het platform houdt zijn aanmelding. Zet gebeurtenissen weer aan op deze kaart om te hervatten; de controle van de taken haalt gemiste toestanden daarna in."

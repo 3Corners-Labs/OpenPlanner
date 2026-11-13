@@ -13726,3 +13726,15 @@ msgstr "This connection's own list cannot be read, so this address accepts no ca
 
 msgid "admin.source.state.unreadable_default_card"
 msgstr "The installation's default list cannot be read, so this address accepts no call. Ask the platform administrator, or set a list of your own on this card."
+
+msgid "admin.channels.cc_inbound_enabled"
+msgstr "Handle events from the platform"
+
+msgid "admin.channels.cc_inbound_enabled_hint"
+msgstr "Switch this off to pause the address: the platform still gets its 204 and keeps its subscription, but verified events are dropped and not remembered. After resuming, missed states are brought back by the periodic check of the tasks, not at once."
+
+msgid "admin.source.paused_chip"
+msgstr "Paused"
+
+msgid "admin.source.paused_text"
+msgstr "This address is paused: deliveries are accepted and dropped, and the platform keeps its subscription. Switch events on again on this card to resume; the periodic check of the tasks then catches up on missed states."

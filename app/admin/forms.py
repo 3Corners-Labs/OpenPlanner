@@ -454,7 +454,9 @@ class Field:
         label: Visible label.
         kind: ``text``, ``number``, ``time`` (24-hour text), ``date`` (dd-mm-yyyy text),
             ``datetime`` (a date input plus a 24-hour ``{name}_time`` input; value
-            ``YYYY-MM-DDTHH:MM``), ``textarea`` or ``select``.
+            ``YYYY-MM-DDTHH:MM``), ``textarea``, ``select`` or ``checkbox`` (value ``yes`` is
+            ticked; the form also sends ``no`` when it is not, so an absent field means a form
+            that never had it, ``FormData.switch``).
         value: Current or submitted value.
         hint: Help text, linked with ``aria-describedby``.
         error: Message for this field, linked the same way.
@@ -584,6 +586,15 @@ class FormData:
         if name not in self.values and f"{name}_time" not in self.values:
             return default
         return f"{self.text(name)}T{self.text(f'{name}_time')}"
+
+    def switch(self, name: str) -> bool | None:
+        """Return a ``checkbox`` field's state: ``True`` ticked, ``False`` not, ``None`` not sent.
+
+        The ``checkbox`` field sends ``yes`` when ticked and a hidden ``no`` after it when not
+        (the first value of a name wins), so a form without the field leaves the setting as it is.
+        """
+        value = self.values.get(name)
+        return None if value is None else value == "yes"
 
     def checked(self, name: str) -> bool:
         """Return whether the checkbox ``name`` was ticked."""

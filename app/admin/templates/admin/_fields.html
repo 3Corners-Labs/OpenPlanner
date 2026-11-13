@@ -13,6 +13,18 @@
 
 {#- One accessible input: visible label, hint and error linked with aria-describedby. -#}
 {% macro field(f) -%}
+{%- if f.kind == "checkbox" %}
+<div class="field{% if f.error %} field--error{% endif %}">
+  <div class="choice__option"><input type="checkbox" id="{{ f.name }}" name="{{ f.name }}" value="yes"{% if f.value == "yes" %} checked{% endif %}{% if f.described_by %} aria-describedby="{{ f.described_by }}"{% endif %}><label for="{{ f.name }}">{{ f.label }}</label></div>
+  <input type="hidden" name="{{ f.name }}" value="no">
+  {%- if f.hint %}
+  <p class="hint" id="{{ f.name }}-hint">{{ f.hint }}</p>
+  {%- endif %}
+  {%- if f.error %}
+  {{ error_message(f.error, f.name ~ "-error") }}
+  {%- endif %}
+</div>
+{%- else %}
 <div class="field{% if f.kind == "textarea" %} field--wide{% endif %}{% if f.error %} field--error{% endif %}">
   <label for="{{ f.name }}">{{ f.label }}
     {%- if f.kind == "time" %} <span class="field__format">{{ _("form.time_format") }}</span>
@@ -64,6 +76,7 @@
   {{ error_message(f.error, f.name ~ "-error") }}
   {%- endif %}
 </div>
+{%- endif %}
 {%- endmacro %}
 
 {#- The inputs of a simple card form, its submit button and an optional cancel link. -#}

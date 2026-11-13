@@ -1,10 +1,12 @@
 """The organisation's own contact-center connection on its *Kanalen* page (ADR 0032 points 9–10)."""
 
 import json
+import re
 from dataclasses import replace
 
 import httpx
 import pytest
+import structlog.testing
 
 from app.adapters.contact_center_connections import SealedConnections
 from app.adapters.db.credentials import CredentialStore
@@ -12,6 +14,7 @@ from app.adapters.db.record_names import contact_center_credential_name
 from app.adapters.integrations import sealed_store
 from app.adapters.webhooks import sign_wxcc
 from app.domain.contact_center import ContactCenterKind, Registration
+from app.domain.integration import EventOutcome
 from app.domain.networks import NetworkList
 from app.web.protection import RateLimits, configure_rate_limits
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
@@ -502,3 +505,121 @@ async def test_an_unreadable_default_tells_the_card_whom_to_ask_and_an_own_list_
     assert "Advanced" not in card
     assert refused.status_code == 403
     assert repaired.status_code == 204  # an own list replaces the default, however it reads
+
+
+# --- The pause (ADR 0124 point 9, step 3a) ----------------------------------------------------
+
+
+class _Handler:
+    """Stands in for the integration service: remembers that an event reached the handling."""
+
+    def __init__(self) -> None:
+        self.handled = 0
+
+    async def record_task_event(self, *args: object, **kwargs: object) -> EventOutcome:
+        self.handled += 1
+        return EventOutcome.UNKNOWN
+
+
+def _handler(site: Site) -> _Handler:
+    handler = _Handler()
+    site_app(site).state.integration_service = handler
+    return handler
+
+
+async def _save_pause(site: Site, value: str | None) -> httpx.Response:
+    """Save the card with only the pause changed (secrets blank: kept); ``None``: no field sent."""
+    data = FORM | {"cc_client_secret": "", "cc_refresh_token": ""}
+    if value is not None:
+        data["cc_inbound_enabled"] = value
+    return await site.client.post(f"{PAGE}/contact-center", data=data, headers=SAME_ORIGIN)
+
+
+def _ticked(page: str) -> bool:
+    return bool(re.search(r'<input type="checkbox" id="cc_inbound_enabled"[^>]* checked', page))
+
+
+async def test_the_card_offers_the_pause_as_a_labelled_checkbox_that_is_on_by_default(
+    site: Site,
+) -> None:
+    await _connect(site)
+
+    page = (await site.client.get(PAGE)).text
+
+    assert _ticked(page)
+    assert (
+        '<label for="cc_inbound_enabled">Gebeurtenissen van het platform verwerken</label>' in page
+    )
+    assert 'name="cc_inbound_enabled" value="no"' in page  # sent when the box is not ticked
+    assert "Gepauzeerd" not in page
+
+
+async def test_pausing_on_the_card_keeps_the_secret_registers_nothing_and_shows_a_finding(
+    site: Site,
+) -> None:
+    await _connect(site)
+    registrar = _registrar(site)
+    before = await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC)
+
+    saved = await _save_pause(site, "no")
+
+    assert "done=contact_center_saved" in saved.headers["location"]
+    assert registrar.registered == []
+    assert await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC) == before
+    page = (await site.client.get(PAGE)).text
+    assert "Dit adres is gepauzeerd" in page
+    assert not _ticked(page)
+    audit = await site_app(site).state.admin_service.audit_log(SUPER)
+    newest = next(e.event.detail for e in audit if e.event.detail.startswith("contact_center"))
+    assert newest == "contact_center_connection.save,kind:webex_cc,inbound_enabled"
+    resumed = await _save_pause(site, "yes")
+    assert "done=contact_center_saved" in resumed.headers["location"]
+    assert "Dit adres is gepauzeerd" not in (await site.client.get(PAGE)).text
+
+
+async def test_a_form_without_the_pause_field_leaves_the_pause_as_it_is(site: Site) -> None:
+    await _connect(site)
+    await _save_pause(site, "no")
+
+    await _save_pause(site, None)
+
+    stored = await _connections(site).get(1)
+    assert stored is not None
+    assert not stored.inbound_enabled
+
+
+async def test_a_paused_address_verifies_first_then_drops_the_event_and_remembers_nothing(
+    site: Site,
+) -> None:
+    """A pause is no way to get an unsigned 204, and a redelivery after resuming is handled."""
+    await _connect(site)
+    handler = _handler(site)
+    await _save_pause(site, "no")
+
+    with structlog.testing.capture_logs() as logs:
+        paused = await _call_from(site, SUPPLIER)
+        forged = await _call_from(site, SUPPLIER, secret="x" * 43)
+    await _save_pause(site, "yes")
+    resumed = await _call_from(site, SUPPLIER)
+
+    assert (paused.status_code, paused.content) == (204, b"")
+    assert (forged.status_code, forged.content) == (401, b"")  # still verified while paused
+    assert resumed.status_code == 204
+    assert handler.handled == 1  # only the call after resuming reached the handling
+    dropped = [line for line in logs if line["event"] == "webhook.paused"]
+    assert [(e["source"], e["organisation"]) for e in dropped] == [("wxcc", "demo")]
+    assert set(dropped[0]) == {"event", "log_level", "source", "organisation"}
+    assert await _webhook_refusals(site) == [("invalid_signature", "source:wxcc,organisation:demo")]
+
+
+async def test_a_paused_address_still_refuses_what_any_address_refuses(site: Site) -> None:
+    await _connect(site)
+    await _save_networks(site, SUPPLIER_RANGE, cc_inbound_enabled="no")
+    handler = _handler(site)
+
+    outside = await _call_from(site, STRANGER)
+    inside = await _call_from(site, SUPPLIER)
+
+    assert [(r.status_code, r.content) for r in (outside, inside)] == [(403, b""), (204, b"")]
+    assert handler.handled == 0
+    assert await _webhook_refusals(site) == [("network", "source:wxcc,organisation:demo")]

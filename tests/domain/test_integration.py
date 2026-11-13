@@ -25,6 +25,13 @@ from app.domain.integration import (
 )
 from app.domain.job_plan import JobStatus, JobType, PlannedJob
 from app.domain.request_log import REQUEST_EVENT
+from app.domain.webhook_replay import (
+    INSTALLATION_SCOPE,
+    ReplayContext,
+    body_identity,
+    replay_key,
+    scope_of,
+)
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeProbes
 from tests.fakes.persistence import InMemoryUnitOfWork
@@ -338,7 +345,95 @@ async def test_remembered_events_are_forgotten_after_the_retention(
 
     await service.record_meeting_event("meeting-1", EventKind.GUEST_JOINED, later, event_key="new")
 
-    assert set(uow.state.webhook_events) == {("webex", "new")}
+    assert set(uow.state.webhook_events) == {
+        ("webex", replay_key("webex", INSTALLATION_SCOPE, "new"))
+    }
+
+
+ACME, DEMO = ReplayContext(scope_of(1)), ReplayContext(scope_of(2))
+
+
+async def test_the_same_event_at_two_organisations_is_two_events(
+    service: IntegrationService, uow: InMemoryUnitOfWork
+) -> None:
+    """ADR 0124 point 7: delivered to two organisations it is two events; twice to one, a replay."""
+    joined = EventKind.GUEST_JOINED
+
+    first = await service.record_meeting_event("meeting-1", joined, NOW, event_key="k", replay=ACME)
+    other = await service.record_meeting_event("meeting-1", joined, NOW, event_key="k", replay=DEMO)
+    again = await service.record_meeting_event("meeting-1", joined, NOW, event_key="k", replay=ACME)
+    bare = await service.record_meeting_event("meeting-1", joined, NOW, event_key="k")
+
+    assert (first, other, again, bare) == (
+        EventOutcome.RECORDED,
+        EventOutcome.RECORDED,
+        EventOutcome.DUPLICATE,
+        EventOutcome.RECORDED,
+    )
+    assert len(uow.state.webhook_events) == 3
+
+
+async def test_an_event_without_an_identifier_is_remembered_by_its_verified_body(
+    service: IntegrationService, uow: InMemoryUnitOfWork
+) -> None:
+    joined = EventKind.GUEST_JOINED
+    same = ReplayContext(scope_of(1), body_identity(b'{"signed":"body"}'))
+    other = ReplayContext(scope_of(1), body_identity(b'{"signed":"other"}'))
+    elsewhere = ReplayContext(scope_of(2), same.body_identity)
+
+    first = await service.record_meeting_event("meeting-1", joined, NOW, replay=same)
+    replay = await service.record_meeting_event("meeting-1", joined, NOW, replay=same)
+    different = await service.record_meeting_event("meeting-1", joined, NOW, replay=other)
+    moved = await service.record_meeting_event("meeting-1", joined, NOW, replay=elsewhere)
+
+    assert (first, replay, different, moved) == (
+        EventOutcome.RECORDED,
+        EventOutcome.DUPLICATE,
+        EventOutcome.RECORDED,
+        EventOutcome.RECORDED,
+    )
+    assert all("signed" not in key for _, key in uow.state.webhook_events)  # digests only
+
+
+async def test_an_event_with_neither_identifier_nor_body_always_counts(
+    service: IntegrationService,
+) -> None:
+    joined = EventKind.GUEST_JOINED
+
+    one = await service.record_meeting_event("meeting-1", joined, NOW)
+    two = await service.record_meeting_event("meeting-1", joined, NOW)
+
+    assert (one, two) == (EventOutcome.RECORDED, EventOutcome.RECORDED)
+
+
+async def test_an_event_remembered_before_the_upgrade_is_still_a_replay(
+    service: IntegrationService, uow: InMemoryUnitOfWork
+) -> None:
+    """ADR 0116: the old shape (the adapter's digest under the platform) is read until 0.7.0."""
+    joined = EventKind.GUEST_JOINED
+    uow.state.webhook_events[("webex", "k-before")] = NOW - timedelta(days=1)
+
+    replay = await service.record_meeting_event(
+        "meeting-1", joined, NOW, event_key="k-before", replay=ACME
+    )
+    fresh = await service.record_meeting_event(
+        "meeting-1", joined, NOW, event_key="k-after", replay=ACME
+    )
+
+    assert (replay, fresh) == (EventOutcome.DUPLICATE, EventOutcome.RECORDED)
+
+
+async def test_the_old_shape_is_not_looked_for_under_a_body_identity(
+    service: IntegrationService, uow: InMemoryUnitOfWork
+) -> None:
+    identity = body_identity(b"{}")
+    uow.state.webhook_events[("webex", identity)] = NOW
+
+    outcome = await service.record_meeting_event(
+        "meeting-1", EventKind.GUEST_JOINED, NOW, replay=ReplayContext(scope_of(1), identity)
+    )
+
+    assert outcome is EventOutcome.RECORDED
 
 
 async def test_day_overview_covers_the_25_hour_day_when_clocks_go_back(
