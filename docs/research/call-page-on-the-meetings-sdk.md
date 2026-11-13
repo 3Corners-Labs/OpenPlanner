@@ -278,8 +278,8 @@ platform's API with the guest's token; it recorded status codes and counts only.
 - **Messages to others:** a message to an address that cannot exist is refused (400). A message
   to a real account whose owner agreed to the test was **accepted** (200): the platform made a
   direct room between the guest and that account, and the guest cannot leave it (403). So a
-  guest can write to anyone whose address it knows. Whether the message was shown to the
-  account's owner is confirmed by the owner, not by the API.
+  guest can write to anyone whose address it knows. The account's owner confirmed that the
+  message arrived in their app.
 - **Tokens:** a second minting for the same subject returns another token for the same guest;
   the earlier token keeps working.
 - **The rename:** a second minting with another name changes the guest's name, also as seen with
