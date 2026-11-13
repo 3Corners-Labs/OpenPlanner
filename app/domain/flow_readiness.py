@@ -28,6 +28,7 @@ from app.domain.service_flows import (
     FlowRevision,
     FlowState,
     HandlingAction,
+    IntakeMode,
     InteractionKind,
     ServiceFlow,
 )
@@ -229,11 +230,24 @@ def _dispatch_reason(
         kind not in flows.BUILT_KINDS
         or revision.dispatch not in flows.BUILT_DISPATCH
         or action not in flows.BUILT_ACTIONS
+        or _immediate_at_contact_center(revision)
     ):
         return ReadinessReason.NOT_BUILT_YET
     if action is HandlingAction.ASSIGN_WORKSTATION and revision.location_id is None:
         return ReadinessReason.LOCATION_MISSING
     return None
+
+
+def _immediate_at_contact_center(revision: FlowRevision) -> bool:
+    """Return whether the flow would send immediate work to the contact center.
+
+    Not built (ADR 0121 step 7, choice I8): the contact center needs a reference for work
+    without a booking and a rule to match its late events; immediate work goes to the own queue.
+    """
+    return (
+        IntakeMode.ON_DEMAND in revision.intake_modes
+        and revision.dispatch is DispatchKind.CONTACT_CENTER
+    )
 
 
 def _completion_reason(revision: FlowRevision) -> ReadinessReason | None:

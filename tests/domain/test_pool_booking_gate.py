@@ -209,9 +209,10 @@ async def test_the_same_default_books_on_the_pool_once_the_gate_is_open(
 
 
 @pytest.mark.parametrize("gate_open", GATES)
-def test_the_gate_lets_a_pool_flow_through_for_appointments_only(
+def test_the_gate_lets_a_pool_flow_through_on_both_paths(
     gate_open: bool, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Appointments since ADR 0122 step 5, immediate intake since ADR 0121 step 7."""
     if gate_open:
         open_gate(monkeypatch)
     both = frozenset({IntakeMode.APPOINTMENT, IntakeMode.ON_DEMAND})
@@ -219,7 +220,7 @@ def test_the_gate_lets_a_pool_flow_through_for_appointments_only(
     wrapper = flow("appointment", current=legacy(published_at=NOW), flow_id=2)
 
     assert gate_allows(on_pool, IntakeMode.APPOINTMENT) is gate_open
-    assert gate_allows(on_pool, IntakeMode.ON_DEMAND) is False  # ADR 0121 step 7
+    assert gate_allows(on_pool, IntakeMode.ON_DEMAND) is gate_open
     assert gate_allows(wrapper, IntakeMode.APPOINTMENT) is True
     assert gate_allows(wrapper, IntakeMode.ON_DEMAND) is True
 

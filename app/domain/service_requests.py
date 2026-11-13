@@ -20,7 +20,14 @@ ended, it is a commitment ``in_progress`` over ``[started_at, planned_until)`` w
 key, the same key as the booking's hold, so the pool counts one unit (invariant 3). Ending the
 work item releases it, exactly once; ``recovery_required`` is not ended and keeps it (A34).
 
-Pure Python, no I/O. The build brief is ``docs/service-flows-requests-design.md``.
+Immediate work (ADR 0121 step 7) is a request without an appointment, taken in on a pool
+(``on_demand_request``): its claim acquires a unit of that pool from the claim on (the work item
+carries the pool and the planned end before it starts), and the participant may withdraw it
+until treatment starts (``withdraw``). An appointment of a flow with an explicit check-in records
+its arrival on its request (``check_in``, ``needs_check_in``).
+
+Pure Python, no I/O. The build briefs are ``docs/service-flows-requests-design.md`` and
+``docs/service-flows-immediate-intake-design.md``.
 """
 
 from dataclasses import dataclass, field, replace
@@ -33,7 +40,13 @@ from app.domain.flow_resolution import FlowRef
 from app.domain.form_fields import Answers
 from app.domain.job_plan import PURGE_AFTER
 from app.domain.pool_accounting import Commitment, CommitmentKey
-from app.domain.service_flows import FlowRevision, IntakeMode, InteractionKind
+from app.domain.service_flows import (
+    COMBINATIONS,
+    FlowRevision,
+    IntakeMode,
+    InteractionKind,
+    ReadinessPolicy,
+)
 
 
 class HandlingState(StrEnum):
@@ -202,16 +215,21 @@ class WorkItem:
         )
 
     def commitment(self, key: CommitmentKey) -> Commitment | None:
-        """Return the unit it occupies, ``in_progress``, or ``None`` when it holds none.
+        """Return the unit it occupies, or ``None`` when it holds none.
 
-        Started, on a pool, and not ended: ``recovery_required`` holds its unit too (A34).
+        Started, on a pool, and not ended: ``in_progress``; ``recovery_required`` holds its unit
+        too (A34). Claimed immediate work (ADR 0121 step 7) holds its unit from the claim, over
+        ``[assigned_at, planned_until)``: its claim acquired it, so a competing claim or an
+        appointment that would need it sees it. An appointment's claim sets no pool: the
+        booking's hold is its unit.
         """
-        if (
-            self.ended_at is not None
-            or self.started_at is None
-            or self.pool_id is None
-            or self.planned_until is None
-        ):
+        if self.ended_at is not None or self.pool_id is None or self.planned_until is None:
+            return None
+        if self.started_at is None:
+            if self.state is not WorkItemState.ASSIGNED or self.assigned_at >= self.planned_until:
+                return None
+            return Commitment(key, self.assigned_at, self.planned_until)
+        if self.started_at >= self.planned_until:
             return None
         return Commitment(key, self.started_at, self.planned_until, in_progress=True)
 
@@ -234,6 +252,17 @@ class ServiceRequest:
         resolved_at: When it reached a terminal state.
         personal_data: The state of the request-level record.
         data_deleted_at: When that record was deleted.
+        pool_id: The pool immediate work draws on, fixed at acceptance from its revision (A23);
+            ``None`` for an appointment, whose slot carries its pool (ADR 0121 step 7).
+        subject: The subject code chosen at an immediate intake (ADR 0081), for the skills of
+            its SubjectFlow; an appointment's subject stays on its booking.
+        arrived_at: Attendance: an appointment's check-in, an immediate request's acceptance.
+        public_ref: Names an immediate request in the participant's address; authorises
+            nothing (as a booking's public reference, ADR 0093).
+        access_hash: ``sha256`` of the value in the participant's cookie; emptied with the
+            personal data.
+        intake_key_hash: ``sha256`` of the intake form's key, so a retried intake returns this
+            request (A16); emptied with the personal data.
     """
 
     id: int | None
@@ -248,17 +277,31 @@ class ServiceRequest:
     resolved_at: datetime | None = None
     personal_data: PersonalDataState = PersonalDataState.NOT_COLLECTED
     data_deleted_at: datetime | None = None
+    pool_id: int | None = None
+    subject: str | None = None
+    arrived_at: datetime | None = None
+    public_ref: str | None = None
+    access_hash: str | None = field(default=None, repr=False)
+    intake_key_hash: str | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         """Refuse an appointment without a booking and a resolved time out of step.
 
         Raises:
-            DomainError: ``invalid_configuration`` with field ``booking_id`` or ``resolved_at``.
+            DomainError: ``invalid_configuration`` with field ``booking_id``, ``resolved_at``
+                or ``pool_id`` (immediate work names its pool, an appointment does not).
         """
         if (self.intake is IntakeMode.APPOINTMENT) != (self.booking_id is not None):
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, "booking_id")
         if (self.handling in TERMINAL) != (self.resolved_at is not None):
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, "resolved_at")
+        if (self.intake is IntakeMode.ON_DEMAND) != (self.pool_id is not None):
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "pool_id")
+
+    @property
+    def immediate(self) -> bool:
+        """Whether this is immediate work: a request without an appointment (ADR 0121 step 7)."""
+        return self.intake is IntakeMode.ON_DEMAND
 
     @property
     def terminal(self) -> bool:
@@ -327,6 +370,55 @@ def appointment_request(
     )
 
 
+@dataclass(frozen=True)
+class Access:
+    """How the participant finds immediate work again: hashes only (ADR 0121 step 7).
+
+    Attributes:
+        public_ref: Names the request in the participant's address; authorises nothing.
+        access_hash: ``sha256`` of the value of the participant's cookie.
+        intake_key_hash: ``sha256`` of the intake form's key (A16).
+    """
+
+    public_ref: str
+    access_hash: str = field(repr=False)
+    intake_key_hash: str = field(repr=False)
+
+
+def on_demand_request(
+    *,
+    organisation_id: int,
+    group_id: int,
+    flow: FlowRef,
+    pool_id: int,
+    subject: str | None,
+    access: Access,
+    now: datetime,
+    unresolved_hours: int,
+) -> ServiceRequest:
+    """Return a new immediate request, accepted now: queued, arrived, watched from now (I10).
+
+    Its personal data, if any was asked, is the request-level record stored with it (D1).
+    """
+    return ServiceRequest(
+        id=None,
+        organisation_id=organisation_id,
+        group_id=group_id,
+        flow=flow,
+        intake=IntakeMode.ON_DEMAND,
+        booking_id=None,
+        handling=HandlingState.QUEUED,
+        created_at=now,
+        watchdog_at=watchdog_deadline(now, unresolved_hours),
+        pool_id=pool_id,
+        subject=subject,
+        arrived_at=now,
+        public_ref=access.public_ref,
+        access_hash=access.access_hash,
+        intake_key_hash=access.intake_key_hash,
+    )
+
+
 def _resolved(request: ServiceRequest, handling: HandlingState, now: datetime) -> ServiceRequest:
     """Return ``request`` in ``handling``, with ``resolved_at`` set when that is terminal."""
     return replace(request, handling=handling, resolved_at=now if handling in TERMINAL else None)
@@ -344,17 +436,25 @@ def claim(
     now: datetime,
     agent: str,
     lease_minutes: int,
+    planned_until: datetime | None = None,
 ) -> tuple[ServiceRequest, WorkItem]:
     """Return the request assigned and its new work item, with a lease until the start.
 
+    ``planned_until`` is given for immediate work only (ADR 0121 step 7): its claim acquires a
+    unit of the request's pool until then, which the caller judged with ``check_start`` under
+    the lock. An appointment's claim acquires none (the booking's hold is its unit).
+
     Raises:
         DomainError: ``booking_not_active`` for a finished request, ``already_claimed`` when it
-            has an active work item.
+            has an active work item, ``invalid_configuration`` (``planned_until``) when it is
+            given for an appointment or missing for immediate work.
     """
     if request.terminal or request.handling is HandlingState.RECOVERY_REQUIRED:
         raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
     if active is not None or request.handling is not HandlingState.QUEUED:
         raise DomainError(ErrorCode.ALREADY_CLAIMED)
+    if request.immediate != (planned_until is not None):
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "planned_until")
     item = WorkItem(
         id=None,
         request_id=request.id or 0,
@@ -362,8 +462,47 @@ def claim(
         assigned_to=agent,
         assigned_at=now,
         lease_until=now + timedelta(minutes=lease_minutes),
+        pool_id=request.pool_id,
+        planned_until=planned_until,
     )
     return _resolved(request, HandlingState.ASSIGNED, now), item
+
+
+def check_in(request: ServiceRequest, now: datetime) -> ServiceRequest:
+    """Return ``request`` checked in at ``now``; a second check-in keeps the first time (A15).
+
+    Attendance only: the reservation is reused, no unit is added and the handling state does
+    not change (ADR 0121 point 6, step 7).
+
+    Raises:
+        DomainError: ``booking_not_active`` for a finished request or for immediate work, which
+            arrives with its acceptance.
+    """
+    if request.terminal or request.immediate:
+        raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
+    return request if request.arrived_at is not None else replace(request, arrived_at=now)
+
+
+def withdraw(
+    request: ServiceRequest, item: WorkItem | None, *, now: datetime
+) -> tuple[ServiceRequest, WorkItem | None]:
+    """Return immediate work withdrawn by its participant: cancelled, its claim ended.
+
+    Allowed until treatment starts (choice I7); a claimed work item ends ``cancelled``, which
+    releases the unit its claim acquired, exactly once. A finished request is returned as it
+    is, so withdrawing twice changes nothing.
+
+    Raises:
+        DomainError: ``request_in_progress`` once treatment started.
+    """
+    if request.terminal:
+        return request, None
+    if item is not None and item.state is not WorkItemState.ASSIGNED:
+        raise DomainError(ErrorCode.REQUEST_IN_PROGRESS)
+    if request.handling not in (HandlingState.QUEUED, HandlingState.ASSIGNED):
+        raise DomainError(ErrorCode.REQUEST_IN_PROGRESS)
+    ended = _ended(item, WorkItemState.CANCELLED, now) if item is not None else None
+    return _resolved(request, HandlingState.CANCELLED, now), ended
 
 
 def check_startable(item: WorkItem | None, now: datetime) -> WorkItem:
@@ -504,6 +643,18 @@ def is_request_work(revision: FlowRevision | None) -> bool:
         and not revision.legacy
         and revision.interaction_kind is not InteractionKind.VIDEO
     )
+
+
+def needs_check_in(revision: FlowRevision | None) -> bool:
+    """Return whether appointments of ``revision`` are claimed only after a check-in (I2).
+
+    The readiness of the closed table of ADR 0121 point 4: an explicit check-in (``in_person``)
+    needs one; automatic readiness (``telephone``, ``none``) is ready at the start. A legacy or
+    a video flow never does.
+    """
+    if not is_request_work(revision) or revision is None or revision.interaction_kind is None:
+        return False
+    return COMBINATIONS[revision.interaction_kind].readiness is ReadinessPolicy.EXPLICIT_CHECK_IN
 
 
 def watchdog_outcome(

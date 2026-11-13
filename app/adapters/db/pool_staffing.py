@@ -33,7 +33,7 @@ from app.adapters.db.proposals import open_proposal
 from app.adapters.db.service_requests import open_occupations
 from app.domain.authorization import Scope
 from app.domain.booking import HOLDS_PLACE, BookingKind, Slot
-from app.domain.capacity import PoolMode
+from app.domain.capacity import PoolMode, check_max_waiting
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.pool_accounting import MAX_SPAN, Commitment
 from app.domain.pool_staffing import PoolStaffing, check_timezone, zone_or_none
@@ -145,6 +145,27 @@ class PoolStaffingQueries(CapacityPoolQueries):
             return False
         await self._session.execute(
             update(CapacityPoolRow).where(CapacityPoolRow.id == pool_id).values(timezone=timezone)
+        )
+        return True
+
+    async def get_pool_max_waiting(self, pool_id: int) -> int | None:
+        """Return the pool's waiting limit (ADR 0121 step 7); ``None`` is no limit."""
+        found: int | None = await self._session.scalar(
+            select(CapacityPoolRow.max_waiting).where(CapacityPoolRow.id == pool_id)
+        )
+        return found
+
+    async def set_pool_max_waiting(self, scope: Scope, pool_id: int, limit: int | None) -> bool:
+        """Set the waiting limit of a counted pool; ``False`` for a pool that is not one in scope.
+
+        Raises:
+            DomainError: ``invalid_configuration`` (field ``max_waiting``) outside 1 to 1000.
+        """
+        check_max_waiting(limit)
+        if await self._counted_pool_row(scope, pool_id) is None:
+            return False
+        await self._session.execute(
+            update(CapacityPoolRow).where(CapacityPoolRow.id == pool_id).values(max_waiting=limit)
         )
         return True
 

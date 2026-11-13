@@ -74,6 +74,7 @@ def on_demand(**changes: object) -> ServiceRequest:
         created_at=T0,
         watchdog_at=watchdog_deadline(T0, 24),
         personal_data=PersonalDataState.PRESENT,
+        pool_id=3,
     )
     return replace(base, **changes)  # type: ignore[arg-type]
 

@@ -15,7 +15,7 @@ request made and fixed into the rows (``lease_until``, ``watchdog_at``).
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import cast
 
 from app.domain.booking import Booking, BookingStatus, Slot, stored_id
@@ -32,10 +32,12 @@ from app.domain.service_requests import (
     WorkItem,
     WorkItemState,
     appointment_request,
+    check_in,
     check_startable,
     claim,
     complete,
     is_request_work,
+    needs_check_in,
     release,
     start,
 )
@@ -96,12 +98,18 @@ class RequestWork:
     ) -> Work | None:
         """Open a work item for the claimed ``booking`` when it is on a pool; make its request.
 
+        An appointment of a flow with an explicit check-in is claimed only after its check-in
+        (choice I2 of ADR 0121 step 7).
+
         Raises:
-            DomainError: ``already_claimed`` when the request has an active work item, or
-                ``booking_not_active`` when it is finished.
+            DomainError: ``already_claimed`` when the request has an active work item,
+                ``booking_not_active`` when it is finished, ``not_checked_in``.
         """
-        if booking.flow is None or not await self.handles(tx, booking):
+        judge = WorkJudge(tx)
+        if booking.flow is None or not await judge.handles(booking):
             return None
+        if not await judge.ready(booking):
+            raise DomainError(ErrorCode.NOT_CHECKED_IN)
         found = await self.request_of(tx, group, booking, now)
         active = await tx.get_active_work_item(found.id or 0)
         lease = value_for(self._lease, group.organisation_id)
@@ -109,6 +117,30 @@ class RequestWork:
         if not await tx.update_service_request(request, found.handling):
             raise DomainError(ErrorCode.ALREADY_CLAIMED)
         return Work(request, await tx.add_work_item(item))
+
+    async def check_in(
+        self, tx: Transaction, group: Group, booking: Booking, now: datetime
+    ) -> ServiceRequest:
+        """Check the appointment in: its request (made now if none) records the arrival.
+
+        Idempotent: a second check-in keeps the first time and the one request, so the
+        reservation is counted once (A15). Allowed while the queue shows the booking, from
+        ``queue_visible_from_minutes`` before its start until its end (choice I3).
+
+        Raises:
+            DomainError: ``booking_not_active`` for a booking that is not confirmed request
+                work, ``outside_booking_window`` outside that time.
+        """
+        if not booking.is_active or not await self.handles(tx, booking):
+            raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
+        shown = booking.start - timedelta(minutes=group.queue_visible_from_minutes)
+        if not shown <= now < booking.end:
+            raise DomainError(ErrorCode.OUTSIDE_BOOKING_WINDOW)
+        found = await self.request_of(tx, group, booking, now)
+        arrived = check_in(found, now)
+        if arrived is not found and not await tx.update_service_request(arrived, found.handling):
+            raise DomainError(ErrorCode.ALREADY_CLAIMED)
+        return arrived
 
     async def request_of(
         self, tx: Transaction, group: Group, booking: Booking, now: datetime
@@ -198,13 +230,29 @@ class RequestWork:
     async def _write(
         self, tx: Transaction, work: Work, request: ServiceRequest, item: WorkItem
     ) -> None:
-        """Write the new states, conditional on the ones read; a race loses cleanly."""
-        seen = work.item.state if work.item else WorkItemState.ASSIGNED
-        if not (
-            await tx.update_work_item(item, seen)
-            and await tx.update_service_request(request, work.request.handling)
-        ):
-            raise DomainError(ErrorCode.ALREADY_CLAIMED)
+        """Write the new states of ``work`` (``write_work``)."""
+        await write_work(tx, work.request, work.item, request, item)
+
+
+async def write_work(
+    tx: Transaction,
+    seen_request: ServiceRequest,
+    seen_item: WorkItem | None,
+    request: ServiceRequest,
+    item: WorkItem | None,
+) -> None:
+    """Write a request and its work item, conditional on the states read; a race loses cleanly.
+
+    The one write of every change of request work: the queue's appointments, immediate work
+    (``request_queue``) and a participant's withdrawal (``immediate_requests``).
+
+    Raises:
+        DomainError: ``already_claimed`` when another transaction changed either first.
+    """
+    seen = seen_item.state if seen_item is not None else WorkItemState.ASSIGNED
+    written = item is None or await tx.update_work_item(item, seen)
+    if not (written and await tx.update_service_request(request, seen_request.handling)):
+        raise DomainError(ErrorCode.ALREADY_CLAIMED)
 
 
 def recovering(work: Work | None) -> bool:
@@ -234,7 +282,23 @@ class WorkJudge:
             self._pooled[booking.slot_id] = slot is not None and slot.capacity_pool_id is not None
         if not self._pooled[booking.slot_id]:
             return False
-        if booking.flow not in self._revisions:
-            ref = booking.flow
+        return is_request_work(await self._revision(booking.flow))
+
+    async def needs_check_in(self, booking: Booking) -> bool:
+        """Return whether ``booking`` is claimed only after a check-in (``needs_check_in``)."""
+        return await self.handles(booking) and needs_check_in(
+            await self._revision(cast(FlowRef, booking.flow))
+        )
+
+    async def ready(self, booking: Booking) -> bool:
+        """Return whether ``booking`` may be claimed now: no check-in needed, or checked in."""
+        if not await self.needs_check_in(booking):
+            return True
+        request = await self._tx.get_request_of_booking(stored_id(booking))
+        return request is not None and request.arrived_at is not None
+
+    async def _revision(self, ref: FlowRef) -> FlowRevision | None:
+        """Return the revision ``ref``, read once per transaction."""
+        if ref not in self._revisions:
             self._revisions[ref] = await self._tx.flow_revision(ref.flow_id, ref.revision)
-        return is_request_work(self._revisions[booking.flow])
+        return self._revisions[ref]

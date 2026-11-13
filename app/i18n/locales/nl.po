@@ -6417,6 +6417,9 @@ msgstr "Tijd om opgepakt werk te beginnen (minuten)"
 msgid "settings.field.request_unresolved_hours.label"
 msgstr "Uiterlijke afhandeltijd van een verzoek na de afspraak (uren)"
 
+msgid "settings.field.on_demand_admission_lookahead_minutes.label"
+msgstr "Hoe ver vooruit iemand zonder afspraak geholpen moet kunnen worden (minuten)"
+
 msgid "settings.field.planner_changes_alert_per_hour.label"
 msgstr "Waarschuwing bij wijzigingen per planner per uur"
 
@@ -13505,3 +13508,12 @@ msgstr "Dit werk is al begonnen. Rond het af in plaats van het terug te geven."
 
 msgid "error.request_not_started"
 msgstr "Dit werk is nog niet begonnen. Begin eerst, of geef het terug."
+
+msgid "error.on_demand_full"
+msgstr "Er wachten nu al zoveel mensen dat we u niet meer in de rij kunnen zetten. Probeer het later opnieuw of maak een afspraak."
+
+msgid "error.on_demand_unavailable"
+msgstr "We kunnen u de komende tijd niet zonder afspraak helpen. Probeer het later opnieuw of maak een afspraak."
+
+msgid "error.not_checked_in"
+msgstr "Deze afspraak is nog niet aangemeld. Meld de deelnemer eerst aan."

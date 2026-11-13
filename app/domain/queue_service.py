@@ -13,6 +13,10 @@ exactly one wins; the other gets ``already_claimed`` (a chosen row) or the next 
     release     ─► the claiming agent, or anyone who may view the group's bookings
     start       ─► request work only: holder, eligible, lease, the pool's check_start (locked)
     complete    ─► request work only: holder (or a supervisor in recovery) ─► unit released
+    check_in    ─► request work only: the participant arrived (ADR 0121 step 7); a flow with an
+                   explicit check-in is claimed only after it
+
+Immediate work without an appointment is ``app.domain.request_queue``'s, not this module's.
 
 Request work (ADR 0121 step 5): a booking of a flow without video on a counted pool. Its claim
 also makes the request and a work item with a lease (``RequestWork``); its page offers *Start*
@@ -73,8 +77,9 @@ RELEASED = "queue.released"
 STARTED = "queue.started"
 STARTED_IN_CONFLICT = "queue.started_in_conflict"
 COMPLETED = "queue.completed"
+CHECKED_IN = "queue.checked_in"
 """Audit details of the changes (``action`` is the permission, ``queue.work``); start and
-completion are of request work only (ADR 0121 step 5)."""
+completion are of request work only (ADR 0121 step 5), the check-in too (step 7)."""
 
 
 @dataclass(frozen=True)
@@ -98,6 +103,8 @@ class QueueRow:
         missing: The skills the booking requires that the viewer does not hold, to name them
             (choice S3); empty when the viewer may take it.
         without_video: Request work of a flow without video (ADR 0121 step 5).
+        awaiting_check_in: Request work of a flow with an explicit check-in that is not checked
+            in yet: it cannot be claimed until it is (ADR 0121 step 7, choice I2).
     """
 
     booking_id: int
@@ -115,6 +122,7 @@ class QueueRow:
     eligible: bool = True
     missing: tuple[Skill, ...] = ()
     without_video: bool = False
+    awaiting_check_in: bool = False
 
 
 @dataclass(frozen=True)
@@ -224,15 +232,21 @@ class QueueService:
                 for e in entries
                 if self._work is not None and await judge_work.handles(e.booking)
             }
+            unready = {
+                _id(e.booking) for e in entries if not await _ready(judge_work, self._work, e)
+            }
         me = agent_pseudonyms(self._keys, principal.subject)
         limit = timedelta(minutes=group.not_picked_up_minutes)
-        nxt = next_up(e for e in entries if not lacking[_id(e.booking)])
+        nxt = next_up(
+            e for e in entries if not lacking[_id(e.booking)] and _id(e.booking) not in unready
+        )
         rows = [
             replace(
                 _row(e, me, e.not_picked_up(now, limit)),
                 eligible=not lacking[_id(e.booking)],
                 missing=named.get(_id(e.booking), ()),
                 without_video=_id(e.booking) in requests,
+                awaiting_check_in=_id(e.booking) in unready,
             )
             for e in entries
         ]
@@ -241,7 +255,7 @@ class QueueService:
             rows,
             nxt.booking.id if nxt else None,
             group.queue_free_pick_allowed,
-            _supervises(principal, summary),
+            supervises(principal, summary),
         )
 
     async def summaries(
@@ -298,6 +312,8 @@ class QueueService:
         now = self._clock.now()
         async with self._uow.locked() as tx:
             entries = await self._entries(tx, principal, summary.group, now)
+            judge_work = WorkJudge(tx)
+            entries = [e for e in entries if await _ready(judge_work, self._work, e)]
             judge = WorkEligibility(tx, principal, summary.organisation_slug)
             nxt = next_up(entries)
             if nxt is None:
@@ -368,7 +384,7 @@ class QueueService:
             DomainError: ``not_claimed`` for anyone else or an unclaimed booking.
         """
         summary = await self._group(principal, slug)
-        supervisor = _supervises(principal, summary)
+        supervisor = supervises(principal, summary)
         async with self._uow.locked() as tx:
             booking = await _booking_of(tx, slug, booking_id)
             mine = self._holds(principal, booking)
@@ -379,6 +395,26 @@ class QueueService:
             await tx.release_claim(booking_id)
             await self._audit(tx, principal, summary, booking_id, RELEASED)
             await record_queue_released(tx, booking, summary.group, self._clock.now())
+
+    async def check_in(self, principal: Principal, slug: str, booking_id: int) -> None:
+        """Check an appointment in: the participant has arrived (ADR 0121 step 7, choice I1).
+
+        Staff of the queue (``queue.work``) record the arrival; a second check-in changes
+        nothing (A15). Request work only.
+
+        Raises:
+            DomainError: ``booking_not_found``, ``booking_not_active`` (not request work, or
+                not confirmed), ``outside_booking_window``, or as ``view``.
+        """
+        summary = await self._group(principal, slug)
+        async with self._uow.locked() as tx:
+            booking = await _booking_of(tx, slug, booking_id)
+            if self._work is None:
+                raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
+            before = await tx.get_request_of_booking(booking_id)
+            arrived = await self._work.check_in(tx, summary.group, booking, self._clock.now())
+            if before is None or before.arrived_at != arrived.arrived_at:
+                await self._audit(tx, principal, summary, booking_id, CHECKED_IN)
 
     async def start(self, principal: Principal, slug: str, booking_id: int) -> ClaimedBooking:
         """Start the treatment of request work ``principal`` claimed (ADR 0121 step 5).
@@ -417,7 +453,7 @@ class QueueService:
             booking, _ = await group_booking(tx, slug, booking_id)
             work = await self._work.of(tx, booking) if self._work else None
             allowed = self._holds(principal, booking) or (
-                recovering(work) and _supervises(principal, summary)
+                recovering(work) and supervises(principal, summary)
             )
             if self._work is None or work is None or not allowed:
                 raise DomainError(ErrorCode.NOT_CLAIMED)
@@ -426,10 +462,7 @@ class QueueService:
 
     async def _group(self, principal: Principal, slug: str) -> GroupSummary:
         """Authorise ``queue.work`` on the group and return it if it has an own queue."""
-        summary = await self._admin.authorize_group(principal, Permission.QUEUE_WORK, slug)
-        if not summary.group.queue_open:
-            raise DomainError(ErrorCode.QUEUE_NOT_ENABLED)
-        return summary
+        return await queue_group(self._admin, principal, slug)
 
     async def _entries(
         self, tx: Transaction, principal: Principal, group: Group, now: datetime
@@ -514,13 +547,32 @@ def _signed_in_for(
     )
 
 
-def _supervises(principal: Principal, summary: GroupSummary) -> bool:
+async def queue_group(admin: AdminService, principal: Principal, slug: str) -> GroupSummary:
+    """Authorise ``queue.work`` on the service and return it if it has an own queue.
+
+    The one check of every queue use case, of appointments and of immediate work alike.
+
+    Raises:
+        DomainError: ``not_permitted``, ``group_not_found`` or ``queue_not_enabled``.
+    """
+    summary = await admin.authorize_group(principal, Permission.QUEUE_WORK, slug)
+    if not summary.group.queue_open:
+        raise DomainError(ErrorCode.QUEUE_NOT_ENABLED)
+    return summary
+
+
+def supervises(principal: Principal, summary: GroupSummary) -> bool:
     """Return whether ``principal`` may release any claim: who may view the group's bookings.
 
     Not audited as a denial: holding the claim is enough for the agent who claimed it.
     """
     target = Target.for_group(summary.group.slug, summary.organisation_slug)
     return decide(principal, Permission.BOOKINGS_VIEW, target).allowed
+
+
+async def _ready(judge: WorkJudge, work: RequestWork | None, entry: QueueEntry) -> bool:
+    """Return whether ``entry`` may be claimed now: not awaiting its check-in (choice I2)."""
+    return work is None or await judge.ready(entry.booking)
 
 
 async def _lacking(judge: WorkEligibility, entries: list[QueueEntry]) -> dict[int, frozenset[int]]:

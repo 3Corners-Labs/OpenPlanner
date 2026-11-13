@@ -117,7 +117,9 @@ never respect the pool across services. So a flow may be activated only in an im
 previous supported minor already holds the readers and the accounting of every record it writes.
 This stays false until the release after the last reader-adding step, and until the upgrade
 matrix has proven it: activate a flow, book on the pool, roll back to the previous minor, book
-and claim there, and check that no unit was sold twice (A30). Setting it true is a decision.
+and claim there, and check that no unit was sold twice (A30). Setting it true is a decision,
+and needs ADR 0121 step 7b too: with the gate open, a service whose on-demand default is a pool
+flow is refused by the legacy direct call and is served only by the immediate intake pages.
 
 Read when called, never copied (tests flip it with a monkeypatch): ``readiness`` reports
 ``rollback_not_safe`` while it is false (ADR 0122 step 5), and

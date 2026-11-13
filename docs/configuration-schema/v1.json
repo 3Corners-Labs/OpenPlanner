@@ -216,6 +216,23 @@
           ],
           "description": "Codes of the skills every counted unit of the pool holds."
         },
+        "max_waiting": {
+          "allOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          ],
+          "description": "How many people without an appointment may wait for the pool at once (ADR 0121 step 7); null: no limit."
+        },
         "name": {
           "type": "string",
           "maxLength": 80

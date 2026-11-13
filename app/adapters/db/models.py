@@ -1949,6 +1949,9 @@ class CapacityPoolRow(Base):
     # ADR 0122 step 2: the zone the pool's weekly blocks are local to; NULL for a legacy pool
     # and for a counted pool that has no staffing yet.
     timezone: Mapped[str | None] = mapped_column(String(64))
+    # ADR 0121 step 7: how many immediate requests may wait at once; NULL is no limit. The
+    # bounds (1 to 1000) are checked by the adapter: a check here would copy the table.
+    max_waiting: Mapped[int | None] = mapped_column(Integer)
 
     __table_args__ = (
         CheckConstraint("mode IN ('legacy_group', 'counted')", name="mode"),
@@ -2163,6 +2166,14 @@ class ServiceRequestRow(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     personal_data: Mapped[str] = mapped_column(String(16), server_default=text("'not_collected'"))
     data_deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # ADR 0121 step 7, immediate intake and check-in. ``pool_id`` has no database foreign key,
+    # like ``slots.capacity_pool_id`` (migration 0111): adding one would copy the table.
+    pool_id: Mapped[int | None] = mapped_column(Integer)
+    subject: Mapped[str | None] = mapped_column(String(64))
+    arrived_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    public_ref: Mapped[str | None] = mapped_column(String(32))
+    access_hash: Mapped[str | None] = mapped_column(String(64))
+    intake_key_hash: Mapped[str | None] = mapped_column(String(64))
 
     __table_args__ = (
         ForeignKeyConstraint(
@@ -2179,6 +2190,15 @@ class ServiceRequestRow(Base):
             "(intake = 'appointment') = (booking_id IS NOT NULL)", name="appointment_booking"
         ),
         Index("ix_service_requests_flow", "flow_id", "flow_revision"),
+        Index("ix_service_requests_pool_handling", "pool_id", "handling"),
+        Index("uq_service_requests_public_ref", "public_ref", unique=True),
+        Index(
+            "uq_service_requests_intake_key",
+            "group_id",
+            "intake_key_hash",
+            unique=True,
+            sqlite_where=text("intake_key_hash IS NOT NULL"),
+        ),
     )
 
 

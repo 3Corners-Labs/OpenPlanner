@@ -198,6 +198,7 @@ ON_ONE_BOOKING: dict[str, Callable[[QueueService, int], Awaitable[object]]] = {
     "release": lambda s, b: s.release(GROUP_ADMIN, "demo", b),
     "start": lambda s, b: s.start(GROUP_ADMIN, "demo", b),
     "complete": lambda s, b: s.complete(GROUP_ADMIN, "demo", b),
+    "check_in": lambda s, b: s.check_in(GROUP_ADMIN, "demo", b),
 }
 """Every use case on one booking, by the group admin of ``demo`` through their own group."""
 

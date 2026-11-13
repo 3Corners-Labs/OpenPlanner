@@ -64,6 +64,31 @@ def _clean_phone(raw: str | None, mode: PhoneMode, region: str) -> str | None:
     return normalise_phone(raw or "", region, "phone")
 
 
+def clean_contact_fields(
+    *,
+    first_name: str,
+    last_name: str,
+    email: str | None,
+    phone: str | None,
+    phone_mode: PhoneMode,
+    region: str = DEFAULT_PHONE_REGION,
+) -> tuple[str, str, str | None, str | None]:
+    """Validate and normalise contact fields as ``Contact.create`` does; ``email`` may be absent.
+
+    For a request without an appointment (ADR 0121 step 7): its flow may not ask for an email
+    address (``collects_email``), and nothing is invented for a field that was not asked (A20).
+
+    Raises:
+        DomainError: ``invalid_contact`` naming the offending field.
+    """
+    return (
+        _clean_name(first_name, "first_name"),
+        _clean_name(last_name, "last_name"),
+        _clean_email(email) if email is not None else None,
+        _clean_phone(phone, phone_mode, region),
+    )
+
+
 @dataclass(frozen=True)
 class Contact:
     """Validated contact details of a participant. Build it with ``Contact.create``.

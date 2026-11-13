@@ -48,20 +48,27 @@ class WorkEligibility:
 
     async def required(self, booking: Booking) -> frozenset[int]:
         """Return the skill ids ``booking`` requires: its flow revision plus its subject's."""
-        ref = booking.flow
+        subject = booking.routing.subject if booking.routing else None
+        return await self.required_of(booking.flow, subject)
+
+    async def required_of(self, ref: FlowRef | None, subject: str | None) -> frozenset[int]:
+        """Return the skill ids work made under ``ref`` about ``subject`` requires.
+
+        The one rule for a booking and for immediate work without one (ADR 0121 step 7).
+        """
         if ref is None:
             return frozenset()
         if ref not in self._revisions:
             self._revisions[ref] = await self._tx.flow_revision(ref.flow_id, ref.revision)
-        subject = booking.routing.subject if booking.routing else None
         return requirement_of(self._revisions[ref], subject)
 
     async def of(self, booking: Booking) -> Eligibility:
         """Return whether the person may take ``booking`` by skill."""
-        required = await self.required(booking)
-        if not required:
-            return Eligible()
-        return eligibility(required, await self._held_skills())
+        return await self._judge(await self.required(booking))
+
+    async def of_work(self, ref: FlowRef | None, subject: str | None) -> Eligibility:
+        """Return whether the person may take work made under ``ref`` about ``subject``."""
+        return await self._judge(await self.required_of(ref, subject))
 
     async def check(self, booking: Booking) -> None:
         """Refuse ``booking`` unless the person holds every skill it requires.
@@ -71,6 +78,21 @@ class WorkEligibility:
         """
         if isinstance(await self.of(booking), Missing):
             raise DomainError(ErrorCode.NOT_ELIGIBLE)
+
+    async def check_work(self, ref: FlowRef | None, subject: str | None) -> None:
+        """Refuse work made under ``ref`` about ``subject`` unless every skill is held.
+
+        Raises:
+            DomainError: ``not_eligible``.
+        """
+        if isinstance(await self.of_work(ref, subject), Missing):
+            raise DomainError(ErrorCode.NOT_ELIGIBLE)
+
+    async def _judge(self, required: frozenset[int]) -> Eligibility:
+        """Return whether the held skills cover ``required``; reads nothing when it is empty."""
+        if not required:
+            return Eligible()
+        return eligibility(required, await self._held_skills())
 
     async def skills(self, ids: Iterable[int]) -> tuple[Skill, ...]:
         """Return the skills ``ids`` (archived ones included) by code, to name what is missing."""

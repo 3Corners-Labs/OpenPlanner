@@ -33,7 +33,7 @@ from app.domain.service_requests import (
     watchdog_outcome,
 )
 from tests.support.domain import NOW, SLOT_0900
-from tests.support.flow_world import World
+from tests.support.flow_world import EVERYTHING, World
 from tests.support.pool_flows import PoolFlow
 from tests.support.request_storage import LENGTH, UNTIL, pool_booking, request_for
 
@@ -200,6 +200,10 @@ async def test_the_booking_purge_empties_the_agent_pseudonym_and_keeps_the_state
     assert kept == request
 
 
+LATER = NOW + timedelta(minutes=35)
+"""The end of the unit an immediate claim acquires: 30 minutes plus a 5-minute wrap-up."""
+
+
 def on_demand(world: World, flow: PoolFlow) -> ServiceRequest:
     """Return a request without an appointment of Acme's service (the writer is step 7)."""
     return ServiceRequest(
@@ -212,6 +216,7 @@ def on_demand(world: World, flow: PoolFlow) -> ServiceRequest:
         handling=HandlingState.QUEUED,
         created_at=NOW,
         watchdog_at=watchdog_deadline(NOW, 24),
+        pool_id=flow.pool_id,
     )
 
 
@@ -221,7 +226,7 @@ async def test_the_record_is_stored_read_and_deleted_once(world: World) -> None:
     async with world.uow.locked() as tx:
         request = await tx.add_service_request(on_demand(world, flow), record)
         item = await tx.add_work_item(
-            claim(request, None, now=NOW, agent=AGENT, lease_minutes=5)[1]
+            claim(request, None, now=NOW, agent=AGENT, lease_minutes=5, planned_until=LATER)[1]
         )
     assert request.personal_data is PersonalDataState.PRESENT
     async with world.uow.read() as tx:
@@ -290,7 +295,9 @@ async def test_a_pseudonym_without_a_record_is_held_data_and_is_emptied_once(
         appointment = await tx.add_service_request(request_for(world, flow, booking_id))
         await tx.add_work_item(claim(appointment, None, now=NOW, agent=AGENT, lease_minutes=5)[1])
         request = await tx.add_service_request(on_demand(world, flow))
-        await tx.add_work_item(claim(request, None, now=NOW, agent=AGENT, lease_minutes=5)[1])
+        await tx.add_work_item(
+            claim(request, None, now=NOW, agent=AGENT, lease_minutes=5, planned_until=LATER)[1]
+        )
     async with world.uow.read() as tx:
         held = [r.id for r in await tx.requests_holding_data()]
     assert held == [request.id]  # an appointment's pseudonym goes with its booking's purge
@@ -316,3 +323,114 @@ async def test_the_watchdog_moment_is_written_with_the_handling(world: World) ->
         assert await tx.update_service_request(later, HandlingState.QUEUED)
     async with world.uow.read() as tx:
         assert await tx.get_service_request(request.id or 0) == later
+
+
+# --- ADR 0121 step 7: immediate work ----------------------------------------------------------
+
+
+def immediate(world: World, flow: PoolFlow, ref: str, key: str) -> ServiceRequest:
+    """Return immediate work of Acme's service with its access hashes."""
+    return replace(
+        on_demand(world, flow), public_ref=ref, access_hash=f"a-{ref}", intake_key_hash=key
+    )
+
+
+async def test_immediate_work_is_found_by_reference_key_line_and_service(world: World) -> None:
+    flow, _ = await pool_booking(world)
+    async with world.uow.locked() as tx:
+        first = await tx.add_service_request(immediate(world, flow, "r1", "k1"))
+        second = await tx.add_service_request(immediate(world, flow, "r2", "k2"))
+        assigned, _ = claim(
+            second, None, now=NOW, agent=AGENT, lease_minutes=5, planned_until=LATER
+        )
+        assert await tx.update_service_request(assigned, HandlingState.QUEUED)
+        assert await tx.set_request_access(first.id or 0, "a-new")
+    async with world.uow.read() as tx:
+        by_ref = await tx.get_request_by_ref("r1")
+        by_key = await tx.get_request_by_intake_key(world.acme_group, "k2")
+        other_service = await tx.get_request_by_intake_key(world.acme_group + 99, "k2")
+        line = await tx.waiting_immediate(flow.pool_id)
+        open_ = await tx.open_immediate(world.acme_group)
+
+    assert by_ref is not None
+    assert by_ref.access_hash == "a-new"
+    assert by_key is not None
+    assert by_key.id == second.id
+    assert other_service is None
+    assert [r.id for r in line] == [first.id, second.id]
+    assert [r.id for r in open_] == [first.id, second.id]
+
+
+async def test_an_intake_key_makes_one_request_per_service(world: World) -> None:
+    flow, _ = await pool_booking(world)
+    async with world.uow.locked() as tx:
+        await tx.add_service_request(immediate(world, flow, "r1", "k1"))
+    with pytest.raises(Exception, match="UNIQUE"):  # noqa: PT011 - the database's own message
+        async with world.uow.locked() as tx:
+            await tx.add_service_request(immediate(world, flow, "r2", "k1"))
+
+
+async def test_a_claimed_immediate_request_holds_its_unit_until_its_item_ends(
+    world: World,
+) -> None:
+    flow, _ = await pool_booking(world)
+    async with world.uow.locked() as tx:
+        request = await tx.add_service_request(immediate(world, flow, "r1", "k1"))
+        assigned, item = claim(
+            request, None, now=NOW, agent=AGENT, lease_minutes=5, planned_until=LATER
+        )
+        await tx.update_service_request(assigned, HandlingState.QUEUED)
+        stored = await tx.add_work_item(item)
+    key = ("request", request.id or 0)
+    async with world.uow.read() as tx:
+        held = await tx.get_pool_commitments(flow.pool_id, NOW, LATER)
+    assert Commitment(key, NOW, LATER) in held
+
+    async with world.uow.locked() as tx:
+        ended = replace(stored, state=WorkItemState.CANCELLED, lease_until=None, ended_at=NOW)
+        assert await tx.update_work_item(ended, WorkItemState.ASSIGNED)
+    async with world.uow.read() as tx:
+        held = await tx.get_pool_commitments(flow.pool_id, NOW, LATER)
+    assert all(c.key != key for c in held)
+
+
+async def test_the_check_in_is_written_with_the_handling(world: World) -> None:
+    flow, booking_id = await pool_booking(world)
+    async with world.uow.locked() as tx:
+        request = await tx.add_service_request(request_for(world, flow, booking_id))
+        arrived = replace(request, arrived_at=NOW)
+        assert await tx.update_service_request(arrived, HandlingState.QUEUED)
+    async with world.uow.read() as tx:
+        found = await tx.get_request_of_booking(booking_id)
+    assert found is not None
+    assert found.arrived_at == NOW
+
+
+async def test_the_deletion_also_empties_the_access_hashes(world: World) -> None:
+    flow, _ = await pool_booking(world)
+    async with world.uow.locked() as tx:
+        request = await tx.add_service_request(immediate(world, flow, "r1", "k1"))
+        assert await tx.delete_request_personal_data(request.id or 0, NOW)
+        assert not await tx.delete_request_personal_data(request.id or 0, NOW)
+        assert not await tx.set_request_access(request.id or 0, "again")
+    async with world.uow.read() as tx:
+        found = await tx.get_service_request(request.id or 0)
+    assert found is not None
+    assert (found.access_hash, found.intake_key_hash) == (None, None)
+    assert found.public_ref == "r1"
+
+
+async def test_a_pools_waiting_limit_is_bounded_and_scoped(world: World) -> None:
+    flow, _ = await pool_booking(world)
+    async with world.uow.locked() as tx:
+        assert await tx.set_pool_max_waiting(EVERYTHING, flow.pool_id, 12)
+        assert not await tx.set_pool_max_waiting(EVERYTHING, flow.pool_id + 99, 12)
+        with pytest.raises(DomainError) as error:
+            await tx.set_pool_max_waiting(EVERYTHING, flow.pool_id, 1001)
+    assert error.value.field == "max_waiting"
+    async with world.uow.read() as tx:
+        assert await tx.get_pool_max_waiting(flow.pool_id) == 12
+    async with world.uow.locked() as tx:
+        assert await tx.set_pool_max_waiting(EVERYTHING, flow.pool_id, None)
+    async with world.uow.read() as tx:
+        assert await tx.get_pool_max_waiting(flow.pool_id) is None

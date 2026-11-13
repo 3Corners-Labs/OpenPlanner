@@ -21,7 +21,7 @@ skills, a pool is not archived under a flow that draws on it) are in
 from collections.abc import Mapping
 
 from app.domain.authorization import Permission
-from app.domain.capacity import CapacityPool, PoolMode
+from app.domain.capacity import MAX_WAITING, CapacityPool, PoolMode
 from app.domain.configuration_changes import RuleContext
 from app.domain.configuration_checks import (
     invalid,
@@ -36,6 +36,7 @@ from app.domain.configuration_schema import (
     Kind,
     Shape,
     boolean,
+    integer,
     json_object,
     strings,
     text,
@@ -149,6 +150,16 @@ CAPACITY_POOL = Kind(
         ),
         boolean("archived", default=False, columns=("archived_at",)),
         *staffing_fields(),
+        integer(
+            "max_waiting",
+            nullable=True,
+            minimum=1,
+            maximum=MAX_WAITING,
+            description=(
+                "How many people without an appointment may wait for the pool at once (ADR 0121"
+                " step 7); null: no limit."
+            ),
+        ),
     ),
     check=_pool_check,
     archive=("archived", True),

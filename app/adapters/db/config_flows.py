@@ -67,7 +67,7 @@ from app.adapters.db.service_flows import (
 )
 from app.adapters.db.skills import skill_ids_by_code
 from app.adapters.db.skills import write_skill as write_skill_row
-from app.domain.capacity import CapacityPool, PoolMode
+from app.domain.capacity import CapacityPool, PoolMode, check_max_waiting
 from app.domain.configuration_changes import Change, ChangeAction
 from app.domain.configuration_checks import (
     json_list,
@@ -163,6 +163,7 @@ async def read_catalogue(
                     "timezone": pool_row.timezone,
                     "staffing_rules": rules,
                     "staffing_overrides": overrides,
+                    "max_waiting": pool_row.max_waiting,
                 },
             )
         )
@@ -484,7 +485,7 @@ async def _write_staffing(session: AsyncSession, change: Change) -> None:
     stays as it is; a part it names is replaced as a whole.
     """
     names = _names(change)
-    if not names & {"timezone", "staffing_rules", "staffing_overrides"}:
+    if not names & {"timezone", "staffing_rules", "staffing_overrides", "max_waiting"}:
         return
     pool = await session.scalar(
         select(CapacityPoolRow).where(
@@ -499,6 +500,9 @@ async def _write_staffing(session: AsyncSession, change: Change) -> None:
     if "timezone" in names:
         name = change.values.get("timezone")
         pool.timezone = None if name is None else str(name)
+    if "max_waiting" in names:
+        limit = change.values.get("max_waiting")
+        pool.max_waiting = check_max_waiting(None if limit is None else int(str(limit)))
     rules, overrides = staffing_of(change.values)
     await replace_pool_staffing(
         session,

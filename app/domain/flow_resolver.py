@@ -36,8 +36,9 @@ async def resolve_flow(
     (an administrator archived it); the service's own settings decide what is offered. Both
     cases record NULL: the column cannot tell "no flow rows" from "default archived" (ADR 0121).
 
-    A flow on a counted pool takes part only while the rollback gate is open, and only for
-    appointments (``gate_allows``, ADR 0122 step 5); otherwise it counts as not active.
+    A flow on a counted pool takes part only while the rollback gate is open (``gate_allows``,
+    ADR 0122 step 5, and since ADR 0121 step 7 on both paths); otherwise it counts as not
+    active.
 
     Raises:
         DomainError: ``flow_not_available`` for an explicit code that does not resolve,

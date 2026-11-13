@@ -44,7 +44,9 @@ async def seed_staffing(engine: AsyncEngine) -> None:
     async with AsyncSession(engine) as session, session.begin():
         session.add(OrganisationRow(name="Beta", slug="beta"))
         await session.flush()
-        loket = await add_pool(session, "acme", "loket", timezone="Europe/Amsterdam")
+        loket = await add_pool(
+            session, "acme", "loket", timezone="Europe/Amsterdam", max_waiting=12
+        )
         await add_pool(session, "acme", "bare")
         other = await add_pool(session, "beta", "loket", timezone="UTC")
         session.add_all(
@@ -150,6 +152,7 @@ async def test_the_document_holds_the_staffing_in_one_order(source: AsyncEngine)
     ]
     bare = pool_of(exported, "acme", "bare")
     assert (bare["timezone"], bare["staffing_rules"], bare["staffing_overrides"]) == (None, [], [])
+    assert (loket["max_waiting"], bare["max_waiting"]) == (12, None)  # ADR 0121 step 7
 
 
 async def test_export_import_export_gives_the_same_document(

@@ -1730,6 +1730,21 @@ class Transaction(Protocol):
         """
         ...
 
+    async def get_pool_max_waiting(self, pool_id: int) -> int | None:
+        """Return how many immediate requests may wait for a pool at once; ``None``: no limit.
+
+        Not scoped: read inside an intake whose pool the flow named (ADR 0121 step 7).
+        """
+        ...
+
+    async def set_pool_max_waiting(self, scope: Scope, pool_id: int, limit: int | None) -> bool:
+        """Set a counted pool's waiting limit (``None`` clears it); ``False`` when no such pool.
+
+        Raises:
+            DomainError: ``invalid_configuration`` (field ``max_waiting``) outside 1 to 1000.
+        """
+        ...
+
     async def add_pool_rule(self, scope: Scope, pool_id: int, rule: ScheduleRule) -> int | None:
         """Store a weekly block of a counted pool; return its id, ``None`` when no such pool."""
         ...
@@ -1850,10 +1865,39 @@ class Transaction(Protocol):
         ...
 
     async def update_service_request(self, request: ServiceRequest, seen: HandlingState) -> bool:
-        """Write the request's handling, ``resolved_at`` and ``watchdog_at`` if still ``seen``.
+        """Write the request's handling, ``resolved_at``, ``watchdog_at`` and ``arrived_at``.
 
-        Returns ``False`` when another transaction changed it first (nothing written).
+        Only if the stored handling is still ``seen``; returns ``False`` when another
+        transaction changed it first (nothing written).
         """
+        ...
+
+    async def get_request_by_ref(self, public_ref: str) -> ServiceRequest | None:
+        """Return the immediate request with this public reference, or ``None`` (ADR 0121 step 7).
+
+        Not scoped: the participant's page authorises by its cookie, after this read.
+        """
+        ...
+
+    async def get_request_by_intake_key(
+        self, group_id: int, intake_key_hash: str
+    ) -> ServiceRequest | None:
+        """Return the service's immediate request made with this intake key, or ``None`` (A16)."""
+        ...
+
+    async def set_request_access(self, request_id: int, access_hash: str) -> bool:
+        """Replace the hash of the participant's cookie value; ``False`` when it was emptied."""
+        ...
+
+    async def waiting_immediate(self, pool_id: int) -> list[ServiceRequest]:
+        """Return the pool's immediate requests that wait or are claimed and not started.
+
+        ``queued`` and ``assigned``, oldest first: the line that ``max_waiting`` bounds.
+        """
+        ...
+
+    async def open_immediate(self, group_id: int) -> list[ServiceRequest]:
+        """Return the service's immediate requests that are not finished, oldest first."""
         ...
 
     async def update_work_item(self, item: WorkItem, seen: WorkItemState) -> bool:
@@ -1870,8 +1914,9 @@ class Transaction(Protocol):
     async def delete_request_personal_data(self, request_id: int, now: datetime) -> bool:
         """Delete the request-level record and mark the request ``deleted`` (decision D1).
 
-        Also empties the pseudonyms on the request's work items, with or without a record.
-        Returns ``False`` when there was nothing to remove: idempotent.
+        Also empties the pseudonyms on the request's work items, with or without a record, and
+        the hashes that let a browser find the request again (ADR 0121 step 7). Returns
+        ``False`` when there was nothing to remove: idempotent.
         """
         ...
 
