@@ -40,7 +40,16 @@ from app.domain.tokens import derive_token, hash_token, key_for_booking
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.agent_api import api_caller
-from tests.support.domain import NOW, SLOT_0900, SLOT_0930, TEST_TOKEN_KEY, book_another
+from tests.support.domain import (
+    NOW,
+    SLOT_0900,
+    SLOT_0930,
+    TEST_TOKEN_KEY,
+    another_participant,
+    book_another,
+    book_confirmed,
+)
+from tests.support.pool_flows import open_gate, seed_pool_flow
 
 PHONE = "06 1234 5678"
 OTHER_KEY = b"o" * 32
@@ -486,4 +495,90 @@ async def test_expired_requests_are_deleted_after_the_retention(
     assert await prune_change_requests(uow, clock, keep) == 0
     clock.advance(timedelta(seconds=1))
     assert await prune_change_requests(uow, clock, keep) == 2
+    assert uow.state.change_requests == {}
+
+
+# --- a booking on a counted pool (ADR 0122 step 5, gate item G04) ------------------------------
+# The pool is staffed Mondays 09:00-12:00 Amsterdam and its flow takes 20 minutes, so 09:20 is a
+# time of the pool only and 09:30 one of the service's own staffing only.
+
+POOL_ONLY = SLOT_0900 + timedelta(minutes=20)
+
+
+async def _pool_booked(
+    monkeypatch: pytest.MonkeyPatch, uow: InMemoryUnitOfWork, bookings: BookingService
+) -> tuple[int, str, str]:
+    """Open the gate, store a pool flow of ``demo`` and book 09:00 on it; as ``_booked``."""
+    open_gate(monkeypatch)
+    async with uow.locked() as tx:
+        await tx.ensure_default_flows(1)
+    await seed_pool_flow(uow, 1, 1)
+    receipt = await book_confirmed(
+        bookings,
+        group_slug="demo",
+        start=SLOT_0900,
+        contact=another_participant(),
+        locale="nl",
+        flow="advies",
+    )
+    booking = receipt.booking
+    return (
+        booking.id or 0,
+        receipt.management_token,
+        derive_code(TEST_TOKEN_KEY, booking.token_salt),
+    )
+
+
+async def test_a_pool_booking_is_asked_about_a_time_of_its_pool_and_moves_there(
+    monkeypatch: pytest.MonkeyPatch,
+    changes: ChangeRequestService,
+    bookings: BookingService,
+    uow: InMemoryUnitOfWork,
+) -> None:
+    booking_id, token, code = await _pool_booked(monkeypatch, uow, bookings)
+
+    request = await changes.request(CALLER, await _demo(uow), PHONE, code, POOL_ONLY)
+    done = await changes.confirm(PublicRef((await bookings.find(token)).booking.public_ref))
+
+    assert request.booking_id == booking_id
+    assert done.moved is not None
+    assert done.moved.booking.start == POOL_ONLY
+    moved_slot = uow.state.slots[done.moved.booking.slot_id]
+    assert moved_slot.capacity_pool_id is not None  # it stays on its pool
+
+
+async def test_a_time_off_the_matched_bookings_own_times_reaches_nobody_with_the_same_answer(
+    monkeypatch: pytest.MonkeyPatch,
+    changes: ChangeRequestService,
+    bookings: BookingService,
+    uow: InMemoryUnitOfWork,
+) -> None:
+    pooled, _t1, pool_code = await _pool_booked(monkeypatch, uow, bookings)
+    own, _t2, own_code = await _booked(bookings, SLOT_0930)
+    demo = await _demo(uow)
+
+    pool_to_own = await changes.request(CALLER, demo, PHONE, pool_code, SLOT_0930)
+    own_to_pool = await changes.request(CALLER, demo, PHONE, own_code, POOL_ONLY)
+    nobody = await changes.request(CALLER, demo, "06 8765 4321", pool_code, POOL_ONLY)
+
+    for request in (pool_to_own, own_to_pool, nobody):
+        assert request.booking_id is None
+        assert request.status(NOW) is ChangeStatus.PENDING
+        assert request.expires_at == NOW + timedelta(minutes=60)
+    assert JobType.SEND_CHANGE_REQUEST not in _jobs(uow, pooled)
+    assert JobType.SEND_CHANGE_REQUEST not in _jobs(uow, own)
+    reasons = [e.reason for e in uow.state.audit if e.action == "bookings:request_change"]
+    assert reasons == [NO_MATCH, NO_MATCH, NO_MATCH]
+
+
+async def test_with_the_gate_shut_a_time_of_a_pool_only_is_refused_as_before(
+    changes: ChangeRequestService, bookings: BookingService, uow: InMemoryUnitOfWork
+) -> None:
+    await seed_pool_flow(uow, 1, 1)
+    _id, _token, code = await _booked(bookings)
+
+    with pytest.raises(DomainError) as refused:
+        await changes.request(CALLER, await _demo(uow), PHONE, code, POOL_ONLY)
+
+    assert refused.value.code is ErrorCode.SLOT_UNAVAILABLE
     assert uow.state.change_requests == {}
