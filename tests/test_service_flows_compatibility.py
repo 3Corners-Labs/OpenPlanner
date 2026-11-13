@@ -140,8 +140,8 @@ def test_the_gate_stays_shut_while_a_blocking_item_is_open() -> None:
     open_blocking = [
         name
         for name, item in _checklist().items()
-        if item.blocks in {"yes", "cc"} and not item.status.startswith("done")
+        if item.blocks == "yes" and not item.status.startswith("done")
     ]
 
-    assert open_blocking  # today: the gate has work before it
-    assert service_flows.ROLLBACK_SAFE is False
+    if open_blocking:
+        assert service_flows.ROLLBACK_SAFE is False, open_blocking

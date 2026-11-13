@@ -146,14 +146,15 @@ client, audit events), taken back to 0108.
 | Upgrade 0108 to head: every pre-train value unchanged; personal data on live bookings only; every pending job claimable; every stored setting usable | `tests/test_upgrade_train.py::test_upgrading_keeps_every_pre_train_value_and_the_matrix_invariants` |
 | Downgrade head to 0108 gives the pre-train database back, value for value; upgrading again gives the same backfill | `tests/test_upgrade_train.py::test_downgrading_gives_the_pre_train_database_back_and_upgrading_again_the_same_backfill` |
 | Only `bookings` and `slots` of the pre-train tables change, and only by nullable or defaulted columns; no pre-train column changes type or becomes stricter | `tests/test_upgrade_train.py::test_the_train_changes_only_bookings_and_slots_of_the_pre_train_tables_and_only_additively` |
-| N-1 writer: a slot, booking and job written with pre-train columns only is stored, read and claimed by the current code | `tests/test_upgrade_train.py::test_the_previous_image_writes_and_the_current_code_reads_and_claims_it` |
+| N-1 writer: a slot, booking and job written with pre-train columns only is stored by the database and read by the current code (the booking counted with its personal data, the job claimed by the worker); a booking without a flow is booked and moved by the current code as before (section 1, group booking and rebooking) | `tests/test_upgrade_train.py::test_the_previous_image_writes_and_the_current_code_reads_and_claims_it` |
 | N-1 writer: the legacy slot index is exactly as strict for the previous image | `tests/test_migration_pool_staffing.py::test_the_previous_image_still_writes_and_is_held_by_the_same_rules` |
 | A service an older image created during a rollback gets its pool and flows once, going forward again | `tests/adapters/db/test_default_flows_contract.py::test_the_repair_gives_a_group_of_an_older_image_its_rows_once` |
 | Downgrade refuses while a pool slot exists (0111) | `tests/test_migration_pool_staffing.py::test_downgrade_refuses_while_a_slot_carries_a_pool` |
 | Downgrade refuses while a request-level record holds personal data (0113) | `tests/test_migration_service_requests.py::test_downgrade_refuses_while_a_record_holds_personal_data` |
 | Downgrade refuses while a contact-center attempt exists (0114) | `tests/test_migration_work_item_channel.py::test_downgrade_refuses_while_an_attempt_exists_and_restores_the_states` |
 | Downgrade refuses while an immediate request exists (0115) | `tests/test_migration_immediate_intake.py::test_downgrade_refuses_while_immediate_work_exists_and_drops_the_columns` |
-| A refused downgrade stops at the refusing step, keeps what that step guards, and goes up again with every pre-train value | `tests/test_upgrade_train.py::test_a_refused_downgrade_stops_at_the_refusing_step_keeps_what_it_guards_and_goes_up_again` |
+| A downgrade is one transaction: one refused part way (0115 to 0112 went down, 0111 refuses) leaves the database at head with every row, the request and its started work included | `tests/test_upgrade_train.py::test_a_refused_downgrade_leaves_the_database_at_head_with_every_row` |
+| No index, key or check of a pre-train table becomes stricter: only the legacy slot key changes (it gains `AND capacity_pool_id IS NULL`, met by every row the previous image writes) and only the pool key is added (rows with a pool only); every column keeps its type, nullability and default | `tests/test_upgrade_train.py::test_no_index_or_constraint_of_a_pre_train_table_becomes_stricter` |
 
 **What the train adds that the previous image does not know, and why that is safe while the
 gate is shut.** No job kind, booking status, event kind or settings key that the previous image
@@ -164,7 +165,7 @@ as unknown, not as unusable). The records the previous image would miscount (a p
 its service's `group_id`; an immediate request occupies a unit of a pool) are written only by
 gated paths.
 
-**Findings of step 8** (each is a row of the gate checklist):
+**Findings of step 8** (the open ones are rows of the gate checklist):
 
 - *The released-image proof cannot run yet.* ADR 0121 point 9 asks for the previous supported
   image on the expanded database after the new image has written new records, including booking
@@ -174,12 +175,12 @@ gated paths.
   schema level with the current code. The proof with real images is possible from the first
   minor after 0.6.0, which is also the earliest image that may open the gate (ADR 0122,
   consequences).
-- *A refused downgrade is not atomic on SQLite.* The migration run is one transaction, but
-  SQLite's driver runs schema statements outside it: a refusal at 0111 leaves the database at
-  0111 with 0112 to 0115 already undone (their own guards had passed). Nothing a guard protects
-  is lost, and `alembic upgrade head` brings the schema back; what the undone steps dropped
-  without a guard is configuration (skill contact-center codes, `max_waiting`) and check-in
-  times. The runbook says to export the configuration package first and to run the downgrade
-  only as the fallback.
+- *A refused downgrade was not atomic* (fixed in this step). Alembic's SQLite default commits
+  after every migration, so a refusal at 0111 left the database at 0111 with 0115 to 0112 already
+  undone, and 0113 had dropped the requests and work items of pool bookings that held no personal
+  data. `migrations/env.py` now runs the whole migration with `transactional_ddl=True` (the
+  engine emits `BEGIN` itself, so SQLite's schema statements are transactional): a refusal rolls
+  the whole run back, and the `foreign_key_check` of env.py now runs before the commit, as its
+  docstring always said.
 - *The OpenAPI document is not diffed against a stored copy.* CLAUDE.md asks for it; today the
   additive `flow` is held by the test above that no `/api/v1` schema requires it.

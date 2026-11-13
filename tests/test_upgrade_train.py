@@ -12,15 +12,15 @@ matrix in ``docs/service-flows-compatibility.md``:
   setting usable);
 * downgrading back to 0108 gives the pre-train database back value for value, and upgrading
   again gives the same backfill;
-* a refused downgrade stops at the refusing migration (SQLite runs schema statements outside the
-  migration's transaction), keeps what that migration guards, and goes up again with every
-  pre-train value;
+* a downgrade is one transaction: a refusal on a record that only the gated paths write leaves
+  the database at head with every row in it, never between revisions;
 * the previous image (N-1) still reads and writes: every pre-train column keeps its type and
   never becomes stricter, and a row written with the pre-train columns only is stored, read and
   claimed by the current code.
 """
 
 import asyncio
+import shutil
 import sqlite3
 from contextlib import closing
 from datetime import timedelta
@@ -37,6 +37,7 @@ from app.adapters.db.upgrade_fixture import (
     inspect_fixture,
     seed_upgrade_fixture,
 )
+from tests.support.database import ROOT
 from tests.support.domain import NOW
 
 PRE_TRAIN = "0108"
@@ -103,25 +104,35 @@ async def _seed(url: str) -> None:
         await engine.dispose()
 
 
-@pytest.fixture
-def database(alembic_config: Config, tmp_path: Path) -> Path:
-    """Return the path of the database ``alembic_config`` migrates."""
-    return tmp_path / "migrate.db"
-
-
-@pytest.fixture
-def pre_train(alembic_config: Config, database: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+@pytest.fixture(scope="module")
+def pre_train_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """Return a database at 0108 holding the upgrade fixture: what a pre-train image holds.
 
     The fixture is written at head (the seed speaks the current schema) and taken back to 0108;
-    the downgrade removes what the train added, so what is left is a pre-train database.
+    the downgrade removes what the train added, so what is left is a pre-train database. Made
+    once per module; every test works on its own copy.
     """
-    monkeypatch.setenv("ENVIRONMENT", "dev")
-    command.upgrade(alembic_config, "head")
-    asyncio.run(_seed(f"sqlite+aiosqlite:///{database}"))
-    command.downgrade(alembic_config, PRE_TRAIN)
-    assert revision(database) == PRE_TRAIN
-    return database
+    path = tmp_path_factory.mktemp("pre-train") / "template.db"
+    with pytest.MonkeyPatch.context() as scoped:
+        scoped.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{path}")
+        scoped.setenv("ENVIRONMENT", "dev")
+        config = Config(str(ROOT / "alembic.ini"))
+        config.set_main_option("script_location", str(ROOT / "migrations"))
+        command.upgrade(config, "head")
+        asyncio.run(_seed(f"sqlite+aiosqlite:///{path}"))
+        command.downgrade(config, PRE_TRAIN)
+    with closing(sqlite3.connect(path)) as database:
+        database.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    assert revision(path) == PRE_TRAIN
+    return path
+
+
+@pytest.fixture
+def pre_train(alembic_config: Config, tmp_path: Path, pre_train_template: Path) -> Path:
+    """Return a copy of the pre-train database, where ``alembic_config`` migrates."""
+    path = tmp_path / "migrate.db"
+    shutil.copyfile(pre_train_template, path)
+    return path
 
 
 @pytest.fixture
@@ -219,13 +230,56 @@ def test_the_train_changes_only_bookings_and_slots_of_the_pre_train_tables_and_o
     changed = {table for table, columns in pre_train_shape.items() if head[table] != columns}
     assert changed == TRAIN_TOUCHED
     for table, columns in pre_train_shape.items():
-        old = {name: (kind, notnull) for name, kind, notnull, _ in columns}
+        old = {name: (kind, notnull, default) for name, kind, notnull, default in columns}
         now = {name: (kind, notnull, default) for name, kind, notnull, default in head[table]}
-        for name, (kind, notnull) in old.items():
-            assert now[name][:2] == (kind, notnull), f"{table}.{name} changed"
+        for name, before in old.items():
+            assert now[name] == before, f"{table}.{name} changed"
         for name in now.keys() - old.keys():
             _, notnull, default = now[name]
             assert not notnull or default is not None, f"{table}.{name} needs a value"
+
+
+def _indexes(path: Path, tables: set[str]) -> dict[str, str]:
+    """Return the SQL of every index on ``tables``, by name."""
+    with closing(sqlite3.connect(path)) as database:
+        return {
+            name: str(sql)
+            for name, table, sql in database.execute(
+                "SELECT name, tbl_name, sql FROM sqlite_master WHERE type = 'index'"
+                " AND sql IS NOT NULL"
+            )
+            if table in tables
+        }
+
+
+def test_no_index_or_constraint_of_a_pre_train_table_becomes_stricter(
+    alembic_config: Config,
+    pre_train: Path,
+    pre_train_shape: dict[str, list[tuple[str, str, int, object]]],
+) -> None:
+    tables = set(pre_train_shape)
+    before = _indexes(pre_train, tables)
+    with closing(sqlite3.connect(pre_train)) as database:
+        definitions = dict(
+            database.execute("SELECT name, sql FROM sqlite_master WHERE type = 'table'")
+        )
+
+    command.upgrade(alembic_config, "head")
+
+    after = _indexes(pre_train, tables)
+    changed = {name for name in before if after.get(name) != before[name]}
+    added_unique = {name for name in after.keys() - before.keys() if "UNIQUE" in after[name]}
+    # The legacy key gains "AND capacity_pool_id IS NULL", which every pre-train row and every
+    # row the previous image writes meets: exactly as strict for it. The pool key holds only
+    # rows with a pool, which the previous image never writes.
+    assert changed == {"uq_slots_group_start_scheduled"}
+    assert after["uq_slots_group_start_scheduled"].endswith("AND capacity_pool_id IS NULL")
+    assert added_unique == {"uq_slots_pool"}
+    assert after["uq_slots_pool"].endswith("WHERE capacity_pool_id IS NOT NULL")
+    with closing(sqlite3.connect(pre_train)) as database:
+        now = dict(database.execute("SELECT name, sql FROM sqlite_master WHERE type = 'table'"))
+    for table in tables - {"bookings", "slots"}:
+        assert now[table] == definitions[table], table  # checks and keys untouched
 
 
 def test_the_previous_image_writes_and_the_current_code_reads_and_claims_it(
@@ -264,8 +318,17 @@ def test_the_previous_image_writes_and_the_current_code_reads_and_claims_it(
 
 
 @pytest.fixture
-def at_head_with_gated_records(alembic_config: Config, pre_train: Path) -> Path:
-    """Return the database at head holding a pool slot, which only the gated pool path writes."""
+def at_head_with_gated_records(
+    alembic_config: Config,
+    pre_train: Path,
+    pre_train_shape: dict[str, list[tuple[str, str, int, object]]],
+) -> Path:
+    """Return the database at head holding records only the gated paths write.
+
+    A pool slot (0111 refuses on it) and a request with started work but no personal data
+    (0113 and 0114 pass it, so a downgrade that was not one transaction would drop it before
+    0111 refuses). ``pre_train_shape`` is taken first, while the database is still at 0108.
+    """
     command.upgrade(alembic_config, "head")
     with closing(sqlite3.connect(pre_train)) as database:
         group, organisation = database.execute(
@@ -282,29 +345,36 @@ def at_head_with_gated_records(alembic_config: Config, pre_train: Path) -> Path:
             " '2030-02-02 08:30:00.000000', 1, 'scheduled', ?, '2030-02-02 08:35:00.000000')",
             (group, pool),
         )
+        flow, revision_ = database.execute(
+            "SELECT id, current_revision FROM service_flows WHERE group_id = ? LIMIT 1", (group,)
+        ).fetchone()
+        request = database.execute(
+            "INSERT INTO service_requests (organisation_id, group_id, flow_id, flow_revision,"
+            " intake, handling, created_at, watchdog_at) VALUES (?, ?, ?, ?, 'on_demand',"
+            " 'in_progress', '2030-02-02 08:00:00.000000', '2030-02-03 08:00:00.000000')",
+            (organisation, group, flow, revision_),
+        ).lastrowid
+        database.execute(
+            "INSERT INTO work_items (request_id, state, assigned_at)"
+            " VALUES (?, 'in_progress', '2030-02-02 08:01:00.000000')",
+            (request,),
+        )
         database.commit()
     return pre_train
 
 
-def test_a_refused_downgrade_stops_at_the_refusing_step_keeps_what_it_guards_and_goes_up_again(
-    alembic_config: Config,
-    at_head_with_gated_records: Path,
-    pre_train_shape: dict[str, list[tuple[str, str, int, object]]],
+def test_a_refused_downgrade_leaves_the_database_at_head_with_every_row(
+    alembic_config: Config, at_head_with_gated_records: Path
 ) -> None:
     path = at_head_with_gated_records
-    pre_train_rows = snapshot(path, pre_train_shape)
-    pool_slots = "SELECT COUNT(*) FROM slots WHERE capacity_pool_id IS NOT NULL"
+    head = revision(path)
+    rows = snapshot(path, schema(path))
 
-    # 0115 to 0112 go down first. SQLite runs their schema changes outside the migration's
-    # transaction, so they stay done when 0111 refuses: the database stops at 0111, not at head
-    # (the runbook's rollback section; the image swap without a downgrade is the normal path).
+    # 0115 to 0112 go down first, 0111 then refuses: the whole run is rolled back.
     with pytest.raises(RuntimeError, match="pool slots exist"):
         command.downgrade(alembic_config, PRE_TRAIN)
 
-    assert revision(path) == "0111"
+    assert revision(path) == head
+    assert snapshot(path, schema(path)) == rows
     with closing(sqlite3.connect(path)) as database:
-        assert database.execute(pool_slots).fetchone() == (1,)
-    command.upgrade(alembic_config, "head")
-    assert snapshot(path, pre_train_shape) == pre_train_rows
-    with closing(sqlite3.connect(path)) as database:
-        assert database.execute(pool_slots).fetchone() == (1,)
+        assert database.execute("SELECT COUNT(*) FROM work_items").fetchone() == (1,)

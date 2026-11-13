@@ -24,10 +24,9 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission
-from app.admin.forms import redirect_done
 from app.admin.group_routes import group_page
 from app.admin.pages import Locale, SameOrigin
-from app.admin.queue_routes import or_list
+from app.admin.queue_routes import or_done, or_list
 from app.admin.request_queue_views import claimed_view, queue
 from app.domain.authorization import Permission
 from app.domain.request_queue import ClaimedRequest
@@ -58,19 +57,6 @@ async def _opened(
     if isinstance(claimed, HTMLResponse):
         return claimed
     return RedirectResponse(f"{_url(slug)}/requests/{claimed.request.id}", status_code=303)
-
-
-async def _finished(
-    request: Request,
-    locale: RequestLocale,
-    context: AdminContext,
-    slug: str,
-    attempt: Awaitable[None],
-    done: str,
-) -> Response:
-    """Go back to the queue with ``done``, or with the reason it did not work."""
-    result = await or_list(request, locale, context, slug, attempt)
-    return result if isinstance(result, HTMLResponse) else redirect_done(_url(slug), done)
 
 
 @router.post("/groups/{slug}/queue/requests/next", response_class=HTMLResponse)
@@ -119,7 +105,7 @@ async def complete(
 ) -> Response:
     """Complete a request: its unit of the pool is released."""
     attempt = queue(request).complete(context.principal, slug, request_id)
-    return await _finished(request, locale, context, slug, attempt, "completed")
+    return await or_done(request, locale, context, slug, attempt, "completed")
 
 
 @router.post("/groups/{slug}/queue/requests/{request_id}/release", response_class=HTMLResponse)
@@ -128,4 +114,4 @@ async def release(
 ) -> Response:
     """Put a claimed request back in the line; its unit of the pool is released."""
     attempt = queue(request).release(context.principal, slug, request_id)
-    return await _finished(request, locale, context, slug, attempt, "released")
+    return await or_done(request, locale, context, slug, attempt, "released")

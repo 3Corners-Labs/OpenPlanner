@@ -2159,13 +2159,10 @@ request, so:
    pool's waiting limit, and an upgrade gives each service its legacy pool and flows back, not
    what an administrator configured. It refuses, naming the reason, while a pool slot (0111), a
    request-level record holding personal data (0113), a contact-center attempt (0114) or an
-   immediate request (0115) exists. A refusal stops at that migration with the ones above it
-   already undone (SQLite runs schema statements outside the migration's transaction): the
-   database is then at that revision, which no image runs. Recover with
-   `docker compose run --rm web alembic upgrade head` with the *new* image (nothing a refusal
-   guards is lost), start the new image, and either stay there or wait until the retention rules
-   have deleted what the refusal named. Check the revision with
-   `docker compose run --rm web alembic current`.
+   immediate request (0115) exists. The whole downgrade is one transaction: after a refusal
+   the database is still at head with every row, and the new image starts as before. Check the
+   revision with `docker compose run --rm web alembic current`; either stay on the new image or
+   wait until the retention rules have deleted what the refusal named.
 
 ## Backup and restore
 

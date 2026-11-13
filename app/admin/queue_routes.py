@@ -333,7 +333,7 @@ async def _claimed(
     return RedirectResponse(f"{_url(slug)}/{claimed.booking_id}", status_code=303)
 
 
-async def _done(
+async def or_done(
     request: Request,
     locale: RequestLocale,
     context: AdminContext,
@@ -511,7 +511,7 @@ async def release(
 ) -> Response:
     """Put a claimed booking back in the queue."""
     attempt = _service(request).release(context.principal, slug, booking_id)
-    return await _done(request, locale, context, slug, attempt, "released")
+    return await or_done(request, locale, context, slug, attempt, "released")
 
 
 @router.post("/groups/{slug}/queue/{booking_id}/start", response_class=HTMLResponse)
@@ -529,7 +529,7 @@ async def complete(
 ) -> Response:
     """Complete request work: its unit of the pool is released (ADR 0121 step 5)."""
     attempt = _service(request).complete(context.principal, slug, booking_id)
-    return await _done(request, locale, context, slug, attempt, "completed")
+    return await or_done(request, locale, context, slug, attempt, "completed")
 
 
 @router.post("/groups/{slug}/queue/{booking_id}/check-in", response_class=HTMLResponse)
@@ -538,4 +538,4 @@ async def check_in(
 ) -> Response:
     """Check an appointment in: the participant has arrived (ADR 0121 step 7, choice I1)."""
     attempt = _service(request).check_in(context.principal, slug, booking_id)
-    return await _done(request, locale, context, slug, attempt, "checked_in")
+    return await or_done(request, locale, context, slug, attempt, "checked_in")

@@ -249,11 +249,13 @@ def _schemas(node: object) -> Iterator[dict[str, object]]:
 async def test_no_api_v1_schema_requires_a_flow(site: httpx.AsyncClient) -> None:
     # ADR 0121 step 8: the flow is additive in /api/v1, so a client from before flows still works.
     spec = (await site.get("/openapi.json")).json()
+    # What a client sends: parameters and request bodies (a new response field breaks no client).
     used = [
-        operation
+        {key: operation[key] for key in ("parameters", "requestBody") if key in operation}
         for path, item in spec["paths"].items()
         if path.startswith("/api/v1/")
         for operation in item.values()
+        if isinstance(operation, dict)
     ]
     components = spec.get("components", {}).get("schemas", {})
     fragments: list[object] = list(used)

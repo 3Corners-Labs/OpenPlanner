@@ -34,8 +34,8 @@ the PR that did it.
 | G08 | The full demonstration fixture: a video flow and an in-person flow on one shared pool, with a third independent flow; G06, G07 and G09 run on it | 0121/10 | yes | build | follow-up |
 | G09 | Every row of the acceptance matrix A01 to A36 (`docs/service-flows-handover.md`) names its test, green with the gate opened in the test | 0121/34 | yes | build | open |
 | G10 | The product owner's decision to open the gate, after G01 to G09 | step 8 | yes | po | open |
-| G11 | A downgrade that is refused part way leaves the database at the refusing step (SQLite runs schema statements outside the migration's transaction); make the run atomic or add a preflight that reports every refusal before any step runs. The runbook covers the procedure meanwhile | 0121/35 | no | build | open |
-| G12 | Diff the generated OpenAPI document against a stored copy (CLAUDE.md asks for it); today one test holds that `/api/v1` requires no `flow` | 0121/36 | no | build | open |
+| G11 | A downgrade refused part way stopped between revisions (Alembic committed every SQLite migration on its own); the migration run is now one transaction (`transactional_ddl=True` in `migrations/env.py`) | step 8 | no | build | done (#786) |
+| G12 | Diff the generated OpenAPI document against a stored copy (CLAUDE.md asks for it); today one test holds that `/api/v1` requires no `flow` | 0121/35 | no | build | open |
 | G13 | The watchdog ends the task at the platform when it expires or cancels a contact-center attempt | 0121/27 | cc | build | follow-up |
 | G14 | The own queue shows work the contact center holds as held, not as open | 0121/28 | cc | build | follow-up |
 | G15 | See on the test host that Webex Contact Center's task events carry the origin, so a late task is matched | 0121/29 | cc | operator | follow-up |
