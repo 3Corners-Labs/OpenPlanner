@@ -534,6 +534,9 @@ class Settings(BaseSettings):
     rate_limit_reads: str = "60/minute"
     # Links that match no booking, per IP address and path-independent (ADR 0011, 0042 §7).
     rate_limit_unknown_links: str = "20/hour"
+    # Inbound webhooks (ADR 0124 point 5, class C): calls a minute per platform, organisation and
+    # source address. The off switch stays RATE_LIMIT_ENABLED.
+    rate_limit_webhook_per_minute: int = Field(default=600, ge=60, le=6000)
 
     # ADR 0035: how many host websites one organisation may allow for the widget. Class C.
     embedding_max_origins: int = Field(default=20, ge=1, le=100)

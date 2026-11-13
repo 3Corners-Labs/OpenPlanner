@@ -12,18 +12,18 @@ The attributes are stored as one JSON object of strings (``group_contact_center.
 import json
 from collections.abc import Mapping
 
-from app.adapters.webhooks import WXCC_INBOUND, InboundWebhook
+from app.adapters.webhooks import WXCC_INBOUND, ContactCenterWebhook
 from app.adapters.wxcc import DESCRIPTOR as WEBEX_CC
 from app.domain.contact_center import ContactCenterKind, ContactCenterRouting, ProviderDescriptor
 
 DESCRIPTORS: Mapping[ContactCenterKind, ProviderDescriptor] = {WEBEX_CC.kind: WEBEX_CC}
 """Every platform OpenPlanner has an adapter for, by kind."""
 
-INBOUND: Mapping[ContactCenterKind, InboundWebhook] = {WXCC_INBOUND.kind: WXCC_INBOUND}
+INBOUND: Mapping[ContactCenterKind, ContactCenterWebhook] = {WXCC_INBOUND.kind: WXCC_INBOUND}
 """How each platform's webhooks are checked and read (ADR 0032 point 6), by kind."""
 
 
-def inbound(kind: str) -> InboundWebhook | None:
+def inbound(kind: str) -> ContactCenterWebhook | None:
     """Return the webhook handling of the platform named ``kind``; ``None`` for any other text.
 
     ``kind`` comes from the URL, so an unknown or malformed value is an answer, not an error.

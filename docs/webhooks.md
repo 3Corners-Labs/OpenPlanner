@@ -236,6 +236,66 @@ Each is sent once signed with the configured secret (expected `204`) and once wi
 wrong key (expected `401`). The ids match no meeting or task, so the endpoint acknowledges
 them as unknown: nothing is recorded and no dedup key is stored.
 
+## The gate every inbound webhook passes (ADR 0124)
+
+Every route under `/webhooks/` depends on one gate, `app/web/webhook_gate.py` (the rules are in
+`app/domain/inbound_gate.py`); a route declares which address it is and gets a verified, parsed
+event, or the call is refused before the route runs. A test walks the application's routes and
+fails for a `/webhooks/` route without the gate. The checks run in this order, cheapest first,
+and the first that fails refuses:
+
+| Step | Check | Refusal reason | Answer |
+|---|---|---|---|
+| 1 | The address exists: the platform has an adapter, the organisation exists and is connected to it, a secret is set | `unknown_address` | 404 |
+| 2 | `Content-Type`, when the call sends one, is `application/json` or `application/cloudevents+json` (parameters such as `charset` ignored). A call **without** the header passes: the signature decides | `content_type` | 415 |
+| 3 | The body is at most 64 KiB: a declared `Content-Length` over it refuses unread, and a body without a length (chunked) is cut off as soon as more than 64 KiB has arrived | `too_large` | 413 |
+| 4 | The signature over the raw body, in constant time | `invalid_signature` | 401 |
+| 5 | The signed time, where the platform signs one (WxCC), is within 300 seconds | `stale` | 401 |
+| 6 | The body is a JSON object | `malformed` | 400 |
+| 7 | The limits (below) | `rate` | 429 with `Retry-After` |
+| 8 | The event was not seen before (the domain's event key, see below); a replay is acknowledged | | 204 |
+
+The limits come after the checks, so a call that cannot sign never uses up the budget of the
+authentic ones. Both buckets have the value of `rate_limit_webhook_per_minute` (class C, default
+600, 60 to 6000) and the key platform, organisation (or `-` for an address of the installation)
+and the caller's address as the server derived it; a forwarded header changes nothing:
+
+- A call refused at steps 2 to 6 counts against the bucket of **refused** calls. While it has room
+  the call gets its own reason; once it is used up the call gets `rate` instead.
+- A call that passed steps 2 to 6 counts against the bucket of **verified** calls and is refused
+  with `rate` only when that one is used up (the supplier itself sending too much). The refused
+  bucket never touches a verified call: someone who can make the supplier's shared sending address
+  call an organisation's address with a bad signature cannot lock its authentic deliveries out.
+
+`Retry-After` is the window of the limit (60 seconds for a per-minute limit).
+
+Calls to an address that does not exist have a bucket of their own: per caller address only (the
+platform and organisation in the path come from the caller, so they never make a key), with the
+value of `rate_limit_webhook_per_minute`. The gate always resolves the address first. Only when it
+does not exist does the bucket count: up to the limit the answer is a 404 (`unknown_address`),
+over it a 429 (`rate`, source `unknown`). So the bucket caps how many refusal events a prober
+can start, and it never touches a call to an address that exists: a customer of the same supplier
+cannot fill it from the shared address to lock real organisations out. Accepted remainder: a
+call to a made-up address still costs one indexed lookup, with no ceiling in the application; the
+proxy's connection limits are the ceiling.
+
+`rate` and `unknown_address` write no log line per call (a flood produces them by definition); their
+trace is the security event, held back when repeated. Every other reason also logs
+`webhook.rejected` once per call.
+
+Every refusal answers with an **empty body**, never the HTML error page. Reasons that later steps
+of ADR 0124 produce (`network`, `source_unknown`) are already in the closed list, and the two
+source-network checks will sit before step 2. Step 6 runs before step 8 in the code, because the
+event key comes from the parsed body.
+
+Every refusal is also a security event `webhook.rejected` (ADR 0034, 0053) with the reason, the
+platform's code (`source:webex`, `source:wxcc`, or `source:unknown` when the platform in the path
+has no adapter) and, at an organisation's own address, `organisation:<slug>`. The slug is public
+and no personal data; it is written only for an organisation that exists, so a slug made up by a
+caller never becomes a value. The caller is the pseudonym of ADR 0053; no body, header value,
+signature or address is stored. A flood is one event per reason, address and caller per window.
+`docs/audit-events.md` and `docs/logging.md` list the event.
+
 ## Inbound: Webex webhooks (`POST /webhooks/webex`)
 
 Registered org-owned for `meetings` (`started`, `ended`) and `meetingParticipants` (`joined`,
@@ -295,9 +355,14 @@ agent's host role comes from `allowAnyUserToBeCoHost` (ADR 0017). `task:failed` 
 admins on the booking's timeline.
 
 Deduplication and last event (ADR 0082 point 5): every verified WxCC event of a booking's task is
-keyed by a SHA-256 digest of its type, `data.taskId` and the CloudEvent `id` (without an `id`:
-the event's own time), stored in `webhook_events` for 30 days like the Webex keys. A redelivered
-or replayed event is acknowledged with 204, logged with outcome `duplicate` and changes nothing.
+keyed by a SHA-256 digest of its type, `data.taskId` and the CloudEvent `id`, stored in
+`webhook_events` for 30 days like the Webex keys. A redelivered or replayed event is acknowledged
+with 204, logged with outcome `duplicate` and changes nothing. An event **without** an `id` has
+no key and is not recognised as a replay: it is recorded every time it arrives (a time field
+could be the task's own and would hide a real second event, such as a second `task:connected`
+after a transfer). Within 300 seconds of its signed time a replayed body without an `id` is
+therefore recorded twice; a key from the hash of the verified body is planned (ADR 0124 point 7,
+step 3).
 Every verified webhook of either platform is noted as that platform's last inbound event (time,
 type, outcome), shown on **Koppelingen** and *System status*.
 
