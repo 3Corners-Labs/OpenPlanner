@@ -254,6 +254,7 @@ def update_service(
         channel=channel,
         auto_apply=lambda: current().update_auto_apply,
         interval=lambda: timedelta(minutes=current().update_check_minutes),
+        stalled_after=lambda: timedelta(minutes=current().update_stalled_minutes),
         line=lambda: current().update_line,
         window=window,
         production=settings.environment == "prod",
