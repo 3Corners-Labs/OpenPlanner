@@ -17,7 +17,7 @@ from datetime import date, datetime, timedelta
 
 from app.domain.agenda import ShortfallAcceptance, agenda_day
 from app.domain.availability import utc_bounds
-from app.domain.booking import BookingKind, BookingStatus
+from app.domain.booking import BookingStatus
 from app.domain.closure import Closure
 from app.domain.holiday_service import effective_schedule
 from app.domain.ports import Clock, Transaction, UnitOfWork
@@ -136,7 +136,7 @@ class _Staffing:
 
         A pool slot has none here: its supply is the pool's, not the service's agenda.
         """
-        if slot.kind is not BookingKind.SCHEDULED or slot.pooled:
+        if not slot.counts_capacity:
             return None
         day = slot.start.astimezone(group.tz).date()
         if group.id not in self._closures:

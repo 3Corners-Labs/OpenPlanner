@@ -234,10 +234,12 @@ def test_a_pool_booking_is_completed_only_by_the_operators_explicit_evidence() -
 def test_a_pool_booking_nobody_claimed_or_started_was_not_picked_up() -> None:
     open_ = _booking()
     picked = replace(_booking(), claimed=True)
+    started = replace(_booking(), work_started=True)
     cancelled = _booking(BookingStatus.CANCELLED)
 
-    facts = _facts(_pool_slot(open_, picked, cancelled))
+    facts = _facts(_pool_slot(open_, picked, started, cancelled))
 
     assert [f.kind for f in facts] == [FactKind.CALL_NOT_PICKED_UP]
     assert facts[0].bucket_hour == START
     assert not pool_not_picked_up(picked)
+    assert not pool_not_picked_up(started)

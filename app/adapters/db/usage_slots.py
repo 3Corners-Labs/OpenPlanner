@@ -79,8 +79,8 @@ class UsageSlotQueries:
     async def _bookings_of(self, slot_ids: list[int]) -> dict[int, list[ClosedBooking]]:
         """Return the closing view of every booking in ``slot_ids``, by slot.
 
-        A booking was picked up when it was claimed in the own queue or its request has work
-        that started (a contact-center attempt that connected, among others).
+        Besides the own queue's claim, whether work of the booking's request started (a
+        contact-center attempt that connected, among others); the domain decides what counts.
         """
         found: dict[int, list[ClosedBooking]] = {}
         if not slot_ids:
@@ -117,8 +117,9 @@ class UsageSlotQueries:
                     locale,
                     created_at,
                     start,
-                    claimed is not None or bool(began),
+                    claimed is not None,
                     call_status_of(call) if call is not None else new_status(booking_id),
+                    bool(began),
                 )
             )
         return found

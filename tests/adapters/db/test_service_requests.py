@@ -452,4 +452,5 @@ async def test_started_work_makes_its_pool_booking_picked_up_when_the_slot_close
 
     (slot,) = ended.slots
     assert slot.pool_id == flow.pool_id
-    assert [b.claimed for b in slot.bookings] == [True, False]
+    assert [b.work_started for b in slot.bookings] == [True, False]
+    assert not any(b.claimed for b in slot.bookings)

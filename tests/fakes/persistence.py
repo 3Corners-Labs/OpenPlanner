@@ -1174,8 +1174,9 @@ class InMemoryTransaction(ServiceRequestStore):
                         b.locale,
                         b.created_at,
                         b.start,
-                        b.claim is not None or self._work_started(b.id or 0),
+                        b.claim is not None,
                         self.state.call_status.get(b.id or 0) or new_status(b.id or 0),
+                        self._work_started(b.id or 0),
                     )
                     for b in sorted(self.state.bookings.values(), key=lambda b: b.id or 0)
                     if b.slot_id == s.id
