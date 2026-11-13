@@ -356,14 +356,21 @@ What constrains the answer:
     on the channel in their profile, and their recent sessions were actually logged in to it. It
     extends the chain check that exists for work items, and, like it, never creates work a staff
     member sees.
-18. **Five conditions before a production group uses it.** Cisco's written answer on which
+18. **Six conditions before a production group uses it.** Cisco's written answer on which
     licence covers the published package and whether a page may leave the Webex name out; Cisco's
     answer on the licence and cost of guests; the DPIA updated for point 16. Until then
     `embedded_call_enabled` stays off on production installations (*Settings*). The licence
     exception for the package is recorded in `docs/dependencies.md` with that answer. Two more:
     the contact center's retention and deletion of conversation transcripts is known and in the
     DPIA before chat is switched on; and the manual accessibility pass of step 8 is done before
-    a service hides the supplier's app (point 11, open decision O8). The switch can be locked
+    a service hides the supplier's app (point 11, open decision O8). And a sixth (product owner,
+    2026-11-14): a guest's token can do more than join. On the lab tenant a guest wrote to an
+    account whose address it knew, and the message arrived
+    (`docs/research/call-page-on-the-meetings-sdk.md`, section 16); our server can neither
+    withdraw a token nor narrow what it may do. So before a production group uses the page,
+    either the supplier gives a way to deny messaging to these guests (a narrower token, or a
+    policy of the organisation) and the lab check shows it holds, or the organisation accepts
+    the risk in writing. The switch can be locked
     off from the environment like every platform setting (ADR 0042), and switching it on is an
     audited change.
 19. **Not in this decision.** The staff side: the staff member opens the meeting from the task as
@@ -423,7 +430,7 @@ the pseudonym key, which is the existing bootstrap key material, not a new secre
 | 7d | The chain check of point 17 in the portal for the conversation task | | planned |
 | 8 | The end-to-end gates with the test double; the manual accessibility pass in `docs/a11y-audit.md` | | planned |
 | 9 | Phones: iOS Safari and Android Chrome verified on a host with a public certificate, then no longer sent to the redirect (point 11) | | planned |
-| 10 | `docs/architecture.md`; the five conditions of point 18 recorded | | planned |
+| 10 | `docs/architecture.md`; the six conditions of point 18 recorded | | planned |
 | 11 | The staff member's video inside the agent desktop (point 19): a decision of its own | | follow-up |
 | 12 | `join_client` and the task kind on the flow revision, with the first video flow of ADR 0121 | | planned |
 
