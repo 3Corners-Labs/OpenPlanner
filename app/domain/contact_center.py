@@ -292,6 +292,9 @@ class OrganisationConnection:
         allowed_networks: The networks the platform's webhooks may come from (ADR 0124 point 3),
             canonical CIDR; empty: the installation's default applies; or unreadable (a stored
             list that cannot be read, never taken for an empty one). Not secret.
+        inbound_enabled: Whether the address accepts events (ADR 0124 point 9); off: a verified
+            event is dropped and the platform still gets its 204. A record without the field
+            reads as on.
     """
 
     kind: ContactCenterKind
@@ -301,6 +304,7 @@ class OrganisationConnection:
     has_refresh_token: bool
     webhook_secret_at: datetime | None
     allowed_networks: NetworkList = NetworkList()
+    inbound_enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -312,7 +316,9 @@ class ConnectionChange:
     (``allowed_networks_text``, an ``InitVar`` as the route has the text): ``__post_init__`` parses
     it once, with the rule of ``app.domain.source_networks``, into ``allowed_networks``, the tuple
     that everything after it uses. An empty text clears the list, so the installation's default
-    applies again. A tuple given directly is checked by the same rule.
+    applies again. A tuple given directly is checked by the same rule. The pause (ADR 0124
+    point 9) is not part of this form: it is its own action
+    (``ContactCenterConnectionService.set_inbound``).
 
     Raises:
         DomainError: ``invalid_configuration`` naming the refused field.

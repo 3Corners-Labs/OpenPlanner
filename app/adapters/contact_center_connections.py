@@ -6,7 +6,9 @@ the API host, the client id and the three secrets: client secret, refresh token 
 webhook secret this module generates, and the networks the platform's webhooks may come from
 (``allowed_networks``, not secret, ADR 0124 point 3; a record without the field reads as an
 empty list, so records made before it keep working; a field that cannot be read reads as an
-unreadable list, never as an empty one). Nothing of it is readable in the portal:
+unreadable list, never as an empty one) and whether the address handles its events
+(``inbound_enabled``, the pause of ADR 0124 point 9; a record without the field reads as on, and
+only a stored ``False`` pauses). Nothing of it is readable in the portal:
 ``get`` returns ``OrganisationConnection``, which says only whether a secret is set.
 ``webhook_secret`` is for the webhook route only, outside the domain.
 """
@@ -88,6 +90,7 @@ class SealedConnections:
             has_refresh_token=bool(record.get("refresh_token")),
             webhook_secret_at=datetime.fromisoformat(rotated) if isinstance(rotated, str) else None,
             allowed_networks=networks,
+            inbound_enabled=record.get("inbound_enabled") is not False,
         )
 
     async def save(self, organisation_id: int, change: ConnectionChange, now: datetime) -> None:
@@ -117,6 +120,18 @@ class SealedConnections:
         if moved or not record.get("webhook_secret"):
             # Another tenant (host or client): the old tenant's subscription must stop verifying.
             record |= {"webhook_secret": new_webhook_secret(), "webhook_secret_at": now.isoformat()}
+        await self._store.put(contact_center_credential_name(organisation_id), record, now)
+
+    async def set_inbound_enabled(self, organisation_id: int, enabled: bool, now: datetime) -> None:
+        """Pause or resume the address (ADR 0124 point 9): that one field, nothing else.
+
+        Nothing happens for an organisation whose record went away in the meantime, as for
+        ``rotate_webhook_secret``.
+        """
+        record = await self._record(organisation_id)
+        if record is None:
+            return
+        record["inbound_enabled"] = enabled
         await self._store.put(contact_center_credential_name(organisation_id), record, now)
 
     async def rotate_webhook_secret(self, organisation_id: int, now: datetime) -> None:

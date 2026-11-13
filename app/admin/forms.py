@@ -85,6 +85,8 @@ DONE_MESSAGES: dict[str, str] = {
     "idp_disabled": "admin.done.idp_disabled",
     "idp_key_rotated": "admin.done.idp_key_rotated",
     "webhook_secret_rotated": "admin.done.webhook_secret_rotated",
+    "contact_center_paused": "admin.done.contact_center_paused",
+    "contact_center_resumed": "admin.done.contact_center_resumed",
     "contact_center_refused": "admin.done.contact_center_refused",
     "contact_center_registered": "admin.done.contact_center_registered",
     "contact_center_saved_not_ready": "admin.done.contact_center_saved_not_ready",
