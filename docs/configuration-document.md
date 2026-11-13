@@ -106,6 +106,9 @@ subject (`subjects`); no id appears anywhere, and neither does `published_by` (a
   `staffing_overrides` replaces that list as a whole, and an empty list clears it. Changing
   them needs `capacity.manage` on the organisation, like the rest of the pool. Items are listed
   in one order (weekday and time, or date), so the same staffing is the same document.
+- **A counted pool's waiting limit** (ADR 0121 step 7): `max_waiting`, how many people without an
+  appointment may wait for the pool at once, 1 to 1000, or null for no limit. A document that
+  does not name it leaves it as it is.
 - **Revisions are history.** An export carries every revision with `published_at` (empty for the
   draft). A document never changes or removes a stored published revision
   (`configuration_revision_published`); a draft may be replaced, and a `replace` document never

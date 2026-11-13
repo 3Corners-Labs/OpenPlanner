@@ -140,6 +140,7 @@ def on_demand() -> ServiceRequest:
         handling=HandlingState.QUEUED,
         created_at=NOW,
         watchdog_at=watchdog_deadline(NOW, 24),
+        pool_id=7,
     )
 
 

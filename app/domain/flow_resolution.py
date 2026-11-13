@@ -91,11 +91,11 @@ def pool_flows_bookable(mode: IntakeMode) -> bool:
     """Return whether any flow on a counted pool may take a new booking on the path ``mode`` now.
 
     The one reader of the rollback gate ``ROLLBACK_SAFE`` on the booking paths (ADR 0122 step 5),
-    read when called: only appointments (on-demand intake on a pool is ADR 0121 step 7), and only
-    while the gate is open. ``False`` lets a caller skip reading flows at all. Moving a booking
-    that already sits on a pool does not ask: it stays on its pool (``pool_booking.Placements``).
+    read when called: appointments and, since ADR 0121 step 7, immediate intake, only while the
+    gate is open. ``False`` lets a caller skip reading flows at all. Moving a booking that
+    already sits on a pool does not ask: it stays on its pool (``pool_booking.Placements``).
     """
-    return mode is IntakeMode.APPOINTMENT and bool(service_flows.ROLLBACK_SAFE)
+    return mode in IntakeMode and bool(service_flows.ROLLBACK_SAFE)
 
 
 def gate_allows(flow: ServiceFlow, mode: IntakeMode) -> bool:

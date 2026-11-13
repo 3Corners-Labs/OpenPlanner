@@ -1993,6 +1993,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=168,
     ),
     S(
+        "on_demand_admission_lookahead_minutes",
+        K.INT,
+        120,
+        _D,
+        T.PLANNER,
+        "Minutes ahead within which a start must fit before someone without an appointment is "
+        "taken into the line of a pool; read at every intake (ADR 0121 step 7).",
+        minimum=15,
+        maximum=480,
+    ),
+    S(
         "planner_changes_alert_per_hour",
         K.INT,
         50,

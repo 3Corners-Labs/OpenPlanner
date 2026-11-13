@@ -202,6 +202,7 @@ class State:
     skill_grants: dict[tuple[int, int], tuple[int | None, datetime]] = field(default_factory=dict)
     pools: dict[int, CapacityPool] = field(default_factory=dict)
     pool_timezones: dict[int, str] = field(default_factory=dict)
+    pool_max_waiting: dict[int, int] = field(default_factory=dict)
     pool_rules: dict[int, tuple[int, ScheduleRule]] = field(default_factory=dict)
     pool_overrides: dict[int, tuple[int, ScheduleOverride]] = field(default_factory=dict)
     flows: dict[int, ServiceFlow] = field(default_factory=dict)

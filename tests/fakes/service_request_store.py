@@ -7,6 +7,7 @@ the updates are conditional on the state read, as in SQL.
 the fake's ``State`` (``requests``, ``work_items``, ``request_data``).
 """
 
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime
 
@@ -34,10 +35,10 @@ class ServiceRequestStore(PoolStaffingStore):
         self, pool_id: int, lower: datetime, upper: datetime
     ) -> list[Commitment]:
         held = await super().get_pool_commitments(pool_id, lower, upper)
-        started = [i for i in self.state.work_items.values() if i.started_at is not None]
-        for item in sorted(started, key=lambda i: (i.started_at, i.id)):
+        occupying = [i for i in self.state.work_items.values() if i.pool_id == pool_id]
+        for item in sorted(occupying, key=lambda i: (i.started_at or i.assigned_at, i.id)):
             request = self.state.requests[item.request_id]
-            found = item.commitment(request.key) if item.pool_id == pool_id else None
+            found = item.commitment(request.key)
             if found is not None and found.start < upper:
                 held.append(found)
         return held
@@ -116,6 +117,10 @@ class ServiceRequestStore(PoolStaffingStore):
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, "data")
         if request.booking_id is not None and await self.get_request_of_booking(request.booking_id):
             raise ValueError("UNIQUE constraint failed: service_requests.booking_id")
+        if request.intake_key_hash is not None and await self.get_request_by_intake_key(
+            request.group_id, request.intake_key_hash
+        ):
+            raise ValueError("UNIQUE constraint failed: service_requests.intake_key_hash")
         stored = replace(
             request,
             id=self._new_id(),
@@ -142,8 +147,45 @@ class ServiceRequestStore(PoolStaffingStore):
             handling=request.handling,
             resolved_at=request.resolved_at,
             watchdog_at=request.watchdog_at,
+            arrived_at=request.arrived_at,
         )
         return True
+
+    async def get_request_by_ref(self, public_ref: str) -> ServiceRequest | None:
+        return next((r for r in self.state.requests.values() if r.public_ref == public_ref), None)
+
+    async def get_request_by_intake_key(
+        self, group_id: int, intake_key_hash: str
+    ) -> ServiceRequest | None:
+        return next(
+            (
+                r
+                for r in self.state.requests.values()
+                if r.group_id == group_id and r.intake_key_hash == intake_key_hash
+            ),
+            None,
+        )
+
+    async def set_request_access(self, request_id: int, access_hash: str) -> bool:
+        stored = self.state.requests.get(request_id)
+        if stored is None or stored.access_hash is None:
+            return False
+        self.state.requests[request_id] = replace(stored, access_hash=access_hash)
+        return True
+
+    async def waiting_immediate(self, pool_id: int) -> list[ServiceRequest]:
+        waiting = (HandlingState.QUEUED, HandlingState.ASSIGNED)
+        return self._immediate(lambda r: r.pool_id == pool_id and r.handling in waiting)
+
+    async def open_immediate(self, group_id: int) -> list[ServiceRequest]:
+        return self._immediate(lambda r: r.group_id == group_id and not r.terminal)
+
+    def _immediate(self, keep: Callable[[ServiceRequest], bool]) -> list[ServiceRequest]:
+        """Return the immediate requests ``keep`` accepts, oldest first."""
+        return sorted(
+            (r for r in self.state.requests.values() if r.immediate and keep(r)),
+            key=lambda r: (r.created_at, r.id or 0),
+        )
 
     async def update_work_item(self, item: WorkItem, seen: WorkItemState) -> bool:
         stored = self.state.work_items.get(item.id or 0)
@@ -165,8 +207,14 @@ class ServiceRequestStore(PoolStaffingStore):
             i.request_id == request_id and i.assigned_to for i in self.state.work_items.values()
         )
         self._forget_agents(request_id)
+        stored = self.state.requests.get(request_id)
+        hashed = stored is not None and (stored.access_hash or stored.intake_key_hash)
+        if stored is not None and hashed:
+            self.state.requests[request_id] = replace(
+                stored, access_hash=None, intake_key_hash=None
+            )
         if self.state.request_data.pop(request_id, None) is None:
-            return named
+            return named or bool(hashed)
         self.state.requests[request_id] = replace(
             self.state.requests[request_id],
             personal_data=PersonalDataState.DELETED,

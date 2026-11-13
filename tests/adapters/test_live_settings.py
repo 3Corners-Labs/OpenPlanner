@@ -183,6 +183,7 @@ async def test_the_organisation_states_show_the_source() -> None:
         "treatment_buffer_minutes",
         "assignment_start_lease_minutes",
         "request_unresolved_hours",
+        "on_demand_admission_lookahead_minutes",
         "planner_rebook_days",
         "planner_rebook_reminder_days",
         "reschedule_proposal_confirm_hours",

@@ -183,3 +183,22 @@ def check_pool_archive(flow_codes: Collection[str]) -> None:
     """
     if flow_codes:
         raise DomainError(ErrorCode.CONFIGURATION_OBJECT_IN_USE, "capacity_pool")
+
+
+MAX_WAITING = 1000
+"""Largest waiting limit of a pool (``capacity_pools.max_waiting``, ADR 0121 step 7): a typo
+guard like ``MAX_CAPACITY``, not a tuning value."""
+
+
+def check_max_waiting(limit: int | None) -> int | None:
+    """Return a pool's waiting limit after checking it: ``None`` (no limit) or 1 to 1000.
+
+    How many immediate requests may wait for the pool at once; configuration of one pool, not a
+    setting (ADR 0122 *Settings*).
+
+    Raises:
+        DomainError: ``invalid_configuration`` (field ``max_waiting``) outside the bounds.
+    """
+    if limit is not None and not 1 <= limit <= MAX_WAITING:
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "max_waiting")
+    return limit

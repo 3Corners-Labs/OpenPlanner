@@ -6417,6 +6417,9 @@ msgstr "Time to start work that was picked up (minutes)"
 msgid "settings.field.request_unresolved_hours.label"
 msgstr "Latest handling time of a request after its appointment (hours)"
 
+msgid "settings.field.on_demand_admission_lookahead_minutes.label"
+msgstr "How far ahead someone without an appointment must be able to be helped (minutes)"
+
 msgid "settings.field.planner_changes_alert_per_hour.label"
 msgstr "Alert above changes per planner per hour"
 
@@ -13492,3 +13495,12 @@ msgstr "This work has started. Complete it instead of handing it back."
 
 msgid "error.request_not_started"
 msgstr "This work has not started yet. Start it first, or hand it back."
+
+msgid "error.on_demand_full"
+msgstr "So many people are waiting now that we cannot add you to the line. Please try again later or make an appointment."
+
+msgid "error.on_demand_unavailable"
+msgstr "We cannot help you without an appointment in the coming time. Please try again later or make an appointment."
+
+msgid "error.not_checked_in"
+msgstr "This appointment has not been checked in yet. Check the participant in first."

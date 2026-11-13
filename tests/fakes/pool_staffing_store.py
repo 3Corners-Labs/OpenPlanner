@@ -4,7 +4,8 @@ A mixin of ``InMemoryTransaction`` on top of the skills, pools and flows store. 
 the rules (overlaps, subjects) are ``app.domain.pool_staffing.check_pool_staffing``, which the
 use case calls. Scope and the "counted pools only" rule are what the SQL adapter does too, pinned
 by ``tests/adapters/db/test_pool_staffing.py``, which runs the same cases on both. Its data lives
-in the fake's ``State`` (``pool_timezones``, ``pool_rules``, ``pool_overrides``).
+in the fake's ``State`` (``pool_timezones``, ``pool_max_waiting``, ``pool_rules``,
+``pool_overrides``).
 """
 
 from dataclasses import replace
@@ -12,7 +13,7 @@ from datetime import date, datetime
 
 from app.domain.authorization import Scope
 from app.domain.booking import Slot
-from app.domain.capacity import PoolMode
+from app.domain.capacity import PoolMode, check_max_waiting
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.pool_accounting import MAX_SPAN, Commitment
 from app.domain.pool_staffing import PoolStaffing, check_timezone, zone_or_none
@@ -59,6 +60,19 @@ class PoolStaffingStore(ServiceFlowStore):
             self.state.pool_timezones.pop(pool_id, None)
         else:
             self.state.pool_timezones[pool_id] = timezone
+        return True
+
+    async def get_pool_max_waiting(self, pool_id: int) -> int | None:
+        return self.state.pool_max_waiting.get(pool_id)
+
+    async def set_pool_max_waiting(self, scope: Scope, pool_id: int, limit: int | None) -> bool:
+        check_max_waiting(limit)
+        if not await self._counted(scope, pool_id):
+            return False
+        if limit is None:
+            self.state.pool_max_waiting.pop(pool_id, None)
+        else:
+            self.state.pool_max_waiting[pool_id] = limit
         return True
 
     async def add_pool_rule(self, scope: Scope, pool_id: int, rule: ScheduleRule) -> int | None:

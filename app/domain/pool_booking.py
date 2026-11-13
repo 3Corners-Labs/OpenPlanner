@@ -57,6 +57,8 @@ from app.domain.flow_resolver import resolve_flow
 from app.domain.holidays import closures
 from app.domain.pool_accounting import (
     AdmissionOutcome,
+    Commitment,
+    CommitmentKey,
     StartCheck,
     admit_appointment,
     check_start,
@@ -124,6 +126,15 @@ class LegacyPlacement:
     ) -> Slot:
         """Reserve a place in the service's own slot at ``start``."""
         return await self.reserve_slot(tx, group, start, routing)
+
+
+@dataclass(frozen=True)
+class OnDemandScene:
+    """A pool loaded for immediate work: its supply, its commitments and the wrap-up now."""
+
+    supply: Supply
+    commitments: list[Commitment]
+    buffer_minutes: int
 
 
 @dataclass(frozen=True)
@@ -314,6 +325,72 @@ class PoolBookings:
             buffer,
             intake=Intake.APPOINTMENT,
             own_key=("booking", booking_id),
+        )
+
+    def wrap_up(self, organisation_id: int) -> int:
+        """Return the organisation's wrap-up in minutes now (``treatment_buffer_minutes``)."""
+        return value_for(self._treatment_buffer, organisation_id)
+
+    async def on_demand_scene(
+        self,
+        tx: Transaction,
+        group: Group,
+        target: PoolTarget,
+        lower: datetime,
+        upper: datetime,
+        *,
+        archived: bool = False,
+    ) -> OnDemandScene | None:
+        """Load what immediate work on the pool needs for starts from ``lower`` to ``upper``.
+
+        The supply and the commitments reach one request's length plus wrap-up past ``upper``,
+        so a start at ``upper`` is judged over its whole interval (ADR 0121 step 7). ``None``
+        when the pool offers nothing (as ``reserve``); ``archived`` lets an archived pool serve
+        work it already took in.
+        """
+        loaded = await self._load(tx, group, target, lower, upper, archived=archived)
+        if loaded is None:
+            return None
+        reach = upper + loaded.step(target)
+        return OnDemandScene(
+            loaded.supply(lower, reach),
+            await tx.get_pool_commitments(loaded.id, lower, reach),
+            loaded.buffer_minutes,
+        )
+
+    async def check_on_demand_start(
+        self,
+        tx: Transaction,
+        group: Group,
+        target: PoolTarget,
+        now: datetime,
+        *,
+        buffer_minutes: int,
+        own: CommitmentKey | None = None,
+    ) -> StartCheck:
+        """Judge whether immediate work may take a unit of its pool now (ADR 0122 decision 10).
+
+        Run inside ``locked()``, at the claim and again at the start (A35), over ``now`` to
+        ``now`` plus the target's length plus ``buffer_minutes`` (the wrap-up fixed at the
+        claim). ``own`` is the work's own commitment (the unit its claim acquired), left out so
+        it does not block itself. Immediate work never starts with a conflict: no unit free over
+        the whole interval is a refusal (P8 is for appointments only).
+
+        Raises:
+            DomainError: ``start_refused`` when the pool offers nothing.
+        """
+        until = interval_end(now, target.duration_minutes, buffer_minutes)
+        scene = await self.on_demand_scene(tx, group, target, now, until, archived=True)
+        if scene is None:
+            raise DomainError(ErrorCode.START_REFUSED)
+        others = [c for c in scene.commitments if c.key != own]
+        return check_start(
+            scene.supply,
+            others,
+            now,
+            target.duration_minutes,
+            buffer_minutes,
+            intake=Intake.ON_DEMAND,
         )
 
     async def _load(

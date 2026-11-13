@@ -148,6 +148,9 @@ SETTING_LABELS: dict[str, str] = {
     "treatment_buffer_minutes": "settings.field.treatment_buffer_minutes.label",
     "assignment_start_lease_minutes": "settings.field.assignment_start_lease_minutes.label",
     "request_unresolved_hours": "settings.field.request_unresolved_hours.label",
+    "on_demand_admission_lookahead_minutes": (
+        "settings.field.on_demand_admission_lookahead_minutes.label"
+    ),
     "planner_changes_alert_per_hour": "settings.field.planner_changes_alert_per_hour.label",
     "contact_reveals_alert_per_hour": "settings.field.contact_reveals_alert_per_hour.label",
     "planner_rebook_days": "settings.field.planner_rebook_days.label",

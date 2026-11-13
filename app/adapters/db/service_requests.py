@@ -8,13 +8,17 @@ write lock of ``locked()`` all the same. The partial unique index ``uq_work_item
 one active work item per request whatever a caller does.
 
 ``open_occupations`` is the part of ``get_pool_commitments`` that the work items add: a started
-work item that has not ended holds one unit of its pool, keyed like the booking's hold.
+work item that has not ended holds one unit of its pool, keyed like the booking's hold, and so
+does claimed immediate work from its claim on (ADR 0121 step 7). The immediate-work queries
+(``get_request_by_ref``, ``waiting_immediate``, ...) carry no scope either: the participant's
+page authorises by its cookie, the staff use cases by the service they authorised.
 """
 
 from datetime import datetime
 
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import ColumnElement
 
 from app.adapters.db.form_fields import answers_from_json, answers_json
 from app.adapters.db.models import (
@@ -28,7 +32,7 @@ from app.adapters.db.models import (
 from app.domain.booking import BookingStatus
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.flow_resolution import FlowRef
-from app.domain.pool_accounting import Commitment
+from app.domain.pool_accounting import Commitment, CommitmentKey
 from app.domain.service_flows import IntakeMode
 from app.domain.service_requests import (
     ACTIVE_ITEM,
@@ -47,6 +51,11 @@ from app.domain.service_requests import (
 _ACTIVE = sorted(state.value for state in ACTIVE_ITEM)
 """The stored values of an active work item; ``models.ACTIVE_WORK_ITEM`` is the index's twin
 (a test keeps the two equal)."""
+
+_WAITING = sorted(state.value for state in (HandlingState.QUEUED, HandlingState.ASSIGNED))
+"""The handling states of the line ``max_waiting`` bounds (ADR 0121 step 7)."""
+
+_TERMINAL = sorted(state.value for state in TERMINAL)
 
 _WATCHED = sorted(
     state.value
@@ -71,6 +80,12 @@ def request_of(row: ServiceRequestRow) -> ServiceRequest:
         resolved_at=row.resolved_at,
         personal_data=PersonalDataState(row.personal_data),
         data_deleted_at=row.data_deleted_at,
+        pool_id=row.pool_id,
+        subject=row.subject,
+        arrived_at=row.arrived_at,
+        public_ref=row.public_ref,
+        access_hash=row.access_hash,
+        intake_key_hash=row.intake_key_hash,
     )
 
 
@@ -116,33 +131,42 @@ async def open_occupations(
     Bounded by the open work items of one pool (``ix_work_items_pool_open``), not by ``lower``:
     an occupation past its planned end is an overrun and lasts until it ends.
     """
-    found = await session.execute(
-        select(
-            ServiceRequestRow.id,
-            ServiceRequestRow.booking_id,
-            WorkItemRow.started_at,
-            WorkItemRow.planned_until,
-        )
-        .join(ServiceRequestRow, ServiceRequestRow.id == WorkItemRow.request_id)
+    found = await session.scalars(
+        select(WorkItemRow)
         .where(
             WorkItemRow.pool_id == pool_id,
             WorkItemRow.ended_at.is_(None),
-            WorkItemRow.started_at.is_not(None),
             WorkItemRow.planned_until.is_not(None),
-            WorkItemRow.started_at < upper,
+            or_(
+                WorkItemRow.started_at < upper,
+                and_(
+                    WorkItemRow.started_at.is_(None),
+                    WorkItemRow.state == WorkItemState.ASSIGNED.value,
+                    WorkItemRow.assigned_at < upper,
+                ),
+            ),
         )
-        .order_by(WorkItemRow.started_at, WorkItemRow.id)
+        .order_by(func.coalesce(WorkItemRow.started_at, WorkItemRow.assigned_at), WorkItemRow.id)
     )
-    return [
-        Commitment(
-            ("booking", booking_id) if booking_id is not None else ("request", request_id),
-            started,
-            until,
-            in_progress=True,
+    items = list(found)
+    keys = await _keys(session, {item.request_id for item in items})
+    held = (item_of(item).commitment(keys[item.request_id]) for item in items)
+    return [commitment for commitment in held if commitment is not None]
+
+
+async def _keys(session: AsyncSession, request_ids: set[int]) -> dict[int, CommitmentKey]:
+    """Return the commitment key of each request: its booking's, or its own without one."""
+    if not request_ids:
+        return {}
+    rows = await session.execute(
+        select(ServiceRequestRow.id, ServiceRequestRow.booking_id).where(
+            ServiceRequestRow.id.in_(request_ids)
         )
-        for request_id, booking_id, started, until in found
-        if started is not None and until is not None and started < until
-    ]
+    )
+    return {
+        request_id: ("booking", booking_id) if booking_id is not None else ("request", request_id)
+        for request_id, booking_id in rows
+    }
 
 
 class ServiceRequestQueries:
@@ -282,6 +306,12 @@ class ServiceRequestQueries:
             resolved_at=request.resolved_at,
             personal_data=state.value,
             data_deleted_at=request.data_deleted_at,
+            pool_id=request.pool_id,
+            subject=request.subject,
+            arrived_at=request.arrived_at,
+            public_ref=request.public_ref,
+            access_hash=request.access_hash,
+            intake_key_hash=request.intake_key_hash,
         )
         self._session.add(row)
         await self._session.flush()
@@ -315,9 +345,61 @@ class ServiceRequestQueries:
                 handling=request.handling.value,
                 resolved_at=request.resolved_at,
                 watchdog_at=request.watchdog_at,
+                arrived_at=request.arrived_at,
             )
         )
         return bool(getattr(result, "rowcount", 0))
+
+    async def get_request_by_ref(self, public_ref: str) -> ServiceRequest | None:
+        """Return the immediate request with this public reference, or ``None``."""
+        row = await self._session.scalar(
+            select(ServiceRequestRow).where(ServiceRequestRow.public_ref == public_ref)
+        )
+        return request_of(row) if row is not None else None
+
+    async def get_request_by_intake_key(
+        self, group_id: int, intake_key_hash: str
+    ) -> ServiceRequest | None:
+        """Return the service's immediate request made with this intake key, or ``None``."""
+        row = await self._session.scalar(
+            select(ServiceRequestRow).where(
+                ServiceRequestRow.group_id == group_id,
+                ServiceRequestRow.intake_key_hash == intake_key_hash,
+            )
+        )
+        return request_of(row) if row is not None else None
+
+    async def set_request_access(self, request_id: int, access_hash: str) -> bool:
+        """Replace the cookie's hash while the request still has one (not after deletion)."""
+        result = await self._session.execute(
+            update(ServiceRequestRow)
+            .where(ServiceRequestRow.id == request_id, ServiceRequestRow.access_hash.is_not(None))
+            .values(access_hash=access_hash)
+        )
+        return bool(getattr(result, "rowcount", 0))
+
+    async def waiting_immediate(self, pool_id: int) -> list[ServiceRequest]:
+        """Return the pool's queued and assigned immediate requests, oldest first."""
+        return await self._immediate(
+            ServiceRequestRow.pool_id == pool_id,
+            ServiceRequestRow.handling.in_(_WAITING),
+        )
+
+    async def open_immediate(self, group_id: int) -> list[ServiceRequest]:
+        """Return the service's immediate requests that are not finished, oldest first."""
+        return await self._immediate(
+            ServiceRequestRow.group_id == group_id,
+            ServiceRequestRow.handling.not_in(_TERMINAL),
+        )
+
+    async def _immediate(self, *where: ColumnElement[bool]) -> list[ServiceRequest]:
+        """Return the immediate requests matching ``where``, oldest first."""
+        rows = await self._session.scalars(
+            select(ServiceRequestRow)
+            .where(ServiceRequestRow.intake == IntakeMode.ON_DEMAND.value, *where)
+            .order_by(ServiceRequestRow.created_at, ServiceRequestRow.id)
+        )
+        return [request_of(row) for row in rows]
 
     async def update_work_item(self, item: WorkItem, seen: WorkItemState) -> bool:
         """Write the work item if its stored state is still ``seen``."""
@@ -356,6 +438,17 @@ class ServiceRequestQueries:
         result = await self._session.execute(
             delete(RequestPersonalDataRow).where(RequestPersonalDataRow.request_id == request_id)
         )
+        access = await self._session.execute(
+            update(ServiceRequestRow)
+            .where(
+                ServiceRequestRow.id == request_id,
+                or_(
+                    ServiceRequestRow.access_hash.is_not(None),
+                    ServiceRequestRow.intake_key_hash.is_not(None),
+                ),
+            )
+            .values(access_hash=None, intake_key_hash=None)
+        )
         if getattr(result, "rowcount", 0):
             await self._session.execute(
                 update(ServiceRequestRow)
@@ -363,4 +456,4 @@ class ServiceRequestQueries:
                 .values(personal_data=PersonalDataState.DELETED.value, data_deleted_at=now)
             )
             return True
-        return bool(getattr(agents, "rowcount", 0))
+        return bool(getattr(agents, "rowcount", 0) or getattr(access, "rowcount", 0))

@@ -521,6 +521,9 @@ class BookingService:
         The booking records the flow it is made under (ADR 0121 step 3a): the default flow of
         the on-demand path, or the active flow with the code ``flow`` that offers it.
 
+        A flow on a counted pool is not a direct call: it is immediate intake
+        (``ImmediateRequests``, ADR 0121 step 7) and is refused here.
+
         Raises:
             DomainError: ``group_not_found``, ``flow_not_available``, ``invalid_contact``,
                 ``direct_call_unavailable`` (no staffed block offers direct calls now,
@@ -530,6 +533,9 @@ class BookingService:
         async with self._uow.locked() as tx:
             group = await self._group(tx, group_slug)
             resolved = await resolve_flow(tx, group.id, IntakeMode.ON_DEMAND, flow)
+            if resolved is not None and not resolved.legacy:
+                # A flow on a pool takes immediate work, never a direct call (ADR 0121 step 7).
+                raise DomainError(ErrorCode.FLOW_NOT_AVAILABLE, "flow")
             now = self._clock.now()
             routing = _routing(group, contact)
             subject = routing.subject if routing else None
