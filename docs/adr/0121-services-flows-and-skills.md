@@ -66,7 +66,7 @@ None in step 1: it changes labels only. The later steps add the following, each 
 | 7b | P7, pages: the participant's immediate form and request page (`/g/{slug}/direct` when the on-demand flow is on a pool, `/r/{ref}`, the cookie `op_req`), immediate work and the check-in on the queue page (`app/admin/request_queue_routes.py`), `max_waiting` on the pool's staffing page, follow-up 5d, threat model and data flow | #781 | merged |
 | 8 | P8: the compatibility matrix of every pre-train behaviour against the train's changes, the upgrade and rollback proof over migrations 0109 to 0115 on pre-train data (`tests/test_upgrade_train.py`), a migration run as one transaction (`transactional_ddl=True`, so a refused downgrade leaves the database at head), the checklist of the rollback gate (`docs/service-flows-compatibility.md`, `docs/service-flows-gate-checklist.md`, held to the code by `tests/test_service_flows_compatibility.py`), runbook, threat model, data flow and architecture; the older queue routes answer refusals through `or_list`. `ROLLBACK_SAFE` stays `False` | #786 | merged |
 | 9 | Manual topics in `docs/manual/{nl,en}` say *Dienst / Service* (at the next major release, product owner 2026-11-10) | | follow-up |
-| 10 | The full demonstration fixture: a video flow and an in-person flow on one shared pool, with a third independent flow | | follow-up |
+| 10 | The full demonstration fixture: a video flow and an in-person flow on one shared pool, with a third independent flow. Built: `app/adapters/db/demonstration.py` (`seed_demonstration`, through the port, on SQL and the fake) with the in-person flow on the shared pool of two units and the document review on its own pool; the video flow joins with row 36 | #819 | merged |
 | 11 | Internal names follow the vocabulary (`Group` to `ServiceOffering` in code, URLs, permissions), by expand/contract | | follow-up |
 | 12 | Skills and pools delegated below the organisation admin (per service or per pool) | | follow-up |
 | 13 | Named staff allocations with interval exclusivity, so one person is never counted in two pools | | follow-up |
@@ -90,8 +90,9 @@ None in step 1: it changes labels only. The later steps add the following, each 
 | 31 | The participant checks in, or is told it is their turn, by themselves: a kiosk or own device with proof of presence, and an email or SMS when called (brief of step 7, choices I1 and I4) | | follow-up |
 | 32 | The participant's immediate pages and the claimed request's page in `e2e/pages.json` (axe, Lighthouse, keyboard), once an active pool flow can be seeded on the e2e stack (`ROLLBACK_SAFE` open) | | follow-up |
 | 33 | The upgrade matrix with released images: the v0.6.0 fixture and image, and a mode of `scripts/upgrade-matrix.sh` that writes the gated records with the new image, starts the previous image on that database without a downgrade, and books and claims there (point 9, A30; checklist G07) | | follow-up |
-| 34 | Every row of the acceptance matrix A01 to A36 names its test, green with the gate opened in the test (checklist G09) | | follow-up |
+| 34 | Every row of the acceptance matrix A01 to A36 names its test, green with the gate opened in the test (checklist G09). Built: section 4 of `docs/service-flows-compatibility.md`, held by `tests/test_service_flows_compatibility.py`; new tests for A24 and A25 | #819 | merged |
 | 35 | The generated OpenAPI document diffed against a stored copy (checklist G12) | | follow-up |
+| 36 | Video for a new flow: `BUILT_KINDS` gains `video` (a meeting per pool booking, readiness by media presence), so the video flow of the demonstration fixture (*Samen bespreken*) can be stored and activated (found by step 10) | | follow-up |
 
 ## Consequences
 
