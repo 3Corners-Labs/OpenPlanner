@@ -369,7 +369,6 @@ def create_app(
                 app.state.security_log,
                 request_log,
                 probe_timeout=lambda: timedelta(seconds=live().integration_probe_timeout_seconds),
-                embedded_call_enabled=lambda: live().embedded_call_enabled,
             )
             app.state.integrations = wired
             app.state.call_service = CallService(

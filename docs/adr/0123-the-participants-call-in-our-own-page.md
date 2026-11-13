@@ -76,6 +76,19 @@ What constrains the answer:
    manifest of ADR 0118 §6, so Renovate and `make pins` track it and the SBOM lists it. It is
    exempt from the 30 KB and 100 KB budgets and has its own gate: a test fails when the file
    grows past 1.2 MB gzipped, so growth is a decision. No other SDK file, no CDN, no build step.
+   Until Cisco's written answer on the licence (point 18) the file is not committed and is in no
+   published image: the manifest names its version and checksum, the gates run against the test
+   double of step 8, and an installation that tries the page (the lab host) places the file
+   itself. The bundle carries its own dependencies, which a scanner of our packages does not
+   see; the weekly freshness check therefore also fails when the published package has an
+   advisory for the vendored version.
+   *One origin, weighed.* The call page runs the supplier's script on the origin that also
+   serves the participant's own pages. A separate origin for the call page was weighed and not
+   chosen now: every installation would need a second host name and certificate, and what the
+   script can reach on ours is this participant's own booking, behind the session they already
+   hold; it cannot reach the portal, for which a participant's browser has no session. The
+   script tag carries the manifest's checksum (subresource integrity), the page holds no secret
+   but the guest token, and a staff page never loads the SDK on the portal's origin (point 19).
 4. **Headers, for this route only.** The call page is served with a named policy `CALL_CSP`:
    `SCRIPT_CSP` plus `connect-src` for `https://*.wbx2.com`, `wss://*.wbx2.com`,
    `https://*.webex.com`, `wss://*.webex.com` and `https://*.ciscospark.com`; and with
@@ -83,10 +96,14 @@ What constrains the answer:
    point 10) for our own origin. Not added:
    `unsafe-eval`, `unsafe-inline`, `wasm-unsafe-eval`, `worker-src blob:`, `*.webexcontent.com` or
    any script, style, font or image origin. `COEP`, `COOP` and every other header stay. A test
-   asserts that no other route carries either change.
+   asserts that no other route carries either change. The route keeps
+   `form-action 'self'`, `base-uri 'none'` and `frame-ancestors 'none'`, names `worker-src` and
+   `media-src` explicitly, and the same test asserts that its policy holds no `unsafe-` token.
 5. **Cisco is contacted only after a click.** The page first renders, from the server, what the
-   join page shows today plus one button to start the call. The SDK file is requested and
-   initialised only after that click. No text on the page names the supplier (point 14); the
+   join page shows today plus one button to start. The device check of point 10 uses the
+   browser alone: no SDK file and no request to Cisco. The SDK file is requested and initialised
+   only after the click that joins, and next to that button the page says that the call is
+   carried by an external video service, with the link to the organisation's privacy statement. No text on the page names the supplier (point 14); the
    organisation's privacy statement does, and the page links to it.
    `no-third-parties.spec.ts` keeps failing on any other page and on this page before the click.
 6. **The guest token comes from our server, on that click.** `VideoProvider` gains
@@ -95,18 +112,32 @@ What constrains the answer:
    session (ADR 0093) and the form protection of every participant post, answers only for a
    confirmed booking inside the join window (the rule of `/join/go`), and is rate limited by the
    common limiter. The token is never stored, logged, put in a URL or in a job payload. The page
-   has no input field for a token, a password or a meeting.
+   has no input field for a token, a password or a meeting. The answer carries the token
+   and the meeting's guest link, never the host's, and neither is logged. Requests for a token
+   are limited per booking and per address (*Settings*). The token lives for hours and an
+   earlier one is not withdrawn by a new one; what a guest token can do in the organisation's
+   Webex beyond joining this meeting (looking up people, writing to staff, joining other
+   meetings) is established on the lab site before step 4 is built, and decides whether step 4
+   goes ahead as written. The name set at minting is a label, not an identity: staff see the
+   participant as a guest.
 7. **One guest per booking, with a pseudonym.** The subject is an HMAC of the booking under a
    server key, so a participant who reloads reuses their guest, nothing links two bookings, and
    the subject says nothing outside our database. The display name is the participant's first
    name, so the staff member sees who they are talking to; an organisation may choose its term
    for a participant instead (*Settings*): the catalogue's word for a participant in the
    organisation's language (ADR 0077). The first name is what the contact center already
-   receives (`CLAUDE.md`, privacy rules); the last name and every other field of the booking stay
+   receives; the privacy rules of `CLAUDE.md` now name this payload to the video platform too; the last name and every other field of the booking stay
    with us. When the booking's personal data is purged, the server mints once more for the same
    subject with the neutral term, so the guest identity that Cisco keeps no longer carries the
    name. Webex's own record of the meeting keeps the name it was held under, as it does today for
-   a name typed into Webex (ADR 0102).
+   a name typed into Webex (ADR 0102). Three things are settled with it. The rename at the purge is
+   tried on the lab site before step 4 relies on it; if a second minting does not change the
+   name, nothing is removed at the supplier and `docs/dataflow.md` says so. The purge of our own
+   data never waits for the supplier: the rename is a job of its own, with retries and a system
+   event when it gives up. The subject is not stored: it can be worked out again from the
+   booking and the key while the booking exists, and the key comes from the management token
+   key, so after that key is rotated the purge renames the guest under the current and under
+   the previous key (step 4).
 8. **Chat is required, and the meeting's own chat is closed to our page.** Cisco's chat service
    answers a browser from `web.webex.com` only, so the participant cannot read or write the
    meeting's chat from our origin. **Decided (product owner, 2026-11-13): the chat is a side bar
@@ -225,6 +256,16 @@ What constrains the answer:
    labelled text field, sending by button and by Enter, focus that stays in the field, no time
    limit. When the conversation is closed (the task ended, or a message was refused) the field
    makes way for a line that says so.
+   Chat is free text, which the booking form avoids (`CLAUDE.md`, delivery surface) and which
+   the contact center did not receive until now (privacy rules); this ADR amends both lines.
+   Before the first message the side bar asks the participant not to write identity numbers or
+   other sensitive details; there is no filter on what they write. Messages are limited in
+   number per minute as well as in length (*Settings*), so a participant cannot flood a staff
+   member's desktop. A delivery is matched to the booking that owns the task and to nothing
+   else, and a refusal never tells whether a booking exists (ADR 0124 point 12). Showing a staff
+   member's account name to a participant is the organisation's choice, and its staff are told;
+   the manual says so. The widget on a work item is not built before the question of how the
+   widget proves which task it may read has an answer.
    Meetings of a service that uses the call page are created with `enabledChat` off, with or
    without the conversation task, so staff do not write into a panel the participant cannot
    see; the manual says so. Lobby, cohost and every other option of ADR 0017 stay.
@@ -239,7 +280,7 @@ What constrains the answer:
       moves when they speak, and a button that plays a test sound; they choose camera, microphone
       and, where the browser allows it, speakers. A refused permission is explained in plain words
       with what to click in this browser. They may join with the camera or the microphone off.
-      Nothing is sent to Webex during the check.
+      Nothing is loaded from or sent to Webex during the check (point 5).
     - *Connecting.* A visible state and an automatic retry of registration and join (*Settings*);
       after the last attempt the page says so and offers what point 11 allows.
     - *Waiting for staff* (the lobby), with their own picture still shown.
@@ -295,8 +336,9 @@ What constrains the answer:
     registration is temporary. What cannot be switched off (contact from initialisation, the
     telemetry on the call's own hosts, a guest identity that Cisco keeps) is written in
     `docs/dataflow.md` and is input for the DPIA.
-17. **Reported early.** The service-app check and the group check (ADR 0065) get a finding for
-    the guest scopes: a group cannot be saved as `embedded` while the check has not minted a
+17. **Reported early.** The service-app check gets a finding for the guest scopes, once for
+    the installation (ADR 0065). From step 6 the group check repeats it for a group that uses the
+    call page, and such a group cannot be saved as `embedded` while the check has not minted a
     guest token. The check uses one fixed subject, so it creates one guest and no more. While
     `embedded_call_enabled` is off no check calls the guest endpoint: an installation that does
     not use the call page creates no guest at the supplier and sees no finding about it. The
@@ -312,11 +354,16 @@ What constrains the answer:
     on the channel in their profile, and their recent sessions were actually logged in to it. It
     extends the chain check that exists for work items, and, like it, never creates work a staff
     member sees.
-18. **Three conditions before a production group uses it.** Cisco's written answer on which
+18. **Five conditions before a production group uses it.** Cisco's written answer on which
     licence covers the published package and whether a page may leave the Webex name out; Cisco's
     answer on the licence and cost of guests; the DPIA updated for point 16. Until then
     `embedded_call_enabled` stays off on production installations (*Settings*). The licence
-    exception for the package is recorded in `docs/dependencies.md` with that answer.
+    exception for the package is recorded in `docs/dependencies.md` with that answer. Two more:
+    the contact center's retention and deletion of conversation transcripts is known and in the
+    DPIA before chat is switched on; and the manual accessibility pass of step 8 is done before
+    a service hides the supplier's app (point 11, open decision O8). The switch can be locked
+    off from the environment like every platform setting (ADR 0042), and switching it on is an
+    audited change.
 19. **Not in this decision.** The staff side: the staff member opens the meeting from the task as
     today, in the browser or in the supplier's app, outside the agent desktop. Whether the video
     should run inside the desktop, and whether the installed app may take over, is open (product
@@ -338,6 +385,8 @@ What constrains the answer:
 | `embedded_call_connect_attempts` | C platform | 3 | 1–5 | `settings.platform.manage` | Attempts before the page reports that it cannot connect |
 | `embedded_call_chat_poll_seconds` | C platform | 3 | 2–10 | `settings.platform.manage` | How often the call page asks our server for new chat messages. Registered in step 7c |
 | `embedded_call_chat_max_chars` | D organisation | 1000 | 200–4000 | `settings.organisation.manage` | Longest chat message a participant may send. Registered in step 7b |
+| `embedded_call_token_per_booking_per_hour` | C platform | 20 | 5–60 | `settings.platform.manage` | Guest tokens one booking may ask for in an hour; per address the common read limit applies. Registered in step 4 |
+| `embedded_call_chat_per_minute` | C platform | 20 | 5–60 | `settings.platform.manage` | Chat messages one participant may send in a minute. Registered in step 7b |
 
 Classes:
 
@@ -359,19 +408,19 @@ the pseudonym key, which is the existing bootstrap key material, not a new secre
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed; the lines of `CLAUDE.md` it amends; the row in `docs/adr-status.md`; the findings in `docs/research/call-page-on-the-meetings-sdk.md` | #787 | merged |
-| 1 | `VideoProvider.guest_access`, the Webex adapter's guest token call with its fake and contract fixture, the pseudonymous subject in the domain, the guest-scope finding in the service-app check and the group check; the five call settings of this ADR in the registry. No page, no participant sees a change | #787 | merged |
-| 2 | The call page as a kind of page: the vendored SDK with manifest, size gate and SBOM entry; `CALL_CSP` and the permissions for the one route with their tests (`render()` takes the kind of page); the recorded exception in `no-third-parties.spec.ts`; `docs/dependencies.md` | | planned |
+| 1 | `VideoProvider.guest_access`, the Webex adapter's guest token call with its fake and contract fixture, the pseudonymous subject in the domain, the guest-scope finding in the service-app check; the five call settings of this ADR in the registry. No page, no participant sees a change | #787 | merged |
+| 2 | The call page as a kind of page: the vendored SDK with manifest, size gate and SBOM entry; `CALL_CSP` and the permissions for the one route with their tests (`render()` takes the kind of page); the recorded exception in `no-third-parties.spec.ts`; `docs/dependencies.md`. The SDK file itself waits for the licence answer (point 3) | | planned |
 | 3 | Design: mock-ups of every state of point 10, the chat side bar included, in two organisations' themes, approved by the product owner (point 15) | | planned |
-| 4 | The way in: device check with camera, microphone and speaker test, the token endpoint with its abuse cases, connecting with retry, the lobby, the failure state with `embedded_call_webex_option`; behind `embedded_call_enabled` | | planned |
-| 5 | In the call: the control bar, device change, sharing a screen both ways, the recording and connection notices, closed captions (point 12), the ended and failed states | | planned |
-| 6 | `join_client = embedded` on the service's settings form with the checks of point 17, `call_client(service, flow)`, meetings without chat, the trial call on the same page, the configuration package, the manual topic | | planned |
+| 4 | The way in: device check with camera, microphone and speaker test, the token endpoint with its abuse cases, connecting with retry, the lobby, the failure state with `embedded_call_webex_option`; behind `embedded_call_enabled`. First, on the lab site: what a guest token can do, and the rename at the purge (points 6 and 7). With it: the rename job, `embedded_call_token_per_booking_per_hour`, the data flow, the threat model with its abuse cases, and the runbook entry for an SDK that stops working | | planned |
+| 5 | In the call: the control bar, device change, sharing a screen both ways, the recording and connection notices, closed captions (point 12), the ended and failed states; the data flow and threat model for the call | | planned |
+| 6 | `join_client = embedded` on the service's settings form with the checks of point 17 (the group check's guest finding for a group that uses the call page), `call_client(service, flow)`, meetings without chat, the trial call on the same page, the configuration package, the manual topic | | planned |
 | 7a | Chat, the contract: the task kind `conversation` in the channel-independent task contract and in the Webex Contact Center adapter (create, append), its capability, `contact_center.task_kind` on the service's routing, fake and recorded fixture | | planned |
-| 7b | Chat, inbound: the message deliveries and the task-message events through the gate of ADR 0124; `call_messages`, the privacy list and the purge; `embedded_call_chat_max_chars` | | planned |
+| 7b | Chat, inbound: the message deliveries and the task-message events through the gate of ADR 0124; `call_messages`, the privacy list and the purge; `embedded_call_chat_max_chars` and `embedded_call_chat_per_minute`; the data flow and the threat model for the chat | | planned |
 | 7c | Chat, the side bar on the call page: sending, polling, the staff member's name, the closed state; `embedded_call_chat_poll_seconds` | | planned |
 | 7d | The chain check of point 17 in the portal for the conversation task | | planned |
 | 8 | The end-to-end gates with the test double; the manual accessibility pass in `docs/a11y-audit.md` | | planned |
 | 9 | Phones: iOS Safari and Android Chrome verified on a host with a public certificate, then no longer sent to the redirect (point 11) | | planned |
-| 10 | `docs/dataflow.md`, `docs/threat-model.md`, `docs/architecture.md` and the runbook entry for an SDK that stops working; the three conditions of point 18 recorded | | planned |
+| 10 | `docs/architecture.md`; the five conditions of point 18 recorded | | planned |
 | 11 | The staff member's video inside the agent desktop (point 19): a decision of its own | | follow-up |
 | 12 | `join_client` and the task kind on the flow revision, with the first video flow of ADR 0121 | | planned |
 

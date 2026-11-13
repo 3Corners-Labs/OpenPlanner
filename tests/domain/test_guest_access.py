@@ -7,6 +7,7 @@ import pytest
 from app.domain.guest_access import (
     CHECK_SUBJECT,
     MAX_DISPLAY_NAME,
+    NEUTRAL_TERM,
     SUBJECT_PREFIX,
     DisplayNameMode,
     GuestAccess,
@@ -57,3 +58,18 @@ def test_the_token_never_appears_in_repr() -> None:
 
     assert "secret-token-value" not in repr(access)
     assert "secret-token-value" not in str(access)
+
+
+@pytest.mark.parametrize("mode", list(DisplayNameMode))
+def test_the_name_is_never_empty(mode: DisplayNameMode) -> None:
+    assert guest_display_name("", mode, "  \x00 ") == NEUTRAL_TERM
+    assert guest_display_name(None, mode, "") == NEUTRAL_TERM
+
+
+def test_the_registry_choices_come_from_the_enums() -> None:
+    from app.domain.guest_access import StaffNameMode
+    from app.domain.settings_registry import BY_KEY
+
+    assert BY_KEY["embedded_call_display_name"].choices == ("first_name", "term")
+    assert BY_KEY["embedded_call_staff_name"].choices == tuple(m.value for m in StaffNameMode)
+    assert [m.value for m in StaffNameMode] == ["name", "term"]

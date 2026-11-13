@@ -78,6 +78,14 @@ PARTICIPANT_LIMIT = "100"
 """Page size of the participant list; a group call has a handful of participants."""
 
 
+def guest_token_request(subject: str, display_name: str) -> dict[str, str]:
+    """Return the ``POST /guests/token`` body: the one place that builds it (ADR 0123).
+
+    Used by the adapter and by the service-app check's probe, so both send the same shape.
+    """
+    return {"subject": subject, "displayName": display_name}
+
+
 class WebexMeetings:
     """Creates, deletes and reports on meetings.
 
@@ -164,12 +172,15 @@ class WebexMeetings:
         response = await self._client.request(
             "POST",
             f"{self._base}/guests/token",
-            json={"subject": subject, "displayName": display_name},
+            json=guest_token_request(subject, display_name),
         )
-        data = response.json()
+        try:
+            data = response.json()
+        except ValueError:
+            raise IntegrationError("unexpected_response", retryable=False) from None
         token = data.get("accessToken") if isinstance(data, dict) else None
         lifetime = data.get("expiresIn") if isinstance(data, dict) else None
-        if not isinstance(token, str) or not token or not isinstance(lifetime, int):
+        if not isinstance(token, str) or not token or type(lifetime) is not int or lifetime <= 0:
             raise IntegrationError("unexpected_response", retryable=False)
         return GuestAccess(token, self._clock.now() + timedelta(seconds=lifetime))
 

@@ -26,6 +26,7 @@ from typing import Any
 import httpx
 
 from app.adapters.webex_auth import WebexTokens
+from app.adapters.webex_meetings import guest_token_request
 from app.domain.guest_access import CHECK_SUBJECT, NEUTRAL_TERM
 from app.domain.ports import Clock, IntegrationError
 
@@ -100,7 +101,7 @@ def probes(webex_base_url: str, wxcc_base_url: str | None, *, guest: bool = Fals
                 f"{webex}/guests/token",
                 "guest-issuer:read and guest-issuer:write (guest tokens for the call page, "
                 "ADR 0123)",
-                json={"subject": CHECK_SUBJECT, "displayName": NEUTRAL_TERM},
+                json=guest_token_request(CHECK_SUBJECT, NEUTRAL_TERM),
             )
         )
     if not wxcc_base_url:

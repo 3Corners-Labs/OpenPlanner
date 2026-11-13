@@ -434,7 +434,7 @@ class Settings(BaseSettings):
     # ADR 0093: how long a participant's browser keeps the right to use a booking after it last
     # did. At least 20 hours, so no form has a time limit in practice (WCAG 2.2.1). Class C.
     participant_link_session_hours: int = Field(default=24, ge=20, le=168)
-    # ADR 0123: the participant's call in our own page. The switch stays off until the three
+    # ADR 0123: the participant's call in our own page. The switch stays off until the
     # conditions of its point 18 are met; the connect values are how long and how often the page
     # tries before it says it cannot connect. Class C, platform.
     embedded_call_enabled: bool = False

@@ -13630,9 +13630,3 @@ msgstr "Participant's name shown to staff in the call (first name or own word)"
 
 msgid "settings.field.embedded_call_staff_name.label"
 msgstr "Staff member's name shown to the participant in the call (account name or own word)"
-
-msgid "admin.check.webex.guest_ok"
-msgstr "A guest token for the call in the organisation's own page was minted (the installation's one fixed check guest)."
-
-msgid "admin.check.webex.guest_refused"
-msgstr "Webex gave no guest token ({error}). The Service App probably lacks the scopes guest-issuer:read and guest-issuer:write; add them in the developer portal and authorise the app again in Control Hub. Until then no participant can join in the own page."

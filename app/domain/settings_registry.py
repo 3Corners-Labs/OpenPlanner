@@ -18,6 +18,7 @@ from enum import StrEnum
 import phonenumbers
 
 from app.domain.authorization import Permission
+from app.domain.guest_access import DisplayNameMode, StaffNameMode
 
 
 class SettingClass(StrEnum):
@@ -2335,20 +2336,20 @@ REGISTRY: tuple[SettingSpec, ...] = (
         K.ENUM,
         "first_name",
         _D,
-        T.PLANNER,
+        T.DISPLAY,
         "What staff see as the participant's name in the call page's meeting: the first name, "
         "or the organisation's word for a participant (ADR 0123).",
-        choices=("first_name", "term"),
+        choices=tuple(m.value for m in DisplayNameMode),
     ),
     S(
         "embedded_call_staff_name",
         K.ENUM,
         "name",
         _D,
-        T.PLANNER,
+        T.DISPLAY,
         "How the call page names the staff member to the participant: the name of their "
         "account, or the organisation's word for staff (ADR 0123).",
-        choices=("name", "term"),
+        choices=tuple(m.value for m in StaffNameMode),
     ),
 )
 """Every setting of the service, in the order of ``docs/settings.md``."""

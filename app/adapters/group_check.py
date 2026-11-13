@@ -2,10 +2,6 @@
 
 For one group it walks the chain a call depends on and turns every link into a ``Finding``:
 
-    guest     only while the embedded call is on (ADR 0123 point 17): one guest token is minted for
-              the fixed subject of the checks and proves the guest scopes of the Service App;
-              a refusal is a failure. The same subject every time, so one guest in all.
-              Switched off: no request, no finding
     webex     a probe meeting is scheduled for the host exactly as a booking would schedule
               one (same adapter, same body: licence, scope, host, time zone and options in one
               go) and deleted at once (ADR 0065); a refusal carries Webex's reason. For a group
@@ -58,7 +54,6 @@ from app.domain.calls import (
     probe_task,
 )
 from app.domain.checks import CheckArea, CheckStatus, Finding
-from app.domain.guest_access import CHECK_SUBJECT, NEUTRAL_TERM
 from app.domain.ports import (
     Clock,
     ContactCenterDispatcher,
@@ -135,8 +130,6 @@ class PlatformChecker:
         probes: Where the probe's webhook events arrive; ``None`` skips the probe work item.
         probe_timeout: How long to wait for the probe's events
             (``integration_probe_timeout_seconds``).
-        embedded_call_enabled: Whether the embedded call is on (``embedded_call_enabled``); a
-            guest token that cannot be minted is then a failure; off, it is not asked for.
         sleep: Waits between looks at the registry (tests pass one that does not wait).
     """
 
@@ -151,7 +144,6 @@ class PlatformChecker:
         dispatcher: ContactCenterDispatcher | None = None,
         probes: ProbeRegistry | None = None,
         probe_timeout: Callable[[], timedelta] = lambda: PROBE_TIMEOUT,
-        embedded_call_enabled: Callable[[], bool] = lambda: False,
         sleep: Sleep = asyncio.sleep,
     ) -> None:
         """Store the collaborators."""
@@ -164,7 +156,6 @@ class PlatformChecker:
         self._dispatcher = dispatcher
         self._probes = probes
         self._probe_timeout = probe_timeout
-        self._embedded_call_enabled = embedded_call_enabled
         self._sleep = sleep
 
     async def check_group(self, group: Group, peers: Sequence[Group]) -> list[Finding]:
@@ -172,27 +163,9 @@ class PlatformChecker:
         webex, link = await self._webex(group)
         return [
             *webex,
-            *await self._guest(),
             *await self._wxcc(group, peers, link),
             *await self._webhooks(group),
         ]
-
-    async def _guest(self) -> list[Finding]:
-        """Mint the one fixed guest of the checks and report whether the scopes work (ADR 0123).
-
-        Only while the embedded call is on; otherwise no request and no finding. The subject and
-        the name are fixed and carry no participant data, so every check reuses the same guest.
-        The token is dropped unread. A refusal is a failure.
-        """
-        if not self._embedded_call_enabled():
-            return []
-        video = WebexMeetings(self._client, self._config.webex_base_url, self._clock)
-        try:
-            await video.guest_access(CHECK_SUBJECT, NEUTRAL_TERM)
-        except IntegrationError as error:
-            params = (("error", error.code),)
-            return [Finding(CheckArea.WEBEX, "webex.guest_refused", CheckStatus.FAIL, params)]
-        return [Finding(CheckArea.WEBEX, "webex.guest_ok", CheckStatus.OK)]
 
     async def _webex(self, group: Group) -> tuple[list[Finding], str | None]:
         """Schedule a probe meeting for the group's host as a booking would, then delete it.

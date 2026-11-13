@@ -20,7 +20,6 @@ from app.adapters.webhook_registration import WEBEX_EVENTS
 from app.adapters.wxcc_config import parse_flow
 from app.domain.calls import EventKind
 from app.domain.checks import CheckArea, CheckStatus, Finding
-from app.domain.guest_access import CHECK_SUBJECT, NEUTRAL_TERM
 from app.domain.ports import IntegrationError
 from app.domain.scheduling import JoinClient
 from tests.fakes.clock import FixedClock
@@ -95,7 +94,6 @@ class Platforms:
 
     def __init__(self) -> None:
         self.host_status = 200
-        self.guest_status = 200
         self.delete_status = 204
         self.trial_status = 200
         self.trial_stored: dict[str, Any] = {}
@@ -115,10 +113,6 @@ class Platforms:
         url = str(request.url)
         if request.url.path.endswith("/access_token"):
             return httpx.Response(200, json={"access_token": "a", "expires_in": 3600})
-        if url == f"{WEBEX}/guests/token":
-            if self.guest_status != 200:
-                return httpx.Response(self.guest_status, json={"message": "Ada is refused."})
-            return httpx.Response(200, json={"accessToken": "made-up", "expiresIn": 64799})
         if url == f"{WEBEX}/meetings" and request.method == "POST":
             trial = json.loads(request.content).get("enabledJoinBeforeHost") is True
             status = self.trial_status if trial else self.host_status
@@ -735,48 +729,3 @@ async def test_a_probe_without_a_probe_meeting_carries_a_placeholder_link() -> N
     await checker.check_group(GROUP, [GROUP])
 
     assert dispatcher.items[0].meeting_link == "https://openplanner.invalid/probe"
-
-
-def _guest_bodies(platforms: Platforms) -> list[dict[str, Any]]:
-    return [json.loads(r.content) for r in platforms.requests if r.url.path == "/v1/guests/token"]
-
-
-def _checker_with_guest(platforms: Platforms, enabled: bool) -> PlatformChecker:
-    clock = FixedClock(NOW)
-    tokens, http = webex_client(platforms, clock)
-    return PlatformChecker(http, tokens, CONFIG, clock, embedded_call_enabled=lambda: enabled)
-
-
-@pytest.mark.usefixtures("wxcc_ok")
-async def test_with_the_embedded_call_off_no_guest_is_asked_for_and_no_finding_appears() -> None:
-    platforms = Platforms()
-
-    findings = await _checker_with_guest(platforms, False).check_group(GROUP, [GROUP])
-
-    assert not _guest_bodies(platforms)
-    assert not [f for f in findings if "guest" in f.code]
-
-
-@pytest.mark.usefixtures("wxcc_ok")
-async def test_with_the_embedded_call_on_the_one_fixed_guest_is_minted_on_every_run() -> None:
-    platforms = Platforms()
-    checker = _checker_with_guest(platforms, True)
-
-    for _ in range(2):
-        findings = await checker.check_group(GROUP, [GROUP])
-        assert _codes(findings)["webex.guest_ok"] is CheckStatus.OK
-
-    assert _guest_bodies(platforms) == [{"subject": CHECK_SUBJECT, "displayName": NEUTRAL_TERM}] * 2
-
-
-@pytest.mark.usefixtures("wxcc_ok")
-async def test_a_refused_guest_token_is_a_failure_when_the_embedded_call_is_on() -> None:
-    platforms = Platforms()
-    platforms.guest_status = 403
-
-    findings = await _checker_with_guest(platforms, True).check_group(GROUP, [GROUP])
-
-    guest = next(f for f in findings if f.code == "webex.guest_refused")
-    assert guest.status is CheckStatus.FAIL
-    assert guest.params == (("error", "rejected_403"),)
-    assert "Ada" not in str(guest)  # Webex's reason is neither asked for nor kept

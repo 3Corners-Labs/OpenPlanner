@@ -3,12 +3,13 @@
 import json
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import httpx
 import pytest
 from structlog.testing import capture_logs
 
-from app.adapters.webex_meetings import WebexMeetings
+from app.adapters.webex_meetings import WebexMeetings, guest_token_request
 from app.domain.booking import MeetingRef
 from app.domain.calls import CallState, MeetingRequest, MeetingStatus
 from app.domain.guest_access import GuestAccess
@@ -266,31 +267,53 @@ async def test_a_timestamp_without_zone_is_read_as_utc_not_as_local_time() -> No
     assert status.started_at == datetime(2026, 1, 5, 8, 0, 40, tzinfo=UTC)
 
 
-GUEST_TOKEN = {  # recorded shape of POST /v1/guests/token (token made up)
-    "accessToken": "made-up-guest-token-0123456789",
-    "expiresIn": 64799,
-}
+RECORDED_GUEST = json.loads(Path(__file__).with_name("webex_guest_token.json").read_text())
+"""The guest token exchange as recorded (the token is made up)."""
 
 
 async def test_a_guest_token_is_asked_for_a_subject_and_a_name() -> None:
     seen: list[httpx.Request] = []
+    recorded = RECORDED_GUEST["request"]
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
-        return httpx.Response(200, json=GUEST_TOKEN)
+        return httpx.Response(
+            RECORDED_GUEST["response"]["status"], json=RECORDED_GUEST["response"]["body"]
+        )
 
-    access = await _meetings(handler).guest_access("op1-abc", "Ada")
+    body = recorded["body"]
+    access = await _meetings(handler).guest_access(body["subject"], body["displayName"])
 
     assert access == GuestAccess("made-up-guest-token-0123456789", NOW + timedelta(seconds=64799))
     request = seen[0]
-    assert (request.method, request.url.path) == ("POST", "/v1/guests/token")
-    assert json.loads(request.content) == {"subject": "op1-abc", "displayName": "Ada"}
+    assert (request.method, request.url.path) == (recorded["method"], recorded["path"])
+    assert json.loads(request.content) == body
+    assert guest_token_request(body["subject"], body["displayName"]) == body
     assert request.headers["authorization"].startswith("Bearer ")
 
 
-@pytest.mark.parametrize("body", [{}, {"accessToken": "t"}, {"expiresIn": 5}, ["x"]])
+@pytest.mark.parametrize(
+    "body",
+    [
+        {},
+        {"accessToken": "t"},
+        {"expiresIn": 5},
+        ["x"],
+        {"accessToken": "t", "expiresIn": 0},
+        {"accessToken": "t", "expiresIn": -5},
+        {"accessToken": "t", "expiresIn": True},
+        {"accessToken": "t", "expiresIn": "64799"},
+    ],
+)
 async def test_an_answer_without_token_or_lifetime_is_unexpected(body: object) -> None:
     meetings = _meetings(lambda request: httpx.Response(200, json=body))
+
+    with pytest.raises(IntegrationError, match="unexpected_response"):
+        await meetings.guest_access("op1-abc", "Ada")
+
+
+async def test_a_guest_answer_that_is_not_json_is_unexpected_not_a_crash() -> None:
+    meetings = _meetings(lambda request: httpx.Response(200, content=b"<html>gateway</html>"))
 
     with pytest.raises(IntegrationError, match="unexpected_response"):
         await meetings.guest_access("op1-abc", "Ada")

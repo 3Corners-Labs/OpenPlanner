@@ -47,6 +47,13 @@ class DisplayNameMode(StrEnum):
     TERM = "term"
 
 
+class StaffNameMode(StrEnum):
+    """How the staff member is named to the participant (``embedded_call_staff_name``)."""
+
+    NAME = "name"
+    TERM = "term"
+
+
 @dataclass(frozen=True)
 class GuestAccess:
     """A guest token for one call.
@@ -77,10 +84,11 @@ def guest_display_name(first_name: str | None, mode: DisplayNameMode, term: str)
     Args:
         first_name: The booking's first name; ``None`` or empty after a purge.
         mode: ``FIRST_NAME`` uses the first name when there is one, ``TERM`` never does.
-        term: The organisation's word for a participant, for ``TERM`` and as the fallback.
+        term: The organisation's word for a participant, for ``TERM`` and as the fallback; when
+            it is empty too, ``NEUTRAL_TERM``, so the name is never empty.
     """
     wanted = first_name if mode is DisplayNameMode.FIRST_NAME else None
-    return _clean(wanted) or _clean(term)
+    return _clean(wanted) or _clean(term) or NEUTRAL_TERM
 
 
 def _clean(text: str | None) -> str:
