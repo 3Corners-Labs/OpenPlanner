@@ -4,7 +4,7 @@
 {% elif view.rows %}
 {#- Five columns do not fit a narrow widget: the table scrolls in its own region (WCAG 1.4.10). -#}
 <div class="table-scroll widget-scroll" role="region" aria-label="{{ _(view.widget.title_key) }}" tabindex="0">
-<table class="widget-table">
+<table class="widget-table widget-table--wrap">
   <caption class="visually-hidden">{{ _(view.widget.title_key) }}</caption>
   <thead>
     <tr><th scope="col">{{ _("admin.overview.widget.queue.group") }}</th><th scope="col" class="widget-table__number">{{ _("admin.overview.widget.queue.waiting") }}</th><th scope="col" class="widget-table__number">{{ _("admin.overview.widget.queue.longest_wait") }}</th><th scope="col" class="widget-table__number">{{ _("admin.overview.widget.queue.not_picked_up") }}</th><th scope="col" class="widget-table__number">{{ _("admin.overview.widget.queue.staff") }}</th></tr>
@@ -13,10 +13,10 @@
     {% for row in view.rows %}
     <tr>
       <th scope="row"><a href="{{ row.href }}" aria-label="{{ _("admin.overview.widget.queue.queue_link", name=row.name) }}">{{ row.name }}</a><br><span class="widget-list__meta">{{ row.organisation }}</span></th>
-      <td class="widget-table__number">{{ row.waiting }}</td>
-      <td class="widget-table__number">{{ _("admin.overview.widget.queue.minutes", minutes=row.longest_wait_minutes) }}{% if row.wait_state %}<br><span class="chip chip--{{ row.wait_tone }}">{{ row.wait_state }}</span>{% endif %}</td>
-      <td class="widget-table__number">{{ row.not_picked_up }}{% if row.not_picked_up %}<br><span class="chip chip--danger">{{ _("admin.agenda.not_picked_up") }}</span>{% endif %}</td>
-      <td class="widget-table__number">{{ row.staff_available }}</td>
+      <td class="widget-table__number"><span class="widget-table__value">{{ row.waiting }}</span></td>
+      <td class="widget-table__number"><span class="widget-table__value">{{ _("admin.overview.widget.queue.minutes", minutes=row.longest_wait_minutes) }}</span>{% if row.wait_state %}<br><span class="chip chip--{{ row.wait_tone }}">{{ row.wait_state }}</span>{% endif %}</td>
+      <td class="widget-table__number"><span class="widget-table__value">{{ row.not_picked_up }}</span>{% if row.not_picked_up %}<br><span class="chip chip--danger">{{ _("admin.agenda.not_picked_up") }}</span>{% endif %}</td>
+      <td class="widget-table__number"><span class="widget-table__value">{{ row.staff_available }}</span></td>
     </tr>
     {% endfor %}
   </tbody>
