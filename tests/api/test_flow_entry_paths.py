@@ -5,7 +5,7 @@ that resolves, and one that does not is refused without any fallback and books n
 case: a flow code of another service or organisation in the booking request.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 
 import httpx
 import pytest
@@ -233,6 +233,48 @@ async def test_the_flow_is_in_the_widget_openapi_schema(site: httpx.AsyncClient)
     properties = request["content"]["application/json"]["schema"]["properties"]
     assert "flow" in properties
     assert properties["flow"]["anyOf"][0]["pattern"] == "^[a-z0-9][a-z0-9-]{0,39}$"
+
+
+def _schemas(node: object) -> Iterator[dict[str, object]]:
+    """Yield every object in an OpenAPI fragment that may carry ``properties`` or ``required``."""
+    if isinstance(node, dict):
+        yield node
+        for value in node.values():
+            yield from _schemas(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _schemas(value)
+
+
+async def test_no_api_v1_schema_requires_a_flow(site: httpx.AsyncClient) -> None:
+    # ADR 0121 step 8: the flow is additive in /api/v1, so a client from before flows still works.
+    spec = (await site.get("/openapi.json")).json()
+    used = [
+        operation
+        for path, item in spec["paths"].items()
+        if path.startswith("/api/v1/")
+        for operation in item.values()
+    ]
+    names = {
+        ref.rsplit("/", 1)[-1]
+        for node in _schemas(used)
+        if isinstance(ref := node.get("$ref"), str)
+    }
+    fragments = [*used, *(spec.get("components", {}).get("schemas", {})[name] for name in names)]
+
+    required = [
+        node
+        for node in _schemas(fragments)
+        if isinstance(listed := node.get("required"), list) and "flow" in listed
+    ]
+    parameters = [
+        node
+        for node in _schemas(used)
+        if node.get("in") == "query" and node.get("name") == "flow" and node.get("required")
+    ]
+    assert used
+    assert required == []
+    assert parameters == []
 
 
 async def test_moving_a_page_booking_keeps_the_flow(site: httpx.AsyncClient) -> None:
