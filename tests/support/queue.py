@@ -52,9 +52,12 @@ async def own_queue(site: Site, *, meeting: bool = True, **changes: object) -> i
     return booking_id
 
 
-async def request_work(site: Site) -> int:
-    """Book in the own queue and put the booking on a staffed pool under a flow without video."""
-    booking_id = await own_queue(site, meeting=False, queue_free_pick_allowed=True)
+async def staffed_pool_flow(site: Site) -> tuple[int, int]:
+    """Give the demo organisation a pool staffed Fridays 08:00–17:00 and a flow ``advies`` on it.
+
+    The pool takes both kinds of work; the flow is published, without video. Returns the
+    pool's id and the flow's id.
+    """
     await site.login_as(SUPER)
     pool = await add_pool(site, "Loket")
     async with site_uow(site).locked() as tx:
@@ -63,8 +66,14 @@ async def request_work(site: Site) -> int:
         assert await tx.add_pool_rule(EVERYTHING, pool, ScheduleRule(4, block)) is not None
     await add_flow(site, "advies", pool)
     await publish_flow(site)
+    return pool, (await flow_ids(engine_of(site.client)))["advies"]
+
+
+async def request_work(site: Site) -> int:
+    """Book in the own queue and put the booking on a staffed pool under a flow without video."""
+    booking_id = await own_queue(site, meeting=False, queue_free_pick_allowed=True)
+    pool, flow_id = await staffed_pool_flow(site)
     engine = engine_of(site.client)
-    flow_id = (await flow_ids(engine))["advies"]
     async with AsyncSession(engine) as session, session.begin():
         group_id = await session.scalar(
             select(BookingRow.group_id).where(BookingRow.id == booking_id)

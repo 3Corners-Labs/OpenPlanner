@@ -225,24 +225,17 @@ async def set_max_waiting(
 ) -> Response:
     """Set how many people without an appointment may wait for the pool (ADR 0121 step 7)."""
     form = await read_form(request, locale)
-    raw = form.text(MAX_WAITING_FIELD).strip()
-    try:
-        limit = int(raw) if raw else None
-        changed = await pool_planning_service(request).set_max_waiting(
-            context.principal, org, pool_id, limit
-        )
-    except (ValueError, DomainError) as error:
-        refused = error if isinstance(error, DomainError) else _not_a_number()
-        _refused(form, refused, locale)
-        return await _staffing_response(
-            request, locale, context, org, pool_id, zone=form, status=422
-        )
-    return redirect_done(_staffing_path(org, pool_id), "saved" if changed else "unchanged")
-
-
-def _not_a_number() -> DomainError:
-    """Return the refusal of a waiting limit that is not a whole number."""
-    return DomainError(ErrorCode.INVALID_CONFIGURATION, MAX_WAITING_FIELD)
+    limit = form.optional_integer(MAX_WAITING_FIELD)
+    if not form.errors:
+        try:
+            changed = await pool_planning_service(request).set_max_waiting(
+                context.principal, org, pool_id, limit
+            )
+        except DomainError as error:
+            _refused(form, error, locale)
+        else:
+            return redirect_done(_staffing_path(org, pool_id), "saved" if changed else "unchanged")
+    return await _staffing_response(request, locale, context, org, pool_id, zone=form, status=422)
 
 
 @router.post("/organisations/{org}/capacity/{pool_id}/staffing", response_class=HTMLResponse)

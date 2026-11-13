@@ -1,10 +1,12 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 
 from app.domain.booking import BookingStatus
 from app.domain.closure_retention import DEFAULT_CLOSURE_RETENTION as LIMITS
 from app.domain.closure_retention import ClosureRetention
+from app.domain.flow_resolution import FlowRef
+from app.domain.immediate_intake import new_access
 from app.domain.retention import (
     PURGE_GRACE,
     GroupRetentionCounts,
@@ -17,6 +19,7 @@ from app.domain.retention import (
     summarise,
 )
 from app.domain.scheduling import GroupSummary
+from app.domain.service_requests import ServiceRequest, on_demand_request
 from tests.support.domain import NOW, make_group
 
 DAY = timedelta(hours=24)
@@ -191,10 +194,10 @@ def test_request_level_records_are_counted_on_their_own() -> None:
         [GroupRetentionCounts(DEMO, 0, 0, None), GroupRetentionCounts(OTHER, 0, 0, None)], []
     )
     records = [
-        (1, NOW + DAY),  # still within its time
-        (1, NOW - PURGE_GRACE - timedelta(minutes=1)),  # past its moment and the grace
-        (2, NOW - PURGE_GRACE + timedelta(minutes=1)),  # past its moment, within the grace
-        (9, NOW - 9 * DAY),  # a service outside the overview's scope
+        record(1, deleted_at=NOW + DAY),  # still within its time
+        record(1, deleted_at=NOW - PURGE_GRACE - timedelta(minutes=1)),  # past moment and grace
+        record(2, deleted_at=NOW - PURGE_GRACE + timedelta(minutes=1)),  # within the grace
+        record(9, deleted_at=NOW - 9 * DAY),  # a service outside the overview's scope
     ]
 
     overview = summarise(facts, NOW, lambda _org: LIMITS, records)
@@ -204,3 +207,18 @@ def test_request_level_records_are_counted_on_their_own() -> None:
     assert overview.requests_overdue == 1
     assert overview.groups[0].needs_attention
     assert not overview.in_order
+
+
+def record(group_id: int, *, deleted_at: datetime) -> ServiceRequest:
+    """Return immediate work of ``group_id`` whose data goes at ``deleted_at``."""
+    access, _ = new_access("k" * 43)
+    return on_demand_request(
+        organisation_id=1,
+        group_id=group_id,
+        flow=FlowRef(1, 1),
+        pool_id=1,
+        subject=None,
+        access=access,
+        now=deleted_at - 2 * DAY,
+        unresolved_hours=24,
+    )

@@ -16,9 +16,9 @@
     <div><dt>{{ _("admin.agenda.participant") }}</dt><dd>{{ claimed.first_name or "–" }}</dd></div>
     {% with answers = claimed.claimed.answers %}{% include "admin/_answers.html" %}{% endwith %}
   </dl>
-  {% if claimed.sentence %}<p>{{ claimed.sentence }}</p>{% endif %}
+  {% if claimed.work.sentence %}<p>{{ claimed.work.sentence }}</p>{% endif %}
   <div class="form-actions">
-    {% if claimed.can_start %}
+    {% if claimed.work.can_start %}
     <form method="post" action="/admin/groups/{{ summary.group.slug }}/queue/requests/{{ claimed.request_id }}/start">
       <button type="submit" class="button">{{ _("admin.queue.work.start") }}</button>
     </form>
@@ -26,7 +26,7 @@
       <button type="submit" class="button button--secondary">{{ _("admin.queue.release") }}</button>
     </form>
     {% endif %}
-    {% if claimed.can_complete %}
+    {% if claimed.work.can_complete %}
     <form method="post" action="/admin/groups/{{ summary.group.slug }}/queue/requests/{{ claimed.request_id }}/complete">
       <button type="submit" class="button">{{ _("admin.queue.work.complete") }}</button>
     </form>

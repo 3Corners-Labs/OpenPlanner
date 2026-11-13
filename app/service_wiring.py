@@ -108,3 +108,14 @@ def request_queue(
 def request_watch(uow: UnitOfWork, clock: Clock, live: LiveSettings) -> RequestWatch:
     """Return the watchdog round of requests with each organisation's hours."""
     return RequestWatch(uow, clock, lambda org: live.for_organisation(org).request_unresolved_hours)
+
+
+def request_services(
+    uow: UnitOfWork,
+    clock: Clock,
+    admin: AdminService,
+    live: LiveSettings,
+    keys: tuple[bytes, bytes | None],
+) -> tuple[ImmediateRequests, RequestQueue]:
+    """Return immediate intake and immediate work in the own queue (ADR 0121 step 7)."""
+    return immediate_requests(uow, clock, live), request_queue(uow, clock, admin, live, keys)

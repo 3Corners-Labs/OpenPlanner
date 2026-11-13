@@ -125,7 +125,7 @@ No new section, top-level entry or seventh tab. No manual topic changes (existin
 
 | Flow | Threat | Mitigation | Test |
 |---|---|---|---|
-| Immediate intake | bots fill the line (slot exhaustion without slots) | rate limit `booking_limit` (the common limiter), honeypot, same origin, `max_waiting`, the look-ahead, one open request per browser and service | `test_waiting_limit_refuses`, `test_a_browser_holds_one_open_request`, route rate-limit test |
+| Immediate intake | bots fill the line (slot exhaustion without slots) | rate limit `booking_limit` (the common limiter), honeypot, same origin, `max_waiting`, the look-ahead (one open request per browser is a convenience, not a bound: a bot keeps no cookie) | `test_waiting_limit_refuses`, `test_a_browser_holds_one_open_request`, route rate-limit test |
 | Immediate intake | a retried POST makes two requests (A16) | the intake key, unique per service, returns the same request | `test_a_retried_intake_returns_the_same_request` |
 | Request page | someone reads or withdraws another's request (A31) | random 16-byte reference that authorises nothing; the cookie's hash on the request; `link_required` the same for a missing and a foreign request | `test_the_page_needs_its_cookie` |
 | Request page | personal data in an address or a log | reference only in the address; the record's fields are masked by the one list (`privacy.REQUEST_DATA_FIELDS`); the page shows the first name only | `test_no_personal_data_in_the_address` |

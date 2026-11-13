@@ -87,12 +87,20 @@ async def test_a_request_is_taken_in_and_shown_by_its_cookie(
     assert "Uw plaats in de rij: 1." in page.text
     assert "ada@example.org" not in page.text
 
+    cookie = sent.headers["set-cookie"].lower()
+    assert "httponly" in cookie
+    assert "samesite=lax" in cookie
+    assert "ada" not in cookie
+
     stranger = httpx.AsyncClient(transport=site._transport, base_url=str(site.base_url))
     async with stranger:
         refused = await stranger.get(target)
+        withdrawn = await stranger.post(f"{target}/leave", headers=SAME_ORIGIN)
         unknown = await site.get("/r/unknown-reference")
-    assert refused.status_code == unknown.status_code
+    assert refused.status_code == unknown.status_code == withdrawn.status_code
     assert refused.status_code >= 400
+    still = await site.get(target)
+    assert "U staat in de rij." in still.text  # the stranger withdrew nothing
 
 
 async def test_a_retried_post_and_a_second_visit_give_the_same_request(

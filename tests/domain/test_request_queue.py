@@ -163,7 +163,9 @@ async def test_a_missing_skill_keeps_the_request_visible_and_unclaimable(
     await ask(uow, clock)
     agents = staff(uow, clock)
 
-    rows = await agents.view(AGENT, "demo")
+    found = await agents.view(AGENT, "demo")
+    rows = found.rows
+    assert found.next_request_id is None
     assert [(r.eligible, [s.code for s in r.missing]) for r in rows] == [(False, ["passport"])]
     with pytest.raises(DomainError) as error:
         await agents.claim(AGENT, "demo")

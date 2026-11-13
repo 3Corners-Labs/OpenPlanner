@@ -169,13 +169,7 @@ from app.keys import (
     session_secret,
 )
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
-from app.service_wiring import (
-    booking_service,
-    immediate_requests,
-    planner_service,
-    request_queue,
-    request_work,
-)
+from app.service_wiring import booking_service, planner_service, request_services, request_work
 from app.web.alert_text import alert_composer
 from app.web.authz_labels import ROLE_LABELS
 from app.web.call_labels import agent_start_label
@@ -679,13 +673,9 @@ def create_app(
             request_work(clock, app.state.live_settings),
         )
         # ADR 0121 step 7: immediate work on a pool, for participants and for the own queue.
-        app.state.immediate_requests = immediate_requests(uow, clock, app.state.live_settings)
-        app.state.request_queue = request_queue(
-            uow,
-            clock,
-            app.state.admin_service,
-            app.state.live_settings,
-            (agent_pseudonym_key(settings), agent_pseudonym_key_previous(settings)),
+        keys = (agent_pseudonym_key(settings), agent_pseudonym_key_previous(settings))
+        app.state.immediate_requests, app.state.request_queue = request_services(
+            uow, clock, app.state.admin_service, app.state.live_settings, keys
         )
 
         async def own_connection(organisation_id: int) -> bool:

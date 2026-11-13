@@ -24,13 +24,12 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.admin.authz import AdminContext, RequirePermission
-from app.admin.forms import raise_refusal, redirect_done
+from app.admin.forms import redirect_done
 from app.admin.group_routes import group_page
 from app.admin.pages import Locale, SameOrigin
-from app.admin.queue_routes import SHOWN_ON_THE_LIST, render_list
+from app.admin.queue_routes import or_list
 from app.admin.request_queue_views import claimed_view, queue
 from app.domain.authorization import Permission
-from app.domain.errors import DomainError
 from app.domain.request_queue import ClaimedRequest
 from app.web.locale import RequestLocale
 
@@ -47,25 +46,31 @@ def _url(slug: str) -> str:
     return f"/admin/groups/{slug}/queue"
 
 
-async def _done(
+async def _opened(
     request: Request,
     locale: RequestLocale,
     context: AdminContext,
     slug: str,
-    attempt: Awaitable[object],
-    done: str | None = None,
+    attempt: Awaitable[ClaimedRequest],
 ) -> Response:
-    """Run ``attempt``; go to the claimed request (or the list with ``done``), or explain."""
-    try:
-        result = await attempt
-    except DomainError as error:
-        raise_refusal(error)
-        if error.code not in SHOWN_ON_THE_LIST:
-            raise
-        return await render_list(request, locale, context, slug, error.code)
-    if isinstance(result, ClaimedRequest):
-        return RedirectResponse(f"{_url(slug)}/requests/{result.request.id}", status_code=303)
-    return redirect_done(_url(slug), done or "saved")
+    """Go to the claimed request, or back to the queue with the reason it did not work."""
+    claimed = await or_list(request, locale, context, slug, attempt)
+    if isinstance(claimed, HTMLResponse):
+        return claimed
+    return RedirectResponse(f"{_url(slug)}/requests/{claimed.request.id}", status_code=303)
+
+
+async def _finished(
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    slug: str,
+    attempt: Awaitable[None],
+    done: str,
+) -> Response:
+    """Go back to the queue with ``done``, or with the reason it did not work."""
+    result = await or_list(request, locale, context, slug, attempt)
+    return result if isinstance(result, HTMLResponse) else redirect_done(_url(slug), done)
 
 
 @router.post("/groups/{slug}/queue/requests/next", response_class=HTMLResponse)
@@ -74,7 +79,7 @@ async def pick_up_next(
 ) -> Response:
     """Claim the oldest request without an appointment the agent may take."""
     attempt = queue(request).claim(context.principal, slug)
-    return await _done(request, locale, context, slug, attempt)
+    return await _opened(request, locale, context, slug, attempt)
 
 
 @router.post("/groups/{slug}/queue/requests/{request_id}/claim", response_class=HTMLResponse)
@@ -83,7 +88,7 @@ async def claim(
 ) -> Response:
     """Claim one chosen request (only where the service allows free picking)."""
     attempt = queue(request).claim(context.principal, slug, request_id)
-    return await _done(request, locale, context, slug, attempt)
+    return await _opened(request, locale, context, slug, attempt)
 
 
 @router.get("/groups/{slug}/queue/requests/{request_id}", response_class=HTMLResponse)
@@ -91,13 +96,10 @@ async def claimed(
     request: Request, locale: Locale, slug: str, request_id: int, context: WorkQueue
 ) -> Response:
     """Show a request the agent holds, with *Start* or *Complete*."""
-    try:
-        found = await queue(request).claimed(context.principal, slug, request_id, locale.code)
-    except DomainError as error:
-        raise_refusal(error)
-        if error.code not in SHOWN_ON_THE_LIST:
-            raise
-        return await render_list(request, locale, context, slug, error.code)
+    attempt = queue(request).claimed(context.principal, slug, request_id, locale.code)
+    found = await or_list(request, locale, context, slug, attempt)
+    if isinstance(found, HTMLResponse):
+        return found
     view = claimed_view(found, locale, context)
     return group_page(request, locale, context, "admin/queue_request.html", {"claimed": view})
 
@@ -108,7 +110,7 @@ async def start(
 ) -> Response:
     """Start the treatment of a claimed request; its pool is judged again now."""
     attempt = queue(request).start(context.principal, slug, request_id)
-    return await _done(request, locale, context, slug, attempt)
+    return await _opened(request, locale, context, slug, attempt)
 
 
 @router.post("/groups/{slug}/queue/requests/{request_id}/complete", response_class=HTMLResponse)
@@ -117,7 +119,7 @@ async def complete(
 ) -> Response:
     """Complete a request: its unit of the pool is released."""
     attempt = queue(request).complete(context.principal, slug, request_id)
-    return await _done(request, locale, context, slug, attempt, "completed")
+    return await _finished(request, locale, context, slug, attempt, "completed")
 
 
 @router.post("/groups/{slug}/queue/requests/{request_id}/release", response_class=HTMLResponse)
@@ -126,4 +128,4 @@ async def release(
 ) -> Response:
     """Put a claimed request back in the line; its unit of the pool is released."""
     attempt = queue(request).release(context.principal, slug, request_id)
-    return await _done(request, locale, context, slug, attempt, "released")
+    return await _finished(request, locale, context, slug, attempt, "released")

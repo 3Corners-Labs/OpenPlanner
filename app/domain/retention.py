@@ -33,6 +33,7 @@ from app.domain.closure_retention import (
 )
 from app.domain.job_plan import PURGE_AFTER
 from app.domain.scheduling import GroupSummary
+from app.domain.service_requests import ServiceRequest, data_deletion_at
 
 PURGE_GRACE = timedelta(hours=1)
 """How long after its purge moment a booking may still hold personal data (worker, retries)."""
@@ -207,16 +208,25 @@ def is_backlog(candidate: PurgeCandidate, now: datetime, retention: ClosureReten
     return purge_moment(candidate, retention) + (BACKLOG_AGE - PURGE_AFTER) < now
 
 
+def is_record_overdue(request: ServiceRequest, now: datetime) -> bool:
+    """Return whether a request-level record is past its deletion moment and the grace.
+
+    The one rule of the nightly sweep and of the overview (ADR 0121 steps 5 and 7).
+    """
+    moment = data_deletion_at(request)
+    return moment is not None and moment + PURGE_GRACE < now
+
+
 def summarise(
     facts: RetentionFacts,
     now: datetime,
     retention_of: ClosureRetentionOf,
-    records: Iterable[tuple[int, datetime]] = (),
+    records: Iterable[ServiceRequest] = (),
 ) -> RetentionOverview:
     """Combine the counts and the overdue candidates into the overview, per group.
 
     ``retention_of`` gives the maximum of the organisation a candidate belongs to (ADR 0102).
-    ``records`` are the request-level records still held, as ``(group id, deletion moment)``
+    ``records`` are the requests without an appointment that still hold personal data
     (ADR 0121 step 7, follow-up 5d); a group outside the overview's scope is not counted.
     """
     overdue: dict[int, int] = {}
@@ -225,10 +235,10 @@ def summarise(
             overdue[candidate.group_id] = overdue.get(candidate.group_id, 0) + 1
     held: dict[int, int] = {}
     late: dict[int, int] = {}
-    for group_id, moment in records:
-        held[group_id] = held.get(group_id, 0) + 1
-        if moment + PURGE_GRACE < now:
-            late[group_id] = late.get(group_id, 0) + 1
+    for request in records:
+        held[request.group_id] = held.get(request.group_id, 0) + 1
+        if is_record_overdue(request, now):
+            late[request.group_id] = late.get(request.group_id, 0) + 1
     return RetentionOverview(
         now,
         tuple(

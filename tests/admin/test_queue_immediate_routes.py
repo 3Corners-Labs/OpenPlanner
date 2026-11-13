@@ -6,19 +6,14 @@ A request without an appointment of the demo service, on a counted pool staffed 
 appointment that is request work offers *Check in*.
 """
 
-from datetime import time
 
 from app.domain.authorization import Scope
 from app.domain.flow_resolution import FlowRef
 from app.domain.immediate_intake import new_access
-from app.domain.scheduling import Offer, ScheduleRule, TimeWindow
 from app.domain.service_requests import RequestPersonalData, on_demand_request
-from tests.admin.conftest import AGENT, SAME_ORIGIN, SUPER, Site
+from tests.admin.conftest import AGENT, SAME_ORIGIN, Site
 from tests.support.admin_site import site_uow
-from tests.support.flow_seed import add_flow, publish_flow
-from tests.support.flows import engine_of, flow_ids
-from tests.support.queue import own_queue, request_work
-from tests.support.skill_seed import add_pool
+from tests.support.queue import own_queue, request_work, staffed_pool_flow
 
 QUEUE = "/admin/groups/demo/queue"
 EVERYTHING = Scope(everything=True)
@@ -27,25 +22,15 @@ EVERYTHING = Scope(everything=True)
 async def _immediate(site: Site) -> int:
     """Give the demo service a pool flow and one waiting request without an appointment."""
     await own_queue(site, meeting=False, queue_free_pick_allowed=False)
-    await site.login_as(SUPER)
-    pool = await add_pool(site, "Loket")
-    async with site_uow(site).locked() as tx:
-        assert await tx.set_pool_timezone(EVERYTHING, pool, "Europe/Amsterdam")
-        block = TimeWindow(time(8), time(17), 2, None, Offer.BOTH)
-        assert await tx.add_pool_rule(EVERYTHING, pool, ScheduleRule(4, block)) is not None
-    await add_flow(site, "advies", pool)
-    await publish_flow(site)
-    flow_id = (await flow_ids(engine_of(site.client)))["advies"]
+    pool, flow_id = await staffed_pool_flow(site)
     async with site_uow(site).locked() as tx:
         group = await tx.get_group("demo")
         assert group is not None
-        flow = next(f for f in await tx.list_service_flows(EVERYTHING, group.id) if f.id == flow_id)
-        assert flow.current is not None
         access, _ = new_access("k" * 43)
         request = on_demand_request(
             organisation_id=group.organisation_id,
             group_id=group.id,
-            flow=FlowRef(flow_id, flow.current.revision),
+            flow=FlowRef(flow_id, 1),
             pool_id=pool,
             subject=None,
             access=access,
@@ -92,7 +77,9 @@ async def test_a_refusal_is_explained_on_the_list(site: Site) -> None:
     unknown = await site.client.get(f"{QUEUE}/requests/{request_id + 999}")
 
     assert chosen.status_code == 409  # free picking is off for the demo service here
+    assert "Zonder afspraak" in chosen.text  # the queue, with the reason
     assert unknown.status_code == 409
+    assert "Zonder afspraak" in unknown.text
 
 
 async def test_an_appointment_of_request_work_is_checked_in(site: Site) -> None:

@@ -204,11 +204,11 @@ async def start_direct(request: Request, slug: str, locale: Locale, _: SameOrigi
     chosen = await checked_flow(service, slug, IntakeMode.ON_DEMAND, form.get("flow"))
     offer = await immediate.service(request).offer(slug, chosen)
     if offer is not None:  # ADR 0121 step 7: the flow takes immediate work on a pool
-        read_contact(form)  # the honeypot first, before anything is stored
+        values = read_contact(form)  # the honeypot first, before anything is stored
         held = await immediate.open_request_of(request, slug)
         if held is not None:  # choice I12
             return RedirectResponse(f"/r/{held}", status_code=303)
-        return await immediate.accept(request, locale, slug, form, offer, chosen)
+        return await immediate.accept(request, locale, slug, form, values, offer, chosen)
     values = read_contact(form)
     try:
         receipt = await service.start_direct(

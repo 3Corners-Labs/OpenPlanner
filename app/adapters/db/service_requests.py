@@ -14,9 +14,10 @@ does claimed immediate work from its claim on (ADR 0121 step 7). The immediate-w
 page authorises by its cookie, the staff use cases by the service they authorised.
 """
 
+from collections.abc import Collection
 from datetime import datetime
 
-from sqlalchemy import and_, delete, func, or_, select, update
+from sqlalchemy import and_, delete, func, or_, select, true, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import ColumnElement
 
@@ -225,7 +226,9 @@ class ServiceRequestQueries:
             if flow is not None and revision is not None
         ]
 
-    async def requests_holding_data(self) -> list[ServiceRequest]:
+    async def requests_holding_data(
+        self, group_ids: Collection[int] | None = None
+    ) -> list[ServiceRequest]:
         """Return the requests without a booking that still hold personal data.
 
         A request-level record, or an agent's pseudonym on one of its work items: a flow that
@@ -247,6 +250,7 @@ class ServiceRequestQueries:
                     ServiceRequestRow.personal_data == PersonalDataState.PRESENT.value,
                     pseudonym,
                 ),
+                true() if group_ids is None else ServiceRequestRow.group_id.in_(group_ids),
             )
             .order_by(ServiceRequestRow.id)
         )

@@ -41,16 +41,19 @@ from app.admin.forms import raise_refusal, redirect_done
 from app.admin.group_routes import group_page
 from app.admin.live import Seen, fragment, key
 from app.admin.pages import Locale, SameOrigin, admin_moment
-from app.admin.request_queue_views import ImmediateRowView, has_next, immediate_rows
+from app.admin.request_queue_views import (
+    ImmediateRowView,
+    WorkView,
+    immediate_rows,
+    work_view,
+)
 from app.admin.skill_inputs import skill_name
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.fallback import FallbackService
 from app.domain.own_queue import ParticipantState, VideoState
 from app.domain.queue_service import ClaimedBooking, QueueRow, QueueService, QueueView
-from app.domain.request_work import Work
 from app.domain.routing import GroupRouting
-from app.domain.service_requests import HandlingState, WorkItemState
 from app.i18n import BoundGettext
 from app.i18n.dates import format_clock
 from app.web.errors import ERROR_KEYS
@@ -141,18 +144,8 @@ class ListView:
     key: str
     immediate: list[ImmediateRowView] = field(default_factory=list)
     """Requests without an appointment, oldest first (ADR 0121 step 7)."""
-
-
-@dataclass(frozen=True)
-class WorkView:
-    """Request work on the claimed page: where it stands and what may be done (ADR 0121 step 5)."""
-
-    state: str
-    sentence: str
-    can_start: bool
-    can_complete: bool
-    conflict: bool
-    recovery: bool
+    has_next_immediate: bool = False
+    """*Pick up next* has a request without an appointment to take."""
 
 
 @dataclass(frozen=True)
@@ -258,8 +251,9 @@ async def _list_view(
         has_next,
         view.free_pick,
         _("admin.queue.announcement", count=len(rows), waiting=waiting),
-        key(shown, has_next, immediate),
-        immediate,
+        key(shown, has_next, immediate.rows, immediate.has_next),
+        immediate.rows,
+        immediate.has_next,
     )
 
 
@@ -271,7 +265,7 @@ def _list_context(request: Request, slug: str, view: ListView) -> dict[str, obje
         "free_pick": view.free_pick,
         "announcement": view.announcement,
         "immediate": view.immediate,
-        "has_next_immediate": has_next(view.immediate),
+        "has_next_immediate": view.has_next_immediate,
         **_poll(request, f"{_url(slug)}/live", view.key),
     }
 
@@ -308,6 +302,23 @@ async def render_list(
     )
 
 
+async def or_list[T](
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    slug: str,
+    attempt: Awaitable[T],
+) -> T | HTMLResponse:
+    """Return what ``attempt`` gives, or the queue with the reason it was refused."""
+    try:
+        return await attempt
+    except DomainError as error:
+        raise_refusal(error)
+        if error.code not in SHOWN_ON_THE_LIST:
+            raise
+        return await render_list(request, locale, context, slug, error.code)
+
+
 async def _claimed(
     request: Request,
     locale: RequestLocale,
@@ -326,37 +337,10 @@ async def _claimed(
     return RedirectResponse(f"{_url(slug)}/{claimed.booking_id}", status_code=303)
 
 
-def _work_view(work: Work, locale: RequestLocale, tz: tzinfo) -> WorkView:
-    """Write request work out: a sentence for its state, and the one action it allows."""
-    _ = locale.gettext
-    item = work.item
-    handling = work.request.handling
-    if item is not None and item.state is WorkItemState.ASSIGNED and item.lease_until:
-        moment = format_clock(item.lease_until, tz, locale.code)
-        sentence = _("admin.queue.work.assigned", time=moment)
-    elif item is not None and item.started_at and handling is HandlingState.IN_PROGRESS:
-        sentence = _(
-            "admin.queue.work.in_progress", time=format_clock(item.started_at, tz, locale.code)
-        )
-    elif handling is HandlingState.RECOVERY_REQUIRED:
-        sentence = _("admin.queue.work.recovery")
-    else:
-        sentence = ""
-    started = item is not None and item.started
-    return WorkView(
-        state=handling.value,
-        sentence=sentence,
-        can_start=item is not None and item.state is WorkItemState.ASSIGNED,
-        can_complete=started and item is not None and item.active,
-        conflict=item is not None and item.start_conflict,
-        recovery=handling is HandlingState.RECOVERY_REQUIRED,
-    )
-
-
 def _claimed_view(booking: ClaimedBooking, locale: RequestLocale, tz: tzinfo) -> ClaimedView:
     """Write the claimed booking out; polling stops once nothing can change any more."""
     if booking.work is not None:
-        work = _work_view(booking.work, locale, tz)
+        work = work_view(booking.work.item, booking.work.request.handling, locale, tz)
         return ClaimedView(
             booking=booking,
             time=format_clock(booking.start, tz, locale.code),
@@ -559,11 +543,6 @@ async def check_in(
     request: Request, locale: Locale, slug: str, booking_id: int, _: SameOrigin, context: WorkQueue
 ) -> Response:
     """Check an appointment in: the participant has arrived (ADR 0121 step 7, choice I1)."""
-    try:
-        await _service(request).check_in(context.principal, slug, booking_id)
-    except DomainError as error:
-        raise_refusal(error)
-        if error.code not in SHOWN_ON_THE_LIST:
-            raise
-        return await render_list(request, locale, context, slug, error.code)
-    return redirect_done(_url(slug), "checked_in")
+    attempt = _service(request).check_in(context.principal, slug, booking_id)
+    done = await or_list(request, locale, context, slug, attempt)
+    return done if isinstance(done, HTMLResponse) else redirect_done(_url(slug), "checked_in")

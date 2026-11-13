@@ -13,10 +13,11 @@ on a client's site keeps working whatever the flow is.
     POST /r/{ref}/leave          withdraw; 303 to the page
 
 The address names the request by a random reference that authorises nothing; the browser holds
-``op_req`` (``<reference>.<random value>``, ``HttpOnly``, ``SameSite=Lax``), whose hash the
-request keeps (choice I4, the pattern of ADR 0093). A browser that holds an open request of the
-service is shown it instead of a second form (choice I12). The form carries a random intake key,
-so a POST sent again after a lost answer gets the same request (A16). Posts are same-origin,
+``op_req`` (up to ``MAX_HELD`` entries ``<reference>.<random value>``, ``HttpOnly``,
+``SameSite=Lax``), whose hashes the requests keep (choice I4, the pattern of ADR 0093). A
+browser that holds an open request of the service is shown it instead of a second form (I12).
+The form carries a random intake key, so a POST sent again after a lost answer gets the same
+request (A16). Posts are same-origin,
 rate limited like a booking and carry the honeypot; nothing personal is in an address or a log
 line, and the pages show the first name at most. The page never reloads by itself (no time
 limits, WCAG 2.2.1): ``static/live-region.js`` polls the fragment, a button refreshes it without
@@ -32,7 +33,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from starlette.datastructures import FormData
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
-from app.api.contact_form import HONEYPOT_FIELD, contact_input, load_contact_form, read_contact
+from app.api.contact_form import HONEYPOT_FIELD, contact_input, load_contact_form
 from app.api.link_session import lifetime
 from app.api.participant import participant_page, templates
 from app.domain.errors import DomainError, ErrorCode
@@ -55,6 +56,8 @@ COOKIE_BASE = "op_req"
 """The cookie of the participant's immediate request, without the ``__Host-`` prefix."""
 PLAIN_PATH = "/"
 """The path over plain http: the cookie is read on ``/g/{slug}/direct`` and on ``/r/``."""
+MAX_HELD = 5
+"""Most immediate requests one browser holds (an abuse bound like ADR 0093's, not a setting)."""
 
 Locale = Annotated[RequestLocale, Depends(request_locale)]
 SameOrigin = Annotated[None, Depends(require_same_origin)]
@@ -84,25 +87,34 @@ def request_cookie(request: Request) -> CookieSpec:
     return cookie_for(request.app.state.settings.public_base_url, COOKIE_BASE, PLAIN_PATH)
 
 
-def held(request: Request) -> tuple[str, str] | None:
-    """Return the reference and value the browser's cookie holds, or ``None``."""
+def held(request: Request) -> dict[str, str]:
+    """Return the requests the browser's cookie holds: reference to value, newest last.
+
+    The cookie holds at most ``MAX_HELD`` entries ``<reference>.<value>`` joined by ``~``, so a
+    participant who asks at two services keeps both pages (ADR 0121 step 7).
+    """
     raw = request.cookies.get(request_cookie(request).name, "")
-    ref, _, value = raw.partition(".")
-    return (ref, value) if ref and value else None
+    entries = (entry.partition(".") for entry in raw.split("~")[-MAX_HELD:])
+    return {ref: value for ref, _, value in entries if ref and value}
+
+
+def _cookie_value(request: Request, ref: str, value: str) -> str:
+    """Return the cookie with ``ref`` added as the newest entry, the oldest dropped."""
+    kept = {r: v for r, v in held(request).items() if r != ref}
+    kept[ref] = value
+    return "~".join(f"{r}.{v}" for r, v in list(kept.items())[-MAX_HELD:])
 
 
 async def open_request_of(request: Request, slug: str) -> str | None:
     """Return the reference of an open request of service ``slug`` this browser holds (I12)."""
-    found = held(request)
-    if found is None:
-        return None
-    try:
-        page = await service(request).page(*found)
-    except DomainError:
-        return None
-    if page.group.slug != slug or page.status not in CHANGING:
-        return None
-    return found[0]
+    for ref, value in held(request).items():
+        try:
+            page = await service(request).page(ref, value)
+        except DomainError:
+            continue
+        if page.group.slug == slug and page.status in CHANGING:
+            return ref
+    return None
 
 
 async def form_page(
@@ -143,11 +155,14 @@ async def accept(
     locale: RequestLocale,
     slug: str,
     form: FormData,
+    values: dict[str, str],
     offer: ImmediateOffer,
     flow: str | None,
 ) -> Response:
-    """Take the request in; set the cookie and go to its page, or show the form again."""
-    values = read_contact(form)
+    """Take the request in; set the cookie and go to its page, or show the form again.
+
+    ``values`` are the contact fields ``read_contact`` returned (the honeypot already checked).
+    """
     key = form.get("intake_key")
     try:
         accepted = await service(request).accept(
@@ -163,7 +178,8 @@ async def accept(
     response = RedirectResponse(f"/r/{ref}", status_code=303)
     response.headers["cache-control"] = "no-store"  # it carries a cookie
     seconds = int(lifetime(request).total_seconds())
-    set_cookie(response, request_cookie(request), f"{ref}.{accepted.cookie_value}", seconds)
+    value = _cookie_value(request, ref, accepted.cookie_value)
+    set_cookie(response, request_cookie(request), value, seconds)
     return response
 
 
@@ -208,10 +224,10 @@ async def _view(request: Request, ref: str) -> RequestView:
     Raises:
         DomainError: ``link_required`` for anything else, the same answer every time (A31).
     """
-    found = held(request)
-    if found is None or found[0] != ref:
+    value = held(request).get(ref)
+    if value is None:
         raise DomainError(ErrorCode.LINK_REQUIRED)
-    page = await service(request).page(ref, found[1])
+    page = await service(request).page(ref, value)
     follow(request, page.group.organisation_id)
     return RequestView(page, ref)
 
@@ -250,9 +266,9 @@ async def leave_page(request: Request, ref: str, locale: Locale) -> Response:
 @limiter.limit(booking_limit)
 async def leave(request: Request, ref: str, locale: Locale, _: SameOrigin) -> Response:
     """Withdraw the request (choice I7); repeating it only shows the page again."""
-    found = held(request)
-    if found is None or found[0] != ref:
+    value = held(request).get(ref)
+    if value is None:
         raise DomainError(ErrorCode.LINK_REQUIRED)
-    page = await service(request).withdraw(ref, found[1])
+    page = await service(request).withdraw(ref, value)
     log.info("immediate.withdrawn", request_id=page.request.id)
     return RedirectResponse(f"/r/{ref}", status_code=303)
