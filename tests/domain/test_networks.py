@@ -181,6 +181,9 @@ def test_a_network_list_is_unreadable_only_when_it_says_so() -> None:
         ("https://planner.localhost", False),
         ("https://planner.internal", False),
         ("https://planner.local", False),
+        ("https://planner\u3002internal", False),  # a full stop IDNA reads as a dot
+        ("https://api.planner\uff0elocal", False),
+        ("https://localhost\uff61", False),
         ("https://planner", False),  # no dot: not a public name
         ("https://127.1", False),  # the short spelling a resolver maps to loopback
         ("https://0x7f.1", False),
