@@ -10,3 +10,5 @@
 !widget/package-lock.json
 !widget/src/
 **/__pycache__
+# ADR 0123 point 3: the call page's SDK is in no image before the licence answer, even when hand-placed.
+app/web/static/vendor/webex/meetings.min.js
