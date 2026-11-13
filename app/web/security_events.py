@@ -18,6 +18,7 @@ from app.adapters.event_sink import StdoutEventSink
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Outcome, Source
 from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.security_log import SecurityLog
+from app.web.protection import client_address
 
 log = structlog.get_logger()
 
@@ -38,7 +39,7 @@ async def report(
     pseudonyms: ClientPseudonyms | None = getattr(request.app.state, "client_pseudonyms", None)
     if security is None or pseudonyms is None:  # before startup, or an app without them
         return
-    client = pseudonyms.of(request.client.host if request.client else None)
+    client = pseudonyms.of(client_address(request))
     try:
         await security.record(
             action, Outcome.DENIED, reason=reason, detail=detail, client=client, actor=actor

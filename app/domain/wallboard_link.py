@@ -31,14 +31,13 @@ from app.domain.authorization import Scope
 TOKEN_BYTES = 32
 """Random bytes of a link's token and of its session secret: not a setting, a crypto parameter."""
 MAX_NETWORKS = 20
-"""Ranges one ACL may hold (ADR 0117 point 20)."""
+"""Ranges one ACL may hold (ADR 0117 point 20); its own limit, not the machine API's (ADR 0023)."""
 MAX_NAME = 80
 """Longest name of a screen."""
 TOUCH_EVERY = timedelta(minutes=10)
 """How often a link's *last used* is written: a poll every few seconds must not write each time."""
 REFUSAL_EVERY = timedelta(hours=1)
 """One refusal event per link per period: a screen on the wrong network asks every few seconds."""
-NETWORKS_FIELD = "networks"
 NAME_FIELD = "name"
 DAYS_FIELD = "days"
 ENABLED_FIELD = "enabled"
@@ -151,7 +150,7 @@ def parse_networks(text: str) -> tuple[str, ...]:
         DomainError: ``invalid_configuration`` (field ``networks``) for text that is no range or
             more than ``MAX_NETWORKS`` ranges.
     """
-    return net.parse_networks(text, maximum=MAX_NETWORKS, field=NETWORKS_FIELD)
+    return net.parse_networks(net.split_entries(text), maximum=MAX_NETWORKS)
 
 
 def inside(inner: Sequence[str], outer: Sequence[str]) -> bool:
@@ -164,17 +163,12 @@ def inside(inner: Sequence[str], outer: Sequence[str]) -> bool:
         return True
     if not inner:
         return False
-    return net.inside(inner, outer)
-
-
-def pinned_range(address: str) -> str | None:
-    """Return the range an address pins to: its ``/32`` (IPv4) or ``/64`` (IPv6), else ``None``."""
-    return net.pinned_network(address)
+    return net.each_within(inner, outer)
 
 
 def allowed_from(address: str, networks: Sequence[str]) -> bool:
     """Return whether ``address`` lies in one of ``networks`` (an empty list allows any)."""
-    return not networks or net.allowed_from(address, networks)
+    return not networks or net.in_any(address, networks)
 
 
 def refusal_for(link: WallboardLink, address: str) -> Refusal | None:

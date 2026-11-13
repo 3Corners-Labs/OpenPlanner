@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.domain.errors import DomainError
+from app.domain.networks import pinned_network
 from app.domain.wallboard_link import (
     LinkStatus,
     Refusal,
@@ -14,7 +15,6 @@ from app.domain.wallboard_link import (
     inside,
     new_token,
     parse_networks,
-    pinned_range,
     refusal_for,
     same_hash,
     status_of,
@@ -100,10 +100,10 @@ def test_a_link_may_only_narrow_the_default() -> None:
 
 
 def test_a_pin_is_a_32_for_ipv4_and_a_64_for_ipv6() -> None:
-    assert pinned_range("10.20.4.31") == "10.20.4.31/32"
-    assert pinned_range("2001:db8:ab12:5:1:2:3:4") == "2001:db8:ab12:5::/64"
-    assert pinned_range("not an address") is None
-    assert pinned_range("") is None
+    assert pinned_network("10.20.4.31") == "10.20.4.31/32"
+    assert pinned_network("2001:db8:ab12:5:1:2:3:4") == "2001:db8:ab12:5::/64"
+    assert pinned_network("not an address") is None
+    assert pinned_network("") is None
 
 
 def test_an_address_is_allowed_by_an_empty_list_or_a_range() -> None:
@@ -124,6 +124,6 @@ def test_the_acl_and_the_pin_both_apply_and_the_acl_is_asked_first() -> None:
 
 
 def test_an_ipv4_mapped_ipv6_address_is_the_ipv4_address() -> None:
-    assert pinned_range("::ffff:10.20.4.31") == "10.20.4.31/32"  # not the whole ::/64
+    assert pinned_network("::ffff:10.20.4.31") == "10.20.4.31/32"  # not the whole ::/64
     assert allowed_from("::ffff:10.20.4.31", ("10.20.0.0/16",))
     assert not allowed_from("::ffff:10.21.4.31", ("10.20.0.0/16",))

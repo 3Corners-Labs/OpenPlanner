@@ -8,12 +8,12 @@ and the CLI say the same thing. No address of a visitor is ever kept here.
 
 import hashlib
 import hmac
-import ipaddress
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from urllib.parse import urlsplit
 
+from app.domain.networks import address_of
 from app.domain.web_transport import BUNDLED_PROXY_ADDRESS
 
 EVENT = "public_address"
@@ -243,9 +243,8 @@ class PeerClass(StrEnum):
 
 def classify_peer(address: str | None) -> PeerClass:
     """Return the class of a peer address; anything unparsable counts as public."""
-    try:
-        parsed = ipaddress.ip_address(address or "")
-    except ValueError:
+    parsed = address_of(address)
+    if parsed is None:
         return PeerClass.PUBLIC
     if parsed.is_loopback:
         return PeerClass.LOOPBACK

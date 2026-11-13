@@ -15,12 +15,13 @@ lab identity provider is an internal host; production never passes it.
 """
 
 import asyncio
-import ipaddress
 import socket
 from collections.abc import Callable
 from typing import Any
 
 import httpx
+
+from app.domain.networks import address_of
 
 MAX_RESPONSE_BYTES = 1_000_000
 """Largest response read; a discovery document or key set is a few kilobytes."""
@@ -55,9 +56,9 @@ def is_public(address: str) -> bool:
     Loopback, private, link-local (cloud metadata), carrier-grade NAT, unspecified, reserved
     and multicast addresses are not, nor IPv6 addresses that map onto such an IPv4 address.
     """
-    ip = ipaddress.ip_address(address)
-    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
-        ip = ip.ipv4_mapped
+    ip = address_of(address)
+    if ip is None:
+        raise ValueError("not an IP address")
     return ip.is_global and not ip.is_multicast
 
 

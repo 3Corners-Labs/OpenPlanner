@@ -8,7 +8,8 @@ from starlette.requests import Request
 
 from app.web.protection import (
     RateLimits,
-    caller_key,
+    caller_of,
+    client_address,
     configure_rate_limits,
     count_unknown_link,
     limiter,
@@ -37,22 +38,27 @@ def _request(address: str | None, **headers: str) -> Request:
 
 
 def test_the_key_is_the_ipv4_address_or_the_ipv6_64() -> None:
-    assert caller_key(_request("203.0.113.7")) == "203.0.113.7"
-    assert caller_key(_request("2001:db8:1:2::1")) == "2001:db8:1:2::/64"
-    assert caller_key(_request("2001:db8:1:2::1")) == caller_key(_request("2001:db8:1:2:f::9"))
-    assert caller_key(_request("2001:db8:1:2::1")) != caller_key(_request("2001:db8:1:3::1"))
-    assert caller_key(_request("::ffff:203.0.113.7")) == caller_key(_request("203.0.113.7"))
-    assert caller_key(_request(None)) == "unknown"
+    assert caller_of(_request("203.0.113.7")) == "203.0.113.7"
+    assert caller_of(_request("2001:db8:1:2::1")) == "2001:db8:1:2::/64"
+    assert caller_of(_request("2001:db8:1:2::1")) == caller_of(_request("2001:db8:1:2:f::9"))
+    assert caller_of(_request("2001:db8:1:2::1")) != caller_of(_request("2001:db8:1:3::1"))
+    assert caller_of(_request("::ffff:203.0.113.7")) == caller_of(_request("203.0.113.7"))
+    assert caller_of(_request(None)) == "unknown"
+
+
+def test_the_address_is_the_one_the_server_derived_or_none() -> None:
+    assert client_address(_request("203.0.113.7")) == "203.0.113.7"
+    assert client_address(_request(None)) is None
 
 
 def test_a_forwarded_header_cannot_change_the_key() -> None:
     forged = _request("203.0.113.7", x_forwarded_for="198.51.100.9", forwarded="for=198.51.100.9")
 
-    assert caller_key(forged) == "203.0.113.7"
+    assert caller_of(forged) == "203.0.113.7"
 
 
-def test_the_limiters_default_key_is_the_caller_key() -> None:
-    assert limiter._key_func is caller_key  # noqa: SLF001 - the one way to see which key it uses
+def test_the_limiters_default_key_is_the_caller_of() -> None:
+    assert limiter._key_func is caller_of  # noqa: SLF001 - the one way to see which key it uses
 
 
 def test_unknown_links_count_an_ipv6_caller_by_its_64() -> None:
@@ -73,10 +79,10 @@ def test_webhook_buckets_are_counted_under_the_callers_key() -> None:
     configure_rate_limits(RateLimits(webhooks="2/minute"), enabled=True)
 
     verdicts = [
-        within_webhook_limit("wxcc", "acme", caller_key(_request(f"2001:db8:1:2::{n:x}")))
+        within_webhook_limit("wxcc", "acme", caller_of(_request(f"2001:db8:1:2::{n:x}")))
         for n in (1, 2, 3)
     ]
-    other = within_webhook_limit("wxcc", "acme", caller_key(_request("2001:db8:1:3::1")))
+    other = within_webhook_limit("wxcc", "acme", caller_of(_request("2001:db8:1:3::1")))
 
     assert verdicts == [True, True, False]
     assert other is True

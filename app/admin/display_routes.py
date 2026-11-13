@@ -22,6 +22,7 @@ from app.admin.wallboard_routes import board_context, wallboard_service
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.wallboard_link import Refusal, WallboardLink
 from app.web.cookies import CookieSpec, cookie_for, set_cookie
+from app.web.protection import client_address as caller_address
 from app.web.protection import limiter, unknown_link_limit
 from app.web.templates import render
 
@@ -54,7 +55,7 @@ def client_address(request: Request) -> str:
 
     The same value the rate limiter keys on; never a raw ``X-Forwarded-For`` header.
     """
-    return request.client.host if request.client else ""
+    return caller_address(request) or ""
 
 
 def _refused(request: Request, locale: Locale, error: DomainError) -> HTMLResponse:

@@ -22,7 +22,7 @@ the reason, the platform and, for an organisation's address, the organisation's 
 of an organisation that does not exist is never written: it comes from the caller. The replay
 check stays with the domain's event key (ADR 0124 point 7 is a later step). The caller's address
 is the one the server derived (``--proxy-headers``), counted by its /64 when it is IPv6
-(``caller_key``); nothing is read from a forwarded header here.
+(``caller_of``); nothing is read from a forwarded header here.
 """
 
 import json
@@ -47,7 +47,7 @@ from app.domain.inbound_gate import MAX_BODY_BYTES, Refusal, accepts_content_typ
 from app.domain.ports import Clock
 from app.domain.security_log import WEBHOOK_REJECTED
 from app.web.protection import (
-    caller_key,
+    caller_of,
     webhook_retry_after,
     within_refused_limit,
     within_unknown_address_limit,
@@ -208,7 +208,7 @@ def webhook_gate[W: InboundWebhook](
         request: Request, found: Annotated[Address[W] | Unresolved, Depends(resolve)]
     ) -> Delivery[W]:
         """Return the verified delivery, or raise ``WebhookRefused`` after leaving its trace."""
-        caller = caller_key(request)
+        caller = caller_of(request)
         if isinstance(found, Unresolved):
             # Only an address that does not exist counts here: it never touches one that does.
             if not within_unknown_address_limit(caller):

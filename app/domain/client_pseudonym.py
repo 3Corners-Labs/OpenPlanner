@@ -16,12 +16,10 @@ import hashlib
 import hmac
 
 from app.domain import networks
+from app.domain.networks import UNKNOWN_CALLER
 
 PSEUDONYM_HEX = 16
 """Length of a pseudonym in hex characters (64 bits): fixed, a crypto parameter."""
-
-UNKNOWN_CLIENT = "unknown"
-"""Pseudonym when the caller's address is missing or not an IP address."""
 
 MANY_CLIENTS = "many"
 """Client under which events count once ``SecurityLog`` tracks its maximum of callers."""
@@ -42,7 +40,7 @@ class ClientPseudonyms:
         """Return the pseudonym of ``address``, or ``unknown`` if it is not an IP address."""
         ip = networks.address_of(address)
         if ip is None:
-            return UNKNOWN_CLIENT
-        canonical = networks.key_of(ip)
+            return UNKNOWN_CALLER
+        canonical = networks.caller_key(address)
         digest = hmac.new(self._key, canonical.encode(), hashlib.sha256).hexdigest()
         return digest[:PSEUDONYM_HEX]

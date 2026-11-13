@@ -36,6 +36,7 @@ SECRET_LIFETIME_DAYS = (90, 180, 365)
 SECRET_EXPIRY_WARNING = timedelta(days=30)
 MAX_NAME_LENGTH = 80
 MAX_NETWORKS = 20
+"""Networks one client may list (ADR 0023); its own limit, not the display links' (ADR 0117)."""
 
 _CLIENT_ID = re.compile(r"^opc_[A-Za-z0-9_-]{16,64}$")
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
@@ -71,22 +72,12 @@ def is_client_id(value: str) -> bool:
     return bool(_CLIENT_ID.fullmatch(value))
 
 
-def parse_networks(lines: Iterable[str]) -> tuple[str, ...]:
-    """Normalise an allow-list of networks (CIDR or single addresses), at most ``MAX_NETWORKS``.
-
-    Raises:
-        DomainError: ``invalid_configuration`` for ``networks`` when an entry is not a
-            network or there are too many.
-    """
-    return net.parse_networks(lines, maximum=MAX_NETWORKS)
-
-
 def address_allowed(networks: tuple[str, ...], address: str | None) -> bool:
     """Return whether ``address`` lies in one of ``networks``; no networks allows any.
 
     An IPv4 address written as IPv6 counts as the IPv4 address (ADR 0124 step 2a).
     """
-    return not networks or net.allowed_from(address, networks)
+    return not networks or net.in_any(address, networks)
 
 
 @dataclass(frozen=True)
@@ -143,7 +134,7 @@ class ClientDraft:
             organisation,
             frozenset(g for g in groups if g),
             granted,
-            parse_networks(networks),
+            net.parse_networks(networks, maximum=MAX_NETWORKS),
         )
 
 

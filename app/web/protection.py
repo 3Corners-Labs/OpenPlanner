@@ -6,7 +6,7 @@ Forms carry no CSRF token. The primary signal is Fetch Metadata: browsers send
 audited download, is refused (``RejectedRequest``) and becomes a security event (ADR 0053); an
 audited download that the browser loads in advance (prefetch, prerender) is refused without one.
 
-Rate limits use slowapi, keyed by caller (``caller_key``): the client IP as uvicorn derived it
+Rate limits use slowapi, keyed by caller (``caller_of``): the client IP as uvicorn derived it
 (behind a proxy, ``--proxy-headers`` supplies the real address), an IPv6 caller by its /64 so
 that rotating addresses within it never gives a fresh bucket (ADR 0124 step 2a). slowapi
 buckets per request path, so links that match no booking get a bound of their own, one bucket
@@ -22,7 +22,7 @@ from limits import parse
 from slowapi import Limiter
 
 from app.config import Settings
-from app.domain.networks import caller_key as network_caller_key
+from app.domain.networks import caller_key
 from app.domain.security_log import CROSS_SITE, ORIGIN_MISMATCH
 from app.web.route_dependencies import dependency_calls
 
@@ -158,19 +158,27 @@ class RateLimits:
         )
 
 
-def caller_key(request: Request) -> str:
+def client_address(request: Request) -> str | None:
+    """Return the caller's address as the server derived it, or ``None`` without one.
+
+    The one reading of "the caller's address" in the application: ``request.client``, which
+    behind a proxy uvicorn's ``--proxy-headers`` has set from the trusted proxy (ADR 0086). No
+    forwarded header is ever read anywhere else; a header the caller sends cannot change it.
+    """
+    return request.client.host if request.client else None
+
+
+def caller_of(request: Request) -> str:
     """Return the key every limiter counts the caller of ``request`` under.
 
-    The address is the one the server derived (``request.client``; behind a proxy uvicorn's
-    ``--proxy-headers`` set it); no forwarded header is read here. An IPv4 caller counts by its
-    address, an IPv6 caller by its /64, and an IPv4-mapped IPv6 address as its IPv4 form
-    (``app.domain.networks.caller_key``).
+    An IPv4 caller counts by its address, an IPv6 caller by its /64, an IPv4-mapped IPv6 address
+    as its IPv4 form (``app.domain.networks.caller_key``).
     """
-    return network_caller_key(request.client.host if request.client else None)
+    return caller_key(client_address(request))
 
 
 LIMITS = RateLimits()
-limiter = Limiter(key_func=caller_key)
+limiter = Limiter(key_func=caller_of)
 
 
 def _adopt(limits: RateLimits) -> None:
@@ -225,7 +233,7 @@ def count_unknown_link(request: Request) -> bool:
     if not limiter.enabled:
         return False
     item = parse(unknown_link_limit())
-    return not limiter.limiter.hit(item, "unknown-management-link", caller_key(request))
+    return not limiter.limiter.hit(item, "unknown-management-link", caller_of(request))
 
 
 def asset_limit() -> str:

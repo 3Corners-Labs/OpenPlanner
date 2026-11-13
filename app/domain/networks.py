@@ -4,14 +4,15 @@ Three places used to keep their own copy of this: the machine API's allowed netw
 links' ACL and pin, and the pseudonym of a caller. They all need the same few rules, so they live
 here and nowhere else:
 
-    text ─► ``parse_networks`` ─► canonical CIDR strings (host bits cleared, once each, counted)
-    address ─► ``address_of`` ─► IPv4 or IPv6 (an IPv4 address written as IPv6 is the IPv4 one)
-    address + list ─► ``allowed_from`` ─► does one network hold it?
+    text ─► ``split_entries`` ─► ``parse_networks`` ─► canonical CIDR strings (once each, counted)
+    text ─► ``address_of`` ─► IPv4 or IPv6 (an IPv4 address written as IPv6 is the IPv4 one)
+    address + list ─► ``in_any`` ─► does one network hold it?
     address ─► ``caller_key`` ─► what a limiter counts it under: IPv4 as it is, IPv6 by its /64
 
-An empty list of networks means nothing here: a list that holds nothing holds no address. What an
-empty list stands for (any source, any network, none yet) is the caller's own rule and stays in
-the caller. Pure Python, no framework: the web layer passes the address the server derived.
+The matching functions (``in_any``, ``each_within``) give no meaning to an empty list. What an
+empty list stands for (any source, any network, none yet, a setting's choice) is the caller's own
+rule and stays in the caller: the same word must never mean two things here and there. Pure
+Python, no framework: the web layer passes the address the server derived.
 """
 
 import ipaddress
@@ -20,7 +21,6 @@ from collections.abc import Iterable, Sequence
 from app.domain.errors import DomainError, ErrorCode
 
 type Address = ipaddress.IPv4Address | ipaddress.IPv6Address
-type Network = ipaddress.IPv4Network | ipaddress.IPv6Network
 
 IPV6_PREFIX = 64
 """Prefix length under which an IPv6 address counts as one caller: one host owns a whole /64 and
@@ -30,21 +30,26 @@ IPV4_PIN_PREFIX = 32
 """Prefix of the network an IPv4 address pins to (the address itself)."""
 
 UNKNOWN_CALLER = "unknown"
-"""The key of a caller without an address."""
+"""The key (and the pseudonym) of a caller without an address."""
 
 NETWORKS_FIELD = "networks"
 """``DomainError`` field of a refused list, so the page says which input was wrong."""
 
 
+def split_entries(text: str) -> list[str]:
+    """Return the entries of ``text``: one per line or comma separated."""
+    return text.replace(",", "\n").splitlines()
+
+
 def parse_networks(
-    entries: Iterable[str] | str, *, maximum: int, field: str = NETWORKS_FIELD
+    entries: Iterable[str], *, maximum: int, field: str = NETWORKS_FIELD
 ) -> tuple[str, ...]:
     """Return the networks of ``entries`` in canonical CIDR form, each once, in the given order.
 
     Args:
-        entries: Entries (a single address is its own ``/32`` or ``/128``), or one text with the
-            entries one per line or comma separated. Blank entries are skipped. Bits right of the
-            prefix are cleared (``10.0.0.7/24`` is ``10.0.0.0/24``).
+        entries: One network each; a single address is its own ``/32`` or ``/128``. Blank
+            entries are skipped. Bits right of the prefix are cleared (``10.0.0.7/24`` is
+            ``10.0.0.0/24``).
         maximum: How many different networks the caller allows.
         field: The field named in the error.
 
@@ -52,9 +57,8 @@ def parse_networks(
         DomainError: ``invalid_configuration`` for ``field`` when an entry is no network or there
             are more than ``maximum`` different ones.
     """
-    parts = entries.replace(",", "\n").splitlines() if isinstance(entries, str) else entries
     found: list[str] = []
-    for part in parts:
+    for part in entries:
         value = part.strip()
         if not value:
             continue
@@ -69,45 +73,61 @@ def parse_networks(
     return tuple(found)
 
 
+def _read(text: str | None) -> Address | None:
+    """Return ``text`` as written, or ``None`` when it is no address."""
+    try:
+        return ipaddress.ip_address(text or "")
+    except ValueError:
+        return None
+
+
 def address_of(text: str | None) -> Address | None:
     """Return ``text`` as an address, or ``None`` when it is none.
 
     An IPv4 address written as IPv6 (``::ffff:203.0.113.7``) is that IPv4 address: the same
     caller whichever way the network stack spelled it.
     """
-    try:
-        found = ipaddress.ip_address(text or "")
-    except ValueError:
-        return None
+    found = _read(text)
     if isinstance(found, ipaddress.IPv6Address) and found.ipv4_mapped is not None:
         return found.ipv4_mapped
     return found
 
 
-def allowed_from(address: str | None, networks: Sequence[str]) -> bool:
+def in_any(address: str | None, networks: Sequence[str]) -> bool:
     """Return whether ``address`` lies in one of ``networks``.
 
-    An address of the other family does not match (it is no error), an address that is none
-    matches nothing, and an empty list holds no address: the caller decides what that means.
+    An IPv4 address written as IPv6 is tried in both readings: as the IPv4 address against the
+    IPv4 networks and as written against the IPv6 ones, so a list that names a mapped range
+    (``::ffff:0:0/96``) or everything (``::/0``) still lets it in. An address of the other family
+    matches nothing (no error), neither does a text that is no address.
+
+    This gives no meaning to an empty list: it holds no address. Whether an empty list means
+    "no restriction" is the caller's rule, never this function's.
     """
-    found = address_of(address)
-    if found is None:
+    written = _read(address)
+    if written is None:
         return False
+    readings: list[Address] = [written]
+    if isinstance(written, ipaddress.IPv6Address) and written.ipv4_mapped is not None:
+        readings.append(written.ipv4_mapped)
     return any(
-        found.version == net.version and found in net
+        reading.version == net.version and reading in net
         for net in (ipaddress.ip_network(n) for n in networks)
+        for reading in readings
     )
 
 
-def inside(inner: Sequence[str], outer: Sequence[str]) -> bool:
+def each_within(inner: Sequence[str], outer: Sequence[str]) -> bool:
     """Return whether every network of ``inner`` lies within a network of ``outer``.
 
-    Networks of another family are never inside. An empty ``inner`` is inside anything (there is
-    nothing outside); an empty ``outer`` holds only an empty ``inner``.
+    Networks of another family are never within. This gives no meaning to an empty list: an empty
+    ``inner`` is vacuously within anything and an empty ``outer`` holds only an empty ``inner``.
+    What an empty list stands for is the caller's rule.
     """
     wide = [ipaddress.ip_network(n) for n in outer]
     return all(
         any(
+            # The versions are compared first; mypy cannot narrow the pair of networks by that.
             candidate.version == net.version and candidate.subnet_of(net)  # type: ignore[arg-type]
             for net in wide
         )
@@ -128,22 +148,20 @@ def pinned_network(address: str | None) -> str | None:
     return str(ipaddress.ip_network(f"{found}/{prefix}", strict=False))
 
 
-def key_of(address: Address) -> str:
-    """Return what a caller is counted under: an IPv4 address as it is, an IPv6 one by its /64."""
-    if isinstance(address, ipaddress.IPv6Address):
-        return str(ipaddress.IPv6Network((address, IPV6_PREFIX), strict=False))
-    return str(address)
-
-
 def caller_key(address: str | None) -> str:
     """Return the key a limiter counts the caller at ``address`` under.
 
-    A caller that rotates addresses within its IPv6 ``/64`` keeps one key, so it cannot get a
-    fresh bucket per request; an IPv4-mapped IPv6 address has the key of its IPv4 form. The
-    address is the one the server derived, never a header: an unreadable text (a test client)
-    is its own key and a missing address is ``UNKNOWN_CALLER``.
+    An IPv4 address counts as it is, an IPv6 address by its ``/64``, so a caller that rotates
+    addresses within its prefix keeps one key; an IPv4-mapped IPv6 address has the key of its IPv4
+    form. The address is the one the server derived, never a header. The /64 rule holds for
+    addresses only: a text that is no address (a test client's name) is its own key, as the raw
+    text was before, and a missing address is ``UNKNOWN_CALLER``.
     """
     if not address:
         return UNKNOWN_CALLER
     found = address_of(address)
-    return address if found is None else key_of(found)
+    if found is None:
+        return address
+    if isinstance(found, ipaddress.IPv6Address):
+        return str(ipaddress.IPv6Network((found, IPV6_PREFIX), strict=False))
+    return str(found)
