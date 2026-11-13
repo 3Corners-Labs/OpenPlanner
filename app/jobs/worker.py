@@ -53,7 +53,7 @@ from app.domain.address_check import AddressWatch
 from app.domain.admin import AdminService
 from app.domain.admin_session_service import AdminSessionService
 from app.domain.alert_delivery import AlertNotifier
-from app.domain.alerts import QUEUE_WAIT_EVENT, open_conditions
+from app.domain.alerts import QUEUE_WAIT_EVENT, RECOVERY_EVENT, open_conditions
 from app.domain.booking_rollup_service import BookingRowRollup
 from app.domain.change_request_service import prune_change_requests
 from app.domain.diagnostics import DiagnosticsService
@@ -76,6 +76,7 @@ from app.domain.queue_wait import NotPickedUpWatch, QueueWaitWatch
 from app.domain.report_digest_service import DigestRunner
 from app.domain.request_dispatch import AttemptEvents, own_connection_of
 from app.domain.request_log import RequestEvents
+from app.domain.request_recovery import RecoveryWatch
 from app.domain.request_watch import WatchResult
 from app.domain.retention_sweep import RetentionSweep
 from app.domain.security_log import SecurityLog
@@ -400,6 +401,8 @@ async def run_worker(
     )
     # ADR 0043 point 8: one system event per own-queue booking nobody claimed in time.
     unpicked = NotPickedUpWatch(uow, clock, system_log)
+    # ADR 0121 step 5e: an alert while a service has work in recovery.
+    recovery = RecoveryWatch(uow, system_log, partial(_open_recovery, uow))
     # ADR 0082 point 9: the open alerts to their email addresses and Webex spaces.
     notifier = AlertNotifier(
         uow,
@@ -493,6 +496,7 @@ async def run_worker(
                     await _digest(digest, digest_texts)
                     await _watch_waits(waits)
                     await _watch_unpicked(unpicked)
+                    await _watch_recovery(recovery)
                 settings.worker_heartbeat_path.write_text(clock.now().isoformat())
             with suppress(TimeoutError):
                 await asyncio.wait_for(stop.wait(), timeout=live.settings.worker_poll_seconds)
@@ -644,6 +648,22 @@ async def _check_integrations(watch: IntegrationWatch) -> None:
 async def _open_waits(uow: UnitOfWork) -> set[str]:
     """Return the groups with an open wait alert, so a restarted watch continues from them."""
     return {a.group for a in await open_conditions(uow, QUEUE_WAIT_EVENT) if a.group}
+
+
+async def _open_recovery(uow: UnitOfWork) -> set[str]:
+    """Return the services with an open recovery alert, so a restarted watch continues."""
+    return {a.group for a in await open_conditions(uow, RECOVERY_EVENT) if a.group}
+
+
+async def _watch_recovery(watch: RecoveryWatch) -> None:
+    """Record the services whose work in recovery started or ended; never stops the loop."""
+    try:
+        changed = await watch.check()
+    except Exception as exc:  # e.g. schema not migrated yet
+        log.warning("requests.recovery_watch_failed", error=type(exc).__name__)
+        return
+    if changed:
+        log.info("requests.recovery_changed", groups=len(changed))
 
 
 async def _watch_waits(watch: QueueWaitWatch) -> None:

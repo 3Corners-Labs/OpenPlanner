@@ -43,8 +43,10 @@ from app.admin.live import Seen, fragment, key
 from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.request_queue_views import (
     ImmediateRowView,
+    RecoveryRowView,
     WorkView,
     immediate_rows,
+    recovery_rows,
     work_view,
 )
 from app.admin.skill_inputs import skill_name
@@ -147,6 +149,8 @@ class ListView:
     """Requests without an appointment, oldest first (ADR 0121 step 7)."""
     has_next_immediate: bool = False
     """*Pick up next* has a request without an appointment to take."""
+    recovery: list[RecoveryRowView] = field(default_factory=list)
+    """Work in recovery, for a supervisor of the queue (ADR 0121 step 5e)."""
 
 
 @dataclass(frozen=True)
@@ -230,6 +234,7 @@ async def _list_view(
     view = await _service(request).view(context.principal, slug)
     rows = [_row(r, view, locale, view.group.tz, view.group.routing) for r in view.rows]
     immediate = await immediate_rows(request, locale, context, slug, view.free_pick)
+    recovery = recovery_rows(request, locale, slug, view.recovery)
     waiting = sum(1 for r in view.rows if r.in_lobby and not r.claimed)
     has_next = view.next_booking_id is not None
     shown = [
@@ -252,9 +257,10 @@ async def _list_view(
         has_next,
         view.free_pick,
         _("admin.queue.announcement", count=len(rows), waiting=waiting),
-        key(shown, has_next, immediate.rows, immediate.has_next),
+        key(shown, has_next, immediate.rows, immediate.has_next, [r.key for r in recovery]),
         immediate.rows,
         immediate.has_next,
+        recovery,
     )
 
 
@@ -267,6 +273,7 @@ def _list_context(request: Request, slug: str, view: ListView) -> dict[str, obje
         "announcement": view.announcement,
         "immediate": view.immediate,
         "has_next_immediate": view.has_next_immediate,
+        "recovery": view.recovery,
         **_poll(request, f"{_url(slug)}/live", view.key),
     }
 
