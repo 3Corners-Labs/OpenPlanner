@@ -15,12 +15,12 @@ import structlog
 import uvicorn
 from fastapi import FastAPI, Request
 from slowapi import Limiter
-from slowapi.util import get_remote_address
 from sqlalchemy import text
 
 from app.adapters.db.engine import create_engine
 from app.domain.event_context import bind_actor_role, bind_level, set_service, trace_scope
 from app.domain.event_schema import SCHEMA, Envelope
+from app.domain.networks import caller_key
 from app.domain.privacy import ALIASES
 from app.domain.privacy import PII_FIELDS as PII_COLUMNS
 from app.logging import (
@@ -34,6 +34,7 @@ from app.logging import (
     tracer,
     warn_loose_secret_files,
 )
+from app.web.caller import caller_of
 
 
 @pytest.fixture
@@ -534,7 +535,8 @@ async def _limited_page(request: Request, token: str) -> dict[str, str]:
 @pytest.mark.parametrize("address", ADDRESSES)
 async def test_a_rate_limit_hit_leaves_no_address_and_no_path_in_any_line(address: str) -> None:
     """slowapi writes ``ratelimit 2 per 1 minute (<address>) exceeded at endpoint: <path>``."""
-    limiter = Limiter(key_func=get_remote_address)  # as app.web.protection builds it
+    limiter = Limiter(key_func=caller_of)  # as app.web.protection builds it
+    key = caller_key(address)  # slowapi writes the key: the address, or an IPv6 address's /64
     app = FastAPI()
     app.add_api_route("/b/{token}", limiter.limit("2/minute")(_limited_page))
     transport = httpx.ASGITransport(app=app, client=(address, 50000))
@@ -543,8 +545,8 @@ async def test_a_rate_limit_hit_leaves_no_address_and_no_path_in_any_line(addres
             statuses = [(await client.get(f"/b/{TOKEN}")).status_code for _ in range(3)]
 
     assert statuses == [200, 200, 429]
-    assert any(address in message and TOKEN in message for message in watch.seen.messages)
-    assert watch.leaks(address, TOKEN, "/b/") == []
+    assert any(key in message and TOKEN in message for message in watch.seen.messages)
+    assert watch.leaks(address, key, TOKEN, "/b/") == []
 
 
 def test_a_slowapi_warning_without_request_data_still_reaches_the_log(

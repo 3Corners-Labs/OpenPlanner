@@ -22,6 +22,7 @@ from app.domain.api_clients import ApiAuthError, ApiCaller
 from app.domain.authorization import API_SCOPES, ApiScope
 from app.domain.scheduling import GroupSummary
 from app.domain.security_log import TOKEN_REJECTED, UNKNOWN_TOKEN
+from app.web.caller import caller_of, client_address
 from app.web.security_events import report
 
 log = structlog.get_logger()
@@ -63,11 +64,6 @@ def api_access(request: Request) -> ApiAccessService:
     """Return the application's machine API service."""
     service: ApiAccessService = request.app.state.api_access
     return service
-
-
-def client_address(request: Request) -> str | None:
-    """Return the caller's IP address (behind a proxy, uvicorn's ``--proxy-headers`` sets it)."""
-    return request.client.host if request.client else None
 
 
 @dataclass(frozen=True)
@@ -152,6 +148,10 @@ class RequireScope:
 
 
 def client_key(request: Request) -> str:
-    """Rate-limit key of an authenticated call: the client id (set by ``RequireScope``)."""
+    """Rate-limit key of an authenticated call: the client id (set by ``RequireScope``).
+
+    A call that did not authenticate is counted by its caller (``caller_of``: an IPv6 caller by
+    its /64), so a prober cannot rotate addresses to get a fresh bucket.
+    """
     client_id = getattr(request.state, "agent_client_id", None)
-    return f"agent:{client_id}" if client_id else f"agent-ip:{client_address(request)}"
+    return f"agent:{client_id}" if client_id else f"agent-ip:{caller_of(request)}"

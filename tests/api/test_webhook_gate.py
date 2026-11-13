@@ -12,6 +12,7 @@ from app.adapters.db.engine import create_engine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
 from app.domain.authorization import Scope
+from app.main import create_app
 from app.web.protection import limiter
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
@@ -256,6 +257,40 @@ async def test_probing_made_up_addresses_is_a_404_up_to_the_limit_then_a_429(
     assert (over.status_code, over.content, over.headers["retry-after"]) == (429, b"", "60")
     assert again.status_code == 429
     assert ("rate", "source:unknown") in await _refusals(database_url)
+
+
+async def test_rotating_addresses_within_an_ipv6_64_never_opens_a_fresh_bucket(
+    settings: Settings, database_url: str
+) -> None:
+    """Abuse case ADR 0124 step 2a: an IPv6 caller counts by its /64, in every webhook bucket."""
+    limited = _configured(
+        settings, database_url, rate_limit_enabled=True, rate_limit_webhook_per_minute=5
+    )
+    app = create_app(limited, FixedClock(NOW))
+
+    async def post(address: str, path: str, **headers: str) -> int:
+        transport = httpx.ASGITransport(app=app, client=(address, 4711))
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
+            return (await c.post(path, content=b"{}", headers=headers)).status_code
+
+    forged = {"x-spark-signature": "bad"}
+    async with app.router.lifespan_context(app):
+        # Calls to addresses that do not exist: one bucket per /64, each call from a new address.
+        probes = [await post(f"2001:db8:1:2::{n:x}", _unknown(n)) for n in range(1, 7)]
+        other_64 = await post("2001:db8:1:3::1", _unknown(7))
+        # Refused calls to an address that exists: the same.
+        refused = [
+            await post(f"2001:db8:5:6::{n:x}", "/webhooks/webex", **forged) for n in range(6)
+        ]
+        # An IPv4 caller is counted as it is; the mapped form shares its bucket.
+        v4 = [await post("203.0.113.7", "/webhooks/webex", **forged) for _ in range(3)]
+        mapped = [await post("::ffff:203.0.113.7", "/webhooks/webex", **forged) for _ in range(3)]
+
+    assert probes == [404] * 5 + [429]
+    assert other_64 == 404
+    assert refused == [401] * 5 + [429]
+    assert v4 == [401] * 3
+    assert mapped == [401] * 2 + [429]
 
 
 async def test_a_full_bucket_for_unknown_addresses_never_locks_a_real_address_out(

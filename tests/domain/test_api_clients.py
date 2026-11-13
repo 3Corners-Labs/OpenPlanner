@@ -19,7 +19,6 @@ from app.domain.api_clients import (
     new_access_token,
     new_client_id,
     new_secret,
-    parse_networks,
 )
 from app.domain.authorization import ApiScope
 from app.domain.errors import DomainError, ErrorCode
@@ -47,10 +46,20 @@ def test_client_ids_are_recognised_by_shape() -> None:
         assert not is_client_id(bad)
 
 
+def _draft(networks: list[str]) -> ClientDraft:
+    return ClientDraft.create(
+        name="Bot",
+        organisation="acme",
+        groups=[],
+        scopes=[ApiScope.AVAILABILITY_READ.value],
+        networks=networks,
+    )
+
+
 def test_networks_are_normalised_and_deduplicated() -> None:
     lines = ["  10.0.0.7/24", "", "10.0.0.0/24", "2001:db8::1", "192.0.2.1"]
 
-    assert parse_networks(lines) == ("10.0.0.0/24", "2001:db8::1/128", "192.0.2.1/32")
+    assert _draft(lines).networks == ("10.0.0.0/24", "2001:db8::1/128", "192.0.2.1/32")
 
 
 TOO_MANY = [f"10.0.{i}.0/24" for i in range(MAX_NETWORKS + 1)]
@@ -59,7 +68,7 @@ TOO_MANY = [f"10.0.{i}.0/24" for i in range(MAX_NETWORKS + 1)]
 @pytest.mark.parametrize("lines", [["not-a-network"], ["10.0.0.0/33"], TOO_MANY])
 def test_bad_or_too_many_networks_are_refused(lines: list[str]) -> None:
     with pytest.raises(DomainError) as caught:
-        parse_networks(lines)
+        _draft(lines)
     assert (caught.value.code, caught.value.field) == (ErrorCode.INVALID_CONFIGURATION, "networks")
 
 
@@ -72,6 +81,25 @@ def test_address_allow_list() -> None:
     assert not address_allowed(networks, "10.0.1.9")
     assert not address_allowed(networks, None)
     assert not address_allowed(networks, "testclient")
+
+
+def test_an_ipv4_address_written_as_ipv6_is_the_ipv4_address() -> None:
+    """ADR 0124 step 2a: it used to be compared without unwrapping, so it never matched."""
+    networks = ("10.0.0.0/24",)
+
+    assert address_allowed(networks, "::ffff:10.0.0.9")
+    assert not address_allowed(networks, "::ffff:10.0.1.9")
+    assert address_allowed((), "::ffff:10.0.1.9")
+
+
+@pytest.mark.parametrize("listed", ["::ffff:10.0.0.0/104", "::ffff:0:0/96", "::/0"])
+def test_a_mapped_address_still_matches_an_ipv6_network_that_lets_it_in(listed: str) -> None:
+    """Both readings are tried: a list written for the mapped form keeps working."""
+    assert address_allowed((listed,), "::ffff:10.0.0.9")
+
+
+def test_a_plain_ipv6_caller_does_not_match_an_ipv4_network() -> None:
+    assert not address_allowed(("10.0.0.0/8",), "2001:db8::9")
 
 
 def test_draft_validates_name_and_scopes() -> None:
