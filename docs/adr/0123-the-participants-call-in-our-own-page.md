@@ -1,7 +1,8 @@
 # 0123. The participant's call in our own page, on the Webex Meetings SDK
 
-Status: accepted, partly built (2026-11-13), requested by the product owner. Step 1 is built, no
-page yet (see *Build status*); it merged together with that step (ADR 0119). Extends ADR 0017 (video through the Webex
+Status: accepted, partly built (2026-11-13), requested by the product owner. Steps 1 and 2 are built: the
+page exists as a shell behind the feature switch, without a call (see *Build status*); the ADR
+merged together with step 1 (ADR 0119). Extends ADR 0017 (video through the Webex
 Meetings API), ADR 0071 (trial call) and ADR 0075 (`join_client` gets a third value). It is the
 separate ADR that ADR 0045 (*Later*) and ADR 0075 (*Consequences*, issue #162) point to. Amends
 ADR 0118 §2 and §5 to §7 by naming a third kind of page next to islands and the widget, and the
@@ -409,7 +410,7 @@ the pseudonym key, which is the existing bootstrap key material, not a new secre
 |---|---|---|---|
 | 0 | ADR proposed; the lines of `CLAUDE.md` it amends; the row in `docs/adr-status.md`; the findings in `docs/research/call-page-on-the-meetings-sdk.md` | #787 | merged |
 | 1 | `VideoProvider.guest_access`, the Webex adapter's guest token call with its fake and contract fixture, the pseudonymous subject in the domain, the guest-scope finding in the service-app check; the five call settings of this ADR in the registry. No page, no participant sees a change | #787 | merged |
-| 2 | The call page as a kind of page: the vendored SDK with manifest, size gate and SBOM entry; `CALL_CSP` and the permissions for the one route with their tests (`render()` takes the kind of page); the recorded exception in `no-third-parties.spec.ts`; `docs/dependencies.md`. The SDK file itself waits for the licence answer (point 3) | | planned |
+| 2 | The call page as a kind of page: the vendored SDK with manifest, size gate and SBOM entry; `CALL_CSP` and the permissions for the one route with their tests (`render()` takes the kind of page); the recorded exception in `no-third-parties.spec.ts`; `docs/dependencies.md`. The SDK file itself waits for the licence answer (point 3) | #806 | merged |
 | 3 | Design: mock-ups of every state of point 10, the chat side bar included, in two organisations' themes, approved by the product owner (point 15) | | planned |
 | 4 | The way in: device check with camera, microphone and speaker test, the token endpoint with its abuse cases, connecting with retry, the lobby, the failure state with `embedded_call_webex_option`; behind `embedded_call_enabled`. First, on the lab site: what a guest token can do, and the rename at the purge (points 6 and 7). With it: the rename job, `embedded_call_token_per_booking_per_hour`, the data flow, the threat model with its abuse cases, and the runbook entry for an SDK that stops working | | planned |
 | 5 | In the call: the control bar, device change, sharing a screen both ways, the recording and connection notices, closed captions (point 12), the ended and failed states; the data flow and threat model for the call | | planned |
