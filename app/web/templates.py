@@ -19,10 +19,7 @@ from starlette.responses import HTMLResponse
 from app.logging import tracer
 from app.web.locale import LANG_PARAM, RequestLocale
 from app.web.protection import is_action
-from app.web.security_policy import CALL_CSP as CALL_CSP  # noqa: PLC0414 - re-exported
 from app.web.security_policy import CALL_POLICY, POLICIES, PageKind, Policy
-from app.web.security_policy import HTML_CSP as HTML_CSP  # noqa: PLC0414 - re-exported
-from app.web.security_policy import SCRIPT_CSP as SCRIPT_CSP  # noqa: PLC0414 - re-exported
 from app.web.static_assets import ASSETS
 from app.web.widgets import OVERVIEW_PATH
 

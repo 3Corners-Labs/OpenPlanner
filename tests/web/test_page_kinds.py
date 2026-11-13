@@ -24,9 +24,25 @@ from tests.web.conftest import RenderSource
 
 APP = Path("app")
 CALL_NAMES = frozenset(
-    {"render_call_page", "participant_call_page", "CALL_POLICY", "CALL_CSP", "CALL_PERMISSIONS"}
+    {
+        "render_call_page",
+        "participant_call_page",
+        "_render",
+        "CALL_POLICY",
+        "CALL_CSP",
+        "CALL_PERMISSIONS",
+    }
 )
-"""Every name that can produce the call page's response policy."""
+"""Every name that can produce the call page's response policy, the shared private renderer
+(which takes any ``Policy``) included."""
+DYNAMIC_NAMES = frozenset({"__import__", "globals", "vars", "eval", "exec", "importlib"})
+DYNAMIC_ALLOWED = frozenset({"app/logging.py"})
+"""Modules of ``app/`` that may reach a name by a string or by the module table. Each defeats the
+closed list above, so an entry needs a reason: ``app/logging.py`` calls ``vars(record)`` on a log
+record (its attributes), never on a module."""
+PRIVATE_NAMES = frozenset({"_render"})
+"""Names that other modules use for their own local helpers (``_render`` is common): only an
+import of the name or an attribute access (``templates._render``) counts, not a local name."""
 CALL_MODULES = frozenset(
     {
         "app/web/security_policy.py",
@@ -135,7 +151,7 @@ def _mentions(tree: ast.AST, names: frozenset[str]) -> set[str]:
                     found.add(alias.name)
         elif isinstance(node, ast.Name | ast.Attribute):
             name = node.id if isinstance(node, ast.Name) else node.attr
-            if name in names:
+            if name in names and not (isinstance(node, ast.Name) and name in PRIVATE_NAMES):
                 found.add(name)
         elif isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value in names:
             found.add(node.value)  # getattr(module, "CALL_POLICY")
@@ -169,10 +185,88 @@ def test_the_syntax_check_sees_an_alias_and_a_forwarded_name() -> None:
     aliased = ast.parse("from app.web.templates import render_call_page as r\nr()")
     forwarded = ast.parse("import app.web.security_policy as p\nx = p.CALL_POLICY")
     by_string = ast.parse('getattr(m, "CALL_CSP")')
+    private_import = ast.parse("from app.web.templates import _render as r")
+    private_attribute = ast.parse("import app.web.templates as t\nt._render(1)")
+    private_local = ast.parse("def _render(x):\n    return x\n_render(1)")
 
     assert _mentions(aliased, CALL_NAMES) == {"render_call_page"}
     assert _mentions(forwarded, CALL_NAMES) == {"CALL_POLICY"}
     assert _mentions(by_string, CALL_NAMES) == {"CALL_CSP"}
+    assert _mentions(private_import, CALL_NAMES) == {"_render"}
+    assert _mentions(private_attribute, CALL_NAMES) == {"_render"}
+    assert _mentions(private_local, CALL_NAMES) == set()
+
+
+def _constructs(tree: ast.AST, name: str) -> bool:
+    """Whether a module calls ``name(...)`` or ``x.name(...)``."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            func = node.func
+            if (isinstance(func, ast.Name) and func.id == name) or (
+                isinstance(func, ast.Attribute) and func.attr == name
+            ):
+                return True
+    return False
+
+
+def test_only_the_policy_module_builds_a_policy() -> None:
+    builders = {path for path, tree in _modules().items() if _constructs(tree, "Policy")}
+
+    assert builders == {"app/web/security_policy.py"}
+
+
+def test_the_construction_check_sees_a_call_under_any_spelling() -> None:
+    assert _constructs(ast.parse("Policy('a', 'b')"), "Policy")
+    assert _constructs(ast.parse("m.Policy(csp='a', permissions='b')"), "Policy")
+    assert not _constructs(ast.parse("x: Policy = y"), "Policy")
+
+
+def _dynamic(tree: ast.AST) -> set[str]:
+    """The ways a module can reach a name without writing it: dynamic imports and name tables."""
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id in DYNAMIC_NAMES:
+            found.add(node.id)
+        elif isinstance(node, ast.Attribute) and node.attr == "import_module":
+            found.add("import_module")
+        elif (
+            isinstance(node, ast.Attribute)
+            and node.attr == "modules"
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "sys"
+        ):
+            found.add("sys.modules")
+        elif isinstance(node, ast.ImportFrom) and node.module == "importlib":
+            found.add("importlib")
+        elif isinstance(node, ast.Import) and any(a.name == "importlib" for a in node.names):
+            found.add("importlib")
+    return found
+
+
+def test_no_module_reaches_a_name_dynamically() -> None:
+    reaching = {
+        path: found
+        for path, tree in _modules().items()
+        if path not in DYNAMIC_ALLOWED and (found := _dynamic(tree))
+    }
+
+    assert reaching == {}
+
+
+def test_the_dynamic_check_sees_each_way() -> None:
+    sources = [
+        "import importlib",
+        "from importlib import import_module",
+        "m = __import__('x')",
+        "g = globals()['CALL_POLICY']",
+        "v = vars(mod)",
+        "import sys\nsys.modules['a']",
+        "eval('x')",
+        "x.import_module('a')",
+    ]
+
+    assert all(_dynamic(ast.parse(source)) for source in sources)
+    assert not _dynamic(ast.parse("import os\nprint(os.path)"))
 
 
 def _header_writers(tree: ast.AST) -> bool:

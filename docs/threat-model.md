@@ -895,8 +895,18 @@ are added there).
 | The SDK file is committed before the licence answer | `.gitignore`, `.dockerignore` and a test on the tracked files | `tests/web/test_vendor.py::test_the_file_is_not_committed_until_the_licence_answer`, `::test_a_locally_built_image_cannot_carry_a_hand_placed_file` |
 | The SBOM lists a vendored package that no image contains, so the scan fails every pull request or the attested SBOM is wrong | `scripts/vendor_sbom.py` adds the component only when the file is placed with a checksum of the pinned version, and says so otherwise | `tests/scripts/test_vendor_sbom.py` |
 | The page is reachable, or shows that the feature exists, while it is switched off | While `embedded_call_enabled` is off the route answers `404` exactly as an unknown address, before the booking is looked at | `tests/api/test_call_pages.py::test_the_page_does_not_exist_while_the_feature_is_off` |
-| A browser without the participant's session opens the page | The same session check as the join page; a refusal is the same for a booking that does not exist | `tests/api/test_call_pages.py::test_the_page_needs_the_participants_session` |
+| A browser without the participant's session opens the page | The same session check as the join page: a `403` that is the same for a booking that does not exist, one `token.rejected` security event (reason `link_required`, no reference in it) and a draw on the budget for links that match nothing | `tests/api/test_call_pages.py::test_the_page_needs_the_participants_session`, `tests/api/test_security_events.py::test_a_visit_to_the_call_page_without_a_session_is_a_security_event` |
 | A public page contacts another origin before the participant clicks | `no-third-parties.spec.ts` keeps failing on every page, and on the call page before the click; the call hosts are allowed after the join click only (a recorded allowance nothing uses yet; not run here) | `e2e/tests/no-third-parties.spec.ts` |
+
+What an attack on this flow leaves in the log: a visit without the participant's session is the
+one `token.rejected` security event above. The other cases leave no event, each for its own
+reason. Another route getting the call page's policy, a loosened policy, a swapped or grown SDK
+file, a committed file and an SBOM entry for a file that is not shipped are defects of the build,
+found by the tests and gates named in the table before anything is released; there is no request
+to attribute at run time. A visit while the feature is off is an unknown address like any other
+(a `404`, the same page and the same headers), so it leaves what an unknown address leaves,
+which is nothing. A page that contacts another origin is caught by the end-to-end test, not
+by a runtime event.
 
 ## Flow: widget script on host websites (ADR 0035, EM-3)
 

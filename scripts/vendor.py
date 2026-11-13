@@ -16,6 +16,7 @@ is false until the file and the checksum are replaced together. ``scripts.check_
 ``scripts.vendor_sbom`` and ``tests/web/test_vendor.py`` read manifests through this module only.
 """
 
+import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -61,6 +62,20 @@ class Manifest:
     def checksum_is_current(self) -> bool:
         """Whether the manifest carries a checksum taken of the pinned ``version``."""
         return self.sha256 is not None and self.checksum_version == self.version
+
+
+def file_matches(manifest: Manifest) -> bool:
+    """Whether the placed file's bytes are the ones the manifest's current checksum names.
+
+    True only when the file is placed, the checksum is of the pinned version and the SHA-256 of
+    the file equals it. The one place that hashes a vendored file: the size and checksum gates
+    of ``tests/web/test_vendor.py`` and the SBOM step both use it.
+    """
+    return (
+        manifest.placed
+        and manifest.checksum_is_current
+        and hashlib.sha256(manifest.vendored.read_bytes()).hexdigest() == manifest.sha256
+    )
 
 
 def load(path: Path) -> Manifest:

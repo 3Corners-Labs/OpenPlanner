@@ -12,7 +12,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from scripts.vendor import Manifest, load, manifests
+from scripts.vendor import Manifest, file_matches, load, manifests
 
 WEBEX = Path("app/web/static/vendor/webex")
 MAX_GZIP_BYTES = 1_200 * 1024
@@ -32,7 +32,7 @@ def problems(manifest: Manifest) -> list[str]:
         # Renovate moves ``version`` only: until the file and its checksum are replaced too, a
         # placed file is the old one (or has no checksum at all).
         found.append("no checksum of this version")
-    elif hashlib.sha256(data).hexdigest() != manifest.sha256:
+    elif not file_matches(manifest):
         found.append("sha256 differs from the manifest")
     return found
 

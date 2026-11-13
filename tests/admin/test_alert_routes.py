@@ -17,8 +17,8 @@ from app.domain.calls import CallStatus
 from app.domain.integration_check import CHECK_EVENT
 from app.domain.storage import STORAGE_EVENT
 from app.i18n.formatting import placeholders
+from app.web.security_policy import HTML_CSP, SCRIPT_CSP
 from app.web.settings_labels import TLS_FINDING_LABELS
-from app.web.templates import HTML_CSP, SCRIPT_CSP
 from tests.admin.conftest import AGENT, AUDITOR, ORG_ADMIN, OUTSIDER, SUPER, Site, _running_site
 from tests.support.admin_site import site_uow
 from tests.support.queue import own_queue
