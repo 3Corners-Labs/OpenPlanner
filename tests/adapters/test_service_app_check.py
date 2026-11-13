@@ -49,6 +49,19 @@ async def test_the_probes_run_and_the_region_check_follows_a_working_token() -> 
     assert "/v2/tasks" in seen
 
 
+async def test_the_guest_token_is_asked_for_only_when_the_embedded_call_is_on() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403 if request.url.path == "/v1/guests/token" else 200, json={})
+
+    tokens, http = webex_tokens(handler, CLOCK)
+
+    off = await service_app_check(http, tokens, WEBEX, None, CLOCK)
+    on = await service_app_check(http, tokens, WEBEX, None, CLOCK, embedded_call_enabled=True)
+
+    assert not [r for r in off if r.name == "POST /guests/token"]
+    assert [r.required for r in on if r.name == "POST /guests/token"] == [True]
+
+
 def test_a_report_round_trips_without_tokens_or_bodies() -> None:
     body = report_body(LINES, wxcc_checked=True)
 

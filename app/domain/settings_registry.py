@@ -18,6 +18,7 @@ from enum import StrEnum
 import phonenumbers
 
 from app.domain.authorization import Permission
+from app.domain.guest_access import DisplayNameMode, StaffNameMode
 
 
 class SettingClass(StrEnum):
@@ -2298,6 +2299,57 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "opened from the emailed link (ADR 0093); the email link always works again.",
         minimum=20,
         maximum=168,
+    ),
+    S(
+        "embedded_call_enabled",
+        K.BOOL,
+        False,
+        _C,
+        T.WEBEX,
+        "Whether groups on this installation may let participants join the call in the "
+        "organisation's own page instead of the Webex app; off until the conditions of "
+        "ADR 0123 point 18 are met.",
+    ),
+    S(
+        "embedded_call_connect_seconds",
+        K.INT,
+        30,
+        _C,
+        T.WEBEX,
+        "Seconds the call page waits for one attempt at registering or joining before it "
+        "tries again (ADR 0123).",
+        minimum=10,
+        maximum=90,
+    ),
+    S(
+        "embedded_call_connect_attempts",
+        K.INT,
+        3,
+        _C,
+        T.WEBEX,
+        "Attempts the call page makes before it says it cannot connect (ADR 0123).",
+        minimum=1,
+        maximum=5,
+    ),
+    S(
+        "embedded_call_display_name",
+        K.ENUM,
+        "first_name",
+        _D,
+        T.DISPLAY,
+        "What staff see as the participant's name in the call page's meeting: the first name, "
+        "or the organisation's word for a participant (ADR 0123).",
+        choices=tuple(m.value for m in DisplayNameMode),
+    ),
+    S(
+        "embedded_call_staff_name",
+        K.ENUM,
+        "name",
+        _D,
+        T.DISPLAY,
+        "How the call page names the staff member to the participant: the name of their "
+        "account, or the organisation's word for staff (ADR 0123).",
+        choices=tuple(m.value for m in StaffNameMode),
     ),
 )
 """Every setting of the service, in the order of ``docs/settings.md``."""

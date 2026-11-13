@@ -34,11 +34,22 @@ async def service_app_check(
     webex_base_url: str,
     wxcc_base_url: str | None,
     clock: Clock,
+    *,
+    embedded_call_enabled: bool = False,
 ) -> list[CheckResult]:
-    """Run every probe, then the WxCC region check when the token works."""
+    """Run every probe, then the WxCC region check when the token works.
+
+    With ``embedded_call_enabled`` the guest token probe is added and required (ADR 0123
+    point 17); without it nothing is asked of the guest endpoint.
+    """
     if tokens is None:
         return [NOT_CONFIGURED]
-    results = await run_checks(http, tokens, probes(webex_base_url, wxcc_base_url), clock)
+    results = await run_checks(
+        http,
+        tokens,
+        probes(webex_base_url, wxcc_base_url, guest=embedded_call_enabled),
+        clock,
+    )
     if wxcc_base_url and results[0].ok:
         token = await tokens.access_token()
         results.append((await region_check(http, token, wxcc_base_url))[0])

@@ -314,6 +314,11 @@ class Settings(BaseSettings):
     # ADR 0121 step 5: how long a claimed request may wait for its start before it goes back to
     # the queue, fixed into the work item at the claim. Class D organisation.
     assignment_start_lease_minutes: int = Field(default=5, ge=1, le=30)
+    # ADR 0123 point 7 and the *Settings* table: what the participant is called to staff (the
+    # first name, or the organisation's word) and what staff are called to the participant (their
+    # account name, or the organisation's word). Class D organisation.
+    embedded_call_display_name: Literal["first_name", "term"] = "first_name"
+    embedded_call_staff_name: Literal["name", "term"] = "name"
     # ADR 0121 step 5: the watchdog: hours after the appointment's end before unstarted work
     # expires and started work is marked for recovery. Class D organisation.
     request_unresolved_hours: int = Field(default=24, ge=1, le=168)
@@ -429,6 +434,12 @@ class Settings(BaseSettings):
     # ADR 0093: how long a participant's browser keeps the right to use a booking after it last
     # did. At least 20 hours, so no form has a time limit in practice (WCAG 2.2.1). Class C.
     participant_link_session_hours: int = Field(default=24, ge=20, le=168)
+    # ADR 0123: the participant's call in our own page. The switch stays off until the
+    # conditions of its point 18 are met; the connect values are how long and how often the page
+    # tries before it says it cannot connect. Class C, platform.
+    embedded_call_enabled: bool = False
+    embedded_call_connect_seconds: int = Field(default=30, ge=10, le=90)
+    embedded_call_connect_attempts: int = Field(default=3, ge=1, le=5)
     # ADR 0046, staff directory. An admin's "last seen" is written at most once per this many
     # seconds (class C, platform; ADR 0042 registry).
     staff_last_seen_interval_seconds: int = Field(default=300, ge=60, le=3600)
