@@ -144,6 +144,23 @@ async def test_webhook_events_are_claimed_once_and_forgotten(engine: AsyncEngine
     assert after is True
 
 
+async def test_a_webhook_event_can_be_looked_up_without_remembering_it(
+    engine: AsyncEngine,
+) -> None:
+    """The old shape of a key is only read (ADR 0124 step 3a): asking never writes."""
+    uow = SqlUnitOfWork(engine)
+
+    async with uow.locked() as tx:
+        before = await tx.webhook_event_seen("webex", "a" * 64)
+        await tx.claim_webhook_event("webex", "a" * 64, NOW)
+        after = await tx.webhook_event_seen("webex", "a" * 64)
+        other_source = await tx.webhook_event_seen("wxcc", "a" * 64)
+        still_new = await tx.claim_webhook_event("webex", "b" * 64, NOW)
+        asked = await tx.webhook_event_seen("webex", "b" * 64)
+
+    assert (before, after, other_source, still_new, asked) == (False, True, False, True, True)
+
+
 async def test_direct_calls_are_listed_with_their_status_and_cap(engine: AsyncEngine) -> None:
     await seed_group(engine, slug="balie", capacity=2)
     uow = SqlUnitOfWork(engine)

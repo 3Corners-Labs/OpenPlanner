@@ -26,6 +26,7 @@ from app.domain.service_requests import (
     WorkItem,
     WorkItemState,
 )
+from app.domain.webhook_replay import INSTALLATION_SCOPE
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.contact_center_requests import CC_FLOW, WINDOW, Desk, cc_world, desk
@@ -80,6 +81,8 @@ async def event(the_desk: Desk, task_id: str, kind: EventKind, origin: str = "")
         origin=origin,
         provider=ContactCenterKind.WEBEX_CC,
         source=SOURCE,
+        scope=INSTALLATION_SCOPE,
+        body_identity="",
     )
 
 
@@ -413,6 +416,8 @@ async def test_a_late_task_is_only_ours_within_the_window_and_the_organisation(
         provider=ContactCenterKind.WEBEX_CC,
         source=SOURCE,
         organisation_id=2,
+        scope=INSTALLATION_SCOPE,
+        body_identity="",
     )
     assert foreign is EventOutcome.UNKNOWN
     clock.advance(timedelta(minutes=WINDOW))
@@ -466,6 +471,8 @@ async def test_the_installation_address_never_adopts_work_of_an_organisation_wit
         provider=ContactCenterKind.WEBEX_CC,
         source=SOURCE,
         organisation_id=1,
+        scope=INSTALLATION_SCOPE,
+        body_identity="",
     )
     assert own is EventOutcome.RECORDED
     task = uow.state.bookings[booking_id].contact_center_task

@@ -583,6 +583,10 @@ class ContactCenterConnections(Protocol):
         """Generate a new webhook secret for an existing connection, replacing the old one."""
         ...
 
+    async def set_inbound_enabled(self, organisation_id: int, enabled: bool, now: datetime) -> None:
+        """Pause or resume the address of an existing connection; nothing else of it changes."""
+        ...
+
     async def delete(self, organisation_id: int) -> None:
         """Remove the organisation's connection and its secrets."""
         ...
@@ -1413,6 +1417,10 @@ class Transaction(Protocol):
 
     async def claim_webhook_event(self, source: str, key: str, at: datetime) -> bool:
         """Remember that the event ``key`` from ``source`` was seen; ``False`` if it was before."""
+        ...
+
+    async def webhook_event_seen(self, source: str, key: str) -> bool:
+        """Return whether the event ``key`` from ``source`` is remembered; remembers nothing."""
         ...
 
     async def forget_webhook_events(self, before: datetime) -> int:

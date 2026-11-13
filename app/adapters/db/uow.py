@@ -1477,6 +1477,15 @@ class SqlTransaction(
         )
         return bool(getattr(result, "rowcount", 0))
 
+    async def webhook_event_seen(self, source: str, key: str) -> bool:
+        """Return whether the event key is remembered."""
+        found = await self._session.execute(
+            select(WebhookEventRow.seen_at)
+            .where(WebhookEventRow.source == source, WebhookEventRow.event_key == key)
+            .limit(1)
+        )
+        return found.first() is not None
+
     async def forget_webhook_events(self, before: datetime) -> int:
         """Delete event keys seen before ``before``."""
         result = await self._session.execute(

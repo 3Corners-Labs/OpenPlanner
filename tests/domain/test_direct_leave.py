@@ -14,6 +14,7 @@ from app.domain.integration import EventOutcome, IntegrationService
 from app.domain.job_plan import JobType
 from app.domain.scheduling import Offer, ScheduleRule
 from app.domain.services import BookingService
+from app.domain.webhook_replay import INSTALLATION_SCOPE
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import ADA, TEST_TOKEN_KEY, book, make_group, window
@@ -162,7 +163,11 @@ async def test_the_meeting_is_still_followed_after_the_waiting_left() -> None:
     )
 
     outcome = await integration.record_meeting_event(
-        "meeting-1", EventKind.MEETING_ENDED, MONDAY_0915 + timedelta(minutes=5)
+        "meeting-1",
+        EventKind.MEETING_ENDED,
+        MONDAY_0915 + timedelta(minutes=5),
+        scope=INSTALLATION_SCOPE,
+        body_identity="",
     )
 
     assert outcome is EventOutcome.RECORDED

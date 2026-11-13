@@ -12,6 +12,7 @@ from app.domain.integration import EventOutcome, IntegrationService
 from app.domain.meeting_status_service import MeetingStatusService
 from app.domain.services import BookingService
 from app.domain.usage import FactKind, UsageFact
+from app.domain.webhook_replay import INSTALLATION_SCOPE
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeVideo
 from tests.fakes.persistence import InMemoryTransaction, InMemoryUnitOfWork, State
@@ -98,7 +99,12 @@ async def test_a_replayed_webhook_writes_no_second_fact(
 ) -> None:
     for _ in range(3):
         outcome = await integration.record_meeting_event(
-            "meeting-1", EventKind.HOST_JOINED, clock.now(), event_key="evt-1"
+            "meeting-1",
+            EventKind.HOST_JOINED,
+            clock.now(),
+            event_key="evt-1",
+            scope=INSTALLATION_SCOPE,
+            body_identity="",
         )
 
     assert outcome is EventOutcome.DUPLICATE

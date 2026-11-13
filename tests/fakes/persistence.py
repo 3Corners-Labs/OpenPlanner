@@ -873,6 +873,9 @@ class InMemoryTransaction(ServiceRequestStore):
         self.state.webhook_events[(source, key)] = at
         return True
 
+    async def webhook_event_seen(self, source: str, key: str) -> bool:
+        return (source, key) in self.state.webhook_events
+
     async def forget_webhook_events(self, before: datetime) -> int:
         old = [k for k, at in self.state.webhook_events.items() if at < before]
         for key in old:

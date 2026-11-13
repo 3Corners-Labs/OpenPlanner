@@ -19,6 +19,7 @@ from app.domain.booking import MeetingRef
 from app.domain.calls import CallState, TaskState
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.services import BookingService
+from app.domain.webhook_replay import body_identity, replay_key, scope_of
 from tests.adapters.db.conftest import seed_group
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
@@ -331,3 +332,60 @@ async def test_a_replayed_wxcc_event_changes_the_timeline_once_and_is_noted(
     assert [(e.platform.value, e.kind, e.outcome) for e in inbound] == [
         ("wxcc", "task:connected", "recorded")
     ]
+
+
+def _without_an_id(body: bytes) -> bytes:
+    """The same WxCC event as ``body`` without its CloudEvent id: nothing of its own to key on."""
+    event = json.loads(body)
+    del event["id"]
+    return json.dumps(event).encode()
+
+
+def _remembered_as(body: bytes) -> str:
+    """The key under which the installation's address remembers ``body``'s event (WxCC)."""
+    return replay_key("wxcc", scope_of(None), body_identity(body))
+
+
+async def test_a_signed_body_without_an_id_sent_twice_is_one_event(
+    client: httpx.AsyncClient, booking_id: int, database_url: str
+) -> None:
+    """ADR 0124 point 7: no identifier of its own, so the verified body is what is remembered."""
+    body = _without_an_id(wxcc_body("task:connected", at=NOW))
+    headers = {"x-webexcc-signature": sign(body), "x-webexcc-timestamp": timestamp(body)}
+    other = _without_an_id(wxcc_body("task:ended", at=NOW))
+    other_headers = {"x-webexcc-signature": sign(other), "x-webexcc-timestamp": timestamp(other)}
+
+    with structlog.testing.capture_logs() as first_logs:
+        first = await client.post("/webhooks/wxcc", content=body, headers=headers)
+    _, _, once = await _status(database_url, booking_id)
+    with structlog.testing.capture_logs() as replay_logs:
+        replay = await client.post("/webhooks/wxcc", content=body, headers=headers)
+    different = await client.post("/webhooks/wxcc", content=other, headers=other_headers)
+
+    assert (first.status_code, replay.status_code, different.status_code) == (204, 204, 204)
+    outcomes = [
+        [e["outcome"] for e in logs if e["event"] == "webhook.contact_center"]
+        for logs in (first_logs, replay_logs)
+    ]
+    assert outcomes == [["recorded"], ["duplicate"]]  # a replay is traceable in the log
+    assert (await _status(database_url, booking_id))[2] == once + 1  # only the other one counts
+    engine = create_engine(database_url)
+    async with SqlUnitOfWork(engine).read() as tx:
+        remembered = await tx.webhook_event_seen("wxcc", _remembered_as(body))
+        raw = await tx.webhook_event_seen("wxcc", body.decode())
+    await engine.dispose()
+    assert (remembered, raw) == (True, False)  # a digest of the body, never the body
+
+
+async def test_a_webex_event_without_an_id_is_remembered_by_its_body_too(
+    client: httpx.AsyncClient, booking_id: int, database_url: str
+) -> None:
+    body = json.dumps(
+        {"resource": "meetingParticipants", "event": "joined", "data": {"meetingId": "meeting-1"}}
+    ).encode()
+    headers = {"x-spark-signature": sign(body, "sha1")}
+
+    await client.post("/webhooks/webex", content=body, headers=headers)
+    await client.post("/webhooks/webex", content=body, headers=headers)
+
+    assert (await _status(database_url, booking_id))[2] == 1

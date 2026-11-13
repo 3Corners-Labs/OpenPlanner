@@ -149,6 +149,7 @@ async def test_only_the_superuser_may_touch_it(
         service.save(who, "demo", change()),  # type: ignore[arg-type]
         service.rotate_webhook_secret(who, "demo"),  # type: ignore[arg-type]
         service.remove(who, "demo"),  # type: ignore[arg-type]
+        service.set_inbound(who, "demo", enabled=False),  # type: ignore[arg-type]
     ):
         with pytest.raises(DomainError) as refused:
             await call
@@ -442,3 +443,105 @@ async def test_the_webhook_target_carries_the_connections_own_list(
 
     assert target.allowed_networks == SUPPLIED
     assert (await service.webhook_target("andere", WXCC)).allowed_networks == NetworkList()
+
+
+# --- The pause (ADR 0124 point 9, step 3a) ----------------------------------------------------
+
+
+async def test_pausing_makes_no_secret_registers_nothing_and_is_audited_by_name_when_it_changes(
+    uow: InMemoryUnitOfWork,
+    connections: FakeContactCenterConnections,
+    registrar: FakeOrganisationDispatchers,
+    registering: ContactCenterConnectionService,
+) -> None:
+    """A pause must not cost the subscription: the platform keeps it and its secret."""
+    await registering.save(SUPER, "demo", change())
+    before = await registering.view(SUPER, "demo")
+    assert before is not None
+    assert before.inbound_enabled  # a new connection handles its events
+
+    paused = await registering.set_inbound(SUPER, "demo", enabled=False)
+    again = await registering.set_inbound(SUPER, "demo", enabled=False)  # a stale tab
+    shown = await registering.view(SUPER, "demo")
+    resumed = await registering.set_inbound(SUPER, "demo", enabled=True)
+
+    assert (paused, again, resumed) == (True, False, True)
+    assert shown is not None
+    assert not shown.inbound_enabled
+    after = await registering.view(SUPER, "demo")
+    assert after is not None
+    assert after.inbound_enabled
+    assert registrar.registered == [(1, "demo")]  # the first save only
+    assert connections.rotations == 0
+    assert after.webhook_secret_at == before.webhook_secret_at
+    details = [
+        e.detail for e in uow.state.audit if e.detail.startswith("contact_center_connection.")
+    ]
+    assert details[-2:] == ["contact_center_connection.pause", "contact_center_connection.resume"]
+    assert details.count("contact_center_connection.pause") == 1  # only when the state changes
+
+
+async def test_a_save_leaves_the_pause_as_it_is(
+    registering: ContactCenterConnectionService,
+) -> None:
+    await registering.save(SUPER, "demo", change())
+    await registering.set_inbound(SUPER, "demo", enabled=False)
+
+    await registering.save(SUPER, "demo", change(client_secret="other-secret"))
+
+    shown = await registering.view(SUPER, "demo")
+    assert shown is not None
+    assert not shown.inbound_enabled
+
+
+async def test_without_a_connection_there_is_nothing_to_pause(
+    uow: InMemoryUnitOfWork, registering: ContactCenterConnectionService
+) -> None:
+    with pytest.raises(DomainError) as refused:
+        await registering.set_inbound(SUPER, "demo", enabled=False)
+
+    assert refused.value.code is ErrorCode.INVALID_CONFIGURATION
+    assert not [e for e in uow.state.audit if e.detail.endswith(".pause")]
+
+
+async def test_without_a_settings_key_nothing_can_be_paused(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    keyless = ContactCenterConnectionService(
+        uow, clock, AdminService(uow, clock), None, lambda: None
+    )
+
+    with pytest.raises(DomainError) as refused:
+        await keyless.set_inbound(SUPER, "demo", enabled=False)
+
+    assert refused.value.code is ErrorCode.INTEGRATION_NOT_READY
+
+
+@pytest.mark.parametrize("who", [ORG_ADMIN, OUTSIDER, GROUP_ADMIN])
+async def test_a_pause_by_someone_without_the_right_or_from_another_organisation_is_refused(
+    service: ContactCenterConnectionService,
+    connections: FakeContactCenterConnections,
+    uow: InMemoryUnitOfWork,
+    who: object,
+) -> None:
+    await service.save(SUPER, "demo", change())
+
+    with pytest.raises(DomainError) as refused:
+        await service.set_inbound(who, "demo", enabled=False)  # type: ignore[arg-type]
+
+    assert refused.value.code is ErrorCode.NOT_PERMITTED
+    assert connections.connections[1].inbound_enabled  # nothing changed
+    assert not [e for e in uow.state.audit if e.detail.endswith(".pause")]
+
+
+async def test_the_webhook_target_carries_the_pause(
+    service: ContactCenterConnectionService,
+) -> None:
+    await service.save(SUPER, "demo", change())
+    on = await service.webhook_target("demo", WXCC)
+    await service.set_inbound(SUPER, "demo", enabled=False)
+    off = await service.webhook_target("demo", WXCC)
+
+    assert (on.inbound_enabled, off.inbound_enabled) == (True, False)
+    assert off.found  # a paused address still exists: it verifies, then drops
+    assert (await service.webhook_target("andere", WXCC)).inbound_enabled

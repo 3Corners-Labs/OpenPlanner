@@ -71,6 +71,7 @@ WRITABLE_IN_MAINTENANCE = frozenset(
         # ADR 0032 point 9: the organisation's contact-center connection, integrations.manage.
         "POST /admin/organisations/{org}/channels/contact-center",
         "POST /admin/organisations/{org}/channels/contact-center/webhook-secret",
+        "POST /admin/organisations/{org}/channels/contact-center/inbound",
         "POST /admin/organisations/{org}/channels/contact-center/delete",
     }
 )
