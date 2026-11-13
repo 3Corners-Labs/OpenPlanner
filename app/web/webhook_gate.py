@@ -21,8 +21,8 @@ Every refusal answers with an empty body and the status of its reason
 the reason, the platform and, for an organisation's address, the organisation's slug. The slug
 of an organisation that does not exist is never written: it comes from the caller. The replay
 check stays with the domain's event key (ADR 0124 point 7 is a later step). The caller's address
-is the one the server derived (``--proxy-headers``); nothing is read from a forwarded header
-here.
+is the one the server derived (``--proxy-headers``), counted by its /64 when it is IPv6
+(``caller_of``); nothing is read from a forwarded header here.
 """
 
 import json
@@ -33,7 +33,6 @@ from typing import Annotated, Any, NoReturn
 
 import structlog
 from fastapi import Depends, Request
-from slowapi.util import get_remote_address
 from starlette.responses import Response
 
 from app.adapters.contact_centers import inbound
@@ -47,6 +46,7 @@ from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.inbound_gate import MAX_BODY_BYTES, Refusal, accepts_content_type
 from app.domain.ports import Clock
 from app.domain.security_log import WEBHOOK_REJECTED
+from app.web.caller import caller_of
 from app.web.protection import (
     webhook_retry_after,
     within_refused_limit,
@@ -208,7 +208,7 @@ def webhook_gate[W: InboundWebhook](
         request: Request, found: Annotated[Address[W] | Unresolved, Depends(resolve)]
     ) -> Delivery[W]:
         """Return the verified delivery, or raise ``WebhookRefused`` after leaving its trace."""
-        caller = get_remote_address(request)
+        caller = caller_of(request)
         if isinstance(found, Unresolved):
             # Only an address that does not exist counts here: it never touches one that does.
             if not within_unknown_address_limit(caller):

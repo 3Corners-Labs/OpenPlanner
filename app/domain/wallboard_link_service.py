@@ -24,13 +24,13 @@ from app.domain.admin import AdminService
 from app.domain.audit import Outcome
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.networks import NETWORKS_FIELD, pinned_network
 from app.domain.ports import Clock, WallboardLinkStore, WallboardLinkUnitOfWork
 from app.domain.wallboard_link import (
     DAYS_FIELD,
     ENABLED_FIELD,
     MAX_NAME,
     NAME_FIELD,
-    NETWORKS_FIELD,
     REFUSAL_EVERY,
     TOUCH_EVERY,
     Refusal,
@@ -40,7 +40,6 @@ from app.domain.wallboard_link import (
     inside,
     new_token,
     parse_networks,
-    pinned_range,
     same_hash,
 )
 
@@ -213,7 +212,7 @@ class WallboardLinkService:
                 found = decide(
                     link, now, self._enabled(link.organisation_id), address, first_use=True
                 )
-                pin = pinned_range(address) if link.pin else None
+                pin = pinned_network(address) if link.pin else None
                 if found is None and link.pin and pin is None:
                     found = Refusal.NETWORK  # a pin needs an address to pin
                 if found is None:

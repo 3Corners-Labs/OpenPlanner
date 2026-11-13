@@ -19,27 +19,25 @@ No database and no framework: ``WallboardLinkService`` is the use case, the adap
 
 import hashlib
 import hmac
-import ipaddress
 import secrets
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
 
+from app.domain import networks as net
 from app.domain.authorization import Scope
-from app.domain.errors import DomainError, ErrorCode
 
 TOKEN_BYTES = 32
 """Random bytes of a link's token and of its session secret: not a setting, a crypto parameter."""
 MAX_NETWORKS = 20
-"""Ranges one ACL may hold (ADR 0117 point 20)."""
+"""Ranges one ACL may hold (ADR 0117 point 20); its own limit, not the machine API's (ADR 0023)."""
 MAX_NAME = 80
 """Longest name of a screen."""
 TOUCH_EVERY = timedelta(minutes=10)
 """How often a link's *last used* is written: a poll every few seconds must not write each time."""
 REFUSAL_EVERY = timedelta(hours=1)
 """One refusal event per link per period: a screen on the wrong network asks every few seconds."""
-NETWORKS_FIELD = "networks"
 NAME_FIELD = "name"
 DAYS_FIELD = "days"
 ENABLED_FIELD = "enabled"
@@ -152,20 +150,7 @@ def parse_networks(text: str) -> tuple[str, ...]:
         DomainError: ``invalid_configuration`` (field ``networks``) for text that is no range or
             more than ``MAX_NETWORKS`` ranges.
     """
-    found: list[str] = []
-    for part in text.replace(",", "\n").splitlines():
-        value = part.strip()
-        if not value:
-            continue
-        try:
-            network = ipaddress.ip_network(value, strict=False)
-        except ValueError:
-            raise DomainError(ErrorCode.INVALID_CONFIGURATION, NETWORKS_FIELD) from None
-        if str(network) not in found:
-            found.append(str(network))
-    if len(found) > MAX_NETWORKS:
-        raise DomainError(ErrorCode.INVALID_CONFIGURATION, NETWORKS_FIELD)
-    return tuple(found)
+    return net.parse_networks(net.split_entries(text), maximum=MAX_NETWORKS)
 
 
 def inside(inner: Sequence[str], outer: Sequence[str]) -> bool:
@@ -178,47 +163,12 @@ def inside(inner: Sequence[str], outer: Sequence[str]) -> bool:
         return True
     if not inner:
         return False
-    wide = [ipaddress.ip_network(n) for n in outer]
-    return all(
-        any(
-            candidate.version == net.version and candidate.subnet_of(net)  # type: ignore[arg-type]
-            for net in wide
-        )
-        for candidate in (ipaddress.ip_network(n) for n in inner)
-    )
-
-
-def _address(text: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
-    """Return ``text`` as an address, an IPv4-mapped IPv6 one (``::ffff:10.0.0.1``) as IPv4."""
-    try:
-        found = ipaddress.ip_address(text)
-    except ValueError:
-        return None
-    if isinstance(found, ipaddress.IPv6Address) and found.ipv4_mapped is not None:
-        return found.ipv4_mapped
-    return found
-
-
-def pinned_range(address: str) -> str | None:
-    """Return the range an address pins to: its ``/32`` (IPv4) or ``/64`` (IPv6), else ``None``."""
-    found = _address(address)
-    if found is None:
-        return None
-    prefix = 32 if found.version == 4 else 64
-    return str(ipaddress.ip_network(f"{found}/{prefix}", strict=False))
+    return net.each_within(inner, outer)
 
 
 def allowed_from(address: str, networks: Sequence[str]) -> bool:
     """Return whether ``address`` lies in one of ``networks`` (an empty list allows any)."""
-    if not networks:
-        return True
-    found = _address(address)
-    if found is None:
-        return False
-    return any(
-        found.version == net.version and found in net
-        for net in (ipaddress.ip_network(n) for n in networks)
-    )
+    return not networks or net.in_any(address, networks)
 
 
 def refusal_for(link: WallboardLink, address: str) -> Refusal | None:

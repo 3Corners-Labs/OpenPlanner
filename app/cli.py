@@ -184,7 +184,7 @@ from app.domain.admin_session_service import AdminSessionService
 from app.domain.admin_sessions import EndReason
 from app.domain.audit import Outcome
 from app.domain.authorization import Grant, Principal, Role, RoleCatalogue, Scope
-from app.domain.client_pseudonym import UNKNOWN_CLIENT, ClientPseudonyms
+from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.closure_service import ClosureInput, ClosureService, GroupOutcome
 from app.domain.configuration_document_service import Actor
 from app.domain.configuration_package import (
@@ -202,6 +202,7 @@ from app.domain.evidence import render_markdown as render_evidence
 from app.domain.identity_provider_service import IdentityProviderService
 from app.domain.maintenance import MaintenanceReason, MaintenanceStatus
 from app.domain.maintenance_service import MaintenanceService
+from app.domain.networks import UNKNOWN_CALLER
 from app.domain.platform_settings import EMPTY, PlatformSettingsStore, PortalValues
 from app.domain.ports import (
     CertificateProbe,
@@ -1832,7 +1833,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "client-pseudonym":
         pseudonym = ClientPseudonyms(client_pseudonym_key(Settings())).of(args.address)
         sys.stdout.write(f"{pseudonym}\n")
-        return 0 if pseudonym != UNKNOWN_CLIENT else 1
+        return 0 if pseudonym != UNKNOWN_CALLER else 1
     if args.command == "oidc-check":
         if args.idp:
             return _write(asyncio.run(_idp_check(Settings(), args.idp)))
