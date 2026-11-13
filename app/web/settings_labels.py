@@ -184,6 +184,11 @@ SETTING_LABELS: dict[str, str] = {
     "booking_confirm_reminders": "settings.field.booking_confirm_reminders.label",
     "booking_confirm_min_minutes": "settings.field.booking_confirm_min_minutes.label",
     "participant_link_session_hours": "settings.field.participant_link_session_hours.label",
+    "embedded_call_enabled": "settings.field.embedded_call_enabled.label",
+    "embedded_call_connect_seconds": "settings.field.embedded_call_connect_seconds.label",
+    "embedded_call_connect_attempts": "settings.field.embedded_call_connect_attempts.label",
+    "embedded_call_display_name": "settings.field.embedded_call_display_name.label",
+    "embedded_call_staff_name": "settings.field.embedded_call_staff_name.label",
 }
 """The label of every class C and D setting, by key."""
 

@@ -410,7 +410,12 @@ async def _wxcc_check(
         if tokens is None:  # pragma: no cover - video_configured implies tokens
             return "Webex is not configured; nothing to check.\n", False
         results = await service_app_check(
-            http, tokens, settings.webex_api_base_url, settings.wxcc_api_base_url, SystemClock()
+            http,
+            tokens,
+            settings.webex_api_base_url,
+            settings.wxcc_api_base_url,
+            SystemClock(),
+            embedded_call_enabled=settings.embedded_call_enabled,
         )
     report = format_report(results)
     if not settings.wxcc_api_base_url:

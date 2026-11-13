@@ -212,6 +212,9 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `MAX_FLOWS_PER_SERVICE` | int | `20` | 3–100 | `settings.platform.manage` | Flows a service may keep at most, archived ones and the existing flows of a service not counted (ADR 0121). |
 | `BOOKING_CONFIRM_MIN_MINUTES` | int | `15` | 5–120 | `settings.platform.manage` | Less time to confirm than this: confirm until the change deadline, no reminder. |
 | `PARTICIPANT_LINK_SESSION_HOURS` | int | `24` | 20–168 | `settings.platform.manage` | Hours after its last use that a participant's browser may still use a booking it opened from the emailed link (ADR 0093); the email link always works again. |
+| `EMBEDDED_CALL_ENABLED` | bool | `false` | — | `settings.platform.manage` | Whether groups on this installation may let participants join the call in the organisation's own page instead of the Webex app; off until the conditions of ADR 0123 point 18 are met. |
+| `EMBEDDED_CALL_CONNECT_SECONDS` | int | `30` | 10–90 | `settings.platform.manage` | Seconds the call page waits for one attempt at registering or joining before it tries again (ADR 0123). |
+| `EMBEDDED_CALL_CONNECT_ATTEMPTS` | int | `3` | 1–5 | `settings.platform.manage` | Attempts the call page makes before it says it cannot connect (ADR 0123). |
 
 ## D. Organisation (portal, organisation settings; lockable by env)
 
@@ -251,3 +254,5 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `BOOKING_CONFIRM_WINDOW_HOURS` | int | `24` | 1–72 | `settings.organisation.manage` | Hours after booking within which the participant confirms by email link (ADR 0056). |
 | `BOOKING_CONFIRM_CUTOFF_HOURS` | int | `2` | 0–24 | `settings.organisation.manage` | Hours before the start by which the participant confirms at the latest (ADR 0056). |
 | `BOOKING_CONFIRM_REMINDERS` | int | `1` | 0–3 | `settings.organisation.manage` | Reminders to confirm, spread evenly over the time to confirm (ADR 0056). |
+| `EMBEDDED_CALL_DISPLAY_NAME` | enum | `first_name` | first_name, term | `settings.organisation.manage` | What staff see as the participant's name in the call page's meeting: the first name, or the organisation's word for a participant (ADR 0123). |
+| `EMBEDDED_CALL_STAFF_NAME` | enum | `name` | name, term | `settings.organisation.manage` | How the call page names the staff member to the participant: the name of their account, or the organisation's word for staff (ADR 0123). |

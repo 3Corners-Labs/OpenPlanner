@@ -71,6 +71,7 @@ from app.domain.direct_queue import DirectCall
 from app.domain.embedding import AllowedOrigins
 from app.domain.entitlements import Directory, LoginClaims
 from app.domain.form_fields import FormDefinition
+from app.domain.guest_access import GuestAccess
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar
 from app.domain.identity_providers import GeneratedKey, OrganisationProvider, SigningKey
 from app.domain.images import ImageFile, ImageText
@@ -411,6 +412,19 @@ class VideoProvider(Protocol):
 
         Raises:
             IntegrationError: If the provider refuses or cannot be reached.
+        """
+        ...
+
+    async def guest_access(self, subject: str, display_name: str) -> GuestAccess:
+        """Mint a guest token for the call page (ADR 0123 point 6).
+
+        The same ``subject`` always names the same guest at the provider; ``display_name``
+        is what the staff member sees. Neither the token, the subject nor the name is ever
+        logged, stored or put in an error.
+
+        Raises:
+            IntegrationError: If the provider refuses (``rejected_401``/``rejected_403``: the
+                service app lacks the guest scopes) or cannot be reached.
         """
         ...
 

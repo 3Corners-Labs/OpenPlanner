@@ -26,6 +26,8 @@ from typing import Any
 import httpx
 
 from app.adapters.webex_auth import WebexTokens
+from app.adapters.webex_meetings import guest_token_request
+from app.domain.guest_access import CHECK_SUBJECT, NEUTRAL_TERM
 from app.domain.ports import Clock, IntegrationError
 
 NIL_TASK_ID = "00000000-0000-0000-0000-000000000000"
@@ -66,8 +68,13 @@ class CheckResult:
     """Values the translated text needs (names, ids); never secrets or personal data."""
 
 
-def probes(webex_base_url: str, wxcc_base_url: str | None) -> list[Probe]:
-    """Return the probes for the configured hosts; WxCC probes only with a WxCC host."""
+def probes(webex_base_url: str, wxcc_base_url: str | None, *, guest: bool = False) -> list[Probe]:
+    """Return the probes for the configured hosts; WxCC probes only with a WxCC host.
+
+    With ``guest`` (the embedded call is on, ADR 0123 point 17) a required probe mints the one
+    fixed guest of the checks and sends no participant data. Without it there is no probe: an
+    installation that does not use the call page never calls the guest endpoint.
+    """
     webex = webex_base_url.rstrip("/")
     found = [
         Probe(
@@ -86,6 +93,17 @@ def probes(webex_base_url: str, wxcc_base_url: str | None) -> list[Probe]:
             params={"max": "1", "ownedBy": "org"},
         ),
     ]
+    if guest:
+        found.append(
+            Probe(
+                "POST /guests/token",
+                "POST",
+                f"{webex}/guests/token",
+                "guest-issuer:read and guest-issuer:write (guest tokens for the call page, "
+                "ADR 0123)",
+                json=guest_token_request(CHECK_SUBJECT, NEUTRAL_TERM),
+            )
+        )
     if not wxcc_base_url:
         return found
     wxcc = wxcc_base_url.rstrip("/")

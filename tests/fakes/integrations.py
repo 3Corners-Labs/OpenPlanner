@@ -6,7 +6,7 @@ adapters report every call to (ADR 0068).
 
 from collections.abc import Sequence
 from dataclasses import replace
-from datetime import datetime
+from datetime import UTC, datetime
 
 from app.domain.alert_model import AlertChannelKind, AlertTarget, RenderedAlert
 from app.domain.booking import MeetingRef
@@ -26,6 +26,7 @@ from app.domain.contact_center import (
     OrganisationConnection,
     Registration,
 )
+from app.domain.guest_access import GuestAccess
 from app.domain.ports import (
     ContactCenterDispatcher,
     IntegrationError,
@@ -33,6 +34,9 @@ from app.domain.ports import (
     RequestRecord,
 )
 from app.domain.scheduling import Group
+
+GUEST_EXPIRES = datetime(2026, 1, 1, 18, tzinfo=UTC)
+"""When the fake's guest tokens expire."""
 
 
 class FakeVideo:
@@ -43,6 +47,8 @@ class FakeVideo:
         self.polled: list[tuple[str, str]] = []
         self.statuses: dict[str, MeetingStatus] = {}
         self.status_error: IntegrationError | None = None
+        self.guests: list[tuple[str, str]] = []
+        self.guest_error: IntegrationError | None = None
 
     async def create_meeting(self, request: MeetingRequest) -> MeetingRef:
         if self.error:
@@ -62,6 +68,12 @@ class FakeVideo:
         if self.status_error:
             raise self.status_error
         return self.statuses.get(meeting_id, MeetingStatus(CallState.SCHEDULED))
+
+    async def guest_access(self, subject: str, display_name: str) -> GuestAccess:
+        if self.guest_error:
+            raise self.guest_error
+        self.guests.append((subject, display_name))
+        return GuestAccess(f"guest-token-{len(self.guests)}", GUEST_EXPIRES)
 
 
 def webex_cc(dispatcher: "FakeDispatcher") -> dict[ContactCenterKind, ContactCenterDispatcher]:

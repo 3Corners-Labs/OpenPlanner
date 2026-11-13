@@ -1,0 +1,11 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1/guests/token",
+    "body": {"subject": "op1-0123456789abcdef0123456789abcdef", "displayName": "Ada"}
+  },
+  "response": {
+    "status": 200,
+    "body": {"accessToken": "made-up-guest-token-0123456789", "expiresIn": 64799}
+  }
+}
