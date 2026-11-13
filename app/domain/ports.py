@@ -551,6 +551,13 @@ class ContactCenterConnections(Protocol):
         """Remove the organisation's connection and its secrets."""
         ...
 
+    async def webhook_secret(self, organisation_id: int, kind: ContactCenterKind) -> str | None:
+        """Return the webhook secret when the organisation is connected to ``kind``; else ``None``.
+
+        For the webhook gate and the dispatcher only (ADR 0032 point 10); never shown.
+        """
+        ...
+
 
 class ProbeRegistry(Protocol):
     """Remembers the probe work item of a group check and the events it got (ADR 0082).

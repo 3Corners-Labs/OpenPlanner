@@ -47,22 +47,20 @@ installation with several organisations.
    installation, which secret, which freshness rule) and gets a verified, parsed event or
    nothing. No route verifies on its own. A test walks the application's routes and fails for a
    `/webhooks/` route without the gate, the way the authorisation sweep does for admin routes.
-2. **A fixed order, cheapest first.** (a) The address exists: the platform is known, the
-   organisation is known, its connection exists and is not paused, a secret is set; otherwise
-   404. (b) The source network is allowed (point 3); otherwise 403. (c) The rate limit (point
-   5); otherwise 429. (d) `POST` with a JSON content type (`application/json` or
-   `application/cloudevents+json`); otherwise 415. (e) The declared length and then the bytes
-   actually read stay under the limit (point 6); otherwise 413, without reading on. (f) The
-   signature over the raw body, in constant time, under the current secret or the previous one
-   inside its overlap (point 8); otherwise 401. (g) The signed time, where the platform signs
-   one, is within 300 seconds; otherwise 401. (h) The body is an object of the expected shape;
-   otherwise 400. (i) The event was not seen before (point 7); otherwise 204, counted as a
-   duplicate. (j) The event is about something this organisation's connection created;
-   otherwise 204, counted as unknown (point 12). Every refusal answers with an empty body.
-   Calls to an address that does not exist count against a limit of their own per caller; over
-   it they get 429 instead of 404 and start no further event. That limit never refuses a call
-   to an address that exists: several organisations, and strangers, can share one supplier
-   address, and one of them must not be able to lock the others out.
+2. **A fixed order.** (a) The address exists: the platform is known, the organisation is known,
+   its connection exists, a secret is set; otherwise 404. (b) The source network is allowed
+   (point 3); otherwise 403. (c) `POST`; a content type, when the call names one, is JSON
+   (`application/json` or `application/cloudevents+json`), otherwise 415; a call that names
+   none goes on, because the signature decides and not every platform's deliveries were
+   observed. (d) The declared length and then the bytes actually read stay under the limit
+   (point 6); otherwise 413, without reading on. (e) The signature over the raw body, in
+   constant time, under the current secret or the previous one inside its overlap (point 8);
+   otherwise 401. (f) The signed time, where the platform signs one, is within 300 seconds;
+   otherwise 401. (g) The body is an object of the expected shape; otherwise 400. (h) The rate
+   limits (point 5); otherwise 429. (i) The event was not seen before (point 7); otherwise 204,
+   counted as a duplicate. (j) The event is about something this organisation's connection
+   created; otherwise 204, counted as unknown (point 12). Every refusal answers with an empty
+   body. The limits come after the signature on purpose: see point 5.
 3. **Source networks.** A connection carries a list of allowed networks (IPv4 and IPv6, at most
    32, written as CIDR), edited by the organisation's administrator next to the connection's
    other fields. The installation has a default list per platform, set by the superuser; a
@@ -72,41 +70,78 @@ installation with several organisations.
    (`WEBHOOK_SOURCE_NETWORKS_REQUIRED`): then an address without one does not accept. One
    helper, `app/domain/networks.py`, parses and matches networks, handles an IPv4 address
    written as IPv6, and replaces the two near-copies that the machine API's clients and the
-   display links use today (ADR 0005: extract at the second use).
+   display links use today (ADR 0005: extract at the second use). A list is defence in depth
+   and no more: the supplier's ranges are shared by all its customers, so the signature is what
+   stops a stranger, and a list that has gone stale is an outage of our own making. The
+   portal therefore shows, next to a list, when the last delivery was accepted and when a call
+   was last refused for its network, and a refusal for the network while deliveries were
+   recently accepted is one of the things the alert of point 10 counts. A caller cannot tell a
+   refusal for its network from one for an unknown source: both are 403 with an empty body.
 4. **The address is only as good as the proxy chain.** The gate takes the caller's address as
    the server derived it from the trusted proxy (`FORWARDED_ALLOW_IPS`) and reads no forwarded
    header itself. When an allow-list applies and the address cannot be trusted (the proxy
    watch of ADR 0086 reports forwarded headers from an untrusted hop, or the caller appears to
    be the proxy itself), the gate refuses with the reason `source_unknown`: a restriction that
    cannot be evaluated is not passed. System status says what to repair. An address without a
-   list is not affected.
-5. **The rate limit goes through the common limiter.** `rate_limit_webhook_per_minute` joins
-   the limiter's settings; the bucket is per platform, organisation and source address, so
-   organisations behind one supplier address no longer share one; a refusal is 429 with
-   `Retry-After` and no page.
+   list is not affected. The cases, each with its test: `FORWARDED_ALLOW_IPS` is `*` or wider
+   than single hosts (every address could be spoofed); the caller's address is one of the
+   trusted proxies, or a loopback or private address while the public address is not (a hop
+   that did not hand the caller on); a chain of more than one proxy where a hop is not
+   trusted. The PROXY protocol, where a load balancer uses it, ends at the proxy; the
+   application never speaks it.
+5. **Limits that a stranger cannot turn against an organisation.** A supplier sends from
+   addresses it shares among all its customers, and any customer can make those addresses call
+   ours. So a call that fails a check never counts against the deliveries that pass:
+   - *Verified deliveries* have a bucket per platform, organisation and caller address,
+     `rate_limit_webhook_per_minute`; only the supplier's own authentic traffic can fill it.
+   - *Refused calls to an address that exists* have a bucket of their own with the same key and
+     value. While it has room a call gets its own reason; when it is full the call gets 429.
+     It never refuses a verified delivery, so each such call is read (at most the size limit)
+     and its signature checked: that work is the price, and the proxy's connection limits are
+     its ceiling.
+   - *Calls to an address that does not exist* have a bucket per caller address. Over it they
+     get 429 instead of 404. It never refuses a call to an address that exists.
+   All three go through the common limiter and its settings; a refusal is 429 with
+   `Retry-After` and no page. A bucket key uses the caller's address as the server derived it;
+   from step 2 an IPv6 caller counts by its /64, in the one helper every limiter uses. The
+   refusals of the two stranger-fed buckets leave an event that is held back when repeated,
+   and no log line per call.
 6. **The size limit holds before and while reading.** 64 KiB stays the limit, as a constant: a
    real event is a few kilobytes. The bundled proxy applies the same limit to `/webhooks/*`.
 7. **Replays, per organisation.** The remembered key includes the platform and the
    organisation. An event without an identifier is remembered by the hash of its verified body:
-   the same signed body twice is a replay by definition. `docs/webhooks.md` is corrected.
+   the same signed body twice is a replay by definition. The memory is consulted only after the
+   signature held, holds the hash and never the body, and its key does not depend on which
+   secret verified. `docs/webhooks.md` is corrected.
 8. **A secret rotates with an overlap.** After a rotation the previous secret keeps verifying
    for `webhook_secret_overlap_minutes`, for an organisation's secret and for the installation's
    own. The subscription at the platform is changed in place where the platform allows it, and
    otherwise made anew inside the overlap, so no event is refused on the way. The previous
-   secret is sealed like the current one and removed when the overlap ends.
-9. **A connection can be paused.** `inbound_enabled` on the connection; a paused address
-   answers 404 and shows as a finding. The installation-wide addresses that ADR 0032 point 11
-   keeps for one more minor pass the same gate with the installation's defaults until they go.
+   secret is sealed like the current one and removed when the overlap ends. Whether the previous
+   secret still counts is decided by the clock at the moment of checking, not by the job that
+   removes it; both secrets are always compared, without stopping at the first, so the time
+   taken tells nothing about which one matched. Per platform: the video platform's webhook is
+   updated in place with the new secret; the contact center's subscription is updated in place
+   where its API allows and otherwise made anew inside the overlap.
+9. **A connection can be paused.** `inbound_enabled` on the connection. A paused address still
+   passes the gate and answers 204, and the verified event is dropped and counted as paused: a
+   platform that keeps getting errors switches a subscription off, and a pause must not cost
+   the subscription. A pause shows as a finding; on resuming, the reconcile of ADR 0032 brings
+   the states back. The installation-wide addresses that ADR 0032 point 11 keeps for one more
+   minor pass the same gate with the installation's defaults until they go.
 10. **Every refusal leaves a trace, with its reason.** Through the one place that turns a
     request into a security event, with the platform, the organisation's slug (public, not
-    personal data) and one reason of a closed list: `unknown_address`, `network`,
-    `source_unknown`, `rate`, `content_type`, `too_large`, `invalid_signature` (the name audit rows already carry),
-    `stale`, `malformed`.
-    Repeats are held back as today. When the refusals for one connection pass
-    `webhook_refusal_alert_count` inside the event window, one system event for that
-    organisation says so. The connection's card shows the last accepted and the last refused
+    personal data, and only of an organisation that exists) and one reason of a closed list:
+    `unknown_address`, `network`, `source_unknown`, `rate`, `content_type`, `too_large`,
+    `invalid_signature` (the name audit rows already carry), `stale`, `malformed`. Repeats are
+    held back as today. The connection's card shows the last accepted and the last refused
     delivery with its reason, and counts per reason for the window. No body, header value,
     signature or address in clear is stored: the caller is the pseudonym of ADR 0043.
+    *The alert* counts only what a passer-by cannot cause alone, because anyone who knows a
+    slug can send calls that fail: a `stale` delivery (it was signed: a replay, or a clock that
+    is off), and, for a connection with a list of networks, any refusal from inside that list.
+    When those pass `webhook_refusal_alert_count` inside the event window, one system event for
+    that organisation says so. Refusals from strangers show in the counts and raise nothing.
 11. **Behind a proxy.** *The bundled proxy* gets a rule for `/webhooks/*`: `POST` only, the size
     limit, and, when `WEBHOOK_PROXY_NETWORKS` is set, only those source networks, refused before
     the application sees the call. When `WEBHOOK_BASE_URL` names a host of its own, the proxy
@@ -120,14 +155,20 @@ installation with several organisations.
     values for a separate webhook host and its network policy. *Proof:* the existing signed
     test delivery (`webhooks-health`) runs through `WEBHOOK_BASE_URL` and reports which source
     address the application saw, so an administrator sees whether the chain keeps addresses
-    before relying on a list.
+    before relying on a list. Three more rules for the proxy: its rule for
+    `/webhooks/*` carries a deadline for reading a body, since the application has none of its
+    own; when `WEBHOOK_BASE_URL` names its own host and the main name still serves
+    `/webhooks/*`, that is a finding on System status; and `check-proxy.sh` asserts that the
+    proxy logs no bodies, where it can be asserted.
 12. **What comes in must answer what went out.** An organisation's address accepts only events
     about work its own connection created; an event about unknown work is counted and joins the
     alert of point 10, because it usually means a subscription that points at the wrong
     address. The addresses we register are built from `WEBHOOK_BASE_URL` and the organisation's
     slug only, and a test keeps it so. An API host typed in the portal is resolved and must be
     public every time it is used, through the outbound guard that the login providers already
-    use, not only checked as a name when it is saved.
+    use, not only checked as a name when it is saved. The guard connects to the address
+    it resolved and checked, so a name that changes between the check and the connection gains
+    nothing, and it follows no redirect.
 13. **In the portal, no new home.** The organisation's contact-center connection card (ADR
     0032, ADR 0047) shows the address, when the secret was made and until when the previous one
     is valid, the allowed networks, paused or not, and the status of point 10. System status
@@ -140,19 +181,25 @@ installation with several organisations.
     `/webhooks/contact-center/{kind}/{org}/messages`, with a secret of its own that is shown
     once when it is made (the administrator pastes it into the platform's console; our own
     subscription secret never leaves the server). It passes this gate; ADR 0123 step 7b builds
-    it.
+    it. The deliveries are signed by the platform with that secret, as the events are
+    (measured on the lab tenant, ADR 0123). Shown once means: on a page that is not stored by
+    the browser, never in an event, a log, an address or a job; lost is solved by making a new
+    one, and a new one overlaps the old as in point 8. The chat of ADR 0123 is text only, so
+    the 64 KiB limit holds; a message with an attachment is refused. These bodies are a
+    participant's words: every refusal stays without a body, and the replay memory keeps a
+    hash that includes the organisation, never the text.
 
 ## Settings
 
 | Key | Class | Default | Bounds | Permission | Note |
 |---|---|---|---|---|---|
-| `rate_limit_webhook_per_minute` | C platform | 600 | 60–6000 | `settings.platform.manage` | Per platform, organisation and source address. Today a constant |
+| `rate_limit_webhook_per_minute` | C platform | 600 | 60–6000 | `settings.platform.manage` | The value of each of the three buckets of point 5. Today a constant |
 | `webhook_source_networks_video` | C platform | empty | at most 32 networks | `settings.platform.manage` | The installation's allowed sources for the video platform's webhooks |
 | `webhook_source_networks_contact_center` | C platform | empty | at most 32 networks | `settings.platform.manage` | The installation's default for contact-center connections |
 | connection: allowed networks | D organisation (per connection) | empty (the installation's default) | at most 32 networks | as the connection's other fields | Replaces the default for this connection |
-| connection: `inbound_enabled` | D organisation (per connection) | on | on / off | as the connection's other fields | Pauses the address; a pause is a finding |
+| connection: `inbound_enabled` | D organisation (per connection) | on | on / off | as the connection's other fields | Pauses the address: verified events are dropped, the platform still gets 204; a pause is a finding |
 | `webhook_secret_overlap_minutes` | C platform | 60 | 0–1440 | `settings.platform.manage` | How long the previous secret keeps verifying; 0 is at once |
-| `webhook_refusal_alert_count` | C platform | 20 | 5–1000 | `settings.platform.manage` | Refusals for one connection inside the event window before the alert |
+| `webhook_refusal_alert_count` | C platform | 20 | 5–1000 | `settings.platform.manage` | Refusals of the kinds point 10 counts, for one connection inside the event window, before the alert |
 | `WEBHOOK_SOURCE_NETWORKS_REQUIRED` | B deployment (env) | off | on / off | host | When on, an address without allowed networks does not accept |
 | `WEBHOOK_PROXY_NETWORKS` | B deployment (env) | empty | networks | host | Enforced by the bundled proxy, before the application |
 
@@ -167,15 +214,16 @@ Classes:
 
 **Fixed on purpose:** the order of the checks; the 64 KiB limit; the 300 seconds of freshness and
 the 30 days of replay memory (security rules); refusing when the source cannot be known; the
-accepted content types; the closed list of refusal reasons.
+accepted content types; the closed list of refusal reasons. `Retry-After` is 60 seconds while the limit
+counts per minute.
 
 ## Build status
 
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR proposed; the row in `docs/adr-status.md` | #791 | merged |
-| 1 | The gate, with today's checks moved into it and: the limit as a setting with its own bucket and a machine answer, the declared and the streamed size limit, the content type, refusal events with reason, platform and organisation; the route sweep; `docs/webhooks.md` corrected | #791 | merged |
-| 2 | Source networks: the shared network helper (machine API clients and display links moved onto it), the list per connection and the installation's defaults, refusing on an untrusted proxy chain, `WEBHOOK_SOURCE_NETWORKS_REQUIRED`, the findings | | planned |
+| 1 | The gate, with today's checks moved into it and: the limit as a setting, with separate buckets for verified deliveries, refused calls and calls to addresses that do not exist, and a machine answer, the declared and the streamed size limit, the content type, refusal events with reason, platform and organisation; the route sweep; `docs/webhooks.md` corrected | #791 | merged |
+| 2 | Source networks: the shared network helper (machine API clients and display links moved onto it), the list per connection and the installation's defaults, refusing on an untrusted proxy chain, `WEBHOOK_SOURCE_NETWORKS_REQUIRED`, the findings; an IPv6 caller counted by its /64 in every limiter | | planned |
 | 3 | Replays per organisation and by body hash; the pause; the refusal alert and the connection card's status | | planned |
 | 4 | Secret rotation with an overlap | | planned |
 | 5 | The bundled proxy: the webhook rule, the host of its own, `WEBHOOK_PROXY_NETWORKS`, `check-proxy.sh`; the chart's webhook host and network policy | | planned |

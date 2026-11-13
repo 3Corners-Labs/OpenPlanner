@@ -1,12 +1,20 @@
 """The one gate every inbound webhook passes (ADR 0124).
 
-A route under ``/webhooks/`` declares what it is, through a resolver that finds its secret, and
-depends on a ``WebhookGate``; it gets a verified, parsed ``Delivery`` or the call is refused
-before the route runs. No route verifies anything itself, and a test fails for a ``/webhooks/``
-route without the gate.
+A route under ``/webhooks/`` depends on a gate made by ``webhook_gate(resolver)``. The resolver is
+a FastAPI dependency that declares the path parameters it needs (``kind``, ``org``) and finds the
+address and its secret; the gate then admits the call and hands the route a verified, parsed
+``Delivery``, or refuses it before the route runs. No route verifies anything itself, and a test
+fails for a ``/webhooks/`` route without a gate (``is_webhook_gate``).
 
-    call ─► address exists ─► rate limit ─► content type ─► size ─► signature ─► time ─► shape
-              404               429           415            413      401         401      400
+    call ─► address exists ─► content type ─► size ─► signature ─► time ─► shape ─► the limits
+              404 / 429         415            413      401         401      400       429
+
+The limits come last for an address that exists, so a call that cannot sign never uses up the
+budget of the authentic ones (ADR 0124 point 5): a call refused for any reason before them counts
+against a bucket of refused calls (over it, the reason becomes ``rate``), and only a call that
+passed everything counts against the bucket of verified calls. A call to an address that does not
+exist counts against a bucket of its own, per caller address; it never touches an address that
+exists.
 
 Every refusal answers with an empty body and the status of its reason
 (``app.domain.inbound_gate``), and is reported through ``app.web.security_events.report`` with
@@ -18,32 +26,38 @@ here.
 """
 
 import json
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, NoReturn
+from typing import Annotated, Any, NoReturn
 
 import structlog
-from fastapi import Request
+from fastapi import Depends, Request
 from slowapi.util import get_remote_address
 from starlette.responses import Response
 
-from app.adapters.contact_center_connections import SealedConnections
 from app.adapters.contact_centers import inbound
-from app.adapters.webhooks import InboundWebhook, check_webex
-from app.domain.admin import AdminService
+from app.adapters.webhooks import (
+    WEBEX_INBOUND,
+    WXCC_INBOUND,
+    ContactCenterWebhook,
+    InboundWebhook,
+)
+from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.inbound_gate import MAX_BODY_BYTES, Refusal, accepts_content_type
 from app.domain.ports import Clock
-from app.domain.scheduling import is_slug
 from app.domain.security_log import WEBHOOK_REJECTED
-from app.web.protection import within_unknown_address_limit, within_webhook_limit
+from app.web.protection import (
+    webhook_retry_after,
+    within_refused_limit,
+    within_unknown_address_limit,
+    within_webhook_limit,
+)
 from app.web.request_body import read_capped
 from app.web.security_events import report
 
 log = structlog.get_logger()
 
-RETRY_AFTER_SECONDS = "60"
-"""What a rate-limited webhook is told: the limits count per minute."""
 UNKNOWN_SOURCE = "unknown"
 """The source code written when the platform itself is not known (the code is fixed, never the
 caller's text)."""
@@ -54,28 +68,21 @@ FLOOD_REASONS = frozenset({Refusal.RATE, Refusal.UNKNOWN_ADDRESS})
 """Reasons that a flood produces by definition: no log line per call, the security event (held
 back when repeated) is their trace."""
 
-Verifier = Callable[[bytes, Mapping[str, str], str, datetime], Refusal | None]
-"""``(body, headers, secret, now)`` → ``None`` when the call is authentic and recent."""
-
 
 @dataclass(frozen=True)
-class Address:
-    """An address that exists: who it is for and the secret its calls are verified with.
+class Address[W: InboundWebhook]:
+    """An address that exists: its platform's record and the secret its calls are verified with.
 
     Attributes:
-        source: The platform's code for logs, events, limits and replay keys (``webex``, ``wxcc``).
+        inbound: How the platform's webhooks are checked and read (source, verify, parse, ...).
         secret: The secret the signature is checked under.
-        verify: The platform's check of signature and signed time.
-        handling: The contact-center platform's handling, ``None`` for the video platform.
         organisation_id: The organisation whose own connection this is; ``None`` for an
             address of the installation.
         organisation: That organisation's slug, public and no personal data.
     """
 
-    source: str
+    inbound: W
     secret: str
-    verify: Verifier
-    handling: InboundWebhook | None = None
     organisation_id: int | None = None
     organisation: str | None = None
 
@@ -94,12 +101,8 @@ class Unresolved:
     organisation: str | None = None
 
 
-Resolver = Callable[[Request], Awaitable[Address | Unresolved]]
-"""Finds the address a request is for, from the application's state and the path."""
-
-
 @dataclass(frozen=True)
-class Delivery:
+class Delivery[W: InboundWebhook]:
     """A webhook that passed the gate: authentic, recent, small and a JSON object.
 
     Attributes:
@@ -108,7 +111,7 @@ class Delivery:
         now: The time the gate used, for the route to reuse.
     """
 
-    address: Address
+    address: Address[W]
     payload: dict[str, Any]
     now: datetime
 
@@ -129,7 +132,7 @@ class WebhookRefused(Exception):  # noqa: N818 - reads as an outcome, like HTTPE
 async def webhook_refused_response(request: Request, exc: Exception) -> Response:
     """Answer a refused webhook: the status of its reason, no body, ``Retry-After`` for a rate."""
     reason = exc.reason if isinstance(exc, WebhookRefused) else Refusal.MALFORMED
-    headers = {"retry-after": RETRY_AFTER_SECONDS} if reason is Refusal.RATE else None
+    headers = {"retry-after": webhook_retry_after()} if reason is Refusal.RATE else None
     return Response(status_code=reason.status, headers=headers)
 
 
@@ -158,94 +161,124 @@ def _json_object(body: bytes) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
-class WebhookGate:
-    """FastAPI dependency: admit a webhook call or refuse it, in the fixed order of ADR 0124.
+async def _inspect[W: InboundWebhook](
+    request: Request, address: Address[W]
+) -> Refusal | tuple[dict[str, Any], datetime]:
+    """Run the checks of an address that exists, up to the shape; no limit is counted here.
+
+    Returns:
+        The reason of the first check that fails, else the payload and the time used.
+    """
+    if not accepts_content_type(request.headers.get("content-type")):
+        return Refusal.CONTENT_TYPE
+    body = await read_capped(request, MAX_BODY_BYTES)
+    if body is None:
+        return Refusal.TOO_LARGE
+    clock: Clock = request.app.state.clock
+    now = clock.now()
+    failure = address.inbound.verify(body, request.headers, address.secret, now)
+    if failure is not None:
+        return failure
+    payload = _json_object(body)
+    if payload is None:
+        return Refusal.MALFORMED
+    return payload, now
+
+
+_GATES: list[object] = []
+
+
+def is_webhook_gate(call: object) -> bool:
+    """Return whether ``call`` was made by ``webhook_gate``: what the route sweep looks for."""
+    return any(call is gate for gate in _GATES)
+
+
+def webhook_gate[W: InboundWebhook](
+    resolve: Callable[..., Awaitable[Address[W] | Unresolved]],
+) -> Callable[..., Awaitable[Delivery[W]]]:
+    """Return the FastAPI dependency that admits or refuses a webhook call (ADR 0124 point 2).
 
     Args:
-        resolve: Finds the address the request is for; the route's declaration of what it is.
+        resolve: A dependency that finds the address the request is for. It declares the path
+            parameters it needs itself, so the route's parameters are honest.
     """
 
-    def __init__(self, resolve: Resolver) -> None:
-        """Store the resolver."""
-        self._resolve = resolve
-
-    async def __call__(self, request: Request) -> Delivery:
+    async def gate(
+        request: Request, found: Annotated[Address[W] | Unresolved, Depends(resolve)]
+    ) -> Delivery[W]:
         """Return the verified delivery, or raise ``WebhookRefused`` after leaving its trace."""
         caller = get_remote_address(request)
-        found = await self._resolve(request)
         if isinstance(found, Unresolved):
+            # Only an address that does not exist counts here: it never touches one that does.
             if not within_unknown_address_limit(caller):
-                await _refuse(request, Refusal.RATE, UNKNOWN_SOURCE)
+                await _refuse(request, Refusal.RATE, found.source)
             await _refuse(request, Refusal.UNKNOWN_ADDRESS, found.source, found.organisation)
         address = found
-        who = (address.source, address.organisation)
-        # Seam: the source network (ADR 0124 point 3) is checked here, before the limit.
-        bucket = address.organisation or INSTALLATION
-        if not within_webhook_limit(address.source, bucket, caller):
-            await _refuse(request, Refusal.RATE, *who)
-        if not accepts_content_type(request.headers.get("content-type")):
-            await _refuse(request, Refusal.CONTENT_TYPE, *who)
-        body = await read_capped(request, MAX_BODY_BYTES)
-        if body is None:
-            await _refuse(request, Refusal.TOO_LARGE, *who)
-        clock: Clock = request.app.state.clock
-        now = clock.now()
-        failure = address.verify(body, request.headers, address.secret, now)
-        if failure is not None:
-            await _refuse(request, failure, *who)
-        payload = _json_object(body)
-        if payload is None:
-            await _refuse(request, Refusal.MALFORMED, *who)
+        source, organisation = address.inbound.source, address.organisation
+        bucket = organisation or INSTALLATION
+        # Seam: the source network (ADR 0124 point 3) is checked here, before the limits.
+        inspected = await _inspect(request, address)
+        if isinstance(inspected, Refusal):
+            if not within_refused_limit(source, bucket, caller):
+                await _refuse(request, Refusal.RATE, source, organisation)
+            await _refuse(request, inspected, source, organisation)
+        if not within_webhook_limit(source, bucket, caller):
+            await _refuse(request, Refusal.RATE, source, organisation)
+        payload, now = inspected
         return Delivery(address, payload, now)
 
+    _GATES.append(gate)
+    return gate
 
-async def webex_address(request: Request) -> Address | Unresolved:
+
+async def webex_address(request: Request) -> Address[InboundWebhook] | Unresolved:
     """Resolve the video platform's address; without ``WEBEX_WEBHOOK_SECRET`` it does not exist."""
-    secret = request.app.state.settings.webex_webhook_secret
+    secret = WEBEX_INBOUND.secret(request.app.state.settings)
     if secret is None:
-        return Unresolved("webex")
-    return Address("webex", secret.get_secret_value(), check_webex)
+        return Unresolved(WEBEX_INBOUND.source)
+    return Address(WEBEX_INBOUND, secret.get_secret_value())
 
 
-def installation_address(fixed: InboundWebhook | None = None) -> Resolver:
-    """Return the resolver of a contact-center address that uses the installation's secret.
+def _installation(
+    request: Request, handling: ContactCenterWebhook | None
+) -> Address[ContactCenterWebhook] | Unresolved:
+    """Resolve a contact-center address that uses the installation's secret (ADR 0032 point 11).
 
-    Args:
-        fixed: The platform of an address that names it in its path (the alias ``/webhooks/wxcc``);
-            ``None`` reads the platform from the ``{kind}`` in the path. A platform without an
-            adapter, or without its secret set, does not exist (ADR 0032 point 6).
+    A platform without an adapter, or without its secret set, does not exist (point 6).
     """
-
-    async def resolve(request: Request) -> Address | Unresolved:
-        handling = fixed or inbound(str(request.path_params.get("kind", "")))
-        if handling is None:
-            return Unresolved(UNKNOWN_SOURCE)
-        secret = handling.secret(request.app.state.settings)
-        if secret is None:
-            return Unresolved(handling.source)
-        return Address(handling.source, secret.get_secret_value(), handling.verify, handling)
-
-    return resolve
-
-
-async def organisation_address(request: Request) -> Address | Unresolved:
-    """Resolve an organisation's own contact-center address (ADR 0032 point 10).
-
-    It exists when the platform has an adapter, the organisation exists and is connected to that
-    platform with a secret; the secret is that organisation's own.
-    """
-    handling = inbound(str(request.path_params.get("kind", "")))
     if handling is None:
         return Unresolved(UNKNOWN_SOURCE)
-    slug = str(request.path_params.get("org", ""))
-    connections: SealedConnections | None = request.app.state.contact_center_connections
-    if connections is None or not is_slug(slug):
-        return Unresolved(handling.source)
-    admin: AdminService = request.app.state.admin_service
-    organisation_id = await admin.organisation_id(slug)
-    if organisation_id is None:
-        return Unresolved(handling.source)
-    secret = await connections.webhook_secret(organisation_id, handling.kind)
+    secret = handling.secret(request.app.state.settings)
     if secret is None:
-        return Unresolved(handling.source, slug)
-    return Address(handling.source, secret, handling.verify, handling, organisation_id, slug)
+        return Unresolved(handling.source)
+    return Address(handling, secret.get_secret_value())
+
+
+async def installation_address(
+    request: Request, kind: str
+) -> Address[ContactCenterWebhook] | Unresolved:
+    """Resolve ``/webhooks/contact-center/{kind}``."""
+    return _installation(request, inbound(kind))
+
+
+async def alias_address(request: Request) -> Address[ContactCenterWebhook] | Unresolved:
+    """Resolve the alias of Webex Contact Center's address (ADR 0032 CC-4)."""
+    return _installation(request, WXCC_INBOUND)
+
+
+async def organisation_address(
+    request: Request, kind: str, org: str
+) -> Address[ContactCenterWebhook] | Unresolved:
+    """Resolve ``/webhooks/contact-center/{kind}/{org}``: an organisation's own address.
+
+    The rule of when it exists is the connection service's (``webhook_target``); this only reads
+    the path and calls it.
+    """
+    handling = inbound(kind)
+    if handling is None:
+        return Unresolved(UNKNOWN_SOURCE)
+    service: ContactCenterConnectionService = request.app.state.contact_center_connection_service
+    target = await service.webhook_target(org, handling.kind)
+    if not target.found or target.secret is None:
+        return Unresolved(handling.source, target.organisation)
+    return Address(handling, target.secret, target.organisation_id, target.organisation)

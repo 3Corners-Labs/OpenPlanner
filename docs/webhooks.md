@@ -247,13 +247,27 @@ and the first that fails refuses:
 | Step | Check | Refusal reason | Answer |
 |---|---|---|---|
 | 1 | The address exists: the platform has an adapter, the organisation exists and is connected to it, a secret is set | `unknown_address` | 404 |
-| 2 | Rate limit per platform, organisation and source address: `rate_limit_webhook_per_minute` (class C, default 600, 60 to 6000) | `rate` | 429 with `Retry-After` |
-| 3 | `Content-Type` is `application/json` or `application/cloudevents+json` (parameters such as `charset` ignored) | `content_type` | 415 |
-| 4 | The body is at most 64 KiB: a declared `Content-Length` over it refuses unread, and a body without a length (chunked) is cut off as soon as more than 64 KiB has arrived | `too_large` | 413 |
-| 5 | The signature over the raw body, in constant time | `invalid_signature` | 401 |
-| 6 | The signed time, where the platform signs one (WxCC), is within 300 seconds | `stale` | 401 |
-| 7 | The event was not seen before (the domain's event key, see below); a replay is acknowledged | | 204 |
-| 8 | The body is a JSON object | `malformed` | 400 |
+| 2 | `Content-Type`, when the call sends one, is `application/json` or `application/cloudevents+json` (parameters such as `charset` ignored). A call **without** the header passes: the signature decides | `content_type` | 415 |
+| 3 | The body is at most 64 KiB: a declared `Content-Length` over it refuses unread, and a body without a length (chunked) is cut off as soon as more than 64 KiB has arrived | `too_large` | 413 |
+| 4 | The signature over the raw body, in constant time | `invalid_signature` | 401 |
+| 5 | The signed time, where the platform signs one (WxCC), is within 300 seconds | `stale` | 401 |
+| 6 | The body is a JSON object | `malformed` | 400 |
+| 7 | The limits (below) | `rate` | 429 with `Retry-After` |
+| 8 | The event was not seen before (the domain's event key, see below); a replay is acknowledged | | 204 |
+
+The limits come after the checks, so a call that cannot sign never uses up the budget of the
+authentic ones. Both buckets have the value of `rate_limit_webhook_per_minute` (class C, default
+600, 60 to 6000) and the key platform, organisation (or `-` for an address of the installation)
+and the caller's address as the server derived it; a forwarded header changes nothing:
+
+- A call refused at steps 2 to 6 counts against the bucket of **refused** calls. While it has room
+  the call gets its own reason; once it is used up the call gets `rate` instead.
+- A call that passed steps 2 to 6 counts against the bucket of **verified** calls and is refused
+  with `rate` only when that one is used up (the supplier itself sending too much). The refused
+  bucket never touches a verified call: someone who can make the supplier's shared sending address
+  call an organisation's address with a bad signature cannot lock its authentic deliveries out.
+
+`Retry-After` is the window of the limit (60 seconds for a per-minute limit).
 
 Calls to an address that does not exist have a bucket of their own: per caller address only (the
 platform and organisation in the path come from the caller, so they never make a key), with the
@@ -271,7 +285,7 @@ trace is the security event, held back when repeated. Every other reason also lo
 
 Every refusal answers with an **empty body**, never the HTML error page. Reasons that later steps
 of ADR 0124 produce (`network`, `source_unknown`) are already in the closed list, and the two
-source-network checks will sit before step 2. Step 8 runs before step 7 in the code, because the
+source-network checks will sit before step 2. Step 6 runs before step 8 in the code, because the
 event key comes from the parsed body.
 
 Every refusal is also a security event `webhook.rejected` (ADR 0034, 0053) with the reason, the

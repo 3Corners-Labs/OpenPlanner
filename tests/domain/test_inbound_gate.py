@@ -55,17 +55,17 @@ def test_the_size_limit_is_64_kib() -> None:
         " application/json ",
         "application/cloudevents+json",
         "application/cloudevents+json; charset=utf-8",
+        None,
+        "",
     ],
 )
-def test_json_media_types_are_accepted(value: str) -> None:
+def test_json_media_types_and_no_header_at_all_are_accepted(value: str) -> None:
     assert accepts_content_type(value)
 
 
 @pytest.mark.parametrize(
     "value",
     [
-        None,
-        "",
         "text/plain",
         "application/x-www-form-urlencoded",
         "multipart/form-data; boundary=x",
@@ -76,7 +76,7 @@ def test_json_media_types_are_accepted(value: str) -> None:
         ";application/json",
     ],
 )
-def test_anything_else_is_refused(value: str | None) -> None:
+def test_a_header_naming_anything_else_is_refused(value: str) -> None:
     assert not accepts_content_type(value)
 
 

@@ -9,3 +9,7 @@ d4df732c4d2049194f57cc3899f279ec39b78e42:tests/domain/test_configuration_v1_logi
 # A fake referer token in the re-login test of the sign-in query fix (PR #637), reachable in
 # history (commit d431514d); the value is a plain word on later commits.
 d431514d569531900815a84ba87e759c6d3edad6:tests/admin/test_group_routes.py:generic-api-key:562
+# A made-up value that only looks like a secret, in the test that proves a refusal event holds
+# nothing from the request (ADR 0124 step 1, PR #791), reachable in history (commit 7973c4bf);
+# marked `gitleaks:allow` on later commits.
+7973c4bf8d3c91925096a05d25b687c57695fa86:tests/api/test_webhook_gate.py:generic-api-key:175

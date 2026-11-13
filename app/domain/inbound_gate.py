@@ -38,7 +38,7 @@ class Refusal(StrEnum):
     RATE = "rate"
     """Too many calls from this source to this address."""
     CONTENT_TYPE = "content_type"
-    """The body is not sent as JSON."""
+    """The call names a content type that is not JSON."""
     TOO_LARGE = "too_large"
     """The body is over the size limit, declared or actually sent."""
     SIGNATURE = INVALID_SIGNATURE
@@ -73,16 +73,18 @@ STATUS: dict[Refusal, int] = {
 
 
 def accepts_content_type(value: str | None) -> bool:
-    """Return whether a ``Content-Type`` header names a media type a webhook may use.
+    """Return whether a ``Content-Type`` header is no reason to refuse a webhook.
 
-    Only the media type is compared, case-insensitively; parameters such as
-    ``; charset=utf-8`` are ignored.
+    A call without the header (or with an empty one) passes: the signature decides, and the
+    video platform's real deliveries were never observed to send it. A header that is there must
+    name one of the two JSON media types; only the media type is compared, case-insensitively,
+    and parameters such as ``; charset=utf-8`` are ignored.
 
     Args:
         value: The header value, or ``None`` when the call sent none.
     """
     if not value:
-        return False
+        return True
     return value.split(";", 1)[0].strip().lower() in ACCEPTED_MEDIA_TYPES
 
 
