@@ -358,8 +358,8 @@ the pseudonym key, which is the existing bootstrap key material, not a new secre
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed; the lines of `CLAUDE.md` it amends; the row in `docs/adr-status.md`; the findings in `docs/research/call-page-on-the-meetings-sdk.md` | #PRNUM | merged |
-| 1 | `VideoProvider.guest_access`, the Webex adapter's guest token call with its fake and contract fixture, the pseudonymous subject in the domain, the guest-scope finding in the service-app check and the group check; the five call settings of this ADR in the registry. No page, no participant sees a change | #PRNUM | merged |
+| 0 | ADR proposed; the lines of `CLAUDE.md` it amends; the row in `docs/adr-status.md`; the findings in `docs/research/call-page-on-the-meetings-sdk.md` | #787 | merged |
+| 1 | `VideoProvider.guest_access`, the Webex adapter's guest token call with its fake and contract fixture, the pseudonymous subject in the domain, the guest-scope finding in the service-app check and the group check; the five call settings of this ADR in the registry. No page, no participant sees a change | #787 | merged |
 | 2 | The call page as a kind of page: the vendored SDK with manifest, size gate and SBOM entry; `CALL_CSP` and the permissions for the one route with their tests (`render()` takes the kind of page); the recorded exception in `no-third-parties.spec.ts`; `docs/dependencies.md` | | planned |
 | 3 | Design: mock-ups of every state of point 10, the chat side bar included, in two organisations' themes, approved by the product owner (point 15) | | planned |
 | 4 | The way in: device check with camera, microphone and speaker test, the token endpoint with its abuse cases, connecting with retry, the lobby, the failure state with `embedded_call_webex_option`; behind `embedded_call_enabled` | | planned |
