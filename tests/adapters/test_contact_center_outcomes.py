@@ -64,6 +64,7 @@ def test_the_origin_is_the_id_and_never_the_name() -> None:
     plain = parse_wxcc(_event({"origin": "OP-000124"}))
     without = parse_wxcc(_event({}))
     odd = parse_wxcc(_event({"origin": {"name": "Ada"}}))
+    caller = parse_wxcc(_event({"origin": "+31612345678"}))
 
     assert sent is not None
     assert sent.origin == "OP-000123"
@@ -74,3 +75,5 @@ def test_the_origin_is_the_id_and_never_the_name() -> None:
     assert without.origin == ""
     assert odd is not None
     assert odd.origin == ""
+    assert caller is not None
+    assert caller.origin == ""  # a caller's number on someone else's task is never kept

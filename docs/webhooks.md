@@ -139,7 +139,9 @@ queue holds (`own_queue`) and a claim of work the contact center holds is refuse
 reached the platform but got no answer (a read timeout, a broken connection, a `504`) is never
 retried: the attempt waits in `reconciliation_required`. A task event whose task OpenPlanner does
 not know and whose `origin` (the booking reference sent as `origin.id`; the name beside it is
-never read) names that booking adopts the task as the attempt's own. After
+never read, and an origin that is not a reference is dropped) names that confirmed booking adopts
+the task as the attempt's own; an attempt whose create is still running is never adopted. Two
+installations must not share one contact-center tenant: the reference is unique per installation. After
 `contact_center_reconcile_minutes` (class C, default 10) the attempt is fenced: the request goes
 to the own queue, the team is told through the fallback (ADR 0082), and a task that turns up
 later is marked cancelled and ended by the end-task job. Task events on an attempt:

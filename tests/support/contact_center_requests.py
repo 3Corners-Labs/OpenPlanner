@@ -71,7 +71,9 @@ def desk(uow: InMemoryUnitOfWork, clock: FixedClock) -> Desk:
     work = RequestWork(
         PoolBookings(clock, treatment_buffer=5), lease_minutes=5, unresolved_hours=24
     )
-    integration = IntegrationService(uow, clock, AdminService(uow, clock), work=AttemptEvents(work))
+    integration = IntegrationService(
+        uow, clock, AdminService(uow, clock), work=AttemptEvents(work, lambda: WINDOW)
+    )
     dispatcher = FakeDispatcher()
     calls = CallService(uow, integration, FakeVideo(), webex_cc(dispatcher), lambda b, g: "x")
     dispatch = RequestDispatch(
@@ -81,7 +83,7 @@ def desk(uow: InMemoryUnitOfWork, clock: FixedClock) -> Desk:
         task_of=calls.task_for,
         dispatcher_of=calls.dispatcher_of,
         integration=integration,
-        window_minutes=WINDOW,
+        window_minutes=lambda: WINDOW,
     )
     queue = QueueService(uow, clock, AdminService(uow, clock), b"k" * 32, work=work)
     return Desk(uow, clock, dispatcher, work, integration, dispatch, queue)

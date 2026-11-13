@@ -679,7 +679,10 @@ def create_app(
             probes=ProbeReports(ReportStore(app.state.engine)),
             staff_usage=staff_usage,
             # ADR 0121 step 6b: task events move the contact-center attempts of request work.
-            work=AttemptEvents(request_work(clock, app.state.live_settings)),
+            work=AttemptEvents(
+                request_work(clock, app.state.live_settings),
+                lambda: live().contact_center_reconcile_minutes,
+            ),
         )
         # ADR 0082 points 5 and 7: the last inbound webhooks and the health of the connections.
         app.state.health_service = IntegrationHealthService(

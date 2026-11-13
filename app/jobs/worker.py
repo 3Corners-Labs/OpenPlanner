@@ -206,7 +206,11 @@ async def run_worker(
         )
         work = request_work(clock, live)
         integration = IntegrationService(
-            uow, clock, AdminService(uow, clock), version, work=AttemptEvents(work)
+            uow,
+            clock,
+            AdminService(uow, clock),
+            version,
+            work=AttemptEvents(work, lambda: live.settings.contact_center_reconcile_minutes),
         )
         # ADR 0082 point 11: bookings to the own queue when the contact center fails.
         fallback = FallbackService(

@@ -5,6 +5,7 @@ fallback and a late callback: one fenced authority), on the demo service of
 ``tests.support.contact_center_requests``.
 """
 
+from dataclasses import replace
 from datetime import timedelta
 
 import pytest
@@ -269,3 +270,68 @@ async def test_a_failed_task_goes_back_to_the_own_queue(
     [item] = items_of(uow, booking_id)
     assert item.state is WorkItemState.FAILED
     assert request_of(uow, booking_id).handling is HandlingState.QUEUED
+
+
+async def test_an_event_during_the_create_never_ends_the_task_it_creates(
+    the_desk: Desk, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """``task:new`` may arrive before the create answers: the attempt is not adopted then."""
+    booking_id = await book(uow, clock, CC_FLOW)
+    reference = uow.state.bookings[booking_id].reference
+    sent = the_desk.dispatcher.create_task
+
+    async def create_with_early_event(task: object) -> str:
+        task_id = await sent(task)  # type: ignore[arg-type]
+        assert await event(the_desk, task_id, EventKind.TASK_CREATED, reference) is (
+            EventOutcome.UNKNOWN
+        )
+        return task_id
+
+    the_desk.dispatcher.create_task = create_with_early_event  # type: ignore[method-assign]
+
+    assert await dispatch(the_desk, booking_id) is None
+
+    [item] = items_of(uow, booking_id)
+    assert item.state is WorkItemState.DISPATCHED
+    assert JobType.END_WXCC_TASK not in [j.type for j in uow.state.jobs.get(booking_id, [])]
+
+
+async def test_a_late_task_is_only_ours_within_the_window_and_the_organisation(
+    the_desk: Desk, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    booking_id = await book(uow, clock, CC_FLOW)
+    the_desk.dispatcher.error = IntegrationError("unreachable", retryable=True, ambiguous=True)
+    await dispatch(the_desk, booking_id)
+    reference = uow.state.bookings[booking_id].reference
+
+    foreign = await the_desk.integration.record_task_event(
+        "other-org",
+        EventKind.TASK_CONNECTED,
+        clock.now(),
+        origin=reference,
+        provider=ContactCenterKind.WEBEX_CC,
+        source=SOURCE,
+        organisation_id=2,
+    )
+    assert foreign is EventOutcome.UNKNOWN
+    clock.advance(timedelta(minutes=WINDOW))
+    assert await the_desk.dispatch.fence_round() == 1
+    clock.advance(timedelta(minutes=WINDOW + 1))
+    assert await event(the_desk, "too-late", EventKind.TASK_CREATED, reference) is (
+        EventOutcome.UNKNOWN
+    )
+    assert uow.state.bookings[booking_id].contact_center_task is None
+
+
+async def test_a_task_that_cannot_be_built_opens_no_attempt(
+    the_desk: Desk, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    booking_id = await book(uow, clock, CC_FLOW)
+    uow.state.flow_revisions[(53, 1)] = replace(
+        uow.state.flow_revisions[(53, 1)], interaction_kind=InteractionKind.TELEPHONE
+    )
+
+    with pytest.raises(DomainError):
+        await dispatch(the_desk, booking_id)
+
+    assert not [r for r in uow.state.requests.values() if r.booking_id == booking_id]

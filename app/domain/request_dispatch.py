@@ -23,15 +23,14 @@ the contact center, so the timeline, the end-task job and the purge work unchang
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
-from datetime import datetime
-from enum import StrEnum
+from datetime import datetime, timedelta
 
 from app.domain import contact_center_attempts as attempts
 from app.domain.booking import Booking, BookingStatus, booking_id_of, stored_id
 from app.domain.calls import ContactCenterTask, EventKind
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
-from app.domain.errors import DomainError
-from app.domain.fallback import FallbackService
+from app.domain.errors import DomainError, ErrorCode
+from app.domain.fallback import FALLBACK, FallbackService
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.pool_accounting import StartOutcome
@@ -54,22 +53,14 @@ from app.domain.service_requests import (
 )
 
 OWN_QUEUE = "own_queue"
-"""Skip reason: the request's flow uses the own queue, or the own queue holds the request."""
+"""Skip reason: the request's flow uses the own queue, or the own queue holds the request (the
+value of the dispatch job's ``OWN_QUEUE``)."""
 HELD = "already_done"
-"""Skip reason: the request already has an active work item (an attempt or a claim)."""
+"""Skip reason: the request already has an active work item (the job's ``ALREADY_DONE``)."""
 NO_DISPATCH = "no_dispatch"
 """Skip reason: the service has no complete routing, or no dispatcher for its platform."""
 IN_DOUBT_SKIP = "outcome_unknown"
 """The create's outcome is unknown: the attempt waits for reconciliation, the job ends."""
-
-
-class LateTask(StrEnum):
-    """What became of a platform event for a task OpenPlanner did not know."""
-
-    ADOPTED = "adopted"
-    """It is the task of an attempt in doubt: kept as that attempt's task."""
-    ENDED = "ended"
-    """Its attempt was fenced: kept on the booking and ended at the platform."""
 
 
 @dataclass(frozen=True)
@@ -82,11 +73,24 @@ class _Write:
     seen_item: WorkItemState
 
 
-async def _write(tx: Transaction, change: _Write) -> bool:
-    """Write the attempt and the request conditionally; ``False`` when a race changed them."""
-    return await tx.update_work_item(
-        change.item, change.seen_item
-    ) and await tx.update_service_request(change.request, change.seen_request.handling)
+async def _write(tx: Transaction, change: _Write) -> None:
+    """Write the attempt and the request, each conditional on the state it was read in.
+
+    Under the write lock a condition fails only when an invariant is already broken; then the
+    whole transaction is refused rather than half written.
+
+    Raises:
+        DomainError: ``already_claimed`` when either write lost its condition.
+    """
+    if not await tx.update_work_item(change.item, change.seen_item):
+        raise DomainError(ErrorCode.ALREADY_CLAIMED)
+    if not await tx.update_service_request(change.request, change.seen_request.handling):
+        raise DomainError(ErrorCode.ALREADY_CLAIMED)
+
+
+def _out_of_order(error: DomainError) -> bool:
+    """Whether ``error`` is an attempt's transition refusing an event it cannot take."""
+    return error.code is ErrorCode.NOT_CLAIMED
 
 
 class AttemptEvents:
@@ -94,11 +98,14 @@ class AttemptEvents:
 
     Args:
         work: The request work of the own queue: the pool slot and the start check.
+        window_minutes: ``contact_center_reconcile_minutes``: how long after a fence a late
+            task of that attempt is still recognised (and ended) as ours.
     """
 
-    def __init__(self, work: RequestWork) -> None:
-        """Store the collaborator."""
+    def __init__(self, work: RequestWork, window_minutes: Callable[[], int]) -> None:
+        """Store the collaborators."""
         self._work = work
+        self._window = window_minutes
 
     async def on_task_event(
         self, tx: Transaction, booking: Booking, kind: EventKind, at: datetime
@@ -117,14 +124,16 @@ class AttemptEvents:
                 await self._connected(tx, booking, request, item, at)
             elif kind is EventKind.TASK_ENDED:
                 new_request, new_item = attempts.ended(request, item, now=at)
-                if await _write(tx, _Write(new_request, request, new_item, item.state)):
-                    if booking.status is BookingStatus.CONFIRMED:
-                        await tx.save_booking(replace(booking, status=BookingStatus.COMPLETED))
+                await _write(tx, _Write(new_request, request, new_item, item.state))
+                if booking.status is BookingStatus.CONFIRMED:
+                    await tx.save_booking(replace(booking, status=BookingStatus.COMPLETED))
             elif kind is EventKind.TASK_FAILED:
                 new_request, new_item = attempts.failed(request, item, now=at)
                 await _write(tx, _Write(new_request, request, new_item, item.state))
-        except DomainError:
-            return  # an event out of order (connected twice, ended before created): ignored
+        except DomainError as error:
+            if not _out_of_order(error):
+                raise
+            # An event out of order (connected twice, ended before it was dispatched): ignored.
 
     async def _connected(
         self,
@@ -138,7 +147,7 @@ class AttemptEvents:
         slot = await self._work.pool_slot(tx, booking)
         group = await tx.get_group_by_id(booking.group_id)
         if slot is None or slot.occupied_until is None or group is None:
-            return
+            raise DomainError(ErrorCode.NOT_CLAIMED)  # request work always has its pool slot
         check = await self._work.check_start(tx, group, slot, stored_id(booking), at)
         new_request, new_item = attempts.connected(
             request,
@@ -158,12 +167,14 @@ class AttemptEvents:
         provider: ContactCenterKind,
         at: datetime,
         organisation_id: int | None = None,
-    ) -> tuple[Booking, LateTask] | None:
+    ) -> Booking | None:
         """Match a task OpenPlanner did not know to an attempt by its ``origin`` (a reference).
 
-        Only a booking whose request has a contact-center attempt in doubt, or a fenced one and
-        no task yet, is matched; any other origin is not ours (``None``). With
-        ``organisation_id`` (an organisation's own webhook address) only a request of that
+        Only a confirmed booking without a task, whose request has a contact-center attempt in
+        ``reconciliation_required`` (the create returned with an unknown outcome) or one fenced
+        within the window, is matched; any other origin is not ours (``None``). An attempt still
+        ``dispatching`` is never adopted: its create is still running and gives the task itself.
+        With ``organisation_id`` (an organisation's own webhook address) only a request of that
         organisation is matched. An adopted task is the attempt's task (no second task is
         made); a task of a fenced attempt is kept on the booking and the end-task job (ADR 0021)
         ends it at the platform.
@@ -171,9 +182,13 @@ class AttemptEvents:
         booking_id = booking_id_of(origin)
         booking = await tx.get_booking(booking_id) if booking_id is not None else None
         request = await tx.get_request_of_booking(stored_id(booking)) if booking else None
-        if booking is None or request is None or booking.contact_center_task is not None:
-            return None
-        if organisation_id is not None and request.organisation_id != organisation_id:
+        if (
+            booking is None
+            or request is None
+            or booking.contact_center_task is not None
+            or booking.status is not BookingStatus.CONFIRMED
+            or (organisation_id is not None and request.organisation_id != organisation_id)
+        ):
             return None
         task = ContactCenterTaskRef(task_id, provider)
         items = await tx.work_items_of(request.id or 0)
@@ -181,17 +196,20 @@ class AttemptEvents:
         if (
             active is not None
             and active.channel is WorkChannel.CONTACT_CENTER
-            and active.state in IN_DOUBT
+            and active.state is WorkItemState.RECONCILIATION_REQUIRED
         ):
-            adopted = attempts.dispatched(active)
-            if not await tx.update_work_item(adopted, active.state):
+            if not await tx.update_work_item(attempts.dispatched(active), active.state):
                 return None
             await tx.save_task(stored_id(booking), task)
-            return replace(booking, contact_center_task=task), LateTask.ADOPTED
-        if any(i.state is WorkItemState.FENCED for i in items):
+            return replace(booking, contact_center_task=task)
+        horizon = at - timedelta(minutes=self._window())
+        if any(
+            i.state is WorkItemState.FENCED and i.ended_at is not None and i.ended_at >= horizon
+            for i in items
+        ):
             await tx.save_task(stored_id(booking), task)
             await tx.add_jobs(stored_id(booking), [PlannedJob(JobType.END_WXCC_TASK, at, None)])
-            return replace(booking, contact_center_task=task), LateTask.ENDED
+            return replace(booking, contact_center_task=task)
         return None
 
 
@@ -222,7 +240,7 @@ class RequestDispatch:
         task_of: TaskBuilder,
         dispatcher_of: DispatcherOf,
         integration: IntegrationService,
-        window_minutes: int | Callable[[], int],
+        window_minutes: Callable[[], int],
         fallback: FallbackService | None = None,
     ) -> None:
         """Store the collaborators."""
@@ -263,12 +281,13 @@ class RequestDispatch:
         if dispatcher is None or group.contact_center is None:
             return NO_DISPATCH
         if self._fallback is not None and await self._fallback.diverts(booking, group):
-            return OWN_QUEUE
+            return FALLBACK
+        built = await self._task_of(booking, group)  # before the attempt: a refusal opens none
         opened = await self._open(booking, group)
         if opened is None:
             return HELD
         try:
-            task_id = await dispatcher.create_task(await self._task_of(booking, group))
+            task_id = await dispatcher.create_task(built)
         except IntegrationError as error:
             if error.ambiguous:
                 await self._settle(opened, lambda r, i: (r, attempts.in_doubt(i)))
@@ -276,9 +295,6 @@ class RequestDispatch:
                     stored_id(booking), EventKind.INTEGRATION_ERROR, detail=IN_DOUBT_SKIP
                 )
                 return IN_DOUBT_SKIP
-            await self._fail(opened)
-            raise
-        except DomainError:
             await self._fail(opened)
             raise
         task = ContactCenterTaskRef(task_id, group.contact_center.kind)
@@ -335,7 +351,7 @@ class RequestDispatch:
         booking (ADR 0082 point 11). Counts only; no booking or participant is logged.
         """
         now = self._clock.now()
-        window = self._window() if callable(self._window) else self._window
+        window = self._window()
         fenced: list[int] = []
         async with self._uow.locked() as tx:
             for item in await tx.work_items_in_doubt():
@@ -345,8 +361,8 @@ class RequestDispatch:
                 if request is None or request.booking_id is None:
                     continue
                 new_request, new_item = attempts.fence(request, item, now=now)
-                if await _write(tx, _Write(new_request, request, new_item, item.state)):
-                    fenced.append(request.booking_id)
+                await _write(tx, _Write(new_request, request, new_item, item.state))
+                fenced.append(request.booking_id)
         for booking_id in fenced:
             await self._integration.record(booking_id, EventKind.INTEGRATION_ERROR, detail="fenced")
             if self._fallback is not None:

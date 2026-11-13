@@ -41,7 +41,7 @@ def runner_of(
         video=FakeVideo(),
         dispatchers=webex_cc(dispatcher),
         integration=IntegrationService(
-            uow, clock, AdminService(uow, clock), work=AttemptEvents(work)
+            uow, clock, AdminService(uow, clock), work=AttemptEvents(work, lambda: 10)
         ),
         request_work=work,
         reconcile_minutes=lambda: 10,
