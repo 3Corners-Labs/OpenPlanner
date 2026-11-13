@@ -30,12 +30,12 @@ the PR that did it.
 | G04 | The agent API's change-request check judges a requested time on the pool of a matched pool booking, without telling the caller whether anything matched | 0122/5 | yes | build | follow-up |
 | G05 | A list of work in recovery for supervisors, and an alert while any exists (design R9) | 0121/5e | yes | build | follow-up |
 | G06 | The participant's immediate pages and the claimed request's page in `e2e/pages.json` (axe, Lighthouse, keyboard). Not reachable while the gate is shut: the pages render an immediate form only for an active pool flow, which the flow resolver refuses while `ROLLBACK_SAFE` is `False`, and the e2e stack has no switch that opens it (a protection is never a setting). So the entries land in the PR that opens the gate, seeded from G08's fixture, and that PR runs with `ci:full` | 0121/32 | yes | build | follow-up |
-| G07 | The upgrade matrix with released images: the v0.6.0 fixture and image exist (first release with a fixture), and `scripts/upgrade-matrix.sh` gains a mode that writes the gated records with the new image (a pool slot, a request with its record, an attempt, an immediate request), then starts the previous image on that database without a downgrade and books and claims there (ADR 0121 point 9, A30) | step 8 | yes | release, build | open |
+| G07 | The upgrade matrix with released images: the v0.6.0 fixture and image exist (first release with a fixture), and `scripts/upgrade-matrix.sh` gains a mode that writes the gated records with the new image (a pool slot, a request with its record, an attempt, an immediate request), then starts the previous image on that database without a downgrade and books and claims there (ADR 0121 point 9, A30) | 0121/33 | yes | release, build | open |
 | G08 | The full demonstration fixture: a video flow and an in-person flow on one shared pool, with a third independent flow; G06, G07 and G09 run on it | 0121/10 | yes | build | follow-up |
-| G09 | Every row of the acceptance matrix A01 to A36 (`docs/service-flows-handover.md`) names its test, green with the gate opened in the test | step 8 | yes | build | open |
+| G09 | Every row of the acceptance matrix A01 to A36 (`docs/service-flows-handover.md`) names its test, green with the gate opened in the test | 0121/34 | yes | build | open |
 | G10 | The product owner's decision to open the gate, after G01 to G09 | step 8 | yes | po | open |
-| G11 | A downgrade that is refused part way leaves the database at the refusing step (SQLite runs schema statements outside the migration's transaction); make the run atomic or add a preflight that reports every refusal before any step runs. The runbook covers the procedure meanwhile | step 8 | no | build | open |
-| G12 | Diff the generated OpenAPI document against a stored copy (CLAUDE.md asks for it); today one test holds that `/api/v1` requires no `flow` | step 8 | no | build | open |
+| G11 | A downgrade that is refused part way leaves the database at the refusing step (SQLite runs schema statements outside the migration's transaction); make the run atomic or add a preflight that reports every refusal before any step runs. The runbook covers the procedure meanwhile | 0121/35 | no | build | open |
+| G12 | Diff the generated OpenAPI document against a stored copy (CLAUDE.md asks for it); today one test holds that `/api/v1` requires no `flow` | 0121/36 | no | build | open |
 | G13 | The watchdog ends the task at the platform when it expires or cancels a contact-center attempt | 0121/27 | cc | build | follow-up |
 | G14 | The own queue shows work the contact center holds as held, not as open | 0121/28 | cc | build | follow-up |
 | G15 | See on the test host that Webex Contact Center's task events carry the origin, so a late task is matched | 0121/29 | cc | operator | follow-up |
@@ -63,7 +63,7 @@ the PR that did it.
 | G37 | One staffing route factory shared by the service and the pool tabs | 0122/4 | no | build | follow-up |
 | G38 | `_week.html` takes its base path from one variable for both tabs | 0122/4 | no | build | follow-up |
 | G39 | A zone change shown on the week card, and a notice for the daylight saving gap | 0122/4 | no | build | follow-up |
-| G40 | The six older queue routes answer refusals through the shared `or_list` helper, as the routes of step 7 do (code quality of #781) | step 8 | no | build | open |
+| G40 | The older queue routes answer refusals through the shared `or_list` helper, as the routes of step 7 do (code quality of #781); the claimed booking's live fragment keeps its own handler, as it answers with a fragment, not the list | step 8 | no | build | done (#786) |
 
 ## Not on this list, on purpose
 

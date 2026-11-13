@@ -333,6 +333,19 @@ async def _claimed(
     return RedirectResponse(f"{_url(slug)}/{claimed.booking_id}", status_code=303)
 
 
+async def _done(
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    slug: str,
+    attempt: Awaitable[None],
+    outcome: str,
+) -> Response:
+    """Go back to the list with ``outcome``, or with the reason it did not work."""
+    done = await or_list(request, locale, context, slug, attempt)
+    return done if isinstance(done, HTMLResponse) else redirect_done(_url(slug), outcome)
+
+
 def _claimed_view(booking: ClaimedBooking, locale: RequestLocale, tz: tzinfo) -> ClaimedView:
     """Write the claimed booking out; polling stops once nothing can change any more."""
     if booking.work is not None:
@@ -498,8 +511,7 @@ async def release(
 ) -> Response:
     """Put a claimed booking back in the queue."""
     attempt = _service(request).release(context.principal, slug, booking_id)
-    done = await or_list(request, locale, context, slug, attempt)
-    return done if isinstance(done, HTMLResponse) else redirect_done(_url(slug), "released")
+    return await _done(request, locale, context, slug, attempt, "released")
 
 
 @router.post("/groups/{slug}/queue/{booking_id}/start", response_class=HTMLResponse)
@@ -517,8 +529,7 @@ async def complete(
 ) -> Response:
     """Complete request work: its unit of the pool is released (ADR 0121 step 5)."""
     attempt = _service(request).complete(context.principal, slug, booking_id)
-    done = await or_list(request, locale, context, slug, attempt)
-    return done if isinstance(done, HTMLResponse) else redirect_done(_url(slug), "completed")
+    return await _done(request, locale, context, slug, attempt, "completed")
 
 
 @router.post("/groups/{slug}/queue/{booking_id}/check-in", response_class=HTMLResponse)
@@ -527,5 +538,4 @@ async def check_in(
 ) -> Response:
     """Check an appointment in: the participant has arrived (ADR 0121 step 7, choice I1)."""
     attempt = _service(request).check_in(context.principal, slug, booking_id)
-    done = await or_list(request, locale, context, slug, attempt)
-    return done if isinstance(done, HTMLResponse) else redirect_done(_url(slug), "checked_in")
+    return await _done(request, locale, context, slug, attempt, "checked_in")

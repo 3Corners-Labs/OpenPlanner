@@ -255,12 +255,19 @@ async def test_no_api_v1_schema_requires_a_flow(site: httpx.AsyncClient) -> None
         if path.startswith("/api/v1/")
         for operation in item.values()
     ]
-    names = {
-        ref.rsplit("/", 1)[-1]
-        for node in _schemas(used)
-        if isinstance(ref := node.get("$ref"), str)
-    }
-    fragments = [*used, *(spec.get("components", {}).get("schemas", {})[name] for name in names)]
+    components = spec.get("components", {}).get("schemas", {})
+    fragments: list[object] = list(used)
+    names: set[str] = set()
+    while True:  # follow references until no new component is reached
+        found = {
+            ref.rsplit("/", 1)[-1]
+            for node in _schemas(fragments)
+            if isinstance(ref := node.get("$ref"), str)
+        }
+        if found <= names:
+            break
+        fragments += [components[name] for name in found - names]
+        names |= found
 
     required = [
         node

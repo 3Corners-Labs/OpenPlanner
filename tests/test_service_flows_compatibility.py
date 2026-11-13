@@ -12,10 +12,12 @@ import re
 from collections import Counter
 from functools import cache
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
 
 from app.domain import service_flows
+from scripts.adr_tables import OPEN_STATES, state_of, table_rows
 
 ROOT = Path(__file__).resolve().parents[1]
 MATRIX = ROOT / "docs" / "service-flows-compatibility.md"
@@ -37,7 +39,6 @@ OLD_BEHAVIOURS = (
     "Agent API",
 )
 """What OpenPlanner did before the train; each must have its own section of the matrix."""
-OPEN_STATES = {"planned", "follow-up"}
 STEP_8 = "8"
 """This step's own row: it is the proof, not an item of the checklist."""
 TEST_REFERENCE = re.compile(r"`(tests/[\w/]+\.py)::(\w+)`")
@@ -71,9 +72,21 @@ def _sections(text: str) -> dict[str, str]:
     return {parts[i].strip(): parts[i + 1] for i in range(1, len(parts) - 1, 2)}
 
 
-def _checklist() -> dict[str, list[str]]:
+class Item(NamedTuple):
+    """One row of the gate checklist."""
+
+    item: str
+    what: str
+    source: str
+    blocks: str
+    owner: str
+    status: str
+
+
+def _checklist() -> dict[str, Item]:
     """Return the checklist's rows by item."""
-    return {cells[0]: cells for cells in _table_rows(CHECKLIST.read_text(encoding="utf-8"))}
+    rows = _table_rows(CHECKLIST.read_text(encoding="utf-8"))
+    return {cells[0]: Item(*cells) for cells in rows}
 
 
 def _documents() -> str:
@@ -107,31 +120,27 @@ def test_every_old_behaviour_has_a_section_whose_rows_each_have_a_proof() -> Non
 def test_every_open_row_of_both_adrs_has_a_checklist_item() -> None:
     wanted: Counter[str] = Counter()
     for number, path in ADRS.items():
-        status = path.read_text(encoding="utf-8").split("## Build status", 1)[1]
-        status = status.split("\n## ", 1)[0]
-        for cells in _table_rows(status):
-            step, state = cells[0], cells[-1]
-            if state in OPEN_STATES and step != STEP_8:
-                wanted[f"{number}/{step}"] += 1
-    listed = Counter(cells[2] for cells in _checklist().values() if "/" in cells[2])
+        for cells in table_rows(path.read_text(encoding="utf-8")) or []:
+            if state_of(cells) in OPEN_STATES and cells[0] != STEP_8:
+                wanted[f"{number}/{cells[0]}"] += 1
+    listed = Counter(item.source for item in _checklist().values() if "/" in item.source)
 
     assert wanted
     assert listed == wanted
 
 
 def test_every_item_says_whether_it_blocks_who_owns_it_and_where_it_stands() -> None:
-    for item, cells in _checklist().items():
-        _, _, _, blocks, owner, status = cells
-        assert blocks in {"yes", "cc", "no"}, item
-        assert set(owner.split(", ")) <= {"build", "po", "release", "operator"}, item
-        assert status.split(" ")[0] in {"open", "planned", "follow-up", "done"}, item
+    for name, item in _checklist().items():
+        assert item.blocks in {"yes", "cc", "no"}, name
+        assert set(item.owner.split(", ")) <= {"build", "po", "release", "operator"}, name
+        assert item.status.split(" ")[0] in {"open", "planned", "follow-up", "done"}, name
 
 
 def test_the_gate_stays_shut_while_a_blocking_item_is_open() -> None:
     open_blocking = [
-        item
-        for item, cells in _checklist().items()
-        if cells[3] in {"yes", "cc"} and not cells[5].startswith("done")
+        name
+        for name, item in _checklist().items()
+        if item.blocks in {"yes", "cc"} and not item.status.startswith("done")
     ]
 
     assert open_blocking  # today: the gate has work before it

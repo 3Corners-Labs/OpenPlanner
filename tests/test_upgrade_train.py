@@ -12,8 +12,9 @@ matrix in ``docs/service-flows-compatibility.md``:
   setting usable);
 * downgrading back to 0108 gives the pre-train database back value for value, and upgrading
   again gives the same backfill;
-* a downgrade is one transaction: a refusal on a record that only the gated paths write leaves
-  the database at head with everything in it, never half way;
+* a refused downgrade stops at the refusing migration (SQLite runs schema statements outside the
+  migration's transaction), keeps what that migration guards, and goes up again with every
+  pre-train value;
 * the previous image (N-1) still reads and writes: every pre-train column keeps its type and
   never becomes stricter, and a row written with the pre-train columns only is stored, read and
   claimed by the current code.
