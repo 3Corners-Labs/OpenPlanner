@@ -957,9 +957,9 @@ def test_the_world_of_a_resolution_is_read_once_whatever_the_number_of_rules(
     reads: list[int] = []
     original = rules._read_world
 
-    def counting(root: Entity) -> Any:
+    def counting(root: Entity, descriptors: Any) -> Any:
         reads.append(1)
-        return original(root)
+        return original(root, descriptors)
 
     monkeypatch.setattr(rules, "_read_world", counting)
 

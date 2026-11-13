@@ -10,15 +10,10 @@ from dataclasses import replace
 import pytest
 
 from app.domain.admin import AdminService
-from app.domain.booking import MeetingRef
-from app.domain.call_service import CallService
 from app.domain.configuration_v1_group import _check_routing
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.flow_resolution import FlowRef
-from app.domain.integration import IntegrationService
-from app.domain.routing import SUBJECT_SOURCE, RouteVariable, RoutingChoice, Subject
+from app.domain.routing import SUBJECT_SOURCE, RouteVariable, Subject
 from app.domain.routing_service import RoutingService
-from app.domain.scheduling import Organisation, ScheduleRule
 from app.domain.service_flows import (
     DispatchKind,
     FlowState,
@@ -28,14 +23,13 @@ from app.domain.service_flows import (
     check_code_kept,
     readiness,
 )
-from app.domain.services import BookingService
 from app.domain.skill_service import SkillService
 from app.domain.skills import MAX_JOINED_CODES, Skill, mapped_skill_codes, unmapped_skills
 from tests.fakes.clock import FixedClock
-from tests.fakes.integrations import FakeDispatcher, FakeVideo, webex_cc
-from tests.fakes.persistence import InMemoryUnitOfWork, State
+from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import ORG_ADMIN, two_organisations
-from tests.support.domain import NOW, TEST_TOKEN_KEY, book, make_group, webex_routing, window
+from tests.support.contact_center_dispatch import LEGACY_FLOW, SKILLED_FLOW, dispatch_one
+from tests.support.domain import NOW
 from tests.support.service_flows import legacy, pool, revision
 
 GERMAN = Skill(10, 1, "german", {"nl": "Duits", "en": "German"}, contact_center_code="lang_de")
@@ -129,65 +123,25 @@ async def test_the_portal_saves_keeps_and_clears_a_code() -> None:
     assert uow.state.skills[first.id].contact_center_code is None
 
 
-async def _dispatch(*skills: Skill, flow: FlowRef | None, subject: str | None = None) -> object:
-    """Dispatch one booking of a contact-center group made under ``flow``; return the task."""
-    state = State(
-        organisation_slugs={1: "demo"}, organisations={1: Organisation(1, "Demo", "demo")}
-    )
-    group = make_group(
-        id=1,
-        organisation_id=1,
-        slug="balie",
-        video_host_email="host@example.nl",
-        contact_center=webex_routing("openplanner@example.biz", "openplanner-video", "team-1"),
-    )
-    state.groups[1] = group
-    state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=1))]
-    state.skills = {s.id or 0: s for s in skills}
-    state.flow_revisions[(50, 1)] = revision(
-        flow_id=50,
-        dispatch=DispatchKind.CONTACT_CENTER,
-        required_skill_ids=frozenset({10}),
-        subject_skill_ids={"renewal": frozenset({11})},
-        published_at=NOW,
-    )
-    state.flow_revisions[(51, 1)] = legacy(flow_id=51, published_at=NOW)
-    uow = InMemoryUnitOfWork(state)
-    clock = FixedClock(NOW)
-    receipt = await book(BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0))
-    booking = replace(
-        receipt.booking,
-        meeting=MeetingRef("m-1", "https://site.webex.com/m"),
-        flow=flow,
-        routing=RoutingChoice(subject) if subject else None,
-    )
-    dispatcher = FakeDispatcher()
-    integration = IntegrationService(uow, clock, AdminService(uow, clock))
-    calls = CallService(uow, integration, FakeVideo(), webex_cc(dispatcher), lambda b, g: "x")
-    await calls.ensure_task(booking, group)
-    [task] = dispatcher.items
-    return task
-
-
 async def test_the_task_carries_the_codes_of_what_the_booking_requires() -> None:
     mapped = replace(INTAKE, contact_center_code="intake_1")
 
-    plain = await _dispatch(GERMAN, mapped, flow=FlowRef(50, 1))
-    with_subject = await _dispatch(GERMAN, mapped, flow=FlowRef(50, 1), subject="renewal")
+    plain = await dispatch_one(GERMAN, mapped, flow=SKILLED_FLOW)
+    with_subject = await dispatch_one(GERMAN, mapped, flow=SKILLED_FLOW, subject="renewal")
 
-    assert plain.skills == ("lang_de",)  # type: ignore[attr-defined]
-    assert with_subject.skills == ("intake_1", "lang_de")  # type: ignore[attr-defined]
+    assert plain.skills == ("lang_de",)
+    assert with_subject.skills == ("intake_1", "lang_de")
 
 
 async def test_a_booking_without_skills_sends_no_codes() -> None:
     """Nothing changes for flows without skills: no flow, or a legacy wrapper."""
-    for flow in (None, FlowRef(51, 1)):
-        assert (await _dispatch(flow=flow)).skills == ()  # type: ignore[attr-defined]
+    for flow in (None, LEGACY_FLOW):
+        assert (await dispatch_one(flow=flow)).skills == ()
 
 
 async def test_an_unmapped_requirement_is_never_dropped_from_the_task() -> None:
     with pytest.raises(DomainError) as excinfo:
-        await _dispatch(GERMAN, INTAKE, flow=FlowRef(50, 1), subject="renewal")
+        await dispatch_one(GERMAN, INTAKE, flow=SKILLED_FLOW, subject="renewal")
     assert (excinfo.value.code, excinfo.value.field) == (
         ErrorCode.INTEGRATION_NOT_READY,
         "skill_codes",

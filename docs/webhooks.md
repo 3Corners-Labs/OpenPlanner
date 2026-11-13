@@ -103,6 +103,30 @@ center cannot be published or activated with an unmapped skill (readiness reason
 the mapping form refuses it as a variable name. In the client's flow, test the codes with a
 condition (for example `contains`) or pass them to the skill requirement of *Queue To Agent*.
 
+**The channel-independent task contract** (ADR 0121 step 6,
+`docs/service-flows-contact-center-contract-design.md`). The body above is Webex Contact
+Center's form of a neutral `ContactCenterTask` (`app/domain/calls.py`): booking reference, first
+name, start label, group name, host join URL, kind of call, routing, the routing variables, the
+mapped skill codes and the **interaction kind** of the flow the booking was made under (`video`,
+`telephone`, `in_person` or `none`; `video` for a booking without a flow). Every platform adapter
+declares in its `ProviderDescriptor` what it carries (`ContactCenterCapabilities`: interaction
+kinds, and whether it routes on skills); a descriptor that declares nothing carries nothing.
+
+| Platform | Interaction kinds | Skills |
+|---|---|---|
+| Webex Contact Center | `video` | yes (`openplannerSkills`) |
+
+A task the platform does not carry is refused before it is built (`integration_not_ready`,
+field `interaction_kind` or `skill_codes`) and again by the adapter (`not_ready`), so nothing is
+sent; and a flow that dispatches to the contact center is not ready while its service has no
+complete routing (`contact_center_missing`), while the platform cannot take the flow's contact
+channel (`interaction_not_carried`) or, for a flow with skills, cannot route on skills
+(`skills_not_carried`). The interaction kind is not sent to Webex Contact Center while `video` is
+the only kind it carries: the body of every existing flow stays byte for byte what it was
+(`tests/adapters/wxcc_task_bodies.json`, recorded before the contract; a deliberate change of the
+body re-records that file in the same PR). A telephone interaction never adds the participant's
+phone number to a payload.
+
 **Ending a cancelled booking's task** (ADR 0021), v2 first. **Primary:** a Task Messages v2
 snapshot, `POST /v2/tasks/{taskId}/messages` (`cjp:task_write`, beta, `202`), marks the task
 cancelled. **Secondary:** End Task, `POST /v1/tasks/{taskId}/end` without a body (v1 only;

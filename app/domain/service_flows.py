@@ -23,7 +23,9 @@ from enum import StrEnum
 from typing import Final, cast
 
 from app.domain.capacity import CapacityPool, PoolMode, guarantees, unguaranteed
+from app.domain.contact_center import ContactCenterCapabilities
 from app.domain.errors import DomainError, ErrorCode, missing_object, outside_organisation
+from app.domain.interaction import InteractionKind as InteractionKind  # re-exported
 from app.domain.routing import SUBJECT_CODE, validate_labels
 from app.domain.scheduling import valid_slot_minutes
 from app.domain.skills import Skill, check_skills_of, effective_requirements
@@ -39,15 +41,6 @@ class IntakeMode(StrEnum):
 
     APPOINTMENT = "appointment"
     ON_DEMAND = "on_demand"
-
-
-class InteractionKind(StrEnum):
-    """What the participant and staff do together."""
-
-    VIDEO = "video"
-    TELEPHONE = "telephone"
-    IN_PERSON = "in_person"
-    NONE = "none"
 
 
 class ReadinessPolicy(StrEnum):
@@ -95,9 +88,9 @@ BUILT_KINDS: frozenset[InteractionKind] = frozenset(
 )
 """Interaction kinds a new (non-legacy) flow may use; step 5 of ADR 0121 adds video."""
 BUILT_DISPATCH: frozenset[DispatchKind] = frozenset({DispatchKind.OWN_QUEUE})
-"""Dispatch kinds a new flow may use; step 6 of ADR 0121 adds the contact center."""
+"""Dispatch kinds a new flow may use; step 6b of ADR 0121 adds the contact center."""
 BUILT_COMPLETION: frozenset[CompletionPolicy] = frozenset({CompletionPolicy.OPERATOR})
-"""Completion policies a new flow may use; step 6 of ADR 0121 adds the provider event."""
+"""Completion policies a new flow may use; step 6b of ADR 0121 adds the provider event."""
 BUILT_ACTIONS: frozenset[HandlingAction] = frozenset(
     {HandlingAction.OPEN_VIDEO, HandlingAction.VIEW_REQUEST, HandlingAction.CALL}
 )
@@ -319,6 +312,24 @@ def requirement_of(revision: FlowRevision | None, subject: str | None) -> frozen
     return effective_requirements(revision.required_skill_ids, extra)
 
 
+def interaction_of(revision: FlowRevision | None, recorded: bool) -> InteractionKind:
+    """Return the interaction kind of a booking made under ``revision`` (ADR 0121 step 6).
+
+    A booking without a flow (``recorded`` false) is a video booking: it is dispatched with its
+    meeting. A recorded revision is a published one, which always names its interaction kind.
+
+    Raises:
+        DomainError: ``integration_not_ready`` (``interaction_kind``) for a recorded flow whose
+            revision is missing or names no interaction kind: the task is refused rather than
+            sent as a video task by guess.
+    """
+    if not recorded:
+        return InteractionKind.VIDEO
+    if revision is None or revision.interaction_kind is None:
+        raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "interaction_kind")
+    return revision.interaction_kind
+
+
 def check_code_kept(
     skill_id: int, before: str | None, after: str | None, flows: Iterable[ServiceFlow]
 ) -> None:
@@ -434,10 +445,19 @@ class ReadinessReason(StrEnum):
     SKILL_UNMAPPED = "skill_unmapped"
     """A contact-center flow requires a skill without a contact-center code (ADR 0121 step 4b):
     an unmapped requirement is an incomplete configuration, never dropped from the payload."""
+    SKILLS_NOT_CARRIED = "skills_not_carried"
+    """A contact-center flow requires skills, but the service's platform cannot route on skills
+    (``ContactCenterCapabilities.skills``, ADR 0121 step 6)."""
     SUBJECT_UNKNOWN = "subject_unknown"
     KIND_MISSING = "kind_missing"
     DISPATCH_MISSING = "dispatch_missing"
     ACTION_NOT_ALLOWED = "action_not_allowed"
+    CONTACT_CENTER_MISSING = "contact_center_missing"
+    """A flow dispatches to the contact center, but its service has no complete contact-center
+    routing (ADR 0121 step 6)."""
+    INTERACTION_NOT_CARRIED = "interaction_not_carried"
+    """The service's contact-center platform does not carry the flow's interaction kind
+    (``ContactCenterCapabilities.interaction_kinds``, ADR 0121 step 6)."""
     LOCATION_MISSING = "location_missing"
     NOT_BUILT_YET = "not_built_yet"
     COMPLETION_MISSING = "completion_missing"
@@ -509,11 +529,13 @@ def _skills_reason(
     pool: CapacityPool | None,
     offered_subjects: Collection[str],
     coded_skills: Collection[int],
+    carrier: ContactCenterCapabilities | None,
 ) -> ReadinessReason | None:
     """Return why the skills check fails, if it does.
 
-    A revision that dispatches to the contact center needs a contact-center code for every skill
-    it or a subject requires (``coded_skills`` are the ids that have one).
+    A revision that dispatches to the contact center needs a platform that routes on skills
+    (``carrier``, judged only for a non-legacy revision) and a contact-center code for every
+    skill it or a subject requires (``coded_skills`` are the ids that have one).
     """
     if revision.capacity_pool_id is None or pool is None:
         return ReadinessReason.POOL_MISSING
@@ -522,9 +544,11 @@ def _skills_reason(
     for extra in (frozenset[int](), *revision.subject_skill_ids.values()):
         if not guarantees(pool, effective_requirements(revision.required_skill_ids, extra)):
             return ReadinessReason.POOL_DOES_NOT_GUARANTEE
-    if revision.dispatch is DispatchKind.CONTACT_CENTER and revision.all_skill_ids - frozenset(
-        coded_skills
-    ):
+    if revision.dispatch is not DispatchKind.CONTACT_CENTER or not revision.all_skill_ids:
+        return None
+    if not revision.legacy and carrier is not None and not carrier.skills:
+        return ReadinessReason.SKILLS_NOT_CARRIED
+    if revision.all_skill_ids - frozenset(coded_skills):
         return ReadinessReason.SKILL_UNMAPPED
     return None
 
@@ -543,8 +567,31 @@ def missing_guarantees(revision: FlowRevision, pool: CapacityPool | None) -> fro
     return lacking
 
 
-def _dispatch_reason(revision: FlowRevision) -> ReadinessReason | None:
-    """Return why the dispatch check fails, if it does."""
+def _carrier_reason(
+    revision: FlowRevision, kind: InteractionKind, carrier: ContactCenterCapabilities | None
+) -> ReadinessReason | None:
+    """Return why the service's contact center cannot take a non-legacy revision's work, if so.
+
+    A legacy revision follows its service's own settings and is judged by the group check of
+    ADR 0082, so it is not judged here; nor is a revision for the own queue.
+    """
+    if revision.legacy or revision.dispatch is not DispatchKind.CONTACT_CENTER:
+        return None
+    if carrier is None:
+        return ReadinessReason.CONTACT_CENTER_MISSING
+    if not carrier.carries(kind):
+        return ReadinessReason.INTERACTION_NOT_CARRIED
+    return None
+
+
+def _dispatch_reason(
+    revision: FlowRevision, carrier: ContactCenterCapabilities | None
+) -> ReadinessReason | None:
+    """Return why the dispatch check fails, if it does.
+
+    What the administrator can fix comes before what follows in a later version: a contact
+    center that cannot take the work is named before ``not_built_yet``.
+    """
     kind = revision.interaction_kind
     if kind is None:
         return ReadinessReason.KIND_MISSING
@@ -553,6 +600,8 @@ def _dispatch_reason(revision: FlowRevision) -> ReadinessReason | None:
     action = revision.handling_action
     if action is None or action not in COMBINATIONS[kind].actions:
         return ReadinessReason.ACTION_NOT_ALLOWED
+    if (reason := _carrier_reason(revision, kind, carrier)) is not None:
+        return reason
     if not revision.legacy and (
         kind not in BUILT_KINDS
         or revision.dispatch not in BUILT_DISPATCH
@@ -606,22 +655,25 @@ def readiness(
     *,
     offered_subjects: Collection[str],
     coded_skills: Collection[int] = (),
+    carrier: ContactCenterCapabilities | None = None,
 ) -> tuple[ReadinessItem, ...]:
     """Return the seven checklist items, in order, for activating ``revision``.
 
     ``pool`` is the revision's capacity pool, ``offered_subjects`` the codes of the group's
     subjects, ``coded_skills`` the ids of the organisation's skills that have a contact-center
-    code (only a contact-center revision with skills reads it). Values outside the ``BUILT_*``
-    constants fail for a non-legacy revision.
+    code (only a contact-center revision with skills reads it), ``carrier`` what the platform of
+    the service's complete contact-center routing carries (``capabilities_of``; ``None``
+    without one; only a non-legacy contact-center revision reads it, ADR 0121 step 6). Values
+    outside the ``BUILT_*`` constants fail for a non-legacy revision.
     """
     return (
         _item(ReadinessCheck.DATA, _data_reason(revision)),
         _item(ReadinessCheck.CAPACITY, _capacity_reason(revision, pool)),
         _item(
             ReadinessCheck.SKILLS,
-            _skills_reason(revision, pool, offered_subjects, coded_skills),
+            _skills_reason(revision, pool, offered_subjects, coded_skills, carrier),
         ),
-        _item(ReadinessCheck.DISPATCH, _dispatch_reason(revision)),
+        _item(ReadinessCheck.DISPATCH, _dispatch_reason(revision, carrier)),
         _item(ReadinessCheck.COMPLETION, _completion_reason(revision)),
         _item(ReadinessCheck.RETENTION, _retention_reason(revision)),
         _item(ReadinessCheck.ROLLBACK, _rollback_reason(revision)),

@@ -60,7 +60,8 @@ None in step 1: it changes labels only. The later steps add the following, each 
 | 5c | The participant's choice between several flows of a service (the choice screen step 3a left for step 5; design R8) | | follow-up |
 | 5d | The retention overview shows request-level records holding data and overdue as counts of their own (with the first writer, step 7) | | follow-up |
 | 5e | Must be done before `ROLLBACK_SAFE` opens: a list of work in recovery for supervisors, and an alert while any exists (its appointment has ended, so the queue no longer lists it; design R9). Until it is completed, recovery work keeps one unit of its pool occupied as an overrun, which refuses conflicting starts and shows as a shortage | | follow-up |
-| 6 | P6: channel-independent contact-center task contract, reconciliation and fencing | | planned |
+| 6a | P6, the contract: `ContactCenterTask` names the flow's interaction kind (`app/domain/interaction.py`), each adapter declares what it carries (`ContactCenterCapabilities` on its `ProviderDescriptor`; Webex Contact Center: `video` and skills), the task is refused before it is built and again by the adapter when the platform cannot carry it, readiness reasons `contact_center_missing`, `interaction_not_carried` and `skills_not_carried` in the portal and the configuration document, the Webex payload unchanged byte for byte (`tests/adapters/wxcc_task_bodies.json`); build brief `docs/service-flows-contact-center-contract-design.md` | #770 | merged |
+| 6b | P6, dispatch of a new flow: `DispatchKind.CONTACT_CENTER` in `BUILT_DISPATCH`, a provider task as a delivery attempt of a work item, `none` on Webex Contact Center with the asset-schema change and the reserved variable `openplannerInteraction`, reconciliation of a timed-out create and fencing between the own queue and the contact center (A21, A22) | | planned |
 | 7 | P7: immediate intake and check-in on the same pool | | planned |
 | 8 | P8: compatibility matrix, upgrade and rollback proof, documentation | | planned |
 | 9 | Manual topics in `docs/manual/{nl,en}` say *Dienst / Service* (at the next major release, product owner 2026-11-10) | | follow-up |
@@ -79,6 +80,8 @@ None in step 1: it changes labels only. The later steps add the following, each 
 | 22 | The role-name rule of ADR 0077 also refuses the previous shipped names (*Groepsbeheerder*, *Group admin*) and checks stored names after a catalogue change | | follow-up |
 | 23 | The built-in service admin may manage the flows of its own service (a change of the authorisation matrix: `group.edit` today belongs only to the organisation admin and the superuser; a decision PR) | | follow-up |
 | 24 | Split the accessibility suite over several runners (the job needs 28 to 30 minutes and grows with every admin page) | | follow-up |
+| 25 | A telephone interaction through the contact center: a callback whose destination never leaves OpenPlanner as the participant's number (its own privacy decision; brief of step 6, choice C2) | | follow-up |
+| 26 | A chat interaction kind (a change of the closed table of point 4, which needs an ADR; brief of step 6, choice C4) | | follow-up |
 
 ## Consequences
 
