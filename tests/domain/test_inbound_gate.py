@@ -110,3 +110,11 @@ def test_only_a_declared_length_over_the_limit_is_refused(
 def test_the_limit_can_be_given() -> None:
     assert declared_length_acceptable("10", 10)
     assert not declared_length_acceptable("11", 10)
+
+
+def test_a_length_too_long_to_be_a_number_is_refused_not_an_error() -> None:
+    # Python refuses to convert a digit string of thousands of characters; the rule must
+    # still answer, and the answer is "over the limit".
+    assert not declared_length_acceptable("9" * 5000)
+    assert not declared_length_acceptable("1" + "0" * 30, 10)
+    assert declared_length_acceptable("0" * 5000 + "7", 10)

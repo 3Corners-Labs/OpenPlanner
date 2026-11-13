@@ -92,7 +92,8 @@ def declared_length_acceptable(value: str | None, limit: int = MAX_BODY_BYTES) -
     """Return whether a ``Content-Length`` header is no reason to refuse the body unread.
 
     A missing or non-numeric length is not a refusal: a chunked body has none, and it is capped
-    while it is read. Only a number over ``limit`` refuses at once.
+    while it is read. Only a number over ``limit`` refuses at once. A number is compared by its
+    length first, so a digit string too long to convert is over the limit, not an error.
 
     Args:
         value: The header value, or ``None``.
@@ -103,4 +104,8 @@ def declared_length_acceptable(value: str | None, limit: int = MAX_BODY_BYTES) -
     text = value.strip()
     if not (text.isascii() and text.isdigit()):
         return True
-    return int(text) <= limit
+    digits = text.lstrip("0")
+    if len(digits) > len(str(limit)):
+        # More digits than the limit has: over it, and possibly too long to convert at all.
+        return False
+    return int(digits or "0") <= limit
