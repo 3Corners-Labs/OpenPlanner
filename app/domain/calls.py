@@ -384,6 +384,8 @@ class ContactCenterTask:
         variables: The routing variables of ADR 0081: the mapped codes of the participant's
             subject and attributes, ``{name: value}``, never a label, a form answer or another
             field.
+        skills: The contact-center codes of the skills the booking requires (ADR 0121 step 4b),
+            sorted; empty when it requires none. Only codes from the organisation's catalogue.
     """
 
     reference: str
@@ -395,6 +397,7 @@ class ContactCenterTask:
     routing: ContactCenterRouting
     routing_value: str
     variables: tuple[tuple[str, str], ...] = ()
+    skills: tuple[str, ...] = ()
 
 
 def meeting_request(booking: Booking, group: Group) -> MeetingRequest:
@@ -414,10 +417,13 @@ def meeting_request(booking: Booking, group: Group) -> MeetingRequest:
     )
 
 
-def contact_center_task(booking: Booking, group: Group, *, start_label: str) -> ContactCenterTask:
+def contact_center_task(
+    booking: Booking, group: Group, *, start_label: str, skills: tuple[str, ...] = ()
+) -> ContactCenterTask:
     """Return the contact-center task to dispatch for ``booking``.
 
-    ``start_label`` is the start time as the agent reads it (formatted at the edge).
+    ``start_label`` is the start time as the agent reads it (formatted at the edge), ``skills``
+    the mapped codes of the skills it requires (``skills.mapped_skill_codes``).
 
     Raises:
         DomainError: ``integration_not_ready`` naming what is missing (``contact_center``,
@@ -438,6 +444,7 @@ def contact_center_task(booking: Booking, group: Group, *, start_label: str) -> 
         routing=routing,
         routing_value=group.routing_value,
         variables=tuple(sorted(group.routing.variables(booking.routing).items())),
+        skills=skills,
     )
 
 

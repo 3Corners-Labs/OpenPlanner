@@ -27,6 +27,7 @@ from app.domain.errors import DomainError, ErrorCode, missing_object
 from app.domain.organisations import organisation_by_slug, own_object
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.scheduling import Organisation
+from app.domain.service_flows import ServiceFlow, check_code_kept
 from app.domain.skills import Skill, SkillUsage
 from app.domain.tunable import value_of
 
@@ -38,6 +39,14 @@ GRANTS_CHANGED = "staff_skills.changed"
 """Details of the audit events (action ``skills.manage``); the labels are in the audit page."""
 LIMIT_FIELD = "skill_limit"
 """The field of the refusal when the organisation has as many skills as the platform allows."""
+KEEP = "\x00keep"
+"""``relabel``'s default for the contact-center code: leave the stored one as it is."""
+
+
+def _code_of(typed: str | None) -> str | None:
+    """Return a typed contact-center code trimmed; blank means not mapped."""
+    stripped = (typed or "").strip()
+    return stripped or None
 
 
 @dataclass(frozen=True)
@@ -226,14 +235,26 @@ class SkillService:
         return stored
 
     async def relabel(
-        self, principal: Principal, slug: str, skill_id: int, label_nl: str, label_en: str
+        self,
+        principal: Principal,
+        slug: str,
+        skill_id: int,
+        label_nl: str,
+        label_en: str,
+        contact_center_code: str | None = KEEP,
     ) -> bool:
-        """Change the labels of a skill, not archived; its code stays. Return whether they changed.
+        """Change the labels and the contact-center code of a skill, not archived; its code stays.
+
+        ``contact_center_code`` blank or ``None`` takes the mapping away (ADR 0121 step 4b);
+        left at ``KEEP`` it stays as stored. Return whether anything changed.
 
         Raises:
             DomainError: ``not_permitted``, ``organisation_not_found``,
-                ``configuration_object_missing`` (also for an archived skill) or
-                ``invalid_configuration`` (``skill_label``).
+                ``configuration_object_missing`` (also for an archived skill),
+                ``invalid_configuration`` (``skill_label``, ``contact_center_code``),
+                ``slug_taken`` (``contact_center_code`` of another skill) or
+                ``configuration_object_in_use`` (``contact_center_code``: the code is taken away
+                while a contact-center flow's current revision requires the skill).
         """
         scope = await self._admin.scoped(principal, _PERMISSION, slug)
         async with self._uow.locked() as tx:
@@ -245,9 +266,22 @@ class SkillService:
                 current.code,
                 labels_of(label_nl, label_en),
                 current.archived_at,
+                current.contact_center_code
+                if contact_center_code is KEEP
+                else _code_of(contact_center_code),
             )
-            if changed.labels == current.labels:
+            if (changed.labels, changed.contact_center_code) == (
+                current.labels,
+                current.contact_center_code,
+            ):
                 return False
+            if current.contact_center_code is not None and changed.contact_center_code is None:
+                check_code_kept(
+                    skill_id,
+                    current.contact_center_code,
+                    None,
+                    await _organisation_flows(tx, scope, slug),
+                )
             await tx.save_skill(scope, changed)
             await self._record(tx, principal, slug, f"{CHANGED},skill:{current.code}")
         return True
@@ -338,6 +372,15 @@ class SkillService:
             detail = ",".join([GRANTS_CHANGED, f"staff:{member_id}", *changes])
             await self._record(tx, principal, slug, detail, now)
         return True
+
+
+async def _organisation_flows(tx: Transaction, scope: Scope, slug: str) -> list[ServiceFlow]:
+    """Return the flows of every service of organisation ``slug`` inside ``scope``."""
+    flows: list[ServiceFlow] = []
+    for summary in await tx.list_groups(scope):
+        if summary.organisation_slug == slug:
+            flows += await tx.list_service_flows(scope, summary.group.id)
+    return flows
 
 
 async def _own_active_skill(

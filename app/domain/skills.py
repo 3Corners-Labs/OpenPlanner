@@ -3,6 +3,11 @@
 A skill is an organisation's own catalogue entry with a stable code and a label per locale.
 A flow or one of its subjects *requires* skills; a staff member *holds* them. The rule is
 ALL_OF: someone is eligible when nothing required is missing. Nothing here reads a label.
+
+A skill may carry a *contact-center code* (ADR 0121 step 4b): what the organisation's
+contact-center flow tests for it. A dispatch sends the codes of the skills a booking requires
+and nothing else; a required skill without a code is an incomplete configuration, never
+dropped (``mapped_skill_codes``).
 """
 
 from collections.abc import Collection, Mapping
@@ -10,7 +15,11 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from app.domain.errors import DomainError, ErrorCode, missing_object, outside_organisation
-from app.domain.routing import SUBJECT_CODE, validate_labels
+from app.domain.routing import SUBJECT_CODE, VARIABLE_VALUE, validate_labels
+
+MAX_JOINED_CODES = 512
+"""The longest value a contact-center flow variable takes (Webex Contact Center's ``flowSettings``
+limit): the joined codes of one booking must fit in it. A limit of the platform, not a setting."""
 
 
 def _invalid(name: str) -> DomainError:
@@ -28,6 +37,8 @@ class Skill:
         code: Stable code, the same grammar as a subject code.
         labels: The label per locale; ``nl`` and ``en`` are required, plain text.
         archived_at: When it was archived; an archived skill is kept but not newly required.
+        contact_center_code: What the organisation's contact-center flow tests for the skill,
+            the grammar of a routing value (ADR 0081); ``None`` while it is not mapped.
     """
 
     id: int | None
@@ -35,12 +46,16 @@ class Skill:
     code: str
     labels: Mapping[str, str]
     archived_at: datetime | None = None
+    contact_center_code: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate the code (``skill_code``) and the labels (``skill_label``)."""
+        """Validate the code, the labels and the contact-center code (fields as named)."""
         if not SUBJECT_CODE.fullmatch(self.code):
             raise _invalid("skill_code")
         validate_labels(self.labels, "skill_label")
+        code = self.contact_center_code
+        if code is not None and not VARIABLE_VALUE.fullmatch(code):
+            raise _invalid("contact_center_code")
 
     @property
     def archived(self) -> bool:
@@ -93,6 +108,33 @@ def eligibility(required: Collection[int], held: Collection[int]) -> Eligibility
     return Missing(missing) if missing else Eligible()
 
 
+def unmapped_skills(required: Collection[int], skills: Mapping[int, Skill]) -> frozenset[int]:
+    """Return the required skill ids without a contact-center code (an unknown id has none)."""
+    return frozenset(
+        skill_id
+        for skill_id in required
+        if (skill := skills.get(skill_id)) is None or skill.contact_center_code is None
+    )
+
+
+def mapped_skill_codes(required: Collection[int], skills: Mapping[int, Skill]) -> tuple[str, ...]:
+    """Return the contact-center codes of the required skills, sorted; nothing else is sent.
+
+    ``skills`` holds the organisation's skills by id. An unmapped requirement is an incomplete
+    configuration and is never dropped.
+
+    Raises:
+        DomainError: ``integration_not_ready`` (field ``skill_codes``) when a required skill has
+            no code, or when the joined codes exceed ``MAX_JOINED_CODES``.
+    """
+    if unmapped_skills(required, skills):
+        raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "skill_codes")
+    codes = tuple(sorted(str(skills[skill_id].contact_center_code) for skill_id in required))
+    if len(",".join(codes).encode()) > MAX_JOINED_CODES:
+        raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "skill_codes")
+    return codes
+
+
 def effective_requirements(
     flow_skills: Collection[int], subject_flow_skills: Collection[int]
 ) -> frozenset[int]:
@@ -115,17 +157,26 @@ class SkillUsage:
     flows: int = 0
 
 
-def check_skill_save(skill: Skill, stored: Skill | None, same_code_exists: bool) -> None:
+def check_skill_save(
+    skill: Skill,
+    stored: Skill | None,
+    same_code_exists: bool,
+    *,
+    same_contact_center_code_exists: bool = False,
+) -> None:
     """Refuse saving ``skill`` given what is stored; the adapter loads the facts.
 
-    ``stored`` is the skill with ``skill.id`` (``None`` for a new skill or an unknown id) and
-    ``same_code_exists`` whether another skill of the organisation has the code already.
+    ``stored`` is the skill with ``skill.id`` (``None`` for a new skill or an unknown id),
+    ``same_code_exists`` whether another skill of the organisation has the code already and
+    ``same_contact_center_code_exists`` whether another one has its contact-center code (a field
+    ``contact_center_code`` refusal: two skills the platform could not tell apart).
 
     Raises:
         DomainError: ``configuration_object_missing`` (field ``skill_id``) for an id without a
             skill, ``configuration_out_of_scope`` (field ``organisation_id``) when the update
             names another organisation than the stored skill's, ``slug_taken`` (field
-            ``skill_code``) for a duplicate code.
+            ``skill_code``) for a duplicate code, ``slug_taken`` (field ``contact_center_code``)
+            for a duplicate contact-center code.
     """
     if skill.id is not None:
         if stored is None:
@@ -134,6 +185,8 @@ def check_skill_save(skill: Skill, stored: Skill | None, same_code_exists: bool)
             raise outside_organisation("organisation_id")
     if same_code_exists:
         raise DomainError(ErrorCode.SLUG_TAKEN, "skill_code")
+    if same_contact_center_code_exists:
+        raise DomainError(ErrorCode.SLUG_TAKEN, "contact_center_code")
 
 
 def check_skills_of(

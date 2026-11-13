@@ -730,11 +730,23 @@ async def _pool_of(tx: Transaction, scope: Scope, revision: FlowRevision) -> Cap
 async def _readiness_of(
     tx: Transaction, scope: Scope, group: Group, revision: FlowRevision
 ) -> tuple[ReadinessItem, ...]:
-    """Return the readiness checklist of ``revision`` against the pool and subjects it has now."""
+    """Return the readiness checklist of ``revision`` against what the organisation has now.
+
+    That is its pool, the service's subjects and, only for a contact-center revision that
+    requires skills, which skills have a contact-center code.
+    """
+    coded: frozenset[int] = frozenset()
+    if revision.dispatch is flows.DispatchKind.CONTACT_CENTER and revision.all_skill_ids:
+        coded = frozenset(
+            s.id
+            for s in await all_skills(tx, scope, group.organisation_id)
+            if s.id is not None and s.contact_center_code is not None
+        )
     return flows.readiness(
         revision,
         await _pool_of(tx, scope, revision),
         offered_subjects=[s.code for s in group.routing.subjects],
+        coded_skills=coded,
     )
 
 

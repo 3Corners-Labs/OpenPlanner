@@ -25,6 +25,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.lookups import group_summary_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.routing import (
+    RESERVED_FROM_NOW,
     Attribute,
     GroupRouting,
     RouteVariable,
@@ -196,11 +197,13 @@ class RoutingService:
 
         Raises:
             DomainError: ``not_permitted``, ``group_not_found``, ``group_archived`` or
-                ``invalid_configuration`` naming ``mapping``, ``variable_name`` or
-                ``variable_value``.
+                ``invalid_configuration`` naming ``mapping``, ``variable_name`` (also for a name
+                OpenPlanner sends itself, ``RESERVED_FROM_NOW``) or ``variable_value``.
         """
 
         def change(routing: GroupRouting, _: frozenset[str]) -> tuple[GroupRouting, str] | None:
+            if name in RESERVED_FROM_NOW:
+                raise DomainError(ErrorCode.INVALID_CONFIGURATION, "variable_name")
             variable = (
                 RouteVariable(
                     name,

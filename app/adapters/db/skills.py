@@ -44,7 +44,14 @@ from app.domain.staff import StaffStatus
 
 def skill_from_row(row: SkillRow) -> Skill:
     """Map a skill row."""
-    return Skill(row.id, row.organisation_id, row.code, json.loads(row.labels), row.archived_at)
+    return Skill(
+        row.id,
+        row.organisation_id,
+        row.code,
+        json.loads(row.labels),
+        row.archived_at,
+        row.contact_center_code,
+    )
 
 
 async def load_skills(session: AsyncSession, ids: Collection[int]) -> dict[int, Skill]:
@@ -74,7 +81,7 @@ async def skill_ids_by_code(session: AsyncSession, organisation_id: int) -> dict
 
 
 async def write_skill(session: AsyncSession, skill: Skill, row: SkillRow | None) -> SkillRow:
-    """Write a skill's code and labels; return its row (new when ``row`` is ``None``).
+    """Write a skill's code, labels and contact-center code; return its row (new for ``None``).
 
     The one row mapping of a skill: the portal's save and a configuration document both call it,
     after the rules of ``check_skill_save``. The archive time is its own step.
@@ -84,6 +91,7 @@ async def write_skill(session: AsyncSession, skill: Skill, row: SkillRow | None)
         session.add(row)
     row.code = skill.code
     row.labels = json.dumps(dict(skill.labels), sort_keys=True)
+    row.contact_center_code = skill.contact_center_code
     await session.flush()
     return row
 
@@ -139,7 +147,22 @@ class SkillQueries:
                 SkillRow.id != (skill.id or 0),
             )
         )
-        check_skill_save(skill, skill_from_row(row) if row else None, taken is not None)
+        code_taken = skill.contact_center_code is not None and (
+            await self._session.scalar(
+                select(SkillRow.id).where(
+                    SkillRow.organisation_id == skill.organisation_id,
+                    SkillRow.contact_center_code == skill.contact_center_code,
+                    SkillRow.id != (skill.id or 0),
+                )
+            )
+            is not None
+        )
+        check_skill_save(
+            skill,
+            skill_from_row(row) if row else None,
+            taken is not None,
+            same_contact_center_code_exists=code_taken,
+        )
         return skill_from_row(await write_skill(self._session, skill, row))
 
     async def archive_skill(self, scope: Scope, skill_id: int, at: datetime) -> None:
