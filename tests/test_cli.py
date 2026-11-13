@@ -17,6 +17,8 @@ from app.adapters.wxcc_config import PROJECT_ID
 from app.cli import (
     _register_webhooks,
     _seed_closures,
+    _seed_demonstration,
+    _seed_gated_records,
     _webhooks_health,
     _webhooks_list,
     _webhooks_reset,
@@ -26,6 +28,7 @@ from app.cli import (
     main,
 )
 from app.config import Settings
+from app.domain.authorization import Scope
 from tests.adapters.db.conftest import seed_group
 from tests.fakes.tokens import ACCESS_TOKEN
 from tests.support.database import migrated_database
@@ -437,6 +440,16 @@ async def test_seed_closures_prints_the_example_pages_as_json(migrated: Settings
     assert paths["closed_group"] == "/g/demo-gesloten"
     assert paths["planned_closure"] == "/g/demo-gepland/closure"
     assert paths["suspended_booking"].startswith("/b/")
+    # The e2e stack runs only this command: it carries the demonstration of ADR 0121 too (G06).
+    engine = create_engine(migrated.database_url)
+    try:
+        async with SqlUnitOfWork(engine).read() as tx:
+            demo = await tx.get_group("demo")
+            assert demo is not None
+            flows = await tx.list_service_flows(Scope(everything=True), demo.id)
+    finally:
+        await engine.dispose()
+    assert {"documentcontrole", "persoonlijk-gesprek"} <= {f.code for f in flows}
 
 
 async def test_seed_closures_refuses_production(settings: Settings) -> None:
@@ -444,6 +457,44 @@ async def test_seed_closures_refuses_production(settings: Settings) -> None:
 
     assert not ok
     assert report == "seed-closures adds a made-up booking; it runs only outside production\n"
+
+
+async def test_seed_demonstration_prints_the_immediate_form_and_runs_again(
+    migrated: Settings,
+) -> None:
+    first = await _seed_demonstration(migrated)
+    again = await _seed_demonstration(migrated)
+
+    assert first == again
+    assert first[1]
+    assert first[0].endswith("/g/demo/direct?flow=documentcontrole\n")
+
+
+async def test_seed_gated_records_reports_the_ids_and_refuses_production(
+    migrated: Settings, settings: Settings
+) -> None:
+    report, ok = await _seed_gated_records(migrated)
+    refused = await _seed_gated_records(settings.model_copy(update={"environment": "prod"}))
+
+    assert ok
+    assert set(json.loads(report)) == {
+        "pool_booking",
+        "started_request",
+        "attempt_request",
+        "immediate_request",
+        "day",
+    }
+    assert refused == (
+        "seed-gated-records bypasses the rollback gate; it runs only outside production\n",
+        False,
+    )
+
+
+async def test_seed_demonstration_refuses_production(settings: Settings) -> None:
+    report, ok = await _seed_demonstration(settings.model_copy(update={"environment": "prod"}))
+
+    assert not ok
+    assert report == "seed-demonstration writes example flows; it runs only outside production\n"
 
 
 def test_client_pseudonym_prints_the_pseudonym_of_an_address(

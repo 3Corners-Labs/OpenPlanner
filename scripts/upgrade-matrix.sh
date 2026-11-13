@@ -10,6 +10,11 @@
 #       bookings) that IMAGE writes, against UPGRADE_BUDGET_SECONDS
 #   scripts/upgrade-matrix.sh fixture IMAGE VERSION  write upgrade-fixture-VERSION.sqlite and its
 #       .sha256 into the current directory with the released IMAGE (main.yml, every release)
+#   scripts/upgrade-matrix.sh rollback IMAGE      the rollback proof of ADR 0121 (A30, gate item
+#       G07): this checkout migrates a fresh database, seeds demo and the demonstration and writes
+#       one record of each kind the rollback gate holds back (seed-gated-records); the previous
+#       IMAGE then starts on it without a downgrade and books on /g/demo on the day the pool
+#       bookings hold; this checkout checks the invariants of the database again
 #
 # Per fixture: read its state, `alembic upgrade head`, compare (rows per table, personal data
 # on live and not on purged bookings, pending jobs claimable, settings within bounds), start
@@ -136,6 +141,62 @@ fixture() {
   cat "$name.sha256"
 }
 
+# Book the first free time of /g/demo on DAY through the participant pages at $PORT, as a
+# browser does: the day's times, then the form's post. Prints the answer's HTTP status.
+book_on_demo() {
+  local day="$1" start
+  start="$(curl -fsS "http://127.0.0.1:$PORT/g/demo?day=$day" \
+    | grep -o 'class="time-button" name="start" value="[^"]*"' | head -n 1 \
+    | sed 's/.*value="//; s/"$//')"
+  if [ -z "$start" ]; then
+    echo "::error::/g/demo offers no time on $day next to the gated records" >&2
+    return 1
+  fi
+  curl -sS -o /dev/null -w '%{http_code}' -X POST "http://127.0.0.1:$PORT/g/demo/book" \
+    -H "Origin: http://127.0.0.1:$PORT" \
+    --data-urlencode "start=$start" --data-urlencode "first_name=Voorbeeld" \
+    --data-urlencode "last_name=Deelnemer" --data-urlencode "email=matrix@example.org" \
+    --data-urlencode "phone=" --data-urlencode "website="
+}
+
+rollback() {
+  local image="$1" name=rollback.sqlite day status
+  : >"$work/$name"
+  export DATABASE_URL="sqlite+aiosqlite:///$work/$name"
+  echo "== rollback: the gated records written by this checkout, then $image on them"
+  alembic upgrade head
+  cli seed-demo >/dev/null
+  cli seed-gated-records >"$work/gated.json"
+  day="$("${PY[@]}" -c 'import json,sys; print(json.load(open(sys.argv[1]))["day"])' "$work/gated.json")"
+  # One file: fold the write-ahead log in before the image's account opens it.
+  "${PY[@]}" -c "import sqlite3,sys; sqlite3.connect(sys.argv[1]).execute('PRAGMA wal_checkpoint(TRUNCATE)')" "$work/$name"
+  unset DATABASE_URL
+  # No downgrade: the previous image runs on the expanded schema this checkout wrote.
+  docker run -d --name upgrade-app "${AS_ME[@]}" --read-only --tmpfs /tmp --cap-drop ALL \
+    --security-opt no-new-privileges -e ENVIRONMENT=dev \
+    -e "DATABASE_URL=sqlite+aiosqlite:////srv/data/$name" -v "$work:/srv/data" \
+    -p "127.0.0.1:$PORT:8000" "$image" >/dev/null
+  if ! wait_ready "$image"; then
+    docker logs upgrade-app >&2
+    return 1
+  fi
+  if ! status="$(book_on_demo "$day")"; then
+    docker logs upgrade-app >&2
+    return 1
+  fi
+  docker rm -f upgrade-app >/dev/null
+  if [ "$status" != 303 ]; then
+    echo "::error::$image did not book on /g/demo next to the gated records (HTTP $status)" >&2
+    return 1
+  fi
+  echo "$image booked on /g/demo on $day next to the gated records"
+  # The invariants of the database the previous image left (compared with itself: its own
+  # booking adds a live booking, so a comparison with the state before would count it).
+  export DATABASE_URL="sqlite+aiosqlite:///$work/$name"
+  cli upgrade-check --save "$work/after.json" --compare "$work/after.json"
+  unset DATABASE_URL
+}
+
 budget() {
   local image="$1" name=large.sqlite seconds
   if ! seed_with "$image" "$name" "$LARGE_BOOKINGS"; then
@@ -159,5 +220,6 @@ case "${1:-}" in
   one) one "$2" "${3:-}" ;;
   budget) budget "$2" ;;
   fixture) fixture "$2" "$3" ;;
-  *) sed -n '2,19p' "$0" >&2; exit 2 ;;
+  rollback) rollback "$2" ;;
+  *) sed -n '2,24p' "$0" >&2; exit 2 ;;
 esac

@@ -61,6 +61,7 @@ from app.domain.service_flows import (
 )
 from app.domain.skills import Skill
 from tests.support.domain import NOW
+from tests.support.pool_flows import shut_gate
 from tests.support.service_flows import LABELS, flow, legacy, pool, revision
 
 ORDER = tuple(ReadinessCheck)
@@ -211,7 +212,10 @@ def test_the_legacy_wrapper_is_ready_everywhere() -> None:
     assert can_activate(readiness(legacy(), pool(), offered_subjects=()))
 
 
-def test_a_new_flow_cannot_be_activated_while_the_rollback_gate_is_shut() -> None:
+def test_a_new_flow_cannot_be_activated_while_the_rollback_gate_is_shut(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     assert reasons(revision(), pool()) == {
         **dict.fromkeys(ORDER),
         ReadinessCheck.ROLLBACK: R.ROLLBACK_NOT_SAFE,
@@ -1108,6 +1112,7 @@ def test_the_skills_a_pool_does_not_guarantee_are_named_for_the_flow_and_each_su
 def test_retention_is_its_own_point_and_follows_while_it_is_not_built(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     monkeypatch.setattr("app.domain.service_flows.RETENTION_BUILT", False)
     assert reasons(revision(), pool()) == {
         **dict.fromkeys(ORDER),

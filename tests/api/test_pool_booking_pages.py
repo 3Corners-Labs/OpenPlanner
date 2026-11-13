@@ -21,7 +21,7 @@ from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW
 from tests.support.flows import booking_rows, engine_of, slot_count
 from tests.support.participant import ADA, FRIDAY_0900, SAME_ORIGIN, book, booked, open_link
-from tests.support.pool_flows import PoolFlow, block, open_gate, seed_pool_flow
+from tests.support.pool_flows import PoolFlow, block, open_gate, seed_pool_flow, shut_gate
 from tests.support.widget import ADA as WIDGET_ADA
 from tests.support.widget import BASE, SITE, embed
 
@@ -57,8 +57,9 @@ async def _pool_slots(site: httpx.AsyncClient) -> list[SlotRow]:
 
 
 async def test_with_the_gate_shut_the_pool_flow_is_refused_on_every_entry(
-    site: httpx.AsyncClient,
+    site: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     await _pool_flow(site)
 
     calendar = await site.get("/g/demo", params={"flow": "advies"})

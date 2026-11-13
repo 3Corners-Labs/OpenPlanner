@@ -15,9 +15,10 @@ Both pools are staffed on weekdays: the shared one 09:00 to 12:00, the own one 1
 Amsterdam time, for appointments and work without one.
 
 Written through the ``Transaction`` port, as an image with the rollback gate open would write
-it, so one fixture serves the SQL adapter and the fake now, and a development database once the
-e2e stack and the upgrade matrix need it (gate items G06 and G07). Publishing and activation are
-written directly, not through the readiness checklist, on purpose: the checklist refuses every
+it, so one fixture serves the SQL adapter, the fake and a development database: the e2e stack
+(``demonstration_stack``, G06) and the upgrade matrix (``gated_records``, G07). Publishing
+and activation are written directly, not through the readiness checklist, on purpose: the
+checklist refuses every
 new flow while ``ROLLBACK_SAFE`` is false, and the flow resolver ignores these flows while it
 is. A command that runs it must therefore refuse production, as ``seed-closures`` does.
 Idempotent: what exists is kept, the service's subjects included (they are written only when it
@@ -113,13 +114,20 @@ class Demonstration:
     flows: dict[str, int]
 
 
-async def seed_demonstration(tx: Transaction, group: Group, publisher: int) -> Demonstration:
+async def seed_demonstration(
+    tx: Transaction, group: Group, publisher: int | None, *, subjects: bool = True
+) -> Demonstration:
     """Store the fixture on ``group`` and its organisation; return the ids.
 
     Args:
         tx: A locked transaction.
         group: The service the flows belong to; its subjects become the two above.
-        publisher: The staff id the published revisions are stamped with.
+        publisher: The staff id the published revisions are stamped with; ``None`` on a
+            development database where nobody has logged in yet, as for the backfill.
+        subjects: ``False`` leaves the service without the fixture's subjects. A subject is the
+            required first question of every form of its service (ADR 0081), and on the e2e
+            stack the service ``demo`` is the one every participant spec books on; no flow of
+            the fixture binds a subject, so nothing else changes.
     """
     organisation = group.organisation_id
     skills = {s.code: s for s in await tx.list_skills(EVERYTHING, organisation)}
@@ -132,9 +140,9 @@ async def seed_demonstration(tx: Transaction, group: Group, publisher: int) -> D
         raise ValueError("the stored skill has no id")
     shared = await _pool(tx, organisation, SHARED_POOL, "Persoonlijk advies", 2, 9, {general})
     own = await _pool(tx, organisation, OWN_POOL, "Documentcontrole", 1, 13, set())
-    if not group.routing.subjects:
-        subjects = tuple(Subject.create(c, {"nl": nl, "en": en}) for c, nl, en in SUBJECTS)
-        await tx.save_group_routing(group.id, GroupRouting(subjects=subjects))
+    if subjects and not group.routing.subjects:
+        chosen = tuple(Subject.create(c, {"nl": nl, "en": en}) for c, nl, en in SUBJECTS)
+        await tx.save_group_routing(group.id, GroupRouting(subjects=chosen))
     flows = {f.code: f.id or 0 for f in await tx.list_service_flows(EVERYTHING, group.id)}
     for wanted in FLOWS:
         if wanted.code in flows:
