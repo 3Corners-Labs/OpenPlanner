@@ -317,6 +317,19 @@ confirms or corrects them.
 
   Note the answers here after the trial.
 
+## Webhook source networks and the ingress
+
+An address for webhooks can carry a list of allowed source networks (the connection card, and the
+installation's defaults in *Advanced settings*; `docs/webhooks.md`). A list is evaluated only while
+the application knows the caller's address for certain, and that needs `forwardedAllowIps` to name
+the ingress as **single addresses**. The example above names the whole pod network, and the chart's
+fallback is `*`: with either, an address that has a list refuses every call (`source_unknown`)
+and System status says why. An address without a list is not affected. The ingress pods change, so
+a list is only usable here when the controller keeps fixed addresses (a Service with a fixed
+address, or a controller on host networking); otherwise leave the webhook addresses without a list
+and rely on the signature. A content delivery network in front of the ingress hides the caller
+behind its own address: do not list on such an address either.
+
 ## Troubleshooting
 
 | You see | Cause and fix |

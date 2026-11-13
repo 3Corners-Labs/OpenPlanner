@@ -3,9 +3,16 @@
 import json
 from dataclasses import replace
 
+import httpx
+import pytest
+
 from app.adapters.contact_center_connections import SealedConnections
+from app.adapters.db.credentials import CredentialStore
+from app.adapters.db.record_names import contact_center_credential_name
+from app.adapters.integrations import sealed_store
 from app.adapters.webhooks import sign_wxcc
 from app.domain.contact_center import ContactCenterKind, Registration
+from app.domain.networks import NetworkList
 from app.web.protection import RateLimits, configure_rate_limits
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.fakes.integrations import FakeOrganisationDispatchers
@@ -19,6 +26,14 @@ FORM = {
     "cc_client_secret": "client-secret-value",
     "cc_refresh_token": "refresh-token-value",
 }
+
+
+def _credentials(site: Site) -> CredentialStore:
+    """The sealed store the connections live in, as the application builds it."""
+    state = site_app(site).state
+    store = sealed_store(state.engine, state.settings)
+    assert store is not None
+    return store
 
 
 def _connections(site: Site) -> SealedConnections:
@@ -219,3 +234,271 @@ async def test_forged_calls_to_an_organisation_never_lock_its_signed_calls_out(s
     assert [r.status_code for r in forged] == [401, 401, 401, 429, 429]
     assert signed.status_code == 204
     assert other_organisation.status_code == 404
+
+
+# --- Allowed source networks (ADR 0124 point 3, step 2b) --------------------------------------
+
+SUPPLIER = "8.8.8.8"
+SUPPLIER_RANGE = "8.8.8.0/24"
+STRANGER = "8.8.4.4"
+ADDRESS = "/webhooks/contact-center/webex_cc/demo"
+
+
+async def _save_networks(site: Site, text: str, **form: str) -> httpx.Response:
+    """Save the card with only the allowed networks changed (secrets left blank: they are kept)."""
+    data = FORM | {"cc_client_secret": "", "cc_refresh_token": ""} | {"cc_allowed_networks": text}
+    return await site.client.post(f"{PAGE}/contact-center", data=data | form, headers=SAME_ORIGIN)
+
+
+async def _call_from(site: Site, address: str, secret: str | None = None) -> httpx.Response:
+    """Send a task event to the organisation's address from ``address``.
+
+    It is signed correctly unless a ``secret`` (a wrong one) is given.
+    """
+    secret = secret or await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC)
+    assert secret is not None
+    stamp = int(site.clock.now().timestamp() * 1000)
+    body = _event(stamp)
+    transport = httpx.ASGITransport(app=site_app(site), client=(address, 4711))
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
+        return await c.post(ADDRESS, content=body, headers=sign_wxcc(body, secret, stamp))
+
+
+def _set_settings(site: Site, **update: object) -> None:
+    state = site_app(site).state
+    state.settings = state.settings.model_copy(update=update)
+
+
+async def _webhook_refusals(site: Site) -> list[tuple[str, str]]:
+    log = await site_app(site).state.admin_service.audit_log(SUPER)
+    return sorted(
+        (
+            e.event.reason,
+            ",".join(k for k in e.event.detail.split(",") if not k.startswith("client:")),
+        )
+        for e in log
+        if e.event.action == "webhook.rejected"
+    )
+
+
+async def test_the_allowed_networks_are_edited_on_the_card_and_kept_canonical(site: Site) -> None:
+    await _connect(site)
+    assert 'name="cc_allowed_networks"' in (await site.client.get(PAGE)).text
+
+    saved = await _save_networks(site, f"8.8.8.9/24\n\n2001:4860:4860::1/48\n{SUPPLIER_RANGE}")
+
+    assert saved.status_code == 303
+    page = (await site.client.get(PAGE)).text
+    assert f"{SUPPLIER_RANGE}\n2001:4860:4860::/48</textarea>" in page
+    assert "Beperkt tot 2 netwerk(en), uit de eigen lijst van deze koppeling" in page
+    stored = await _connections(site).get(1)
+    assert stored is not None
+    assert stored.allowed_networks == NetworkList((SUPPLIER_RANGE, "2001:4860:4860::/48"))
+
+
+async def test_changing_the_networks_alone_keeps_the_webhook_secret_and_registers_nothing(
+    site: Site,
+) -> None:
+    """The list is not part of the subscription: no new secret, no new registration."""
+    await _connect(site)
+    registrar = _registrar(site)
+    before = await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC)
+
+    saved = await _save_networks(site, SUPPLIER_RANGE)
+
+    assert "done=contact_center_saved" in saved.headers["location"]
+    assert registrar.registered == []
+    assert await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC) == before
+    audit = await site_app(site).state.admin_service.audit_log(SUPER)
+    saves = [
+        e.event.detail for e in audit if e.event.detail.startswith("contact_center_connection.save")
+    ]
+    assert saves[0] == "contact_center_connection.save,kind:webex_cc,allowed_networks"  # newest
+    assert not any("8.8.8" in e.event.detail for e in audit)
+
+
+@pytest.mark.parametrize(
+    "text", ["8.8.8.0/24\nnot-a-network", "8.8.8.0/24\n0.0.0.0/0", "::/0", "::/1", "::ffff:0:0/96"]
+)
+async def test_a_refused_list_is_shown_at_its_input_and_stores_nothing(
+    site: Site, text: str
+) -> None:
+    """Also a network that covers a whole address family: "any source" called "restricted"."""
+    await _connect(site)
+
+    refused = await _save_networks(site, text)
+
+    assert refused.status_code == 422
+    assert 'aria-describedby="cc_allowed_networks' in refused.text
+    assert "Vul netwerken in als CIDR" in refused.text
+    stored = await _connections(site).get(1)
+    assert stored is not None
+    assert stored.allowed_networks == NetworkList()
+
+
+async def test_the_card_never_leaves_the_state_of_the_address_silent(site: Site) -> None:
+    await _connect(site)
+    open_card = (await site.client.get(PAGE)).text
+    _set_settings(site, webhook_source_networks_required=True)
+    required = (await site.client.get(PAGE)).text
+    _set_settings(site, webhook_source_networks_contact_center=SUPPLIER_RANGE)
+    default = (await site.client.get(PAGE)).text
+    await _save_networks(site, "2001:4860:4860::/48")
+    own = (await site.client.get(PAGE)).text
+
+    assert "Niet beperkt: elke bron mag dit adres aanroepen" in open_card
+    assert (
+        "Een lijst is verplicht en ontbreekt: dit adres accepteert geen enkele aanroep" in required
+    )
+    assert "Beperkt tot 1 netwerk(en), uit de standaardlijst van de installatie" in default
+    assert "Beperkt tot 1 netwerk(en), uit de eigen lijst van deze koppeling" in own
+
+
+async def test_a_list_on_a_chain_that_cannot_be_trusted_is_shown_as_refused_with_the_repair(
+    site: Site,
+) -> None:
+    await _connect(site)
+    await _save_networks(site, SUPPLIER_RANGE)
+    _set_settings(site, forwarded_allow_ips="*")
+
+    page = (await site.client.get(PAGE)).text
+
+    assert "Geweigerd" in page
+    assert "proxy-instelling van de installatie" in page
+    assert "platformbeheerder" in page
+    # the card, for the organisation, does not name the host's configuration
+    assert "FORWARDED_ALLOW_IPS" not in page
+
+
+async def test_the_organisations_own_list_governs_its_address_and_a_stranger_gets_a_403(
+    site: Site,
+) -> None:
+    await _connect(site)
+    await _save_networks(site, SUPPLIER_RANGE)
+
+    inside = await _call_from(site, SUPPLIER)
+    outside = await _call_from(site, STRANGER)
+
+    assert inside.status_code == 204
+    assert (outside.status_code, outside.content) == (403, b"")
+    assert await _webhook_refusals(site) == [("network", "source:wxcc,organisation:demo")]
+
+
+async def test_an_own_list_replaces_the_installations_default_and_without_one_the_default_applies(
+    site: Site,
+) -> None:
+    await _connect(site)
+    _set_settings(site, webhook_source_networks_contact_center=SUPPLIER_RANGE)
+
+    default_in = await _call_from(site, SUPPLIER)
+    default_out = await _call_from(site, STRANGER)
+    await _save_networks(site, "8.8.4.0/24")
+    own_in = await _call_from(site, STRANGER)
+    own_out = await _call_from(site, SUPPLIER)  # inside the default, outside the own list
+    await _save_networks(site, "")
+    back_to_default = await _call_from(site, STRANGER)
+
+    assert [r.status_code for r in (default_in, default_out)] == [204, 403]
+    assert [r.status_code for r in (own_in, own_out)] == [204, 403]
+    assert back_to_default.status_code == 403
+
+
+async def test_a_required_list_refuses_an_organisation_without_one_and_a_list_opens_it(
+    site: Site,
+) -> None:
+    await _connect(site)
+    _set_settings(site, webhook_source_networks_required=True)
+
+    refused = await _call_from(site, SUPPLIER)
+    await _save_networks(site, SUPPLIER_RANGE)
+    accepted = await _call_from(site, SUPPLIER)
+
+    assert (refused.status_code, accepted.status_code) == (403, 204)
+    assert await _webhook_refusals(site) == [("network", "source:wxcc,organisation:demo")]
+
+
+async def test_a_co_tenant_inside_the_range_still_fails_the_signature_at_the_organisation(
+    site: Site,
+) -> None:
+    await _connect(site)
+    await _save_networks(site, SUPPLIER_RANGE)
+
+    forged = await _call_from(site, SUPPLIER, secret="x" * 43)
+
+    assert (forged.status_code, forged.content) == (401, b"")
+
+
+async def _damage_the_stored_list(site: Site, value: object) -> None:
+    """Write ``value`` where the sealed record keeps the list, as a damaged record would."""
+    store, name = _credentials(site), contact_center_credential_name(1)
+    record = await store.get(name)
+    assert record is not None
+    await store.put(name, record | {"allowed_networks": value}, site.clock.now())
+
+
+@pytest.mark.parametrize("damage", ["8.8.8.0/24", ["not-a-network"], ["0.0.0.0/0"], None])
+async def test_a_corrupted_stored_list_refuses_every_call_and_the_card_says_so(
+    site: Site, damage: object
+) -> None:
+    """Abuse case: a list that cannot be read is no empty list ("any source"): it is refused."""
+    await _connect(site)
+    await _damage_the_stored_list(site, damage)
+    _set_settings(site, webhook_source_networks_contact_center=SUPPLIER_RANGE)  # not a way round
+
+    inside = await _call_from(site, SUPPLIER)
+    outside = await _call_from(site, STRANGER)
+    card = (await site.client.get(PAGE)).text
+
+    assert [(r.status_code, r.content) for r in (inside, outside)] == [(403, b"")] * 2
+    assert "De eigen lijst van deze koppeling is niet te lezen" in card
+    # one event per caller (ADR 0124 point 10), so one for each of the two callers
+    assert await _webhook_refusals(site) == [("network", "source:wxcc,organisation:demo")] * 2
+
+
+async def test_saving_a_list_repairs_a_corrupted_one(site: Site) -> None:
+    await _connect(site)
+    await _damage_the_stored_list(site, "damaged")
+
+    saved = await _save_networks(site, SUPPLIER_RANGE)
+
+    assert saved.status_code == 303
+    assert (await _call_from(site, SUPPLIER)).status_code == 204
+
+
+async def test_a_list_only_save_on_a_record_without_a_webhook_secret_makes_one_and_registers(
+    site: Site,
+) -> None:
+    """``UNTOUCHED`` is for a connection that has its secret; without one the normal path runs."""
+    await _connect(site)
+    store, name = _credentials(site), contact_center_credential_name(1)
+    record = await store.get(name)
+    assert record is not None
+    await store.put(
+        name, {k: v for k, v in record.items() if k != "webhook_secret"}, site.clock.now()
+    )
+    registrar = _registrar(site)
+
+    saved = await _save_networks(site, SUPPLIER_RANGE)
+
+    assert "done=contact_center_registered" in saved.headers["location"]
+    assert registrar.registered == [(1, "demo")]
+    assert await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC) is not None
+
+
+async def test_an_unreadable_default_tells_the_card_whom_to_ask_and_an_own_list_repairs_it(
+    site: Site,
+) -> None:
+    """The organisation cannot repair the installation's default: the card says so."""
+    await _connect(site)
+    _set_settings(site, webhook_source_networks_contact_center="garbage")
+
+    card = (await site.client.get(PAGE)).text
+    refused = await _call_from(site, SUPPLIER)
+    await _save_networks(site, SUPPLIER_RANGE)
+    repaired = await _call_from(site, SUPPLIER)
+
+    assert "De standaardlijst van de installatie is niet te lezen" in card
+    assert "Vraag de platformbeheerder" in card
+    assert "Advanced" not in card
+    assert refused.status_code == 403
+    assert repaired.status_code == 204  # an own list replaces the default, however it reads

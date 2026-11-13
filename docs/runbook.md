@@ -1242,6 +1242,16 @@ its target stops answering, or Cisco developer support can remove it by id.
 Only `/webhooks/*` needs to be reachable through the tunnel; the admin portal is behind OIDC
 anyway, but a named tunnel with an ingress rule for that path alone is the tidier option.
 
+**A tunnel and a list of source networks do not mix by default.** A delivery through a tunnel
+arrives from the tunnel's hop (a loopback or private address, or the tunnel client itself), not
+from the supplier's network. Once a list applies to the address, that delivery is refused, as
+`source_unknown` (a private or loopback caller while the public address is public, or the caller is
+the trusted proxy) or `network`. In a lab, either leave the address without a list (the default,
+and the signature still protects it), or give `FORWARDED_ALLOW_IPS` the tunnel client's address as
+the single trusted proxy and let the tunnel hand on the caller's address in `X-Forwarded-For`;
+a quick tunnel that does not do that cannot be used with a list. Do not set
+`WEBHOOK_SOURCE_NETWORKS_REQUIRED` in a lab that uses a tunnel.
+
 ### 5. Following calls
 
 - **Groep → Agenda** shows today's bookings with meeting and task state, whether the agent
@@ -1386,6 +1396,46 @@ two weeks before the refresh token expires). It then sends two test events per e
 A passing self-test proves that the address, the tunnel and the secrets work. It does not
 prove that Webex or WxCC send events. For that, check `webhooks-list` (all `CURRENT`, nothing
 `MISSING`, status `active`) and a test meeting's timeline (section 4, tunnel step 4).
+
+#### Webhooks refused for their network (ADR 0124)
+
+A webhook address can carry a list of allowed source networks: an organisation's own list on its
+connection card (*Kanalen*, contact center), and the installation's defaults under *Advanced
+settings* (`WEBHOOK_SOURCE_NETWORKS_VIDEO`, `WEBHOOK_SOURCE_NETWORKS_CONTACT_CENTER`, class C). A
+list is defence in depth: the supplier's ranges are shared by all its customers, so the signature is
+what stops a stranger, and a list that has gone stale refuses the supplier itself. Calls refused for
+their network are security events `webhook.rejected` with the reason `network` (the caller is outside
+the list) or `source_unknown` (a list applies and the caller's address cannot be trusted); the caller
+gets a 403 with an empty body for both. Deliveries that stop arriving while the platform shows no
+error of its own are the first sign.
+
+How to read what you see:
+
+| Where | What it says | What to do |
+|---|---|---|
+| Card or System status: *not restricted* | No list applies; any source may call, the signature decides | Enter the supplier's published ranges, or leave it as it is knowingly |
+| *restricted to N networks* | A list applies (the connection's own, else the default) | Nothing; keep it current |
+| *a list is required and missing* | `WEBHOOK_SOURCE_NETWORKS_REQUIRED=true` and no list applies: the address accepts no call | Enter a list on the card, or set the installation's default |
+| *refused* with `FORWARDED_ALLOW_IPS` is `*` or wide | The caller's address cannot be trusted: any peer could claim any address | Set `FORWARDED_ALLOW_IPS` to the proxy's own address (a single host), restart `web` |
+| *refused* with an entry of `FORWARDED_ALLOW_IPS` that is no address or network | The server cannot read who is trusted (a socket path, a name, a typing mistake) | Name the proxy by the address web sees it connect from, restart `web` |
+| *the list cannot be read* | The stored list is damaged or refused by the rules; every call to the address is refused with `network` | Set the allowed networks again on the card (or the default under *Advanced settings*) |
+| Events with reason `source_unknown` (no card finding: decided per call) | A call arrived with `X-Forwarded-*` headers that web did not use because its peer is not a trusted proxy, or the caller's address was a trusted proxy, or loopback or private while the public address is public | Name the proxy that sends them in `FORWARDED_ALLOW_IPS` (the address web sees it connect from), restart `web`; a stranger's own forged header only refuses that stranger's call |
+
+Deliveries refused for their network (a stale list):
+
+1. Find the refusals: the security events `webhook.rejected` (the audit log and your log destinations), reason `network`,
+   `source:wxcc` or `source:webex` and, at an organisation's address, `organisation:<slug>`.
+2. Ask the supplier for its current source ranges and compare. A supplier that moved addresses is
+   the usual cause; the events started on the day of the change.
+3. Update the list on the card (or the installation's default), or empty the card's list so that
+   the default applies. Saving the list changes neither the webhook secret nor the subscription,
+   so nothing is lost on the way and nothing needs to be registered again.
+4. Events refused in between were answered 403: the platform may retry (WxCC does for a while);
+   anything it gave up on is found by the reconcile of the contact-center tasks (section 11).
+
+`source_unknown` for deliveries that used to work: the proxy or its address changed. Check
+*Address and proxy* first (the proxy it trusts, and the line about forwarded headers that were ignored), then the proxy's own configuration
+(it must hand the caller's address on in `X-Forwarded-For`). The bundled proxy does.
 
 ### 9. Checking one group from the admin portal ("Koppeling controleren")
 

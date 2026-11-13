@@ -13,6 +13,9 @@
     {{ form_body(cc.fields, _("admin.save")) }}
   </form>
   {% if cc.stored %}
+  <h3 id="contact-center-sources-heading">{{ _("admin.source.title") }}</h3>
+  <p><span class="chip chip--{{ cc.sources.chip }}">{{ _("admin.source.finding") }}</span> {{ cc.sources.text }}</p>
+  {% if cc.sources.faults %}<p role="alert"><span class="chip chip--danger">{{ _("admin.source.refused") }}</span> {{ _("admin.source.fault.card") }}</p>{% endif %}
   <h3>{{ _("admin.channels.cc_webhook") }}</h3>
   <p>{{ _("admin.channels.cc_webhook_lead") }}</p>
   <p><code>{{ cc.webhook }}</code></p>

@@ -22,17 +22,17 @@ readiness and the building of a task read that declaration through ``capabilitie
 ``uncarried``; a descriptor that declares nothing carries nothing.
 """
 
-import ipaddress
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from types import MappingProxyType
-from urllib.parse import urlsplit
 
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.interaction import InteractionKind
+from app.domain.networks import NetworkList, host_is_public
+from app.domain.source_networks import source_networks_of
 
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 _ATTRIBUTE_NAME = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
@@ -289,6 +289,9 @@ class OrganisationConnection:
         has_client_secret: Whether a client secret is stored.
         has_refresh_token: Whether a refresh token is stored.
         webhook_secret_at: When the webhook secret was generated; ``None`` before the first.
+        allowed_networks: The networks the platform's webhooks may come from (ADR 0124 point 3),
+            canonical CIDR; empty: the installation's default applies; or unreadable (a stored
+            list that cannot be read, never taken for an empty one). Not secret.
     """
 
     kind: ContactCenterKind
@@ -297,13 +300,19 @@ class OrganisationConnection:
     has_client_secret: bool
     has_refresh_token: bool
     webhook_secret_at: datetime | None
+    allowed_networks: NetworkList = NetworkList()
 
 
 @dataclass(frozen=True)
 class ConnectionChange:
     """What an administrator submits for the organisation's connection.
 
-    A ``None`` secret keeps the stored one (write-only fields render empty).
+    A ``None`` secret keeps the stored one (write-only fields render empty); so does ``None``
+    allowed networks. The networks are given as the text typed, one per line or comma separated
+    (``allowed_networks_text``, an ``InitVar`` as the route has the text): ``__post_init__`` parses
+    it once, with the rule of ``app.domain.source_networks``, into ``allowed_networks``, the tuple
+    that everything after it uses. An empty text clears the list, so the installation's default
+    applies again. A tuple given directly is checked by the same rule.
 
     Raises:
         DomainError: ``invalid_configuration`` naming the refused field.
@@ -314,10 +323,12 @@ class ConnectionChange:
     client_id: str
     client_secret: str | None = None
     refresh_token: str | None = None
+    allowed_networks: tuple[str, ...] | None = None
+    allowed_networks_text: InitVar[str | None] = None
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, allowed_networks_text: str | None) -> None:
         """Validate every field and drop a trailing slash; secrets are checked for shape only."""
-        if not API_HOST.fullmatch(self.api_base_url) or not _public_host(self.api_base_url):
+        if not API_HOST.fullmatch(self.api_base_url) or not host_is_public(self.api_base_url):
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}api_base_url")
         object.__setattr__(self, "api_base_url", self.api_base_url.rstrip("/"))
         if not CLIENT_ID.fullmatch(self.client_id):
@@ -326,31 +337,18 @@ class ConnectionChange:
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}client_secret")
         if self.refresh_token is not None and not _secret_shape(self.refresh_token):
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}refresh_token")
+        typed = allowed_networks_text
+        if typed is None and self.allowed_networks is not None:
+            typed = "\n".join(self.allowed_networks)
+        if typed is not None:
+            networks = source_networks_of(typed, field=f"{CONNECTION_FIELD}allowed_networks")
+            object.__setattr__(self, "allowed_networks", networks)
 
     @property
     def secrets_sent(self) -> tuple[str, ...]:
         """Return the names of the secrets this change replaces (for the audit, never values)."""
         sent = (("client_secret", self.client_secret), ("refresh_token", self.refresh_token))
         return tuple(name for name, value in sent if value)
-
-
-def _public_host(url: str) -> bool:
-    """Whether the API host is not this machine or an internal network (ADR 0032 point 12).
-
-    Refused: ``localhost`` and names under it, IP literals that are loopback, private,
-    link-local, reserved or unspecified, and hosts whose last label is a number or hex (the
-    short and integer IPv4 spellings a resolver still maps to an address, such as ``127.1``).
-    A host name that resolves to such an address is not caught here; the platforms' hosts are
-    public names.
-    """
-    host = (urlsplit(url).hostname or "").lower()
-    if not host or host == "localhost" or host.endswith(".localhost"):
-        return False
-    try:
-        return ipaddress.ip_address(host.strip("[]")).is_global
-    except ValueError:
-        last = host.rsplit(".", 1)[-1]
-        return not (last.isdigit() or last.startswith("0x"))
 
 
 def _secret_shape(value: str) -> bool:
@@ -365,6 +363,9 @@ class Registration(StrEnum):
     """The platform signs the organisation's events with its current secret now."""
     NOT_READY = "not_ready"
     """A secret is missing; the address is registered once the connection is complete."""
+    UNTOUCHED = "untouched"
+    """The connection has its webhook secret and nothing the subscription depends on changed
+    (only the allowed networks), so it was left as it was (ADR 0124 point 3)."""
     REFUSED = "refused"
     """The platform refused (rights, address or secret); the reason is in the request log."""
     FAILED = "failed"

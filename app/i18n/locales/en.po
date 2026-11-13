@@ -13664,6 +13664,75 @@ msgstr "Participant's name shown to staff in the call (first name or own word)"
 msgid "settings.field.embedded_call_staff_name.label"
 msgstr "Staff member's name shown to the participant in the call (account name or own word)"
 
+msgid "settings.field.webhook_source_networks_video.label"
+msgstr "Networks the video platform's webhooks may come from (CIDR, comma or line separated, at most 32; empty: any source)"
+
+msgid "settings.field.webhook_source_networks_contact_center.label"
+msgstr "Default networks contact-center webhooks may come from (CIDR, comma or line separated, at most 32; empty: any source)"
+
+msgid "admin.channels.cc_allowed_networks"
+msgstr "Allowed source networks"
+
+msgid "admin.channels.cc_allowed_networks_hint"
+msgstr "The networks the platform's webhooks to this address may come from, one per line (CIDR, for example 203.0.113.0/24), at most {maximum}. Empty: the installation's default applies. This is defence in depth: the signature is what stops a stranger, and a list that has gone stale refuses the platform itself."
+
+msgid "admin.form.error.cc_allowed_networks"
+msgstr "Enter networks as CIDR, one per line, at most 32. A network that covers a whole address family (a prefix length of 0) is no list."
+
+msgid "admin.done.contact_center_saved"
+msgstr "Saved. The webhook secret and the registration at the platform were left as they were."
+
+msgid "admin.source.title"
+msgstr "Source networks"
+
+msgid "admin.source.finding"
+msgstr "Source"
+
+msgid "admin.source.refused"
+msgstr "Refused"
+
+msgid "admin.source.state.unrestricted"
+msgstr "Not restricted: any source may call this address. The signature still decides."
+
+msgid "admin.source.state.required_missing"
+msgstr "A list is required and missing: this address does not accept any call. Set allowed networks here, or the installation's default."
+
+msgid "admin.source.state.restricted_own"
+msgstr "Restricted to {count} network(s), from this connection's own list."
+
+msgid "admin.source.state.restricted_default"
+msgstr "Restricted to {count} network(s), from the installation's default list."
+
+msgid "admin.source.fault.wide_trust"
+msgstr "Calls are refused (source unknown) while FORWARDED_ALLOW_IPS is * or names a network wider than a single host: any peer could claim any address. Set it to the proxy's own address only."
+
+msgid "admin.settings.address.sources.title"
+msgstr "Source networks of webhooks"
+
+msgid "admin.settings.address.sources.intro"
+msgstr "Where the installation-wide webhook addresses accept calls from. An organisation's own list is on its connection card. A list is defence in depth; the signature stops a stranger. An address with a list also refuses a call whose address cannot be trusted: one that arrived with forwarded headers its peer was not trusted to send, the proxy itself, or a loopback or private address while the public address is public. Those are decided per call and show as refusals in the events, not here."
+
+msgid "admin.settings.address.sources.video"
+msgstr "Video platform"
+
+msgid "admin.settings.address.sources.contact_center"
+msgstr "Contact center (default)"
+
+msgid "admin.source.fault.card"
+msgstr "Deliveries to this address are refused because of the installation's proxy setting, so the allowed networks cannot be checked. Ask the platform administrator to repair it; the detail is on System status."
+
+msgid "admin.source.fault.unreadable_trust"
+msgstr "Calls are refused (source unknown) while an entry of FORWARDED_ALLOW_IPS is no address or network (a socket path cannot be judged here). Name the proxy by the address the web container sees it connect from, and restart web."
+
+msgid "admin.source.state.unreadable"
+msgstr "The installation's default list cannot be read, so this address accepts no call. Set it again under Advanced settings."
+
+msgid "admin.source.state.unreadable_own"
+msgstr "This connection's own list cannot be read, so this address accepts no call. Set the allowed networks again on this card."
+
+msgid "admin.source.state.unreadable_default_card"
+msgstr "The installation's default list cannot be read, so this address accepts no call. Ask the platform administrator, or set a list of your own on this card."
+
 msgid "admin.alerts.source.recovery"
 msgstr "Work in recovery at {group}"
 

@@ -28,6 +28,10 @@ allowAnyForwarder: false
 # Settings of the application that are not secret, as environment variables (.env.example lists
 # them): the login (OIDC_DISCOVERY_URL, OIDC_CLIENT_ID, OIDC_ISSUER), the mail server
 # (SMTP_HOST, SMTP_PORT, MAIL_FROM) and so on. ENVIRONMENT is prod.
+# WEBHOOK_SOURCE_NETWORKS_REQUIRED: "true" makes an inbound webhook address without allowed source
+# networks refuse every call (ADR 0124 point 3). A list of source networks is only evaluated when
+# forwardedAllowIps names the ingress pods as single hosts or narrow ranges: with `*` or a wide
+# range the address of a caller cannot be trusted, and an address with a list refuses its calls.
 env:
   ENVIRONMENT: prod
 

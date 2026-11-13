@@ -99,6 +99,44 @@ says so; check the Service App's rights (cjp:config_write), then make a new webh
 Connect or disconnect an organisation when none of its tasks is open: a task made through the
 previous connection is not ended through the new one.
 
+<!-- field: cc_allowed_networks -->
+### Allowed source networks
+
+The networks the contact center's webhooks to this organisation's address may come from, one per
+line in CIDR notation (for example `203.0.113.0/24`; a single address is allowed too), at most 32.
+Ask the contact-center supplier for its current ranges. The list **replaces** the installation's
+default for this connection; empty, the installation's default applies, and without a default any
+source may call.
+
+The card always says which of three states the address is in: *not restricted* (any source may
+call; the signature still decides), *restricted to N networks* (from this connection's own list or
+the installation's default), or *a list is required and missing* (the host demands a list, so the
+address accepts no call until one is set). A list is defence in depth, not the lock: the supplier's
+ranges are shared by all its customers, so every call from inside the list still has to carry a
+correct signature, and a list that has gone stale refuses the supplier itself. Keep it current when
+the supplier announces new ranges.
+
+A list can only be evaluated while the proxy in front of OpenPlanner hands on the caller's address
+correctly. When the proxy trust `FORWARDED_ALLOW_IPS` is `*` or wider than one host, the card says
+so in red and calls to this address are refused until the host repairs it. A single call whose
+address cannot be trusted (forwarded headers its peer was not trusted to send) is refused on its
+own; the repair is in the runbook, *Webhooks refused for their network*. Saving only the list
+changes neither the webhook secret nor the registration at the platform.
+
+Three set-ups cannot use a list: a proxy that is trusted by a whole network instead of a single
+address (a Kubernetes ingress, whose pods change), a content delivery network in front of the proxy
+(the caller becomes its address, and listing it would admit all its customers), and a supplier that
+calls a public name from a private address. For these, leave the list empty and rely on the
+signature, or ask your platform administrator.
+
+A network that covers a whole address family (`0.0.0.0/0` or `::/0`, or an IPv6 network such as
+`::/1` that also holds every IPv4 address written as IPv6) is refused: that is no list.
+If the stored list cannot be read, the card says so and the address accepts no call until you
+save the list again.
+
+**After you set a list, send a test delivery** and check that it is accepted. The card does not
+yet show refused calls, so a list that locks the supplier out is not visible here.
+
 ## What is recorded
 
 Every change goes to the audit log with the names of the changed fields, never the values. Of

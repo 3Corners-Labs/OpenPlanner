@@ -247,13 +247,14 @@ and the first that fails refuses:
 | Step | Check | Refusal reason | Answer |
 |---|---|---|---|
 | 1 | The address exists: the platform has an adapter, the organisation exists and is connected to it, a secret is set | `unknown_address` | 404 |
-| 2 | `Content-Type`, when the call sends one, is `application/json` or `application/cloudevents+json` (parameters such as `charset` ignored). A call **without** the header passes: the signature decides | `content_type` | 415 |
-| 3 | The body is at most 64 KiB: a declared `Content-Length` over it refuses unread, and a body without a length (chunked) is cut off as soon as more than 64 KiB has arrived | `too_large` | 413 |
-| 4 | The signature over the raw body, in constant time | `invalid_signature` | 401 |
-| 5 | The signed time, where the platform signs one (WxCC), is within 300 seconds | `stale` | 401 |
-| 6 | The body is a JSON object | `malformed` | 400 |
-| 7 | The limits (below) | `rate` | 429 with `Retry-After` |
-| 8 | The event was not seen before (the domain's event key, see below); a replay is acknowledged | | 204 |
+| 2 | The source network: when a list of allowed networks applies, the caller's address is in it (below) | `network`, `source_unknown` | 403 |
+| 3 | `Content-Type`, when the call sends one, is `application/json` or `application/cloudevents+json` (parameters such as `charset` ignored). A call **without** the header passes: the signature decides | `content_type` | 415 |
+| 4 | The body is at most 64 KiB: a declared `Content-Length` over it refuses unread, and a body without a length (chunked) is cut off as soon as more than 64 KiB has arrived | `too_large` | 413 |
+| 5 | The signature over the raw body, in constant time | `invalid_signature` | 401 |
+| 6 | The signed time, where the platform signs one (WxCC), is within 300 seconds | `stale` | 401 |
+| 7 | The body is a JSON object | `malformed` | 400 |
+| 8 | The limits (below) | `rate` | 429 with `Retry-After` |
+| 9 | The event was not seen before (the domain's event key, see below); a replay is acknowledged | | 204 |
 
 The limits come after the checks, so a call that cannot sign never uses up the budget of the
 authentic ones. Both buckets have the value of `rate_limit_webhook_per_minute` (class C, default
@@ -262,9 +263,9 @@ and the caller's address as the server derived it; a forwarded header changes no
 caller counts by its address (an IPv4 address written as IPv6 is the same caller), an IPv6 caller by
 its /64, so rotating addresses within one prefix never opens a fresh bucket:
 
-- A call refused at steps 2 to 6 counts against the bucket of **refused** calls. While it has room
+- A call refused at steps 2 to 7 counts against the bucket of **refused** calls. While it has room
   the call gets its own reason; once it is used up the call gets `rate` instead.
-- A call that passed steps 2 to 6 counts against the bucket of **verified** calls and is refused
+- A call that passed steps 2 to 7 counts against the bucket of **verified** calls and is refused
   with `rate` only when that one is used up (the supplier itself sending too much). The refused
   bucket never touches a verified call: someone who can make the supplier's shared sending address
   call an organisation's address with a bad signature cannot lock its authentic deliveries out.
@@ -281,14 +282,105 @@ cannot fill it from the shared address to lock real organisations out. Accepted 
 call to a made-up address still costs one indexed lookup, with no ceiling in the application; the
 proxy's connection limits are the ceiling.
 
-`rate` and `unknown_address` write no log line per call (a flood produces them by definition); their
-trace is the security event, held back when repeated. Every other reason also logs
-`webhook.rejected` once per call.
+`rate`, `unknown_address`, `network` and `source_unknown` write no log line per call (a flood or a
+passer-by produces them by definition); their trace is the security event, held back when
+repeated. Every other reason also logs `webhook.rejected` once per call.
 
-Every refusal answers with an **empty body**, never the HTML error page. Reasons that later steps
-of ADR 0124 produce (`network`, `source_unknown`) are already in the closed list, and the two
-source-network checks will sit before step 2. Step 6 runs before step 8 in the code, because the
-event key comes from the parsed body.
+Every refusal answers with an **empty body**, never the HTML error page. Step 7 runs before step 9
+in the code, because the event key comes from the parsed body.
+
+### Source networks (`network`, `source_unknown`)
+
+A connection can carry a list of allowed source networks (IPv4 and IPv6, CIDR, at most 32), edited
+on the organisation's connection card (*Kanalen*, contact center) next to its other fields. The
+installation has a default per platform, set by the superuser under *Advanced settings*:
+`WEBHOOK_SOURCE_NETWORKS_VIDEO` for the video platform's address and
+`WEBHOOK_SOURCE_NETWORKS_CONTACT_CENTER` for the contact-center addresses (class C, empty by
+default, comma or line separated). Which list governs an address:
+
+| Address | List |
+|---|---|
+| `/webhooks/webex` | the installation's video default |
+| `/webhooks/contact-center/{kind}` and `/webhooks/wxcc` (installation-wide) | the installation's contact-center default |
+| `/webhooks/contact-center/{kind}/{org}` | the connection's own list if it has one (it *replaces* the default), else the contact-center default |
+
+An empty result means **any source**: that is the behaviour before this step, and it is shown as a
+finding ("not restricted") on the connection card and on System status, never as a silent state.
+The host can demand a list: with `WEBHOOK_SOURCE_NETWORKS_REQUIRED=true` (class B, environment, off
+by default; a protection is not switched off from the portal) an address without a list accepts no
+call and answers `network`; the findings say "a list is required and missing". Changing a
+connection's list alone makes no new webhook secret and does not register the address at the
+platform again (a record that has no webhook secret yet takes the normal path: the secret is made
+and the address registered); it is audited by field name, never by the networks. A network that
+covers a whole address family (prefix length 0, `0.0.0.0/0` or `::/0`), or an IPv6 network that
+holds the whole IPv4-mapped range (`::/1`, `::ffff:0:0/96`: such a network admits every IPv4
+caller), is refused when a list is saved, on the card and in the two defaults, because such a list
+is "any source" called "restricted"; a narrower, wide network (`0.0.0.0/1`, `128.0.0.0/1`) is the
+organisation's choice, the two halves of a family are not refused on purpose. A stored list
+that cannot be read (damaged, an entry that does not parse, or one that is not written the way
+this application writes it) is never taken for an empty one: every call to that address is refused
+with `network`, and the card and System status say the list cannot be read, and whose it is (the
+connection's own list: set it again on the card; the installation's default: ask the platform
+administrator, or set a list of your own on the card). Saving the list again repairs it: the card
+shows an unreadable own list as an empty field, and saving that clears it, an explicit and audited
+act of someone who has the right, on a state the card shows in red. The same holds for an installation default that
+is stored in the portal but refused by these rules.
+
+A caller outside the list is refused with `network`. The address is only as good as the proxy
+chain, so when a list applies and the caller's address cannot be trusted the call is refused with
+`source_unknown`, also when the caller would be inside the list: a restriction that cannot be
+evaluated is not passed. Both answer 403 with an empty body, so a caller cannot tell them apart.
+The gate takes no address from a forwarded header; the address is the one the server derived from
+the trusted proxy (`FORWARDED_ALLOW_IPS`). The caller's address is held as the caller's, for this
+call, unless:
+
+- `FORWARDED_ALLOW_IPS` is `*` or names a network wider than a single host (any peer could claim any
+  address), or has an entry that is neither an address nor a network (a socket path, a name: who is
+  trusted is then unknown; it is a standing fault of its own on System status);
+- **this call** arrived with `X-Forwarded-For` or `X-Forwarded-Proto` that the server did not use,
+  because the peer that sent it is not a trusted proxy (the address held is a hop that is not
+  trusted). A header forged by someone else harms only that caller's own call. A call can carry
+  more than one such header line, and the lines can disagree: each is judged and the least safe
+  answer wins (*ignored* beats *honoured*), whichever line comes first, so a proxy that sends its
+  address as a second line instead of merging it into the first is refused, not passed;
+- the caller's address is one of the trusted proxies, or a loopback or private address while the
+  address webhooks are registered at is public (a hop did not hand the caller on).
+
+All three are decided per call. The standing sighting of the proxy watch of ADR 0086 (forwarded
+headers once seen from an untrusted peer) is a finding on System status and decides nothing at the
+gate: otherwise anyone who can reach the web process directly could refuse every list with one
+request.
+
+An address without a list is not affected by any of this. System status (*Address and proxy*) and
+the connection card show the first (a standing fact of the installation's settings) while a list
+applies; System status with what to repair, the card (for the organisation) only that deliveries
+are refused because of the installation's proxy setting and whom to ask. The per-call faults show as
+refusals in the events and nowhere else until the card shows *last refused* (a later step).
+
+**Three set-ups cannot use a list today.** They are refused, not passed, and the fix is not in
+the list:
+
+1. *A proxy trusted by a network instead of a single address*, such as a Kubernetes ingress whose
+   pods change: `FORWARDED_ALLOW_IPS` is then wider than a single host. (The Helm chart's
+   `forwardedAllowIps` takes the ingress pods; pin them as single addresses to use a list.)
+2. *A content delivery network in front of the proxy*: the caller the proxy sees is the network's
+   address, and listing it would admit all of the network's customers. Do not put a list on such
+   an address; the signature is the protection.
+3. *A supplier that calls a public name from a private address* (split DNS): the caller is then
+   private while the public address is public, so a call is refused as `source_unknown`.
+
+After you set a list, send a test delivery (`webhooks-health`) and read the events: the card does
+not yet show refused calls, so a list that locks the supplier out is found in the events, not on
+the card.
+
+A list is **defence in depth and no more**: the supplier's ranges are shared by all its customers,
+so a caller inside the list may be another customer of the same supplier; the signature (and the
+time) is still checked for every call and is what stops a stranger. A list that has gone stale is
+an outage of our own making: when the supplier changes its ranges, update the list (runbook,
+*Webhooks refused for their network*). The refusals are the security event `webhook.rejected` with
+reason `network` or `source_unknown`; they count against the bucket of refused calls and never
+against verified deliveries. A passer-by causes them, so like `rate` and `unknown_address` they
+write no log line per call: the event, held back when repeated, is the trace.
 
 Every refusal is also a security event `webhook.rejected` (ADR 0034, 0053) with the reason, the
 platform's code (`source:webex`, `source:wxcc`, or `source:unknown` when the platform in the path

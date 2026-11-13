@@ -77,6 +77,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `DEV_SESSION_KEY_PATH` | path | `data/dev-session.key` | Development session key file. |
 | `DEV_SETTINGS_KEY_PATH` | path | `data/dev-settings.key` | Development settings key file. |
 | `CONFIGURATION_PLAINTEXT_EXPORT_ALLOWED` | bool | `false` | Allow the superuser to export the configuration with its secrets in clear text (ADR 0099 point 8a). Off by default; never in the portal, because it switches a protection off. |
+| `WEBHOOK_SOURCE_NETWORKS_REQUIRED` | bool | `false` | Whether an inbound webhook address without allowed networks refuses every call. Class B because whether a list is mandatory is a protection, and a protection is not switched off from the portal (ADR 0124 point 3). |
 | `OIDC_CLAIM_MODE` | enum | `legacy` | Where rights come from: legacy (three claims), shadow (compare), entitlements (ADR 0049); moving back to legacy weakens a protection, so env only. |
 | `SMTP_PLAINTEXT_RELAY_ALLOWED` | bool | `false` | Allow mail without TLS in production, for a relay on a trusted network (ADR 0091); otherwise saving it is refused and System status reports it. Never in the portal. |
 
@@ -155,6 +156,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `RATE_LIMIT_READS` | rate | `60/minute` | 10–300 per minute | `settings.platform.manage` | Availability reads per IP address. |
 | `RATE_LIMIT_UNKNOWN_LINKS` | rate | `20/hour` | 5–100 per hour | `settings.platform.manage` | Unknown management links per IP address. |
 | `RATE_LIMIT_WEBHOOK_PER_MINUTE` | int | `600` | 60–6000 | `settings.platform.manage` | Inbound webhook calls per minute, per platform, organisation and source address (ADR 0124 point 5); the off switch stays RATE_LIMIT_ENABLED. |
+| `WEBHOOK_SOURCE_NETWORKS_VIDEO` | string | `""` | — | `settings.platform.manage` | The networks (CIDR, comma or line separated, at most 32) the video platform's webhooks may come from. Empty means any source, shown as a finding; a defence in depth, the signature is what stops a stranger (ADR 0124 point 3). |
+| `WEBHOOK_SOURCE_NETWORKS_CONTACT_CENTER` | string | `""` | — | `settings.platform.manage` | The default networks (CIDR, comma or line separated, at most 32) contact-center webhooks may come from; a connection's own list replaces it. Empty means any source, shown as a finding (ADR 0124 point 3). |
 | `RATE_LIMIT_AGENT_TOKENS` | rate | `10/minute` | 1–30 per minute | `settings.platform.manage` | Machine API token requests per client. |
 | `RATE_LIMIT_AGENT_CALLS` | rate | `120/minute` | 10–600 per minute | `settings.platform.manage` | Machine API calls per client. |
 | `AGENT_CHANGE_REQUESTS_PER_HOUR` | int | `20` | 1–120 | `settings.platform.manage` | Change requests per API client per hour, next to the machine API's call limit (ADR 0023 step 2); the off switch stays RATE_LIMIT_ENABLED. |

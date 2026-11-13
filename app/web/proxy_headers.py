@@ -10,12 +10,14 @@ address. It changes nothing about the request and never fails it.
 """
 
 import structlog
+from starlette.requests import Request
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.domain.audit import Outcome
 from app.domain.proxy_watch import EVENT_REASON, ProxyHeaderWatch
-from app.domain.public_address import EVENT, Forwarded, classify_peer, forwarded_state
+from app.domain.public_address import EVENT, Forwarded, classify_peer
 from app.domain.system_log import SystemLog
+from app.web.caller import client_address, forwarded_of
 
 log = structlog.get_logger()
 
@@ -44,18 +46,9 @@ async def _observe(scope: Scope) -> None:
     watch: ProxyHeaderWatch | None = getattr(state, "proxy_watch", None)
     if watch is None:
         return
-    headers = {name: value for name, value in scope["headers"] if name.startswith(b"x-forwarded-")}
-    if not headers:
-        return
-    client = scope.get("client")
-    peer = client[0] if client else None
-    seen = forwarded_state(
-        forwarded_for=_text(headers.get(b"x-forwarded-for")),
-        forwarded_proto=_text(headers.get(b"x-forwarded-proto")),
-        client=peer,
-        scheme=scope.get("scheme", "http"),
-    )
-    if seen is not Forwarded.IGNORED or not watch.observe(peer):
+    request = Request(scope)
+    peer = client_address(request)
+    if forwarded_of(request) is not Forwarded.IGNORED or not watch.observe(peer):
         return
     system_log: SystemLog | None = getattr(state, "system_log", None)
     if system_log is None:
@@ -69,8 +62,3 @@ async def _observe(scope: Scope) -> None:
         )
     except Exception as exc:  # an event that cannot be written never fails the request
         log.warning("address.proxy_event_failed", error=type(exc).__name__)
-
-
-def _text(raw: bytes | None) -> str | None:
-    """Decode a header value (latin-1 decodes every byte)."""
-    return raw.decode("latin-1") if raw is not None else None

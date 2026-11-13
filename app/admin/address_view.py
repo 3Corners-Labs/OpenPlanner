@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from fastapi import Request
 
 from app.admin.pages import admin_moment
+from app.admin.source_findings import FAULT_TEXTS, SourceFinding, source_finding
 from app.config import Settings
 from app.domain.address_check import AddressStatus
 from app.domain.proxy_watch import ProxyHeaderWatch
@@ -31,6 +32,7 @@ from app.domain.public_address import (
 )
 from app.domain.web_transport import proxy_hop_unencrypted
 from app.web.locale import RequestLocale
+from app.web.webhook_sources import contact_center_networks, proxy_chain, video_networks
 from app.web.widget_bundle import SCRIPT_URL_PATH
 
 SHAPE_LABELS = {
@@ -81,6 +83,15 @@ class CheckView:
 
 
 @dataclass(frozen=True)
+class SourceRow:
+    """The source networks of one installation-wide webhook address (ADR 0124 point 13)."""
+
+    label: str
+    finding: SourceFinding
+    faults: list[str]
+
+
+@dataclass(frozen=True)
 class AddressView:
     """The *Address and proxy* part of System status."""
 
@@ -94,6 +105,7 @@ class AddressView:
     checks: list[CheckView]
     hop_warning: str
     untrusted: str
+    sources: list[SourceRow]
 
 
 async def address_view(request: Request, locale: RequestLocale, settings: Settings) -> AddressView:
@@ -119,7 +131,30 @@ async def address_view(request: Request, locale: RequestLocale, settings: Settin
         [_check_view(request, locale, c) for c in stored.values()],
         _(HOP_TEXT) if _hop(settings) else "",
         _untrusted_text(request, locale),
+        _source_rows(request, locale, settings),
     )
+
+
+def _source_rows(request: Request, locale: RequestLocale, settings: Settings) -> list[SourceRow]:
+    """Return where webhooks may come from, for the video platform and the contact-center default.
+
+    An organisation's own list is on its connection card; here the installation's defaults are
+    shown, with the proxy-chain faults that would make the gate refuse an address with a list.
+    """
+    _ = locale.gettext
+    chain = proxy_chain(request)
+    required = settings.webhook_source_networks_required
+    findings = [
+        (label, source_finding(_, networks, own=False, required=required, chain=chain))
+        for label, networks in (
+            ("admin.settings.address.sources.video", video_networks(request)),
+            ("admin.settings.address.sources.contact_center", contact_center_networks(request)),
+        )
+    ]
+    return [
+        SourceRow(_(label), found, [_(FAULT_TEXTS[fault]) for fault in found.faults])
+        for label, found in findings
+    ]
 
 
 async def _current(request: Request, settings: Settings) -> dict[AddressKind, AddressCheck]:

@@ -100,6 +100,45 @@ scherm dat; controleer de rechten van de Service App (cjp:config_write) en maak 
 nieuw webhookgeheim. Koppel of ontkoppel een organisatie als er geen taken open staan:
 een taak die via de vorige koppeling is gemaakt, wordt niet meer via de nieuwe afgesloten.
 
+<!-- field: cc_allowed_networks -->
+### Toegestane bronnetwerken
+
+De netwerken waarvandaan de webhooks van het contactcenter naar het adres van deze organisatie
+mogen komen, één per regel in CIDR-notatie (bijvoorbeeld `203.0.113.0/24`; een enkel adres mag ook),
+hooguit 32. Vraag de leverancier van het contactcenter om zijn actuele reeksen. De lijst **vervangt**
+voor deze koppeling de standaardlijst van de installatie; leeg betekent dat de standaardlijst van de
+installatie geldt, en zonder standaardlijst mag elke bron aanroepen.
+
+De kaart zegt altijd in welke van drie standen het adres staat: *niet beperkt* (elke bron mag
+aanroepen; de handtekening beslist nog steeds), *beperkt tot N netwerken* (uit de eigen lijst van
+deze koppeling of de standaardlijst van de installatie) of *een lijst is verplicht en ontbreekt* (de
+host eist een lijst, dus het adres accepteert geen enkele aanroep tot er een is). Een lijst is een
+extra laag, niet het slot: de reeksen van de leverancier worden door al zijn klanten gedeeld, dus
+elke aanroep uit de lijst moet nog steeds een juiste handtekening dragen, en een verouderde lijst
+weigert de leverancier zelf. Houd de lijst bij als de leverancier nieuwe reeksen aankondigt.
+
+Een lijst kan alleen worden beoordeeld zolang de proxy voor OpenPlanner het adres van de aanroeper
+goed doorgeeft. Als het proxyvertrouwen `FORWARDED_ALLOW_IPS` `*` is of breder dan één host, zegt de
+kaart dat in rood en worden aanroepen naar dit adres geweigerd tot de host het herstelt. Een
+enkele aanroep waarvan het adres niet te vertrouwen is (doorgestuurde headers die zijn peer niet
+mocht sturen) wordt op zichzelf geweigerd; het herstel
+staat in het runbook, *Webhooks refused for their network*. Alleen de lijst opslaan verandert het
+webhookgeheim en de aanmelding bij het platform niet.
+
+Drie opstellingen kunnen geen lijst gebruiken: een proxy die door een heel netwerk wordt vertrouwd
+in plaats van door één adres (een Kubernetes-ingress, waarvan de pods wisselen), een content
+delivery network vóór de proxy (de aanroeper wordt het adres daarvan, en dat in de lijst zetten laat
+al zijn klanten toe) en een leverancier die een publieke naam vanaf een privéadres aanroept. Laat de
+lijst dan leeg en vertrouw op de handtekening, of vraag het aan uw platformbeheerder.
+
+Een netwerk dat een hele adresfamilie dekt (`0.0.0.0/0` of `::/0`, of een IPv6-netwerk als `::/1`
+dat ook elk als IPv6 geschreven IPv4-adres bevat) wordt geweigerd: dat is geen lijst. Is de opgeslagen lijst niet te lezen, dan zegt de kaart dat en accepteert het adres geen
+enkele aanroep tot u de lijst opnieuw opslaat.
+
+**Stuur nadat u een lijst hebt ingesteld een testbezorging** en controleer dat die wordt
+geaccepteerd. De kaart toont nog geen geweigerde aanroepen, dus een lijst die de leverancier buiten
+sluit ziet u hier niet.
+
 ## Wat wordt vastgelegd
 
 Elke wijziging komt in het auditlog met de namen van de gewijzigde velden, nooit de waarden.

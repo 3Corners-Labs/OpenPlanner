@@ -18,11 +18,16 @@ from app.admin.authz import AdminContext
 from app.admin.channel_fields import Manage, channels_url, secret_field, value_of
 from app.admin.forms import Field, FormData, moment_label
 from app.admin.pages import SameOrigin
+from app.admin.source_findings import card_finding
 from app.domain.contact_center import ContactCenterKind, OrganisationConnection, Registration
 from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.errors import DomainError
+from app.domain.networks import NetworkList
+from app.domain.source_networks import MAX_WEBHOOK_NETWORKS
+from app.domain.webhook_sources import source_list_that_applies
 from app.i18n import BoundGettext
 from app.web.locale import RequestLocale
+from app.web.webhook_sources import contact_center_networks, proxy_chain
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
@@ -32,6 +37,7 @@ CONNECTION_ANCHOR = "contact-center"
 SAVED_DONE = {
     Registration.REGISTERED: "contact_center_registered",
     Registration.NOT_READY: "contact_center_saved_not_ready",
+    Registration.UNTOUCHED: "contact_center_saved",
     Registration.REFUSED: "contact_center_not_registered",
     Registration.FAILED: "contact_center_not_registered",
 }
@@ -89,6 +95,20 @@ def _connection_fields(
             error=form.error_for("cc_client_id"),
             attributes={"autocapitalize": "none", "spellcheck": "false"},
         ),
+        Field(
+            "cc_allowed_networks",
+            _("admin.channels.cc_allowed_networks"),
+            "textarea",
+            value_of(
+                form,
+                "cc_allowed_networks",
+                "\n".join(stored.allowed_networks.networks) if stored else "",
+            ),
+            hint=_("admin.channels.cc_allowed_networks_hint", maximum=MAX_WEBHOOK_NETWORKS),
+            error=form.error_for("cc_allowed_networks"),
+            required=False,
+            attributes={"rows": "4", "autocapitalize": "none", "spellcheck": "false"},
+        ),
         secret_field(
             "cc_client_secret",
             _("admin.channels.cc_client_secret"),
@@ -118,18 +138,32 @@ async def connection_view(
     form: FormData,
     tz: ZoneInfo,
 ) -> dict[str, object]:
-    """Return the contact-center card: its form, webhook address and when its secret was made."""
+    """Return the contact-center card (ADR 0032, ADR 0124 point 13).
+
+    It holds the form, the webhook address, when its secret was made and where its webhooks may
+    come from.
+    """
     service = connection_service(request)
     _ = locale.gettext
     stored = await service.view(context.principal, org)
-    base = request.app.state.settings.webhook_base
+    settings = request.app.state.settings
+    base = settings.webhook_base
     made = stored.webhook_secret_at if stored else None
+    own = stored.allowed_networks if stored else NetworkList()
+    sources = card_finding(
+        _,
+        source_list_that_applies(own, contact_center_networks(request)),
+        own=own.configured,
+        required=settings.webhook_source_networks_required,
+        chain=proxy_chain(request),
+    )
     return {
         "available": service.available,
         "stored": stored is not None,
         "fields": _connection_fields(form, stored, _),
         "webhook": INBOUND[stored.kind].organisation_url(base, org) if stored else "",
         "secret_made": moment_label(made, tz, locale.code) if made else "",
+        "sources": sources,
     }
 
 

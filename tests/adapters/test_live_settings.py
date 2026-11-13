@@ -214,3 +214,39 @@ async def test_the_organisation_states_show_the_source() -> None:
     }
     assert (states["time_format"].source, states["time_format"].shown) == ("organisation", "12h")
     assert states["admin_timezone"].source == "default"
+
+
+VIDEO_SOURCES = "webhook_source_networks_video"
+
+
+async def _with_stored(value: object, environ: dict[str, str] | None = None) -> LiveSettings:
+    uow = InMemoryUnitOfWork()
+    uow.state.settings_version = 1
+    uow.state.platform_settings = {VIDEO_SOURCES: value}
+    live = LiveSettings(
+        Settings(environment="dev"), environ or {}, PlatformSettingsStore(uow), FixedClock()
+    )
+    await live.refresh()
+    return live
+
+
+async def test_a_stored_value_the_rules_refuse_is_reported_as_ignored() -> None:
+    """ADR 0124 point 3: the default then applies, and its reader must be able to tell why."""
+    for refused in ("not-a-network", "0.0.0.0/0", 7):
+        live = await _with_stored(refused)
+
+        assert live.settings.webhook_source_networks_video == ""
+        assert live.portal_ignored(VIDEO_SOURCES)
+
+
+async def test_a_stored_value_that_applies_or_none_at_all_is_not_ignored() -> None:
+    assert not (await _with_stored("8.8.8.0/24")).portal_ignored(VIDEO_SOURCES)
+    assert not (await _with_stored("8.8.8.0/24")).portal_ignored(
+        "webhook_source_networks_contact_center"
+    )
+
+
+async def test_a_refused_stored_value_plays_no_part_while_the_environment_sets_the_key() -> None:
+    live = await _with_stored("garbage", {VIDEO_SOURCES.upper(): "8.8.8.0/24"})
+
+    assert not live.portal_ignored(VIDEO_SOURCES)

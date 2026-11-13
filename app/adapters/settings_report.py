@@ -67,8 +67,39 @@ def describe(
         portal: The stored portal values.
         now: The current time; lapsed values (``LOG_LEVEL``) no longer apply.
     """
-    names = {name.lower() for name in environ}
-    return [_state(_resolve(spec, settings, environ, names, portal, now)) for spec in REGISTRY]
+    names = _names(environ)
+    return [_state_of(spec, settings, environ, names, portal, now) for spec in REGISTRY]
+
+
+def state_of(
+    key: str,
+    settings: Settings,
+    environ: Mapping[str, str],
+    portal: PortalValues = EMPTY,
+    now: datetime | None = None,
+) -> SettingState:
+    """Return the state of the one registered setting ``key``: ``describe`` for a single key."""
+    return _state_of(BY_KEY[key], settings, environ, _names(environ), portal, now)
+
+
+def _names(environ: Mapping[str, str]) -> set[str]:
+    """Return the names of the process environment, lower case."""
+    return {name.lower() for name in environ}
+
+
+def _state_of(
+    spec: SettingSpec,
+    settings: Settings,
+    environ: Mapping[str, str],
+    names: set[str],
+    portal: PortalValues,
+    now: datetime | None,
+) -> SettingState:
+    """Return the state of one registered setting.
+
+    The one computation ``describe`` and ``state_of`` share.
+    """
+    return _state(_resolve(spec, settings, environ, names, portal, now))
 
 
 def effective(
@@ -84,7 +115,7 @@ def effective(
     TLS), none applies and ``settings`` is returned: the environment's values stay. Call
     ``combination_refused`` to tell. ``settings`` itself is never changed.
     """
-    names = {name.lower() for name in environ}
+    names = _names(environ)
     update = {
         spec.key: SecretStr(str(resolved.value)) if spec.secret else resolved.value
         for spec in REGISTRY
@@ -128,7 +159,7 @@ def combination_problem(
 
 def locked_keys(environ: Mapping[str, str]) -> frozenset[str]:
     """Return the keys of the class C and D settings the environment locks."""
-    names = {name.lower() for name in environ}
+    names = _names(environ)
     return frozenset(
         spec.key
         for spec in REGISTRY

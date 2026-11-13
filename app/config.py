@@ -30,6 +30,7 @@ from app.domain.connection_health import HealthPolicy
 from app.domain.event_schema import Envelope
 from app.domain.login_mapping import LOGIN_KEYS
 from app.domain.settings_registry import PHONE_REGIONS, REGISTRY, SettingClass
+from app.domain.source_networks import MAX_WEBHOOK_NETWORKS, valid_source_networks
 from app.domain.staff_directory import ADMIN_URL_PATTERN
 from app.domain.system_log import EventRetention
 from app.domain.update_policy import valid_line, valid_window
@@ -537,6 +538,13 @@ class Settings(BaseSettings):
     # Inbound webhooks (ADR 0124 point 5, class C): calls a minute per platform, organisation and
     # source address. The off switch stays RATE_LIMIT_ENABLED.
     rate_limit_webhook_per_minute: int = Field(default=600, ge=60, le=6000)
+    # Inbound webhooks (ADR 0124 point 3): where the calls may come from. The installation's
+    # defaults per platform are class C (networks, comma or line separated, at most 32; empty:
+    # any source); a connection's own list replaces them. Whether an address without any list
+    # accepts is the host's (class B): a protection is not switched off from the portal.
+    webhook_source_networks_video: str = Field(default="", max_length=1600)
+    webhook_source_networks_contact_center: str = Field(default="", max_length=1600)
+    webhook_source_networks_required: bool = False
 
     # ADR 0035: how many host websites one organisation may allow for the widget. Class C.
     embedding_max_origins: int = Field(default=20, ge=1, le=100)
@@ -917,6 +925,17 @@ class Settings(BaseSettings):
         """Refuse a previous key shorter than 32 bytes (ADR 0094); the message names no value."""
         if value is not None and len(value.get_secret_value().encode()) < MIN_PREVIOUS_KEY_BYTES:
             raise ValueError(f"{str(info.field_name).upper()} must be at least 32 bytes")
+        return value
+
+    @field_validator("webhook_source_networks_video", "webhook_source_networks_contact_center")
+    @classmethod
+    def _networks_are_networks(cls, value: str, info: ValidationInfo) -> str:
+        """Accept only a list of source networks; the message names no value (ADR 0124)."""
+        if not valid_source_networks(value):
+            raise ValueError(
+                f"{str(info.field_name).upper()} must be at most {MAX_WEBHOOK_NETWORKS} networks,"
+                " none of which lets a whole address family in"
+            )
         return value
 
     @field_validator("phone_default_region")

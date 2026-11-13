@@ -5,10 +5,13 @@ import pytest
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.networks import (
     UNKNOWN_CALLER,
+    NetworkList,
     address_of,
     caller_key,
     each_within,
+    host_is_public,
     in_any,
+    networks_of,
     parse_networks,
     pinned_network,
     split_entries,
@@ -139,3 +142,56 @@ def test_a_caller_without_a_readable_address_still_has_a_key() -> None:
     assert caller_key(None) == UNKNOWN_CALLER
     assert caller_key("") == UNKNOWN_CALLER
     assert caller_key("testclient") == "testclient"  # no address: its own key, no /64 rule
+
+
+def test_a_list_is_read_from_text_with_the_cap_of_the_caller() -> None:
+    assert networks_of("8.8.8.8, 10.0.0.9/24\n\n8.8.8.8", maximum=5) == (
+        "8.8.8.8/32",
+        "10.0.0.0/24",
+    )
+    with pytest.raises(DomainError):
+        networks_of("10.0.0.0/24, 10.0.1.0/24", maximum=1)
+    with pytest.raises(DomainError) as refused:
+        networks_of("nonsense", maximum=5, field="lijst")
+    assert refused.value.field == "lijst"
+
+
+def test_a_network_list_is_unreadable_only_when_it_says_so() -> None:
+    assert NetworkList() == NetworkList((), False)
+    assert NetworkList(unreadable=True) != NetworkList()
+
+
+@pytest.mark.parametrize(
+    ("url", "public"),
+    [
+        ("https://api.voorbeeld.nl", True),
+        ("https://8.8.8.9:8443", True),
+        ("https://[2001:4860::1]", True),
+        ("http://127.0.0.1:8000", False),
+        ("https://10.0.0.5", False),
+        ("https://[::1]", False),
+        ("https://[::ffff:10.0.0.1]", False),
+        ("http://localhost:8000", False),
+        ("http://localhost.:8000", False),  # the absolute form of a name
+        ("https://planner.internal.", False),
+        ("https://planner.localhost.", False),
+        ("https://api.voorbeeld.nl.", True),
+        ("https://.", False),
+        ("https://voorbeeld.nl..", True),  # only one dot is dropped; the name stays a name
+        ("https://planner.localhost", False),
+        ("https://planner.internal", False),
+        ("https://planner.local", False),
+        ("https://planner\u3002internal", False),  # a full stop IDNA reads as a dot
+        ("https://api.planner\uff0elocal", False),
+        ("https://localhost\uff61", False),
+        ("https://planner", False),  # no dot: not a public name
+        ("https://127.1", False),  # the short spelling a resolver maps to loopback
+        ("https://0x7f.1", False),
+        ("https://2130706433", False),
+        ("", False),
+    ],
+)
+def test_a_public_host_is_one_rule_for_the_api_host_and_the_webhook_address(
+    url: str, public: bool
+) -> None:
+    assert host_is_public(url) is public
