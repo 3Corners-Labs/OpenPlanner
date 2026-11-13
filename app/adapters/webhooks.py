@@ -17,13 +17,14 @@ import hashlib
 import hmac
 import json
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
 from pydantic import SecretStr
 
 from app.config import Settings
+from app.domain.booking import booking_id_of
 from app.domain.calls import EventKind
 from app.domain.connection_health import Platform
 from app.domain.contact_center import ContactCenterKind
@@ -49,6 +50,10 @@ class ParsedEvent:
     detail: str = ""
     event_key: str = ""
     """Identifies one delivery's event for deduplication; empty when there is nothing to key on."""
+    origin: str = field(default="", repr=False)
+    """The booking reference OpenPlanner sent as the task's origin, if the event carries one:
+    matches a late task to its attempt (ADR 0121 step 6b). Anything else in the origin (the name
+    beside it, or a caller's address on a task OpenPlanner did not make) is never kept."""
 
 
 def event_body(payload: dict[str, Any]) -> bytes:
@@ -152,7 +157,23 @@ def parse_wxcc(payload: dict[str, Any]) -> ParsedEvent | None:
     if not isinstance(task_id, str):
         return None
     key = _wxcc_key(payload, task_id)
-    return ParsedEvent(task_id, kind, str(reason or "")[:128], event_key=key)
+    return ParsedEvent(task_id, kind, str(reason or "")[:128], event_key=key, origin=_origin(data))
+
+
+def _origin(data: dict[str, Any]) -> str:
+    """Return the origin id of a task event (``origin`` or ``origin.id``), at most 32 characters.
+
+    Only the id is read: Create Task sends ``{"id": reference, "name": first name}``, and the
+    name is personal data that OpenPlanner never takes back. A task the client's contact center
+    made itself may carry a caller's address or number as its origin; anything that is not a
+    booking reference is dropped here, so it is never held.
+    """
+    found = data.get("origin")
+    if isinstance(found, dict):
+        found = found.get("id")
+    if not isinstance(found, str) or booking_id_of(found) is None:
+        return ""
+    return found
 
 
 def _wxcc_key(payload: dict[str, Any], task_id: str) -> str:

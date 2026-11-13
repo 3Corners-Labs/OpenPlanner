@@ -11,6 +11,10 @@ skipped with a reason, ADR 0068) and logging. Failures are classified by the run
     delete_video_room  ─► CallService.delete_meeting
     delete_trial_call  ─► CallService.delete_trial_call   (ADR 0071)
     end_wxcc_task      ─► CallService.end_task      (cancelled bookings, ADR 0021)
+
+A dispatch job of request work (a new flow on a counted pool, ADR 0121 step 6b) goes to
+``RequestDispatch`` instead: the flow, not the group, decides whether it reaches the contact
+center, and an attempt in doubt is never retried.
 """
 
 import structlog
@@ -22,7 +26,9 @@ from app.domain.calls import EventKind
 from app.domain.fallback import FALLBACK
 from app.domain.job_plan import JobType, is_stale
 from app.domain.ports import UnitOfWork
+from app.domain.request_dispatch import RequestDispatch
 from app.domain.scheduling import Group
+from app.domain.service_flows import FlowRevision
 
 log = structlog.get_logger()
 
@@ -62,12 +68,33 @@ class CallJobs:
     Args:
         uow: Reads bookings and groups.
         calls: Creates and removes meetings and work items.
+        requests: Dispatches the request work of new flows (ADR 0121 step 6b), if any.
     """
 
-    def __init__(self, uow: UnitOfWork, calls: CallService) -> None:
-        """Store the collaborators."""
+    def __init__(
+        self, uow: UnitOfWork, calls: CallService, requests: RequestDispatch | None = None
+    ) -> None:
+        """Store the collaborators; ``requests`` dispatches request work (ADR 0121 step 6b)."""
         self._uow = uow
         self._calls = calls
+        self._requests = requests
+
+    async def _request_revision(self, booking: Booking) -> FlowRevision | None:
+        """Return the flow revision of ``booking`` when it is request work, else ``None``."""
+        return await self._requests.handles(booking) if self._requests is not None else None
+
+    async def _dispatch_request(
+        self, job: ClaimedJob, booking: Booking, group: Group, revision: FlowRevision
+    ) -> str | None:
+        """Dispatch the request work of ``booking``; return why it was skipped, if it was."""
+        reason = (
+            ALREADY_DONE
+            if booking.contact_center_task or self._requests is None
+            else await self._requests.dispatch(booking, group, revision)
+        )
+        if reason is not None:
+            log.info("job.skipped", job_id=job.id, reason=reason)
+        return reason
 
     @property
     def types(self) -> set[JobType]:
@@ -108,6 +135,11 @@ class CallJobs:
         elif is_stale(job.pinned_start, booking):
             log.info("job.skipped", job_id=job.id, reason=STALE)
             return STALE
+        elif job.type is JobType.DISPATCH_CONTACT_CENTER_TASK and (
+            revision := await self._request_revision(booking)
+        ):
+            # ADR 0121 step 6b: the flow decides where request work goes, not the group.
+            return await self._dispatch_request(job, booking, group, revision)
         elif job.type is JobType.DISPATCH_CONTACT_CENTER_TASK and await self._calls.diverts(
             booking, group
         ):

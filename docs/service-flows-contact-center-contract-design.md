@@ -5,7 +5,7 @@ Status: design of step 6 of ADR 0121 (*P6: channel-independent contact-center ta
 Step 6 is cut in two:
 
 - **6a (this brief, built now):** the contract. A task is described without naming a platform: what kind of interaction it is, which skills it requires, which booking it belongs to and how it is routed. Each platform adapter declares what it can carry, and the readiness checklist of a flow uses that declaration. Webex Contact Center is ported to the contract with unchanged payload bytes.
-- **6b (follow-up row):** dispatching the work items of a *new* flow to the contact center: `DispatchKind.CONTACT_CENTER` in `BUILT_DISPATCH`, a provider task as a delivery attempt of a work item, reconciliation of a timed-out create (`reconciliation_required`, ADR 0121 point 7) and fencing between the own queue and the contact center (acceptance A21 and A22). It needs step 5b's execution path and so follows it.
+- **6b (section 11):** dispatching the work items of a *new* flow to the contact center: `DispatchKind.CONTACT_CENTER` in `BUILT_DISPATCH`, a provider task as a delivery attempt of a work item, reconciliation of a timed-out create (`reconciliation_required`, ADR 0121 point 7) and fencing between the own queue and the contact center (acceptance A21 and A22). It needs step 5b's execution path and so follows it.
 
 ## 1. What exists, and what the contract adds
 
@@ -126,4 +126,83 @@ Added to `docs/threat-model.md`, flow *routing variables and the contact-center 
 | PR | Content | Acceptance |
 |---|---|---|
 | 6a | `app/domain/interaction.py`, `ContactCenterCapabilities`, `capabilities_of`, `uncarried`, `ContactCenterTask.interaction`, the interaction kind in `CallService.ensure_task`, Webex's declaration and its second-line check, the three readiness reasons with nl and en texts, the carrier in the portal's and the configuration document's readiness, the recorded bodies, `docs/webhooks.md`, threat-model rows, this brief, ADR 0121 build status rows 6a and 6b | contract and capability side of A21; payload unchanged |
-| 6b | `DispatchKind.CONTACT_CENTER` in `BUILT_DISPATCH`; a provider task as a delivery attempt of a work item; `none` on Webex with the asset-schema change; reconciliation of a timed-out create and fencing between the own queue and the contact center | A21, A22 |
+| 6b | Section 11: the readiness checklist in `app/domain/flow_readiness.py` (first commit); `DispatchKind.CONTACT_CENTER` and `CompletionPolicy.PROVIDER_EVENT` built, reason `completion_not_for_dispatch`; `none` on Webex with `openplannerInteraction`; `app/domain/contact_center_attempts.py`, `app/domain/request_dispatch.py`; `IntegrationError.ambiguous`; the origin of a task event; migration 0114; setting `contact_center_reconcile_minutes` | A21, A22 |
+
+## 11. Step 6b: dispatching the work of a new flow to the contact center
+
+Addendum written against `main` after step 6a (#770). Section 7's defaults C1, C3 and C8 are now built; the choices 6b makes itself are E1 to E10 below, each built with its default.
+
+### 11.1 What a new contact-center flow is
+
+- `DispatchKind.CONTACT_CENTER` joins `BUILT_DISPATCH` and `CompletionPolicy.PROVIDER_EVENT` joins `BUILT_COMPLETION`. A flow dispatched to the contact center completes by the platform's event, a flow on the own queue by the operator (**E2**): any other pair is the new readiness reason `completion_not_for_dispatch` (point *Completion*, fixable, nl and en text).
+- Webex Contact Center now carries `none` as well as `video` (**E1**, choice C1): a work item without a meeting, `meetingLink` empty, and the reserved flow variable `openplannerInteraction` set to the interaction kind. The variable is written only for a kind other than `video`, after the routing variables like `openplannerGroup`, so every existing body stays byte for byte what it was (the recorded bodies of 6a) and a routing variable cannot stand in for it. `telephone` and `in_person` stay not carried (C2, follow-up rows 25 and 26). The asset schema needs no new key: `workItemData` keeps its six keys; the client's flow reads `openplannerInteraction` to tell a task without a meeting apart. The interaction kind is a value of a closed list, the *kind of call* of the outbound allow-list in CLAUDE.md; no personal field is added.
+- `CallService.ensure_task` reads the interaction kind (and the skills) of the recorded revision before it waits for a meeting: only a video task waits for one (`meeting_missing`); `contact_center_task` asks for a meeting only for `video`.
+- Every new flow still waits for the rollback gate (`ROLLBACK_SAFE` stays false): nothing in this step is reachable on a host; the tests open the gate.
+
+### 11.2 One owner: the fence
+
+The work of one request has at most one active work item: the partial unique index `uq_work_items_active` of migration 0113 is the fence, and a new column `work_items.channel` (`own_queue`, `contact_center`; migration 0114) says who holds it (**E3**).
+
+| Who comes first | What the other one gets |
+|---|---|
+| An operator claims the booking in the own queue (`claimed_by`, an own-queue work item) | The dispatch job skips it: `own_queue` |
+| The dispatch job opens a contact-center work item | A claim in the own queue is refused: `already_claimed`, as for a colleague's claim |
+| A contact-center attempt was fenced (11.4) | The request is queued again and only the own queue may take it; the dispatch job does not try a second time |
+
+A flow on the own queue is never dispatched: its bookings' dispatch job ends with `own_queue` whatever the service's group-level dispatch says, because the flow decides (ADR 0121 point 4). The task id is kept where it is today, on the booking (`contact_center_task`, `wxcc_task_id`, already a purged provider link), so the timeline, the call status, the cancellation's end-task job and the purge work unchanged and no new column links to the platform (**E4**).
+
+### 11.3 The attempt
+
+```
+dispatch job (request work, flow dispatches to the contact center)
+  lock: request of the booking (made now if none) ─► active item? ─► skip (owner says why)
+        work item channel=contact_center, state dispatching ─► commit
+  create_task(task with interaction kind, skills, no meeting for `none`)
+     ok ─────────────► lock: task on the booking, item dispatched, request assigned
+     refused / unreachable before sending ─► item failed, request queued; the job retries as
+                        today; its final failure hands the booking to the fallback (ADR 0082)
+     outcome unknown ─► item reconciliation_required; never retried (a retry could make a
+                        second task); the request is not claimable while it lasts
+```
+
+The task is built before the attempt opens, so a task that cannot be built (an unmapped skill, a kind not carried) opens no attempt. Every write of an attempt is conditional on the state it was read in; a lost condition refuses the whole transaction rather than half writing it.
+
+**Outcome unknown (E5)** is a transport error after the request may have reached the platform (a read timeout, a broken connection, a protocol error) or a `500`, `502`, `503` or `504`, which a proxy or gateway in front of the platform can answer while the task was made; `IntegrationError.ambiguous` says so, set by the authorised client. A connect error and a refusal (`4xx`, `501`) are *not sent* or *not made*: the attempt fails and the job's own retry applies.
+
+### 11.4 Reconciliation and fencing (A22)
+
+- A provider event for an unknown task whose `origin` is a booking reference (Create Task sends the reference as `origin.id`; the parser keeps only that id, never the name next to it) is matched to that booking (**E7**), only while the booking has no task, only when its service is routed to the platform the event came from, and only at its organisation's own webhook address, or at the installation's while the organisation has no connection of its own. If the booking is confirmed and its request's attempt is `reconciliation_required`, the task is attached: kept on the booking, the attempt `dispatched` (no duplicate task: the late one *is* the task). An attempt still `dispatching` is never adopted: its create is still running and returns the task itself (a `task:new` can arrive before the create's answer). If the attempt is still in doubt but the booking was cancelled meanwhile, or an attempt was fenced or cancelled within the last `contact_center_reconcile_minutes`, the late task is an orphan: it is kept on the booking and ended at the platform by the existing end-task job (marked *cancelled* first, ADR 0021), so the agent sees it is not theirs; a later one is not matched at all.
+- The reconciliation round (worker, with the request watchdog) fences every attempt still `dispatching` or `reconciliation_required` after `contact_center_reconcile_minutes` (**E6**, class C, default 10, bounds 2 to 120): the attempt ends `fenced`, the request is queued for the own queue and the fallback of ADR 0082 tells the team (`dispatch_failed`). From then on one authority holds the request: the own queue.
+- The origin is the booking reference (`OP-` and the booking's id), unique within one installation only: two installations must not share one contact-center tenant (`docs/runbook.md`), or a late task of the one could be matched in the other. The parser keeps an origin only when it has the shape of a reference, so a caller's address on a task the client's own flows made is never held.
+- Whether Webex Contact Center's task events carry the origin is not yet seen on the test host: until it is, a late task of a fenced attempt cannot be recognised and stays at the platform (open item; the reconciliation still fences, so OpenPlanner never has two owners).
+
+### 11.5 Events on a contact-center attempt (A21)
+
+| Platform event | Attempt | Request and booking |
+|---|---|---|
+| `task:connected` | `in_progress`, started now; occupies a unit of the booking's pool until start plus length plus wrap-up; an overrun start is recorded (`start_conflict`), never refused (the call is already running) | `in_progress` |
+| `task:ended` | `completed`, its unit released once | `completed`; a confirmed booking `completed` |
+| `task:failed` | `failed` | `queued` for the own queue; the fallback tells the team (ADR 0082), as after a fence |
+
+The booking timeline records the event as before. A request that is terminal or whose attempt is not the contact center's ignores the event (**E8**).
+
+### 11.6 Choices of 6b (built with the default)
+
+| # | Question | Default built |
+|---|---|---|
+| E1 | Which kinds does Webex Contact Center carry? | `video` and `none`; `none` with an empty `meetingLink` and `openplannerInteraction` |
+| E2 | Which completion goes with which dispatch? | contact center ⇔ provider event, own queue ⇔ operator (`completion_not_for_dispatch`) |
+| E3 | What is the fence? | One active work item per request (existing index) with its owner in `work_items.channel` |
+| E4 | Where is the task id kept? | On the booking, as today; no new provider link column |
+| E5 | Which failures are *outcome unknown*? | Transport errors after sending and `500`, `502`, `503`, `504`; never retried |
+| E6 | How long before an unknown outcome is fenced? | `contact_center_reconcile_minutes`, class C, default 10, 2 to 120 |
+| E7 | How is a late task recognised? | By the booking reference in the event's `origin`, for a service routed to that platform, at its organisation's address (or the installation's without an own connection); a cancelled booking's late task is ended; open item until seen on the test host |
+| E8 | What do platform events do? | connected = start, ended = complete (also without a connect: the platform says the work is done), failed = back to the own queue |
+| E9 | A contact-center attempt that the watchdog expires | Expired as before; its task at the platform is not ended (follow-up row 27) |
+| E10 | The own queue's row of work the contact center holds | Shown as open; a claim is refused `already_claimed` (follow-up row 28: show it as held by the contact center) |
+
+### 11.7 Settings, migration, threat model
+
+- Setting `contact_center_reconcile_minutes` (C, platform, default 10, bounds 2–120, superuser): a delay, not a protection, so C; the fence itself cannot be switched off.
+- Migration 0114 (expand only): `work_items.channel` (NOT NULL, default `own_queue`, check), the state list widened by `dispatching`, `dispatched`, `reconciliation_required`, `fenced` and `failed`, and `uq_work_items_active` rebuilt over the new active states. The previous minor never writes them; it could not read a work item in a new state, and only a non-legacy flow writes one, which the rollback gate keeps shut (ADR 0122 decision 12). Downgrade refuses while a contact-center work item exists.
+- Threat model rows: a duplicate task after a timeout; two owners of one request; a forged late event attaching a task to someone else's booking (the event is signed and verified as every WxCC event, and the origin only matches a booking whose request has an attempt in doubt or fenced).

@@ -16,6 +16,7 @@ request made and fixed into the rows (``lease_until``, ``watchdog_at``).
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import datetime
+from typing import cast
 
 from app.domain.booking import Booking, BookingStatus, Slot, stored_id
 from app.domain.errors import DomainError, ErrorCode
@@ -101,25 +102,42 @@ class RequestWork:
         """
         if booking.flow is None or not await self.handles(tx, booking):
             return None
-        found = await tx.get_request_of_booking(stored_id(booking))
-        if found is None:
-            found = await tx.add_service_request(
-                appointment_request(
-                    organisation_id=group.organisation_id,
-                    group_id=group.id,
-                    flow=booking.flow,
-                    booking_id=stored_id(booking),
-                    booking_end=booking.end,
-                    now=now,
-                    unresolved_hours=value_for(self._hours, group.organisation_id),
-                )
-            )
+        found = await self.request_of(tx, group, booking, now)
         active = await tx.get_active_work_item(found.id or 0)
         lease = value_for(self._lease, group.organisation_id)
         request, item = claim(found, active, now=now, agent=agent, lease_minutes=lease)
         if not await tx.update_service_request(request, found.handling):
             raise DomainError(ErrorCode.ALREADY_CLAIMED)
         return Work(request, await tx.add_work_item(item))
+
+    async def request_of(
+        self, tx: Transaction, group: Group, booking: Booking, now: datetime
+    ) -> ServiceRequest:
+        """Return the request of ``booking``, made now (``queued``) when it has none.
+
+        The one rule of a request of an appointment, for a claim in the own queue and for an
+        attempt at the contact center (ADR 0121 step 6b). ``booking`` is request work.
+        """
+        found = await tx.get_request_of_booking(stored_id(booking))
+        if found is not None:
+            return found
+        return await tx.add_service_request(
+            appointment_request(
+                organisation_id=group.organisation_id,
+                group_id=group.id,
+                flow=cast(FlowRef, booking.flow),
+                booking_id=stored_id(booking),
+                booking_end=booking.end,
+                now=now,
+                unresolved_hours=value_for(self._hours, group.organisation_id),
+            )
+        )
+
+    async def check_start(
+        self, tx: Transaction, group: Group, slot: Slot, booking_id: int, now: datetime
+    ) -> StartOutcome:
+        """Return how the booking's pool judges a start now (``check_start_of``)."""
+        return (await self._pools.check_start_of(tx, group, slot, booking_id, now)).outcome
 
     async def start(self, tx: Transaction, group: Group, booking: Booking, now: datetime) -> Work:
         """Start the treatment of ``booking``'s claimed request, judged on its pool now.

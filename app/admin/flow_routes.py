@@ -81,8 +81,14 @@ from app.admin.skill_inputs import choices as skill_choices
 from app.admin.skill_inputs import chosen_ids, raise_unknown, refuse, ticked_ids
 from app.domain.authorization import Permission, Principal
 from app.domain.errors import DomainError
+from app.domain.flow_readiness import (
+    ReadinessItem,
+)
 from app.domain.flow_service import FlowChoices, FlowDraftInput, FlowPage
-from app.domain.service_flows import FlowState, ReadinessItem, ServiceFlow
+from app.domain.service_flows import (
+    FlowState,
+    ServiceFlow,
+)
 from app.web.errors import FormError
 from app.web.locale import RequestLocale
 

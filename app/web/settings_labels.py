@@ -32,6 +32,7 @@ SETTING_LABELS: dict[str, str] = {
     "alert_repeat_hours": "settings.field.alert_repeat_hours.label",
     "task_reconcile_interval_minutes": "settings.field.task_reconcile_interval_minutes.label",
     "task_reconcile_after_minutes": "settings.field.task_reconcile_after_minutes.label",
+    "contact_center_reconcile_minutes": "settings.field.contact_center_reconcile_minutes.label",
     "integration_health_window_minutes": "settings.field.integration_health_window_minutes.label",
     "integration_degraded_failure_percent": (
         "settings.field.integration_degraded_failure_percent.label"

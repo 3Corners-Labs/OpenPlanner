@@ -326,6 +326,7 @@ request without one keeps it in `request_personal_data` (decision D1), written f
 | Request states and times | `service_requests` (flow and revision, handling, `watchdog_at`, `resolved_at`, personal-data state) | the claim and the watchdog round | as the booking row (cascade), or as the service; no personal data | no |
 | Who took the work | `work_items.assigned_to` (pseudonym, not the subject) | the agent's login | emptied by the booking's purge, or with the request-level record | no |
 | Name, email, phone, answers of a request without an appointment | `request_personal_data` (the booking's column names, `privacy.REQUEST_DATA_FIELDS`) | intake without an appointment (step 7) | `min(resolved_at, watchdog_at) + 24 h`; the row is deleted and the request marked `deleted` | no |
+| Who holds the work, and a contact-center attempt (ADR 0121 step 6b) | `work_items.channel` and the attempt states; the task id on the booking (`wxcc_task_id`, as for every task) | the dispatch job and the platform's task events | as the work item; the task id is purged with the booking | the task (the outbound fields of the contact-center payload, plus `openplannerInteraction` for work without a meeting); an event's `origin` id (the booking reference) is read back, its name never |
 
 ## Branding and the calendar script (WP3b)
 

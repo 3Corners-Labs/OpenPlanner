@@ -14,11 +14,13 @@ from app.domain.booking import BookingStatus
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.pool_accounting import Commitment
 from app.domain.service_requests import (
+    IN_DOUBT,
     HandlingState,
     PersonalDataState,
     RequestPersonalData,
     ServiceRequest,
     UnclaimedBooking,
+    WorkChannel,
     WorkItem,
     WorkItemState,
 )
@@ -90,6 +92,22 @@ class ServiceRequestStore(PoolStaffingStore):
             None,
         )
 
+    async def work_items_of(self, request_id: int) -> list[WorkItem]:
+        return sorted(
+            (i for i in self.state.work_items.values() if i.request_id == request_id),
+            key=lambda i: i.id or 0,
+        )
+
+    async def work_items_in_doubt(self) -> list[WorkItem]:
+        return sorted(
+            (
+                i
+                for i in self.state.work_items.values()
+                if i.channel is WorkChannel.CONTACT_CENTER and i.state in IN_DOUBT
+            ),
+            key=lambda i: i.id or 0,
+        )
+
     async def add_service_request(
         self, request: ServiceRequest, data: RequestPersonalData | None = None
     ) -> ServiceRequest:
@@ -132,7 +150,10 @@ class ServiceRequestStore(PoolStaffingStore):
         if stored is None or stored.state is not seen:
             return False
         self.state.work_items[item.id or 0] = replace(
-            item, assigned_to=stored.assigned_to, assigned_at=stored.assigned_at
+            item,
+            assigned_to=stored.assigned_to,
+            assigned_at=stored.assigned_at,
+            channel=stored.channel,
         )
         return True
 

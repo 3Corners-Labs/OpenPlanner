@@ -2,7 +2,7 @@
 
 A flow belongs to a service (a group). An administrator edits its *draft* revision, publishes it,
 and asks for activation, which the readiness checklist refuses until every point is in order
-(``app.domain.service_flows.readiness``). Every operation asks the matrix first
+(``app.domain.flow_readiness.readiness``). Every operation asks the matrix first
 (``AdminService.authorize_group``, permission ``group.edit``, the one permission of the flows
 sub-tab) and every change runs in one locked transaction with its audit event, carrying the flow's
 code and a revision number, never a label. The wrapper flows of a pre-flow service (*legacy*) are
@@ -22,7 +22,7 @@ listed and never changed here: every operation on one answers like an unknown fl
     archive          an active flow takes no new requests; the ones it has keep it; its draft goes
     delete           a flow that was never active goes with all its revisions
 
-What may be done with a flow is ``service_flows.flow_actions``: the use cases guard with it and
+What may be done with a flow is ``flow_readiness.flow_actions``: the use cases guard with it and
 the pages show their buttons from it.
 """
 
@@ -32,12 +32,17 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import cast
 
+from app.domain import flow_readiness as readiness_rules
 from app.domain import service_flows as flows
 from app.domain.admin import AdminService
 from app.domain.authorization import Permission, Principal, Scope, scope_for
 from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.contact_center import capabilities_of
 from app.domain.errors import DomainError, ErrorCode, missing_object
+from app.domain.flow_readiness import (
+    FlowActions,
+    ReadinessItem,
+)
 from app.domain.lookups import group_summary_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.routing import Subject
@@ -45,13 +50,11 @@ from app.domain.scheduling import Group, GroupSummary
 from app.domain.service_flows import (
     CompletionPolicy,
     DispatchKind,
-    FlowActions,
     FlowRevision,
     FlowState,
     HandlingAction,
     IntakeMode,
     InteractionKind,
-    ReadinessItem,
     ServiceFlow,
 )
 from app.domain.skill_service import all_skills, organisation_skills
@@ -433,7 +436,7 @@ class FlowService:
         """
         async with self._locked_flow(principal, slug, code) as held:
             stored = held.flow
-            if stored.draft is None or not flows.flow_actions(stored, None).save:
+            if stored.draft is None or not readiness_rules.flow_actions(stored, None).save:
                 raise _invalid("state")
             default_for = stored.default_for if stored.defaults_fixed else draft.default_for
             changed = replace(
@@ -461,7 +464,7 @@ class FlowService:
         async with self._locked_flow(principal, slug, code) as held:
             stored = held.flow
             current = stored.current
-            if current is None or not flows.flow_actions(stored, None).prepare:
+            if current is None or not readiness_rules.flow_actions(stored, None).prepare:
                 raise _invalid("state")
             copy = replace(
                 current, revision=current.revision + 1, published_at=None, published_by=None
@@ -476,7 +479,7 @@ class FlowService:
         """Publish the flow's draft: it becomes the current revision. The flow is not activated.
 
         The draft is judged by the readiness checklist first and refused unless every point is in
-        order, except the points that follow (``service_flows.can_publish``).
+        order, except the points that follow (``flow_readiness.can_publish``).
 
         Raises:
             DomainError: ``not_permitted``, ``group_not_found``, ``group_archived``,
@@ -489,10 +492,10 @@ class FlowService:
         async with self._locked_flow(principal, slug, code) as held:
             tx, stored = held.tx, held.flow
             draft = stored.draft
-            if draft is None or not flows.flow_actions(stored, None).save:
+            if draft is None or not readiness_rules.flow_actions(stored, None).save:
                 raise _guard_error(stored)
             items = await _readiness_of(tx, held.scope, held.summary.group, draft)
-            flows.check_publish_ready(items)
+            readiness_rules.check_publish_ready(items)
             actor = await tx.get_staff(principal.subject)
             if actor is None or actor.id is None:
                 raise DomainError(ErrorCode.STAFF_NOT_FOUND)
@@ -515,7 +518,7 @@ class FlowService:
         """
         async with self._locked_flow(principal, slug, code) as held:
             stored = held.flow
-            if not flows.flow_actions(stored, None).discard:
+            if not readiness_rules.flow_actions(stored, None).discard:
                 raise _guard_error(stored)
             await held.tx.discard_draft(held.scope, stored.id or 0)
             await self._record(
@@ -533,7 +536,7 @@ class FlowService:
         """
         async with self._locked_flow(principal, slug, code) as held:
             stored = held.flow
-            if not flows.flow_actions(stored, None).delete:
+            if not readiness_rules.flow_actions(stored, None).delete:
                 raise _invalid("state")
             await held.tx.delete_service_flow(held.scope, stored.id or 0)
             await self._record(held.tx, principal, held.summary, DELETED, stored)
@@ -558,7 +561,7 @@ class FlowService:
             if stored.state is not FlowState.DRAFT or current is None:
                 raise _invalid("state")
             items = await _readiness_of(tx, held.scope, held.summary.group, current)
-            if not flows.flow_actions(stored, items).activate:
+            if not readiness_rules.flow_actions(stored, items).activate:
                 return Activation(False, items)
             active = await tx.set_flow_state(held.scope, stored.id or 0, FlowState.ACTIVE)
             await self._record(tx, principal, held.summary, ACTIVATED, active, active.current)
@@ -578,7 +581,7 @@ class FlowService:
         """
         async with self._locked_flow(principal, slug, code) as held:
             tx, stored = held.tx, held.flow
-            if not flows.flow_actions(stored, None).archive:
+            if not readiness_rules.flow_actions(stored, None).archive:
                 raise _invalid("state")
             if stored.draft is not None:
                 await tx.discard_draft(held.scope, stored.id or 0)
@@ -688,7 +691,7 @@ def _offered(flow: ServiceFlow, group: Group, subject: str) -> Subject:
     if (
         draft is None
         or found is None
-        or not flows.flow_actions(flow, None).save
+        or not readiness_rules.flow_actions(flow, None).save
         or subject not in draft.subject_skill_ids
     ):
         raise missing_object("subject")
@@ -744,7 +747,7 @@ async def _readiness_of(
             for s in await all_skills(tx, scope, group.organisation_id)
             if s.id is not None and s.contact_center_code is not None
         )
-    return flows.readiness(
+    return readiness_rules.readiness(
         revision,
         await _pool_of(tx, scope, revision),
         offered_subjects=[s.code for s in group.routing.subjects],
@@ -799,7 +802,9 @@ async def _page(
         items,
         activation,
         {s.id: s for s in await all_skills(tx, scope, group.organisation_id) if s.id is not None},
-        flows.flow_actions(flow, activation, items if flow.draft is not None else None),
-        flows.missing_guarantees(shown, pool),
-        flows.missing_guarantees(flow.current, current_pool) if flow.current else frozenset(),
+        readiness_rules.flow_actions(flow, activation, items if flow.draft is not None else None),
+        readiness_rules.missing_guarantees(shown, pool),
+        readiness_rules.missing_guarantees(flow.current, current_pool)
+        if flow.current
+        else frozenset(),
     )

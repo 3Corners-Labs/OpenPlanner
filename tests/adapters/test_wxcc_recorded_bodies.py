@@ -16,7 +16,13 @@ from typing import Any
 
 import pytest
 
-from app.adapters.wxcc import cancellation_body, task_body
+from app.adapters.wxcc import (
+    INTERACTION_KEY,
+    ROUTING_KEY,
+    WORK_ITEM_FIELDS,
+    cancellation_body,
+    task_body,
+)
 from app.domain.calls import ContactCenterTask, probe_task
 from app.domain.interaction import InteractionKind
 from app.domain.ports import IntegrationError
@@ -88,11 +94,26 @@ def test_the_body_is_byte_for_byte_the_recorded_one(case: str) -> None:
     assert _wire(_bodies()[case]).encode() == _recorded()[case].encode()
 
 
-@pytest.mark.parametrize(
-    "interaction", [k for k in InteractionKind if k is not InteractionKind.VIDEO]
-)
+@pytest.mark.parametrize("interaction", [InteractionKind.TELEPHONE, InteractionKind.IN_PERSON])
 def test_a_task_wxcc_does_not_carry_is_refused_before_it_is_sent(
     interaction: InteractionKind,
 ) -> None:
     with pytest.raises(IntegrationError, match="not_ready"):
         task_body(replace(BASE, interaction=interaction), ALIAS, STAMP)
+
+
+def test_a_task_without_a_meeting_names_its_kind_and_sends_no_link() -> None:
+    """``none`` (ADR 0121 step 6b): an empty link and the reserved variable, after the routing."""
+    task = replace(
+        BASE,
+        meeting_link="",
+        interaction=InteractionKind.NONE,
+        variables=(("topic", "MOVE"), (INTERACTION_KEY, "video")),
+    )
+
+    body = task_body(task, ALIAS, STAMP)
+
+    assert body["flowSettings"] == {"topic": "MOVE", INTERACTION_KEY: "none", ROUTING_KEY: "demo"}
+    data = body["channelParams"]["message"]["workItemData"]
+    assert data["meetingLink"] == ""
+    assert tuple(data) == WORK_ITEM_FIELDS

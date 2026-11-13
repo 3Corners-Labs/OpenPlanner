@@ -13,12 +13,8 @@ from typing import Any
 import pytest
 
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.flow_resolution import gate_allows, pool_flows_bookable
-from app.domain.scheduling import Organisation, ScheduleRule
-from app.domain.service_flows import (
+from app.domain.flow_readiness import (
     FOLLOWING,
-    FlowState,
-    IntakeMode,
     ReadinessCheck,
     ReadinessReason,
     ReadinessState,
@@ -26,6 +22,12 @@ from app.domain.service_flows import (
     can_publish,
     readiness,
     readiness_state,
+)
+from app.domain.flow_resolution import gate_allows, pool_flows_bookable
+from app.domain.scheduling import Organisation, ScheduleRule
+from app.domain.service_flows import (
+    FlowState,
+    IntakeMode,
 )
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock

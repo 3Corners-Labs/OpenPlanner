@@ -340,12 +340,20 @@ class IntegrationError(Exception):
     with the failure on the timeline and the system event, so admins read it on the page.
     """
 
-    def __init__(self, code: str, *, retryable: bool, reason: str = "") -> None:
-        """Store the code, whether a retry can help, and the provider's reason, if any."""
+    def __init__(
+        self, code: str, *, retryable: bool, reason: str = "", ambiguous: bool = False
+    ) -> None:
+        """Store the code, whether a retry can help, and the provider's reason, if any.
+
+        ``ambiguous`` says the request may have reached the platform before it failed (a read
+        timeout, a broken connection, a gateway timeout): whether it took effect is unknown. A
+        create with such an outcome is reconciled, never retried (ADR 0121 step 6b).
+        """
         super().__init__(code)
         self.code = code
         self.retryable = retryable
         self.reason = reason[:REASON_LIMIT]
+        self.ambiguous = ambiguous
 
 
 @dataclass(frozen=True)
@@ -1808,6 +1816,18 @@ class Transaction(Protocol):
 
     async def get_active_work_item(self, request_id: int) -> WorkItem | None:
         """Return the request's one active work item, or ``None``."""
+        ...
+
+    async def work_items_of(self, request_id: int) -> list[WorkItem]:
+        """Return every work item of a request, oldest first (ADR 0121 step 6b)."""
+        ...
+
+    async def work_items_in_doubt(self) -> list[WorkItem]:
+        """Return the contact-center attempts whose create's outcome is unknown, oldest first.
+
+        ``dispatching`` and ``reconciliation_required``; not scoped: for the worker's fence
+        round only (ADR 0121 step 6b).
+        """
         ...
 
     async def add_service_request(

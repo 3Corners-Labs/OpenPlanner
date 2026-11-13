@@ -15,6 +15,7 @@ once.
 import asyncio
 import signal
 from contextlib import suppress
+from dataclasses import replace
 from datetime import datetime, timedelta
 from functools import partial
 
@@ -35,6 +36,7 @@ from app.adapters.http_trace import traced_transport
 from app.adapters.integrations import (
     Integrations,
     build_integrations,
+    sealed_connections,
     secret_box,
     webex_fingerprint,
 )
@@ -72,7 +74,9 @@ from app.domain.platform_settings import PlatformSettingsStore
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.queue_wait import NotPickedUpWatch, QueueWaitWatch
 from app.domain.report_digest_service import DigestRunner
+from app.domain.request_dispatch import AttemptEvents, own_connection_of
 from app.domain.request_log import RequestEvents
+from app.domain.request_watch import WatchResult
 from app.domain.retention_sweep import RetentionSweep
 from app.domain.security_log import SecurityLog
 from app.domain.slot_close_service import SlotCloser
@@ -93,7 +97,7 @@ from app.jobs.runner import JobRunner
 from app.jobs.usage import backfill_usage, close_slots, roll_up_usage
 from app.keys import management_token_key, management_token_key_previous
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
-from app.service_wiring import booking_service, planner_service, request_watch
+from app.service_wiring import booking_service, planner_service, request_watch, request_work
 from app.web.alert_text import alert_composer
 from app.web.digest_text import compose_digest
 from app.web.fallback_text import SpaceTexts
@@ -201,7 +205,18 @@ async def run_worker(
             clock,
             lambda: timedelta(hours=live.settings.integration_check_interval_hours),
         )
-        integration = IntegrationService(uow, clock, AdminService(uow, clock), version)
+        work = request_work(clock, live)
+        integration = IntegrationService(
+            uow,
+            clock,
+            AdminService(uow, clock),
+            version,
+            work=AttemptEvents(
+                work,
+                lambda: live.settings.contact_center_reconcile_minutes,
+                own_connection_of(sealed_connections(engine, settings)),
+            ),
+        )
         # ADR 0082 point 11: bookings to the own queue when the contact center fails.
         fallback = FallbackService(
             uow,
@@ -216,6 +231,8 @@ async def run_worker(
                 settings.public_base_url,
             ),
         )
+        # ADR 0121 step 6b: contact-center work the platform failed goes back with a notice.
+        integration.set_requeue_handler(fallback.dispatch_failed)
 
         # ADR 0082 points 6 and 7: reconcile stale tasks, then recompute the health.
         health_watch = IntegrationHealthWatch(
@@ -248,6 +265,8 @@ async def run_worker(
                 video=wired.video,
                 dispatchers=wired.dispatchers,
                 organisations=wired.organisations,
+                request_work=work,
+                reconcile_minutes=lambda: live.settings.contact_center_reconcile_minutes,
                 integration=integration,
                 fallback=fallback,
                 retention=lambda: live.settings.event_retention,
@@ -293,6 +312,13 @@ async def run_worker(
     )
 
     staff_lifecycle = StaffLifecycleService(uow, clock)
+    watchdog = request_watch(uow, clock, live)
+
+    async def watch_requests() -> WatchResult:
+        """Run the request watchdog, then fence contact-center attempts in doubt (6b)."""
+        result = await watchdog.run()
+        fenced = await runner.requests.fence_round() if runner.requests else 0
+        return replace(result, changed=result.changed + fenced)
 
     async def erase_staff() -> int:
         """Erase the staff records without a login for ``staff_retention_days`` (ADR 0046)."""
@@ -316,7 +342,7 @@ async def run_worker(
         ).run,
         prune_requests,
         planner.run_automatic,
-        request_watch(uow, clock, live).run,
+        watch_requests,
     )
     # ADR 0117: usage facts into the hourly table, and the retention of both.
     usage = UsageRollup(

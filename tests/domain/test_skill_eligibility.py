@@ -2,7 +2,14 @@
 
 import pytest
 
-from app.domain.service_flows import ReadinessCheck, ReadinessReason, readiness, requirement_of
+from app.domain.flow_readiness import (
+    ReadinessCheck,
+    ReadinessReason,
+    readiness,
+)
+from app.domain.service_flows import (
+    requirement_of,
+)
 from app.domain.skills import Eligible, Missing, eligibility
 from tests.support.service_flows import legacy, pool, revision
 

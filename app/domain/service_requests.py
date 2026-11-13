@@ -69,13 +69,50 @@ class WorkItemState(StrEnum):
     LEASE_EXPIRED = "lease_expired"
     EXPIRED = "expired"
     CANCELLED = "cancelled"
+    DISPATCHING = "dispatching"
+    """A contact-center attempt being created at the platform (ADR 0121 step 6b)."""
+    DISPATCHED = "dispatched"
+    """The platform holds the task; the attempt waits for it to connect."""
+    RECONCILIATION_REQUIRED = "reconciliation_required"
+    """The create's outcome is unknown (a timeout): never retried, not claimable until fenced."""
+    FENCED = "fenced"
+    """An attempt in doubt was closed: the own queue holds the request, a late task is ended."""
+    FAILED = "failed"
+    """The platform refused the task or reported it failed; the request is queued again."""
 
 
 ACTIVE_ITEM: frozenset[WorkItemState] = frozenset(
-    {WorkItemState.ASSIGNED, WorkItemState.IN_PROGRESS, WorkItemState.RECOVERY_REQUIRED}
+    {
+        WorkItemState.ASSIGNED,
+        WorkItemState.IN_PROGRESS,
+        WorkItemState.RECOVERY_REQUIRED,
+        WorkItemState.DISPATCHING,
+        WorkItemState.DISPATCHED,
+        WorkItemState.RECONCILIATION_REQUIRED,
+    }
 )
 """Work item states that count as the request's one active work item (the partial unique index
 ``uq_work_items_active`` is the backstop)."""
+
+
+IN_DOUBT: frozenset[WorkItemState] = frozenset(
+    {WorkItemState.DISPATCHING, WorkItemState.RECONCILIATION_REQUIRED}
+)
+"""Contact-center attempts whose task may or may not exist at the platform."""
+
+ORPHANED: frozenset[WorkItemState] = frozenset({WorkItemState.FENCED, WorkItemState.CANCELLED})
+"""Ended contact-center attempts whose task, if the platform made one after all, is nobody's:
+fenced, or cancelled with its booking while the create's outcome was unknown."""
+
+
+class WorkChannel(StrEnum):
+    """Who holds a work item: the own queue or the contact center (ADR 0121 step 6b).
+
+    One active work item per request is the fence; its channel says which side holds it.
+    """
+
+    OWN_QUEUE = "own_queue"
+    CONTACT_CENTER = "contact_center"
 
 
 class PersonalDataState(StrEnum):
@@ -130,6 +167,7 @@ class WorkItem:
         planned_until: The planned end of the occupation: start plus length plus wrap-up.
         start_conflict: It started during a colleague's overrun (ADR 0122 decision 11).
         ended_at: When it stopped being active: the release of its occupation.
+        channel: Who holds it: the own queue, or the contact center (an attempt, step 6b).
     """
 
     id: int | None
@@ -143,6 +181,7 @@ class WorkItem:
     planned_until: datetime | None = None
     start_conflict: bool = False
     ended_at: datetime | None = None
+    channel: WorkChannel = WorkChannel.OWN_QUEUE
 
     @property
     def active(self) -> bool:

@@ -622,6 +622,9 @@ class Settings(BaseSettings):
     # the health thresholds.
     task_reconcile_interval_minutes: int = Field(default=5, ge=1, le=60)
     task_reconcile_after_minutes: int = Field(default=10, ge=1, le=120)
+    # Class C (ADR 0121 step 6b): a contact-center attempt whose create had an unknown outcome
+    # is fenced, and its request goes to the own queue, after this many minutes.
+    contact_center_reconcile_minutes: int = Field(default=10, ge=2, le=120)
     integration_health_window_minutes: int = Field(default=15, ge=5, le=120)
     integration_degraded_failure_percent: int = Field(default=25, ge=1, le=100)
     integration_down_failure_percent: int = Field(default=75, ge=1, le=100)

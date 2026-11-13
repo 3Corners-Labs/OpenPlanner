@@ -61,7 +61,7 @@ None in step 1: it changes labels only. The later steps add the following, each 
 | 5d | The retention overview shows request-level records holding data and overdue as counts of their own (with the first writer, step 7) | | follow-up |
 | 5e | Must be done before `ROLLBACK_SAFE` opens: a list of work in recovery for supervisors, and an alert while any exists (its appointment has ended, so the queue no longer lists it; design R9). Until it is completed, recovery work keeps one unit of its pool occupied as an overrun, which refuses conflicting starts and shows as a shortage | | follow-up |
 | 6a | P6, the contract: `ContactCenterTask` names the flow's interaction kind (`app/domain/interaction.py`), each adapter declares what it carries (`ContactCenterCapabilities` on its `ProviderDescriptor`; Webex Contact Center: `video` and skills), the task is refused before it is built and again by the adapter when the platform cannot carry it, readiness reasons `contact_center_missing`, `interaction_not_carried` and `skills_not_carried` in the portal and the configuration document, the Webex payload unchanged byte for byte (`tests/adapters/wxcc_task_bodies.json`); build brief `docs/service-flows-contact-center-contract-design.md` | #770 | merged |
-| 6b | P6, dispatch of a new flow: `DispatchKind.CONTACT_CENTER` in `BUILT_DISPATCH`, a provider task as a delivery attempt of a work item, `none` on Webex Contact Center with the asset-schema change and the reserved variable `openplannerInteraction`, reconciliation of a timed-out create and fencing between the own queue and the contact center (A21, A22) | | planned |
+| 6b | P6, dispatch of a new flow: the readiness checklist in `app/domain/flow_readiness.py`; `DispatchKind.CONTACT_CENTER` and `CompletionPolicy.PROVIDER_EVENT` built (reason `completion_not_for_dispatch`); Webex Contact Center carries `none` (empty `meetingLink`, `openplannerInteraction`); a contact-center attempt per work item (`work_items.channel`, migration 0114) fenced from the own queue by the one active work item; an unknown create outcome reconciled, never retried, a late task adopted by its origin or ended once fenced (`contact_center_reconcile_minutes`, C); platform events start, complete or requeue the attempt (A21, A22); brief section 11 | #776 | merged |
 | 7 | P7: immediate intake and check-in on the same pool | | planned |
 | 8 | P8: compatibility matrix, upgrade and rollback proof, documentation | | planned |
 | 9 | Manual topics in `docs/manual/{nl,en}` say *Dienst / Service* (at the next major release, product owner 2026-11-10) | | follow-up |
@@ -82,6 +82,9 @@ None in step 1: it changes labels only. The later steps add the following, each 
 | 24 | Split the accessibility suite over several runners (the job needs 28 to 30 minutes and grows with every admin page) | | follow-up |
 | 25 | A telephone interaction through the contact center: a callback whose destination never leaves OpenPlanner as the participant's number (its own privacy decision; brief of step 6, choice C2) | | follow-up |
 | 26 | A chat interaction kind (a change of the closed table of point 4, which needs an ADR; brief of step 6, choice C4) | | follow-up |
+| 27 | The watchdog ends the task at the platform when it expires or cancels a contact-center attempt (brief section 11, choice E9) | | follow-up |
+| 28 | The own queue shows work the contact center holds as held, not as open (brief section 11, choice E10) | | follow-up |
+| 29 | See on the test host that Webex Contact Center's task events carry the origin, so a late task is matched (brief section 11.4) | | follow-up |
 
 ## Consequences
 

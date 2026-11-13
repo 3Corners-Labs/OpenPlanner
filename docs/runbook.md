@@ -1128,6 +1128,27 @@ the host team needs to know about them:
    and a **RONA** timeout.
 5. Set `WXCC_API_BASE_URL` to your region's API host.
 
+#### One installation per contact-center tenant (ADR 0121 step 6b)
+
+Work of a new flow that the contact center may have received without answering is matched to
+its booking later by the booking reference the task carries as its origin. A reference is
+unique within one installation only, so two installations (production next to test or a lab)
+must not send work items to the same Webex Contact Center tenant: give each its own tenant, or
+keep the other installation's flows on the own queue. An organisation with a connection of its
+own receives its tasks' events at its own webhook address only; the installation's address never
+matches its references.
+
+**Not yet verified:** whether Webex Contact Center's task events carry the origin OpenPlanner
+sends (ADR 0121 follow-up 29). Until it is seen on the test tenant, a task that the platform
+made after an unanswered create cannot be recognised: the attempt is still fenced after
+`contact_center_reconcile_minutes` and the own queue takes the request, but the late task stays
+with an agent at the platform until someone closes it there. Watch the timeline of such
+bookings (*outcome_unknown*, *fenced*) and close a stray work item by hand.
+
+The client's flow reads
+`openplannerInteraction` (`none`: work without a meeting, an empty `meetingLink`) to route that
+work; the asset schema keeps its six keys.
+
 #### Matching a group to its queue
 
 OpenPlanner never names a queue: Create Task v2 has no queue field for work items. Three

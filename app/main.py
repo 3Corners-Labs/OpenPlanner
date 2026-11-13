@@ -134,6 +134,7 @@ from app.domain.proxy_watch import ProxyHeaderWatch
 from app.domain.queue_service import QueueService
 from app.domain.readiness import ReadinessService
 from app.domain.report_digest_service import DigestAdmin
+from app.domain.request_dispatch import AttemptEvents, own_connection_of
 from app.domain.request_log import RequestEvents
 from app.domain.roles import RoleService
 from app.domain.routing_service import RoutingService
@@ -670,6 +671,12 @@ def create_app(
             staff_usage,
             request_work(clock, app.state.live_settings),
         )
+
+        async def own_connection(organisation_id: int) -> bool:
+            """Whether the organisation has its own contact-center connection (ADR 0032)."""
+            has_own = own_connection_of(app.state.contact_center_connections)
+            return has_own is not None and await has_own(organisation_id)
+
         app.state.integration_service = IntegrationService(
             uow,
             clock,
@@ -677,6 +684,12 @@ def create_app(
             settings.app_version,
             probes=ProbeReports(ReportStore(app.state.engine)),
             staff_usage=staff_usage,
+            # ADR 0121 step 6b: task events move the contact-center attempts of request work.
+            work=AttemptEvents(
+                request_work(clock, app.state.live_settings),
+                lambda: live().contact_center_reconcile_minutes,
+                own_connection,
+            ),
         )
         # ADR 0082 points 5 and 7: the last inbound webhooks and the health of the connections.
         app.state.health_service = IntegrationHealthService(
@@ -800,6 +813,10 @@ def create_app(
             app.state.integration_service,
             BotSpacePoster(app.state.bot_tokens, http, live().webex_api_base_url, request_log),
             SpaceTexts(app.state.translator.gettext, settings.public_base_url),
+        )
+        # ADR 0121 step 6b: contact-center work the platform failed goes back with a notice.
+        app.state.integration_service.set_requeue_handler(
+            app.state.fallback_service.dispatch_failed
         )
         text_overrides.attach(uow)
         app.state.organisation_text_service = OrganisationTextService(

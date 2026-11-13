@@ -8,9 +8,11 @@ Admins see a booking's timeline only with ``bookings.view`` on the group of the 
 and only a booking of that group (ADR 0014).
 """
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from enum import StrEnum
+from typing import Protocol
 
 from app.domain.admin import AdminService, require
 from app.domain.audit import AuditEvent, AuditFilter
@@ -38,6 +40,28 @@ WEBHOOK_MEMORY = timedelta(days=30)
 """How long a Webex event key is remembered; older keys are forgotten on the next event."""
 
 WEBEX_SOURCE = "webex"
+
+
+class TaskWork(Protocol):
+    """The request work behind a contact-center task (ADR 0121 step 6b), inside the lock."""
+
+    async def on_task_event(
+        self, tx: Transaction, booking: Booking, kind: EventKind, at: datetime
+    ) -> bool:
+        """Apply a platform event to ``booking``'s attempt; whether it went back to the queue."""
+        ...
+
+    async def adopt(
+        self,
+        tx: Transaction,
+        origin: str,
+        task_id: str,
+        provider: ContactCenterKind,
+        at: datetime,
+        organisation_id: int | None = None,
+    ) -> Booking | None:
+        """Match an unknown task to an attempt by its origin; ``None`` when it is not ours."""
+        ...
 
 
 REQUEST_LIMIT = 100
@@ -95,14 +119,30 @@ class IntegrationService:
         version: str = "",
         probes: ProbeRegistry | None = None,
         staff_usage: StaffUsage | None = None,
+        work: TaskWork | None = None,
     ) -> None:
-        """Store the collaborators; ``staff_usage`` adds a team member's usage facts."""
+        """Store the collaborators; ``staff_usage`` adds a team member's usage facts.
+
+        ``work`` applies task events to the request work of new flows (ADR 0121 step 6b);
+        ``when_requeued`` (``set_requeue_handler``) then tells the team about work that went
+        back to the own queue.
+        """
         self._uow = uow
         self._clock = clock
         self._admin = admin
         self._version = version
         self._probes = probes
         self._staff_usage = staff_usage
+        self._work = work
+        self._requeued: Callable[[int], Awaitable[None]] | None = None
+
+    def set_requeue_handler(self, handler: Callable[[int], Awaitable[None]]) -> None:
+        """Call ``handler`` with a booking whose contact-center work went back to the own queue.
+
+        The fallback's ``dispatch_failed`` (ADR 0082); set after the fallback exists, because the
+        fallback itself records through this service.
+        """
+        self._requeued = handler
 
     @property
     def staff_usage(self) -> StaffUsage | None:
@@ -169,6 +209,7 @@ class IntegrationService:
         detail: str = "",
         *,
         event_key: str = "",
+        origin: str = "",
         provider: ContactCenterKind,
         source: str,
         organisation_id: int | None = None,
@@ -185,9 +226,17 @@ class IntegrationService:
         creation when it got the id. An unknown task may be the group check's probe (ADR
         0082): its event is noted for the check and the outcome is ``PROBE``. Like a Webex
         event, a replayed or redelivered WxCC event is ``DUPLICATE`` (ADR 0082 point 5).
+
+        With request work (ADR 0121 step 6b) the event also moves the booking's contact-center
+        attempt, and an unknown task whose ``origin`` names an attempt in doubt or a fenced one
+        is matched to it (adopted, or ended at the platform).
         """
+        recorded: int | None = None
+        requeued = False
         async with self._uow.locked() as tx:
             booking = await tx.get_booking_by_task(task_id, provider)
+            if booking is None and self._work is not None and origin:
+                booking = await self._work.adopt(tx, origin, task_id, provider, at, organisation_id)
             if booking is not None and organisation_id is not None:
                 group = await tx.get_group_by_id(booking.group_id)
                 if group is None or group.organisation_id != organisation_id:
@@ -198,7 +247,13 @@ class IntegrationService:
                 if not await _claim(tx, source, event_key, at):
                     return EventOutcome.DUPLICATE
                 await self._record(tx, booking.id, kind, at, detail)
-                return EventOutcome.RECORDED
+                recorded = booking.id
+                if self._work is not None:
+                    requeued = await self._work.on_task_event(tx, booking, kind, at)
+        if recorded is not None:
+            if requeued and self._requeued is not None:  # outside the lock: it posts
+                await self._requeued(recorded)
+            return EventOutcome.RECORDED
         # Outside the write lock: the registry writes in a transaction of its own.
         if self._probes is not None and await self._probes.note(task_id, kind, at):
             return EventOutcome.PROBE

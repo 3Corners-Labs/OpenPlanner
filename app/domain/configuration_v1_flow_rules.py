@@ -93,24 +93,26 @@ from app.domain.contact_center import (
 from app.domain.contact_center_codec import contact_center_from_json
 from app.domain.default_flows import check_legacy_shape
 from app.domain.errors import DomainError, ErrorCode, missing_object
+from app.domain.flow_readiness import (
+    can_activate,
+    check_publish_ready,
+    readiness,
+)
 from app.domain.routing_codec import routing_from_json
 from app.domain.service_flows import (
     FlowRevision,
     FlowState,
     IntakeMode,
     ServiceFlow,
-    can_activate,
     check_built_choices,
     check_code_kept,
     check_default_paths,
     check_draft_identity,
     check_flow_references,
-    check_publish_ready,
     check_publishable,
     check_revision_editable,
     check_state_change,
     draws_on_pool,
-    readiness,
     skills_required_on_pool,
 )
 from app.domain.skills import Skill, check_skill_save

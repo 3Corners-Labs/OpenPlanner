@@ -14,24 +14,27 @@ from enum import StrEnum
 from app.admin.flow_inputs import offer_name
 from app.admin.forms import Field, FormData
 from app.admin.skill_inputs import SkillChoice, choices, skill_name
+from app.domain import flow_readiness as readiness_rules
 from app.domain import service_flows as flows
 from app.domain.capacity import CapacityPool, PoolMode
+from app.domain.flow_readiness import (
+    FlowActions,
+    ReadinessCheck,
+    ReadinessItem,
+    ReadinessReason,
+    ReadinessState,
+)
 from app.domain.flow_service import FlowChoices, FlowDraftInput, FlowLine, FlowPage
 from app.domain.scheduling import MAX_SLOT_MINUTES, MIN_SLOT_MINUTES, SLOT_STEP_MINUTES
 from app.domain.service_flows import (
     CompletionPolicy,
     DispatchKind,
-    FlowActions,
     FlowRevision,
     FlowState,
     HandlingAction,
     IntakeMode,
     InteractionKind,
-    ReadinessCheck,
-    ReadinessItem,
     ReadinessPolicy,
-    ReadinessReason,
-    ReadinessState,
     ServiceFlow,
 )
 from app.domain.skills import Skill
@@ -147,6 +150,7 @@ REASON_TEXTS: Mapping[ReadinessReason, str] = {
     ReadinessReason.NOT_BUILT_YET: "admin.flows.reason.not_built_yet",
     ReadinessReason.COMPLETION_MISSING: "admin.flows.reason.completion_missing",
     ReadinessReason.COMPLETION_LEGACY_ONLY: "admin.flows.reason.completion_legacy_only",
+    ReadinessReason.COMPLETION_NOT_FOR_DISPATCH: "admin.flows.reason.completion_not_for_dispatch",
     ReadinessReason.ROLLBACK_NOT_SAFE: "admin.flows.reason.rollback_not_safe",
 }
 """One sentence per reason a check fails."""
@@ -336,7 +340,7 @@ def readiness_view(
         if item.ok or reason is None:
             word, sentence, missing = _("admin.flows.ready_word.ok"), "", False
         else:
-            follows = reason in flows.FOLLOWING
+            follows = reason in readiness_rules.FOLLOWING
             word = _(
                 "admin.flows.ready_word.follows" if follows else "admin.flows.ready_word.missing"
             )
@@ -350,7 +354,7 @@ def readiness_view(
         )
         rows.append(ReadinessRow(_(CHECK_TITLES[item.code]), word, missing, sentence, lacking))
     done = sum(1 for item in items if item.ok)
-    state = flows.readiness_state(items)
+    state = readiness_rules.readiness_state(items)
     return ReadinessView(
         _(HEADINGS[draft, state]),
         _("admin.flows.ready_count", done=done, total=len(items)),
@@ -388,7 +392,7 @@ def activation_view(page: FlowPage, locale: RequestLocale) -> ActivationView | N
         return ActivationView(True, _("admin.flows.activate_ready"))
     if page.activation is None:
         return ActivationView(False, _("admin.flows.activate_publish_first"))
-    follows = any(item.reason in flows.FOLLOWING for item in page.activation)
+    follows = any(item.reason in readiness_rules.FOLLOWING for item in page.activation)
     return ActivationView(
         False,
         _("admin.flows.activate_not_built" if follows else "admin.flows.activate_not_ready"),
