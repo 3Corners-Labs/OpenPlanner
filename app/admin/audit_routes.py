@@ -65,7 +65,7 @@ from app.domain.admin_session_service import (
     SESSIONS_ENDED_BY_ADMIN_EVENT,
     SESSIONS_ENDED_BY_SELF_EVENT,
 )
-from app.domain.alerts import QUEUE_WAIT_EVENT, QUEUE_WAIT_OVER
+from app.domain.alerts import QUEUE_WAIT_EVENT, QUEUE_WAIT_OVER, RECOVERY_EVENT
 from app.domain.api_access import CALL_EVENT, TOKEN_EVENT
 from app.domain.audit import (
     SUBJECT_ACTIONS,
@@ -194,6 +194,8 @@ EVENT_LABELS: dict[str, str] = {
     OVERDUE_EVENT: "audit.event.maintenance_overdue",
     # ADR 0061 OV-7: an own queue's longest wait crossed the warning threshold (at the group).
     QUEUE_WAIT_EVENT: "audit.event.queue_wait",
+    # ADR 0121 step 5e: a service has work in recovery, or none any more (at the group).
+    RECOVERY_EVENT: "audit.event.request_recovery",
     # ADR 0065: "Koppeling controleren", by hand or by the worker (at the group).
     CHECK_EVENT: "audit.event.integration_check",
     # ADR 0082: the Service App check from Koppelingen (global).

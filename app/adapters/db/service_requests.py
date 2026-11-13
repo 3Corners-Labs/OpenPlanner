@@ -196,6 +196,16 @@ class ServiceRequestQueries:
         )
         return list(found)
 
+    async def requests_in_recovery(self, group_id: int | None) -> list[ServiceRequest]:
+        """Return the requests in recovery, of service ``group_id`` or of all, in id order."""
+        query = select(ServiceRequestRow).where(
+            ServiceRequestRow.handling == HandlingState.RECOVERY_REQUIRED.value
+        )
+        if group_id is not None:
+            query = query.where(ServiceRequestRow.group_id == group_id)
+        rows = await self._session.scalars(query.order_by(ServiceRequestRow.id))
+        return [request_of(row) for row in rows]
+
     async def unclaimed_pool_bookings(self, ended_before: datetime) -> list[UnclaimedBooking]:
         """Return confirmed pool bookings with a flow, ended before the moment, without request."""
         found = await self._session.execute(
