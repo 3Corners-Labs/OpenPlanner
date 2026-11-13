@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}{{ _("request.leave.title") }} – {{ group.name }}{% endblock %}
+{% block content %}
+<p class="eyebrow">{{ group.name }}</p>
+<h1>{{ _("request.leave.title") }}</h1>
+<p>{{ _("request.leave.question") }}</p>
+<form method="post" action="/r/{{ ref }}/leave">
+  <ul class="actions">
+    <li><button type="submit" class="button button--danger">{{ _("request.leave.confirm") }}</button></li>
+    <li><a href="/r/{{ ref }}">{{ _("wait.leave.back") }}</a></li>
+  </ul>
+</form>
+{% endblock %}

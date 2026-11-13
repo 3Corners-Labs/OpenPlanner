@@ -20,6 +20,18 @@
     <button type="submit" class="button">{{ _("admin.pool_staffing.timezone_button") }}</button>
   </div>
 </form>
+<form class="card" method="post" action="{{ pool_path }}/waiting" novalidate aria-labelledby="waiting-heading">
+  <div class="card__header">
+    <h2 id="waiting-heading">{{ _("admin.pool_staffing.waiting_heading") }}</h2>
+    <p class="card__lead">{{ _("admin.pool_staffing.waiting_lead") }}</p>
+  </div>
+  <div class="form-grid">
+    {{ field(max_waiting_field) }}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="button">{{ _("admin.pool_staffing.waiting_button") }}</button>
+  </div>
+</form>
 {% if timezone %}
 <section class="card" aria-labelledby="shortfall-heading">
   <div class="card__header">

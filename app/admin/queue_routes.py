@@ -19,13 +19,17 @@ region.
     POST /admin/groups/{slug}/queue/{booking_id}/start      queue.work  (claimer; request work)
     POST /admin/groups/{slug}/queue/{booking_id}/complete   queue.work  (claimer; a group admin
                                                                          for work in recovery)
+    POST /admin/groups/{slug}/queue/{booking_id}/check-in   queue.work  (ADR 0121 step 7)
+
+Immediate work without an appointment (ADR 0121 step 7) is listed under the appointments; its
+routes are ``request_queue_routes``.
 
 Request work (ADR 0121 step 5): a booking of a flow without video on a counted pool has no
 meeting; its page offers *Start* and then *Complete* instead of the meeting link.
 """
 
 from collections.abc import Awaitable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import tzinfo
 from typing import Annotated
 
@@ -37,15 +41,19 @@ from app.admin.forms import raise_refusal, redirect_done
 from app.admin.group_routes import group_page
 from app.admin.live import Seen, fragment, key
 from app.admin.pages import Locale, SameOrigin, admin_moment
+from app.admin.request_queue_views import (
+    ImmediateRowView,
+    WorkView,
+    immediate_rows,
+    work_view,
+)
 from app.admin.skill_inputs import skill_name
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.fallback import FallbackService
 from app.domain.own_queue import ParticipantState, VideoState
 from app.domain.queue_service import ClaimedBooking, QueueRow, QueueService, QueueView
-from app.domain.request_work import Work
 from app.domain.routing import GroupRouting
-from app.domain.service_requests import HandlingState, WorkItemState
 from app.i18n import BoundGettext
 from app.i18n.dates import format_clock
 from app.web.errors import ERROR_KEYS
@@ -75,6 +83,9 @@ SHOWN_ON_THE_LIST = frozenset(
         ErrorCode.START_REFUSED,
         ErrorCode.REQUEST_IN_PROGRESS,
         ErrorCode.REQUEST_NOT_STARTED,
+        ErrorCode.NOT_CHECKED_IN,
+        ErrorCode.OUTSIDE_BOOKING_WINDOW,
+        ErrorCode.REQUEST_NOT_FOUND,
     }
 )
 """Refusals that are answered with the list and a message, not an error page."""
@@ -118,6 +129,8 @@ class RowView:
     """The viewer holds every skill the row requires (ADR 0121 point 5)."""
     missing: str = ""
     """The skills the viewer lacks for the row, named for the page; empty when it fits."""
+    can_check_in: bool = False
+    """The appointment waits for its check-in (ADR 0121 step 7, choice I2)."""
 
 
 @dataclass(frozen=True)
@@ -129,18 +142,10 @@ class ListView:
     free_pick: bool
     announcement: str
     key: str
-
-
-@dataclass(frozen=True)
-class WorkView:
-    """Request work on the claimed page: where it stands and what may be done (ADR 0121 step 5)."""
-
-    state: str
-    sentence: str
-    can_start: bool
-    can_complete: bool
-    conflict: bool
-    recovery: bool
+    immediate: list[ImmediateRowView] = field(default_factory=list)
+    """Requests without an appointment, oldest first (ADR 0121 step 7)."""
+    has_next_immediate: bool = False
+    """*Pick up next* has a request without an appointment to take."""
 
 
 @dataclass(frozen=True)
@@ -203,7 +208,7 @@ def _row(
         direct=row.direct,
         overdue=row.overdue,
         mine=row.mine,
-        can_claim=view.free_pick and not row.claimed and row.eligible,
+        can_claim=view.free_pick and not row.claimed and row.eligible and not row.awaiting_check_in,
         can_release=row.claimed
         and ((view.can_release_any and not row.mine) or (row.mine and not row.eligible)),
         video=locale.gettext(video_key) if video_key and not row.without_video else None,
@@ -212,6 +217,7 @@ def _row(
         fallback=row.fallback,
         eligible=row.eligible,
         missing=", ".join(skill_name(skill, locale.code) for skill in row.missing),
+        can_check_in=row.awaiting_check_in and not row.claimed,
     )
 
 
@@ -222,6 +228,7 @@ async def _list_view(
     _ = locale.gettext
     view = await _service(request).view(context.principal, slug)
     rows = [_row(r, view, locale, view.group.tz, view.group.routing) for r in view.rows]
+    immediate = await immediate_rows(request, locale, context, slug, view.free_pick)
     waiting = sum(1 for r in view.rows if r.in_lobby and not r.claimed)
     has_next = view.next_booking_id is not None
     shown = [
@@ -235,6 +242,7 @@ async def _list_view(
             r.can_release,
             r.eligible,
             r.missing,
+            r.can_check_in,
         )
         for r in rows
     ]
@@ -243,7 +251,9 @@ async def _list_view(
         has_next,
         view.free_pick,
         _("admin.queue.announcement", count=len(rows), waiting=waiting),
-        key(shown, has_next),
+        key(shown, has_next, immediate.rows, immediate.has_next),
+        immediate.rows,
+        immediate.has_next,
     )
 
 
@@ -254,11 +264,13 @@ def _list_context(request: Request, slug: str, view: ListView) -> dict[str, obje
         "has_next": view.has_next,
         "free_pick": view.free_pick,
         "announcement": view.announcement,
+        "immediate": view.immediate,
+        "has_next_immediate": view.has_next_immediate,
         **_poll(request, f"{_url(slug)}/live", view.key),
     }
 
 
-async def _list(
+async def render_list(
     request: Request,
     locale: RequestLocale,
     context: AdminContext,
@@ -290,6 +302,23 @@ async def _list(
     )
 
 
+async def or_list[T](
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    slug: str,
+    attempt: Awaitable[T],
+) -> T | HTMLResponse:
+    """Return what ``attempt`` gives, or the queue with the reason it was refused."""
+    try:
+        return await attempt
+    except DomainError as error:
+        raise_refusal(error)
+        if error.code not in SHOWN_ON_THE_LIST:
+            raise
+        return await render_list(request, locale, context, slug, error.code)
+
+
 async def _claimed(
     request: Request,
     locale: RequestLocale,
@@ -304,41 +333,14 @@ async def _claimed(
         raise_refusal(error)
         if error.code not in SHOWN_ON_THE_LIST:
             raise
-        return await _list(request, locale, context, slug, error.code)
+        return await render_list(request, locale, context, slug, error.code)
     return RedirectResponse(f"{_url(slug)}/{claimed.booking_id}", status_code=303)
-
-
-def _work_view(work: Work, locale: RequestLocale, tz: tzinfo) -> WorkView:
-    """Write request work out: a sentence for its state, and the one action it allows."""
-    _ = locale.gettext
-    item = work.item
-    handling = work.request.handling
-    if item is not None and item.state is WorkItemState.ASSIGNED and item.lease_until:
-        moment = format_clock(item.lease_until, tz, locale.code)
-        sentence = _("admin.queue.work.assigned", time=moment)
-    elif item is not None and item.started_at and handling is HandlingState.IN_PROGRESS:
-        sentence = _(
-            "admin.queue.work.in_progress", time=format_clock(item.started_at, tz, locale.code)
-        )
-    elif handling is HandlingState.RECOVERY_REQUIRED:
-        sentence = _("admin.queue.work.recovery")
-    else:
-        sentence = ""
-    started = item is not None and item.started
-    return WorkView(
-        state=handling.value,
-        sentence=sentence,
-        can_start=item is not None and item.state is WorkItemState.ASSIGNED,
-        can_complete=started and item is not None and item.active,
-        conflict=item is not None and item.start_conflict,
-        recovery=handling is HandlingState.RECOVERY_REQUIRED,
-    )
 
 
 def _claimed_view(booking: ClaimedBooking, locale: RequestLocale, tz: tzinfo) -> ClaimedView:
     """Write the claimed booking out; polling stops once nothing can change any more."""
     if booking.work is not None:
-        work = _work_view(booking.work, locale, tz)
+        work = work_view(booking.work.item, booking.work.request.handling, locale, tz)
         return ClaimedView(
             booking=booking,
             time=format_clock(booking.start, tz, locale.code),
@@ -379,14 +381,14 @@ async def _claimed_or_list(
         raise_refusal(error)
         if error.code not in SHOWN_ON_THE_LIST:
             raise
-        return await _list(request, locale, context, slug, error.code)
+        return await render_list(request, locale, context, slug, error.code)
     return _claimed_view(booking, locale, context.group.group.tz)
 
 
 @router.get("/groups/{slug}/queue", response_class=HTMLResponse)
 async def queue(request: Request, locale: Locale, slug: str, context: WorkQueue) -> HTMLResponse:
     """Show the group's own queue."""
-    return await _list(request, locale, context, slug)
+    return await render_list(request, locale, context, slug)
 
 
 @router.get("/groups/{slug}/queue/live", response_class=FragmentResponse)
@@ -508,7 +510,7 @@ async def release(
         raise_refusal(error)
         if error.code not in SHOWN_ON_THE_LIST:
             raise
-        return await _list(request, locale, context, slug, error.code)
+        return await render_list(request, locale, context, slug, error.code)
     return redirect_done(_url(slug), "released")
 
 
@@ -532,5 +534,15 @@ async def complete(
         raise_refusal(error)
         if error.code not in SHOWN_ON_THE_LIST:
             raise
-        return await _list(request, locale, context, slug, error.code)
+        return await render_list(request, locale, context, slug, error.code)
     return redirect_done(_url(slug), "completed")
+
+
+@router.post("/groups/{slug}/queue/{booking_id}/check-in", response_class=HTMLResponse)
+async def check_in(
+    request: Request, locale: Locale, slug: str, booking_id: int, _: SameOrigin, context: WorkQueue
+) -> Response:
+    """Check an appointment in: the participant has arrived (ADR 0121 step 7, choice I1)."""
+    attempt = _service(request).check_in(context.principal, slug, booking_id)
+    done = await or_list(request, locale, context, slug, attempt)
+    return done if isinstance(done, HTMLResponse) else redirect_done(_url(slug), "checked_in")

@@ -1822,10 +1822,14 @@ class Transaction(Protocol):
         """
         ...
 
-    async def requests_holding_data(self) -> list[ServiceRequest]:
+    async def requests_holding_data(
+        self, group_ids: Collection[int] | None = None
+    ) -> list[ServiceRequest]:
         """Return every request without a booking that still holds personal data.
 
         Its request-level record, or an agent's pseudonym on one of its work items.
+        ``group_ids`` limits it to those services (the retention overview of a scope); the
+        worker's rounds read every service.
         """
         ...
 

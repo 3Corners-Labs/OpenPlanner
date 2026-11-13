@@ -212,6 +212,7 @@ FLOWS: dict[str, Flow] = {
     ),
     "## Flow: own queue (ADR 0043)": Flow(ADMIN),
     "## Flow: requests and work items (ADR 0121 step 5)": Flow(ADMIN),
+    "## Flow: immediate intake and check-in (ADR 0121 step 7)": Flow((PUBLIC, DENIED, CHANGE)),
     "## Flow: overview and alerts (ADR 0061)": Flow(ADMIN),
     "## Flow: verify button and simulator (admin)": Flow(ADMIN),
     "## Flow: troubleshooting per booking (ADR 0068)": Flow(ADMIN),

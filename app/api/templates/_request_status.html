@@ -1,0 +1,20 @@
+{#- The status of an immediate request (ADR 0121 step 7): rendered inside request.html and on its
+    own for static/live-region.js, which swaps it in while ``poll`` is set. The sentence carries
+    data-live-status so a change is announced once, in the page's status region. -#}
+<div data-live-fragment{% if poll %} data-poll="{{ poll }}" data-poll-seconds="{{ poll_seconds }}"{% endif %}>
+<div class="notice">
+  <p data-live-status>{{ status_text }}</p>
+  {% if place %}<p>{{ _("queue.position", position=place) }}</p>{% endif %}
+  {% if expected %}<p>{{ _("now.expected", time=expected) }}</p>{% endif %}
+</div>
+{% if refresh %}
+<p><a class="button button--secondary" href="/r/{{ ref }}">{{ _("join.refresh") }}</a></p>
+{% endif %}
+{% if withdrawable %}
+<p><a href="/r/{{ ref }}/leave">{{ _("request.leave.link") }}</a></p>
+{% endif %}
+{% if again %}
+<p><a class="button" href="/g/{{ group.slug }}/direct">{{ _("request.again") }}</a></p>
+<p><a href="/g/{{ group.slug }}">{{ _("direct.schedule_instead") }}</a></p>
+{% endif %}
+</div>

@@ -565,7 +565,9 @@ class AdminService:
         scope = scope_for(principal, Permission.RETENTION_VIEW)
         async with self._uow.read() as tx:
             facts = await tx.list_retention(scope, candidates_before(now))
-        return summarise(facts, now, self._retention_of)
+            shown = {g.group.group.id for g in facts.groups if g.group.group.id is not None}
+            records = await tx.requests_holding_data(shown)
+        return summarise(facts, now, self._retention_of, records)
 
 
 def memberships_of(principal: Principal) -> list[Membership]:

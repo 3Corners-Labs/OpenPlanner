@@ -39,7 +39,13 @@ from app.web.widgets import OVERVIEW_PATH, WIDGETS
 from tests.admin.conftest import SAME_ORIGIN, Site
 from tests.support.admin_site import AuditRow, audit_events, post_form, site_app, site_uow
 from tests.support.downloads import AUDITED_DOWNLOADS, address
-from tests.support.privacy_sweep import MARKERS, QUEUE_ITEM, Fixture, marker_leaks
+from tests.support.privacy_sweep import (
+    IMMEDIATE_ITEM,
+    MARKERS,
+    QUEUE_ITEM,
+    Fixture,
+    marker_leaks,
+)
 from tests.support.routes import all_routes
 
 ADMIN_TEMPLATES = Path("app/admin/templates")
@@ -60,6 +66,9 @@ QUEUE_ITEM_LIVE = QUEUE_ITEM + "/live"
 FIRST_NAME_PAGES = frozenset(
     {
         "/admin/groups/demo/queue/live",
+        # ADR 0121 step 7: an immediate request's page shows its first name, like a queued
+        # booking's, never its last name or email address.
+        IMMEDIATE_ITEM,
         "/admin/groups/demo/agenda",
         "/admin/groups/demo/agenda/live",
         "/admin/groups/demo/agenda/week",
@@ -123,6 +132,7 @@ PATHS: dict[str, str] = {
     "/admin/groups/{slug}/bookings/{booking_id}": DETAIL,
     "/admin/groups/{slug}/queue": "/admin/groups/demo/queue",
     "/admin/groups/{slug}/queue/{booking_id}": QUEUE_ITEM,
+    "/admin/groups/{slug}/queue/requests/{request_id}": IMMEDIATE_ITEM,
     "/admin/groups/{slug}/queue/live": "/admin/groups/demo/queue/live",
     "/admin/groups/{slug}/queue/{booking_id}/live": QUEUE_ITEM_LIVE,
     "/admin/groups/{slug}/closure": "/admin/groups/demo/closure",

@@ -1315,6 +1315,15 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             404, 403, 403, 404, 403, 403, 403
         ),
     },
+    # ADR 0121 step 7: the waiting limit of a pool, capacity.manage like its time zone.
+    "POST /admin/organisations/{org}/capacity/{pool_id}/waiting": {
+        "/admin/organisations/demo/capacity/999999/waiting": statuses(
+            404, 404, 403, 403, 403, 403, 403
+        ),
+        "/admin/organisations/andere/capacity/999999/waiting": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
     "GET /admin/organisations/{org}/capacity/{pool_id}/staffing/{rule_id}": {
         "/admin/organisations/demo/capacity/999999/staffing/999999": statuses(
             404, 404, 403, 403, 403, 403, 403
@@ -1516,6 +1525,39 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     "POST /admin/groups/{slug}/queue/{booking_id}/complete": {
         "/admin/groups/demo/queue/999999/complete": statuses(404, 404, 404, 403, 403, 404, 403),
+    },
+    # ADR 0121 step 7: the check-in and immediate work, queue.work like the claim.
+    "POST /admin/groups/{slug}/queue/{booking_id}/check-in": {
+        "/admin/groups/demo/queue/999999/check-in": statuses(404, 404, 404, 403, 403, 404, 403),
+    },
+    "POST /admin/groups/{slug}/queue/requests/next": {
+        "/admin/groups/demo/queue/requests/next": statuses(404, 404, 404, 403, 403, 404, 403),
+        "/admin/groups/andere-team/queue/requests/next": statuses(
+            404, 403, 403, 404, 403, 403, 403
+        ),
+    },
+    "GET /admin/groups/{slug}/queue/requests/{request_id}": {
+        "/admin/groups/demo/queue/requests/999999": statuses(404, 404, 404, 403, 403, 404, 403),
+    },
+    "POST /admin/groups/{slug}/queue/requests/{request_id}/claim": {
+        "/admin/groups/demo/queue/requests/999999/claim": statuses(
+            404, 404, 404, 403, 403, 404, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/queue/requests/{request_id}/start": {
+        "/admin/groups/demo/queue/requests/999999/start": statuses(
+            404, 404, 404, 403, 403, 404, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/queue/requests/{request_id}/complete": {
+        "/admin/groups/demo/queue/requests/999999/complete": statuses(
+            404, 404, 404, 403, 403, 404, 403
+        ),
+    },
+    "POST /admin/groups/{slug}/queue/requests/{request_id}/release": {
+        "/admin/groups/demo/queue/requests/999999/release": statuses(
+            404, 404, 404, 403, 403, 404, 403
+        ),
     },
     # A group's own contact block (*Messages › Contact*, ADR 0047 step 4): closure.manage,
     # like the rest of its closure page; the old path redirects with the same permission.

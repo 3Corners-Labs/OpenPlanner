@@ -60,6 +60,7 @@ DONE_MESSAGES: dict[str, str] = {
     "diagnostics_off": "admin.done.diagnostics_off",
     "released": "admin.done.released",
     "completed": "admin.done.work_completed",
+    "checked_in": "admin.done.checked_in",
     "saved": "admin.done.saved",
     # ADR 0096: the admin's own overview layout.
     "widget_added": "admin.done.widget_added",
@@ -196,6 +197,8 @@ FIELD_MESSAGES: dict[str, str] = {
     "organisation": "admin.form.error.organisation",
     "default_locale": "admin.form.error.default_locale",
     "timezone": "admin.form.error.timezone",
+    # ADR 0121 step 7: a pool's waiting limit, a whole number from 1 to 1000 or empty.
+    "max_waiting": "admin.form.error.max_waiting",
     "slot_minutes": "admin.form.error.slot_minutes",
     "min_notice_minutes": "admin.form.error.min_notice_minutes",
     "horizon_days": "admin.form.error.horizon_days",

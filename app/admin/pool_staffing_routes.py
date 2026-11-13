@@ -35,7 +35,13 @@ from starlette.responses import HTMLResponse, Response
 from app.admin.authz import AdminContext, RequirePermission, pool_planning_service
 from app.admin.forms import Field, FormData, done_message, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin, org_page
-from app.admin.pool_staffing_views import TIMEZONE_FIELD, shortfall_list, timezone_field
+from app.admin.pool_staffing_views import (
+    MAX_WAITING_FIELD,
+    TIMEZONE_FIELD,
+    max_waiting_field,
+    shortfall_list,
+    timezone_field,
+)
 from app.admin.skill_inputs import raise_unknown, refuse
 from app.admin.skills_capacity_page import POOLS_ANCHOR
 from app.admin.skills_capacity_page import url as skills_capacity_url
@@ -171,6 +177,7 @@ async def _staffing_response(
         {
             "timezone": found.timezone,
             "timezone_field": timezone_field(zone, locale, found.timezone),
+            "max_waiting_field": max_waiting_field(zone, locale, found.max_waiting),
             "week": week(found.rules, locale, rule_version),
             "staffing_base": _staffing_path(org, pool_id),
             "fields": hours_fields(block, locale, POOL_HINTS),
@@ -210,6 +217,25 @@ async def set_timezone(
             request, locale, context, org, pool_id, zone=form, status=422
         )
     return redirect_done(_staffing_path(org, pool_id), "saved" if changed else "unchanged")
+
+
+@router.post("/organisations/{org}/capacity/{pool_id}/waiting", response_class=HTMLResponse)
+async def set_max_waiting(
+    request: Request, locale: Locale, org: str, pool_id: int, _: SameOrigin, context: Manage
+) -> Response:
+    """Set how many people without an appointment may wait for the pool (ADR 0121 step 7)."""
+    form = await read_form(request, locale)
+    limit = form.optional_integer(MAX_WAITING_FIELD)
+    if not form.errors:
+        try:
+            changed = await pool_planning_service(request).set_max_waiting(
+                context.principal, org, pool_id, limit
+            )
+        except DomainError as error:
+            _refused(form, error, locale)
+        else:
+            return redirect_done(_staffing_path(org, pool_id), "saved" if changed else "unchanged")
+    return await _staffing_response(request, locale, context, org, pool_id, zone=form, status=422)
 
 
 @router.post("/organisations/{org}/capacity/{pool_id}/staffing", response_class=HTMLResponse)

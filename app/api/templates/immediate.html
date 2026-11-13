@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ _("now.title") }} – {{ group.name }}{% endblock %}
+{% block content %}
+{% include "_error_summary.html" %}
+<p class="eyebrow">{{ group.name }}</p>
+<h1>{{ _("now.title") }}</h1>
+{% if outcome == "accepted" %}
+<p>{{ _("now.intro", group_name=group.name) }}</p>
+{#- The line now (ADR 0121 step 7): how many wait, and the forecast for the next one. -#}
+{% if waiting %}<p>{{ _("queue.waiting", count=waiting) }}</p>{% else %}<p>{{ _("queue.nobody") }}</p>{% endif %}
+{% if expected %}<p>{{ _("now.expected", time=expected) }}</p>{% endif %}
+<form class="card" method="post" action="/g/{{ group.slug }}/direct" novalidate>
+  {% if flow %}<input type="hidden" name="flow" value="{{ flow }}">{% endif %}
+  <input type="hidden" name="intake_key" value="{{ intake_key }}">
+  {% include "_contact_fields.html" %}
+  <button type="submit" class="button button--large">{{ _("now.submit") }}</button>
+</form>
+{% elif outcome == "full" %}
+<div class="notice"><p>{{ _("error.on_demand_full") }}</p></div>
+{% else %}
+<div class="notice"><p>{{ _("error.on_demand_unavailable") }}</p></div>
+{% endif %}
+<p><a href="/g/{{ group.slug }}">{{ _("direct.schedule_instead") }}</a></p>
+{% endblock %}

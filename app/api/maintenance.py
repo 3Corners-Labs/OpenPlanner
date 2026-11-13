@@ -72,6 +72,9 @@ BOOKING_ROUTES = frozenset(
         "/b/m/{public_ref}/test",
         "/b/m/{public_ref}/test/go",
         "/b/m/{public_ref}/wait/leave",
+        # ADR 0121 step 7: withdrawing an immediate request changes it, like stopping a
+        # direct call.
+        "/r/{ref}/leave",
     }
 )
 """Participant routes under a management link that close (both the form and the write). The trial
@@ -109,6 +112,8 @@ OPEN_ROUTES = frozenset(
         "/b/m/{public_ref}/join/go",
         "/b/m/{public_ref}/wait",
         "/b/m/{public_ref}/wait/status",
+        "/r/{ref}",
+        "/r/{ref}/status",
         "/healthz",
         "/readyz",
         "/o/{slug}/theme.css",
