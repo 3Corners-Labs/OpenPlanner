@@ -194,7 +194,8 @@ async def test_the_queue_widget_counts_the_waiting_participant_and_the_agent_sig
     assert 'aria-label="Wachtrij van Demo: videogesprek"' in text
     # Five columns do not fit a widget at 320 px nor beside another at 1280 px (found by the
     # browser proof of gate item G06): the table scrolls in its own region, reachable by keyboard.
-    assert '<div class="table-scroll widget-scroll" role="region" aria-label="Wachtrij in mijn diensten" tabindex="0">' in text
+    region = 'role="region" aria-label="Wachtrij in mijn diensten" tabindex="0"'
+    assert f'<div class="table-scroll widget-scroll" {region}>' in text
     assert '<td class="widget-table__number">1</td>' in text  # waiting, and the agent signed in
     assert "3 min" in text
     assert '<th scope="col" class="widget-table__number">Niet opgepakt</th>' in text
