@@ -42,6 +42,10 @@ OLD_BEHAVIOURS = (
 STEP_8 = "8"
 """This step's own row: it is the proof, not an item of the checklist."""
 TEST_REFERENCE = re.compile(r"`(tests/[\w/]+\.py)::(\w+)`")
+ACCEPTANCE = [f"A{n:02d}" for n in range(1, 37)]
+"""The rows of the acceptance matrix of ``docs/service-flows-handover.md`` (gate item G09)."""
+GATE_OPENER = re.compile(r"open_gate\(|ROLLBACK_SAFE\", True")
+"""A call that opens the rollback gate in a test: ``open_gate(...)`` or a monkeypatch to True."""
 ITEM = re.compile(r"\bG\d{2}\b")
 
 
@@ -61,7 +65,7 @@ def _table_rows(text: str) -> list[list[str]]:
         if not line.startswith("| ") or set(line) <= {"|", "-", " "}:
             continue
         cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        if cells[0] not in {"Change", "Claim", "Item", "Step"}:
+        if cells[0] not in {"Change", "Claim", "Item", "Row", "Step"}:
             rows.append(cells)
     return rows
 
@@ -150,3 +154,27 @@ def test_the_gate_stays_shut_while_a_blocking_item_is_open() -> None:
 
     if open_blocking:
         assert service_flows.ROLLBACK_SAFE is False, open_blocking
+
+
+def _acceptance() -> dict[str, list[str]]:
+    """Return the cells of the acceptance section's rows by row."""
+    text = MATRIX.read_text(encoding="utf-8").split("## 4. Acceptance matrix", 1)[1]
+    return {cells[0]: cells for cells in _table_rows(text) if cells[0].startswith("A")}
+
+
+def test_every_acceptance_row_names_its_test_and_how_it_meets_the_gate() -> None:
+    rows = _acceptance()
+
+    assert list(rows) == ACCEPTANCE
+    for name, (_row, _scenario, gate, proof) in rows.items():
+        assert gate in {"open", "both", "n/a"}, name
+        assert TEST_REFERENCE.search(proof), name
+
+
+def test_a_row_that_runs_with_the_gate_open_names_a_module_that_opens_it() -> None:
+    for name, (_row, _scenario, gate, proof) in _acceptance().items():
+        if gate not in {"open", "both"}:
+            continue
+        paths = {path for path, _test in TEST_REFERENCE.findall(proof)}
+        opening = [p for p in paths if GATE_OPENER.search((ROOT / p).read_text(encoding="utf-8"))]
+        assert opening, f"{name}: {sorted(paths)}"

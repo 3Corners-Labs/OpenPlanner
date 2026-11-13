@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.adapters.db.engine import BEGIN_MODE_OPTION, create_engine
 from app.adapters.db.models import BookingRow, JobRow, SlotRow
 from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.booking import BookingStatus
+from app.domain.booking import BookingStatus, Claim
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobType
 from app.domain.privacy import PII_FIELDS
@@ -196,6 +196,48 @@ async def test_concurrent_bookings_on_separate_connections(
     assert len(successes) == 1
     assert [getattr(f, "code", f) for f in failures] == [ErrorCode.SLOT_FULL]
     assert await count(engine, select(func.count()).select_from(BookingRow)) == 1
+
+
+async def test_two_claims_racing_on_separate_connections_give_one_claim(
+    engine: AsyncEngine, database_url: str, service: BookingService
+) -> None:
+    """A10: two agents claim one booking at once; the conditional update lets exactly one win.
+
+    Both claims queue behind a third connection that holds the write lock, as above, so they
+    really contend; the loser's update matches no row and the claim it reads back is the winner's.
+    """
+    await seed_group(engine)
+    booking_id = (await book(service)).booking.id or 0
+    engines = [
+        create_engine(database_url, busy_timeout_ms=PATIENT_BUSY_TIMEOUT_MS),
+        create_engine(database_url, busy_timeout_ms=PATIENT_BUSY_TIMEOUT_MS),
+    ]
+    blocker = create_engine(database_url)
+
+    async def claim(engine_: AsyncEngine, who: str) -> bool:
+        async with SqlUnitOfWork(engine_).locked() as tx:
+            return await tx.claim_booking(booking_id, Claim(NOW, who))
+
+    try:
+        async with hold_write_lock(blocker):
+            pending = [
+                asyncio.ensure_future(claim(e, who))
+                for e, who in zip(engines, ("agent-a", "agent-b"), strict=True)
+            ]
+            await asyncio.sleep(0.1)  # both are now queued behind the blocker
+            assert not any(task.done() for task in pending)
+        results = await asyncio.gather(*pending)
+    finally:
+        for e in (*engines, blocker):
+            await e.dispose()
+
+    assert sorted(results) == [False, True]
+    winner = ("agent-a", "agent-b")[results.index(True)]
+    async with SqlUnitOfWork(engine).read() as tx:
+        stored = await tx.get_booking(booking_id)
+    assert stored is not None
+    assert stored.claim is not None
+    assert stored.claim.claimed_by == winner
 
 
 async def test_lock_timeout_becomes_database_busy(

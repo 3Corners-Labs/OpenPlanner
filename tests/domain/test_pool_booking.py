@@ -533,3 +533,32 @@ async def test_the_pool_reservation_refuses_a_naive_start_and_an_archived_servic
         with pytest.raises(DomainError) as error:
             await pools.reserve(tx, archived, target, AT_0900)
     assert _code(error) is ErrorCode.GROUP_NOT_FOUND
+
+
+async def test_a25_cancelling_or_moving_releases_the_unit_once_and_plans_no_meeting() -> None:
+    """A25: a move frees the old unit, a cancel the new one, each once.
+
+    A flow without video plans no meeting or task, so none is left behind; the stale-job rule of
+    a meeting and a task is ``tests/jobs/test_call_jobs.py::test_stale_dispatch_does_nothing``.
+    """
+    uow, flow = await _world([block(units=1)])
+    service = _service(uow)
+    first = await _book(service, AT_0900)
+    await service.confirm(first.management_token)
+
+    moved = await service.reschedule(first.management_token, AT_0940)
+    await service.cancel(moved.management_token)
+    with pytest.raises(DomainError) as again:  # a second cancel releases nothing again
+        await service.cancel(moved.management_token)
+
+    assert _code(again) is ErrorCode.BOOKING_NOT_ACTIVE
+    async with uow.read() as tx:
+        held = await tx.get_pool_commitments(flow.pool_id, AT_0900, AT_0940 + timedelta(hours=1))
+    assert held == []
+
+    starts = await _starts(service)
+    assert (AT_0900, 1) in starts
+    assert (AT_0940, 1) in starts
+    late = {JobType.CREATE_VIDEO_ROOM, JobType.DISPATCH_CONTACT_CENTER_TASK}
+    pending = [j for jobs in uow.state.jobs.values() for j in jobs if j.type in late]
+    assert pending == []
