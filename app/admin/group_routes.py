@@ -129,6 +129,7 @@ from app.i18n.dates import (
 from app.web.authz_labels import PERMISSION_LABELS
 from app.web.locale import RequestLocale
 from app.web.navigation import object_page
+from app.web.security_policy import PageKind
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 log = structlog.get_logger()
@@ -246,11 +247,11 @@ def group_page(
     extra: dict[str, object],
     status: int = 200,
     *,
-    scripts: bool = False,
+    kind: PageKind = PageKind.DOCUMENT,
 ) -> HTMLResponse:
     """Render a group page with header, the tabs the matrix allows, and any confirmation.
 
-    ``scripts=True`` allows the page's own script (the queue's live region, ADR 0072).
+    ``kind=PageKind.SCRIPTED`` allows the page's own script (the queue's live region, ADR 0072).
     """
     summary = context.group
     tabs, subtabs = object_tabs(
@@ -272,7 +273,7 @@ def group_page(
             "done": done_message(request, locale.gettext),
             **extra,
         },
-        scripts=scripts,
+        kind=kind,
     )
     response.status_code = status
     return response

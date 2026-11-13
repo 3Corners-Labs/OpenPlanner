@@ -2,7 +2,7 @@
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from app.web.templates import DEFAULT_PERMISSIONS, permissions_policy
+from app.web.security_policy import DEFAULT_PERMISSIONS_POLICY
 
 SECURITY_HEADERS: dict[bytes, bytes] = {
     b"content-security-policy": b"default-src 'none'; base-uri 'none'; frame-ancestors 'none'",
@@ -14,7 +14,7 @@ SECURITY_HEADERS: dict[bytes, bytes] = {
     # receive no referrer, so management tokens in paths never leak.
     b"referrer-policy": b"same-origin",
     # Pages need no powerful browser features; the video call itself runs in Webex.
-    b"permissions-policy": permissions_policy(DEFAULT_PERMISSIONS).encode(),
+    b"permissions-policy": DEFAULT_PERMISSIONS_POLICY.encode(),
     # Process isolation: no cross-origin windows or resources can attach to our pages. The
     # embeddable widget (later) serves its script with its own Cross-Origin-Resource-Policy.
     b"cross-origin-opener-policy": b"same-origin",

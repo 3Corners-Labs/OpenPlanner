@@ -1,9 +1,9 @@
 """The participant's call page (ADR 0123): ``GET /b/m/{ref}/call``, the third kind of page.
 
-This route is the one place that serves ``PageKind.CALL``: the response policy that lets the
-page reach the call's hosts and use camera, microphone and screen sharing (the policies are
-named in ``app.web.templates``). It exists only while ``embedded_call_enabled``
-is on; while it is off the route answers as an address that does not exist, so nothing about the
+This route is the one place that serves the call page's response policy, which lets the page
+reach the call's hosts and use camera, microphone and screen sharing (``app.web.security_policy``,
+applied by ``participant_call_page``). It exists only while ``embedded_call_enabled`` is on;
+while it is off the route answers as an address that does not exist, so nothing about the
 feature shows on an installation that does not use it.
 
 In this step the page is the shell: the appointment and one line saying the call in this page is
@@ -18,12 +18,11 @@ from starlette.responses import HTMLResponse
 
 from app.api.labels import slot_label
 from app.api.link_session import authorise
-from app.api.participant import participant_page
+from app.api.participant import participant_call_page
 from app.domain.services import BookingService
 from app.web.locale import resolve_locale
 from app.web.organisation_settings import follow
 from app.web.protection import limiter, read_limit
-from app.web.templates import PageKind
 
 router = APIRouter(include_in_schema=False)
 
@@ -49,4 +48,4 @@ async def call_page(request: Request, public_ref: str) -> HTMLResponse:
         "ref": public_ref,
         "slot_label": slot_label(booking.start, booking.end, group, locale),
     }
-    return await participant_page(request, locale, "call.html", group, context, kind=PageKind.CALL)
+    return await participant_call_page(request, locale, "call.html", group, context)

@@ -21,9 +21,9 @@ const APP = new URL(process.env.BASE_URL ?? 'http://127.0.0.1:8000').origin;
  * uses `mayContact(origin, AFTER_JOIN_CLICK)` in its own test and nowhere else.
  */
 const CALL_HOST_PATTERNS = [
-  /^(https|wss):\/\/([^/]+\.)?wbx2\.com$/,
-  /^(https|wss):\/\/([^/]+\.)?webex\.com$/,
-  /^https:\/\/([^/]+\.)?ciscospark\.com$/,
+  /^(https|wss):\/\/[^/]+\.wbx2\.com$/,
+  /^(https|wss):\/\/[^/]+\.webex\.com$/,
+  /^https:\/\/[^/]+\.ciscospark\.com$/,
 ];
 type Phase = 'every-page' | 'call-page-before-click' | 'call-page-after-click';
 const AFTER_JOIN_CLICK: Phase = 'call-page-after-click';
@@ -40,6 +40,11 @@ test('the call hosts are allowed after the join click only', () => {
   expect(mayContact(host, 'call-page-before-click')).toBe(false);
   expect(mayContact(host, 'every-page')).toBe(false);
   expect(mayContact('https://evil.example', 'call-page-after-click')).toBe(false);
+  // CALL_CSP names *.host: subdomains only, over the listed schemes, never the bare name.
+  expect(mayContact('https://wbx2.com', 'call-page-after-click')).toBe(false);
+  expect(mayContact('https://ciscospark.com', 'call-page-after-click')).toBe(false);
+  expect(mayContact('wss://x.webex.com', 'call-page-after-click')).toBe(true);
+  expect(mayContact('wss://x.ciscospark.com', 'call-page-after-click')).toBe(false);
   expect(mayContact(APP, 'every-page')).toBe(true);
 });
 

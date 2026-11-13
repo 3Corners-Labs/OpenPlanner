@@ -8,19 +8,17 @@ import pytest
 from app.adapters.db.uow import SqlUnitOfWork
 from app.api.security_headers import SECURITY_HEADERS
 from app.config import Settings
-from app.web.templates import (
+from app.web.security_policy import (
     CALL_CSP,
-    CALL_PERMISSIONS,
+    CALL_POLICY,
     HTML_CSP,
     SCRIPT_CSP,
-    permissions_policy,
 )
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW
 from tests.support.participant import booked, open_link
 
-CALL_POLICY = permissions_policy(CALL_PERMISSIONS)
 DEFAULT_POLICY = SECURITY_HEADERS[b"permissions-policy"].decode()
 SUPPLIER = ("webex", "cisco")
 
@@ -40,9 +38,9 @@ async def test_the_call_page_carries_its_own_policy_and_nothing_else_changes(
 
     assert page.status_code == 200
     assert page.headers["content-security-policy"] == CALL_CSP
-    assert page.headers["permissions-policy"] == CALL_POLICY
-    assert "camera=(self)" in CALL_POLICY
-    assert "geolocation=()" in CALL_POLICY
+    assert page.headers["permissions-policy"] == CALL_POLICY.permissions
+    assert "camera=(self)" in CALL_POLICY.permissions
+    assert "geolocation=()" in CALL_POLICY.permissions
     # The headers the middleware adds are the ones every response has.
     for name, value in SECURITY_HEADERS.items():
         if name not in (b"content-security-policy", b"permissions-policy"):

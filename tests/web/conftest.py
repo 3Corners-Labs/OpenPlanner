@@ -19,7 +19,7 @@ __all__ = ["admin_db", "render_source", "site"]
 
 RenderSource = Callable[..., HTMLResponse]
 """``(source, context, frame=None, **options)``: render a template written in the test; the
-options (``scripts``, ``kind``) go to ``render``."""
+options (``kind``) go to ``render``."""
 
 
 @pytest.fixture
@@ -35,7 +35,7 @@ def render_source(tmp_path: Path) -> RenderSource:
         source: str,
         context: Mapping[str, object],
         frame: Mapping[str, object] | None = None,
-        **options: Any,  # noqa: ANN401 - ``scripts`` or ``kind`` of ``render``, passed through
+        **options: Any,  # noqa: ANN401 - ``kind`` of ``render``, passed through
     ) -> HTMLResponse:
         (tmp_path / "page.html").write_text(source)
         templates = create_templates([tmp_path])

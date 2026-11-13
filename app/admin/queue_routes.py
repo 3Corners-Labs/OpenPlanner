@@ -60,6 +60,7 @@ from app.web.errors import ERROR_KEYS
 from app.web.locale import RequestLocale
 from app.web.organisation_settings import settings_for
 from app.web.routing_labels import routing_summary
+from app.web.security_policy import PageKind
 from app.web.templates import FragmentResponse
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -298,7 +299,7 @@ async def render_list(
             ),
         },
         409 if refusal else 200,
-        scripts=True,
+        kind=PageKind.SCRIPTED,
     )
 
 
@@ -467,7 +468,7 @@ async def claimed(
         context,
         "admin/queue_claimed.html",
         _claimed_context(request, slug, view),
-        scripts=True,
+        kind=PageKind.SCRIPTED,
     )
 
 

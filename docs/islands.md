@@ -15,7 +15,7 @@ second, simpler net. Neither can prove that a script is safe, only catch the usu
 ## The rules every island follows
 
 - Served from our own origin with `script-src 'self'` (`SCRIPT_CSP`, set when a page renders with
-  `scripts=True`); no inline script, no `eval`, no external origin.
+  `kind=PageKind.SCRIPTED`); no inline script, no `eval`, no external origin.
 - All text in the DOM is the server's own or comes from a code; a script sets it with
   `textContent` and never builds markup from a string. A label from outside the page (a group
   name) is never trusted.
@@ -46,11 +46,12 @@ colours with reduced motion and axe, and no content-security-policy or script er
 
 Besides the page without scripts and the island page there is one more kind (ADR 0123 point 2):
 the **call page**, `GET /b/m/{ref}/call`, the only page that may load a third-party script, the
-vendored SDK below. It is not an island: it is not an enhancement of a complete page. It is
-selected by `PageKind.CALL` in `render()`, which gives the response `CALL_CSP` (`SCRIPT_CSP` plus
-the call's five hosts in `connect-src`, `media-src` and `worker-src` named, no `unsafe-` token) and a
-`Permissions-Policy` with camera, microphone and screen capture for our own origin. No other route
-can pass that kind (`tests/web/test_page_kinds.py`), the route does not exist while
+vendored SDK below. It is not an island: it is not an enhancement of a complete page. It is not a
+`PageKind` a route can choose either: only `render_call_page()` applies its policy (`app/web/security_policy.py`),
+`CALL_CSP` (`SCRIPT_CSP` plus the call's five hosts in `connect-src`, `media-src` and `worker-src`
+named, no `unsafe-` token) and a `Permissions-Policy` with camera, microphone and screen capture for
+our own origin. A syntax-tree test names the modules that may use it
+(`tests/web/test_page_kinds.py`), the route does not exist while
 `embedded_call_enabled` is off, and the page contacts nobody before the participant's click. The
 call page's own scripts follow the accessibility rules above and the ban on markup sinks. In this
 step the page is a shell without any script.

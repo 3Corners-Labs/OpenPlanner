@@ -30,6 +30,7 @@ from app.domain.wallboard import STALE_AFTER_POLLS, Wallboard
 from app.domain.wallboard_service import WallboardService
 from app.i18n.dates import format_day
 from app.web.organisation_settings import settings_for
+from app.web.security_policy import PageKind
 from app.web.templates import FragmentResponse, render
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -183,7 +184,7 @@ async def wallboard_page(
             "admin/wallboard_kiosk.html",
             locale,
             {**ctx, "exit": f"{base}?view={WALLBOARD}"},
-            scripts=True,
+            kind=PageKind.SCRIPTED,
         )
     framed: dict[str, object] = {
         **ctx,
@@ -195,7 +196,7 @@ async def wallboard_page(
     }
     if group is not None:
         return group_page(
-            request, locale, group, "admin/usage_wallboard.html", framed, scripts=True
+            request, locale, group, "admin/usage_wallboard.html", framed, kind=PageKind.SCRIPTED
         )
     header = organisation_header(
         request, locale, principal, covered[0].organisation_name, organisation or ""
@@ -206,7 +207,7 @@ async def wallboard_page(
         "admin/usage_wallboard.html",
         principal,
         {"org_header": header, "usage_org": organisation or "", **framed},
-        scripts=True,
+        kind=PageKind.SCRIPTED,
     )
 
 

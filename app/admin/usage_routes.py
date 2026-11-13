@@ -53,6 +53,7 @@ from app.domain.report_digest_service import DigestAdmin
 from app.domain.usage_export_service import TIDY, UsageExportService, UsageFile
 from app.domain.usage_report import SPLITS, RangedReport
 from app.domain.usage_report_service import UsageReportService, UsageScreen
+from app.web.security_policy import PageKind
 from app.web.usage_charts import capacity_charts, channels_charts, queue_charts, volume_charts
 from app.web.usage_labels import duration_text, label
 from app.web.usage_tiles import capacity_tiles, volume_tiles
@@ -327,7 +328,7 @@ async def _organisation_page(
             **digest,
             **(extra or {}),
         },
-        scripts=True,
+        kind=PageKind.SCRIPTED,
     )
 
 
@@ -355,7 +356,7 @@ async def group_usage(
     template, _result, ctx = await _report(
         request, locale, context.principal, base, group=slug, wallboard_on=wallboard_on
     )
-    return group_page(request, locale, context, template, ctx, scripts=True)
+    return group_page(request, locale, context, template, ctx, kind=PageKind.SCRIPTED)
 
 
 @dataclass(frozen=True)

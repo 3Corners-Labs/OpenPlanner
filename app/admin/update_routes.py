@@ -54,6 +54,7 @@ from app.i18n.dates import format_time_of_day, weekday_abbreviations
 from app.web.errors import form_errors, status_for
 from app.web.locale import RequestLocale, resolve_locale
 from app.web.organisation_settings import settings_for
+from app.web.security_policy import PageKind
 from app.web.templates import render
 from app.web.update_labels import (
     ACTION_LABELS,
@@ -425,7 +426,7 @@ async def _overview(
                 else None
             ),
         },
-        scripts=live is not None,
+        kind=PageKind.SCRIPTED if live is not None else PageKind.DOCUMENT,
     )
     if error is not None:
         response.status_code = status_for(error)

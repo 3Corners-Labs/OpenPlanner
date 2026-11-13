@@ -24,6 +24,8 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+from scripts import vendor
+
 ROOT = Path(__file__).resolve().parent.parent
 
 # Lines whose version Renovate reads natively (github-actions and docker managers), and step
@@ -105,10 +107,6 @@ def files(root: Path) -> list[Path]:
     )
 
 
-VENDOR_MANIFESTS = "app/web/static/vendor/*/manifest.json"
-"""The manifests of vendored front-end files (ADR 0118 point 6, ADR 0123 point 3)."""
-
-
 def _python_groups(pattern: str) -> str:
     """Return Renovate's regex with Python's spelling of a named group (``(?P<name>``)."""
     return re.sub(r"\(\?<(?![=!])", "(?P<", pattern)
@@ -119,24 +117,23 @@ def check_vendor(root: Path) -> Iterator[Violation]:
 
     A manifest is tracked when a custom manager of ``renovate.json`` matches its path, names
     the manifest's package as ``depNameTemplate`` and its ``matchStrings`` capture exactly the
-    manifest's ``version``. JSON has no comment line for a ``# renovate:`` annotation, so this
-    is the form of rule 2 for these files.
+    manifest's top-level ``version`` (not the ``version`` inside its ``checksum``). JSON has no
+    comment line for a ``# renovate:`` annotation, so this is the form of rule 2 for these files.
     """
     config = json.loads((root / "renovate.json").read_text(encoding="utf-8"))
     managers = [m for m in config.get("customManagers", []) if "depNameTemplate" in m]
-    for path in sorted(root.glob(VENDOR_MANIFESTS)):
-        relative = path.relative_to(root).as_posix()
-        text = path.read_text(encoding="utf-8")
-        manifest = json.loads(text)
+    for manifest in vendor.manifests(root):
+        relative = manifest.path.relative_to(root).as_posix()
+        text = manifest.path.read_text(encoding="utf-8")
         tracked = any(
-            manifest.get("name") == manager["depNameTemplate"]
+            manifest.name == manager["depNameTemplate"]
             and any(
                 re.search(pattern.strip("/"), relative)
                 for pattern in manager["managerFilePatterns"]
             )
             and any(
                 (found := re.search(_python_groups(match), text))
-                and found["currentValue"] == manifest["version"]
+                and found["currentValue"] == manifest.version
                 for match in manager["matchStrings"]
             )
             for manager in managers

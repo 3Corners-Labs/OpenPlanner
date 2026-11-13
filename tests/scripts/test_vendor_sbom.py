@@ -1,64 +1,84 @@
+import hashlib
 import json
 from pathlib import Path
 
-from scripts.vendor_sbom import ROOT, add_vendored, main
+import pytest
+
+from scripts.vendor import MANIFEST, VENDOR_DIRECTORY, load, manifests
+from scripts.vendor_sbom import add_vendored, main
+
+DATA = b"console.log(1);"
 
 
-def _root(tmp_path: Path, *, placed: bool, sha: str = "", sha_of: str = "") -> Path:
-    folder = tmp_path / "app/web/static/vendor/webex"
+def _root(tmp_path: Path, *, placed: bool, checksum_of: str | None = "3.13.0") -> Path:
+    folder = tmp_path / VENDOR_DIRECTORY / "webex"
     folder.mkdir(parents=True)
-    manifest = {
+    fields: dict[str, object] = {
         "name": "webex",
         "version": "3.13.0",
+        "source": "npm package webex",
         "file": "meetings.min.js",
-        "sha256": sha,
-        "sha256_of": sha_of,
     }
-    (folder / "manifest.json").write_text(json.dumps(manifest))
+    if checksum_of is not None:
+        fields["checksum"] = {"version": checksum_of, "sha256": hashlib.sha256(DATA).hexdigest()}
+    (folder / MANIFEST).write_text(json.dumps(fields))
     if placed:
-        (folder / "meetings.min.js").write_text("x")
+        (folder / "meetings.min.js").write_bytes(DATA)
     return tmp_path
 
 
-def test_the_manifest_is_listed_as_a_component_with_version_and_source(tmp_path: Path) -> None:
-    sbom = add_vendored({"components": [{"bom-ref": "other"}]}, _root(tmp_path, placed=False))
+def test_a_placed_file_with_a_checksum_of_this_version_is_listed(tmp_path: Path) -> None:
+    sbom: dict[str, list[dict[str, object]]] = {"components": [{"bom-ref": "other"}]}
 
-    entry = sbom["components"][1]  # type: ignore[index]
+    skipped = add_vendored(sbom, _root(tmp_path, placed=True))
+
+    entry = sbom["components"][1]
+    assert skipped == []
     assert entry["purl"] == "pkg:npm/webex@3.13.0"
     assert entry["version"] == "3.13.0"
-    assert entry["externalReferences"][0]["url"].endswith("/webex/-/webex-3.13.0.tgz")
-    assert {"name": "openplanner:placed", "value": "false"} in entry["properties"]
-    assert "hashes" not in entry
+    assert entry["hashes"] == [{"alg": "SHA-256", "content": hashlib.sha256(DATA).hexdigest()}]
+    assert entry["externalReferences"][0]["url"].endswith("/webex/-/webex-3.13.0.tgz")  # type: ignore[index]
 
 
-def test_a_placed_file_with_a_checksum_of_this_version_carries_it(tmp_path: Path) -> None:
-    sbom = add_vendored({}, _root(tmp_path, placed=True, sha="ab" * 32, sha_of="3.13.0"))
+def test_an_absent_file_adds_nothing(tmp_path: Path) -> None:
+    sbom: dict[str, list[dict[str, object]]] = {"components": []}
 
-    entry = sbom["components"][0]  # type: ignore[index]
-    assert entry["hashes"] == [{"alg": "SHA-256", "content": "ab" * 32}]
-    assert {"name": "openplanner:placed", "value": "true"} in entry["properties"]
+    assert add_vendored(sbom, _root(tmp_path, placed=False, checksum_of=None)) == ["webex"]
+    assert sbom["components"] == []
 
 
-def test_a_checksum_of_another_version_is_not_listed(tmp_path: Path) -> None:
-    sbom = add_vendored({}, _root(tmp_path, placed=True, sha="ab" * 32, sha_of="3.12.0"))
+def test_a_checksum_of_another_version_adds_nothing(tmp_path: Path) -> None:
+    sbom: dict[str, list[dict[str, object]]] = {}
 
-    assert "hashes" not in sbom["components"][0]  # type: ignore[index]
+    assert add_vendored(sbom, _root(tmp_path, placed=True, checksum_of="3.12.0")) == ["webex"]
+    assert sbom["components"] == []
 
 
 def test_running_twice_adds_it_once(tmp_path: Path) -> None:
-    root = _root(tmp_path, placed=False)
-    sbom = add_vendored(add_vendored({}, root), root)
+    root = _root(tmp_path, placed=True)
+    sbom: dict[str, list[dict[str, object]]] = {}
+    add_vendored(sbom, root)
+    add_vendored(sbom, root)
 
-    assert len(sbom["components"]) == 1  # type: ignore[arg-type]
+    assert len(sbom["components"]) == 1
 
 
-def test_the_command_rewrites_the_file_of_the_repository_sbom_shape(tmp_path: Path) -> None:
+def test_the_command_says_so_when_nothing_is_listed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     path = tmp_path / "sbom.cdx.json"
     path.write_text(json.dumps({"bomFormat": "CycloneDX", "components": []}))
 
-    assert main(["vendor_sbom.py", str(path)]) == 0
-    listed = json.loads(path.read_text())["components"]
+    assert main(["vendor_sbom", str(path)]) == 0
 
-    assert [entry["name"] for entry in listed] == ["webex"]
-    assert (ROOT / "app/web/static/vendor/webex/manifest.json").is_file()
-    assert main(["vendor_sbom.py"]) == 2
+    # The repository's own manifest: its file is not placed, so the SBOM stays as syft wrote it.
+    assert json.loads(path.read_text())["components"] == []
+    assert "vendored webex: file not placed" in capsys.readouterr().out
+    assert main(["vendor_sbom"]) == 2
+
+
+def test_the_reader_reads_the_repository_manifest() -> None:
+    found = manifests()
+
+    assert [m.name for m in found] == ["webex"]
+    assert load(found[0].path) == found[0]

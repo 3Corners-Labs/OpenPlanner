@@ -44,6 +44,7 @@ from app.i18n import BoundGettext
 from app.i18n.dates import format_clock, format_day, format_day_short
 from app.web.locale import RequestLocale
 from app.web.organisation_settings import settings_for
+from app.web.security_policy import PageKind
 from app.web.templates import FragmentResponse
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -236,7 +237,9 @@ async def agenda(
 ) -> HTMLResponse:
     """Show the group's slots of one day with agents, bookings and their call status."""
     page, _shown = await _day(request, locale, context, slug, day, status)
-    return group_page(request, locale, context, "admin/group_agenda.html", page, scripts=True)
+    return group_page(
+        request, locale, context, "admin/group_agenda.html", page, kind=PageKind.SCRIPTED
+    )
 
 
 @router.get("/groups/{slug}/agenda/live", response_class=FragmentResponse)

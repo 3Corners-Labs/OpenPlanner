@@ -23,6 +23,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.wallboard_link import Refusal, WallboardLink
 from app.web.cookies import CookieSpec, cookie_for, set_cookie
 from app.web.protection import limiter, unknown_link_limit
+from app.web.security_policy import PageKind
 from app.web.templates import render
 
 router = APIRouter(prefix="/display", include_in_schema=False)
@@ -133,7 +134,7 @@ async def board(request: Request, locale: Locale) -> Response:
         "admin/wallboard_kiosk.html",
         locale,
         {**await _context(request, locale, link), "exit": None},
-        scripts=True,
+        kind=PageKind.SCRIPTED,
     )
     response.headers["referrer-policy"] = "no-referrer"
     return response
