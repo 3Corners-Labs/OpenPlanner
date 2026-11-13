@@ -22,6 +22,9 @@ the answer is a plain POST, same-origin and rate limited like a booking. The pag
 booking's public reference and are opened with the participant cookie (ADR 0093); a call started
 here sets that cookie in its own response, so no token is ever in a URL. The outcome of stopping
 is a fixed word in the query (``status=left`` or ``left_agent``), no personal data.
+
+When the service's on-demand flow draws on a counted pool (ADR 0121 step 7), the same address
+takes immediate work instead of a direct call: ``immediate_pages`` renders and handles it.
 """
 
 import hashlib
@@ -32,6 +35,7 @@ import structlog
 from fastapi import APIRouter, Depends, Query, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
+from app.api import immediate_pages as immediate
 from app.api.contact_form import (
     HONEYPOT_FIELD,
     contact_input,
@@ -166,7 +170,7 @@ async def _form_page(
 @limiter.limit(read_limit)
 async def direct_form(
     request: Request, slug: str, locale: Locale, flow: str | None = None
-) -> HTMLResponse:
+) -> Response:
     """Show the form to start a call now.
 
     An optional ``flow`` (ADR 0121 step 3a) must resolve for the on-demand path, else the page
@@ -175,6 +179,12 @@ async def direct_form(
     service = _bookings(request)
     group = await service.get_group(slug)
     chosen = await checked_flow(service, slug, IntakeMode.ON_DEMAND, flow)
+    offer = await immediate.service(request).offer(slug, chosen)
+    if offer is not None:  # ADR 0121 step 7: the flow takes immediate work on a pool
+        held = await immediate.open_request_of(request, slug)
+        if held is not None:  # choice I12: one open request per browser and service
+            return RedirectResponse(f"/r/{held}", status_code=303)
+        return await immediate.form_page(request, locale, offer, flow=chosen)
     return await _form_page(
         request,
         locale,
@@ -191,8 +201,15 @@ async def start_direct(request: Request, slug: str, locale: Locale, _: SameOrigi
     service = _bookings(request)
     group = await service.get_group(slug)
     form = await request.form()
-    values = read_contact(form)
     chosen = await checked_flow(service, slug, IntakeMode.ON_DEMAND, form.get("flow"))
+    offer = await immediate.service(request).offer(slug, chosen)
+    if offer is not None:  # ADR 0121 step 7: the flow takes immediate work on a pool
+        read_contact(form)  # the honeypot first, before anything is stored
+        held = await immediate.open_request_of(request, slug)
+        if held is not None:  # choice I12
+            return RedirectResponse(f"/r/{held}", status_code=303)
+        return await immediate.accept(request, locale, slug, form, offer, chosen)
+    values = read_contact(form)
     try:
         receipt = await service.start_direct(
             group_slug=slug,

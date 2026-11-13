@@ -83,7 +83,7 @@ Side navigation: *Services*. A row *Tab › Sub-tab* is a sub-tab of that tab.
 | Overview | `/admin/groups/{slug}` | `group.view` | wide | – |
 | Overview › Usage | `/admin/groups/{slug}/usage` | `reports.view` | wide | – |
 | Agenda | `/admin/groups/{slug}/agenda` | `bookings.view` | wide | `/admin/groups/{slug}/bookings/{booking_id}`, `/admin/groups/{slug}/agenda/week`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/move`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/cancel`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/rebook`, `/admin/groups/{slug}/agenda/slot-rebook`, `/admin/groups/{slug}/agenda/waiting`, `/admin/groups/{slug}/agenda/bookings/{booking_id}/propose`, `/admin/groups/{slug}/agenda/slot-propose` |
-| Agenda › Queue | `/admin/groups/{slug}/queue` | `queue.work` | wide | `/admin/groups/{slug}/queue/{booking_id}` |
+| Agenda › Queue | `/admin/groups/{slug}/queue` | `queue.work` | wide | `/admin/groups/{slug}/queue/{booking_id}`, `/admin/groups/{slug}/queue/requests/{request_id}` |
 | Planning | `/admin/groups/{slug}/staffing` | `schedule.manage` | wide | `/admin/groups/{slug}/staffing/{rule_id}`, `/admin/groups/{slug}/staffing/{rule_id}/split` |
 | Planning › Staffing exceptions | `/admin/groups/{slug}/exceptions` | `schedule.manage` | standard | `/admin/groups/{slug}/exceptions/{override_id}` |
 | Planning › Holidays | `/admin/groups/{slug}/holidays` | `schedule.manage` | standard | – |

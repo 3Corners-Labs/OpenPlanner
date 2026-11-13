@@ -614,7 +614,10 @@ OBJECTS = (
                         f"{_GROUP}/queue",
                         Permission.QUEUE_WORK,
                         "queue",
-                        (f"{_GROUP}/queue/{{booking_id}}",),
+                        (
+                            f"{_GROUP}/queue/{{booking_id}}",
+                            f"{_GROUP}/queue/requests/{{request_id}}",
+                        ),
                         width=Width.WIDE,
                     ),
                 ),

@@ -56,6 +56,7 @@ from app.domain.lookups import group_summary_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.retention import RetentionOverview, candidates_before, summarise
 from app.domain.scheduling import GroupSummary
+from app.domain.service_requests import data_deletion_at
 from app.domain.staff import (
     Membership,
     RefusedEntitlement,
@@ -565,7 +566,12 @@ class AdminService:
         scope = scope_for(principal, Permission.RETENTION_VIEW)
         async with self._uow.read() as tx:
             facts = await tx.list_retention(scope, candidates_before(now))
-        return summarise(facts, now, self._retention_of)
+            records = [
+                (r.group_id, moment)
+                for r in await tx.requests_holding_data()
+                if (moment := data_deletion_at(r)) is not None
+            ]
+        return summarise(facts, now, self._retention_of, records)
 
 
 def memberships_of(principal: Principal) -> list[Membership]:

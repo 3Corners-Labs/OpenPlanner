@@ -17,7 +17,7 @@ import pytest
 from app.domain.authorization import Scope
 from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.scheduling import Offer, ScheduleRule, TimeWindow
-from app.domain.service_flows import FlowState, IntakeMode
+from app.domain.service_flows import FlowState, HandlingAction, IntakeMode, InteractionKind
 from app.domain.staff import StaffMember
 from tests.support.domain import NOW
 from tests.support.service_flows import flow as make_flow
@@ -82,9 +82,21 @@ async def add_pool_flow(
     code: str = "advies",
     duration: int = 20,
     default: bool = False,
+    on_demand: bool = False,
 ) -> PoolFlow:
-    """Store, publish and activate a telephone flow of ``group_id`` on the pool ``pool_id``."""
+    """Store, publish and activate a telephone flow of ``group_id`` on the pool ``pool_id``.
+
+    ``on_demand`` makes it a flow without contact that also takes immediate work (ADR 0121
+    step 7), named by its code (the service's legacy direct flow stays the default).
+    """
     draft = revision(flow_id=None, capacity_pool_id=pool_id, duration_minutes=duration)
+    if on_demand:
+        draft = replace(
+            draft,
+            intake_modes=frozenset({IntakeMode.APPOINTMENT, IntakeMode.ON_DEMAND}),
+            interaction_kind=InteractionKind.NONE,
+            handling_action=HandlingAction.VIEW_REQUEST,
+        )
     defaults = frozenset({IntakeMode.APPOINTMENT}) if default else frozenset()
     new = replace(make_flow(code, FlowState.DRAFT, None, defaults, None, draft), group_id=group_id)
     async with uow.locked() as tx:

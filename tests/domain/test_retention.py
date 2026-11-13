@@ -183,3 +183,24 @@ def test_a_booking_is_backlog_once_it_held_data_two_days_after_it_started_to_cou
     assert is_backlog(old, NOW, LIMITS)
     assert not is_backlog(fresh, NOW, LIMITS)
     assert not is_backlog(candidate(BookingStatus.SUSPENDED, end_ago=50 * DAY), NOW, LIMITS)
+
+
+def test_request_level_records_are_counted_on_their_own() -> None:
+    """ADR 0121 step 7, follow-up 5d: held and overdue records per service, never bookings."""
+    facts = RetentionFacts(
+        [GroupRetentionCounts(DEMO, 0, 0, None), GroupRetentionCounts(OTHER, 0, 0, None)], []
+    )
+    records = [
+        (1, NOW + DAY),  # still within its time
+        (1, NOW - PURGE_GRACE - timedelta(minutes=1)),  # past its moment and the grace
+        (2, NOW - PURGE_GRACE + timedelta(minutes=1)),  # past its moment, within the grace
+        (9, NOW - 9 * DAY),  # a service outside the overview's scope
+    ]
+
+    overview = summarise(facts, NOW, lambda _org: LIMITS, records)
+
+    rows = [(g.requests_holding, g.requests_overdue, g.overdue) for g in overview.groups]
+    assert rows == [(2, 1, 0), (1, 0, 0)]
+    assert overview.requests_overdue == 1
+    assert overview.groups[0].needs_attention
+    assert not overview.in_order

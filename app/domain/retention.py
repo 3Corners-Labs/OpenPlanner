@@ -21,6 +21,7 @@ sweep (``app.domain.retention_sweep``) purges what is overdue; it alerts when a 
 personal data ``BACKLOG_AGE`` after the event that started its retention (CLAUDE.md privacy rules).
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -118,11 +119,16 @@ class GroupRetention:
     overdue: int
     failed_purges: int
     last_purged_at: datetime | None
+    requests_holding: int = 0
+    """Requests without an appointment whose request-level record or pseudonym is still held
+    (ADR 0121 step 7, follow-up 5d): counted on their own, never as bookings."""
+    requests_overdue: int = 0
+    """Of those, how many are past their deletion moment and the grace."""
 
     @property
     def needs_attention(self) -> bool:
         """Whether personal data is overdue or a purge failed."""
-        return self.overdue > 0 or self.failed_purges > 0
+        return self.overdue > 0 or self.failed_purges > 0 or self.requests_overdue > 0
 
 
 @dataclass(frozen=True)
@@ -136,6 +142,11 @@ class RetentionOverview:
     def overdue(self) -> int:
         """Bookings past their purge moment, over all groups (the purge backlog)."""
         return sum(g.overdue for g in self.groups)
+
+    @property
+    def requests_overdue(self) -> int:
+        """Request-level records past their deletion moment, over all groups (step 7)."""
+        return sum(g.requests_overdue for g in self.groups)
 
     @property
     def failed_purges(self) -> int:
@@ -197,16 +208,27 @@ def is_backlog(candidate: PurgeCandidate, now: datetime, retention: ClosureReten
 
 
 def summarise(
-    facts: RetentionFacts, now: datetime, retention_of: ClosureRetentionOf
+    facts: RetentionFacts,
+    now: datetime,
+    retention_of: ClosureRetentionOf,
+    records: Iterable[tuple[int, datetime]] = (),
 ) -> RetentionOverview:
     """Combine the counts and the overdue candidates into the overview, per group.
 
     ``retention_of`` gives the maximum of the organisation a candidate belongs to (ADR 0102).
+    ``records`` are the request-level records still held, as ``(group id, deletion moment)``
+    (ADR 0121 step 7, follow-up 5d); a group outside the overview's scope is not counted.
     """
     overdue: dict[int, int] = {}
     for candidate in facts.candidates:
         if is_overdue(candidate, now, retention_of(candidate.organisation_id)):
             overdue[candidate.group_id] = overdue.get(candidate.group_id, 0) + 1
+    held: dict[int, int] = {}
+    late: dict[int, int] = {}
+    for group_id, moment in records:
+        held[group_id] = held.get(group_id, 0) + 1
+        if moment + PURGE_GRACE < now:
+            late[group_id] = late.get(group_id, 0) + 1
     return RetentionOverview(
         now,
         tuple(
@@ -216,6 +238,8 @@ def summarise(
                 overdue.get(counts.group.group.id or 0, 0),
                 counts.failed_purges,
                 counts.last_purged_at,
+                held.get(counts.group.group.id or 0, 0),
+                late.get(counts.group.group.id or 0, 0),
             )
             for counts in facts.groups
         ),

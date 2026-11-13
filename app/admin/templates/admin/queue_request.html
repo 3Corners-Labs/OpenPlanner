@@ -1,0 +1,36 @@
+{#- A request without an appointment that the agent holds (ADR 0121 step 7): the first name, the
+    answers an agent may see, where the work stands and *Start* or *Complete*. Every action is a
+    plain form; the page needs no script. -#}
+{% extends "admin/layout.html" %}
+{% block title %}{{ _("admin.queue.request.title") }} · {{ summary.group.name }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+{% include "admin/_group_header.html" %}
+<p><a href="/admin/groups/{{ summary.group.slug }}/queue">{{ _("admin.queue.back") }}</a></p>
+<section class="card" aria-labelledby="claimed-heading">
+  <div class="card__header">
+    <h2 id="claimed-heading" tabindex="-1">{{ _("admin.queue.request.title") }}</h2>
+    <p class="card__lead">{{ _("admin.queue.request.lead") }}</p>
+  </div>
+  <dl class="facts">
+    <div><dt>{{ _("admin.queue.request.since") }}</dt><dd>{{ claimed.since }}</dd></div>
+    <div><dt>{{ _("admin.agenda.participant") }}</dt><dd>{{ claimed.first_name or "–" }}</dd></div>
+    {% with answers = claimed.claimed.answers %}{% include "admin/_answers.html" %}{% endwith %}
+  </dl>
+  {% if claimed.sentence %}<p>{{ claimed.sentence }}</p>{% endif %}
+  <div class="form-actions">
+    {% if claimed.can_start %}
+    <form method="post" action="/admin/groups/{{ summary.group.slug }}/queue/requests/{{ claimed.request_id }}/start">
+      <button type="submit" class="button">{{ _("admin.queue.work.start") }}</button>
+    </form>
+    <form method="post" action="/admin/groups/{{ summary.group.slug }}/queue/requests/{{ claimed.request_id }}/release">
+      <button type="submit" class="button button--secondary">{{ _("admin.queue.release") }}</button>
+    </form>
+    {% endif %}
+    {% if claimed.can_complete %}
+    <form method="post" action="/admin/groups/{{ summary.group.slug }}/queue/requests/{{ claimed.request_id }}/complete">
+      <button type="submit" class="button">{{ _("admin.queue.work.complete") }}</button>
+    </form>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

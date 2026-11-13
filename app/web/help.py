@@ -132,7 +132,11 @@ TOPICS = (
     ),
     HelpTopic(
         "queue",
-        ("/admin/groups/{slug}/queue", "/admin/groups/{slug}/queue/{booking_id}"),
+        (
+            "/admin/groups/{slug}/queue",
+            "/admin/groups/{slug}/queue/{booking_id}",
+            "/admin/groups/{slug}/queue/requests/{request_id}",
+        ),
         Permission.QUEUE_WORK,
     ),
     HelpTopic(

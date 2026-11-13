@@ -24,10 +24,14 @@
       <tr>
         <th scope="row">{{ item.time }}</th>
         <td>{{ item.first_name }}<br><span class="muted">{{ item.reference }}{% if item.direct %} · {{ _("admin.queue.direct") }}{% endif %}</span>{% if item.routing %}<br><span class="muted">{{ item.routing }}</span>{% endif %}</td>
-        <td><span class="chip{% if item.tone %} chip--{{ item.tone }}{% endif %}">{{ item.state }}</span>{% if item.fallback %}<br><span class="chip chip--warning">{{ _("admin.fallback.chip") }}</span>{% endif %}{% if item.overdue %}<br><span class="chip chip--danger">{{ _("admin.agenda.not_picked_up") }}</span>{% endif %}{% if item.video %}<br><span class="chip{% if item.video_tone %} chip--{{ item.video_tone }}{% endif %}">{{ item.video }}</span>{% endif %}{% if not item.eligible %}<br><span class="chip chip--warning">{{ _("admin.queue.not_for_you", skills=item.missing) }}</span>{% endif %}</td>
+        <td><span class="chip{% if item.tone %} chip--{{ item.tone }}{% endif %}">{{ item.state }}</span>{% if item.fallback %}<br><span class="chip chip--warning">{{ _("admin.fallback.chip") }}</span>{% endif %}{% if item.overdue %}<br><span class="chip chip--danger">{{ _("admin.agenda.not_picked_up") }}</span>{% endif %}{% if item.video %}<br><span class="chip{% if item.video_tone %} chip--{{ item.video_tone }}{% endif %}">{{ item.video }}</span>{% endif %}{% if not item.eligible %}<br><span class="chip chip--warning">{{ _("admin.queue.not_for_you", skills=item.missing) }}</span>{% endif %}{% if item.can_check_in %}<br><span class="chip">{{ _("admin.queue.awaiting_check_in") }}</span>{% endif %}</td>
         <td>
           {% if item.mine and item.eligible %}
           <a href="/admin/groups/{{ summary.group.slug }}/queue/{{ item.id }}">{{ _("admin.queue.open") }}<span class="visually-hidden"> {{ item.reference }}</span></a>
+          {% elif item.can_check_in %}
+          <form method="post" action="/admin/groups/{{ summary.group.slug }}/queue/{{ item.id }}/check-in">
+            <button type="submit" class="button button--secondary">{{ _("admin.queue.check_in") }}<span class="visually-hidden"> {{ item.reference }}</span></button>
+          </form>
           {% elif item.can_claim %}
           <form method="post" action="/admin/groups/{{ summary.group.slug }}/queue/{{ item.id }}/claim">
             <button type="submit" class="button button--secondary">{{ _("admin.queue.claim") }}<span class="visually-hidden"> {{ item.reference }}</span></button>
@@ -45,5 +49,40 @@
   </div>
   {% else %}
   <p class="empty-state">{{ _("admin.queue.empty") }}</p>
+  {% endif %}
+  {#- Requests without an appointment (ADR 0121 step 7), oldest first: first name only. -#}
+  {% if immediate %}
+  <h3 id="immediate-heading">{{ _("admin.queue.request.heading") }}</h3>
+  {% if has_next_immediate %}
+  <form method="post" action="/admin/groups/{{ summary.group.slug }}/queue/requests/next">
+    <button type="submit" class="button">{{ _("admin.queue.request.pick_up_next") }}</button>
+  </form>
+  {% endif %}
+  <div class="table-scroll" role="region" aria-labelledby="immediate-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.queue.request.caption") }}</caption>
+    <thead>
+      <tr><th scope="col">{{ _("admin.queue.request.since") }}</th><th scope="col">{{ _("admin.agenda.participant") }}</th><th scope="col">{{ _("admin.queue.status") }}</th><th scope="col"><span class="visually-hidden">{{ _("admin.actions") }}</span></th></tr>
+    </thead>
+    <tbody>
+      {% for item in immediate %}
+      <tr>
+        <th scope="row">{{ item.since }}</th>
+        <td>{{ item.first_name or "–" }}</td>
+        <td><span class="chip{% if item.tone %} chip--{{ item.tone }}{% endif %}">{{ item.state }}</span>{% if not item.eligible %}<br><span class="chip chip--warning">{{ _("admin.queue.not_for_you", skills=item.missing) }}</span>{% endif %}</td>
+        <td>
+          {% if item.can_open %}
+          <a href="/admin/groups/{{ summary.group.slug }}/queue/requests/{{ item.id }}">{{ _("admin.queue.open") }}<span class="visually-hidden"> {{ item.since }}</span></a>
+          {% elif item.can_claim %}
+          <form method="post" action="/admin/groups/{{ summary.group.slug }}/queue/requests/{{ item.id }}/claim">
+            <button type="submit" class="button button--secondary">{{ _("admin.queue.claim") }}<span class="visually-hidden"> {{ item.since }}</span></button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
   {% endif %}
 </div>

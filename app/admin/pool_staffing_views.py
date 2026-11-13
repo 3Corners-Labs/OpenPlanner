@@ -84,3 +84,25 @@ def timezone_field(form: FormData, locale: RequestLocale, stored: str | None) ->
         error=form.error_for(TIMEZONE_FIELD),
         options=timezone_options(zone),
     )
+
+
+MAX_WAITING_FIELD = "max_waiting"
+
+
+def max_waiting_field(form: FormData, locale: RequestLocale, stored: int | None) -> Field:
+    """Return the waiting-limit input: the submitted value, else the stored one; empty is none.
+
+    How many people without an appointment may wait for the pool at once (ADR 0121 step 7).
+    """
+    _ = locale.gettext
+    submitted = form.text(MAX_WAITING_FIELD)
+    value = submitted if form.text(MAX_WAITING_FIELD) or form.errors else str(stored or "")
+    return Field(
+        MAX_WAITING_FIELD,
+        _("admin.pool_staffing.max_waiting"),
+        "number",
+        value,
+        hint=_("admin.pool_staffing.max_waiting_hint"),
+        error=form.error_for(MAX_WAITING_FIELD),
+        attributes={"min": "1", "max": "1000", "step": "1", "inputmode": "numeric"},
+    )

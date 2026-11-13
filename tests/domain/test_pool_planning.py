@@ -490,3 +490,22 @@ async def test_the_page_lists_the_first_shortfalls_and_counts_the_rest(
 
     assert len(page.shortfalls) == 20
     assert page.shortfall_total == 25
+
+
+async def test_the_waiting_limit_is_set_bounded_audited_and_shown(
+    service: PoolPlanningService, uow: InMemoryUnitOfWork
+) -> None:
+    """ADR 0121 step 7: how many people without an appointment may wait for the pool."""
+    pid = await pool(uow, zone=None)
+
+    assert await service.set_max_waiting(ORG_ADMIN, "demo", pid, 8) is True
+    assert await service.set_max_waiting(ORG_ADMIN, "demo", pid, 8) is False
+    with pytest.raises(DomainError) as refused:
+        await service.set_max_waiting(ORG_ADMIN, "demo", pid, 0)
+    assert refused.value.field == "max_waiting"
+    assert (await service.staffing(ORG_ADMIN, "demo", pid)).max_waiting == 8
+    assert await service.set_max_waiting(ORG_ADMIN, "demo", pid, None) is True
+    assert (await service.staffing(ORG_ADMIN, "demo", pid)).max_waiting is None
+    assert [d for d in details(uow) if d.startswith("pool_staffing")] == [
+        "pool_staffing.max_waiting,pool:loket-demo"
+    ] * 2

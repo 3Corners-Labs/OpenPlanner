@@ -13517,3 +13517,114 @@ msgstr "We kunnen u de komende tijd niet zonder afspraak helpen. Probeer het lat
 
 msgid "error.not_checked_in"
 msgstr "Deze afspraak is nog niet aangemeld. Meld de deelnemer eerst aan."
+
+msgid "now.title"
+msgstr "Nu hulp vragen"
+
+msgid "now.intro"
+msgstr "Vul uw gegevens in. U komt in de rij van {group_name} en wordt geholpen zodra er iemand vrij is."
+
+msgid "now.submit"
+msgstr "In de rij gaan"
+
+msgid "now.expected"
+msgstr "Naar verwachting kan de eerstvolgende om {time} geholpen worden."
+
+msgid "request.title"
+msgstr "Uw verzoek"
+
+msgid "request.waiting"
+msgstr "U staat in de rij."
+
+msgid "request.called"
+msgstr "Uw verzoek is opgepakt; u wordt zo geholpen."
+
+msgid "request.in_progress"
+msgstr "Uw verzoek wordt nu behandeld."
+
+msgid "request.done"
+msgstr "Uw verzoek is afgehandeld."
+
+msgid "request.withdrawn"
+msgstr "U heeft uw verzoek ingetrokken."
+
+msgid "request.expired"
+msgstr "Uw verzoek is niet op tijd behandeld en is vervallen."
+
+msgid "request.again"
+msgstr "Opnieuw hulp vragen"
+
+msgid "request.leave.link"
+msgstr "Verzoek intrekken"
+
+msgid "request.leave.title"
+msgstr "Verzoek intrekken?"
+
+msgid "request.leave.question"
+msgstr "Als u uw verzoek intrekt, verlaat u de rij. U kunt daarna opnieuw hulp vragen."
+
+msgid "request.leave.confirm"
+msgstr "Ja, intrekken"
+
+msgid "admin.queue.check_in"
+msgstr "Aanmelden"
+
+msgid "admin.queue.awaiting_check_in"
+msgstr "Nog niet aangemeld"
+
+msgid "admin.done.checked_in"
+msgstr "De deelnemer is aangemeld."
+
+msgid "admin.queue.request.heading"
+msgstr "Zonder afspraak"
+
+msgid "admin.queue.request.caption"
+msgstr "Verzoeken zonder afspraak, de oudste eerst"
+
+msgid "admin.queue.request.pick_up_next"
+msgstr "Volgende zonder afspraak oppakken"
+
+msgid "admin.queue.request.since"
+msgstr "Sinds"
+
+msgid "admin.queue.request.waiting"
+msgstr "Wacht"
+
+msgid "admin.queue.request.in_progress"
+msgstr "In behandeling"
+
+msgid "admin.queue.request.recovery"
+msgstr "Nog niet afgerond"
+
+msgid "admin.queue.request.title"
+msgstr "Verzoek zonder afspraak"
+
+msgid "admin.queue.request.lead"
+msgstr "U heeft dit verzoek opgepakt. Begin als u de deelnemer helpt en rond het af als u klaar bent."
+
+msgid "admin.retention.requests_holding"
+msgstr "Verzoeken zonder afspraak met gegevens"
+
+msgid "admin.retention.requests_overdue"
+msgstr "Verzoeken zonder afspraak te laat"
+
+msgid "admin.pool_staffing.waiting_heading"
+msgstr "Wachten zonder afspraak"
+
+msgid "admin.pool_staffing.waiting_lead"
+msgstr "Hoeveel mensen zonder afspraak tegelijk op deze pool mogen wachten. Laat het veld leeg voor geen grens."
+
+msgid "admin.pool_staffing.max_waiting"
+msgstr "Grens"
+
+msgid "admin.pool_staffing.max_waiting_hint"
+msgstr "Een heel getal van 1 tot en met 1000, of leeg."
+
+msgid "admin.pool_staffing.waiting_button"
+msgstr "Grens opslaan"
+
+msgid "admin.audit.detail.pool_staffing_max_waiting"
+msgstr "Grens van wachtenden zonder afspraak van een pool gewijzigd"
+
+msgid "admin.form.error.max_waiting"
+msgstr "Vul een heel getal van 1 tot en met 1000 in, of laat het veld leeg."

@@ -318,6 +318,7 @@ DETAIL_LABELS: dict[str, str] = {
     "staff_skills.changed": "admin.audit.detail.staff_skills_changed",
     # ADR 0122 step 4: the staffing of a counted pool (action capacity.manage; the pool follows).
     "pool_staffing.timezone": "admin.audit.detail.pool_staffing_timezone",
+    "pool_staffing.max_waiting": "admin.audit.detail.pool_staffing_max_waiting",
     "pool_staffing.rule_add": "admin.audit.detail.pool_staffing_rule_add",
     "pool_staffing.rule_edit": "admin.audit.detail.pool_staffing_rule_edit",
     "pool_staffing.rule_split": "admin.audit.detail.pool_staffing_rule_split",

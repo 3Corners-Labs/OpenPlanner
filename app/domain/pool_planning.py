@@ -11,6 +11,7 @@ and a legacy pool answer like a missing one.
     staffing      the pool's time zone, blocks, coming exceptions and coming shortfalls
     rule, override   one block or exception, to change it
     set_timezone  the zone the blocks are read in; blocks can be entered only after it
+    set_max_waiting  how many people without an appointment may wait (ADR 0121 step 7)
     add/update/split/remove rule, add/update/remove override
 
 Nothing here changes a booking: existing appointments stay (decision P3) and a drop in staffing
@@ -25,7 +26,7 @@ from datetime import date, datetime, time, timedelta
 
 from app.domain.admin import AdminService
 from app.domain.authorization import Permission, Principal, Scope
-from app.domain.capacity import CapacityPool
+from app.domain.capacity import CapacityPool, check_max_waiting
 from app.domain.capacity_service import own_editable_pool, pool_ref
 from app.domain.errors import DomainError, ErrorCode, missing_object
 from app.domain.holidays import closures
@@ -49,6 +50,7 @@ from app.domain.tunable import value_for
 _PERMISSION = Permission.CAPACITY_MANAGE
 
 TIMEZONE_CHANGED = "pool_staffing.timezone"
+MAX_WAITING_CHANGED = "pool_staffing.max_waiting"
 RULE_ADDED = "pool_staffing.rule_add"
 RULE_CHANGED = "pool_staffing.rule_edit"
 RULE_SPLIT = "pool_staffing.rule_split"
@@ -81,6 +83,8 @@ class PoolStaffingPage:
             where more units are committed than staffed, earliest first.
         shortfall_total: How many such stretches there are in all.
         horizon_days: How far ahead the shortfalls were looked for (``shortfall_horizon_days``).
+        max_waiting: How many people without an appointment may wait for the pool at once;
+            ``None`` is no limit (ADR 0121 step 7).
     """
 
     organisation: Organisation
@@ -91,6 +95,7 @@ class PoolStaffingPage:
     shortfalls: tuple[Shortfall, ...]
     shortfall_total: int
     horizon_days: int
+    max_waiting: int | None = None
 
 
 @dataclass(frozen=True)
@@ -198,8 +203,9 @@ class PoolPlanningService:
             pool = await own_editable_pool(tx, scope, organisation, pool_id)
             found = await tx.get_pool_staffing(scope, pool_id)
             horizon = value_for(self._horizon_days, organisation.id)
+            waiting = await tx.get_pool_max_waiting(pool_id)
             if found is None:
-                return PoolStaffingPage(organisation, pool, None, (), (), (), 0, horizon)
+                return PoolStaffingPage(organisation, pool, None, (), (), (), 0, horizon, waiting)
             today = now.astimezone(found.timezone).date()
             upcoming = tuple(o for o in found.overrides if o.day >= today)
             short, total = await _shortfalls(tx, organisation, pool_id, found, now, horizon)
@@ -212,6 +218,7 @@ class PoolPlanningService:
             tuple(short),
             total,
             horizon,
+            waiting,
         )
 
     async def rule(self, principal: Principal, slug: str, pool_id: int, rule_id: int) -> PoolRule:
@@ -260,6 +267,27 @@ class PoolPlanningService:
                 return False
             await tx.set_pool_timezone(scope, pool_id, timezone)
             await self._record(tx, principal, slug, TIMEZONE_CHANGED, pool)
+        return True
+
+    async def set_max_waiting(
+        self, principal: Principal, slug: str, pool_id: int, limit: int | None
+    ) -> bool:
+        """Set how many people without an appointment may wait for the pool; whether it changed.
+
+        Configuration of one pool (ADR 0121 step 7, ADR 0122 *Settings*); ``None`` is no limit.
+
+        Raises:
+            DomainError: As ``staffing``, and ``invalid_configuration`` (``max_waiting``)
+                outside 1 to 1000.
+        """
+        scope = await self._admin.scoped(principal, _PERMISSION, slug)
+        check_max_waiting(limit)
+        async with self._uow.locked() as tx:
+            _, pool = await _own_pool(tx, scope, slug, pool_id)
+            if await tx.get_pool_max_waiting(pool_id) == limit:
+                return False
+            await tx.set_pool_max_waiting(scope, pool_id, limit)
+            await self._record(tx, principal, slug, MAX_WAITING_CHANGED, pool)
         return True
 
     async def add_rule(
