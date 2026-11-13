@@ -15,6 +15,11 @@ APIs or attribute names.
 
 A routing may be incomplete (an admin filled in one attribute of two): it is stored as it is
 and the group does not dispatch until it is complete, as before ADR 0032.
+
+The descriptor also declares what the platform can carry (``ContactCenterCapabilities``, ADR
+0121 step 6): which interaction kinds of a flow and whether it routes on skills. A flow's
+readiness and the building of a task read that declaration through ``capabilities_of`` and
+``uncarried``; a descriptor that declares nothing carries nothing.
 """
 
 import ipaddress
@@ -27,6 +32,7 @@ from types import MappingProxyType
 from urllib.parse import urlsplit
 
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.interaction import InteractionKind
 
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 _ATTRIBUTE_NAME = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
@@ -93,6 +99,47 @@ class AttributeSpec:
 
 
 @dataclass(frozen=True)
+class ContactCenterCapabilities:
+    """What one contact-center platform's adapter can carry (ADR 0121 step 6).
+
+    A property of the adapter's code, declared as a constant in its descriptor, never a
+    setting. The default carries nothing, so an adapter that forgets to declare receives no
+    task and every flow on it is not ready.
+
+    Attributes:
+        interaction_kinds: The interaction kinds of a flow the platform can hand to an agent.
+        skills: Whether the platform can route on the mapped skill codes (ADR 0121 step 4b).
+    """
+
+    interaction_kinds: frozenset[InteractionKind] = frozenset()
+    skills: bool = False
+
+
+INTERACTION_KIND = "interaction_kind"
+"""What ``uncarried`` names for an interaction kind the platform does not carry."""
+SKILL_CODES = "skill_codes"
+"""What ``uncarried`` names for skills on a platform that cannot route on them."""
+
+
+def uncarried(
+    capabilities: ContactCenterCapabilities,
+    interaction: InteractionKind,
+    skills: bool,
+) -> str | None:
+    """Return what of a task the platform cannot carry, or ``None`` when it carries all of it.
+
+    ``interaction`` is the task's interaction kind and ``skills`` whether it requires any
+    skill. The interaction kind is judged first: a platform that cannot take the work at all
+    is the bigger gap.
+    """
+    if interaction not in capabilities.interaction_kinds:
+        return INTERACTION_KIND
+    if skills and not capabilities.skills:
+        return SKILL_CODES
+    return None
+
+
+@dataclass(frozen=True)
 class ProviderDescriptor:
     """What one contact-center platform needs per group (ADR 0032 point 4).
 
@@ -103,6 +150,7 @@ class ProviderDescriptor:
         routing_value_max_length: Longest routing value the platform accepts.
         routing_value_label_key: i18n key of the routing value's label in the group form.
         routing_value_hint_key: i18n key of its hint, if it has one.
+        capabilities: What the platform can carry (ADR 0121 step 6); nothing by default.
     """
 
     kind: ContactCenterKind
@@ -111,6 +159,7 @@ class ProviderDescriptor:
     routing_value_max_length: int
     routing_value_label_key: str
     routing_value_hint_key: str | None = None
+    capabilities: ContactCenterCapabilities = ContactCenterCapabilities()
 
     def __post_init__(self) -> None:
         """Refuse duplicate attribute names or a routing value limit below 1.
@@ -200,6 +249,16 @@ class ContactCenterRouting:
     def attribute(self, name: str) -> str | None:
         """Return attribute ``name``, or ``None`` when it is not set."""
         return self.attributes.get(name)
+
+
+def capabilities_of(routing: ContactCenterRouting | None) -> ContactCenterCapabilities | None:
+    """Return what the platform of a *complete* ``routing`` carries; ``None`` without one.
+
+    An incomplete routing does not dispatch (ADR 0032), so it carries nothing a flow could use.
+    """
+    if routing is None or not routing.complete:
+        return None
+    return routing.descriptor.capabilities
 
 
 API_HOST = re.compile(r"^https://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?/?$")

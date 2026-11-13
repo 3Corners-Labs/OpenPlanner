@@ -13077,6 +13077,15 @@ msgstr "De capaciteitspool garandeert niet alle vaardigheden die deze flow of ee
 msgid "admin.flows.reason.skill_unmapped"
 msgstr "Deze flow verdeelt naar het contactcenter, maar een vaardigheid die hij of een van de onderwerpen vraagt heeft nog geen code in het contactcenter. Geef die vaardigheid een code onder Vaardigheden en capaciteit."
 
+msgid "admin.flows.reason.contact_center_missing"
+msgstr "Deze flow verdeelt naar het contactcenter, maar deze dienst is nog niet met een contactcenter verbonden. Vul de contactcenterroutering van de dienst in, of laat de flow de eigen wachtrij gebruiken."
+
+msgid "admin.flows.reason.interaction_not_carried"
+msgstr "Het contactcenter van deze dienst kan dit contactkanaal niet aannemen. Kies een ander contactkanaal, of laat de flow de eigen wachtrij gebruiken."
+
+msgid "admin.flows.reason.skills_not_carried"
+msgstr "Deze flow vraagt vaardigheden, maar het contactcenter van deze dienst kan niet op vaardigheden verdelen. Haal de vaardigheden van de flow af, of laat de flow de eigen wachtrij gebruiken."
+
 msgid "admin.flows.reason.missing_skills"
 msgstr "Ontbreekt in de pool: {skills}"
 

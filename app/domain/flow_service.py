@@ -36,6 +36,7 @@ from app.domain import service_flows as flows
 from app.domain.admin import AdminService
 from app.domain.authorization import Permission, Principal, Scope, scope_for
 from app.domain.capacity import CapacityPool, PoolMode
+from app.domain.contact_center import capabilities_of
 from app.domain.errors import DomainError, ErrorCode, missing_object
 from app.domain.lookups import group_summary_by_slug
 from app.domain.ports import Clock, Transaction, UnitOfWork
@@ -732,8 +733,9 @@ async def _readiness_of(
 ) -> tuple[ReadinessItem, ...]:
     """Return the readiness checklist of ``revision`` against what the organisation has now.
 
-    That is its pool, the service's subjects and, only for a contact-center revision that
-    requires skills, which skills have a contact-center code.
+    That is its pool, the service's subjects, what the platform of the service's contact-center
+    routing carries (ADR 0121 step 6) and, only for a contact-center revision that requires
+    skills, which skills have a contact-center code.
     """
     coded: frozenset[int] = frozenset()
     if revision.dispatch is flows.DispatchKind.CONTACT_CENTER and revision.all_skill_ids:
@@ -747,6 +749,7 @@ async def _readiness_of(
         await _pool_of(tx, scope, revision),
         offered_subjects=[s.code for s in group.routing.subjects],
         coded_skills=coded,
+        carrier=capabilities_of(group.contact_center),
     )
 
 

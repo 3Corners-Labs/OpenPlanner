@@ -18,6 +18,8 @@ import pytest
 
 from app.adapters.wxcc import cancellation_body, task_body
 from app.domain.calls import ContactCenterTask, probe_task
+from app.domain.interaction import InteractionKind
+from app.domain.ports import IntegrationError
 from tests.support.domain import make_group, webex_routing
 
 RECORDED = Path(__file__).with_name("wxcc_task_bodies.json")
@@ -57,7 +59,9 @@ def _bodies() -> dict[str, dict[str, Any]]:
             replace(BASE, variables=(("lang", "nl"), ("topic", "MOVE"))), ALIAS, STAMP
         ),
         "skills": task_body(
-            replace(BASE, variables=(("topic", "MOVE"),), skills=("intake_1", "lang_de")), ALIAS, STAMP
+            replace(BASE, variables=(("topic", "MOVE"),), skills=("intake_1", "lang_de")),
+            ALIAS,
+            STAMP,
         ),
         "probe": task_body(probe, ALIAS, STAMP),
         "cancellation": cancellation_body("OP-000123", ALIAS, STAMP),
@@ -82,3 +86,13 @@ def test_every_case_is_recorded() -> None:
 @pytest.mark.parametrize("case", sorted(_bodies()))
 def test_the_body_is_byte_for_byte_the_recorded_one(case: str) -> None:
     assert _wire(_bodies()[case]).encode() == _recorded()[case].encode()
+
+
+@pytest.mark.parametrize(
+    "interaction", [k for k in InteractionKind if k is not InteractionKind.VIDEO]
+)
+def test_a_task_wxcc_does_not_carry_is_refused_before_it_is_sent(
+    interaction: InteractionKind,
+) -> None:
+    with pytest.raises(IntegrationError, match="not_ready"):
+        task_body(replace(BASE, interaction=interaction), ALIAS, STAMP)

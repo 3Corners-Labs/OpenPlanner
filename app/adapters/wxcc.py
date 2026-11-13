@@ -15,6 +15,12 @@ variable of that name.
 link and kind; nothing else (CLAUDE.md). The asset's schema in Control Hub must define
 exactly these keys (runbook).
 
+The adapter declares what it carries on the channel-independent task contract (ADR 0121 step
+6): the interaction kind ``video`` (the work item carries the host join URL) and skill codes.
+The interaction kind itself is not sent while it is the only one, so the body of every existing
+flow is byte for byte what it was (``tests/adapters/wxcc_task_bodies.json``); a task of
+another kind is refused before anything is sent.
+
 A cancelled booking's task is first marked with a Task Messages v2 append
 (``cjp:task_write``) that sets ``kind`` to ``cancelled`` with only the booking reference, so
 the agent sees it without the first name or the meeting link; then End Task v1 (``cjp:user``;
@@ -43,10 +49,13 @@ from app.domain import calls
 from app.domain.calls import ContactCenterTask, TaskSnapshot, TaskState
 from app.domain.contact_center import (
     AttributeSpec,
+    ContactCenterCapabilities,
     ContactCenterKind,
     ContactCenterRouting,
     ProviderDescriptor,
+    uncarried,
 )
+from app.domain.interaction import InteractionKind
 from app.domain.ports import Clock, IntegrationError, RequestLog
 from app.domain.security_log import SecurityLog
 
@@ -71,9 +80,15 @@ DESCRIPTOR = ProviderDescriptor(
     routing_value_max_length=512,
     routing_value_label_key="admin.field.wxcc_routing_value",
     routing_value_hint_key="admin.field.wxcc_routing_value_hint",
+    capabilities=ContactCenterCapabilities(
+        interaction_kinds=frozenset({InteractionKind.VIDEO}), skills=True
+    ),
 )
-"""What a group needs for WxCC (ADR 0032 point 4); the limits are WxCC's (``flowSettings``
-values up to 512 bytes), fixed by the platform and so constants, not settings."""
+"""What a group needs for WxCC (ADR 0032 point 4) and what WxCC carries (ADR 0121 step 6); the
+limits are WxCC's (``flowSettings`` values up to 512 bytes), fixed by the platform and so
+constants, not settings. Only video is carried: a work item without a meeting link (``none``)
+needs a change of the asset schema and the client's flow (ADR 0121 step 6b), and a telephone
+interaction would need the participant's number, which never leaves OpenPlanner."""
 
 PROBE_KIND = calls.PROBE_KIND
 """``kind`` of the group check's probe work item (ADR 0082 point 2), defined in the domain."""
@@ -146,10 +161,11 @@ def task_body(item: ContactCenterTask, alias_id: str, timestamp_ms: int) -> dict
     """Return the Create Task v2 request for ``item``, a task of a complete WxCC routing.
 
     Raises:
-        IntegrationError: ``not_ready`` (not retryable) when the routing lacks an attribute.
+        IntegrationError: ``not_ready`` (not retryable) when the routing lacks an attribute or
+            the task is one WxCC does not carry (``DESCRIPTOR.capabilities``).
     """
     pair = channel_and_address(item.routing)
-    if pair is None:
+    if pair is None or uncarried(DESCRIPTOR.capabilities, item.interaction, bool(item.skills)):
         raise IntegrationError("not_ready", retryable=False)
     channel, address = pair
     return {

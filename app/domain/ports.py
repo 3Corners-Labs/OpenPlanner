@@ -422,13 +422,20 @@ class ContactCenterDispatcher(Protocol):
 
     The application holds one per ``ContactCenterKind`` (``ContactCenterDispatchers``) and
     picks it by the group's routing, as it picks a ``MessageSender`` per ``ChannelKind``.
+
+    The task is channel-independent (ADR 0121 step 6): ``ContactCenterTask`` names no platform
+    field, and each adapter maps it to its own API in one place. Every adapter declares what it
+    carries (interaction kinds, skills) in the ``ContactCenterCapabilities`` of its
+    ``ProviderDescriptor``; the readiness of a flow and the building of a task read that
+    declaration, and the adapter refuses a task outside it.
     """
 
     async def create_task(self, task: ContactCenterTask) -> str:
         """Create the task and return its id at the platform.
 
         Raises:
-            IntegrationError: If the platform refuses or cannot be reached.
+            IntegrationError: If the platform refuses or cannot be reached, or ``not_ready``
+                for a task outside the adapter's declared capabilities.
         """
         ...
 

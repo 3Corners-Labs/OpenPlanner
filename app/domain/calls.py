@@ -22,8 +22,9 @@ from enum import StrEnum
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from app.domain.booking import Booking
-from app.domain.contact_center import ContactCenterRouting
+from app.domain.contact_center import ContactCenterRouting, uncarried
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.interaction import InteractionKind
 from app.domain.scheduling import Group, JoinClient
 
 BROWSER_LINK_PARAMS: tuple[tuple[str, str], ...] = (("launchApp", "true"),)
@@ -386,6 +387,9 @@ class ContactCenterTask:
             field.
         skills: The contact-center codes of the skills the booking requires (ADR 0121 step 4b),
             sorted; empty when it requires none. Only codes from the organisation's catalogue.
+        interaction: The interaction kind of the flow the booking was made under (ADR 0121 step
+            6): what the agent does with the task. A value of a closed list, never personal
+            data; an adapter that does not declare it in its capabilities refuses the task.
     """
 
     reference: str
@@ -398,6 +402,7 @@ class ContactCenterTask:
     routing_value: str
     variables: tuple[tuple[str, str], ...] = ()
     skills: tuple[str, ...] = ()
+    interaction: InteractionKind = InteractionKind.VIDEO
 
 
 def meeting_request(booking: Booking, group: Group) -> MeetingRequest:
@@ -418,18 +423,28 @@ def meeting_request(booking: Booking, group: Group) -> MeetingRequest:
 
 
 def contact_center_task(
-    booking: Booking, group: Group, *, start_label: str, skills: tuple[str, ...] = ()
+    booking: Booking,
+    group: Group,
+    *,
+    start_label: str,
+    skills: tuple[str, ...] = (),
+    interaction: InteractionKind = InteractionKind.VIDEO,
 ) -> ContactCenterTask:
     """Return the contact-center task to dispatch for ``booking``.
 
     ``start_label`` is the start time as the agent reads it (formatted at the edge), ``skills``
-    the mapped codes of the skills it requires (``skills.mapped_skill_codes``).
+    the mapped codes of the skills it requires (``skills.mapped_skill_codes``), ``interaction``
+    the interaction kind of the flow revision recorded on it (video for a booking without one).
 
     Raises:
         DomainError: ``integration_not_ready`` naming what is missing (``contact_center``,
-            ``meeting`` or ``contact``).
+            ``meeting`` or ``contact``) or what the group's platform cannot carry
+            (``interaction_kind`` or ``skill_codes``, ADR 0121 step 6).
     """
     routing = _complete_routing(group)
+    gap = uncarried(routing.descriptor.capabilities, interaction, bool(skills))
+    if gap is not None:
+        raise DomainError(ErrorCode.INTEGRATION_NOT_READY, gap)
     if booking.meeting is None or booking.meeting.link is None:
         raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "meeting")
     if booking.contact is None:
@@ -445,6 +460,7 @@ def contact_center_task(
         routing_value=group.routing_value,
         variables=tuple(sorted(group.routing.variables(booking.routing).items())),
         skills=skills,
+        interaction=interaction,
     )
 
 
@@ -469,6 +485,7 @@ def probe_task(
         kind=PROBE_KIND,
         routing=_complete_routing(group),
         routing_value=group.routing_value,
+        interaction=InteractionKind.VIDEO,  # the probe checks the video path the group runs
     )
 
 

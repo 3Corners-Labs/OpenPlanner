@@ -54,7 +54,7 @@ refuses today (every value outside the ``BUILT_*`` constants of ``service_flows`
 """
 
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from itertools import count
 
@@ -85,6 +85,12 @@ from app.domain.configuration_v1_names import (
     SKILL_KIND,
 )
 from app.domain.configuration_values import Value
+from app.domain.contact_center import (
+    ContactCenterCapabilities,
+    ProviderDescriptor,
+    capabilities_of,
+)
+from app.domain.contact_center_codec import contact_center_from_json
 from app.domain.default_flows import check_legacy_shape
 from app.domain.errors import DomainError, ErrorCode, missing_object
 from app.domain.routing_codec import routing_from_json
@@ -168,6 +174,9 @@ class _World:
         legacy: Every group's legacy pool, by the group's slug.
         pool_by_id: Every pool, counted or legacy, by its id of this run.
         subjects: The subject codes every group offers, by slug.
+        carriers: What the platform of every group's complete contact-center routing carries,
+            by slug; a group without one (or with one that cannot be read) is absent (ADR 0121
+            step 6).
     """
 
     organisations: Mapping[str, int]
@@ -178,6 +187,7 @@ class _World:
     legacy: Mapping[str, CapacityPool]
     pool_by_id: Mapping[int, CapacityPool]
     subjects: Mapping[str, frozenset[str]]
+    carriers: Mapping[str, ContactCenterCapabilities] = field(default_factory=dict)
 
     @property
     def skills_by_id(self) -> dict[int, Skill]:
@@ -207,8 +217,22 @@ def _contact_code(value: object) -> str | None:
     return None if value is None else str(value)
 
 
-def _read_world(root: Entity) -> _World:
-    """Read the skills, pools and groups of a tree; an object that cannot be built is left out."""
+def _carrier(
+    value: object, descriptors: Mapping[str, ProviderDescriptor]
+) -> ContactCenterCapabilities | None:
+    """Return what a group's ``contact_center`` field routes to can carry; ``None`` if nothing."""
+    try:
+        return capabilities_of(contact_center_from_json(value, descriptors))
+    except DomainError:
+        return None
+
+
+def _read_world(root: Entity, descriptors: Mapping[str, ProviderDescriptor]) -> _World:
+    """Read the skills, pools and groups of a tree; an object that cannot be built is left out.
+
+    ``descriptors`` are the installation's contact-center platforms, by kind, to read what a
+    group's routing carries.
+    """
     ids = count(1)
     organisations = {address[0]: next(ids) for address, _ in walk(root, ORGANISATION_KIND)}
     skills: dict[tuple[str, str], Skill] = {}
@@ -227,6 +251,7 @@ def _read_world(root: Entity) -> _World:
     groups: dict[str, int] = {}
     group_organisation: dict[str, str] = {}
     subjects: dict[str, frozenset[str]] = {}
+    carriers: dict[str, ContactCenterCapabilities] = {}
     for address, group in walk(root, GROUP_KIND):
         groups[address[1]] = next(ids)
         group_organisation[address[1]] = address[0]
@@ -235,7 +260,12 @@ def _read_world(root: Entity) -> _World:
         except DomainError:
             offered = ()
         subjects[address[1]] = frozenset(subject.code for subject in offered)
-    world = _World(organisations, groups, group_organisation, skills, {}, {}, {}, subjects)
+        carrier = _carrier(group.fields.get("contact_center"), descriptors)
+        if carrier is not None:
+            carriers[address[1]] = carrier
+    world = _World(
+        organisations, groups, group_organisation, skills, {}, {}, {}, subjects, carriers
+    )
     pools: dict[tuple[str, str], CapacityPool] = {}
     legacy: dict[str, CapacityPool] = {}
     for address, entity in walk(root, CAPACITY_POOL_KIND):
@@ -282,7 +312,7 @@ class _Run:
     def __init__(self, resolution: Resolution) -> None:
         """Read the resolution once: the world, the flows before and after, the changes."""
         self.resolution = resolution
-        self.world = _read_world(resolution.resulting)
+        self.world = _read_world(resolution.resulting, resolution.context.contact_centers)
         self.flows = dict(walk(resolution.resulting, SERVICE_FLOW_KIND))
         self.before = dict(walk(resolution.current, SERVICE_FLOW_KIND))
         self.pools_before = {kind: dict(walk(resolution.current, kind)) for kind in _POOLS}
@@ -748,6 +778,7 @@ def _check_publication(run: _Run, address: Address, number: int, built: FlowRevi
                 pool,
                 offered_subjects=run.world.subjects.get(address[1], ()),
                 coded_skills=run.world.coded_skills,
+                carrier=run.world.carriers.get(address[1]),
             )
         )
 
@@ -776,6 +807,7 @@ def _check_state(run: _Run, address: Address, built: ServiceFlow) -> Iterator[Re
             pool,
             offered_subjects=run.world.subjects.get(address[1], ()),
             coded_skills=run.world.coded_skills,
+            carrier=run.world.carriers.get(address[1]),
         )
         if not can_activate(items):
             for item in items:

@@ -13064,6 +13064,15 @@ msgstr "The capacity pool does not guarantee every skill that this flow or one o
 msgid "admin.flows.reason.skill_unmapped"
 msgstr "This flow sends work to the contact center, but a skill that it or one of its subjects requires has no contact-center code yet. Give that skill a code under Skills and capacity."
 
+msgid "admin.flows.reason.contact_center_missing"
+msgstr "This flow sends work to the contact center, but this service is not connected to a contact center yet. Fill in the service's contact center routing, or let the flow use the own queue."
+
+msgid "admin.flows.reason.interaction_not_carried"
+msgstr "The contact center of this service cannot take this contact channel. Choose another contact channel, or let the flow use the own queue."
+
+msgid "admin.flows.reason.skills_not_carried"
+msgstr "This flow requires skills, but the contact center of this service cannot route on skills. Remove the skills from the flow, or let the flow use the own queue."
+
 msgid "admin.flows.reason.missing_skills"
 msgstr "Missing in the pool: {skills}"
 
