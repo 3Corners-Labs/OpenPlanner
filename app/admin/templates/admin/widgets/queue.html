@@ -2,6 +2,8 @@
 {% if view.chart %}
 {% include "admin/widgets/_chart.html" %}
 {% elif view.rows %}
+{#- Five columns do not fit a narrow widget: the table scrolls in its own region (WCAG 1.4.10). -#}
+<div class="table-scroll widget-scroll" role="region" aria-label="{{ _(view.widget.title_key) }}" tabindex="0">
 <table class="widget-table">
   <caption class="visually-hidden">{{ _(view.widget.title_key) }}</caption>
   <thead>
@@ -19,6 +21,7 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% else %}
 <p class="widget__empty">{{ _("admin.overview.widget.queue.empty") }}</p>
 {% endif %}
