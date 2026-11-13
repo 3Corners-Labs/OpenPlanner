@@ -237,11 +237,13 @@ async def test_a_check_in_outside_the_queues_window_is_refused(
 async def test_a24_a_closure_keeps_running_treatment_and_leaves_the_pool_otherwise_alone(
     uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
-    """A24: the service closes while its treatment runs on a pool another service may share.
+    """A24: the service closes while its treatment runs on the shared pool.
 
-    The treatment keeps its one unit (it really occupies someone) and stays in progress; the
-    closure neither frees nor takes any other unit, so the pool's other unit stays for others.
-    Completing it releases the unit once.
+    The closure suspends the booking, as ``ClosureService`` does; the treatment keeps its one
+    unit (it really occupies someone) and stays in progress through the watchdog round, and the
+    closure takes no other unit of the pool. Completing it releases the unit once. That the
+    closure of one service leaves another service's appointments on the pool alone is
+    ``tests/domain/test_pool_booking.py::test_p4_a_suspended_appointment_keeps_its_unit_in_the_pool``.
     """
     booking_id = await appointment(uow, clock, at(10), NOW_FLOW, 30)
     clock.advance(at(10) - clock.now())

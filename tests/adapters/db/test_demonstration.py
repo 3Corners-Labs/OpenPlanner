@@ -61,16 +61,20 @@ async def test_with_the_gate_open_the_shared_pool_takes_two_and_the_own_pool_is_
     async with world.uow.read() as tx:
         group = await tx.get_group_by_id(world.acme_group)
     assert group is not None
+    subject = group.routing.subjects[0].code  # the service keeps the subjects it had
 
     async def book(flow: str) -> None:
         await service.book(
             group_slug=group.slug,
             start=SLOT_0900,
-            contact=replace(another_participant(), answers={"_subject": "contract"}),
+            contact=replace(another_participant(), answers={"_subject": subject}),
             locale="nl",
             flow=flow,
         )
 
+    before = await service.availability(
+        group.slug, SLOT_0900.date(), SLOT_0900.date(), flow=REVIEW_FLOW
+    )
     await book(IN_PERSON_FLOW)
     await book(IN_PERSON_FLOW)
     with pytest.raises(DomainError) as full:
@@ -80,4 +84,5 @@ async def test_with_the_gate_open_the_shared_pool_takes_two_and_the_own_pool_is_
     )
 
     assert full.value.code is ErrorCode.SLOT_FULL
-    assert review  # the own pool's afternoon is still free
+    assert review == before  # the own pool is untouched by the shared pool's bookings
+    assert review

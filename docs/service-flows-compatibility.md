@@ -197,7 +197,7 @@ legacy paths). A row whose proof needs a released image or a browser names its c
 
 | Row | Scenario | Gate | Proof |
 |---|---|---|---|
-| A01 | Arbitrary service and flow names change no behaviour | n/a | `tests/domain/test_flow_resolution.py::test_the_labels_of_a_flow_change_nothing` |
+| A01 | Arbitrary service and flow names change no behaviour | n/a | `tests/domain/test_flow_resolution.py::test_the_labels_of_a_flow_change_nothing`; the pages: `tests/admin/test_flow_lifecycle_routes.py::test_two_flows_with_arbitrary_names_and_one_configuration_read_the_same` |
 | A02 | Existing links, entitlements, roles and widget configuration resolve unchanged | n/a | `tests/test_upgrade_train.py::test_upgrading_keeps_every_pre_train_value_and_the_matrix_invariants` |
 | A03 | Legacy appointment and direct paths keep confirmation, dispatch, capacity, cancellation | both | `tests/domain/test_pool_booking_gate.py::test_every_path_of_the_service_is_the_same_with_a_pool_flow_beside_it` |
 | A04 | Omitted flow resolves the default; an invalid explicit flow is refused | n/a | `tests/api/test_flow_entry_paths.py::test_an_archived_flow_is_refused_but_the_default_path_keeps_booking` |
@@ -206,7 +206,7 @@ legacy paths). A row whose proof needs a released image or a browser names its c
 | A07 | Skills without permission: no access | n/a | `tests/domain/test_queue_skills.py::test_skills_without_the_right_give_no_access` |
 | A08 | Permission with a missing skill: cannot claim or start | n/a | `tests/domain/test_queue_skills.py::test_a_right_without_the_skill_cannot_claim_or_start` |
 | A09 | A skill revoked between listing and claim: the locked claim refuses | n/a | `tests/domain/test_queue_skills.py::test_a_skill_revoked_after_the_listing_is_refused_by_the_locked_claim` |
-| A10 | Two concurrent claims: exactly one assignment | n/a | `tests/domain/test_queue_skills.py::test_two_eligible_agents_claim_one_booking_once` |
+| A10 | Two concurrent claims: exactly one assignment | n/a | `tests/domain/test_queue_skills.py::test_two_eligible_agents_claim_one_booking_once` (partly: the write lock and the conditional update serialise the claims, which run one after the other here; a race on two connections is not tested) |
 | A11 | Two flows share a pool of two: never more than two commitments | open | `tests/adapters/db/test_pool_booking.py::test_a11_two_bookings_racing_for_the_last_unit_never_overbook`; on the demonstration fixture: `tests/adapters/db/test_demonstration.py::test_with_the_gate_open_the_shared_pool_takes_two_and_the_own_pool_is_untouched` |
 | A12 | Independent pools do not consume each other | open | `tests/domain/test_pool_booking.py::test_a12_a_full_pool_leaves_another_pool_alone` |
 | A13 | Skills X and Y on two people do not make two X+Y units | n/a | `tests/domain/test_skill_eligibility.py::test_two_people_with_one_skill_each_are_no_unit_with_both` |
@@ -216,19 +216,19 @@ legacy paths). A row whose proof needs a released image or a browser names its c
 | A17 | An immediate request before a fully reserved interval may wait, not start | open | `tests/domain/test_request_queue.py::test_immediate_work_never_takes_a_reserved_unit` |
 | A18 | An overrun stays visible with an explicit conflict | n/a | `tests/domain/test_request_work.py::test_a_due_appointment_starts_when_a_colleague_holds_the_last_unit_and_it_is_recorded` |
 | A19 | A flow without video needs no host, provider, meeting job or video state | n/a | `tests/domain/test_request_work.py::test_a_flow_without_video_needs_no_meeting_and_shows_no_video_state` |
-| A20 | A request without collected email or name is valid, invents nothing, expires and is deleted | open | `tests/domain/test_immediate_requests.py::test_a_flow_that_does_not_collect_email_stores_none` |
+| A20 | A request without collected email or name is valid, invents nothing, expires and is deleted | open | `tests/domain/test_immediate_requests.py::test_a_flow_that_does_not_collect_email_stores_none`; expiry and deletion: `tests/domain/test_immediate_requests.py::test_an_immediate_record_is_deleted_end_to_end` |
 | A21 | A task without video: a valid payload without a meeting link, organisation credentials | n/a | `tests/domain/test_request_dispatch.py::test_a_task_without_a_meeting_reaches_the_contact_center_once` |
 | A22 | Provider timeout, fallback, late callback: reconciled, one fenced authority | n/a | `tests/domain/test_request_dispatch.py::test_an_attempt_in_doubt_is_fenced_and_a_later_task_is_ended` |
 | A23 | Flow, skill or capacity edited after booking: stored meaning kept, eligibility rechecked | n/a | `tests/domain/test_queue_skills.py::test_the_booking_keeps_the_requirement_of_its_revision` |
 | A24 | A service closes with treatment active while another service shares the pool | open | `tests/domain/test_request_queue.py::test_a24_a_closure_keeps_running_treatment_and_leaves_the_pool_otherwise_alone` |
 | A25 | Cancel or move with pending jobs: no late meeting or task, allocations released once | open | `tests/domain/test_pool_booking.py::test_a25_cancelling_or_moving_releases_the_unit_once_and_plans_no_meeting` |
 | A26 | Refused, suspended, awaiting a new time: no jobs, no capacity leak, no retention change | open | `tests/domain/test_pool_booking.py::test_p4_a_suspended_appointment_keeps_its_unit_in_the_pool`; the request on hold: `tests/domain/test_request_watch.py::test_a_booking_on_hold_keeps_its_request_open_and_the_deadline_follows_a_new_time` |
-| A27 | Completion and no-show reports from explicit evidence only | n/a | `tests/domain/test_request_work.py::test_start_and_complete_release_the_unit_once_and_complete_the_booking`; the reports close a pool slot from that status only (#807) |
+| A27 | Completion and no-show reports from explicit evidence only | n/a | `tests/domain/test_request_work.py::test_start_and_complete_release_the_unit_once_and_complete_the_booking`; the reports close a pool slot from that status only, and nothing sets `no_show` without evidence (the closing rule of #807 names its own tests) |
 | A28 | Archiving a referenced flow, skill or pool blocks new use, keeps history | n/a | `tests/domain/test_queue_skills.py::test_an_archived_skill_still_binds_accepted_work` |
 | A29 | Configuration export and import keep identities, mappings, revisions | n/a | `tests/adapters/db/test_config_flows.py::test_export_import_export_gives_the_same_document` |
 | A30 | The previous image on the expanded schema: book and claim stay safe | n/a | `tests/test_upgrade_train.py::test_the_previous_image_writes_and_the_current_code_reads_and_claims_it`; with released images: checklist G07 |
-| A31 | A ticket number does not enumerate requests | open | `tests/api/test_immediate_pages.py::test_a_request_is_taken_in_and_shown_by_its_cookie` |
-| A32 | Dutch and English, keyboard, scripts off, narrow screen | open | `tests/api/test_immediate_pages.py::test_a_retried_post_and_a_second_visit_give_the_same_request`; keyboard, narrow screen and axe in the browser: checklist G06 |
+| A31 | A ticket number does not enumerate requests | open | `tests/api/test_immediate_pages.py::test_a_request_is_taken_in_and_shown_by_its_cookie` (partly: a random reference and a cookie, refused the same for a stranger and an unknown reference; no public display exists, follow-up row 20) |
+| A32 | Dutch and English, keyboard, scripts off, narrow screen | open | `tests/api/test_immediate_pages.py::test_a_retried_post_and_a_second_visit_give_the_same_request` (partly: the pages work as plain forms without script; English, keyboard, narrow screen and axe in the browser are checklist G06) |
 | A33 | Never checked in and never claimed requests expire and are deleted | open | `tests/domain/test_immediate_requests.py::test_an_immediate_record_is_deleted_end_to_end` |
 | A34 | Treatment across the deadlines: recovery, deletion, occupancy kept | n/a | `tests/domain/test_request_watch.py::test_started_work_past_the_deadline_is_marked_for_recovery_and_keeps_its_unit` |
 | A35 | A late start after a claim or lease expiry: skills, ownership and capacity rechecked | open | `tests/domain/test_request_queue.py::test_an_expired_lease_releases_the_unit_and_a_late_start_is_refused` |

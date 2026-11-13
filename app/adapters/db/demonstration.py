@@ -15,11 +15,13 @@ Both pools are staffed on weekdays: the shared one 09:00 to 12:00, the own one 1
 Amsterdam time, for appointments and work without one.
 
 Written through the ``Transaction`` port, as an image with the rollback gate open would write
-it, so one fixture serves the SQL adapter, the fake and, through ``seed --demonstration``, a
-development database (gate items G06, G07 and G09). Publishing and activation are written
-directly, not through the readiness checklist, on purpose: the checklist refuses every new flow
-while ``ROLLBACK_SAFE`` is false, and the flow resolver ignores these flows while it is.
-Idempotent: what exists is kept. Configuration only, never a participant.
+it, so one fixture serves the SQL adapter and the fake now, and a development database once the
+e2e stack and the upgrade matrix need it (gate items G06 and G07). Publishing and activation are
+written directly, not through the readiness checklist, on purpose: the checklist refuses every
+new flow while ``ROLLBACK_SAFE`` is false, and the flow resolver ignores these flows while it
+is. A command that runs it must therefore refuse production, as ``seed-closures`` does.
+Idempotent: what exists is kept, the service's subjects included (they are written only when it
+has none). Configuration only, never a participant.
 """
 
 from dataclasses import dataclass
@@ -68,7 +70,6 @@ class _Flow:
     action: HandlingAction
     shared: bool
     minutes: int
-    active: bool
 
 
 FLOWS = (
@@ -80,7 +81,6 @@ FLOWS = (
         HandlingAction.VIEW_REQUEST,
         True,
         30,
-        True,
     ),
     _Flow(
         REVIEW_FLOW,
@@ -90,7 +90,6 @@ FLOWS = (
         HandlingAction.VIEW_REQUEST,
         False,
         20,
-        True,
     ),
 )
 """The flows of the fixture, both active."""
@@ -128,11 +127,14 @@ async def seed_demonstration(tx: Transaction, group: Group, publisher: int) -> D
         if code not in skills:
             skill = Skill(None, organisation, code, {"nl": nl, "en": en})
             skills[code] = await tx.save_skill(EVERYTHING, skill)
-    general = skills[GENERAL].id or 0
+    general = skills[GENERAL].id
+    if general is None:  # pragma: no cover - a stored skill has an id
+        raise ValueError("the stored skill has no id")
     shared = await _pool(tx, organisation, SHARED_POOL, "Persoonlijk advies", 2, 9, {general})
     own = await _pool(tx, organisation, OWN_POOL, "Documentcontrole", 1, 13, set())
-    subjects = tuple(Subject.create(code, {"nl": nl, "en": en}) for code, nl, en in SUBJECTS)
-    await tx.save_group_routing(group.id, GroupRouting(subjects=subjects))
+    if not group.routing.subjects:
+        subjects = tuple(Subject.create(c, {"nl": nl, "en": en}) for c, nl, en in SUBJECTS)
+        await tx.save_group_routing(group.id, GroupRouting(subjects=subjects))
     flows = {f.code: f.id or 0 for f in await tx.list_service_flows(EVERYTHING, group.id)}
     for wanted in FLOWS:
         if wanted.code in flows:
@@ -142,9 +144,8 @@ async def seed_demonstration(tx: Transaction, group: Group, publisher: int) -> D
         draft = _revision(wanted, pool, required)
         new = ServiceFlow(None, group.id, wanted.code, FlowState.DRAFT, frozenset(), None, draft)
         flow_id = (await tx.save_draft(EVERYTHING, new)).id or 0
-        if wanted.active:
-            await tx.publish_draft(EVERYTHING, flow_id, by=publisher, at=PUBLISHED)
-            await tx.set_flow_state(EVERYTHING, flow_id, FlowState.ACTIVE)
+        await tx.publish_draft(EVERYTHING, flow_id, by=publisher, at=PUBLISHED)
+        await tx.set_flow_state(EVERYTHING, flow_id, FlowState.ACTIVE)
         flows[wanted.code] = flow_id
     return Demonstration(group.id, shared, own, {f.code: flows[f.code] for f in FLOWS})
 

@@ -44,7 +44,8 @@ STEP_8 = "8"
 TEST_REFERENCE = re.compile(r"`(tests/[\w/]+\.py)::(\w+)`")
 ACCEPTANCE = [f"A{n:02d}" for n in range(1, 37)]
 """The rows of the acceptance matrix of ``docs/service-flows-handover.md`` (gate item G09)."""
-GATE_OPENERS = ("open_gate", "ROLLBACK_SAFE")
+GATE_OPENER = re.compile(r"open_gate\(|ROLLBACK_SAFE\", True")
+"""A call that opens the rollback gate in a test: ``open_gate(...)`` or a monkeypatch to True."""
 ITEM = re.compile(r"\bG\d{2}\b")
 
 
@@ -173,6 +174,6 @@ def test_a_row_that_runs_with_the_gate_open_names_a_module_that_opens_it() -> No
     for name, (_row, _scenario, gate, proof) in _acceptance().items():
         if gate not in {"open", "both"}:
             continue
-        path, _test = TEST_REFERENCE.findall(proof)[0]
-        text = (ROOT / path).read_text(encoding="utf-8")
-        assert any(opener in text for opener in GATE_OPENERS), f"{name}: {path}"
+        paths = {path for path, _test in TEST_REFERENCE.findall(proof)}
+        opening = [p for p in paths if GATE_OPENER.search((ROOT / p).read_text(encoding="utf-8"))]
+        assert opening, f"{name}: {sorted(paths)}"
