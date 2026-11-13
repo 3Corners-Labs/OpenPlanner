@@ -24,9 +24,9 @@
       <tr>
         <th scope="row">{{ item.time }}</th>
         <td>{{ item.first_name }}<br><span class="muted">{{ item.reference }}{% if item.direct %} · {{ _("admin.queue.direct") }}{% endif %}</span>{% if item.routing %}<br><span class="muted">{{ item.routing }}</span>{% endif %}</td>
-        <td><span class="chip{% if item.tone %} chip--{{ item.tone }}{% endif %}">{{ item.state }}</span>{% if item.fallback %}<br><span class="chip chip--warning">{{ _("admin.fallback.chip") }}</span>{% endif %}{% if item.overdue %}<br><span class="chip chip--danger">{{ _("admin.agenda.not_picked_up") }}</span>{% endif %}{% if item.video %}<br><span class="chip{% if item.video_tone %} chip--{{ item.video_tone }}{% endif %}">{{ item.video }}</span>{% endif %}</td>
+        <td><span class="chip{% if item.tone %} chip--{{ item.tone }}{% endif %}">{{ item.state }}</span>{% if item.fallback %}<br><span class="chip chip--warning">{{ _("admin.fallback.chip") }}</span>{% endif %}{% if item.overdue %}<br><span class="chip chip--danger">{{ _("admin.agenda.not_picked_up") }}</span>{% endif %}{% if item.video %}<br><span class="chip{% if item.video_tone %} chip--{{ item.video_tone }}{% endif %}">{{ item.video }}</span>{% endif %}{% if not item.eligible %}<br><span class="chip chip--warning">{{ _("admin.queue.not_for_you", skills=item.missing) }}</span>{% endif %}</td>
         <td>
-          {% if item.mine %}
+          {% if item.mine and item.eligible %}
           <a href="/admin/groups/{{ summary.group.slug }}/queue/{{ item.id }}">{{ _("admin.queue.open") }}<span class="visually-hidden"> {{ item.reference }}</span></a>
           {% elif item.can_claim %}
           <form method="post" action="/admin/groups/{{ summary.group.slug }}/queue/{{ item.id }}/claim">

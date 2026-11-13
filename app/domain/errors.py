@@ -84,6 +84,8 @@ class ErrorCode(StrEnum):
     ALREADY_CLAIMED = "already_claimed"
     FREE_PICK_NOT_ALLOWED = "free_pick_not_allowed"
     NOT_CLAIMED = "not_claimed"
+    NOT_ELIGIBLE = "not_eligible"
+    """ADR 0121 point 5: the person lacks a skill the work requires (rights are separate)."""
     SETTING_NOT_EDITABLE = "setting_not_editable"
     SETTING_LOCKED = "setting_locked"
     SETTING_INVALID = "setting_invalid"

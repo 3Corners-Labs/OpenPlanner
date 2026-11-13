@@ -377,6 +377,12 @@ msgstr "In this service you always pick up the next appointment."
 msgid "error.not_claimed"
 msgstr "You did not pick up this appointment."
 
+msgid "error.not_eligible"
+msgstr "You do not have every skill this work requires. Pick up other work or hand it back."
+
+msgid "admin.queue.not_for_you"
+msgstr "Not for you: missing skill: {skills}"
+
 msgid "error.booking_not_active"
 msgstr "This appointment is no longer active."
 
