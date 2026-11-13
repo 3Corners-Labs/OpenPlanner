@@ -11,6 +11,13 @@ exactly one wins; the other gets ``already_claimed`` (a chosen row) or the next 
     claim       ─► only with queue_free_pick_allowed; locked: eligible ─► claim_booking
     claimed     ─► eligible again (the start of treatment) ─► the meeting link, claimer only
     release     ─► the claiming agent, or anyone who may view the group's bookings
+    start       ─► request work only: holder, eligible, lease, the pool's check_start (locked)
+    complete    ─► request work only: holder (or a supervisor in recovery) ─► unit released
+
+Request work (ADR 0121 step 5): a booking of a flow without video on a counted pool. Its claim
+also makes the request and a work item with a lease (``RequestWork``); its page offers *Start*
+and *Complete* instead of a meeting link; releasing it ends the unstarted work item, and started
+work is completed, never released. Every other booking is the queue's work as before.
 
 Skills (ADR 0121 point 5): a claim needs the right (``queue.work``), the skills the booking's
 flow revision and subject require (``WorkEligibility``, read inside the locked transaction) and
@@ -51,6 +58,7 @@ from app.domain.own_queue import (
     works_queue,
 )
 from app.domain.ports import Clock, Transaction, UnitOfWork
+from app.domain.request_work import RequestWork, Work, recovering
 from app.domain.routing import RoutingChoice
 from app.domain.scheduling import Group, GroupSummary
 from app.domain.skills import Missing, Skill
@@ -62,7 +70,11 @@ from app.domain.work_eligibility import WorkEligibility
 
 CLAIMED = "queue.claimed"
 RELEASED = "queue.released"
-"""Audit details of the two changes (``action`` is the permission, ``queue.work``)."""
+STARTED = "queue.started"
+STARTED_IN_CONFLICT = "queue.started_in_conflict"
+COMPLETED = "queue.completed"
+"""Audit details of the changes (``action`` is the permission, ``queue.work``); start and
+completion are of request work only (ADR 0121 step 5)."""
 
 
 @dataclass(frozen=True)
@@ -85,6 +97,7 @@ class QueueRow:
         eligible: The viewer holds every skill the booking requires (ADR 0121 point 5).
         missing: The skills the booking requires that the viewer does not hold, to name them
             (choice S3); empty when the viewer may take it.
+        without_video: Request work of a flow without video (ADR 0121 step 5).
     """
 
     booking_id: int
@@ -101,6 +114,7 @@ class QueueRow:
     fallback: bool = False
     eligible: bool = True
     missing: tuple[Skill, ...] = ()
+    without_video: bool = False
 
 
 @dataclass(frozen=True)
@@ -151,6 +165,8 @@ class ClaimedBooking:
     """Whether the meeting is ready, pending or failed (ADR 0072)."""
     participant: ParticipantState = ParticipantState.NOT_YET
     """Where the participant is: not yet joined, in the lobby, in the call, or gone."""
+    work: Work | None = None
+    """The request and its work item for request work (ADR 0121 step 5), else ``None``."""
 
 
 class QueueService:
@@ -165,6 +181,8 @@ class QueueService:
             rotation (ADR 0094 point 4): earlier claims still read as the agent's own.
         staff_usage: Writes the claim as a fact about the agent while the organisation has the
             team view on (ADR 0117 point 9); ``None`` writes none.
+        work: The request work of flows without video on a counted pool (ADR 0121 step 5);
+            ``None`` treats every booking as before.
     """
 
     def __init__(
@@ -175,8 +193,10 @@ class QueueService:
         pseudonym_key: bytes,
         previous_pseudonym_key: bytes | None = None,
         staff_usage: StaffUsage | None = None,
+        work: RequestWork | None = None,
     ) -> None:
         """Store the collaborators; ``staff_usage`` adds the claim to the team member's facts."""
+        self._work = work
         self._uow = uow
         self._clock = clock
         self._admin = admin
@@ -198,6 +218,11 @@ class QueueService:
             judge = WorkEligibility(tx, principal, summary.organisation_slug)
             lacking = await _lacking(judge, entries)
             named = {i: await judge.skills(ids) for i, ids in lacking.items() if ids}
+            requests = {
+                _id(e.booking)
+                for e in entries
+                if self._work and await self._work.handles(tx, e.booking)
+            }
         me = agent_pseudonyms(self._keys, principal.subject)
         limit = timedelta(minutes=group.not_picked_up_minutes)
         nxt = next_up(e for e in entries if not lacking[_id(e.booking)])
@@ -206,6 +231,7 @@ class QueueService:
                 _row(e, me, e.not_picked_up(now, limit)),
                 eligible=not lacking[_id(e.booking)],
                 missing=named.get(_id(e.booking), ()),
+                without_video=_id(e.booking) in requests,
             )
             for e in entries
         ]
@@ -328,7 +354,8 @@ class QueueService:
             await WorkEligibility(tx, principal, summary.organisation_slug).check(booking)
             form = await tx.get_form(summary.group.id)
             status = await tx.get_call_status(booking_id)
-        return _claimed(booking, form, locale, status)
+            work = await self._work.of(tx, booking) if self._work else None
+        return replace(_claimed(booking, form, locale, status), work=work)
 
     async def release(self, principal: Principal, slug: str, booking_id: int) -> None:
         """Put a claimed booking back at the top of the queue.
@@ -346,9 +373,55 @@ class QueueService:
             mine = self._holds(principal, booking)
             if booking.claim is None or not (mine or supervisor):
                 raise DomainError(ErrorCode.NOT_CLAIMED)
+            if self._work is not None:
+                await self._work.released(tx, booking, self._clock.now())
             await tx.release_claim(booking_id)
             await self._audit(tx, principal, summary, booking_id, RELEASED)
             await record_queue_released(tx, booking, summary.group, self._clock.now())
+
+    async def start(self, principal: Principal, slug: str, booking_id: int) -> ClaimedBooking:
+        """Start the treatment of request work ``principal`` claimed (ADR 0121 step 5).
+
+        Inside the lock: the claim, the skills (A35), the lease and the pool's ``check_start``
+        on the live staffing and every commitment (ADR 0122 decision 11). A start during a
+        colleague's overrun goes ahead and is recorded on the work item.
+
+        Raises:
+            DomainError: ``not_claimed``, ``not_eligible``, ``booking_not_active``,
+                ``lease_expired``, ``request_in_progress``, ``start_refused``, or as ``view``.
+        """
+        summary = await self._group(principal, slug)
+        async with self._uow.locked() as tx:
+            booking = await _booking_of(tx, slug, booking_id)
+            if self._work is None or not self._holds(principal, booking):
+                raise DomainError(ErrorCode.NOT_CLAIMED)
+            await WorkEligibility(tx, principal, summary.organisation_slug).check(booking)
+            work = await self._work.start(tx, summary.group, booking, self._clock.now())
+            detail = STARTED_IN_CONFLICT if work.item and work.item.start_conflict else STARTED
+            await self._audit(tx, principal, summary, booking_id, detail)
+        return replace(_claimed(booking), work=work)
+
+    async def complete(self, principal: Principal, slug: str, booking_id: int) -> None:
+        """Complete request work: its pool unit is released once and the booking completed.
+
+        The holder of the claim completes it; work the watchdog marked for recovery may also
+        be completed by anyone who may view the group's bookings, like a release. A booking
+        cancelled during treatment is still completed (design R7).
+
+        Raises:
+            DomainError: ``not_claimed``, ``request_not_started``, or as ``view``.
+        """
+        summary = await self._group(principal, slug)
+        async with self._uow.locked() as tx:
+            booking, _ = await group_booking(tx, slug, booking_id)
+            work = await self._work.of(tx, booking) if self._work else None
+            allowed = self._holds(principal, booking) or (
+                recovering(work) and _supervises(principal, summary)
+            )
+            if self._work is None or work is None or not allowed:
+                raise DomainError(ErrorCode.NOT_CLAIMED)
+            await self._work.complete(tx, booking, self._clock.now())
+            await self._audit(tx, principal, summary, booking_id, COMPLETED)
 
     async def _group(self, principal: Principal, slug: str) -> GroupSummary:
         """Authorise ``queue.work`` on the group and return it if it has an own queue."""
@@ -380,7 +453,10 @@ class QueueService:
         await record_queue_claimed(tx, booking, summary.group, now)
         if self._staff_usage is not None:
             await self._staff_usage.claimed(tx, principal.subject, summary.group, now)
-        return _claimed(booking)
+        work = None
+        if self._work is not None:
+            work = await self._work.claimed(tx, summary.group, booking, claim.claimed_by, now)
+        return replace(_claimed(booking), work=work)
 
     def _holds(self, principal: Principal, booking: Booking) -> bool:
         """Return whether ``principal`` holds the claim on ``booking``."""

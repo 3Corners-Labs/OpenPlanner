@@ -181,6 +181,8 @@ async def test_the_organisation_states_show_the_source() -> None:
         "staff_dormant_after_days",
         "shortfall_horizon_days",
         "treatment_buffer_minutes",
+        "assignment_start_lease_minutes",
+        "request_unresolved_hours",
         "planner_rebook_days",
         "planner_rebook_reminder_days",
         "reschedule_proposal_confirm_hours",

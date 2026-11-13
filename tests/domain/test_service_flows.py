@@ -98,7 +98,7 @@ def test_the_combination_table_is_closed() -> None:
     assert set(COMBINATIONS) == set(InteractionKind)
 
 
-def test_what_is_built_is_exactly_what_the_steps_before_5_and_6_allow() -> None:
+def test_what_is_built_is_exactly_what_the_steps_before_6_allow() -> None:
     assert BUILT_KINDS == {
         InteractionKind.TELEPHONE,
         InteractionKind.IN_PERSON,
@@ -111,7 +111,7 @@ def test_what_is_built_is_exactly_what_the_steps_before_5_and_6_allow() -> None:
         HandlingAction.VIEW_REQUEST,
         HandlingAction.CALL,
     }
-    assert RETENTION_BUILT is False
+    assert RETENTION_BUILT is True  # the watchdog and the deletion of step 5b
     assert ROLLBACK_SAFE is False  # the gate of ADR 0122 stays shut until the upgrade proof
 
 
@@ -209,17 +209,16 @@ def test_the_legacy_wrapper_is_ready_everywhere() -> None:
     assert can_activate(readiness(legacy(), pool(), offered_subjects=()))
 
 
-def test_a_new_flow_cannot_be_activated_before_step_5() -> None:
+def test_a_new_flow_cannot_be_activated_while_the_rollback_gate_is_shut() -> None:
     assert reasons(revision(), pool()) == {
         **dict.fromkeys(ORDER),
-        ReadinessCheck.RETENTION: R.NOT_BUILT_YET,
+        ReadinessCheck.ROLLBACK: R.ROLLBACK_NOT_SAFE,
     }
     assert not can_activate(readiness(revision(), pool(), offered_subjects=()))
 
 
-def test_retention_is_ready_once_it_is_built(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.domain.service_flows.RETENTION_BUILT", True)
-    monkeypatch.setattr("app.domain.service_flows.ROLLBACK_SAFE", True)  # ADR 0122: the gate too
+def test_a_flow_is_ready_once_the_gate_opens(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.domain.service_flows.ROLLBACK_SAFE", True)  # ADR 0122: the gate
     assert reasons(revision(), pool()) == dict.fromkeys(ORDER)
     assert can_activate(readiness(revision(), pool(), offered_subjects=()))
 
@@ -1104,3 +1103,14 @@ def test_the_skills_a_pool_does_not_guarantee_are_named_for_the_flow_and_each_su
 
     assert missing_guarantees(rev, the_pool) == frozenset({2, 3})
     assert missing_guarantees(rev, None) == frozenset()
+
+
+def test_retention_is_its_own_point_and_follows_while_it_is_not_built(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.domain.service_flows.RETENTION_BUILT", False)
+    assert reasons(revision(), pool()) == {
+        **dict.fromkeys(ORDER),
+        ReadinessCheck.RETENTION: R.NOT_BUILT_YET,
+        ReadinessCheck.ROLLBACK: R.ROLLBACK_NOT_SAFE,
+    }

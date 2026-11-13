@@ -234,6 +234,25 @@ class ServiceRequest:
         return ("request", self.id or 0)
 
 
+@dataclass(frozen=True)
+class UnclaimedBooking:
+    """A confirmed booking on a counted pool that has no request yet: what the watchdog needs.
+
+    Attributes:
+        booking_id: The booking.
+        organisation_id: Its service's organisation, whose watchdog hours apply.
+        group_id: Its service.
+        flow: The flow and revision it was made under.
+        end: The end of the appointment.
+    """
+
+    booking_id: int
+    organisation_id: int
+    group_id: int
+    flow: FlowRef
+    end: datetime
+
+
 def watchdog_deadline(anchor: datetime, unresolved_hours: int) -> datetime:
     """Return the watchdog moment: ``anchor`` (reservation end or acceptance) plus the hours."""
     return anchor + timedelta(hours=unresolved_hours)

@@ -18,20 +18,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.form_fields import answers_from_json, answers_json
 from app.adapters.db.models import (
+    BookingRow,
+    GroupRow,
     RequestPersonalDataRow,
     ServiceRequestRow,
+    SlotRow,
     WorkItemRow,
 )
+from app.domain.booking import BookingStatus
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.flow_resolution import FlowRef
 from app.domain.pool_accounting import Commitment
 from app.domain.service_flows import IntakeMode
 from app.domain.service_requests import (
     ACTIVE_ITEM,
+    TERMINAL,
     HandlingState,
     PersonalDataState,
     RequestPersonalData,
     ServiceRequest,
+    UnclaimedBooking,
     WorkItem,
     WorkItemState,
 )
@@ -39,6 +45,13 @@ from app.domain.service_requests import (
 _ACTIVE = sorted(state.value for state in ACTIVE_ITEM)
 """The stored values of an active work item; ``models.ACTIVE_WORK_ITEM`` is the index's twin
 (a test keeps the two equal)."""
+
+_WATCHED = sorted(
+    state.value
+    for state in HandlingState
+    if state not in TERMINAL and state is not HandlingState.RECOVERY_REQUIRED
+)
+"""The handling states the watchdog round still looks at."""
 
 
 def request_of(row: ServiceRequestRow) -> ServiceRequest:
@@ -139,6 +152,59 @@ class ServiceRequestQueries:
             select(ServiceRequestRow).where(ServiceRequestRow.booking_id == booking_id)
         )
         return request_of(row) if row is not None else None
+
+    async def get_service_request(self, request_id: int) -> ServiceRequest | None:
+        """Return a request by id, or ``None``."""
+        row = await self._session.get(ServiceRequestRow, request_id)
+        return request_of(row) if row is not None else None
+
+    async def open_request_ids(self) -> list[int]:
+        """Return the ids of the requests the watchdog still watches."""
+        found = await self._session.scalars(
+            select(ServiceRequestRow.id)
+            .where(ServiceRequestRow.handling.in_(_WATCHED))
+            .order_by(ServiceRequestRow.id)
+        )
+        return list(found)
+
+    async def unclaimed_pool_bookings(self, ended_before: datetime) -> list[UnclaimedBooking]:
+        """Return confirmed pool bookings with a flow, ended before the moment, without request."""
+        found = await self._session.execute(
+            select(
+                BookingRow.id,
+                GroupRow.organisation_id,
+                BookingRow.group_id,
+                BookingRow.flow_id,
+                BookingRow.flow_revision,
+                SlotRow.end,
+            )
+            .join(SlotRow, SlotRow.id == BookingRow.slot_id)
+            .join(GroupRow, GroupRow.id == BookingRow.group_id)
+            .outerjoin(ServiceRequestRow, ServiceRequestRow.booking_id == BookingRow.id)
+            .where(
+                SlotRow.capacity_pool_id.is_not(None),
+                SlotRow.end < ended_before,
+                BookingRow.status == BookingStatus.CONFIRMED.value,
+                BookingRow.flow_id.is_not(None),
+                BookingRow.flow_revision.is_not(None),
+                ServiceRequestRow.id.is_(None),
+            )
+            .order_by(BookingRow.id)
+        )
+        return [
+            UnclaimedBooking(booking_id, organisation_id, group_id, FlowRef(flow, revision), end)
+            for booking_id, organisation_id, group_id, flow, revision, end in found
+            if flow is not None and revision is not None
+        ]
+
+    async def requests_holding_data(self) -> list[ServiceRequest]:
+        """Return the requests whose request-level record still holds personal data."""
+        found = await self._session.scalars(
+            select(ServiceRequestRow)
+            .where(ServiceRequestRow.personal_data == PersonalDataState.PRESENT.value)
+            .order_by(ServiceRequestRow.id)
+        )
+        return [request_of(row) for row in found]
 
     async def get_active_work_item(self, request_id: int) -> WorkItem | None:
         """Return the request's one active work item, or ``None``."""

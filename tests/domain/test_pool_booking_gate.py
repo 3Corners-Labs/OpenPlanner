@@ -225,28 +225,24 @@ def test_the_gate_lets_a_pool_flow_through_for_appointments_only(
 # --- the readiness checklist reads the gate ---------------------------------------------------
 
 
-def test_a_new_flow_waits_for_the_gate_once_retention_is_built(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr("app.domain.service_flows.RETENTION_BUILT", True)
-
+def test_a_new_flow_waits_for_the_gate_on_its_own_point() -> None:
     items = readiness(revision(), pool(), offered_subjects=())
 
     retention = next(i for i in items if i.code is ReadinessCheck.RETENTION)
-    assert retention.reason is ReadinessReason.ROLLBACK_NOT_SAFE
+    rollback = next(i for i in items if i.code is ReadinessCheck.ROLLBACK)
+    assert retention.ok
+    assert rollback.reason is ReadinessReason.ROLLBACK_NOT_SAFE
     assert not can_activate(items)
     assert readiness_state(items) is ReadinessState.COMPLETE_EXCEPT_FOLLOWING
     assert can_publish(items)  # publishing does not activate
 
 
-def test_retention_is_reported_before_the_gate(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_an_open_gate_makes_a_new_flow_ready(monkeypatch: pytest.MonkeyPatch) -> None:
     open_gate(monkeypatch)
 
     items = readiness(revision(), pool(), offered_subjects=())
 
-    retention = next(i for i in items if i.code is ReadinessCheck.RETENTION)
-    assert retention.reason is ReadinessReason.NOT_BUILT_YET
-    assert not can_activate(items)
+    assert can_activate(items)
 
 
 def test_the_legacy_wrapper_never_waits_for_the_gate() -> None:

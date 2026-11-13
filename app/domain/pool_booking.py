@@ -55,7 +55,13 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.flow_resolution import ResolvedFlow, pool_flows_bookable
 from app.domain.flow_resolver import resolve_flow
 from app.domain.holidays import closures
-from app.domain.pool_accounting import AdmissionOutcome, admit_appointment, interval_end
+from app.domain.pool_accounting import (
+    AdmissionOutcome,
+    StartCheck,
+    admit_appointment,
+    check_start,
+    interval_end,
+)
 from app.domain.pool_availability import PoolScene, PoolTarget, resolved_target, slot_target
 from app.domain.pool_staffing import (
     Intake,
@@ -279,6 +285,37 @@ class PoolBookings:
             Slot(None, group.id, start, end, units, BookingKind.SCHEDULED, loaded.id, until)
         )
 
+    async def check_start_of(
+        self, tx: Transaction, group: Group, slot: Slot, booking_id: int, now: datetime
+    ) -> StartCheck:
+        """Judge whether the appointment ``booking_id`` on ``slot`` may start treatment now.
+
+        Run inside ``locked()`` at the start (ADR 0122 decision 11, A35): the pool's live
+        staffing and every commitment are read now; the length and the wrap-up are the slot's,
+        fixed when it was booked (A23). An archived pool still serves the appointments it has.
+
+        Raises:
+            DomainError: ``start_refused`` when the slot is not on a counted pool of the
+                service's organisation or the pool has no staffing at all.
+        """
+        target = slot_target(slot)
+        if target is None or slot.occupied_until is None:
+            raise DomainError(ErrorCode.START_REFUSED)
+        loaded = await self._load(tx, group, target, now, now + timedelta(days=1), archived=True)
+        if loaded is None:
+            raise DomainError(ErrorCode.START_REFUSED)
+        buffer = (slot.occupied_until - slot.end) // timedelta(minutes=1)
+        until = interval_end(now, target.duration_minutes, buffer)
+        return check_start(
+            loaded.supply(now, until),
+            await tx.get_pool_commitments(loaded.id, now, until),
+            now,
+            target.duration_minutes,
+            buffer,
+            intake=Intake.APPOINTMENT,
+            own_key=("booking", booking_id),
+        )
+
     async def _load(
         self,
         tx: Transaction,
@@ -286,6 +323,8 @@ class PoolBookings:
         target: PoolTarget,
         lower: datetime,
         upper: datetime,
+        *,
+        archived: bool = False,
     ) -> _Pool | None:
         """Load the target's pool for the interval, or ``None`` when it offers nothing.
 
@@ -293,6 +332,7 @@ class PoolBookings:
         and has a time zone: a pool id is never taken from a request, but a pool of another
         organisation is refused here as well (A05). Its closed days are the holidays of the
         calendars its organisation chose; the pool's own exception on such a date wins.
+        ``archived`` lets an archived pool serve the appointments it already has (a start).
         """
         pool = await tx.get_capacity_pool(PUBLIC_READ, target.pool_id)
         if (
@@ -300,7 +340,7 @@ class PoolBookings:
             or pool.id is None
             or pool.organisation_id != group.organisation_id
             or pool.mode is not PoolMode.COUNTED
-            or pool.archived_at is not None
+            or (pool.archived_at is not None and not archived)
         ):
             return None
         staffing = await tx.get_pool_staffing(PUBLIC_READ, pool.id)

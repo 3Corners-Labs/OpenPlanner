@@ -68,6 +68,7 @@ async def pool_booking(world: World, number: int = 1) -> tuple[PoolFlow, int]:
                 end=stored.end,
                 token_hash=f"{number:064d}",
                 public_ref=f"ref{number:020d}",
+                flow=FlowRef(flow.flow_id, 1),
             )
         )
     return flow, int(booking.id)
@@ -295,3 +296,33 @@ async def test_nothing_collected_stores_no_record(world: World) -> None:
 
     assert request.personal_data is PersonalDataState.NOT_COLLECTED
     assert empty is None
+
+
+async def test_the_watchdog_reads_open_requests_unclaimed_pool_bookings_and_held_records(
+    world: World,
+) -> None:
+    flow, booking_id = await pool_booking(world)
+    later = SLOT_0900 + timedelta(days=2)
+    async with world.uow.read() as tx:
+        unclaimed = await tx.unclaimed_pool_bookings(later)
+        too_early = await tx.unclaimed_pool_bookings(SLOT_0900)
+    assert [(u.booking_id, u.organisation_id, u.flow) for u in unclaimed] == [
+        (booking_id, world.acme, FlowRef(flow.flow_id, 1))
+    ]
+    assert unclaimed[0].end == SLOT_0900 + LENGTH
+    assert too_early == []
+
+    async with world.uow.locked() as tx:
+        request = await tx.add_service_request(request_for(world, flow, booking_id))
+        held = await tx.add_service_request(
+            on_demand(world, flow), RequestPersonalData(first_name="Ada")
+        )
+        done = await tx.add_service_request(
+            replace(on_demand(world, flow), handling=HandlingState.EXPIRED, resolved_at=NOW)
+        )
+    async with world.uow.read() as tx:
+        assert await tx.unclaimed_pool_bookings(later) == []
+        assert await tx.open_request_ids() == [request.id, held.id]
+        assert [r.id for r in await tx.requests_holding_data()] == [held.id]
+        assert await tx.get_service_request(done.id or 0) == done
+        assert await tx.get_service_request((done.id or 0) + 100) is None

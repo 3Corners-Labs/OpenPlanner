@@ -1959,6 +1959,28 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=120,
     ),
     S(
+        "assignment_start_lease_minutes",
+        K.INT,
+        5,
+        _D,
+        T.PLANNER,
+        "Minutes a claimed request without video may wait for its start before it goes back to "
+        "the queue; fixed into the work item at the claim (ADR 0121 step 5).",
+        minimum=1,
+        maximum=30,
+    ),
+    S(
+        "request_unresolved_hours",
+        K.INT,
+        24,
+        _D,
+        T.PLANNER,
+        "Hours after an appointment's end before work that never started expires and started "
+        "work is marked for recovery; fixed into the request when it is made (ADR 0121 step 5).",
+        minimum=1,
+        maximum=168,
+    ),
+    S(
         "planner_changes_alert_per_hour",
         K.INT,
         50,

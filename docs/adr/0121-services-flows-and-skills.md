@@ -32,8 +32,8 @@ None in step 1: it changes labels only. The later steps add the following, each 
 | Key | Class | Default | Bounds | Permission | Note |
 |---|---|---|---|---|---|
 | `treatment_buffer_minutes` | D organisation | 0 | 0–120 | `capacity.manage` (point 11) | one value per organisation (ADR 0122, settings); a per-flow value is a follow-up if one organisation needs different wrap-up times |
-| `assignment_start_lease_minutes` | D organisation | 5 | 1–30 | `capacity.manage` (point 11) | expiry only before treatment starts |
-| `request_unresolved_hours` | D organisation | 24 | 1–168 | `capacity.manage` (point 11) | the watchdog |
+| `assignment_start_lease_minutes` | D organisation | 5 | 1–30 | `capacity.manage` (point 11) | expiry only before treatment starts; registered in step 5b, edited under the registry's class D permission (held by the same roles as `capacity.manage`, as for `treatment_buffer_minutes`) |
+| `request_unresolved_hours` | D organisation | 24 | 1–168 | `capacity.manage` (point 11) | the watchdog; registered in step 5b, as the line above |
 
 **Fixed on purpose:** the personal-data deletion 24 hours after a terminal state and after the watchdog deadline (a privacy protection, not tunable, ADR 0102); the closed table of interaction kinds and readiness policies; ALL_OF skill matching.
 
@@ -56,8 +56,10 @@ None in step 1: it changes labels only. The later steps add the following, each 
 | 4b | P4: external skill mapping: per organisation a contact-center code per skill, sent as mapped codes only; an unmapped requirement of a contact-center flow is a readiness reason | | planned |
 | 4c | The staff detail's table "what this person may pick up, and why" (screen 5 of the handover) | | planned |
 | 5a | P5, persistence: requests, work items with their pool occupation, the request-level personal-data record (D1) in `privacy.py` and CLAUDE.md, migration 0113, the pure lifecycle, watchdog and deletion rules (`app/domain/service_requests.py`); build brief `docs/service-flows-requests-design.md` | #766 | merged |
-| 5b | P5, execution: claim with a lease, start (`check_start`), complete and release in the own queue for a flow without video; the watchdog round and the deletion in the worker; the retention overview and sweep for request-level records; settings `assignment_start_lease_minutes` and `request_unresolved_hours`; `RETENTION_BUILT` true and the rollback point as its own readiness check | | planned |
+| 5b | P5, execution: claim with a lease, start (`check_start`), complete and release in the own queue for a flow without video (`app/domain/request_work.py`); the watchdog round and the deletion of request-level records in the worker (`app/domain/request_watch.py`) and in the nightly sweep; settings `assignment_start_lease_minutes` and `request_unresolved_hours`; `RETENTION_BUILT` true and the rollback point as its own readiness check | #PR5B | merged |
 | 5c | The participant's choice between several flows of a service (the choice screen step 3a left for step 5; design R8) | | follow-up |
+| 5d | The retention overview shows request-level records holding data and overdue as counts of their own (with the first writer, step 7) | | follow-up |
+| 5e | A list of work in recovery for supervisors (its appointment has ended, so the queue no longer lists it; design R9) | | follow-up |
 | 6 | P6: channel-independent contact-center task contract, reconciliation and fencing | | planned |
 | 7 | P7: immediate intake and check-in on the same pool | | planned |
 | 8 | P8: compatibility matrix, upgrade and rollback proof, documentation | | planned |

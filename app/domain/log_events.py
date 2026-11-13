@@ -347,6 +347,28 @@ _OPERATIONS = (
         _CHECK_HOST,
     ),
     _e(
+        "requests.watched",
+        _OPS,
+        "info",
+        "changed expired_unclaimed deleted failed",
+        "The watchdog round of requests changed {changed}, expired {expired_unclaimed} "
+        "unclaimed, deleted {deleted} records; {failed} failed.",
+        "The worker's round of ADR 0121 step 5 (lease expiry, cancellation, expiry, recovery, "
+        "deletion of request-level records); counts only. A failed request is tried again in "
+        "the next round.",
+    ),
+    _e(
+        "requests.watch_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The watchdog round of requests failed: {error}.",
+        "The whole round of ADR 0121 step 5 did not run; the worker tries again a minute later. "
+        "Requests keep their state until a round runs; the nightly retention sweep still "
+        "deletes overdue records.",
+        _CHECK_HOST,
+    ),
+    _e(
         "flows.repair_incomplete",
         _OPS,
         "warning",

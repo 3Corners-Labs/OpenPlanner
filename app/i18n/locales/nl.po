@@ -1042,6 +1042,9 @@ msgstr "De dienst is aangemaakt. Stel nu de bezetting in."
 msgid "admin.done.released"
 msgstr "De afspraak is vrijgegeven en staat weer in de wachtrij."
 
+msgid "admin.done.work_completed"
+msgstr "Het werk is afgerond."
+
 msgid "admin.done.removed"
 msgstr "Verwijderd."
 
@@ -6407,6 +6410,12 @@ msgstr "Tekorten vooruitkijken (dagen)"
 
 msgid "settings.field.treatment_buffer_minutes.label"
 msgstr "Afrondtijd per afspraak op een pool (minuten)"
+
+msgid "settings.field.assignment_start_lease_minutes.label"
+msgstr "Tijd om opgepakt werk te beginnen (minuten)"
+
+msgid "settings.field.request_unresolved_hours.label"
+msgstr "Uiterlijke afhandeltijd van een verzoek na de afspraak (uren)"
 
 msgid "settings.field.planner_changes_alert_per_hour.label"
 msgstr "Waarschuwing bij wijzigingen per planner per uur"
@@ -13037,6 +13046,30 @@ msgstr "Afronden"
 
 msgid "admin.flows.check.retention"
 msgstr "Bewaren en verwijderen"
+
+msgid "admin.queue.work.start"
+msgstr "Beginnen"
+
+msgid "admin.queue.work.complete"
+msgstr "Afronden"
+
+msgid "admin.queue.work.assigned"
+msgstr "Opgepakt: begin uiterlijk om {time}, anders gaat het werk terug in de wachtrij."
+
+msgid "admin.queue.work.in_progress"
+msgstr "Bezig sinds {time}."
+
+msgid "admin.queue.work.conflict"
+msgstr "Begonnen terwijl een collega uitliep: er is op dit moment geen vrije plek in de pool. Dit is vastgelegd."
+
+msgid "admin.queue.work.recovery"
+msgstr "Dit werk is nog niet afgerond na de uiterlijke afhandeltijd. Rond het af zodra het klaar is; de plek in de pool blijft tot dan bezet."
+
+msgid "admin.queue.work.no_video"
+msgstr "Dit verzoek heeft geen videogesprek."
+
+msgid "admin.flows.check.rollback"
+msgstr "Terugrollen naar de vorige versie"
 
 msgid "admin.flows.reason.labels_invalid"
 msgstr "De naam ontbreekt in het Nederlands of het Engels, of is ongeldig."

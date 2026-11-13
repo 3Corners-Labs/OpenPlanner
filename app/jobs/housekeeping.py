@@ -12,6 +12,8 @@ Called once per worker loop, after the due jobs:
     hourly ─► delete update back-ups older than a day, the second safety net (ADR 0102 point 10)
     daily ─► merge booking rows past booking_row_retention_days into daily counts and delete
              them (ADR 0102 step 4)
+    every minute ─► the watchdog round of requests: lease expiry, cancellation, expiry,
+             recovery, deletion of request-level records (ADR 0121 step 5)
     daily ─► retention sweep: purge personal data the purge job missed, alert on a backlog
              ─► purged something? ─► PRAGMA wal_checkpoint(TRUNCATE) (WP-A3)
 
@@ -34,6 +36,7 @@ from app.adapters.db.maintenance import checkpoint_wal, measure_storage, reclaim
 from app.domain.alerts import open_conditions
 from app.domain.booking_rollup import RollupResult
 from app.domain.ports import Clock, UnitOfWork
+from app.domain.request_watch import WatchResult
 from app.domain.retention_sweep import SweepResult
 from app.domain.scheduling import MIN_RESCHEDULE_AUTO_DELAY_MINUTES
 from app.domain.storage import (
@@ -77,6 +80,10 @@ AUTO_EVERY = timedelta(minutes=MIN_RESCHEDULE_AUTO_DELAY_MINUTES)
 (ADR 0057 point 6): as often as the shortest delay a group may set, so a due shortfall waits
 at most this long past its delay."""
 
+WATCH_EVERY = timedelta(minutes=1)
+"""How often the watchdog round of requests runs (ADR 0121 step 5): a lease of one minute ends
+at most a minute late; a fixed cadence, like ``AUTO_EVERY``, not a setting."""
+
 STAFF_EVERY = timedelta(days=1)
 """How often staff records past their retention are erased; the period is a setting."""
 
@@ -112,6 +119,8 @@ class Housekeeping:
             them to the updater; pruned once per ``BACKUPS_EVERY``.
         rollup: Merges old booking rows into daily counts and deletes them (ADR 0102 step 4);
             called once per ``ROLLUP_EVERY``.
+        watch_requests: The watchdog round of requests (ADR 0121 step 5); called once per
+            ``WATCH_EVERY``.
     """
 
     def __init__(
@@ -130,8 +139,11 @@ class Housekeeping:
         rollup: Callable[[], Awaitable[RollupResult]] | None = None,
         prune_requests: Callable[[], Awaitable[int]] | None = None,
         auto_proposals: Callable[[], Awaitable[int]] | None = None,
+        watch_requests: Callable[[], Awaitable[WatchResult]] | None = None,
     ) -> None:
         """Store the collaborators; nothing has been logged, reclaimed or erased yet."""
+        self._watch_requests = watch_requests
+        self._requests_watched_at: datetime | None = None
         self._auto_proposals = auto_proposals
         self._auto_proposed_at: datetime | None = None
         self._prune_requests = prune_requests
@@ -173,6 +185,7 @@ class Housekeeping:
         rollup: Callable[[], Awaitable[RollupResult]] | None = None,
         prune_requests: Callable[[], Awaitable[int]] | None = None,
         auto_proposals: Callable[[], Awaitable[int]] | None = None,
+        watch_requests: Callable[[], Awaitable[WatchResult]] | None = None,
     ) -> "Housekeeping":
         """Return housekeeping that measures the SQLite file of ``database_url``."""
         return cls(
@@ -190,6 +203,7 @@ class Housekeeping:
             rollup,
             prune_requests,
             auto_proposals,
+            watch_requests,
         )
 
     async def run(self) -> None:
@@ -203,6 +217,7 @@ class Housekeeping:
         await self._erase_staff_records(now)
         await self._prune_change_requests(now)
         await self._send_auto_proposals(now)
+        await self._watch_open_requests(now)
         self._prune_backups(now)
         await self._roll_up_bookings(now)
 
@@ -267,6 +282,28 @@ class Housekeeping:
         else:
             if sent:
                 log.info("reschedule.auto_sent", bookings=sent)
+
+    async def _watch_open_requests(self, now: datetime) -> None:
+        """Run the watchdog round of requests, at most once per ``WATCH_EVERY``."""
+        if self._watch_requests is None:
+            return
+        due = self._requests_watched_at is None or now - self._requests_watched_at >= WATCH_EVERY
+        if not due:
+            return
+        self._requests_watched_at = now
+        try:
+            result = await self._watch_requests()
+        except Exception as exc:  # never stop the loop; the next round tries again
+            log.warning("requests.watch_failed", error=type(exc).__name__)
+            return
+        if result.changed or result.expired_unclaimed or result.deleted or result.failed:
+            log.info(
+                "requests.watched",
+                changed=result.changed,
+                expired_unclaimed=result.expired_unclaimed,
+                deleted=result.deleted,
+                failed=result.failed,
+            )
 
     async def _roll_up_bookings(self, now: datetime) -> None:
         """Merge old purged booking rows into daily counts, at most once per ``ROLLUP_EVERY``."""

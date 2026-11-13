@@ -104,6 +104,7 @@ CHECK_TITLES: Mapping[ReadinessCheck, str] = {
     ReadinessCheck.DISPATCH: "admin.flows.check.dispatch",
     ReadinessCheck.COMPLETION: "admin.flows.check.completion",
     ReadinessCheck.RETENTION: "admin.flows.check.retention",
+    ReadinessCheck.ROLLBACK: "admin.flows.check.rollback",
 }
 """The title of each readiness check."""
 

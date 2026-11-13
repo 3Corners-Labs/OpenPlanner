@@ -100,6 +100,7 @@ from app.domain.service_requests import (
     HandlingState,
     RequestPersonalData,
     ServiceRequest,
+    UnclaimedBooking,
     WorkItem,
     WorkItemState,
 )
@@ -1771,6 +1772,28 @@ class Transaction(Protocol):
 
         Not scoped: the booking id comes from a scoped lookup of the booking.
         """
+        ...
+
+    async def get_service_request(self, request_id: int) -> ServiceRequest | None:
+        """Return a request by id; not scoped: for the worker's watchdog round only."""
+        ...
+
+    async def open_request_ids(self) -> list[int]:
+        """Return the ids of every request the watchdog still watches, in id order.
+
+        Queued, assigned and in progress: not terminal and not marked for recovery.
+        """
+        ...
+
+    async def unclaimed_pool_bookings(self, ended_before: datetime) -> list[UnclaimedBooking]:
+        """Return confirmed pool bookings with a flow, ended before the moment, without request.
+
+        The watchdog makes an ``expired`` request for each one past its deadline (A33).
+        """
+        ...
+
+    async def requests_holding_data(self) -> list[ServiceRequest]:
+        """Return every request whose request-level record still holds personal data."""
         ...
 
     async def get_active_work_item(self, request_id: int) -> WorkItem | None:

@@ -311,6 +311,12 @@ class Settings(BaseSettings):
     # admission and fixed into the commitment's end. Class D organisation (settings registry);
     # first read by the booking path of ADR 0122 step 5.
     treatment_buffer_minutes: int = Field(default=0, ge=0, le=120)
+    # ADR 0121 step 5: how long a claimed request may wait for its start before it goes back to
+    # the queue, fixed into the work item at the claim. Class D organisation.
+    assignment_start_lease_minutes: int = Field(default=5, ge=1, le=30)
+    # ADR 0121 step 5: the watchdog: hours after the appointment's end before unstarted work
+    # expires and started work is marked for recovery. Class D organisation.
+    request_unresolved_hours: int = Field(default=24, ge=1, le=168)
     # ADR 0044: changes by one planner per hour above which a system event warns (never
     # blocks). Class C platform (ADR 0042, settings registry).
     planner_changes_alert_per_hour: int = Field(default=50, ge=5, le=1000)
