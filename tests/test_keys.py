@@ -9,6 +9,7 @@ from app.keys import (
     agent_pseudonym_key,
     client_pseudonym_key,
     guest_pseudonym_key,
+    guest_pseudonym_key_previous,
     management_token_key,
     session_secret,
 )
@@ -87,3 +88,24 @@ def test_each_purpose_has_its_own_key(tmp_path: Path) -> None:
     assert agent_pseudonym_key(settings) != client_pseudonym_key(settings)
     assert guest_pseudonym_key(settings) != agent_pseudonym_key(settings)
     assert guest_pseudonym_key(settings) != client_pseudonym_key(settings)
+
+
+def test_the_guest_key_of_the_previous_token_key_exists_only_during_a_rotation(
+    tmp_path: Path,
+) -> None:
+    """ADR 0123 point 7: the purge renames a guest under the current and the previous key."""
+    rotating = Settings(
+        environment="dev",
+        management_token_key=SecretStr("n" * 40),
+        management_token_key_previous=SecretStr("o" * 40),
+        dev_token_key_path=tmp_path / "k",
+    )
+    settled = rotating.model_copy(update={"management_token_key_previous": None})
+    before = rotating.model_copy(update={"management_token_key": SecretStr("o" * 40)})
+
+    previous = guest_pseudonym_key_previous(rotating)
+
+    assert previous is not None
+    assert previous != guest_pseudonym_key(rotating)
+    assert previous == guest_pseudonym_key(before)  # what the old key derived then
+    assert guest_pseudonym_key_previous(settled) is None

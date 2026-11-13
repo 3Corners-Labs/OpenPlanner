@@ -147,6 +147,7 @@ JOB_LABELS: dict[JobType, str] = {
     JobType.EXPIRE_PROPOSAL: "audit.job.expire_proposal",
     JobType.SEND_PROPOSAL_RELEASED: "audit.job.send_proposal_released",
     JobType.SEND_CHANGE_REQUEST: "audit.job.send_change_request",
+    JobType.RENAME_GUEST: "audit.job.rename_guest",
 }
 """Catalogue key per job type: the jobs list of the booking page (ADR 0068) and the audit log."""
 

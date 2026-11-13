@@ -908,6 +908,51 @@ to attribute at run time. A visit while the feature is off is an unknown address
 which is nothing. A page that contacts another origin is caught by the end-to-end test, not
 by a runtime event.
 
+## Flow: the guest token of the call page (ADR 0123 step 4a)
+
+`POST /b/m/{ref}/call/token` hands the call page a guest token of the video platform for the
+participant's click that joins, and `rename_guest` jobs rename the guest after the purge. Inputs
+from outside: the reference in the path, the participant's session cookie, the form-protection
+headers, the platform's answer. The answer carries `token`, `expires_at` and the meeting's guest
+`link`. Until step 6 the endpoint is dark behind the platform switch alone.
+
+| Abuse case | Control | Test |
+|---|---|---|
+| A token is asked without the participant's session, or for a reference that does not exist | The same session check as every page under the link: `403`, the same answer for a booking that does not exist, one `token.rejected` security event and a draw on the budget for links that match nothing; nothing is sent to the platform | `tests/api/test_call_token.py::test_without_the_session_the_answer_is_the_one_for_a_booking_that_does_not_exist` |
+| A token is asked with the session of another booking | The session holds a set of bookings; one that does not hold this booking is answered as no session | `tests/api/test_call_token.py::test_another_bookings_session_gets_nothing` |
+| A token is asked outside the join window, or for a booking that is cancelled or has no meeting | The rule of `/join/go` (`join_state`) and its https-only link decide: `409` with `not_open`, nothing is sent to the platform, no mark is written | `tests/api/test_call_token.py::test_outside_the_join_window_there_is_no_token`, `::test_the_window_is_the_one_of_the_join_page`, `::test_a_cancelled_booking_gets_no_token`, `::test_a_booking_without_a_meeting_gets_no_token` |
+| The endpoint shows that the feature exists, or works, while the platform switch is off | While `embedded_call_enabled` is off the route answers `404` as an address that does not exist, read live, before the session is looked at | `tests/api/test_call_token.py::test_it_does_not_exist_while_the_switch_is_off` |
+| Many tokens for one booking (a script in the participant's browser, or a leaked link session) | A bucket per booking, `embedded_call_token_per_booking_per_hour` (class C, 5 to 60, default 20), counted only after the session check, so a caller who knows the (not secret) reference but has no session never uses the budget up; over it the site's `429` page and one `request.rate_limited` event | `tests/api/test_call_token.py::test_one_booking_may_ask_a_limited_number_of_times_an_hour`, `::test_a_caller_without_the_session_cannot_use_a_bookings_budget_up` |
+| Many tokens from one address (many bookings of one person, or a bot with several sessions) | The common read limit of the route (`rate_limit_reads`), keyed by the caller as every limited participant route | `tests/api/test_call_token.py::test_one_address_is_held_by_the_common_read_limit` |
+| The token or a link ends up in a log line, an event, an audit row, a job or a stored field | The token is returned to the caller and nowhere else: not stored, not on the timeline (a failure leaves the code only), not in any job (the rename job holds the booking's id and nothing else). The link is the booking's own stored link, purged with it; it is in no log line, event or job | `tests/api/test_call_token.py::test_the_token_is_in_no_log_line_and_in_no_stored_field`, `::test_the_token_and_the_links_are_in_no_event_audit_row_or_job`, `tests/jobs/test_rename_guest.py::test_the_job_holds_the_booking_id_and_no_name_or_token` |
+| A page of another site posts to the endpoint on the participant's behalf | The form protection of every participant post (`require_same_origin`): a cross-site post is `403` with one `request.rejected` security event, before anything is sent to the platform | `tests/api/test_call_token.py::test_a_cross_site_post_is_refused_before_anything_happens` |
+| The host's link, or the answer's headers, give staff access or are cached | The answer carries the guest link only; the host link is never read by the route. `Cache-Control: no-store`, also on the refusals | `tests/api/test_call_token.py::test_the_host_link_never_leaves_the_server`, `::test_the_answer_is_never_cacheable_and_never_in_an_address` |
+| A provider failure tells the page, or leaves, more than it should | The page gets `503` with `unavailable` and no code; the booking's timeline gets the usual `integration_error` with the code, without the provider's reason (it may echo a name) and without a token | `tests/api/test_call_token.py::test_a_provider_failure_is_a_plain_not_available_now`, `::test_a_provider_failure_leaves_the_usual_trace_without_the_token` |
+| The participant's first name stays at the platform after the purge | A booking for which a guest was minted gets one `rename_guest` job in the purge's own transaction; the job mints again for the same subject with the neutral word, under the current and, during a key rotation, the previous key. The purge never waits for it; a booking purged twice enqueues once; a booking without a guest enqueues nothing; the straggler sweep keeps the job | `tests/jobs/test_rename_guest.py`, `tests/adapters/db/test_purge_remains.py::test_a_purge_enqueues_one_rename_for_a_booking_with_a_minted_guest`, `tests/domain/test_retention_sweep.py::test_the_sweep_keeps_the_rename_of_a_guest` |
+| The rename fails for good and nobody notices | A retryable failure is retried after 1, 5 and 15 minutes; when the job gives up (a refusal, or the last attempt) the runner writes one system event `job.rename_guest` with the code and the booking's timeline gets the `integration_error` | `tests/jobs/test_rename_guest.py::test_a_retryable_failure_is_retried_with_the_usual_backoff`, `::test_a_refusal_gives_up_at_once_with_one_system_event`, `::test_a_retry_that_runs_out_gives_up` |
+| The way into a running appointment is closed by maintenance | The route is on the list of open routes (a confirmed appointment takes place during maintenance, ADR 0038); it marks the booking and mints at the platform, as `/join/go` records the click | `tests/api/test_call_token.py::test_the_way_into_a_call_stays_open_during_maintenance`, `tests/api/test_maintenance_pages.py` (every public route is closed or open) |
+
+What an attack on this flow leaves in the log: a request without a session is one `token.rejected`
+security event; a cross-site post is one `request.rejected` event; too many requests are one
+`request.rate_limited` event per caller; a failed rename is the system event of the job. A request
+outside the join window, for a cancelled booking or while the switch is off leaves no event: it
+is refused as `/join/go` refuses it, without a caller to attribute, and the switch off is an
+unknown address.
+
+**Named risk, without a mitigation in this step: the token is a credential of a limited account
+at the video platform.** A guest token can create rooms and webhooks of its own, and its holder
+keeps it for hours: a participant who takes it from the page, which the page cannot prevent, holds
+it until it expires, and a new token does not withdraw an earlier one (lab tenant, 2026-11-13,
+`docs/research/call-page-on-the-meetings-sdk.md` section 16). It cannot look up people, list the
+organisation, create meetings or read recordings. Whether it can write to a staff member whose
+address it knows was not tried on the lab tenant (the test would send a message to a real
+account); it is open until it is tried with an account whose owner agreed, and the build table of
+ADR 0123 (step 4b) carries the check. What limits it today: the token is handed out only for a
+confirmed booking inside its join window, only to the participant's own session, at most the
+number of times of `embedded_call_token_per_booking_per_hour` an hour per booking and the common
+read limit per address, and nothing links it to a name but the participant's first name or the
+organisation's word; beyond that the limits are the organisation's own policy at the platform.
+
 ## Flow: widget script on host websites (ADR 0035, EM-3)
 
 Public: `GET /widget/v1/openplanner-booking.js`, loaded by host pages as a module script.

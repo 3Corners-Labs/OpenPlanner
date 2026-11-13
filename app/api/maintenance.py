@@ -13,7 +13,8 @@ no route can forget it.
               /b/m/{ref}/test (and /test/go), /b/m/{ref}/wait/leave
               ─► 503 + Retry-After: the maintenance page instead of the form or the write
     open      the booking page /b/{token} and /b/m/{ref}, the closure page /g/{slug}/closure
-              (ADR 0037), waiting and join pages, health, brand assets, webhooks (they record what
+              (ADR 0037), waiting, join and call pages (with the call's guest token, ADR 0123),
+              health, brand assets, webhooks (they record what
               happens in running calls); confirming by email link and the "check your
               email" page (ADR 0056): the worker lets unconfirmed bookings lapse during
               maintenance too, so the participant must be able to confirm
@@ -111,6 +112,11 @@ OPEN_ROUTES = frozenset(
         "/b/m/{public_ref}/join",
         "/b/m/{public_ref}/join/go",
         "/b/m/{public_ref}/call",
+        # ADR 0123 step 4a: the guest token of a participant's call. A confirmed appointment
+        # takes place during maintenance (ADR 0038), so the way into it stays open. It mints at
+        # the video platform and marks the booking, as ``/join/go`` records the click; neither
+        # changes what the installation holds about the appointment.
+        "/b/m/{public_ref}/call/token",
         "/b/m/{public_ref}/wait",
         "/b/m/{public_ref}/wait/status",
         "/r/{ref}",

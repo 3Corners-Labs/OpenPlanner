@@ -1213,7 +1213,15 @@ class InMemoryTransaction(ServiceRequestStore):
         current = self.state.slots_closed_until
         self.state.slots_closed_until = until if current is None else max(current, until)
 
+    async def mark_guest_minted(self, booking_id: int, at: datetime) -> None:
+        booking = self.state.bookings[booking_id]
+        if booking.guest_minted_at is None:
+            self.state.bookings[booking_id] = replace(booking, guest_minted_at=at)
+
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
+        before = self.state.bookings[booking_id]
+        if before.guest_minted_at is not None and booking_id not in self.state.purged_at:
+            await self.add_jobs(booking_id, [PlannedJob(JobType.RENAME_GUEST, now, None)])
         self.state.bookings[booking_id] = replace(
             self.state.bookings[booking_id],
             contact=None,

@@ -451,6 +451,7 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         flow=FlowRef(row.flow_id, row.flow_revision)
         if row.flow_id is not None and row.flow_revision is not None
         else None,
+        guest_minted_at=row.guest_minted_at,
     )
 
 
@@ -1385,6 +1386,14 @@ class SqlTransaction(
             )
         )
 
+    async def mark_guest_minted(self, booking_id: int, at: datetime) -> None:
+        """Remember when a guest was first minted for the booking; a later call changes nothing."""
+        await self._session.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id, BookingRow.guest_minted_at.is_(None))
+            .values(guest_minted_at=at)
+        )
+
     async def save_trial_call(self, booking_id: int, trial: TrialCall) -> None:
         """Store a new trial call and count it; a previous one is replaced."""
         await self._session.execute(
@@ -1939,7 +1948,20 @@ class SqlTransaction(
         booking's timeline events, replaces the management token hash by a random value (the
         column is unique and not null; the old hash can no longer find the booking) and records
         ``pii_purged_at``. The salt stays: without the token it identifies nothing.
+
+        A booking for which a guest was minted at the video platform (``guest_minted_at``) and
+        that was not purged before gets one ``rename_guest`` job in the same transaction (ADR
+        0123 point 7); the job carries the booking's id and nothing else.
         """
+        marks = (
+            await self._session.execute(
+                select(BookingRow.guest_minted_at, BookingRow.pii_purged_at).where(
+                    BookingRow.id == booking_id
+                )
+            )
+        ).one_or_none()
+        if marks is not None and marks.guest_minted_at is not None and marks.pii_purged_at is None:
+            await self.add_jobs(booking_id, [PlannedJob(JobType.RENAME_GUEST, now, None)])
         await self._session.execute(
             update(BookingRow)
             .where(BookingRow.id == booking_id)

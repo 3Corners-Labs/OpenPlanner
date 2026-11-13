@@ -142,6 +142,7 @@ class RateLimits:
     reports: str = "30/minute"
     change_requests: str = "20/hour"
     webhooks: str = "600/minute"
+    call_tokens: str = "20/hour"
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "RateLimits":
@@ -155,6 +156,7 @@ class RateLimits:
             reports=f"{settings.reporting_api_rate_per_minute}/minute",
             change_requests=f"{settings.agent_change_requests_per_hour}/hour",
             webhooks=f"{settings.rate_limit_webhook_per_minute}/minute",
+            call_tokens=f"{settings.embedded_call_token_per_booking_per_hour}/hour",
         )
 
 
@@ -317,6 +319,25 @@ def within_unknown_address_limit(source: str) -> bool:
     if not limiter.enabled:
         return True
     return limiter.limiter.hit(parse(webhook_limit()), "webhook-unknown", source)
+
+
+def within_call_token_limit(public_ref: str) -> bool:
+    """Count one request for a guest token against its booking's own bucket (ADR 0123 point 6).
+
+    The key is the booking's public reference alone, so a participant's reloads and several
+    browsers share one budget, whatever the address; the per-address bound is the common read
+    limit of the route. Only a request that holds the participant's session is counted, so a
+    caller who knows the (not secret) reference but has no session never uses the budget up.
+
+    Args:
+        public_ref: The booking's public reference, after the session check.
+
+    Returns:
+        ``False`` when the booking is over its limit; always ``True`` while rate limits are off.
+    """
+    if not limiter.enabled:
+        return True
+    return limiter.limiter.hit(parse(LIMITS.call_tokens), "call-token", public_ref)
 
 
 def check_limit() -> str:

@@ -675,6 +675,10 @@ class BookingRow(Base):
     # table stays a plain ALTER, and the adapter writes only revisions that exist.
     flow_id: Mapped[int | None] = mapped_column(Integer)
     flow_revision: Mapped[int | None] = mapped_column(Integer)
+    # ADR 0123 point 7: when a guest was first minted for the booking at the video platform. A
+    # timestamp, no personal data and not a purged field: the purge reads it to know that the
+    # guest's name has to be replaced at the platform (``rename_guest``).
+    guest_minted_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     __table_args__ = (
         Index("ix_bookings_slot_status", "slot_id", "status"),

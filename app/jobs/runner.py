@@ -25,7 +25,7 @@ While that group or its organisation is in diagnostic mode, each job also writes
 its own retention period.
 """
 
-from collections.abc import Awaitable, Callable, Collection
+from collections.abc import Awaitable, Callable, Collection, Sequence
 from datetime import datetime, timedelta
 from functools import partial
 from time import perf_counter
@@ -156,6 +156,8 @@ class JobRunner:
         reconcile_minutes: ``contact_center_reconcile_minutes`` (class C), read when called.
         conversation_enabled: ``embedded_call_enabled`` (class C), read when called: a routing's
             conversation task is made only while it is on (ADR 0123 step 7a).
+        guest_keys: The keys of the guest subjects now in force, the current one first (ADR 0123
+            point 7); with them a ``rename_guest`` job can run.
         after_purge: Called once after a round that ran ``purge_pii`` jobs (the worker passes
             the WAL checkpoint, WP-A3); a failure is logged and never fails the round.
     """
@@ -181,6 +183,7 @@ class JobRunner:
         request_work: RequestWork | None = None,
         reconcile_minutes: Callable[[], int] | None = None,
         conversation_enabled: Callable[[], bool] | None = None,
+        guest_keys: Callable[[], Sequence[bytes]] | None = None,
     ) -> None:
         """Store the collaborators and decide which job types this worker can handle."""
         self._queue = queue
@@ -210,6 +213,7 @@ class JobRunner:
                 organisations,
                 partial(conversation_opening, composer.translator),
                 conversation_enabled,
+                guest_keys,
             )
             if integration is not None
             else None

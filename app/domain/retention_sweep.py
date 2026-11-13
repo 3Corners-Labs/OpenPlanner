@@ -232,7 +232,10 @@ class RetentionSweep:
                 ):
                     return _CHANGED
                 await tx.purge_personal_data(due.booking_id, self._clock.now())
-                await tx.delete_pending_jobs(due.booking_id, set(JobType))
+                # Everything pending goes, except the rename of the guest at the video platform,
+                # which the purge has just added (ADR 0123 point 7).
+                kept = {JobType.RENAME_GUEST}
+                await tx.delete_pending_jobs(due.booking_id, set(JobType) - kept)
         except Exception as exc:  # one booking must not stop the others; the event reports it
             return type(exc).__name__
         return _PURGED

@@ -1681,6 +1681,9 @@ msgstr "Your video call"
 msgid "call.unavailable"
 msgstr "The call in this page is not available yet. Use the link below to go back to the appointment."
 
+msgid "call.guest.term"
+msgstr "Participant"
+
 msgid "error.direct_call_unavailable"
 msgstr "Starting a call is not possible right now. Please book an appointment."
 
@@ -7060,6 +7063,9 @@ msgstr "Expire unconfirmed booking"
 
 msgid "audit.job.send_unconfirmed_lapsed"
 msgstr "Send notice of an expired booking"
+
+msgid "audit.job.rename_guest"
+msgstr "Replace the guest's name in the call with a neutral word"
 
 msgid "audit.job.send_refusal"
 msgstr "Send notice of a refused booking"
@@ -13687,6 +13693,9 @@ msgstr "Wait per attempt to connect the call (seconds)"
 
 msgid "settings.field.embedded_call_connect_attempts.label"
 msgstr "Attempts to connect the call"
+
+msgid "settings.field.embedded_call_token_per_booking_per_hour.label"
+msgstr "Times per hour one appointment may ask for access to the call"
 
 msgid "settings.field.embedded_call_display_name.label"
 msgstr "Participant's name shown to staff in the call (first name or own word)"

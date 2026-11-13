@@ -129,10 +129,23 @@ async def validation_error_page(request: Request, exc: Exception) -> Response:
     return _page(request, 422, "error.title", "error.invalid_request")
 
 
+async def refuse_rate_limited(request: Request, surface: str = "web") -> Response:
+    """Answer 429 as every limited participant route does, after leaving the security event.
+
+    For a route that counts a limit of its own (a bucket per booking) and so cannot let slowapi
+    raise ``RateLimitExceeded``.
+
+    Args:
+        request: The refused request.
+        surface: The surface named on the event (``web``).
+    """
+    await report(request, RATE_LIMITED, TOO_MANY_REQUESTS, detail=f"surface:{surface}")
+    return _rate_limited_response(request)
+
+
 async def rate_limited_page(request: Request, exc: Exception) -> Response:
     """Render the rate-limit page with a ``Retry-After`` hint."""
-    await report(request, RATE_LIMITED, TOO_MANY_REQUESTS, detail="surface:web")
-    return _rate_limited_response(request)
+    return await refuse_rate_limited(request)
 
 
 async def database_error_page(request: Request, exc: Exception) -> Response:

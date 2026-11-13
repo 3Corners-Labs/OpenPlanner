@@ -1594,7 +1594,16 @@ class Transaction(Protocol):
         ...
 
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
-        """Set every PII column of the booking to NULL and record ``pii_purged_at``."""
+        """Set every PII column of the booking to NULL and record ``pii_purged_at``.
+
+        When a guest was minted for the booking (``guest_minted_at``) and it was not purged
+        before, the same transaction adds one ``rename_guest`` job (ADR 0123 point 7), so the
+        purge itself never waits for the video platform and a second purge adds none.
+        """
+        ...
+
+    async def mark_guest_minted(self, booking_id: int, at: datetime) -> None:
+        """Remember that a guest was minted for the booking; keeps the first moment (ADR 0123)."""
         ...
 
     async def get_booking_by_public_ref(self, public_ref: str) -> Booking | None:

@@ -2373,6 +2373,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=5,
     ),
     S(
+        "embedded_call_token_per_booking_per_hour",
+        K.INT,
+        20,
+        _C,
+        T.WEBEX,
+        "Guest tokens one booking may ask for in an hour on the call page; per address the "
+        "common read limit applies (ADR 0123 point 6).",
+        minimum=5,
+        maximum=60,
+    ),
+    S(
         "embedded_call_display_name",
         K.ENUM,
         "first_name",

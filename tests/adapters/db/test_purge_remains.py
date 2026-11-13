@@ -7,11 +7,12 @@ import pytest
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.adapters.db.models import BookingEventRow, BookingRow
+from app.adapters.db.models import BookingEventRow, BookingRow, JobRow
 from app.adapters.db.uow import SqlTransaction, SqlUnitOfWork
 from app.domain.booking import MeetingRef
 from app.domain.calls import BookingEvent, EventKind
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
+from app.domain.job_plan import JobType
 from app.domain.privacy import PURGED_FIELDS
 from app.domain.services import BookingService
 from tests.adapters.db.conftest import seed_group
@@ -104,3 +105,56 @@ def test_purge_personal_data_names_the_fields_of_privacy_and_no_others() -> None
     assert not re.search(
         r"\b(first_name|email|video_room_id|contact_center_task_id|wxcc_task_id)\s*=", source
     )
+
+
+async def _renames(engine: AsyncEngine, booking_id: int) -> list[tuple[str | None, object]]:
+    """The booking's ``rename_guest`` jobs as (channel, pinned start)."""
+    async with engine.connect() as conn:
+        rows = await conn.execute(
+            select(JobRow.channel, JobRow.pinned_start).where(
+                JobRow.booking_id == booking_id, JobRow.type == JobType.RENAME_GUEST.value
+            )
+        )
+        return [tuple(row) for row in rows]  # type: ignore[misc]
+
+
+async def test_a_purge_enqueues_one_rename_for_a_booking_with_a_minted_guest(
+    engine: AsyncEngine, service: BookingService
+) -> None:
+    booking_id = await _booking_with_everything(engine, service)
+    async with SqlUnitOfWork(engine).locked() as tx:
+        await tx.mark_guest_minted(booking_id, NOW)
+        await tx.mark_guest_minted(booking_id, NOW.replace(hour=9))  # the first moment stays
+    async with engine.connect() as conn:
+        minted = (
+            await conn.execute(
+                select(BookingRow.guest_minted_at).where(BookingRow.id == booking_id)
+            )
+        ).scalar_one()
+    assert minted == NOW
+
+    for _ in range(2):
+        async with SqlUnitOfWork(engine).locked() as tx:
+            await tx.purge_personal_data(booking_id, NOW)
+
+    assert await _renames(engine, booking_id) == [(None, None)]
+    # The mark is no personal data and survives the purge: it is not a purged field.
+    async with engine.connect() as conn:
+        kept = (
+            await conn.execute(
+                select(BookingRow.guest_minted_at).where(BookingRow.id == booking_id)
+            )
+        ).scalar_one()
+    assert kept == NOW
+    assert "guest_minted_at" not in PURGED_FIELDS
+
+
+async def test_a_purge_without_a_minted_guest_enqueues_no_rename(
+    engine: AsyncEngine, service: BookingService
+) -> None:
+    booking_id = await _booking_with_everything(engine, service)
+
+    async with SqlUnitOfWork(engine).locked() as tx:
+        await tx.purge_personal_data(booking_id, NOW)
+
+    assert await _renames(engine, booking_id) == []

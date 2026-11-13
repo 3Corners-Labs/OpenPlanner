@@ -99,6 +99,10 @@ class JobType(StrEnum):
     SEND_PROPOSAL_RELEASED = "send_proposal_released"
     SEND_CHANGE_REQUEST = "send_change_request"
     SEND_REFUSAL = "send_refusal"
+    RENAME_GUEST = "rename_guest"
+    """Mint the booking's guest once more under the neutral term, after the purge (ADR 0123
+    point 7). Added by the purge itself, never planned with the booking; carries the booking's id
+    and nothing else."""
 
     @classmethod
     def _missing_(cls, value: object) -> "JobType | None":

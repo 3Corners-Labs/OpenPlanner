@@ -118,6 +118,16 @@ def guest_pseudonym_key(settings: Settings) -> bytes:
     return _derived(settings, GUEST_PSEUDONYM_INFO)
 
 
+def guest_pseudonym_key_previous(settings: Settings) -> bytes | None:
+    """Return the guest subject key under ``MANAGEMENT_TOKEN_KEY_PREVIOUS``, if one is set.
+
+    While a rotation is in progress the purge renames a guest under this key as well as under
+    the current one (ADR 0123 point 7), because the guest may have been minted before it.
+    """
+    previous = management_token_key_previous(settings)
+    return None if previous is None else _derive_from(previous, GUEST_PSEUDONYM_INFO)
+
+
 def session_secret(settings: Settings) -> str:
     """Return the key that signs the admin session cookie (ADR 0013)."""
     return _bootstrap_key(
