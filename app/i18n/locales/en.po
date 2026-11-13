@@ -3969,6 +3969,30 @@ msgstr "Renew Webex token"
 msgid "admin.audit.reason.invalid_signature"
 msgstr "Signature or timestamp does not verify."
 
+msgid "admin.audit.reason.webhook.unknown_address"
+msgstr "The address or connection does not exist, or has no secret."
+
+msgid "admin.audit.reason.webhook.network"
+msgstr "The sender is outside the allowed networks."
+
+msgid "admin.audit.reason.webhook.source_unknown"
+msgstr "The sender's address cannot be trusted, so the network restriction could not be checked."
+
+msgid "admin.audit.reason.webhook.rate"
+msgstr "The same sender went over the limit for inbound webhooks."
+
+msgid "admin.audit.reason.webhook.content_type"
+msgstr "The message was not sent as JSON."
+
+msgid "admin.audit.reason.webhook.too_large"
+msgstr "The message was larger than the allowed 64 KiB."
+
+msgid "admin.audit.reason.webhook.stale"
+msgstr "The signature is right, but the signed time is more than 300 seconds off."
+
+msgid "admin.audit.reason.webhook.malformed"
+msgstr "The signature is right, but the content is not a valid object."
+
 msgid "admin.audit.reason.unauthorized"
 msgstr "The external system refuses our credentials."
 
@@ -6299,6 +6323,9 @@ msgstr "Unknown management links per IP address"
 
 msgid "settings.field.rate_limit_agent_tokens.label"
 msgstr "Machine API token requests per client"
+
+msgid "settings.field.rate_limit_webhook_per_minute.label"
+msgstr "Inbound webhooks per minute, per platform, organisation and source address"
 
 msgid "settings.field.rate_limit_agent_calls.label"
 msgstr "Machine API calls per client"

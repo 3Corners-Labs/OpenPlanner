@@ -265,6 +265,10 @@ class FakeContactCenterConnections:
     async def delete(self, organisation_id: int) -> None:
         self.connections.pop(organisation_id, None)
 
+    async def webhook_secret(self, organisation_id: int, kind: ContactCenterKind) -> str | None:
+        shown = self.connections.get(organisation_id)
+        return f"secret-of-{organisation_id}" if shown and shown.kind is kind else None
+
 
 class FakeOrganisationDispatchers:
     """``OrganisationConnections`` in memory: per organisation id its dispatcher, or ``None``;

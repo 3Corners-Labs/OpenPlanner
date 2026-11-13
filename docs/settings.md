@@ -154,6 +154,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `RATE_LIMIT_BOOKINGS` | rate | `10/hour` | 1–30 per hour | `settings.platform.manage` | Bookings per IP address. |
 | `RATE_LIMIT_READS` | rate | `60/minute` | 10–300 per minute | `settings.platform.manage` | Availability reads per IP address. |
 | `RATE_LIMIT_UNKNOWN_LINKS` | rate | `20/hour` | 5–100 per hour | `settings.platform.manage` | Unknown management links per IP address. |
+| `RATE_LIMIT_WEBHOOK_PER_MINUTE` | int | `600` | 60–6000 | `settings.platform.manage` | Inbound webhook calls per minute, per platform, organisation and source address (ADR 0124 point 5); the off switch stays RATE_LIMIT_ENABLED. |
 | `RATE_LIMIT_AGENT_TOKENS` | rate | `10/minute` | 1–30 per minute | `settings.platform.manage` | Machine API token requests per client. |
 | `RATE_LIMIT_AGENT_CALLS` | rate | `120/minute` | 10–600 per minute | `settings.platform.manage` | Machine API calls per client. |
 | `AGENT_CHANGE_REQUESTS_PER_HOUR` | int | `20` | 1–120 | `settings.platform.manage` | Change requests per API client per hour, next to the machine API's call limit (ADR 0023 step 2); the off switch stays RATE_LIMIT_ENABLED. |

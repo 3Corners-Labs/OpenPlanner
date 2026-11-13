@@ -426,6 +426,19 @@ REASON_LABELS: dict[str, str] = {
 }
 """Readable explanation per known reason; any other code (an error code) is shown as is."""
 
+ACTION_REASON_LABELS: dict[tuple[str, str], str] = {
+    (WEBHOOK_REJECTED, "unknown_address"): "admin.audit.reason.webhook.unknown_address",
+    (WEBHOOK_REJECTED, "network"): "admin.audit.reason.webhook.network",
+    (WEBHOOK_REJECTED, "source_unknown"): "admin.audit.reason.webhook.source_unknown",
+    (WEBHOOK_REJECTED, "rate"): "admin.audit.reason.webhook.rate",
+    (WEBHOOK_REJECTED, "content_type"): "admin.audit.reason.webhook.content_type",
+    (WEBHOOK_REJECTED, "too_large"): "admin.audit.reason.webhook.too_large",
+    (WEBHOOK_REJECTED, "stale"): "admin.audit.reason.webhook.stale",
+    (WEBHOOK_REJECTED, "malformed"): "admin.audit.reason.webhook.malformed",
+}
+"""Explanation of a reason under one action, looked up before ``REASON_LABELS``: a word such as
+``rate`` or ``network`` means something only under its own event and must not label another."""
+
 OUTCOME_TONES: dict[Outcome, str] = {
     Outcome.SUCCESS: "success",
     Outcome.DENIED: "danger",
@@ -573,9 +586,10 @@ def _action_label(action: str, _: BoundGettext) -> str:
         return action
 
 
-def _reason_label(reason: str, _: BoundGettext) -> str:
-    """Explain a known reason; an unknown one is an error code, shown as the code only."""
-    return _(REASON_LABELS[reason]) if reason in REASON_LABELS else ""
+def _reason_label(action: str, reason: str, _: BoundGettext) -> str:
+    """Explain a known reason, under its action first; an unknown one is shown as the code only."""
+    key = ACTION_REASON_LABELS.get((action, reason)) or REASON_LABELS.get(reason)
+    return _(key) if key else ""
 
 
 def _booking_url(principal: Principal, entry: AuditEntry) -> str | None:
@@ -712,7 +726,7 @@ def audit_views(
             " / ".join(t for t in (e.organisation, e.group) if t) or "–",
             OUTCOME_TONES[e.outcome],
             _detail_label(e.detail, _),
-            _reason_label(e.reason, _),
+            _reason_label(e.action, e.reason, _),
             e.reason,
             e.booking_id,
             _booking_url(principal, entry),

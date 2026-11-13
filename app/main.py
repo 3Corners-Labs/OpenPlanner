@@ -177,7 +177,7 @@ from app.web.call_labels import agent_start_label
 from app.web.error_pages import register_error_pages
 from app.web.fallback_text import SpaceTexts
 from app.web.organisation_settings import ClockScopeMiddleware
-from app.web.protection import configure_rate_limits, limiter, set_rate_limits
+from app.web.protection import RateLimits, configure_rate_limits, limiter, set_rate_limits
 from app.web.proxy_headers import ProxyHeaderMiddleware
 from app.web.public_links import PublicRedirectMiddleware
 from app.web.static_assets import ASSETS, VersionedStaticFiles
@@ -303,16 +303,7 @@ def create_app(
     token_key = management_token_key(settings)
     http = httpx.AsyncClient(timeout=10.0, transport=traced_transport(None))
     configure_clock(settings.time_format)
-    configure_rate_limits(
-        enabled=settings.rate_limit_enabled,
-        bookings=settings.rate_limit_bookings,
-        reads=settings.rate_limit_reads,
-        unknown_links=settings.rate_limit_unknown_links,
-        agent_tokens=settings.rate_limit_agent_tokens,
-        agent_calls=settings.rate_limit_agent_calls,
-        reports=f"{settings.reporting_api_rate_per_minute}/minute",
-        change_requests=f"{settings.agent_change_requests_per_hour}/hour",
-    )
+    configure_rate_limits(RateLimits.from_settings(settings), enabled=settings.rate_limit_enabled)
     # Machine API (ADR 0023): only mounted when the deployment switches it on.
     agent_api = create_agent_api() if settings.agent_api_enabled else None
 
@@ -338,15 +329,7 @@ def create_app(
             app.state.settings = current
             if agent_api is not None:
                 agent_api.state.settings = current
-            set_rate_limits(
-                bookings=current.rate_limit_bookings,
-                reads=current.rate_limit_reads,
-                unknown_links=current.rate_limit_unknown_links,
-                agent_tokens=current.rate_limit_agent_tokens,
-                agent_calls=current.rate_limit_agent_calls,
-                reports=f"{current.reporting_api_rate_per_minute}/minute",
-                change_requests=f"{current.agent_change_requests_per_hour}/hour",
-            )
+            set_rate_limits(RateLimits.from_settings(current))
             set_log_level(current.log_level)
             set_slow_query_ms(current.sql_slow_ms)
             configure_clock(current.time_format)
