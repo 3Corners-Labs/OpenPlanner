@@ -1550,6 +1550,16 @@ fieldset.card {
   white-space: nowrap;
 }
 
+/* The queue widget's five columns fit a widget beside another at 1280 px only when a state
+   under a number may wrap; the number itself stays on one line. */
+.widget-table--wrap td.widget-table__number {
+  white-space: normal;
+}
+
+.widget-table__value {
+  white-space: nowrap;
+}
+
 .widget-table .widget-table__number {
   padding-right: 0;
   padding-left: 0.5rem;

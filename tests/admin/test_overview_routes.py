@@ -196,10 +196,10 @@ async def test_the_queue_widget_counts_the_waiting_participant_and_the_agent_sig
     # browser proof of gate item G06): the table scrolls in its own region, reachable by keyboard.
     region = 'role="region" aria-label="Wachtrij in mijn diensten" tabindex="0"'
     assert f'<div class="table-scroll widget-scroll" {region}>' in text
-    assert '<td class="widget-table__number">1</td>' in text  # waiting, and the agent signed in
+    assert '<span class="widget-table__value">1</span>' in text  # waiting, and the agent signed in
     assert "3 min" in text
     assert '<th scope="col" class="widget-table__number">Niet opgepakt</th>' in text
-    assert '<td class="widget-table__number">0</td>' in text  # nobody past the group's limit
+    assert '<span class="widget-table__value">0</span>' in text  # nobody past the group's limit
     assert "Ada" not in text
     assert "ada@example.org" not in text
     assert "webex.example" not in text
