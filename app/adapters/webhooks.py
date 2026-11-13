@@ -28,6 +28,7 @@ from app.domain.booking import booking_id_of
 from app.domain.calls import EventKind
 from app.domain.connection_health import Platform
 from app.domain.contact_center import ContactCenterKind
+from app.domain.inbound_gate import Refusal
 
 MAX_SKEW = timedelta(seconds=300)
 
@@ -74,32 +75,56 @@ def sign_wxcc(body: bytes, secret: str, stamp_ms: int) -> dict[str, str]:
     }
 
 
-def verify_webex(body: bytes, signature: str | None, secret: str) -> bool:
-    """Return whether ``signature`` is the HMAC-SHA1 of ``body`` under ``secret``."""
+def check_webex(
+    body: bytes, headers: Mapping[str, str], secret: str, now: datetime
+) -> Refusal | None:
+    """Check a Webex webhook: ``X-Spark-Signature`` is the HMAC-SHA1 of ``body`` under ``secret``.
+
+    Webex signs no time, so ``now`` is unused; the comparison is constant-time.
+
+    Returns:
+        ``None`` when authentic, else ``Refusal.SIGNATURE``.
+    """
+    signature = headers.get("x-spark-signature")
     if not signature:
-        return False
+        return Refusal.SIGNATURE
     expected = hmac.new(secret.encode(), body, hashlib.sha1).hexdigest()  # noqa: S324 - Webex's scheme
-    return hmac.compare_digest(expected, signature.strip().lower())
+    if hmac.compare_digest(expected, signature.strip().lower()):
+        return None
+    return Refusal.SIGNATURE
 
 
-def verify_wxcc(
+def check_wxcc(
     body: bytes, signature: str | None, timestamp: str | None, secret: str, now: datetime
-) -> bool:
-    """Return whether a WxCC webhook is authentic, untampered and recent."""
+) -> Refusal | None:
+    """Check a WxCC webhook: authentic and untampered first, then recent.
+
+    The signature is compared first, in constant time; only a body that verifies has its time
+    looked at. A body that is not a JSON object, or whose ``comciscotimestamp`` differs from the
+    header, is never authentic.
+
+    Returns:
+        ``None`` when the webhook is good, ``Refusal.SIGNATURE`` when it is not authentic or
+        the time claims do not match, ``Refusal.STALE`` when it is authentic but more than
+        ``MAX_SKEW`` from ``now``.
+    """
     if not signature or not timestamp:
-        return False
+        return Refusal.SIGNATURE
     expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, signature.strip().lower()):
-        return False
+        return Refusal.SIGNATURE
     try:
         payload = json.loads(body)
         sent_ms = int(timestamp)
     except (ValueError, TypeError):
-        return False
+        return Refusal.SIGNATURE
     if not isinstance(payload, dict) or str(payload.get("comciscotimestamp")) != timestamp:
-        return False
-    sent = datetime.fromtimestamp(sent_ms / 1000, tz=now.tzinfo)
-    return abs(now - sent) <= MAX_SKEW
+        return Refusal.SIGNATURE
+    try:
+        sent = datetime.fromtimestamp(sent_ms / 1000, tz=now.tzinfo)
+    except (OverflowError, OSError, ValueError):
+        return Refusal.SIGNATURE
+    return None if abs(now - sent) <= MAX_SKEW else Refusal.STALE
 
 
 def parse_webex(payload: dict[str, Any]) -> ParsedEvent | None:
@@ -194,33 +219,47 @@ def _wxcc_key(payload: dict[str, Any], task_id: str) -> str:
 
 @dataclass(frozen=True)
 class InboundWebhook:
-    """How one contact-center platform's webhooks are checked and read (ADR 0032 point 6).
+    """How one platform's webhooks are checked and read: the one record every address has.
+
+    The gate (``app.web.webhook_gate``, ADR 0124) and the routes work with this shape only, for
+    the video platform (``WEBEX_INBOUND``) and the contact-center platforms
+    (``ContactCenterWebhook``) alike.
+
+    Attributes:
+        platform: The connection whose latest inbound event the webhook is noted as.
+        source: Short code for logs, security events, rate-limit buckets and the event keys that
+            recognise a replay (``wxcc`` stays the code of Webex Contact Center, so the keys
+            stored before ADR 0032 keep matching).
+        secret: Reads the webhook secret from the settings; without it the endpoint does not
+            exist.
+        verify: ``(body, headers, secret, now)`` → ``None`` when authentic, untampered and within
+            300 s, else ``Refusal.SIGNATURE`` or ``Refusal.STALE`` (ADR 0124 point 2).
+        parse: The verified JSON object → the event, or ``None`` when OpenPlanner ignores it.
+        event_type: The verified JSON object → its event type, codes only, for the note.
+    """
+
+    platform: Platform
+    source: str
+    secret: Callable[[Settings], SecretStr | None]
+    verify: Callable[[bytes, Mapping[str, str], str, datetime], Refusal | None]
+    parse: Callable[[dict[str, Any]], ParsedEvent | None]
+    event_type: Callable[[dict[str, Any]], str]
+
+
+@dataclass(frozen=True)
+class ContactCenterWebhook(InboundWebhook):
+    """A contact-center platform's webhooks (ADR 0032 point 6): the record and its addresses.
 
     The route ``/webhooks/contact-center/{kind}`` is the same for every platform; what differs
     is here, defined by the platform's adapter and listed in ``contact_centers.INBOUND``.
 
     Attributes:
         kind: The platform.
-        platform: The connection whose latest inbound event the webhook is noted as.
-        source: Short code for logs, security events and the event keys that recognise a
-            replay (``wxcc`` stays the code of Webex Contact Center, so the keys stored before
-            ADR 0032 keep matching).
-        secret: Reads the webhook secret from the settings; without it the endpoint does not
-            exist.
-        verify: ``(body, headers, secret, now)`` → authentic, untampered and within 300 s.
-        parse: The verified JSON object → the event, or ``None`` when OpenPlanner ignores it.
-        event_type: The verified JSON object → its event type, codes only, for the note.
         alias: An older address that still works and where OpenPlanner still registers, until
             the subscriptions move (CC-4); ``None`` for a platform without one.
     """
 
     kind: ContactCenterKind
-    platform: Platform
-    source: str
-    secret: Callable[[Settings], SecretStr | None]
-    verify: Callable[[bytes, Mapping[str, str], str, datetime], bool]
-    parse: Callable[[dict[str, Any]], ParsedEvent | None]
-    event_type: Callable[[dict[str, Any]], str]
     alias: str | None = None
 
     @property
@@ -247,15 +286,18 @@ class InboundWebhook:
         return (self.path,) if self.alias is None else (self.path, self.alias)
 
 
+WEBEX_PATH = "/webhooks/webex"
+"""The address of the video platform's webhooks."""
+
 CONTACT_CENTER_PATH = "/webhooks/contact-center"
 """The prefix of every contact-center platform's webhook address (ADR 0032 point 6)."""
 
 
 def _verify_wxcc_headers(
     body: bytes, headers: Mapping[str, str], secret: str, now: datetime
-) -> bool:
+) -> Refusal | None:
     """Check a WxCC webhook by its ``X-WebexCC-Signature`` and ``X-WebexCC-Timestamp``."""
-    return verify_wxcc(
+    return check_wxcc(
         body,
         headers.get("x-webexcc-signature"),
         headers.get("x-webexcc-timestamp"),
@@ -274,7 +316,7 @@ def _wxcc_secret(settings: Settings) -> SecretStr | None:
     return settings.wxcc_webhook_secret
 
 
-WXCC_INBOUND = InboundWebhook(
+WXCC_INBOUND = ContactCenterWebhook(
     kind=ContactCenterKind.WEBEX_CC,
     platform=Platform.WXCC,
     source="wxcc",
@@ -285,3 +327,24 @@ WXCC_INBOUND = InboundWebhook(
     alias="/webhooks/wxcc",
 )
 """Webex Contact Center's webhooks: ``/webhooks/contact-center/webex_cc`` and ``/webhooks/wxcc``."""
+
+
+def _webex_type(payload: dict[str, Any]) -> str:
+    """Return a Webex event's type as ``resource:event`` (codes only, capped)."""
+    return f"{payload.get('resource', '')}:{payload.get('event', '')}"[:64]
+
+
+def _webex_secret(settings: Settings) -> SecretStr | None:
+    """Return the Webex webhook secret (``WEBEX_WEBHOOK_SECRET``)."""
+    return settings.webex_webhook_secret
+
+
+WEBEX_INBOUND = InboundWebhook(
+    platform=Platform.WEBEX,
+    source="webex",
+    secret=_webex_secret,
+    verify=check_webex,
+    parse=parse_webex,
+    event_type=_webex_type,
+)
+"""The video platform's webhooks: ``/webhooks/webex``."""

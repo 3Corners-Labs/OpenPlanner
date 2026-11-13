@@ -2166,10 +2166,14 @@ _AUDIT = (
         "webhook.rejected",
         _SEC,
         "warning outcome",
-        "source",
-        "A webhook from {source} was rejected: its signature did not verify.",
-        "A webhook with a wrong signature or an old timestamp (CLAUDE.md, 300 s).",
-        "Repeated: check the webhook secret, or someone is posting to the endpoint.",
+        "source reason",
+        "A webhook from {source} was refused by the gate.",
+        "The inbound webhook gate (ADR 0124) refused a call; the reason is one of "
+        "`unknown_address`, `network`, `source_unknown`, `rate`, `content_type`, `too_large`, "
+        "`invalid_signature`, `stale` (signed time more than 300 s off) or `malformed`.",
+        "`invalid_signature` or `stale`, repeated: check the webhook secret and the clocks. "
+        "`unknown_address`: the address or its connection does not exist, or someone is probing. "
+        "`rate`, `too_large`, `content_type`: a misconfigured sender or an attack.",
     ),
 )
 

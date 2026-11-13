@@ -248,6 +248,33 @@ async def test_a_security_event_explains_itself_to_the_superuser_only(site: Site
     assert "invalid_signature" not in hidden
 
 
+async def test_a_webhook_refusal_reason_is_explained_under_its_own_action_only(site: Site) -> None:
+    # ADR 0124: ``rate`` and ``network`` mean something under ``webhook.rejected`` only.
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+        for action, category in (
+            ("webhook.rejected", Category.SECURITY),
+            ("job.purge_pii", Category.SYSTEM),
+        ):
+            await tx.add_audit_event(
+                AuditEvent(
+                    NOW,
+                    SYSTEM_ACTOR,
+                    action,
+                    Outcome.DENIED,
+                    "rate",
+                    detail="source:webex",
+                    source=Source.SYSTEM,
+                    category=category,
+                )
+            )
+
+    await site.login_as(SUPER)
+    text = (await site.client.get("/admin/audit?level=debug")).text
+
+    assert text.count("Dezelfde afzender ging over de limiet voor binnenkomende webhooks.") == 1
+
+
 async def test_an_admin_action_is_shipped_once_as_an_audit_line(
     site: Site, capsys: pytest.CaptureFixture[str]
 ) -> None:

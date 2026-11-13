@@ -11,7 +11,7 @@ supplies the real address). slowapi buckets per request path, so links that matc
 get a bound of their own, one bucket per address whatever the path (``count_unknown_link``).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from urllib.parse import urlsplit
 
 import structlog
@@ -20,6 +20,7 @@ from limits import parse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.config import Settings
 from app.domain.security_log import CROSS_SITE, ORIGIN_MISMATCH
 from app.web.route_dependencies import dependency_calls
 
@@ -124,7 +125,10 @@ def is_action(request: Request) -> bool:
 
 @dataclass
 class RateLimits:
-    """Current limit strings; set once per application in ``configure_rate_limits``."""
+    """Current limit strings; set once per application in ``configure_rate_limits``.
+
+    A new limit is one field here and one line in ``from_settings``.
+    """
 
     bookings: str = "10/hour"
     reads: str = "60/minute"
@@ -135,56 +139,46 @@ class RateLimits:
     agent_calls: str = "120/minute"
     reports: str = "30/minute"
     change_requests: str = "20/hour"
+    webhooks: str = "600/minute"
+
+    @classmethod
+    def from_settings(cls, settings: Settings) -> "RateLimits":
+        """Return the limits the settings ask for; the one place that reads them."""
+        return cls(
+            bookings=settings.rate_limit_bookings,
+            reads=settings.rate_limit_reads,
+            unknown_links=settings.rate_limit_unknown_links,
+            agent_tokens=settings.rate_limit_agent_tokens,
+            agent_calls=settings.rate_limit_agent_calls,
+            reports=f"{settings.reporting_api_rate_per_minute}/minute",
+            change_requests=f"{settings.agent_change_requests_per_hour}/hour",
+            webhooks=f"{settings.rate_limit_webhook_per_minute}/minute",
+        )
 
 
 LIMITS = RateLimits()
 limiter = Limiter(key_func=get_remote_address)
 
 
-def configure_rate_limits(
-    *,
-    enabled: bool,
-    bookings: str,
-    reads: str,
-    unknown_links: str = "20/hour",
-    agent_tokens: str = "10/minute",
-    agent_calls: str = "120/minute",
-    reports: str = "30/minute",
-    change_requests: str = "20/hour",
-) -> None:
-    """Apply the settings to the process-wide limiter and clear its counters."""
+def _adopt(limits: RateLimits) -> None:
+    """Make ``limits`` the current ones, in place: the accessors read ``LIMITS``."""
+    for field in fields(limits):
+        setattr(LIMITS, field.name, getattr(limits, field.name))
+
+
+def configure_rate_limits(limits: RateLimits, *, enabled: bool) -> None:
+    """Apply the limits to the process-wide limiter and clear its counters."""
     limiter.enabled = enabled
-    LIMITS.bookings = bookings
-    LIMITS.reads = reads
-    LIMITS.unknown_links = unknown_links
-    LIMITS.agent_tokens = agent_tokens
-    LIMITS.agent_calls = agent_calls
-    LIMITS.reports = reports
-    LIMITS.change_requests = change_requests
+    _adopt(limits)
     limiter.reset()
 
 
-def set_rate_limits(
-    *,
-    bookings: str,
-    reads: str,
-    unknown_links: str,
-    agent_tokens: str,
-    agent_calls: str,
-    reports: str = "30/minute",
-    change_requests: str = "20/hour",
-) -> None:
+def set_rate_limits(limits: RateLimits) -> None:
     """Apply changed limits to the next request, keeping the counters (ADR 0042 §6).
 
     The switch ``RATE_LIMIT_ENABLED`` is deployment-only and stays as it was.
     """
-    LIMITS.bookings = bookings
-    LIMITS.reads = reads
-    LIMITS.unknown_links = unknown_links
-    LIMITS.agent_tokens = agent_tokens
-    LIMITS.agent_calls = agent_calls
-    LIMITS.reports = reports
-    LIMITS.change_requests = change_requests
+    _adopt(limits)
 
 
 def booking_limit() -> str:
@@ -244,6 +238,83 @@ def reports_limit() -> str:
 def change_request_limit() -> str:
     """Limit for a bot's change requests, per API client (ADR 0023 step 2)."""
     return LIMITS.change_requests
+
+
+def webhook_limit() -> str:
+    """Limit for inbound webhooks, per platform, organisation and source address (ADR 0124)."""
+    return LIMITS.webhooks
+
+
+def webhook_retry_after() -> str:
+    """Return the ``Retry-After`` seconds of a refused webhook: the window of its limit.
+
+    Derived from the limit string, so it holds when the limit is no longer per minute.
+    """
+    return str(parse(webhook_limit()).get_expiry())
+
+
+def _within(bucket: str, platform: str, organisation: str, source: str) -> bool:
+    """Count one call against ``bucket`` of one platform, organisation and caller address."""
+    if not limiter.enabled:
+        return True
+    return limiter.limiter.hit(parse(webhook_limit()), bucket, platform, organisation, source)
+
+
+def within_webhook_limit(platform: str, organisation: str, source: str) -> bool:
+    """Count one verified webhook against its bucket and return whether it may go on.
+
+    The bucket is the platform, the organisation (``-`` for an address of the installation)
+    and the caller's address, so organisations behind one supplier address do not share one
+    (ADR 0124 point 5). It counts verified calls only: the gate calls it after the signature
+    held, so a caller that cannot sign never uses it up. It is held by the common limiter: the
+    off switch and the reset work as for every other limit.
+
+    Args:
+        platform: The platform's source code, e.g. ``webex``.
+        organisation: The organisation's slug, or ``-``.
+        source: The caller's address, as the server derived it.
+
+    Returns:
+        ``False`` when the caller is over the limit; always ``True`` while rate limits are off.
+    """
+    return _within("webhook", platform, organisation, source)
+
+
+def within_refused_limit(platform: str, organisation: str, source: str) -> bool:
+    """Count one refused webhook against its own bucket and return whether it keeps its reason.
+
+    A bucket apart from the verified one, with the same value and key: calls that failed a
+    check (content type, size, signature, time, shape) count here and nowhere else, so
+    unverified calls from a shared sending address can never use up the budget of the authentic
+    deliveries (ADR 0124 point 5). Over it, the caller is told ``rate`` instead of the reason.
+
+    Args:
+        platform: The platform's source code.
+        organisation: The organisation's slug, or ``-``.
+        source: The caller's address, as the server derived it.
+    """
+    return _within("webhook-refused", platform, organisation, source)
+
+
+def within_unknown_address_limit(source: str) -> bool:
+    """Count one call to an address that does not exist against its caller's own bucket.
+
+    The bucket only decides, for calls to addresses that do not exist, between a 404 and a 429
+    and so caps how many refusal events a prober can start; it never touches a call to an
+    address that exists, so a customer of the same supplier cannot lock real organisations out
+    from a shared address (ADR 0124 point 5). The key is the caller's address alone, with the
+    value of ``rate_limit_webhook_per_minute``: the platform and organisation in the path come
+    from the caller, so they never make a key.
+
+    Args:
+        source: The caller's address, as the server derived it.
+
+    Returns:
+        ``False`` when the caller is over the bucket; always ``True`` while rate limits are off.
+    """
+    if not limiter.enabled:
+        return True
+    return limiter.limiter.hit(parse(webhook_limit()), "webhook-unknown", source)
 
 
 def check_limit() -> str:
