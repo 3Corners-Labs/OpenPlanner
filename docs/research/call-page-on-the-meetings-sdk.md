@@ -262,3 +262,29 @@ Three statements disagree: the repository says MIT, the npm metadata says "Cisco
 - For the conversation task: a flow whose first step does not fail and that queues at once, how the staff member gets the video link from the task, and channel capacity (the test agent's desktop showed capacity 0 outside voice).
 - For the widget route: how a widget running inside Cisco's desktop proves to our server which task it may read; framing or cross-origin rules for our side (an iframe widget needs CSP headers on our response, a web component needs a CORS allow-list as the booking widget has); and trying it on a tenant.
 - IndexedDB contents after a call.
+
+## 16. What a guest's token can do, and the rename (lab tenant, 2026-11-13)
+
+ADR 0123 points 6 and 7 ask for two things to be established before the way in (step 4) is
+built. A script minted a guest for a made-up subject with the service app's token and asked the
+platform's API with the guest's token; it recorded status codes and counts only.
+
+- **Looking up people:** not possible. A search by name is allowed and returns nothing, for
+  every first letter. A list without a filter is refused (400).
+- **Meetings, the organisation, licences, recordings, meeting preferences:** refused (403). A
+  guest cannot create a meeting.
+- **Things of its own:** a guest can create a room, write in it, delete it, and register a
+  webhook of its own (and delete it). Rooms, memberships, teams, webhooks and devices list empty.
+- **Messages to others:** a message to an address that cannot exist is refused (400). Whether a
+  guest can write to a staff member whose address it knows was **not tried**: it would send a
+  message to a real account.
+- **Tokens:** a second minting for the same subject returns another token for the same guest;
+  the earlier token keeps working.
+- **The rename:** a second minting with another name changes the guest's name, also as seen with
+  the earlier token, within a few seconds (a read straight after the minting still showed the
+  first name). The purge can rely on it (point 7).
+
+What follows for the build: the token is treated as a credential of a limited account in the
+organisation's video platform, not as a pass for one meeting. It is handed to the page only on
+the click that joins, never stored or logged (point 6), and the open question above is a named
+risk in the threat model of step 4 until it is tried with an account whose owner agreed.
