@@ -20,6 +20,16 @@ outcome is therefore *derived from the call*, and only where the call was observ
     scheduled, no guest seen                   ``no_show``
     direct, guest seen and host joined         ``completed``; any other direct call: no outcome
 
+A slot of a counted pool (ADR 0122) is closed too, with its own rule: its outcome is the
+operator's explicit evidence (A27), never an observation of a meeting. Its capacity belongs to a
+pool that several services share, not to the service, so it writes no ``slot.closed`` and no
+``slot.shortfall`` (a pool's shortage is listed on the pool's own page):
+
+    pool booking completed by an operator        ``completed``
+    pool booking marked as a no show             ``no_show``
+    any other pool booking                       no outcome (expiry is not evidence of absence)
+    confirmed, and nobody claimed or started it  ``call.not_picked_up``
+
 A guest is *seen* when a guest-joined event or a poll showed someone besides the host in the
 meeting, or two people were in it at once. ``no_show`` means that no join was observed. Where
 Webex's webhooks are not set up and nobody opened the agenda, a join cannot be seen; the
@@ -66,6 +76,14 @@ the meeting, or two people were in it at once. `no_show` therefore means that no
 where Webex's webhooks are not set up and nobody opened the agenda, a join cannot be seen. A slot
 exists only when it had a booking, so hours nobody booked are not in utilisation. Slots that ended
 before the upgrade are not closed afterwards, and `completed` and `no_show` cannot be backfilled.
+
+An appointment of a flow on a counted pool (ADR 0122) has no meeting to observe: its outcome is
+the operator's explicit *Complete* (`completed`), or `no_show` where the booking was marked so;
+work that expired unstarted has no outcome. It counts as not picked up when, at closing, nobody
+had claimed it or started it. Its places belong to a pool that several services share, so it adds
+nothing to utilisation, fill or idle capacity (C1 to C3) and no shortfall (C5): a pool's shortage
+is on the pool's own page. Work completed more than two hours after the appointment's end (work
+in recovery, among others) is closed without its outcome.
 """
 """The rule of ``outcome_of`` in words, as published in ``docs/reporting.md``."""
 
@@ -109,6 +127,8 @@ class EndedSlot:
         end: The slot end.
         capacity: The capacity snapshot of the slot.
         bookings: Every booking in it, whatever its status.
+        pool_id: The counted pool the slot draws on (ADR 0122), ``None`` for the service's
+            own (legacy) slot.
     """
 
     slot_id: int
@@ -118,6 +138,12 @@ class EndedSlot:
     end: datetime
     capacity: int
     bookings: tuple[ClosedBooking, ...]
+    pool_id: int | None = None
+
+    @property
+    def pooled(self) -> bool:
+        """Whether the slot draws on a counted pool rather than the service's own staffing."""
+        return self.pool_id is not None
 
 
 @dataclass(frozen=True)
@@ -199,6 +225,28 @@ def outcome_of(booking: ClosedBooking, kind: BookingKind) -> UsageOutcome | None
     return None
 
 
+def pool_outcome_of(booking: ClosedBooking) -> UsageOutcome | None:
+    """Return how a pool booking ended: only from the explicit evidence of its status (A27).
+
+    The operator's *Complete* sets the booking to ``completed``; nothing is derived from a
+    meeting or from work that expired unstarted.
+    """
+    if booking.status is BookingStatus.COMPLETED:
+        return UsageOutcome.COMPLETED
+    if booking.status is BookingStatus.NO_SHOW:
+        return UsageOutcome.NO_SHOW
+    return None
+
+
+def pool_not_picked_up(booking: ClosedBooking) -> bool:
+    """Return whether nobody picked up a pool booking before its slot closed (metric Q6).
+
+    A pool booking always reaches a queue (the own queue or a contact-center attempt), so it
+    counts when it is still confirmed and nobody claimed it or started its work.
+    """
+    return booking.status is BookingStatus.CONFIRMED and not booking.claimed
+
+
 def not_picked_up(booking: ClosedBooking, dispatch: DispatchKind, limit: timedelta) -> bool:
     """Return whether nobody picked ``booking`` up within ``limit`` of its start (metric Q6).
 
@@ -240,19 +288,21 @@ def closing_facts(
 ) -> list[UsageFact]:
     """Return the facts that closing ``slot`` writes.
 
+    A pool slot writes only the facts of its bookings, by the pool rule (see the module).
+
     Args:
         slot: The ended slot.
         organisation_id: The group's organisation.
         dispatch: How the group's bookings reach staff.
         not_picked_up_limit: The group's ``not_picked_up_minutes``.
-        staffing: The agenda's view of a scheduled slot; ``None`` for a direct slot or a slot
-            the staffing does not know.
+        staffing: The agenda's view of a scheduled slot; ``None`` for a direct slot, a pool
+            slot or a slot the staffing does not know.
     """
     facts: list[UsageFact] = []
     slot_facts = BookingFacts(
         organisation_id, slot.group_id, slot.kind, dispatch, None, slot.start, slot.start
     )
-    if slot.kind is BookingKind.SCHEDULED:
+    if slot.kind is BookingKind.SCHEDULED and not slot.pooled:
         booked = sum(1 for b in slot.bookings if counts(b))
         facts.append(
             keyed(
@@ -273,7 +323,12 @@ def closing_facts(
             )
     for booking in slot.bookings:
         b = _facts_of(booking, organisation_id, slot.group_id, slot.kind, dispatch)
-        outcome = outcome_of(booking, slot.kind)
+        if slot.pooled:
+            outcome = pool_outcome_of(booking)
+            unanswered = pool_not_picked_up(booking)
+        else:
+            outcome = outcome_of(booking, slot.kind)
+            unanswered = not_picked_up(booking, dispatch, not_picked_up_limit)
         if outcome is not None:
             facts.append(
                 keyed(
@@ -284,7 +339,7 @@ def closing_facts(
                     outcome=outcome,
                 )
             )
-        if not_picked_up(booking, dispatch, not_picked_up_limit):
+        if unanswered:
             facts.append(keyed(FactKind.CALL_NOT_PICKED_UP, b, slot.start))
     return facts
 

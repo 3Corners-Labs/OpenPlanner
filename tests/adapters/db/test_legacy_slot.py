@@ -52,8 +52,9 @@ ALL_SLOTS = {
     "db/rotation.py:open_booking_credentials": "credentials of every open booking",
     "db/health.py:stale_tasks": "contact-center tasks of every booking",
     "db/rollup.py:find_rollable": "rolls up purged bookings, any slot",
-    "db/usage_rollup.py:find_unbackfilled": "facts of every booking (closing pool slots: planned)",
-    "db/usage_slots.py:_bookings_of": "bookings of slots already chosen by ended_slots (legacy)",
+    "db/usage_rollup.py:find_unbackfilled": "facts of every booking, a pool booking among them",
+    "db/usage_slots.py:ended_slots": "closes every ended slot; a pool slot by the pool rule",
+    "db/usage_slots.py:_bookings_of": "bookings of the slots ended_slots chose",
     # Erasing and seeding.
     "db/config_group.py:write_group": "a configuration import replaces the group's slots",
     "db/config_organisation.py:_delete_organisation": "erases every slot of the organisation",
@@ -198,14 +199,17 @@ async def test_a_closure_reads_the_pool_booking_too(
     assert sorted(b.slot_id for b in both) == sorted([legacy, pooled])
 
 
-async def test_the_closing_of_ended_slots_skips_the_pool_slot(
+async def test_the_closing_of_ended_slots_closes_the_pool_slot_as_a_pool_slot(
     engine: AsyncEngine, seeded: tuple[int, int, int]
 ) -> None:
-    _, legacy, _ = seeded
+    _, legacy, pooled = seeded
     async with SqlUnitOfWork(engine).read() as tx:
         ended = await tx.ended_slots(START, END + timedelta(hours=1), 100)
 
-    assert [s.slot_id for s in ended.slots] == [legacy]
+    by_id = {s.slot_id: s for s in ended.slots}
+    assert sorted(by_id) == sorted([legacy, pooled])
+    assert not by_id[legacy].pooled
+    assert by_id[pooled].pooled
 
 
 async def test_the_planner_usage_counts_only_the_legacy_slot_load(

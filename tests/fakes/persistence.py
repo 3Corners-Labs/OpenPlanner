@@ -1174,16 +1174,25 @@ class InMemoryTransaction(ServiceRequestStore):
                         b.locale,
                         b.created_at,
                         b.start,
-                        b.claim is not None,
+                        b.claim is not None or self._work_started(b.id or 0),
                         self.state.call_status.get(b.id or 0) or new_status(b.id or 0),
                     )
                     for b in sorted(self.state.bookings.values(), key=lambda b: b.id or 0)
                     if b.slot_id == s.id
                 ),
+                s.capacity_pool_id,
             )
             for s in found
         )
         return EndedSlots(slots, covered)
+
+    def _work_started(self, booking_id: int) -> bool:
+        """Return whether the request of ``booking_id`` has work that started."""
+        requests = {r.id for r in self.state.requests.values() if r.booking_id == booking_id}
+        return any(
+            i.started_at is not None and i.request_id in requests
+            for i in self.state.work_items.values()
+        )
 
     async def slots_closed_until(self) -> datetime | None:
         return self.state.slots_closed_until

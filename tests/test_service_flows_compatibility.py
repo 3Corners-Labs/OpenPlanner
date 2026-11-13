@@ -118,12 +118,17 @@ def test_every_old_behaviour_has_a_section_whose_rows_each_have_a_proof() -> Non
 
 
 def test_every_open_row_of_both_adrs_has_a_checklist_item() -> None:
+    """An item that is done stays on the list; its ADR row is then merged, so it is not counted."""
     wanted: Counter[str] = Counter()
     for number, path in ADRS.items():
         for cells in table_rows(path.read_text(encoding="utf-8")) or []:
             if state_of(cells) in OPEN_STATES and cells[0] != STEP_8:
                 wanted[f"{number}/{cells[0]}"] += 1
-    listed = Counter(item.source for item in _checklist().values() if "/" in item.source)
+    listed = Counter(
+        item.source
+        for item in _checklist().values()
+        if "/" in item.source and not item.status.startswith("done")
+    )
 
     assert wanted
     assert listed == wanted

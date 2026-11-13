@@ -132,8 +132,11 @@ class _Staffing:
         return self._groups[group_id]
 
     async def of(self, group: Group, slot: EndedSlot) -> SlotStaffing | None:
-        """Return the staffing of a scheduled ``slot`` as the agenda shows it, or ``None``."""
-        if slot.kind is not BookingKind.SCHEDULED:
+        """Return the staffing of a scheduled ``slot`` as the agenda shows it, or ``None``.
+
+        A pool slot has none here: its supply is the pool's, not the service's agenda.
+        """
+        if slot.kind is not BookingKind.SCHEDULED or slot.pooled:
             return None
         day = slot.start.astimezone(group.tz).date()
         if group.id not in self._closures:
