@@ -14,9 +14,11 @@ from app.domain.calls import ContactCenterTask, contact_center_task
 from app.domain.contact_center import (
     INTERACTION_KIND,
     SKILL_CODES,
+    TASK_KIND,
     ContactCenterCapabilities,
     ContactCenterKind,
     ProviderDescriptor,
+    TaskKind,
     capabilities_of,
     uncarried,
 )
@@ -78,7 +80,7 @@ VIDEO = {"interaction_kind": InteractionKind.VIDEO, "handling_action": HandlingA
 
 def test_webex_contact_center_declares_video_none_and_skills() -> None:
     carried = frozenset({InteractionKind.VIDEO, InteractionKind.NONE})  # ``none`` since 6b
-    assert WEBEX == ContactCenterCapabilities(carried, skills=True)
+    assert WEBEX == ContactCenterCapabilities(carried, skills=True, conversation=True)
 
 
 def test_a_descriptor_that_declares_nothing_carries_nothing() -> None:
@@ -94,6 +96,17 @@ def test_uncarried_names_the_interaction_first_then_the_skills() -> None:
     assert uncarried(WEBEX, InteractionKind.TELEPHONE, skills=True) == INTERACTION_KIND
     assert uncarried(VIDEO_ONLY_NO_SKILLS, InteractionKind.VIDEO, skills=False) is None
     assert uncarried(VIDEO_ONLY_NO_SKILLS, InteractionKind.VIDEO, skills=True) == SKILL_CODES
+
+
+def test_the_conversation_is_carried_only_by_a_platform_that_declares_it() -> None:
+    bare = ProviderDescriptor(ContactCenterKind.WEBEX_CC, "k", (), 10, "k.value")
+    form = TaskKind.FORM
+    conversation = TaskKind.CONVERSATION
+
+    assert uncarried(WEBEX, InteractionKind.VIDEO, False, conversation) is None
+    assert uncarried(VIDEO_ONLY_NO_SKILLS, InteractionKind.VIDEO, False, form) is None
+    assert uncarried(VIDEO_ONLY_NO_SKILLS, InteractionKind.VIDEO, False, conversation) == TASK_KIND
+    assert not bare.capabilities.carries_task(conversation)
 
 
 def test_only_a_complete_routing_carries_anything() -> None:

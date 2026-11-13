@@ -16,6 +16,7 @@ from app.domain.calls import (
     EventKind,
     MeetingRequest,
     MeetingStatus,
+    ParticipantMessage,
     TaskSnapshot,
     TaskState,
 )
@@ -23,8 +24,10 @@ from app.domain.checks import Finding
 from app.domain.contact_center import (
     ConnectionChange,
     ContactCenterKind,
+    ContactCenterTaskRef,
     OrganisationConnection,
     Registration,
+    TaskKind,
 )
 from app.domain.guest_access import GuestAccess
 from app.domain.networks import NetworkList
@@ -93,12 +96,26 @@ class FakeDispatcher:
         self.read: list[str] = []
         self.snapshots: dict[str, TaskSnapshot] = {}
         self.read_error: IntegrationError | None = None
+        self.kinds: list[TaskKind] = []
+        """The kind of every task created, in order (ADR 0123 step 7a)."""
+        self.appended: list[tuple[str, ParticipantMessage]] = []
+        """The messages appended to conversation tasks, once per message identifier."""
+        self.append_error: IntegrationError | None = None
 
     async def create_task(self, task: ContactCenterTask) -> str:
         if self.error:
             raise self.error
         self.items.append(task)
+        self.kinds.append(task.task_kind)
         return f"task-{len(self.items)}"
+
+    async def append_message(self, task: ContactCenterTaskRef, message: ParticipantMessage) -> None:
+        if self.append_error:
+            raise self.append_error
+        if task.task_kind is not TaskKind.CONVERSATION:
+            raise IntegrationError("not_ready", retryable=False)
+        if all(m.message_id != message.message_id for _, m in self.appended):
+            self.appended.append((task.id, message))  # the platform takes one id as one message
 
     async def end_task(self, task_id: str) -> None:
         if self.end_error:

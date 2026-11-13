@@ -7,6 +7,7 @@ import asyncio
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, suppress
 from datetime import timedelta
+from functools import partial
 
 import httpx
 import structlog
@@ -174,6 +175,7 @@ from app.service_wiring import booking_service, planner_service, request_service
 from app.web.alert_text import alert_composer
 from app.web.authz_labels import ROLE_LABELS
 from app.web.call_labels import agent_start_label
+from app.web.conversation_opening import conversation_opening
 from app.web.error_pages import register_error_pages
 from app.web.fallback_text import SpaceTexts
 from app.web.organisation_settings import ClockScopeMiddleware
@@ -363,6 +365,7 @@ def create_app(
                 agent_start_label,
                 app.state.fallback_service,
                 wired.organisations,
+                partial(conversation_opening, app.state.translator),
             )
             app.state.trial_call_service = TrialCallService(
                 uow, wired.video, app.state.integration_service, clock

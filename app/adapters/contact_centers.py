@@ -14,7 +14,12 @@ from collections.abc import Mapping
 
 from app.adapters.webhooks import WXCC_INBOUND, ContactCenterWebhook
 from app.adapters.wxcc import DESCRIPTOR as WEBEX_CC
-from app.domain.contact_center import ContactCenterKind, ContactCenterRouting, ProviderDescriptor
+from app.domain.contact_center import (
+    ContactCenterKind,
+    ContactCenterRouting,
+    ProviderDescriptor,
+    TaskKind,
+)
 
 DESCRIPTORS: Mapping[ContactCenterKind, ProviderDescriptor] = {WEBEX_CC.kind: WEBEX_CC}
 """Every platform OpenPlanner has an adapter for, by kind."""
@@ -44,11 +49,16 @@ def descriptor(kind: ContactCenterKind) -> ProviderDescriptor:
 
 
 def routing(
-    kind: ContactCenterKind, routing_value: str | None, attributes: Mapping[str, str | None]
+    kind: ContactCenterKind,
+    routing_value: str | None,
+    attributes: Mapping[str, str | None],
+    task_kind: TaskKind = TaskKind.FORM,
 ) -> ContactCenterRouting | None:
     """Return the routing of ``kind`` with the given values, or ``None`` when all are empty.
 
-    An attribute whose value is ``None`` is left out (not set).
+    An attribute whose value is ``None`` is left out (not set). A task kind alone is no
+    routing: with no routing value and no attribute there is nothing to dispatch to, and the
+    kind is not kept.
 
     Raises:
         DomainError: ``invalid_configuration`` for a value the descriptor refuses.
@@ -56,7 +66,7 @@ def routing(
     filled = {name: value for name, value in attributes.items() if value is not None}
     if routing_value is None and not filled:
         return None
-    return ContactCenterRouting(descriptor(kind), routing_value, filled)
+    return ContactCenterRouting(descriptor(kind), routing_value, filled, task_kind)
 
 
 def attributes_json(attributes: Mapping[str, str]) -> str:

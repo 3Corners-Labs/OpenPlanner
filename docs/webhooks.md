@@ -189,6 +189,50 @@ topic *Contactcenter inrichten* (`docs/manual/nl/contact-center-setup.md`).
 Create Task request at all (they skip with reason `fallback`); when the fallback ends, bookings
 not yet claimed get a fresh dispatch job and the usual request above.
 
+## Outbound: WxCC conversation task (ADR 0123 point 8, step 7a)
+
+A routing with the task kind `conversation` (`group_contact_center.task_kind`, default `form`)
+sends a `customMessaging` task instead of the work item. The request is
+`tests/adapters/wxcc_conversation.json` (made-up identifiers); `app/adapters/wxcc.py`
+(`conversation_body`, `append_body`) is the one place that builds it.
+
+Create Task v2, `POST /v2/tasks`, the same business address, channel and `flowSettings` as the
+work item (route, routing variables, skill codes, interaction kind):
+
+```json
+{
+  "origin": {"id": "OP-000123", "name": "Zoë"},
+  "destination": {"id": "<business address>", "type": "businessAddress"},
+  "channelType": "customMessaging",
+  "channel": "<messaging channel>",
+  "flowSettings": {"openplannerGroup": "demo"},
+  "channelParams": {
+    "type": "text",
+    "message": {"aliasId": "<uuid>", "text": "<first message>", "timestamp": 1767600000000}
+  }
+}
+```
+
+The booking reference is the participant's identifier: WxCC allows one open conversation per
+identifier and business address, so one per appointment. The first message is a fixed catalogue
+text in the organisation's language with the booking reference, first name, start, group name
+and, for a video task, the meeting link; nothing else of the booking.
+
+Task Messages v2, `POST /v2/tasks/{taskId}/messages`, one participant message (nothing sends one
+before step 7b); `aliasId` is the message's own identifier, so the same one twice is one message:
+
+```json
+{"mediaType": "customMessaging",
+ "channelParams": {"type": "text", "message": {"aliasId": "<message id>", "text": "<text>", "timestamp": 1767600000000}}}
+```
+
+Both are answered with 202. A conversation needs the messaging feature of the contact center
+and a messaging channel in its control panel: without them WxCC answers 403, which OpenPlanner
+reports as `messaging_not_configured` (never a work item in its place). A second open
+conversation for the same identifier is refused; the status of that refusal was not recorded on
+the lab tenant, and OpenPlanner reads a 409 as `conversation_open`. Any other refusal keeps its
+own `rejected_<status>` code. None of the three is retried.
+
 ## Webhook addresses
 
 Webex calls `<WEBHOOK_BASE_URL>/webhooks/webex`. An organisation with its own contact-center

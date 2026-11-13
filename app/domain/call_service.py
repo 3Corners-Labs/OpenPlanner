@@ -25,8 +25,9 @@ from app.domain.calls import (
     contact_center_task,
     meeting_request,
 )
-from app.domain.contact_center import ContactCenterTaskRef
+from app.domain.contact_center import ContactCenterTaskRef, TaskKind
 from app.domain.contact_center_dispatch import DispatcherChoice
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.fallback import FallbackService
 from app.domain.integration import IntegrationService
 from app.domain.interaction import InteractionKind
@@ -44,6 +45,13 @@ from app.domain.service_flows import interaction_of, requirement_of
 from app.domain.skills import mapped_skill_codes
 
 StartLabel = Callable[[Booking, Group], str]
+OpeningText = Callable[[str, ContactCenterTask], str]
+"""Composes the first message of a conversation task from a locale and the task (ADR 0123 step
+7a); the catalogue and the translator are the edge's, so the domain is handed the function."""
+DEFAULT_LOCALE = "nl"
+"""The language of the first message when the organisation cannot be read; as everywhere."""
+OPENING_MESSAGE = "opening_message"
+"""What a refusal names when a conversation task cannot be given its first message."""
 
 
 class CallService:
@@ -55,6 +63,8 @@ class CallService:
         video: Video provider, or ``None`` when Webex is not configured.
         dispatchers: The dispatcher per contact-center platform; empty when none is configured.
         start_label: Formats the start time for agents.
+        opening: Composes the first message of a conversation task (ADR 0123 step 7a); without
+            it a conversation task cannot be built and is refused as not ready.
     """
 
     def __init__(
@@ -66,6 +76,7 @@ class CallService:
         start_label: StartLabel,
         fallback: FallbackService | None = None,
         organisations: OrganisationDispatchers | None = None,
+        opening: OpeningText | None = None,
     ) -> None:
         """Store the collaborators; ``fallback`` diverts dispatches to the own queue (ADR 0082).
 
@@ -78,6 +89,7 @@ class CallService:
         self._dispatchers = DispatcherChoice(dispatchers, organisations)
         self._start_label = start_label
         self._fallback = fallback
+        self._opening = opening
 
     @property
     def video_available(self) -> bool:
@@ -121,8 +133,10 @@ class CallService:
             return booking
         if await self.diverts(booking, group):
             return booking
-        task_id = await dispatcher.create_task(await self.task_for(booking, group))
-        booking_id, task = _id(booking), ContactCenterTaskRef(task_id, routing.kind)
+        built = await self.task_for(booking, group)
+        task_id = await dispatcher.create_task(built)
+        booking_id = _id(booking)
+        task = ContactCenterTaskRef(task_id, routing.kind, built.task_kind)
         async with self._uow.locked() as tx:
             await tx.save_task(booking_id, task)
         await self._integration.record(booking_id, EventKind.TASK_CREATED)
@@ -134,18 +148,27 @@ class CallService:
         Raises:
             IntegrationError: ``meeting_missing`` (retryable) while a video task's meeting is
                 not there.
-            DomainError: ``integration_not_ready`` (``skill_codes``, ``interaction_kind``, ...).
+            DomainError: ``integration_not_ready`` (``skill_codes``, ``interaction_kind``,
+                ``task_kind``, ``opening_message``, ...).
         """
         interaction, skills = await self._flow_terms(booking, group)
         if interaction is InteractionKind.VIDEO and booking.meeting is None:
             raise IntegrationError("meeting_missing", retryable=True)
-        return contact_center_task(
+        task = contact_center_task(
             booking,
             group,
             start_label=self._start_label(booking, group),
             skills=skills,
             interaction=interaction,
         )
+        if task.task_kind is not TaskKind.CONVERSATION:
+            return task
+        if self._opening is None:
+            raise DomainError(ErrorCode.INTEGRATION_NOT_READY, OPENING_MESSAGE)
+        async with self._uow.read() as tx:
+            organisation = await tx.get_organisation_by_id(group.organisation_id)
+        locale = organisation.default_locale if organisation else DEFAULT_LOCALE
+        return replace(task, first_message=self._opening(locale, task))
 
     async def dispatcher_of(self, group: Group) -> ContactCenterDispatcher | None:
         """Return the dispatcher of the group's contact-center platform, ``None`` without one."""

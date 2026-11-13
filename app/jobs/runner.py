@@ -27,6 +27,7 @@ its own retention period.
 
 from collections.abc import Awaitable, Callable, Collection
 from datetime import datetime, timedelta
+from functools import partial
 from time import perf_counter
 from typing import Protocol
 
@@ -73,6 +74,7 @@ from app.jobs.calls import CALL_JOBS, STALE, CallJobs
 from app.jobs.messages import MESSAGE_KINDS, MessageComposer
 from app.logging import tracer
 from app.web.call_labels import agent_start_label
+from app.web.conversation_opening import conversation_opening
 
 log = structlog.get_logger()
 
@@ -203,6 +205,7 @@ class JobRunner:
                 agent_start_label,
                 fallback,
                 organisations,
+                partial(conversation_opening, composer.translator),
             )
             if integration is not None
             else None

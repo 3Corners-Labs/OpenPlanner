@@ -16,13 +16,14 @@ No names, email addresses or IP addresses of participants are stored: only count
 host joined, and times. Pure Python, no I/O; ``app.domain.integration`` records and shows them.
 """
 
+import re
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from enum import StrEnum
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from app.domain.booking import Booking
-from app.domain.contact_center import ContactCenterRouting, uncarried
+from app.domain.contact_center import ContactCenterRouting, TaskKind, uncarried
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.interaction import InteractionKind
 from app.domain.scheduling import Group, JoinClient
@@ -390,6 +391,12 @@ class ContactCenterTask:
         interaction: The interaction kind of the flow the booking was made under (ADR 0121 step
             6): what the agent does with the task. A value of a closed list, never personal
             data; an adapter that does not declare it in its capabilities refuses the task.
+        task_kind: What the task is to the agent (ADR 0123 point 8), from the routing: the form
+            (the work item) or the conversation. An adapter that does not declare the
+            conversation in its capabilities refuses the task.
+        first_message: For a conversation, the text that opens it, composed at the edge from
+            the catalogue and filled with the fields above only (``message_texts``); empty for
+            a form, which has no text.
     """
 
     reference: str
@@ -403,6 +410,54 @@ class ContactCenterTask:
     variables: tuple[tuple[str, str], ...] = ()
     skills: tuple[str, ...] = ()
     interaction: InteractionKind = InteractionKind.VIDEO
+    task_kind: TaskKind = TaskKind.FORM
+    first_message: str = field(default="", repr=False)
+
+
+MESSAGE_ID_MAX_LENGTH = 64
+"""Longest identifier of a conversation message; a fixed rule of the contact-center contract."""
+MESSAGE_TEXT_MAX_LENGTH = 20_000
+"""Longest text of one conversation message the platform accepts; fixed by the platform (ADR
+0123 point 8), so a constant and not a setting. The chat's own, shorter limit is step 7b's."""
+_MESSAGE_ID = re.compile(r"^[A-Za-z0-9_.:-]+$")
+
+
+@dataclass(frozen=True)
+class ParticipantMessage:
+    """One message of the participant in a conversation task (ADR 0123 point 8).
+
+    Its text is personal data by nature (free text), so it is never shown in a repr, a log
+    line, an event or an error.
+
+    Attributes:
+        message_id: Identifier of this message, chosen by the caller and kept for a retry: the
+            same identifier twice is one message at the platform.
+        text: What the participant wrote.
+
+    Raises:
+        DomainError: ``invalid_configuration`` naming ``message_id`` or ``text`` (blank, too
+            long or, for the identifier, outside ``A-Z a-z 0-9 _ . : -``).
+    """
+
+    message_id: str
+    text: str = field(repr=False)
+
+    def __post_init__(self) -> None:
+        """Refuse a malformed identifier or text."""
+        if len(self.message_id) > MESSAGE_ID_MAX_LENGTH or not _MESSAGE_ID.fullmatch(
+            self.message_id
+        ):
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "message_id")
+        if not self.text.strip() or len(self.text) > MESSAGE_TEXT_MAX_LENGTH:
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "text")
+
+
+MESSAGING_NOT_CONFIGURED = "messaging_not_configured"
+"""``IntegrationError`` code: the platform refused a conversation because its messaging feature
+or channel is not set up for the organisation (a 403). Never a reason to send a form task."""
+CONVERSATION_OPEN = "conversation_open"
+"""``IntegrationError`` code: the platform already holds an open conversation for this
+appointment's participant identifier and refused a second one (ADR 0123 point 8)."""
 
 
 def meeting_request(booking: Booking, group: Group) -> MeetingRequest:
@@ -440,10 +495,12 @@ def contact_center_task(
     Raises:
         DomainError: ``integration_not_ready`` naming what is missing (``contact_center``,
             ``meeting`` or ``contact``) or what the group's platform cannot carry
-            (``interaction_kind`` or ``skill_codes``, ADR 0121 step 6).
+            (``interaction_kind``, ``skill_codes`` or ``task_kind``, ADR 0121 step 6, ADR 0123
+            step 7a). The task is of the routing's kind; a conversation still lacks its
+            ``first_message``, which the caller composes.
     """
     routing = _complete_routing(group)
-    gap = uncarried(routing.descriptor.capabilities, interaction, bool(skills))
+    gap = uncarried(routing.descriptor.capabilities, interaction, bool(skills), routing.task_kind)
     if gap is not None:
         raise DomainError(ErrorCode.INTEGRATION_NOT_READY, gap)
     link = booking.meeting.link if booking.meeting else None
@@ -463,6 +520,7 @@ def contact_center_task(
         variables=tuple(sorted(group.routing.variables(booking.routing).items())),
         skills=skills,
         interaction=interaction,
+        task_kind=routing.task_kind,
     )
 
 

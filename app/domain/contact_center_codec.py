@@ -2,17 +2,27 @@
 
 The configuration document holds the routing of a group as ``{"kind": ..., "routing_value":
 ..., "attributes": {...}}``, whatever the platform, so adding a platform changes no document
-format. The platform's descriptor (what it needs, and how long each value may be) comes in as
-an argument: the domain knows the kinds, never their adapters.
+format. A routing that makes conversation tasks (ADR 0123 step 7a) adds ``"task_kind":
+"conversation"``; the form, the default, is left out, so a document of a routing that makes
+work items is what it always was and an import without the key makes work items. The
+platform's descriptor (what it needs, and how long each value may be) comes in as an argument:
+the domain knows the kinds, never their adapters.
 """
 
 from collections.abc import Mapping
 
-from app.domain.contact_center import ContactCenterKind, ContactCenterRouting, ProviderDescriptor
+from app.domain.contact_center import (
+    TASK_KIND,
+    ContactCenterKind,
+    ContactCenterRouting,
+    ProviderDescriptor,
+    TaskKind,
+    routing_field,
+)
 from app.domain.errors import DomainError, ErrorCode
 
 _FIELD = "contact_center"
-_KEYS = frozenset({"kind", "routing_value", "attributes"})
+_KEYS = frozenset({"kind", "routing_value", "attributes", "task_kind"})
 
 
 def _invalid(part: str = "") -> DomainError:
@@ -50,7 +60,17 @@ def contact_center_from_json(
         isinstance(name, str) and isinstance(item, str) for name, item in attributes.items()
     ):
         raise _invalid("attributes")
-    routing = ContactCenterRouting(descriptor, routing_value, dict(attributes))
+    task_kind = value.get("task_kind", TaskKind.FORM.value)
+    if not isinstance(task_kind, str) or task_kind not in {m.value for m in TaskKind}:
+        raise _invalid("task_kind")
+    try:
+        routing = ContactCenterRouting(
+            descriptor, routing_value, dict(attributes), TaskKind(task_kind)
+        )
+    except DomainError as error:
+        if error.field == routing_field(TASK_KIND):  # a kind this platform does not carry
+            raise _invalid("task_kind") from error
+        raise
     return routing if routing.routing_value is not None or routing.attributes else None
 
 
@@ -62,4 +82,7 @@ def contact_center_to_json(routing: ContactCenterRouting | None) -> dict[str, ob
         "kind": ContactCenterKind(routing.kind).value,
         "routing_value": routing.routing_value,
         "attributes": dict(routing.attributes),
+        **(
+            {"task_kind": routing.task_kind.value} if routing.task_kind is not TaskKind.FORM else {}
+        ),
     }

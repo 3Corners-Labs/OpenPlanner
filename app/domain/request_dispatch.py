@@ -28,7 +28,7 @@ from datetime import datetime, timedelta
 from app.domain import contact_center_attempts as attempts
 from app.domain.booking import Booking, BookingStatus, booking_id_of, stored_id
 from app.domain.calls import ContactCenterTask, EventKind
-from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef, TaskKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.fallback import FALLBACK, FallbackService
 from app.domain.integration import IntegrationService
@@ -210,7 +210,11 @@ class AttemptEvents:
             return None
         if not await self._ours(tx, booking, request, provider, organisation_id):
             return None
-        task = ContactCenterTaskRef(task_id, provider)
+        group = await tx.get_group_by_id(booking.group_id)
+        # The kind the group's routing has now: the create that made the task used it, unless
+        # the routing was edited in the minutes between (a task is kept as it was made).
+        task_kind = group.contact_center.task_kind if group and group.contact_center else None
+        task = ContactCenterTaskRef(task_id, provider, task_kind or TaskKind.FORM)
         items = [
             i
             for i in await tx.work_items_of(request.id or 0)
@@ -363,7 +367,7 @@ class RequestDispatch:
                 return IN_DOUBT_SKIP
             await self._fail(opened)
             raise
-        task = ContactCenterTaskRef(task_id, group.contact_center.kind)
+        task = ContactCenterTaskRef(task_id, group.contact_center.kind, built.task_kind)
         async with self._uow.locked() as tx:
             await tx.save_task(stored_id(booking), task)
             current = await tx.get_active_work_item(opened.request.id or 0)

@@ -17,9 +17,14 @@ A routing may be incomplete (an admin filled in one attribute of two): it is sto
 and the group does not dispatch until it is complete, as before ADR 0032.
 
 The descriptor also declares what the platform can carry (``ContactCenterCapabilities``, ADR
-0121 step 6): which interaction kinds of a flow and whether it routes on skills. A flow's
-readiness and the building of a task read that declaration through ``capabilities_of`` and
-``uncarried``; a descriptor that declares nothing carries nothing.
+0121 step 6): which interaction kinds of a flow, whether it routes on skills and whether it can
+hold a conversation (ADR 0123 step 7a). A flow's readiness and the building of a task read that
+declaration through ``capabilities_of`` and ``uncarried``; a descriptor that declares nothing
+carries nothing.
+
+A routing also names the kind of task a request becomes (``TaskKind``, ADR 0123 point 8): the
+form (a work item, the default) or the conversation (a messaging task staff answer in their
+agent desktop). The kind is stored with the routing and, once a task exists, with the task.
 """
 
 import re
@@ -52,6 +57,18 @@ class ContactCenterKind(StrEnum):
     """Webex Contact Center, through its Tasks API (ADR 0018)."""
 
 
+class TaskKind(StrEnum):
+    """What a contact-center task is to the agent (ADR 0123 point 8), whatever the platform.
+
+    A closed list: a third kind changes the ADR.
+    """
+
+    FORM = "form"
+    """The work item of ADR 0018: the agent sees its fields and a link. The default."""
+    CONVERSATION = "conversation"
+    """A messaging task: the agent answers the participant in a conversation."""
+
+
 @dataclass(frozen=True)
 class ContactCenterTaskRef:
     """A booking's task at a contact-center platform (ADR 0032 point 6).
@@ -59,10 +76,13 @@ class ContactCenterTaskRef:
     Attributes:
         id: The platform's task id; a provider link, purged with the contact.
         kind: The platform that holds the task, and so the dispatcher that ends it.
+        task_kind: The kind the task was created with, so a later step knows a conversation
+            without asking the platform; later changes of the routing do not touch it.
     """
 
     id: str
     kind: ContactCenterKind
+    task_kind: TaskKind = TaskKind.FORM
 
 
 def routing_field(name: str) -> str:
@@ -109,37 +129,50 @@ class ContactCenterCapabilities:
     Attributes:
         interaction_kinds: The interaction kinds of a flow the platform can hand to an agent.
         skills: Whether the platform can route on the mapped skill codes (ADR 0121 step 4b).
+        conversation: Whether the platform can hold a conversation task (ADR 0123 step 7a). The
+            form task is the baseline every platform has, so only the conversation is declared.
     """
 
     interaction_kinds: frozenset[InteractionKind] = frozenset()
     skills: bool = False
+    conversation: bool = False
 
     def carries(self, interaction: InteractionKind) -> bool:
         """Return whether the platform can hand work of ``interaction`` to an agent."""
         return interaction in self.interaction_kinds
+
+    def carries_task(self, task_kind: TaskKind) -> bool:
+        """Return whether the platform can create a task of ``task_kind``."""
+        return task_kind is TaskKind.FORM or self.conversation
 
 
 INTERACTION_KIND = "interaction_kind"
 """What ``uncarried`` names for an interaction kind the platform does not carry."""
 SKILL_CODES = "skill_codes"
 """What ``uncarried`` names for skills on a platform that cannot route on them."""
+TASK_KIND = "task_kind"
+"""What ``uncarried`` names for a conversation task on a platform that cannot hold one, and the
+field a refusal of the routing's task kind names (``contact_center.task_kind``)."""
 
 
 def uncarried(
     capabilities: ContactCenterCapabilities,
     interaction: InteractionKind,
     skills: bool,
+    task_kind: TaskKind = TaskKind.FORM,
 ) -> str | None:
     """Return what of a task the platform cannot carry, or ``None`` when it carries all of it.
 
-    ``interaction`` is the task's interaction kind and ``skills`` whether it requires any
-    skill. The interaction kind is judged first: a platform that cannot take the work at all
-    is the bigger gap.
+    ``interaction`` is the task's interaction kind, ``skills`` whether it requires any skill
+    and ``task_kind`` what kind of task it is. The interaction kind is judged first: a
+    platform that cannot take the work at all is the bigger gap.
     """
     if not capabilities.carries(interaction):
         return INTERACTION_KIND
     if skills and not capabilities.skills:
         return SKILL_CODES
+    if not capabilities.carries_task(task_kind):
+        return TASK_KIND
     return None
 
 
@@ -205,16 +238,19 @@ class ContactCenterRouting:
         descriptor: The platform's descriptor; gives the kind and the rules.
         routing_value: What the platform's flow routes on; the group slug when ``None``.
         attributes: The platform's attributes by name, read-only; absent means not set.
+        task_kind: The kind of task a request becomes (ADR 0123 point 8); the form by default.
 
     Raises:
         DomainError: ``invalid_configuration`` naming ``contact_center.<attribute>``,
-            ``contact_center.routing_value`` or ``contact_center.attributes`` (a name the
-            descriptor does not know).
+            ``contact_center.routing_value``, ``contact_center.attributes`` (a name the
+            descriptor does not know) or ``contact_center.task_kind`` (a kind the platform
+            does not carry).
     """
 
     descriptor: ProviderDescriptor = field(repr=False)
     routing_value: str | None = None
     attributes: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}))
+    task_kind: TaskKind = TaskKind.FORM
 
     def __post_init__(self) -> None:
         """Freeze the attributes and validate everything against the descriptor."""
@@ -227,14 +263,19 @@ class ContactCenterRouting:
             if spec is None:
                 raise DomainError(ErrorCode.INVALID_CONFIGURATION, routing_field(ATTRIBUTES))
             _check_text(value, spec.max_length, name)
+        if not self.descriptor.capabilities.carries_task(self.task_kind):
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, routing_field(TASK_KIND))
 
     def __hash__(self) -> int:
-        """Hash by kind, routing value and attributes (a mapping is not hashable itself)."""
-        return hash((self.kind, self.routing_value, tuple(self.attributes.items())))
+        """Hash by kind, routing value, attributes and task kind (a mapping is not hashable)."""
+        return hash((self.kind, self.routing_value, tuple(self.attributes.items()), self.task_kind))
 
     def __reduce__(self) -> tuple[type["ContactCenterRouting"], tuple[object, ...]]:
         """Copy and pickle through the constructor (a mapping proxy cannot be pickled)."""
-        return (type(self), (self.descriptor, self.routing_value, dict(self.attributes)))
+        return (
+            type(self),
+            (self.descriptor, self.routing_value, dict(self.attributes), self.task_kind),
+        )
 
     @property
     def kind(self) -> ContactCenterKind:

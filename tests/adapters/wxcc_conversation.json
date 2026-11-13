@@ -1,0 +1,25 @@
+{
+  "note": "Made-up identifiers throughout; the shapes are those of the lab run in docs/research/call-page-on-the-meetings-sdk.md (202 for both calls, 403 with no reason without the messaging feature).",
+  "create": {
+    "request": {
+      "method": "POST",
+      "path": "/v2/tasks",
+      "body": "{\"origin\":{\"id\":\"OP-000123\",\"name\":\"Zoë\"},\"destination\":{\"id\":\"openplanner@example.biz\",\"type\":\"businessAddress\"},\"channelType\":\"customMessaging\",\"channel\":\"openplanner-chat\",\"flowSettings\":{\"openplannerGroup\":\"demo\"},\"channelParams\":{\"type\":\"text\",\"message\":{\"aliasId\":\"alias-1\",\"text\":\"Videoafspraak OP-000123 met Zoë, 5 jan 2026, 09:00, Demo. Start het gesprek: https://site.webex.com/m/1\",\"timestamp\":1767600000000}}}"
+    },
+    "response": {
+      "status": 202,
+      "body": {"meta": {"orgId": "00000000-0000-4000-8000-000000000001"}, "data": {"id": "11111111-2222-4333-8444-555555555555"}}
+    }
+  },
+  "append": {
+    "request": {
+      "method": "POST",
+      "path": "/v2/tasks/11111111-2222-4333-8444-555555555555/messages",
+      "body": "{\"mediaType\":\"customMessaging\",\"channelParams\":{\"type\":\"text\",\"message\":{\"aliasId\":\"msg-0001\",\"text\":\"Ik ben er over vijf minuten.\",\"timestamp\":1767600000000}}}"
+    },
+    "response": {"status": 202, "body": {"data": {"id": "11111111-2222-4333-8444-555555555555"}}}
+  },
+  "refused_without_messaging": {
+    "response": {"status": 403, "body": {"error": {"key": "403"}}}
+  }
+}

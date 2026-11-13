@@ -63,6 +63,12 @@ msgstr "View or change appointment"
 msgid "message.signoff"
 msgstr "Kind regards, {group_name}"
 
+msgid "message.conversation.opening_video"
+msgstr "Video appointment {reference} with {first_name}, {start}, {group_name}. Start the call: {link}"
+
+msgid "message.conversation.opening"
+msgstr "Appointment {reference} with {first_name}, {start}, {group_name}."
+
 msgid "message.team_invite.subject"
 msgstr "Video appointment {date} {time}, {group_name} ({reference})"
 
@@ -1555,6 +1561,18 @@ msgstr "Routing value for the WxCC flow"
 msgid "admin.field.wxcc_routing_value_hint"
 msgstr "The flow chooses the queue with it. Empty: the service's web address."
 
+msgid "admin.field.contact_center_task_kind"
+msgstr "Kind of contact-center task"
+
+msgid "admin.field.contact_center_task_kind_hint"
+msgstr "Work item: the staff member sees the fields and the link in the agent desktop (the default). Conversation: a messaging task the staff member answers in the agent desktop. The conversation can be chosen only on an installation that has the call page switched on, and needs the messaging channel of the contact center."
+
+msgid "admin.contact_center.task_kind.form"
+msgstr "Work item"
+
+msgid "admin.contact_center.task_kind.conversation"
+msgstr "Conversation"
+
 msgid "admin.field.direct_call_enabled"
 msgstr "Start a call right away"
 
@@ -1581,6 +1599,9 @@ msgstr "Enter a valid email address."
 
 msgid "admin.form.error.integration_text"
 msgstr "Enter a value without special characters, or leave the field empty."
+
+msgid "admin.form.error.task_kind"
+msgstr "Choose a kind of task from the list. The conversation is not available on this installation or at this contact center."
 
 msgid "admin.form.error.choice"
 msgstr "Make a choice."
@@ -1809,6 +1830,12 @@ msgstr "The task waited for the video meeting, but it never came. Fix the meetin
 
 msgid "call.hint.task.other"
 msgstr "Webex Contact Center did not accept the task. Check the service's entry point and channel under Settings and the WxCC setup under Integrations; the code is WxCC's reason."
+
+msgid "call.hint.task.messaging_not_configured"
+msgstr "The contact center refused the conversation: its messaging feature or messaging channel is not set up for this organisation. Check the channel under the service's settings and the messaging channel in the contact center's control panel. No work item was made instead."
+
+msgid "call.hint.task.conversation_open"
+msgstr "The contact center already has an open conversation for this appointment. End it in the agent desktop, then try again. No work item was made instead."
 
 msgid "call.hint.integration.other"
 msgstr "Webex refused a request. Webex's answer is shown when Webex gave one; the worker log also has a trackingId at integration.refused."
