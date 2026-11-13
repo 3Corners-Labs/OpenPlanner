@@ -36,6 +36,7 @@ from app.adapters.http_trace import traced_transport
 from app.adapters.integrations import (
     Integrations,
     build_integrations,
+    sealed_connections,
     secret_box,
     webex_fingerprint,
 )
@@ -73,7 +74,7 @@ from app.domain.platform_settings import PlatformSettingsStore
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.queue_wait import NotPickedUpWatch, QueueWaitWatch
 from app.domain.report_digest_service import DigestRunner
-from app.domain.request_dispatch import AttemptEvents
+from app.domain.request_dispatch import AttemptEvents, own_connection_of
 from app.domain.request_log import RequestEvents
 from app.domain.request_watch import WatchResult
 from app.domain.retention_sweep import RetentionSweep
@@ -210,7 +211,11 @@ async def run_worker(
             clock,
             AdminService(uow, clock),
             version,
-            work=AttemptEvents(work, lambda: live.settings.contact_center_reconcile_minutes),
+            work=AttemptEvents(
+                work,
+                lambda: live.settings.contact_center_reconcile_minutes,
+                own_connection_of(sealed_connections(engine, settings)),
+            ),
         )
         # ADR 0082 point 11: bookings to the own queue when the contact center fails.
         fallback = FallbackService(
@@ -226,6 +231,8 @@ async def run_worker(
                 settings.public_base_url,
             ),
         )
+        # ADR 0121 step 6b: contact-center work the platform failed goes back with a notice.
+        integration.set_requeue_handler(fallback.dispatch_failed)
 
         # ADR 0082 points 6 and 7: reconcile stale tasks, then recompute the health.
         health_watch = IntegrationHealthWatch(

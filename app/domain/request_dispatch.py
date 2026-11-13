@@ -36,6 +36,7 @@ from app.domain.job_plan import JobType, PlannedJob
 from app.domain.pool_accounting import StartOutcome
 from app.domain.ports import (
     Clock,
+    ContactCenterConnections,
     ContactCenterDispatcher,
     IntegrationError,
     Transaction,
@@ -46,6 +47,7 @@ from app.domain.scheduling import Group
 from app.domain.service_flows import DispatchKind, FlowRevision
 from app.domain.service_requests import (
     IN_DOUBT,
+    ORPHANED,
     ServiceRequest,
     WorkChannel,
     WorkItem,
@@ -100,25 +102,40 @@ class AttemptEvents:
         work: The request work of the own queue: the pool slot and the start check.
         window_minutes: ``contact_center_reconcile_minutes``: how long after a fence a late
             task of that attempt is still recognised (and ended) as ours.
+        own_connection: Whether an organisation has its own contact-center connection (ADR 0032
+            point 9); its tasks never come to the installation's webhook address. ``None``: no
+            organisation has one (an installation without the connections' key).
     """
 
-    def __init__(self, work: RequestWork, window_minutes: Callable[[], int]) -> None:
+    def __init__(
+        self,
+        work: RequestWork,
+        window_minutes: Callable[[], int],
+        own_connection: Callable[[int], Awaitable[bool]] | None = None,
+    ) -> None:
         """Store the collaborators."""
         self._work = work
         self._window = window_minutes
+        self._own_connection = own_connection
 
     async def on_task_event(
         self, tx: Transaction, booking: Booking, kind: EventKind, at: datetime
-    ) -> None:
+    ) -> bool:
         """Apply a platform event of ``booking``'s task to its active attempt, if it has one.
 
         A booking without a request, or whose active work item is not the contact center's,
-        is left alone: the event is on its timeline and nothing else changes (E8).
+        is left alone: the event is on its timeline and nothing else changes (E8). An attempt
+        that ends before it connected (``task:ended`` straight after the task was made) is
+        completed all the same: the platform says the work is done, and it held no pool unit.
+
+        Returns:
+            Whether the request went back to the own queue (``task:failed``): the caller tells
+            the team through the fallback (ADR 0082), outside its transaction.
         """
         request = await tx.get_request_of_booking(stored_id(booking))
         item = await tx.get_active_work_item(request.id or 0) if request else None
         if request is None or item is None or item.channel is not WorkChannel.CONTACT_CENTER:
-            return
+            return False
         try:
             if kind is EventKind.TASK_CONNECTED:
                 await self._connected(tx, booking, request, item, at)
@@ -130,10 +147,12 @@ class AttemptEvents:
             elif kind is EventKind.TASK_FAILED:
                 new_request, new_item = attempts.failed(request, item, now=at)
                 await _write(tx, _Write(new_request, request, new_item, item.state))
+                return True
         except DomainError as error:
             if not _out_of_order(error):
                 raise
             # An event out of order (connected twice, ended before it was dispatched): ignored.
+        return False
 
     async def _connected(
         self,
@@ -170,47 +189,94 @@ class AttemptEvents:
     ) -> Booking | None:
         """Match a task OpenPlanner did not know to an attempt by its ``origin`` (a reference).
 
-        Only a confirmed booking without a task, whose request has a contact-center attempt in
-        ``reconciliation_required`` (the create returned with an unknown outcome) or one fenced
-        within the window, is matched; any other origin is not ours (``None``). An attempt still
-        ``dispatching`` is never adopted: its create is still running and gives the task itself.
-        With ``organisation_id`` (an organisation's own webhook address) only a request of that
-        organisation is matched. An adopted task is the attempt's task (no second task is
-        made); a task of a fenced attempt is kept on the booking and the end-task job (ADR 0021)
-        ends it at the platform.
+        Only a booking without a task, of a service routed to ``provider``, inside the
+        organisation of the webhook address (``organisation_id``; at the installation's address
+        only an organisation without its own connection), whose request has a contact-center
+        attempt that never got a task, is matched; any other origin is not ours (``None``):
+
+        * a confirmed booking whose attempt is ``reconciliation_required`` (the create returned
+          with an unknown outcome): the task is adopted as the attempt's own, no second task;
+        * an attempt fenced, or ended because the booking was cancelled, within the window: the
+          task is an orphan, kept on the booking and ended at the platform by the end-task job
+          (ADR 0021), so it never stays with an agent.
+
+        An attempt still ``dispatching`` is never adopted: its create is still running and gives
+        the task itself.
         """
         booking_id = booking_id_of(origin)
         booking = await tx.get_booking(booking_id) if booking_id is not None else None
         request = await tx.get_request_of_booking(stored_id(booking)) if booking else None
-        if (
-            booking is None
-            or request is None
-            or booking.contact_center_task is not None
-            or booking.status is not BookingStatus.CONFIRMED
-            or (organisation_id is not None and request.organisation_id != organisation_id)
-        ):
+        if booking is None or request is None or booking.contact_center_task is not None:
+            return None
+        if not await self._ours(tx, booking, request, provider, organisation_id):
             return None
         task = ContactCenterTaskRef(task_id, provider)
-        items = await tx.work_items_of(request.id or 0)
-        active = next((i for i in items if i.active), None)
-        if (
-            active is not None
-            and active.channel is WorkChannel.CONTACT_CENTER
-            and active.state is WorkItemState.RECONCILIATION_REQUIRED
-        ):
-            if not await tx.update_work_item(attempts.dispatched(active), active.state):
+        items = [
+            i
+            for i in await tx.work_items_of(request.id or 0)
+            if i.channel is WorkChannel.CONTACT_CENTER
+        ]
+        doubt = next((i for i in items if i.state is WorkItemState.RECONCILIATION_REQUIRED), None)
+        if doubt is not None and booking.status is BookingStatus.CONFIRMED:
+            if not await tx.update_work_item(attempts.dispatched(doubt), doubt.state):
                 return None
             await tx.save_task(stored_id(booking), task)
             return replace(booking, contact_center_task=task)
         horizon = at - timedelta(minutes=self._window())
-        if any(
-            i.state is WorkItemState.FENCED and i.ended_at is not None and i.ended_at >= horizon
-            for i in items
+        orphaned = doubt is not None or any(
+            i.state in ORPHANED and i.ended_at is not None and i.ended_at >= horizon for i in items
+        )
+        if not orphaned:
+            return None
+        await tx.save_task(stored_id(booking), task)
+        await tx.add_jobs(stored_id(booking), [PlannedJob(JobType.END_WXCC_TASK, at, None)])
+        return replace(booking, contact_center_task=task)
+
+    async def _ours(
+        self,
+        tx: Transaction,
+        booking: Booking,
+        request: ServiceRequest,
+        provider: ContactCenterKind,
+        organisation_id: int | None,
+    ) -> bool:
+        """Whether an event of ``provider`` at this webhook address may concern ``booking``.
+
+        Its service must be routed to that platform, and the address must be its organisation's
+        own, or the installation's while the organisation has no connection of its own (ADR 0032
+        point 10): a reference names a booking of one installation and one organisation only.
+        """
+        group = await tx.get_group_by_id(booking.group_id)
+        if (
+            group is None
+            or group.contact_center is None
+            or group.contact_center.kind is not provider
         ):
-            await tx.save_task(stored_id(booking), task)
-            await tx.add_jobs(stored_id(booking), [PlannedJob(JobType.END_WXCC_TASK, at, None)])
-            return replace(booking, contact_center_task=task)
+            return False
+        if organisation_id is not None:
+            return request.organisation_id == organisation_id
+        if self._own_connection is None:
+            return True
+        return not await self._own_connection(request.organisation_id)
+
+
+def own_connection_of(
+    connections: ContactCenterConnections | None,
+) -> Callable[[int], Awaitable[bool]] | None:
+    """Return whether an organisation has its own connection, read from ``connections``.
+
+    ``None`` without the connections (an installation without their key): no organisation has
+    one then, and every task comes to the installation's webhook address.
+    """
+    if connections is None:
         return None
+    store = connections
+
+    async def has_own(organisation_id: int) -> bool:
+        """Whether ``organisation_id`` has a connection of its own."""
+        return await store.get(organisation_id) is not None
+
+    return has_own
 
 
 TaskBuilder = Callable[[Booking, Group], Awaitable[ContactCenterTask]]
@@ -352,19 +418,37 @@ class RequestDispatch:
         """
         now = self._clock.now()
         window = self._window()
+        async with self._uow.read() as tx:
+            due = [
+                i for i in await tx.work_items_in_doubt() if attempts.due_for_fence(i, now, window)
+            ]
         fenced: list[int] = []
-        async with self._uow.locked() as tx:
-            for item in await tx.work_items_in_doubt():
-                if not attempts.due_for_fence(item, now, window):
-                    continue
-                request = await tx.get_service_request(item.request_id)
-                if request is None or request.booking_id is None:
-                    continue
-                new_request, new_item = attempts.fence(request, item, now=now)
-                await _write(tx, _Write(new_request, request, new_item, item.state))
-                fenced.append(request.booking_id)
+        for item in due:
+            booking_id = await self._fence_one(item, now)
+            if booking_id is not None:
+                fenced.append(booking_id)
         for booking_id in fenced:
             await self._integration.record(booking_id, EventKind.INTEGRATION_ERROR, detail="fenced")
             if self._fallback is not None:
                 await self._fallback.dispatch_failed(booking_id)
         return len(fenced)
+
+    async def _fence_one(self, seen: WorkItem, now: datetime) -> int | None:
+        """Fence one attempt in its own transaction; its booking id, or ``None`` when skipped.
+
+        A request that finished meanwhile, or a write that lost its condition, skips this
+        attempt only: its transaction is rolled back and the round goes on with the next.
+        """
+        try:
+            async with self._uow.locked() as tx:
+                item = await tx.get_active_work_item(seen.request_id)
+                request = await tx.get_service_request(seen.request_id)
+                if item is None or item.id != seen.id or request is None:
+                    return None
+                if request.booking_id is None:
+                    return None
+                new_request, new_item = attempts.fence(request, item, now=now)
+                await _write(tx, _Write(new_request, request, new_item, item.state))
+                return request.booking_id
+        except DomainError:
+            return None

@@ -40,8 +40,10 @@ NOT_SENT = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
 """Transport errors raised before a request left OpenPlanner: its outcome is known (nothing
 happened). Any other transport error may come after the platform received the request, so its
 outcome is unknown (``IntegrationError.ambiguous``, ADR 0121 step 6b)."""
-GATEWAY_TIMEOUT = 504
-"""A gateway gave up waiting: the platform may still have done the request (ambiguous)."""
+UNKNOWN_OUTCOME = frozenset({500, 502, 503, 504})
+"""Server errors after which the platform may still have done the request (ambiguous): a proxy
+or gateway in front of it can answer so while the platform created the task. A create that gets
+one is reconciled, never retried (ADR 0121 step 6b); other callers only retry as before."""
 
 
 class TokenStore(Protocol):
@@ -341,7 +343,7 @@ def http_failure(response: httpx.Response, *, explain: bool = False) -> Integrat
         return IntegrationError("rate_limited", retryable=True, reason=reason)
     if status >= 500:
         return IntegrationError(
-            "server_error", retryable=True, reason=reason, ambiguous=status == GATEWAY_TIMEOUT
+            "server_error", retryable=True, reason=reason, ambiguous=status in UNKNOWN_OUTCOME
         )
     return IntegrationError(f"rejected_{status}", retryable=False, reason=reason)
 

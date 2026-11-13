@@ -64,16 +64,33 @@ class Desk:
     integration: IntegrationService
     dispatch: RequestDispatch
     queue: QueueService
+    requeued: list[int]
+    """Bookings whose contact-center work went back to the own queue (the fallback's notice)."""
 
 
-def desk(uow: InMemoryUnitOfWork, clock: FixedClock) -> Desk:
-    """Return the request dispatch of ``uow`` wired as the worker wires it."""
+def desk(
+    uow: InMemoryUnitOfWork, clock: FixedClock, own_connections: frozenset[int] = frozenset()
+) -> Desk:
+    """Return the request dispatch of ``uow`` wired as the worker wires it.
+
+    ``own_connections`` are the organisations with a contact-center connection of their own.
+    """
     work = RequestWork(
         PoolBookings(clock, treatment_buffer=5), lease_minutes=5, unresolved_hours=24
     )
+
+    async def has_own(organisation_id: int) -> bool:
+        return organisation_id in own_connections
+
     integration = IntegrationService(
-        uow, clock, AdminService(uow, clock), work=AttemptEvents(work, lambda: WINDOW)
+        uow, clock, AdminService(uow, clock), work=AttemptEvents(work, lambda: WINDOW, has_own)
     )
+    requeued: list[int] = []
+
+    async def note(booking_id: int) -> None:
+        requeued.append(booking_id)
+
+    integration.set_requeue_handler(note)
     dispatcher = FakeDispatcher()
     calls = CallService(uow, integration, FakeVideo(), webex_cc(dispatcher), lambda b, g: "x")
     dispatch = RequestDispatch(
@@ -86,4 +103,4 @@ def desk(uow: InMemoryUnitOfWork, clock: FixedClock) -> Desk:
         window_minutes=lambda: WINDOW,
     )
     queue = QueueService(uow, clock, AdminService(uow, clock), b"k" * 32, work=work)
-    return Desk(uow, clock, dispatcher, work, integration, dispatch, queue)
+    return Desk(uow, clock, dispatcher, work, integration, dispatch, queue, requeued)

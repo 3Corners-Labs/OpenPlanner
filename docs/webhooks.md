@@ -136,7 +136,8 @@ work item of channel `contact_center`. One active work item per request is the f
 queue and the contact center never hold the same request: the dispatch job skips work the own
 queue holds (`own_queue`) and a claim of work the contact center holds is refused
 (`already_claimed`). The task id is kept on the booking as for every task. A create that may have
-reached the platform but got no answer (a read timeout, a broken connection, a `504`) is never
+reached the platform but got no answer (a read timeout, a broken connection, a `500`, `502`,
+`503` or `504`) is never
 retried: the attempt waits in `reconciliation_required`. A task event whose task OpenPlanner does
 not know and whose `origin` (the booking reference sent as `origin.id`; the name beside it is
 never read, and an origin that is not a reference is dropped) names that confirmed booking adopts
@@ -146,7 +147,7 @@ installations must not share one contact-center tenant: the reference is unique 
 to the own queue, the team is told through the fallback (ADR 0082), and a task that turns up
 later is marked cancelled and ended by the end-task job. Task events on an attempt:
 `task:connected` starts the treatment (a unit of the booking's pool), `task:ended` completes the
-request and the booking, `task:failed` puts the request back in the own queue. Whether Webex
+request and the booking, `task:failed` puts the request back in the own queue and the fallback tells the team. Whether Webex
 Contact Center's task events carry the origin is still to be seen on the test host.
 
 **Ending a cancelled booking's task** (ADR 0021), v2 first. **Primary:** a Task Messages v2

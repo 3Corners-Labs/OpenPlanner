@@ -129,11 +129,14 @@ def fence(
     all is ended when it shows up (``app.domain.request_dispatch``).
 
     Raises:
-        DomainError: ``not_claimed`` unless the attempt is in doubt.
+        DomainError: ``not_claimed`` unless the attempt is in doubt, ``booking_not_active`` for
+            a request that finished meanwhile (it is never queued again).
     """
     attempt = _attempt(item)
     if attempt.state not in IN_DOUBT:
         raise DomainError(ErrorCode.NOT_CLAIMED)
+    if request.terminal:
+        raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
     ended = replace(attempt, state=WorkItemState.FENCED, ended_at=now)
     return _handled(request, HandlingState.QUEUED, now), ended
 

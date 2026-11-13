@@ -335,3 +335,114 @@ async def test_a_task_that_cannot_be_built_opens_no_attempt(
         await dispatch(the_desk, booking_id)
 
     assert not [r for r in uow.state.requests.values() if r.booking_id == booking_id]
+
+
+async def in_doubt(the_desk: Desk, booking_id: int) -> str:
+    """Leave the booking's attempt in ``reconciliation_required``; return its reference."""
+    the_desk.dispatcher.error = IntegrationError("unreachable", retryable=True, ambiguous=True)
+    await dispatch(the_desk, booking_id)
+    the_desk.dispatcher.error = None
+    return the_desk.uow.state.bookings[booking_id].reference
+
+
+async def test_the_installation_address_never_adopts_work_of_an_organisation_with_its_own(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """A reference names a booking of one organisation: its own address, or the installation's
+    only while it has no connection of its own."""
+    the_desk = desk(uow, clock, own_connections=frozenset({1}))
+    booking_id = await book(uow, clock, CC_FLOW)
+    reference = await in_doubt(the_desk, booking_id)
+
+    assert await event(the_desk, "installation", EventKind.TASK_CONNECTED, reference) is (
+        EventOutcome.UNKNOWN
+    )
+    own = await the_desk.integration.record_task_event(
+        "own",
+        EventKind.TASK_CONNECTED,
+        clock.now(),
+        origin=reference,
+        provider=ContactCenterKind.WEBEX_CC,
+        source=SOURCE,
+        organisation_id=1,
+    )
+    assert own is EventOutcome.RECORDED
+    task = uow.state.bookings[booking_id].contact_center_task
+    assert task is not None
+    assert task.id == "own"
+
+
+async def test_a_late_task_of_a_service_routed_elsewhere_is_not_ours(
+    the_desk: Desk, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    booking_id = await book(uow, clock, CC_FLOW)
+    reference = await in_doubt(the_desk, booking_id)
+    uow.state.groups[1] = replace(uow.state.groups[1], contact_center=None)
+
+    assert await event(the_desk, "elsewhere", EventKind.TASK_CONNECTED, reference) is (
+        EventOutcome.UNKNOWN
+    )
+    assert uow.state.bookings[booking_id].contact_center_task is None
+
+
+async def test_a_late_task_of_a_cancelled_booking_is_ended(
+    the_desk: Desk, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """The booking was cancelled while the create's outcome was unknown: no orphan stays."""
+    booking_id = await book(uow, clock, CC_FLOW)
+    reference = await in_doubt(the_desk, booking_id)
+    uow.state.bookings[booking_id] = replace(
+        uow.state.bookings[booking_id], status=BookingStatus.CANCELLED
+    )
+
+    await event(the_desk, "orphan", EventKind.TASK_CREATED, reference)
+
+    task = uow.state.bookings[booking_id].contact_center_task
+    assert task is not None
+    assert task.id == "orphan"
+    assert JobType.END_WXCC_TASK in [j.type for j in uow.state.jobs[booking_id]]
+    [item] = items_of(uow, booking_id)
+    assert item.state is WorkItemState.RECONCILIATION_REQUIRED  # never adopted
+
+
+async def test_a_finished_request_is_not_fenced_and_the_round_goes_on(
+    the_desk: Desk, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    first = await book(uow, clock, CC_FLOW)
+    second = await book(uow, clock, CC_FLOW)
+    await in_doubt(the_desk, first)
+    await in_doubt(the_desk, second)
+    done = request_of(uow, first)
+    uow.state.requests[done.id or 0] = replace(
+        done, handling=HandlingState.CANCELLED, resolved_at=clock.now()
+    )
+    clock.advance(timedelta(minutes=WINDOW))
+
+    assert await the_desk.dispatch.fence_round() == 1
+
+    assert request_of(uow, first).handling is HandlingState.CANCELLED
+    assert items_of(uow, first)[0].state is WorkItemState.RECONCILIATION_REQUIRED
+    assert items_of(uow, second)[0].state is WorkItemState.FENCED
+
+
+async def test_a_failed_task_tells_the_team_and_an_early_end_completes(
+    the_desk: Desk, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """``task:failed`` hands the booking to the fallback's notice; ``task:ended`` before any
+    connect completes the request without a pool unit (the platform says it is done)."""
+    failing = await book(uow, clock, CC_FLOW)
+    ending = await book(uow, clock, CC_FLOW)
+    for booking_id in (failing, ending):
+        await dispatch(the_desk, booking_id)
+    failed_task = uow.state.bookings[failing].contact_center_task
+    ended_task = uow.state.bookings[ending].contact_center_task
+    assert failed_task is not None
+    assert ended_task is not None
+
+    await event(the_desk, failed_task.id, EventKind.TASK_FAILED)
+    await event(the_desk, ended_task.id, EventKind.TASK_ENDED)
+
+    assert the_desk.requeued == [failing]
+    [item] = items_of(uow, ending)
+    assert (item.state, item.started_at, item.pool_id) == (WorkItemState.COMPLETED, None, None)
+    assert request_of(uow, ending).handling is HandlingState.COMPLETED

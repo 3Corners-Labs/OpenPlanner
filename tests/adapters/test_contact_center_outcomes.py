@@ -45,8 +45,11 @@ async def test_a_transport_error_after_sending_is_ambiguous(
     assert (failure.code, failure.retryable, failure.ambiguous) == ("unreachable", True, ambiguous)
 
 
-@pytest.mark.parametrize(("status", "ambiguous"), [(504, True), (503, False), (400, False)])
-async def test_only_a_gateway_timeout_answer_is_ambiguous(status: int, ambiguous: bool) -> None:
+@pytest.mark.parametrize(
+    ("status", "ambiguous"),
+    [(500, True), (502, True), (503, True), (504, True), (501, False), (400, False)],
+)
+async def test_a_server_error_answer_is_ambiguous(status: int, ambiguous: bool) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path.endswith("/tasks"):
             return httpx.Response(status, json={})

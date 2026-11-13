@@ -8,6 +8,7 @@ Admins see a booking's timeline only with ``bookings.view`` on the group of the 
 and only a booking of that group (ADR 0014).
 """
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from enum import StrEnum
@@ -46,8 +47,8 @@ class TaskWork(Protocol):
 
     async def on_task_event(
         self, tx: Transaction, booking: Booking, kind: EventKind, at: datetime
-    ) -> None:
-        """Apply a platform event of ``booking``'s task to its contact-center attempt."""
+    ) -> bool:
+        """Apply a platform event to ``booking``'s attempt; whether it went back to the queue."""
         ...
 
     async def adopt(
@@ -122,7 +123,9 @@ class IntegrationService:
     ) -> None:
         """Store the collaborators; ``staff_usage`` adds a team member's usage facts.
 
-        ``work`` applies task events to the request work of new flows (ADR 0121 step 6b).
+        ``work`` applies task events to the request work of new flows (ADR 0121 step 6b);
+        ``when_requeued`` (``set_requeue_handler``) then tells the team about work that went
+        back to the own queue.
         """
         self._uow = uow
         self._clock = clock
@@ -131,6 +134,15 @@ class IntegrationService:
         self._probes = probes
         self._staff_usage = staff_usage
         self._work = work
+        self._requeued: Callable[[int], Awaitable[None]] | None = None
+
+    def set_requeue_handler(self, handler: Callable[[int], Awaitable[None]]) -> None:
+        """Call ``handler`` with a booking whose contact-center work went back to the own queue.
+
+        The fallback's ``dispatch_failed`` (ADR 0082); set after the fallback exists, because the
+        fallback itself records through this service.
+        """
+        self._requeued = handler
 
     @property
     def staff_usage(self) -> StaffUsage | None:
@@ -219,6 +231,8 @@ class IntegrationService:
         attempt, and an unknown task whose ``origin`` names an attempt in doubt or a fenced one
         is matched to it (adopted, or ended at the platform).
         """
+        recorded: int | None = None
+        requeued = False
         async with self._uow.locked() as tx:
             booking = await tx.get_booking_by_task(task_id, provider)
             if booking is None and self._work is not None and origin:
@@ -233,9 +247,13 @@ class IntegrationService:
                 if not await _claim(tx, source, event_key, at):
                     return EventOutcome.DUPLICATE
                 await self._record(tx, booking.id, kind, at, detail)
+                recorded = booking.id
                 if self._work is not None:
-                    await self._work.on_task_event(tx, booking, kind, at)
-                return EventOutcome.RECORDED
+                    requeued = await self._work.on_task_event(tx, booking, kind, at)
+        if recorded is not None:
+            if requeued and self._requeued is not None:  # outside the lock: it posts
+                await self._requeued(recorded)
+            return EventOutcome.RECORDED
         # Outside the write lock: the registry writes in a transaction of its own.
         if self._probes is not None and await self._probes.note(task_id, kind, at):
             return EventOutcome.PROBE
