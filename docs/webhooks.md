@@ -258,7 +258,9 @@ and the first that fails refuses:
 The limits come after the checks, so a call that cannot sign never uses up the budget of the
 authentic ones. Both buckets have the value of `rate_limit_webhook_per_minute` (class C, default
 600, 60 to 6000) and the key platform, organisation (or `-` for an address of the installation)
-and the caller's address as the server derived it; a forwarded header changes nothing:
+and the caller's address as the server derived it; a forwarded header changes nothing. An IPv4
+caller counts by its address (an IPv4 address written as IPv6 is the same caller), an IPv6 caller by
+its /64, so rotating addresses within one prefix never opens a fresh bucket:
 
 - A call refused at steps 2 to 6 counts against the bucket of **refused** calls. While it has room
   the call gets its own reason; once it is used up the call gets `rate` instead.
@@ -269,7 +271,7 @@ and the caller's address as the server derived it; a forwarded header changes no
 
 `Retry-After` is the window of the limit (60 seconds for a per-minute limit).
 
-Calls to an address that does not exist have a bucket of their own: per caller address only (the
+Calls to an address that does not exist have a bucket of their own: per caller (address, or /64 for IPv6) only (the
 platform and organisation in the path come from the caller, so they never make a key), with the
 value of `rate_limit_webhook_per_minute`. The gate always resolves the address first. Only when it
 does not exist does the bucket count: up to the limit the answer is a 404 (`unknown_address`),

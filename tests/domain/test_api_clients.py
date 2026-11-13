@@ -74,6 +74,15 @@ def test_address_allow_list() -> None:
     assert not address_allowed(networks, "testclient")
 
 
+def test_an_ipv4_address_written_as_ipv6_is_the_ipv4_address() -> None:
+    """ADR 0124 step 2a: it used to be compared without unwrapping, so it never matched."""
+    networks = ("10.0.0.0/24",)
+
+    assert address_allowed(networks, "::ffff:10.0.0.9")
+    assert not address_allowed(networks, "::ffff:10.0.1.9")
+    assert address_allowed((), "::ffff:10.0.1.9")
+
+
 def test_draft_validates_name_and_scopes() -> None:
     draft = ClientDraft.create(
         name="  WxCC   AI Agent ",

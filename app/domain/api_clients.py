@@ -11,13 +11,13 @@ their SHA-256, so a database copy cannot call the API. Comparisons use
 
 import hashlib
 import hmac
-import ipaddress
 import re
 import secrets
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
+from app.domain import networks as net
 from app.domain.authorization import ApiScope, ClientGrant
 from app.domain.errors import DomainError, ErrorCode
 
@@ -72,37 +72,21 @@ def is_client_id(value: str) -> bool:
 
 
 def parse_networks(lines: Iterable[str]) -> tuple[str, ...]:
-    """Normalise an allow-list of networks (CIDR or single addresses).
+    """Normalise an allow-list of networks (CIDR or single addresses), at most ``MAX_NETWORKS``.
 
     Raises:
         DomainError: ``invalid_configuration`` for ``networks`` when an entry is not a
             network or there are too many.
     """
-    networks: list[str] = []
-    for line in lines:
-        entry = line.strip()
-        if not entry:
-            continue
-        try:
-            networks.append(str(ipaddress.ip_network(entry, strict=False)))
-        except ValueError as exc:
-            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "networks") from exc
-    if len(networks) > MAX_NETWORKS:
-        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "networks")
-    return tuple(dict.fromkeys(networks))
+    return net.parse_networks(lines, maximum=MAX_NETWORKS)
 
 
 def address_allowed(networks: tuple[str, ...], address: str | None) -> bool:
-    """Return whether ``address`` lies in one of ``networks``; no networks allows any."""
-    if not networks:
-        return True
-    if address is None:
-        return False
-    try:
-        ip = ipaddress.ip_address(address)
-    except ValueError:
-        return False
-    return any(ip in ipaddress.ip_network(network) for network in networks)
+    """Return whether ``address`` lies in one of ``networks``; no networks allows any.
+
+    An IPv4 address written as IPv6 counts as the IPv4 address (ADR 0124 step 2a).
+    """
+    return not networks or net.allowed_from(address, networks)
 
 
 @dataclass(frozen=True)

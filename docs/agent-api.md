@@ -24,7 +24,7 @@ it (**API-koppelingen → Documentatie publiceren**).
 | Organisation | The one organisation the bot works for (cannot change later) |
 | Scopes | `availability:read` (read groups and free times); `reports:read` (the hourly usage figures of the client's groups, [reporting-api.md](reporting-api.md)); `configuration:transfer` (export, plan and apply the configuration document of the whole installation, section 6) |
 | Teams | Leave empty for every team of the organisation, or tick only the teams the bot serves |
-| Allowed networks | Optional: the egress IP ranges of your WxCC region, one per line (CIDR) |
+| Allowed networks | Optional: the egress IP ranges of your WxCC region, one per line (CIDR); an IPv4 address that arrives written as IPv6 (`::ffff:203.0.113.7`) counts as that IPv4 address |
 | Secret lifetime | 90, 180 or 365 days; rotate before it ends |
 
 After **Client aanmaken** the page shows the client ID, the client secret and the token URL
