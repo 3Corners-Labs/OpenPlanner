@@ -57,6 +57,7 @@ from app.domain.usage_api_service import UsageApiService, UsagePage
 from app.domain.usage_report_csv import TIDY_HEADER, TIDY_VERSION
 from app.i18n.dates import format_clock, format_day_short, local_day
 from app.web.protection import agent_call_limit, limiter, reports_limit
+from app.web.request_body import read_capped
 
 router = APIRouter()
 
@@ -566,15 +567,10 @@ async def _body(request: Request, limit: int) -> bytes:
         DomainError: ``configuration_package_too_large``, from the declared length when there
             is one, else as soon as the read passes the limit.
     """
-    declared = request.headers.get("content-length", "")
-    if declared.isdigit() and int(declared) > limit:
+    body = await read_capped(request, limit)
+    if body is None:
         raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE, "package")
-    body = bytearray()
-    async for chunk in request.stream():
-        body += chunk
-        if len(body) > limit:
-            raise DomainError(ErrorCode.CONFIGURATION_PACKAGE_TOO_LARGE, "package")
-    return bytes(body)
+    return body
 
 
 def _documents(request: Request) -> ConfigurationDocumentService:

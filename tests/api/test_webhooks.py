@@ -56,6 +56,8 @@ async def client(settings: Settings, database_url: str) -> AsyncIterator[httpx.A
         }
     )
     async with app_client(configured, FixedClock(NOW)) as client:
+        # What the platforms send (ADR 0124 point 2 d); a test of the gate overrides it.
+        client.headers["content-type"] = "application/json"
         yield client
 
 

@@ -1489,6 +1489,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=100,
     ),
     S(
+        "rate_limit_webhook_per_minute",
+        K.INT,
+        600,
+        _C,
+        T.RATE_LIMITS,
+        "Inbound webhook calls per minute, per platform, organisation and source address (ADR "
+        "0124 point 5); the off switch stays RATE_LIMIT_ENABLED.",
+        minimum=60,
+        maximum=6000,
+    ),
+    S(
         "rate_limit_agent_tokens",
         K.RATE,
         "10/minute",

@@ -1218,7 +1218,9 @@ redirect and the links in mails keep working, and give the webhooks their own ad
 4. Check delivery with `webhooks-health` (section 8): it sends signed test events through
    the tunnel. A live check: a test meeting's start and the participant counts appear on the
    booking's timeline; `docker compose logs web | grep webhook` shows `webhook.webex` lines
-   (`webhook.rejected` means a wrong secret).
+   (`webhook.rejected` means the gate refused a call; its `reason` says why: `invalid_signature`
+   is a wrong secret, `stale` a clock more than 300 s off, `unknown_address` an address or
+   connection that does not exist, see `docs/webhooks.md`).
 
 **After changing `WXCC_API_BASE_URL`** (for example to the right region), `register-webhooks`
 and `webhooks-list` see subscriptions on the new host only; a subscription made earlier

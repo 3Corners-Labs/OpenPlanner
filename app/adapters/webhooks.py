@@ -28,6 +28,7 @@ from app.domain.booking import booking_id_of
 from app.domain.calls import EventKind
 from app.domain.connection_health import Platform
 from app.domain.contact_center import ContactCenterKind
+from app.domain.inbound_gate import Refusal
 
 MAX_SKEW = timedelta(seconds=300)
 
@@ -82,24 +83,57 @@ def verify_webex(body: bytes, signature: str | None, secret: str) -> bool:
     return hmac.compare_digest(expected, signature.strip().lower())
 
 
-def verify_wxcc(
+def check_webex(
+    body: bytes, headers: Mapping[str, str], secret: str, now: datetime
+) -> Refusal | None:
+    """Check a Webex webhook by its ``X-Spark-Signature``; ``now`` is unused (no signed time).
+
+    Returns:
+        ``None`` when authentic, else ``Refusal.SIGNATURE``.
+    """
+    if verify_webex(body, headers.get("x-spark-signature"), secret):
+        return None
+    return Refusal.SIGNATURE
+
+
+def check_wxcc(
     body: bytes, signature: str | None, timestamp: str | None, secret: str, now: datetime
-) -> bool:
-    """Return whether a WxCC webhook is authentic, untampered and recent."""
+) -> Refusal | None:
+    """Check a WxCC webhook: authentic and untampered first, then recent.
+
+    The signature is compared first, in constant time; only a body that verifies has its time
+    looked at. A body that is not a JSON object, or whose ``comciscotimestamp`` differs from the
+    header, is never authentic.
+
+    Returns:
+        ``None`` when the webhook is good, ``Refusal.SIGNATURE`` when it is not authentic or
+        the time claims do not match, ``Refusal.STALE`` when it is authentic but more than
+        ``MAX_SKEW`` from ``now``.
+    """
     if not signature or not timestamp:
-        return False
+        return Refusal.SIGNATURE
     expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, signature.strip().lower()):
-        return False
+        return Refusal.SIGNATURE
     try:
         payload = json.loads(body)
         sent_ms = int(timestamp)
     except (ValueError, TypeError):
-        return False
+        return Refusal.SIGNATURE
     if not isinstance(payload, dict) or str(payload.get("comciscotimestamp")) != timestamp:
-        return False
-    sent = datetime.fromtimestamp(sent_ms / 1000, tz=now.tzinfo)
-    return abs(now - sent) <= MAX_SKEW
+        return Refusal.SIGNATURE
+    try:
+        sent = datetime.fromtimestamp(sent_ms / 1000, tz=now.tzinfo)
+    except (OverflowError, OSError, ValueError):
+        return Refusal.SIGNATURE
+    return None if abs(now - sent) <= MAX_SKEW else Refusal.STALE
+
+
+def verify_wxcc(
+    body: bytes, signature: str | None, timestamp: str | None, secret: str, now: datetime
+) -> bool:
+    """Return whether a WxCC webhook is authentic, untampered and recent."""
+    return check_wxcc(body, signature, timestamp, secret, now) is None
 
 
 def parse_webex(payload: dict[str, Any]) -> ParsedEvent | None:
@@ -207,7 +241,8 @@ class InboundWebhook:
             ADR 0032 keep matching).
         secret: Reads the webhook secret from the settings; without it the endpoint does not
             exist.
-        verify: ``(body, headers, secret, now)`` → authentic, untampered and within 300 s.
+        verify: ``(body, headers, secret, now)`` → ``None`` when authentic, untampered and within
+            300 s, else ``Refusal.SIGNATURE`` or ``Refusal.STALE`` (ADR 0124 point 2).
         parse: The verified JSON object → the event, or ``None`` when OpenPlanner ignores it.
         event_type: The verified JSON object → its event type, codes only, for the note.
         alias: An older address that still works and where OpenPlanner still registers, until
@@ -218,7 +253,7 @@ class InboundWebhook:
     platform: Platform
     source: str
     secret: Callable[[Settings], SecretStr | None]
-    verify: Callable[[bytes, Mapping[str, str], str, datetime], bool]
+    verify: Callable[[bytes, Mapping[str, str], str, datetime], Refusal | None]
     parse: Callable[[dict[str, Any]], ParsedEvent | None]
     event_type: Callable[[dict[str, Any]], str]
     alias: str | None = None
@@ -253,9 +288,9 @@ CONTACT_CENTER_PATH = "/webhooks/contact-center"
 
 def _verify_wxcc_headers(
     body: bytes, headers: Mapping[str, str], secret: str, now: datetime
-) -> bool:
+) -> Refusal | None:
     """Check a WxCC webhook by its ``X-WebexCC-Signature`` and ``X-WebexCC-Timestamp``."""
-    return verify_wxcc(
+    return check_wxcc(
         body,
         headers.get("x-webexcc-signature"),
         headers.get("x-webexcc-timestamp"),

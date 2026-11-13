@@ -100,6 +100,7 @@ SETTING_LABELS: dict[str, str] = {
     "rate_limit_reads": "settings.field.rate_limit_reads.label",
     "rate_limit_unknown_links": "settings.field.rate_limit_unknown_links.label",
     "rate_limit_agent_tokens": "settings.field.rate_limit_agent_tokens.label",
+    "rate_limit_webhook_per_minute": "settings.field.rate_limit_webhook_per_minute.label",
     "rate_limit_agent_calls": "settings.field.rate_limit_agent_calls.label",
     "admin_session_hours": "settings.field.admin_session_hours.label",
     "admin_reauth_minutes": "settings.field.admin_reauth_minutes.label",

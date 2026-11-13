@@ -311,6 +311,7 @@ def create_app(
         agent_calls=settings.rate_limit_agent_calls,
         reports=f"{settings.reporting_api_rate_per_minute}/minute",
         change_requests=f"{settings.agent_change_requests_per_hour}/hour",
+        webhooks=f"{settings.rate_limit_webhook_per_minute}/minute",
     )
     # Machine API (ADR 0023): only mounted when the deployment switches it on.
     agent_api = create_agent_api() if settings.agent_api_enabled else None
@@ -345,6 +346,7 @@ def create_app(
                 agent_calls=current.rate_limit_agent_calls,
                 reports=f"{current.reporting_api_rate_per_minute}/minute",
                 change_requests=f"{current.agent_change_requests_per_hour}/hour",
+                webhooks=f"{current.rate_limit_webhook_per_minute}/minute",
             )
             set_log_level(current.log_level)
             set_slow_query_ms(current.sql_slow_ms)

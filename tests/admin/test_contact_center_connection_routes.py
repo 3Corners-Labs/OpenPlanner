@@ -108,6 +108,11 @@ async def test_an_organisation_admin_may_not_set_the_connection(site: Site) -> N
     assert refused.status_code == 403
 
 
+def _json(headers: dict[str, str]) -> dict[str, str]:
+    """Add the content type the platform sends (ADR 0124 point 2 d)."""
+    return headers | {"content-type": "application/json"}
+
+
 def _event(stamp_ms: int) -> bytes:
     return json.dumps(
         {
@@ -128,8 +133,12 @@ async def test_the_organisations_address_verifies_with_its_own_secret(site: Site
     body = _event(stamp)
     address = "/webhooks/contact-center/webex_cc/demo"
 
-    signed = await site.client.post(address, content=body, headers=sign_wxcc(body, secret, stamp))
-    forged = await site.client.post(address, content=body, headers=sign_wxcc(body, "x" * 43, stamp))
+    signed = await site.client.post(
+        address, content=body, headers=_json(sign_wxcc(body, secret, stamp))
+    )
+    forged = await site.client.post(
+        address, content=body, headers=_json(sign_wxcc(body, "x" * 43, stamp))
+    )
 
     assert signed.status_code == 204  # an unknown task is acknowledged
     assert forged.status_code == 401
@@ -140,6 +149,49 @@ async def test_the_organisations_address_verifies_with_its_own_secret(site: Site
         "/webhooks/contact-center/webex_cc/Not-A-Slug",
     ):
         response = await site.client.post(
-            other, content=body, headers=sign_wxcc(body, secret, stamp)
+            other, content=body, headers=_json(sign_wxcc(body, secret, stamp))
         )
         assert response.status_code == 404, other
+
+
+async def test_a_refusal_at_an_organisations_address_names_the_organisation_and_only_a_real_one(
+    site: Site,
+) -> None:
+    """ADR 0124 point 10: the slug is public; a slug the caller made up is never written."""
+    await _connect(site)
+    secret = await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC)
+    assert secret is not None
+    stamp = int(site.clock.now().timestamp() * 1000)
+    body = _event(stamp)
+    forged = _json(sign_wxcc(body, "x" * 43, stamp))
+
+    for address in (
+        "/webhooks/contact-center/webex_cc/demo",  # a wrong signature
+        "/webhooks/contact-center/webex_cc/andere",  # exists, no connection
+        "/webhooks/contact-center/webex_cc/nobody",  # does not exist
+    ):
+        response = await site.client.post(address, content=body, headers=forged)
+        assert response.content == b""
+    refused = await site.client.post(
+        "/webhooks/contact-center/webex_cc/demo",
+        content=body,
+        headers=sign_wxcc(body, secret, stamp) | {"content-type": "text/plain"},
+    )
+    assert (refused.status_code, refused.content) == (415, b"")
+
+    log = await site_app(site).state.admin_service.audit_log(SUPER)
+    refusals = sorted(
+        (
+            e.event.reason,
+            ",".join(k for k in e.event.detail.split(",") if not k.startswith("client:")),
+        )
+        for e in log
+        if e.event.action == "webhook.rejected"
+    )
+    assert refusals == [
+        ("content_type", "source:wxcc,organisation:demo"),
+        ("invalid_signature", "source:wxcc,organisation:demo"),
+        ("unknown_address", "source:wxcc"),  # "nobody" does not exist: its slug is not written
+        ("unknown_address", "source:wxcc,organisation:andere"),
+    ]
+    assert "nobody" not in str(refusals)

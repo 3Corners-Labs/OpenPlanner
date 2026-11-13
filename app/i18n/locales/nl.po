@@ -3963,6 +3963,30 @@ msgstr "Webex-token vernieuwen"
 msgid "admin.audit.reason.invalid_signature"
 msgstr "Handtekening of tijdstempel klopt niet."
 
+msgid "admin.audit.reason.webhook.unknown_address"
+msgstr "Het adres of de koppeling bestaat niet, of heeft geen geheim."
+
+msgid "admin.audit.reason.webhook.network"
+msgstr "De afzender zit buiten de toegestane netwerken."
+
+msgid "admin.audit.reason.webhook.source_unknown"
+msgstr "Het adres van de afzender is niet te vertrouwen, dus de netwerkbeperking kon niet worden getoetst."
+
+msgid "admin.audit.reason.webhook.rate"
+msgstr "Dezelfde afzender ging over de limiet voor binnenkomende webhooks."
+
+msgid "admin.audit.reason.webhook.content_type"
+msgstr "Het bericht was niet als JSON verstuurd."
+
+msgid "admin.audit.reason.webhook.too_large"
+msgstr "Het bericht was groter dan de toegestane 64 KiB."
+
+msgid "admin.audit.reason.webhook.stale"
+msgstr "De handtekening klopt, maar de getekende tijd wijkt meer dan 300 seconden af."
+
+msgid "admin.audit.reason.webhook.malformed"
+msgstr "De handtekening klopt, maar de inhoud is geen geldig object."
+
 msgid "admin.audit.reason.unauthorized"
 msgstr "Het externe systeem weigert onze inloggegevens."
 
@@ -6293,6 +6317,9 @@ msgstr "Onbekende beheerlinks per IP-adres"
 
 msgid "settings.field.rate_limit_agent_tokens.label"
 msgstr "Tokenaanvragen machine-API per client"
+
+msgid "settings.field.rate_limit_webhook_per_minute.label"
+msgstr "Binnenkomende webhooks per minuut, per koppeling en bronadres"
 
 msgid "settings.field.rate_limit_agent_calls.label"
 msgstr "Aanroepen machine-API per client"
