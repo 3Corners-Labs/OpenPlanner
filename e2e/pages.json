@@ -28,6 +28,24 @@
       "island": true
     },
     {
+      "name": "immediate request form",
+      "path": "{immediate_form}",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "immediate request",
+      "path": "{immediate_request}",
+      "locales": [
+        "nl",
+        "en"
+      ],
+      "island": true,
+      "cookie": "immediate_request_cookie"
+    },
+    {
       "name": "closed group",
       "path": "/g/demo-gesloten",
       "locales": [
@@ -508,6 +526,15 @@
       "name": "organisation: change capacity pool exception",
       "path": "{pool_exception_edit}",
       "user": "super",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
+      "name": "claimed request without an appointment",
+      "path": "{claimed_request}",
+      "user": "agent",
       "locales": [
         "nl",
         "en"
