@@ -11,6 +11,9 @@ immediate pages, which run at whatever hour the suite starts:
   cannot end at 24:00), so the form takes a request whenever the suite runs, and a request the
   set-up claims leaves a unit for the form's forecast. The pool's time zone is the first of
   ``ZONES`` that is not near midnight at seeding, so the closed five minutes stay out of a run.
+* The service ``demo`` gets the own queue (``DispatchKind.OPENPLANNER_QUEUE``): the fixture's
+  flows dispatch to it, and the own queue of a service opens only with it (``queue_open``):
+  without it nobody can claim their work (found by the browser proof of this item).
 * The service keeps its subjects as they are (``subjects=False``): every participant spec books
   on ``demo``, and a subject is the required first question of each of its forms.
 
@@ -35,7 +38,7 @@ from app.adapters.db.demonstration import (
 from app.adapters.db.seed import DEMO_SLUG, seeded_group
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.ports import Transaction
-from app.domain.scheduling import Offer, ScheduleRule, TimeWindow
+from app.domain.scheduling import DispatchKind, Group, Offer, ScheduleRule, TimeWindow
 from app.domain.service_flows import IntakeMode
 
 IMMEDIATE_FORM = f"/g/{DEMO_SLUG}/direct?flow={REVIEW_FLOW}"
@@ -60,10 +63,18 @@ async def seed_demonstration_stack(engine: AsyncEngine, now: datetime) -> Demons
     """
     async with SqlUnitOfWork(engine).locked() as tx:
         demo = await seeded_group(tx, DEMO_SLUG)
+        if not demo.queue_open:
+            demo = await _with_own_queue(tx, demo)
         ids = await seed_demonstration(tx, demo, None, subjects=False)
         await _on_demand(tx, ids.flows[REVIEW_FLOW], now)
         await _around_the_clock(tx, ids.own_pool, away_from_midnight(now))
     return ids
+
+
+async def _with_own_queue(tx: Transaction, group: Group) -> Group:
+    """Give ``group`` the own queue, so the fixture's own-queue flows have staff to claim work."""
+    await tx.save_group(replace(group, dispatch_kind=DispatchKind.OPENPLANNER_QUEUE))
+    return await seeded_group(tx, group.slug)
 
 
 def away_from_midnight(now: datetime) -> str:

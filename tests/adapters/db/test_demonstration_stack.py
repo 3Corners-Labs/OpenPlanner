@@ -50,6 +50,7 @@ async def test_the_review_takes_work_without_appointment_on_a_pool_open_all_day(
     assert review.revision == 2  # a rerun publishes nothing new
     assert review.intake_modes == {IntakeMode.APPOINTMENT, IntakeMode.ON_DEMAND}
     assert demo.routing.subjects == ()  # every participant spec books on demo
+    assert demo.has_own_queue  # the fixture's flows dispatch to the own queue
     assert staffing is not None
     assert str(staffing.timezone) == "Europe/Amsterdam"
     assert sorted(r.weekday for r in staffing.rules) == list(range(7))
