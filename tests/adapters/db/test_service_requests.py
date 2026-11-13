@@ -434,3 +434,23 @@ async def test_a_pools_waiting_limit_is_bounded_and_scoped(world: World) -> None
         assert await tx.set_pool_max_waiting(EVERYTHING, flow.pool_id, None)
     async with world.uow.read() as tx:
         assert await tx.get_pool_max_waiting(flow.pool_id) is None
+
+
+async def test_started_work_makes_its_pool_booking_picked_up_when_the_slot_closes(
+    world: World,
+) -> None:
+    flow, request, _ = await started(world)
+    async with world.uow.locked() as tx:
+        booking = await tx.get_booking(request.booking_id or 0)
+        assert booking is not None
+        await tx.add_booking(  # a second appointment in the same pool slot, nobody took it
+            replace(booking, id=None, token_hash=f"{2:064d}", public_ref=f"ref{2:020d}")
+        )
+
+    async with world.uow.read() as tx:
+        ended = await tx.ended_slots(SLOT_0900, UNTIL + timedelta(days=1), 100)
+
+    (slot,) = ended.slots
+    assert slot.pool_id == flow.pool_id
+    assert [b.work_started for b in slot.bookings] == [True, False]
+    assert not any(b.claimed for b in slot.bookings)
