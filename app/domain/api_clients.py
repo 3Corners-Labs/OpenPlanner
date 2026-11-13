@@ -11,13 +11,13 @@ their SHA-256, so a database copy cannot call the API. Comparisons use
 
 import hashlib
 import hmac
-import ipaddress
 import re
 import secrets
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
+from app.domain import networks as net
 from app.domain.authorization import ApiScope, ClientGrant
 from app.domain.errors import DomainError, ErrorCode
 
@@ -36,6 +36,7 @@ SECRET_LIFETIME_DAYS = (90, 180, 365)
 SECRET_EXPIRY_WARNING = timedelta(days=30)
 MAX_NAME_LENGTH = 80
 MAX_NETWORKS = 20
+"""Networks one client may list (ADR 0023); its own limit, not the display links' (ADR 0117)."""
 
 _CLIENT_ID = re.compile(r"^opc_[A-Za-z0-9_-]{16,64}$")
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
@@ -71,38 +72,12 @@ def is_client_id(value: str) -> bool:
     return bool(_CLIENT_ID.fullmatch(value))
 
 
-def parse_networks(lines: Iterable[str]) -> tuple[str, ...]:
-    """Normalise an allow-list of networks (CIDR or single addresses).
-
-    Raises:
-        DomainError: ``invalid_configuration`` for ``networks`` when an entry is not a
-            network or there are too many.
-    """
-    networks: list[str] = []
-    for line in lines:
-        entry = line.strip()
-        if not entry:
-            continue
-        try:
-            networks.append(str(ipaddress.ip_network(entry, strict=False)))
-        except ValueError as exc:
-            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "networks") from exc
-    if len(networks) > MAX_NETWORKS:
-        raise DomainError(ErrorCode.INVALID_CONFIGURATION, "networks")
-    return tuple(dict.fromkeys(networks))
-
-
 def address_allowed(networks: tuple[str, ...], address: str | None) -> bool:
-    """Return whether ``address`` lies in one of ``networks``; no networks allows any."""
-    if not networks:
-        return True
-    if address is None:
-        return False
-    try:
-        ip = ipaddress.ip_address(address)
-    except ValueError:
-        return False
-    return any(ip in ipaddress.ip_network(network) for network in networks)
+    """Return whether ``address`` lies in one of ``networks``; no networks allows any.
+
+    An IPv4 address written as IPv6 counts as the IPv4 address (ADR 0124 step 2a).
+    """
+    return not networks or net.in_any(address, networks)
 
 
 @dataclass(frozen=True)
@@ -159,7 +134,7 @@ class ClientDraft:
             organisation,
             frozenset(g for g in groups if g),
             granted,
-            parse_networks(networks),
+            net.parse_networks(networks, maximum=MAX_NETWORKS),
         )
 
 

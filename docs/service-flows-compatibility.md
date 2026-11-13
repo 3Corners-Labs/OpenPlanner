@@ -129,7 +129,9 @@ settings only, and no train module imports it.
 |---|---|---|
 | none | Unchanged: the agent API books through the same booking service | `tests/api/test_agent_api.py::test_booking_service_is_shared` |
 | none | Unchanged: a change request answers the same with or without a match | `tests/api/test_agent_change_requests.py::test_a_change_request_answers_the_same_with_or_without_a_match` |
-| P | Open (gated): a requested time is judged on the service's own times, so a time on the pool of a pool booking is refused; must be fixed before the gate opens (ADR 0122 build status, step 5) | checklist G04 |
+| P | Intended (gated): a requested time is judged on every placement of the service before any booking is read, the matched booking on its own slot (its pool, or the service's own times); one that cannot move there is no match, with the same answer | `tests/domain/test_change_requests.py::test_a_time_off_the_matched_bookings_own_times_reaches_nobody_with_the_same_answer` |
+| P | Intended (gated): a pool booking is asked about a free time of its pool and moves there | `tests/domain/test_change_requests.py::test_a_pool_booking_is_asked_about_a_time_of_its_pool_and_moves_there` |
+| P | Unchanged: with the gate shut a time of a pool only is refused as before | `tests/domain/test_change_requests.py::test_with_the_gate_shut_a_time_of_a_pool_only_is_refused_as_before` |
 
 ## 2. Upgrade and rollback proof (ADR 0116)
 

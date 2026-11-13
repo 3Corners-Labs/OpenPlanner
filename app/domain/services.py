@@ -340,9 +340,39 @@ class BookingService:
             group = await self._group_by_id(tx, booking.group_id)
             if group.is_archived:
                 raise DomainError(ErrorCode.GROUP_NOT_FOUND)
-            known = booking.subject if group.routing.subject(booking.subject) else None
-            placement = await self._placements.of_booking(tx, booking)
-            return await placement.free(tx, group, first_day, last_day, known)
+            return await self._move_free(tx, booking, group, first_day, last_day)
+
+    async def may_move_to(
+        self, tx: Transaction, booking: Booking, group: Group, start: datetime
+    ) -> bool:
+        """Return whether ``start`` is a free time ``booking`` could move to, inside ``tx``.
+
+        Judged as ``move_times`` judges it: on the booking's own slot, so a booking on a pool
+        on its pool and one on the service's own staffing on the service's own times (ADR 0122).
+        """
+        day = group.today(start)
+        return any(s.start == start for s in await self._move_free(tx, booking, group, day, day))
+
+    async def offers_somewhere(self, group: Group, start: datetime) -> bool:
+        """Return whether ``start`` is a free time of any placement of ``group``.
+
+        The service's own times or the pool of one of its flows (``Placements.every_placement``):
+        what a request that does not yet know its booking may ask for (ADR 0023 step 2).
+        """
+        day = group.today(start)
+        async with self._uow.read() as tx:
+            for placement in await self._placements.every_placement(tx, group):
+                if any(s.start == start for s in await placement.free(tx, group, day, day, None)):
+                    return True
+        return False
+
+    async def _move_free(
+        self, tx: Transaction, booking: Booking, group: Group, first_day: date, last_day: date
+    ) -> list[AvailableSlot]:
+        """Return the free times of ``booking``'s own placement, for its subject (ADR 0081)."""
+        known = booking.subject if group.routing.subject(booking.subject) else None
+        placement = await self._placements.of_booking(tx, booking)
+        return await placement.free(tx, group, first_day, last_day, known)
 
     async def free_times(
         self,
