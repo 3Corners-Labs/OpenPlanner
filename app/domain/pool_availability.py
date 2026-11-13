@@ -35,6 +35,7 @@ from app.domain.pool_accounting import (
     interval_end,
 )
 from app.domain.pool_staffing import Intake, Supply, lowest_units
+from app.domain.service_flows import FlowRevision
 
 
 @dataclass(frozen=True)
@@ -61,6 +62,19 @@ def resolved_target(resolved: ResolvedFlow | None) -> PoolTarget | None:
     if resolved.capacity_pool_id is None or resolved.duration_minutes is None:
         raise DomainError(ErrorCode.SLOT_UNAVAILABLE)
     return PoolTarget(resolved.capacity_pool_id, resolved.duration_minutes)
+
+
+def revision_target(revision: FlowRevision | None) -> PoolTarget | None:
+    """Return what a published revision draws on; ``None`` for a legacy one or one without both.
+
+    Unlike ``resolved_target`` it never refuses: a caller that lists the pools a service may
+    offer skips a revision it cannot place.
+    """
+    if revision is None or revision.legacy:
+        return None
+    if revision.capacity_pool_id is None or revision.duration_minutes is None:
+        return None
+    return PoolTarget(revision.capacity_pool_id, revision.duration_minutes)
 
 
 def slot_target(slot: Slot) -> PoolTarget | None:

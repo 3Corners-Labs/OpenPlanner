@@ -78,8 +78,9 @@ async def test_a_request_is_taken_in_and_shown_by_its_cookie(
 
     assert sent.status_code == 303
     target = sent.headers["location"]
+    # Only random token characters: no name, address or other text can be in it. A substring
+    # check such as "Ada" not in target would fail by chance on a random reference.
     assert re.fullmatch(r"/r/[A-Za-z0-9_-]{16,32}", target)
-    assert "Ada" not in target
     assert "ada@example.org" not in repr(logs)
     page = await site.get(target)
     assert page.status_code == 200
@@ -87,10 +88,13 @@ async def test_a_request_is_taken_in_and_shown_by_its_cookie(
     assert "Uw plaats in de rij: 1." in page.text
     assert "ada@example.org" not in page.text
 
-    cookie = sent.headers["set-cookie"].lower()
-    assert "httponly" in cookie
-    assert "samesite=lax" in cookie
-    assert "ada" not in cookie
+    cookie = sent.headers["set-cookie"]
+    value = cookie.split(";", 1)[0].partition("=")[2]
+    assert "httponly" in cookie.lower()
+    assert "samesite=lax" in cookie.lower()
+    # The value is the reference and a random value, nothing else (deterministic, ADR 0093).
+    assert re.fullmatch(r"[A-Za-z0-9_-]{16,32}\.[A-Za-z0-9_-]+", value)
+    assert value.partition(".")[0] == target.removeprefix("/r/")
 
     stranger = httpx.AsyncClient(transport=site._transport, base_url=str(site.base_url))
     async with stranger:
