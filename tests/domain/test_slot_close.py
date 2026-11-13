@@ -16,6 +16,8 @@ from app.domain.slot_close import (
     in_order,
     not_picked_up,
     outcome_of,
+    pool_not_picked_up,
+    pool_outcome_of,
 )
 from app.domain.usage import FactKind, UsageFact, UsageOutcome
 
@@ -200,3 +202,44 @@ def test_slots_are_closed_in_the_order_they_ended() -> None:
     early = replace(_slot(), slot_id=2)
 
     assert [s.slot_id for s in in_order([late, early])] == [2, 1]
+
+
+def _pool_slot(*bookings: ClosedBooking) -> EndedSlot:
+    return replace(_slot(*bookings), pool_id=5)
+
+
+def test_a_pool_slot_writes_no_capacity_and_no_shortfall_of_the_service() -> None:
+    slot = _pool_slot(_booking(BookingStatus.COMPLETED))
+
+    facts = _facts(slot, SlotStaffing(1, 5, accepted=False))
+
+    assert [f.kind for f in facts] == [FactKind.BOOKING_OUTCOME]
+
+
+def test_a_pool_booking_is_completed_only_by_the_operators_explicit_evidence() -> None:
+    completed = _booking(BookingStatus.COMPLETED)
+    no_show = _booking(BookingStatus.NO_SHOW)
+    observed = replace(_booking(**vars_of(SEEN)), claimed=True)  # a meeting is no evidence here
+    unseen = replace(_booking(), claimed=True)
+
+    facts = _facts(_pool_slot(completed, no_show, observed, unseen))
+
+    assert [f.outcome for f in facts if f.kind is FactKind.BOOKING_OUTCOME] == [
+        UsageOutcome.COMPLETED,
+        UsageOutcome.NO_SHOW,
+    ]
+    assert pool_outcome_of(unseen) is None
+
+
+def test_a_pool_booking_nobody_claimed_or_started_was_not_picked_up() -> None:
+    open_ = _booking()
+    picked = replace(_booking(), claimed=True)
+    started = replace(_booking(), work_started=True)
+    cancelled = _booking(BookingStatus.CANCELLED)
+
+    facts = _facts(_pool_slot(open_, picked, started, cancelled))
+
+    assert [f.kind for f in facts] == [FactKind.CALL_NOT_PICKED_UP]
+    assert facts[0].bucket_hour == START
+    assert not pool_not_picked_up(picked)
+    assert not pool_not_picked_up(started)
