@@ -17,7 +17,8 @@ from pydantic import BaseModel
 
 from app.domain.address_check import InstanceService
 from app.domain.public_address import forwarded_state
-from app.web.protection import client_address, limiter, read_limit
+from app.web.caller import client_address
+from app.web.protection import limiter, read_limit
 
 router = APIRouter(prefix="/api/v1", tags=["instance"])
 

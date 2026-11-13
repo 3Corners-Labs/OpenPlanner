@@ -22,8 +22,8 @@ from limits import parse
 from slowapi import Limiter
 
 from app.config import Settings
-from app.domain.networks import caller_key
 from app.domain.security_log import CROSS_SITE, ORIGIN_MISMATCH
+from app.web.caller import caller_of
 from app.web.route_dependencies import dependency_calls
 
 log = structlog.get_logger()
@@ -156,25 +156,6 @@ class RateLimits:
             change_requests=f"{settings.agent_change_requests_per_hour}/hour",
             webhooks=f"{settings.rate_limit_webhook_per_minute}/minute",
         )
-
-
-def client_address(request: Request) -> str | None:
-    """Return the caller's address as the server derived it, or ``None`` without one.
-
-    The one reading of "the caller's address" in the application: ``request.client``, which
-    behind a proxy uvicorn's ``--proxy-headers`` has set from the trusted proxy (ADR 0086). No
-    forwarded header is ever read anywhere else; a header the caller sends cannot change it.
-    """
-    return request.client.host if request.client else None
-
-
-def caller_of(request: Request) -> str:
-    """Return the key every limiter counts the caller of ``request`` under.
-
-    An IPv4 caller counts by its address, an IPv6 caller by its /64, an IPv4-mapped IPv6 address
-    as its IPv4 form (``app.domain.networks.caller_key``).
-    """
-    return caller_key(client_address(request))
 
 
 LIMITS = RateLimits()

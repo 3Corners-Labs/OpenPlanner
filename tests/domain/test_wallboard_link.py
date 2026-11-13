@@ -114,6 +114,25 @@ def test_an_address_is_allowed_by_an_empty_list_or_a_range() -> None:
     assert not allowed_from("2001:db8::1", ("10.20.0.0/16",))
 
 
+@pytest.mark.parametrize(
+    "listed", ["10.20.0.0/16", "::/0", "::ffff:0:0/96", "::ffff:10.20.0.0/112"]
+)
+def test_a_caller_written_as_ipv6_matches_what_lets_it_in_in_either_reading(listed: str) -> None:
+    """The display links share the helper (ADR 0124 step 2a): both readings of a mapped caller."""
+    assert allowed_from("::ffff:10.20.4.31", (listed,))
+    assert not allowed_from("::ffff:10.20.4.31", ("2001:db8::/32",))
+    assert pinned_network("::ffff:10.20.4.31") == "10.20.4.31/32"  # its pin is the IPv4 /32
+
+
+def test_a_plain_ipv6_caller_is_not_allowed_by_an_ipv4_network() -> None:
+    assert not allowed_from("2001:db8::1", ("10.20.0.0/16",))
+
+
+def test_ipv6_networks_are_not_inside_a_list_of_ipv4_networks() -> None:
+    assert not inside(("2001:db8::/32",), ("10.0.0.0/8",))
+    assert not inside(("::/0",), ("10.0.0.0/8",))
+
+
 def test_the_acl_and_the_pin_both_apply_and_the_acl_is_asked_first() -> None:
     link = _link(networks=("10.20.0.0/16",), pinned_network="10.20.4.31/32")
 

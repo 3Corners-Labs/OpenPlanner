@@ -6,10 +6,9 @@ import pytest
 from fastapi import FastAPI
 from starlette.requests import Request
 
+from app.web.caller import caller_of, client_address
 from app.web.protection import (
     RateLimits,
-    caller_of,
-    client_address,
     configure_rate_limits,
     count_unknown_link,
     limiter,

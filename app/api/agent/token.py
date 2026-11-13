@@ -19,7 +19,8 @@ from starlette.responses import JSONResponse
 from app.api.agent.auth import api_access
 from app.api.agent.errors import ApiProblem
 from app.api.agent.schemas import ErrorResponse, TokenResponse
-from app.web.protection import agent_token_limit, client_address, limiter
+from app.web.caller import client_address
+from app.web.protection import agent_token_limit, limiter
 
 router = APIRouter()
 

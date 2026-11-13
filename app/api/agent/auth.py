@@ -22,7 +22,7 @@ from app.domain.api_clients import ApiAuthError, ApiCaller
 from app.domain.authorization import API_SCOPES, ApiScope
 from app.domain.scheduling import GroupSummary
 from app.domain.security_log import TOKEN_REJECTED, UNKNOWN_TOKEN
-from app.web.protection import caller_of, client_address
+from app.web.caller import caller_of, client_address
 from app.web.security_events import report
 
 log = structlog.get_logger()

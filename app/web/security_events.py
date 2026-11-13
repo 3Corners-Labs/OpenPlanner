@@ -18,7 +18,7 @@ from app.adapters.event_sink import StdoutEventSink
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Category, Outcome, Source
 from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.security_log import SecurityLog
-from app.web.protection import client_address
+from app.web.caller import client_address
 
 log = structlog.get_logger()
 

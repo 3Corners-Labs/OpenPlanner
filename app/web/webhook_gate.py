@@ -46,8 +46,8 @@ from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.inbound_gate import MAX_BODY_BYTES, Refusal, accepts_content_type
 from app.domain.ports import Clock
 from app.domain.security_log import WEBHOOK_REJECTED
+from app.web.caller import caller_of
 from app.web.protection import (
-    caller_of,
     webhook_retry_after,
     within_refused_limit,
     within_unknown_address_limit,
