@@ -35,7 +35,7 @@ from app.domain.system_log import EventRetention
 from app.domain.update_policy import valid_line, valid_window
 from app.domain.updates import valid_release
 from app.domain.user_names import DEFAULT_SUFFIX, valid_suffix
-from app.domain.webhook_sources import valid_networks
+from app.domain.webhook_sources import valid_source_networks
 from app.i18n.dates import ClockStyle
 
 LogLevel = Literal["TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -931,7 +931,7 @@ class Settings(BaseSettings):
     @classmethod
     def _networks_are_networks(cls, value: str, info: ValidationInfo) -> str:
         """Accept only a list of at most 32 networks; the message names no value (ADR 0124)."""
-        if not valid_networks(value):
+        if not valid_source_networks(value):
             raise ValueError(f"{str(info.field_name).upper()} must be at most 32 networks")
         return value
 

@@ -42,6 +42,8 @@ def test_the_portal_refuses_a_value_that_is_no_list_of_at_most_32_networks(key: 
     assert usable(entry, "8.8.8.0/24\n8.8.9.0/24")
     assert not usable(entry, "not-a-network")
     assert not usable(entry, "8.8.8.0/24, 300.1.1.1")
+    assert not usable(entry, "0.0.0.0/0")  # a whole address family is "any source"
+    assert not usable(entry, "8.8.8.0/24, ::/0")
     assert not usable(entry, too_many)
     assert not usable(entry, 7)
 
@@ -49,7 +51,7 @@ def test_the_portal_refuses_a_value_that_is_no_list_of_at_most_32_networks(key: 
 @pytest.mark.parametrize("key", LISTS)
 def test_the_environment_cannot_hold_a_wrong_list_either(key: str) -> None:
     assert getattr(Settings(environment="test", **{key: "8.8.8.0/24"}), key) == "8.8.8.0/24"
-    for wrong in ("nonsense", ",".join(f"10.0.{n}.0/24" for n in range(33))):
+    for wrong in ("nonsense", "0.0.0.0/0", "::/0", ",".join(f"10.0.{n}.0/24" for n in range(33))):
         with pytest.raises(ValidationError) as refused:
             Settings(environment="test", **{key: wrong})
         assert key.upper() in str(refused.value)

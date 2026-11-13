@@ -146,11 +146,11 @@ def _source_rows(request: Request, locale: RequestLocale, settings: Settings) ->
     return [
         SourceRow(
             _(label),
-            source_finding(_, networks, own=False, required=required, chain=chain),
+            source_finding(_, networks, own=False, required=required, chain=chain, detailed=True),
         )
         for label, networks in (
-            ("admin.settings.address.sources.video", video_networks(settings)),
-            ("admin.settings.address.sources.contact_center", contact_center_networks(settings)),
+            ("admin.settings.address.sources.video", video_networks(request)),
+            ("admin.settings.address.sources.contact_center", contact_center_networks(request)),
         )
     ]
 

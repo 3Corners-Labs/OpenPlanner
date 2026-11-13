@@ -13671,7 +13671,7 @@ msgid "admin.channels.cc_allowed_networks_hint"
 msgstr "The networks the platform's webhooks to this address may come from, one per line (CIDR, for example 203.0.113.0/24), at most {maximum}. Empty: the installation's default applies. This is defence in depth: the signature is what stops a stranger, and a list that has gone stale refuses the platform itself."
 
 msgid "admin.form.error.cc_allowed_networks"
-msgstr "Enter networks as CIDR, one per line, at most 32."
+msgstr "Enter networks as CIDR, one per line, at most 32. A network that covers a whole address family (a prefix length of 0) is no list."
 
 msgid "admin.done.contact_center_saved"
 msgstr "Saved. The webhook secret and the registration at the platform were left as they were."
@@ -13711,3 +13711,12 @@ msgstr "Video platform"
 
 msgid "admin.settings.address.sources.contact_center"
 msgstr "Contact center (default)"
+
+msgid "admin.source.fault.card"
+msgstr "Deliveries to this address are refused because of the installation's proxy setting, so the allowed networks cannot be checked. Ask the platform administrator to repair it; the detail is on System status."
+
+msgid "admin.source.fault.unreadable_trust"
+msgstr "Calls are refused (source unknown) while an entry of FORWARDED_ALLOW_IPS is no address or network (a socket path cannot be judged here). Name the proxy by the address the web container sees it connect from, and restart web."
+
+msgid "admin.source.state.unreadable"
+msgstr "The stored list cannot be read, so this address accepts no call. Set the allowed networks again."

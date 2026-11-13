@@ -16,8 +16,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.domain.address_check import InstanceService
-from app.domain.public_address import forwarded_state
-from app.web.caller import client_address
+from app.web.caller import forwarded_of
 from app.web.protection import limiter, read_limit
 
 router = APIRouter(prefix="/api/v1", tags=["instance"])
@@ -51,16 +50,10 @@ async def instance(
 ) -> JSONResponse:
     """Return the instance id, and the proxy detail to the caller that holds the pending nonce."""
     service: InstanceService = request.app.state.instance_service
-    client = client_address(request)
     answer = await service.answer(
         probe,
         scheme=request.url.scheme,
-        forwarded=forwarded_state(
-            forwarded_for=request.headers.get("x-forwarded-for"),
-            forwarded_proto=request.headers.get("x-forwarded-proto"),
-            client=client,
-            scheme=request.url.scheme,
-        ),
+        forwarded=forwarded_of(request),
     )
     body = InstanceBody(
         instance_id=answer.instance_id,

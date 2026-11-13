@@ -34,6 +34,7 @@ from app.adapters.settings_report import (
     describe,
     effective,
     locked_keys,
+    state_of,
 )
 from app.config import Settings
 from app.domain.closure_retention import ClosureRetention
@@ -41,6 +42,7 @@ from app.domain.platform_settings import (
     RELOAD_SECONDS,
     PlatformSettingsStore,
     PortalValues,
+    Source,
     resolve_for_organisation,
     usable,
 )
@@ -107,6 +109,16 @@ class LiveSettings:
     def states(self) -> list[SettingState]:
         """Return every setting with its effective value and source, for the screens."""
         return describe(self._base, self._environ, self._store.current, self._clock.now())
+
+    def portal_ignored(self, key: str) -> bool:
+        """Return whether ``key`` has its default because its stored portal value breaks the rules.
+
+        The one judgement of the resolver (``Resolved.portal_ignored``), for a caller to whom the
+        default would mean something else than "nothing stored". ``False`` while the environment
+        sets the key: the stored value plays no part then.
+        """
+        state = state_of(key, self._base, self._environ, self._store.current, self._clock.now())
+        return state.portal_ignored and state.source is Source.DEFAULT
 
     @property
     def portal(self) -> PortalValues:

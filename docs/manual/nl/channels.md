@@ -122,8 +122,22 @@ goed doorgeeft. Als het proxyvertrouwen `FORWARDED_ALLOW_IPS` `*` is of breder d
 kaart dat in rood en worden aanroepen naar dit adres geweigerd tot de host het herstelt. Een
 enkele aanroep waarvan het adres niet te vertrouwen is (doorgestuurde headers die zijn peer niet
 mocht sturen) wordt op zichzelf geweigerd; het herstel
-staat in het runbook, *Webhooks refused for their network*. Alleen de lijst opslaan verandert het webhookgeheim en de
-aanmelding bij het platform niet.
+staat in het runbook, *Webhooks refused for their network*. Alleen de lijst opslaan verandert het
+webhookgeheim en de aanmelding bij het platform niet.
+
+Drie opstellingen kunnen geen lijst gebruiken: een proxy die door een heel netwerk wordt vertrouwd
+in plaats van door één adres (een Kubernetes-ingress, waarvan de pods wisselen), een content
+delivery network vóór de proxy (de aanroeper wordt het adres daarvan, en dat in de lijst zetten laat
+al zijn klanten toe) en een leverancier die een publieke naam vanaf een privéadres aanroept. Laat de
+lijst dan leeg en vertrouw op de handtekening, of vraag het aan uw platformbeheerder.
+
+Een netwerk dat een hele adresfamilie dekt (`0.0.0.0/0` of `::/0`) wordt geweigerd: dat is geen
+lijst. Is de opgeslagen lijst niet te lezen, dan zegt de kaart dat en accepteert het adres geen
+enkele aanroep tot u de lijst opnieuw opslaat.
+
+**Stuur nadat u een lijst hebt ingesteld een testbezorging** en controleer dat die wordt
+geaccepteerd. De kaart toont nog geen geweigerde aanroepen, dus een lijst die de leverancier buiten
+sluit ziet u hier niet.
 
 ## Wat wordt vastgelegd
 

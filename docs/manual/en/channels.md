@@ -119,9 +119,22 @@ the supplier announces new ranges.
 A list can only be evaluated while the proxy in front of OpenPlanner hands on the caller's address
 correctly. When the proxy trust `FORWARDED_ALLOW_IPS` is `*` or wider than one host, the card says
 so in red and calls to this address are refused until the host repairs it. A single call whose
-address cannot be trusted (forwarded headers its peer was not trusted to send) is refused on its own; the repair is in the runbook,
-*Webhooks refused for their network*. Saving only the list changes neither the webhook secret nor the
-registration at the platform.
+address cannot be trusted (forwarded headers its peer was not trusted to send) is refused on its
+own; the repair is in the runbook, *Webhooks refused for their network*. Saving only the list
+changes neither the webhook secret nor the registration at the platform.
+
+Three set-ups cannot use a list: a proxy that is trusted by a whole network instead of a single
+address (a Kubernetes ingress, whose pods change), a content delivery network in front of the proxy
+(the caller becomes its address, and listing it would admit all its customers), and a supplier that
+calls a public name from a private address. For these, leave the list empty and rely on the
+signature, or ask your platform administrator.
+
+A network that covers a whole address family (`0.0.0.0/0` or `::/0`) is refused: that is no list.
+If the stored list cannot be read, the card says so and the address accepts no call until you
+save the list again.
+
+**After you set a list, send a test delivery** and check that it is accepted. The card does not
+yet show refused calls, so a list that locks the supplier out is not visible here.
 
 ## What is recorded
 

@@ -1242,6 +1242,16 @@ its target stops answering, or Cisco developer support can remove it by id.
 Only `/webhooks/*` needs to be reachable through the tunnel; the admin portal is behind OIDC
 anyway, but a named tunnel with an ingress rule for that path alone is the tidier option.
 
+**A tunnel and a list of source networks do not mix by default.** A delivery through a tunnel
+arrives from the tunnel's hop (a loopback or private address, or the tunnel client itself), not
+from the supplier's network. Once a list applies to the address, that delivery is refused, as
+`source_unknown` (a private or loopback caller while the public address is public, or the caller is
+the trusted proxy) or `network`. In a lab, either leave the address without a list (the default,
+and the signature still protects it), or give `FORWARDED_ALLOW_IPS` the tunnel client's address as
+the single trusted proxy and let the tunnel hand on the caller's address in `X-Forwarded-For`;
+a quick tunnel that does not do that cannot be used with a list. Do not set
+`WEBHOOK_SOURCE_NETWORKS_REQUIRED` in a lab that uses a tunnel.
+
 ### 5. Following calls
 
 - **Groep → Agenda** shows today's bookings with meeting and task state, whether the agent
@@ -1407,6 +1417,8 @@ How to read what you see:
 | *restricted to N networks* | A list applies (the connection's own, else the default) | Nothing; keep it current |
 | *a list is required and missing* | `WEBHOOK_SOURCE_NETWORKS_REQUIRED=true` and no list applies: the address accepts no call | Enter a list on the card, or set the installation's default |
 | *refused* with `FORWARDED_ALLOW_IPS` is `*` or wide | The caller's address cannot be trusted: any peer could claim any address | Set `FORWARDED_ALLOW_IPS` to the proxy's own address (a single host), restart `web` |
+| *refused* with an entry of `FORWARDED_ALLOW_IPS` that is no address or network | The server cannot read who is trusted (a socket path, a name, a typing mistake) | Name the proxy by the address web sees it connect from, restart `web` |
+| *the list cannot be read* | The stored list is damaged or refused by the rules; every call to the address is refused with `network` | Set the allowed networks again on the card (or the default under *Advanced settings*) |
 | Events with reason `source_unknown` (no card finding: decided per call) | A call arrived with `X-Forwarded-*` headers that web did not use because its peer is not a trusted proxy, or the caller's address was a trusted proxy, or loopback or private while the public address is public | Name the proxy that sends them in `FORWARDED_ALLOW_IPS` (the address web sees it connect from), restart `web`; a stranger's own forged header only refuses that stranger's call |
 
 Deliveries refused for their network (a stale list):

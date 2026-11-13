@@ -226,9 +226,36 @@ async def test_a_list_that_the_gate_would_refuse_says_what_to_repair(site: Site)
     _app(site).state.proxy_watch.observe("10.0.0.9")
     sighted = await _part(site)
 
-    assert "FORWARDED_ALLOW_IPS * is of een breder netwerk dan één host" in wide
+    assert (
+        "FORWARDED_ALLOW_IPS * is of een breder netwerk dan één host" in wide
+    )  # the detail is here
     assert "Geweigerd" in wide
     assert "Geweigerd" not in sound
     # the sighting of the proxy watch stays its own finding and refuses nothing at the gate
     assert "Geweigerd" not in sighted
     assert "negeerde ze" in sighted
+
+
+async def test_a_trust_entry_that_cannot_be_read_is_a_finding_of_its_own(site: Site) -> None:
+    """ADR 0124 point 4: an entry the server cannot read is not skipped in silence."""
+    _settings(
+        site,
+        forwarded_allow_ips="10.0.0.5, /run/proxy.sock",
+        webhook_source_networks_video="8.8.8.0/24",
+    )
+    await site.login_as(SUPER)
+
+    part = await _part(site)
+
+    assert "geen adres of netwerk" in part
+    assert part.count("Geweigerd") == 1  # only the row with a list
+
+
+async def test_a_default_list_that_cannot_be_read_is_shown_as_unreadable(site: Site) -> None:
+    _settings(site, forwarded_allow_ips="10.0.0.5", webhook_source_networks_video="garbage")
+    await site.login_as(SUPER)
+
+    part = await _part(site)
+
+    assert part.count("De opgeslagen lijst is niet te lezen") == 1
+    assert part.count("Niet beperkt") == 1  # the other default is a readable, empty list

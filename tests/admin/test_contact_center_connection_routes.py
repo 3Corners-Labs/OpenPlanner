@@ -4,10 +4,13 @@ import json
 from dataclasses import replace
 
 import httpx
+import pytest
 
 from app.adapters.contact_center_connections import SealedConnections
+from app.adapters.db.record_names import contact_center_credential_name
 from app.adapters.webhooks import sign_wxcc
 from app.domain.contact_center import ContactCenterKind, Registration
+from app.domain.networks import NetworkList
 from app.web.protection import RateLimits, configure_rate_limits
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.fakes.integrations import FakeOrganisationDispatchers
@@ -280,7 +283,7 @@ async def test_the_allowed_networks_are_edited_on_the_card_and_kept_canonical(si
     assert "Beperkt tot 2 netwerk(en), uit de eigen lijst van deze koppeling" in page
     stored = await _connections(site).get(1)
     assert stored is not None
-    assert stored.allowed_networks == (SUPPLIER_RANGE, "2001:4860:4860::/48")
+    assert stored.allowed_networks == NetworkList((SUPPLIER_RANGE, "2001:4860:4860::/48"))
 
 
 async def test_changing_the_networks_alone_keeps_the_webhook_secret_and_registers_nothing(
@@ -304,17 +307,21 @@ async def test_changing_the_networks_alone_keeps_the_webhook_secret_and_register
     assert not any("8.8.8" in e.event.detail for e in audit)
 
 
-async def test_a_refused_list_is_shown_at_its_input_and_stores_nothing(site: Site) -> None:
+@pytest.mark.parametrize("text", ["8.8.8.0/24\nnot-a-network", "8.8.8.0/24\n0.0.0.0/0", "::/0"])
+async def test_a_refused_list_is_shown_at_its_input_and_stores_nothing(
+    site: Site, text: str
+) -> None:
+    """Also a network that covers a whole address family: "any source" called "restricted"."""
     await _connect(site)
 
-    refused = await _save_networks(site, "8.8.8.0/24\nnot-a-network")
+    refused = await _save_networks(site, text)
 
     assert refused.status_code == 422
     assert 'aria-describedby="cc_allowed_networks' in refused.text
     assert "Vul netwerken in als CIDR" in refused.text
     stored = await _connections(site).get(1)
     assert stored is not None
-    assert stored.allowed_networks == ()
+    assert stored.allowed_networks == NetworkList()
 
 
 async def test_the_card_never_leaves_the_state_of_the_address_silent(site: Site) -> None:
@@ -345,7 +352,10 @@ async def test_a_list_on_a_chain_that_cannot_be_trusted_is_shown_as_refused_with
     page = (await site.client.get(PAGE)).text
 
     assert "Geweigerd" in page
-    assert "Zet het alleen op het eigen adres van de proxy" in page
+    assert "proxy-instelling van de installatie" in page
+    assert "platformbeheerder" in page
+    # the card, for the organisation, does not name the host's configuration
+    assert "FORWARDED_ALLOW_IPS" not in page
 
 
 async def test_the_organisations_own_list_governs_its_address_and_a_stranger_gets_a_403(
@@ -404,3 +414,62 @@ async def test_a_co_tenant_inside_the_range_still_fails_the_signature_at_the_org
     forged = await _call_from(site, SUPPLIER, secret="x" * 43)
 
     assert (forged.status_code, forged.content) == (401, b"")
+
+
+async def _damage_the_stored_list(site: Site, value: object) -> None:
+    """Write ``value`` where the sealed record keeps the list, as a damaged record would."""
+    store = _connections(site)._store  # noqa: SLF001
+    name = contact_center_credential_name(1)
+    record = await store.get(name)
+    assert record is not None
+    await store.put(name, record | {"allowed_networks": value}, site.clock.now())
+
+
+@pytest.mark.parametrize("damage", ["8.8.8.0/24", ["not-a-network"], ["0.0.0.0/0"], None])
+async def test_a_corrupted_stored_list_refuses_every_call_and_the_card_says_so(
+    site: Site, damage: object
+) -> None:
+    """Abuse case: a list that cannot be read is no empty list ("any source"): it is refused."""
+    await _connect(site)
+    await _damage_the_stored_list(site, damage)
+    _set_settings(site, webhook_source_networks_contact_center=SUPPLIER_RANGE)  # not a way round
+
+    inside = await _call_from(site, SUPPLIER)
+    outside = await _call_from(site, STRANGER)
+    card = (await site.client.get(PAGE)).text
+
+    assert [(r.status_code, r.content) for r in (inside, outside)] == [(403, b"")] * 2
+    assert "De opgeslagen lijst is niet te lezen" in card
+    # one event per caller (ADR 0124 point 10), so one for each of the two callers
+    assert await _webhook_refusals(site) == [("network", "source:wxcc,organisation:demo")] * 2
+
+
+async def test_saving_a_list_repairs_a_corrupted_one(site: Site) -> None:
+    await _connect(site)
+    await _damage_the_stored_list(site, "damaged")
+
+    saved = await _save_networks(site, SUPPLIER_RANGE)
+
+    assert saved.status_code == 303
+    assert (await _call_from(site, SUPPLIER)).status_code == 204
+
+
+async def test_a_list_only_save_on_a_record_without_a_webhook_secret_makes_one_and_registers(
+    site: Site,
+) -> None:
+    """``UNTOUCHED`` is for a connection that has its secret; without one the normal path runs."""
+    await _connect(site)
+    store = _connections(site)._store  # noqa: SLF001
+    name = contact_center_credential_name(1)
+    record = await store.get(name)
+    assert record is not None
+    await store.put(
+        name, {k: v for k, v in record.items() if k != "webhook_secret"}, site.clock.now()
+    )
+    registrar = _registrar(site)
+
+    saved = await _save_networks(site, SUPPLIER_RANGE)
+
+    assert "done=contact_center_registered" in saved.headers["location"]
+    assert registrar.registered == [(1, "demo")]
+    assert await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC) is not None

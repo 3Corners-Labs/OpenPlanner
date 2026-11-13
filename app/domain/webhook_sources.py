@@ -1,26 +1,30 @@
 """Where a webhook may come from: the source-network rule of the gate (ADR 0124 points 3 and 4).
 
 A connection carries a list of allowed networks, the installation a default per platform, and the
-host may demand a list (``WEBHOOK_SOURCE_NETWORKS_REQUIRED``). This module holds the three
-decisions that make of that one answer, all pure:
+host may demand a list (``WEBHOOK_SOURCE_NETWORKS_REQUIRED``). This module holds the decisions
+that make of that one answer, all pure:
 
-    own list, default list ─► ``networks_that_apply`` ─► the list that governs an address
+    text ─► ``source_networks_of`` ─► canonical networks (at most 32; none that covers a whole
+                                      address family: that is "any source" called "restricted")
+    stored value ─► ``read_stored_networks`` ─► a ``NetworkList``, readable or not
+    own list, default list ─► ``source_list_that_applies`` ─► the list that governs an address
     caller, list, switch, chain ─► ``check_source`` ─► allow, ``network`` or ``source_unknown``
     list, switch ─► ``source_state`` ─► what the portal says about the address (a finding)
 
 What an empty list means is decided here and nowhere else: *any source*, except while the host
 demands a list, when an address without one does not accept (``network``). ``app.domain.networks``
-gives no meaning to an empty list; this module is the one place that does for webhooks.
+gives no meaning to an empty list; this module is the one place that does for webhooks. A list that
+is stored but cannot be read is never an empty one: every call to that address is refused.
 
 The address is only as good as the proxy chain (point 4). A list that cannot be evaluated is
 refused, not passed: ``ProxyChain`` says in which cases the caller's address cannot be trusted, and
 every case reuses a judgement the application already makes of the proxy (``trusted_proxy``,
 ``classify_peer`` and ``forwarded_state`` of ``app.domain.public_address``); no second reading of
 the chain lives here. The rule for the caller's address: it is held as the caller's only if
-``FORWARDED_ALLOW_IPS`` is no wider than single hosts, this call did not arrive with forwarded
-headers its peer was not trusted to send, and the address is neither a trusted proxy's nor a
-loopback or private one while the public address is public. All of it is decided per call: the
-proxy watch's standing sighting (ADR 0086) is a finding for System status and decides nothing
+``FORWARDED_ALLOW_IPS`` is readable and no wider than single hosts, this call did not arrive with
+forwarded headers its peer was not trusted to send, and the address is neither a trusted proxy's
+nor a loopback or private one while the public address is public. All of it is decided per call:
+the proxy watch's standing sighting (ADR 0086) is a finding for System status and decides nothing
 here, because a state that lasts would let any stranger switch every list off with one request.
 An address without a list is never affected by it.
 """
@@ -29,10 +33,21 @@ import ipaddress
 from dataclasses import dataclass
 from enum import StrEnum
 
-from app.domain.errors import DomainError
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.inbound_gate import Refusal
-from app.domain.networks import MAX_NETWORKS, address_of, in_any, parse_networks, split_entries
-from app.domain.public_address import PeerClass, address_is_public, classify_peer, trusted_proxy
+from app.domain.networks import (
+    NetworkList,
+    address_of,
+    host_is_public,
+    in_any,
+    networks_of,
+)
+from app.domain.public_address import PeerClass, classify_peer, trusted_proxy
+
+MAX_WEBHOOK_NETWORKS = 32
+"""The most networks one list of allowed webhook source networks holds, a connection's or an
+installation's default (ADR 0124 point 3). A fixed rule: a longer list is a sign that the wrong
+tool is being used."""
 
 NETWORKS_FIELD = "allowed_networks"
 """``DomainError`` field of a refused list."""
@@ -40,32 +55,74 @@ NETWORKS_FIELD = "allowed_networks"
 WILDCARD = "*"
 """The entry of ``FORWARDED_ALLOW_IPS`` that trusts every peer."""
 
+WHOLE_FAMILY_PREFIX = 0
+"""A network with this prefix length covers a whole address family (``0.0.0.0/0``, ``::/0``)."""
 
-def networks_of(text: str, *, field: str = NETWORKS_FIELD) -> tuple[str, ...]:
-    """Return the networks written in ``text`` (one per line or comma separated), canonical.
+
+def source_networks_of(text: str, *, field: str = NETWORKS_FIELD) -> tuple[str, ...]:
+    """Return the allowed source networks written in ``text``, canonical; the one validation.
+
+    The card, the two class C defaults and the ``Settings`` validator all go through here.
 
     Raises:
-        DomainError: ``invalid_configuration`` for ``field`` when an entry is no network or there
-            are more than ``MAX_NETWORKS`` different ones.
+        DomainError: ``invalid_configuration`` for ``field`` when an entry is no network, there
+            are more than ``MAX_WEBHOOK_NETWORKS`` different ones, or one covers a whole address
+            family (a list that lets everything in is no list).
     """
-    return parse_networks(split_entries(text), maximum=MAX_NETWORKS, field=field)
+    found = networks_of(text, maximum=MAX_WEBHOOK_NETWORKS, field=field)
+    if _covers_a_family(found):
+        raise DomainError(ErrorCode.INVALID_CONFIGURATION, field)
+    return found
 
 
-def valid_networks(text: str) -> bool:
-    """Return whether ``text`` is a list of at most ``MAX_NETWORKS`` networks (may be empty)."""
+def _covers_a_family(networks: tuple[str, ...]) -> bool:
+    """Return whether one of ``networks`` covers a whole address family."""
+    return any(ipaddress.ip_network(n).prefixlen == WHOLE_FAMILY_PREFIX for n in networks)
+
+
+def valid_source_networks(text: str) -> bool:
+    """Return whether ``text`` is an acceptable list of source networks (may be empty)."""
     try:
-        networks_of(text)
+        source_networks_of(text)
     except DomainError:
         return False
     return True
 
 
-def networks_that_apply(own: tuple[str, ...], default: tuple[str, ...]) -> tuple[str, ...]:
+def read_stored_networks(value: object) -> NetworkList:
+    """Read a stored list back; anything that cannot be read is unreadable, never empty.
+
+    The caller decides what a missing field means (a record made before the field existed is an
+    empty list). A value that is there must be a list of at most ``MAX_WEBHOOK_NETWORKS`` strings
+    that are networks as written by this module: a wrong type (``None`` too), an entry that does
+    not parse (also a blank one, or one with host bits) or a network that covers a whole address
+    family makes the whole list unreadable.
+    """
+    unreadable = NetworkList(unreadable=True)
+    if not isinstance(value, list) or len(value) > MAX_WEBHOOK_NETWORKS:
+        return unreadable
+    found: list[str] = []
+    for entry in value:
+        if not isinstance(entry, str):
+            return unreadable
+        try:
+            network = ipaddress.ip_network(entry)
+        except ValueError:
+            return unreadable
+        if network.prefixlen == WHOLE_FAMILY_PREFIX:
+            return unreadable
+        found.append(str(network))
+    return NetworkList(tuple(found))
+
+
+def source_list_that_applies(own: NetworkList, default: NetworkList) -> NetworkList:
     """Return the list that governs an address: the connection's own, else the installation's.
 
-    An own list *replaces* the default (ADR 0124 point 3); an empty one falls back to it.
+    An own list *replaces* the default (ADR 0124 point 3); an empty one falls back to it. An
+    unreadable own list stays unreadable: it is not an empty one, so the default does not
+    replace it.
     """
-    return own or default
+    return own if own.networks or own.unreadable else default
 
 
 class ChainFault(StrEnum):
@@ -73,6 +130,8 @@ class ChainFault(StrEnum):
 
     WIDE_TRUST = "wide_trust"
     """``FORWARDED_ALLOW_IPS`` is ``*`` or wider than a host: any peer could say who it is."""
+    UNREADABLE_TRUST = "unreadable_trust"
+    """An entry of ``FORWARDED_ALLOW_IPS`` is no address or network: who is trusted is unknown."""
     UNTRUSTED_HOP = "untrusted_hop"
     """This very call carries forwarded headers that the server ignored: the address it holds is
     a hop that is not trusted. Decided per call; a header forged by someone else harms only
@@ -85,31 +144,44 @@ class ChainFault(StrEnum):
     """The server derived no address for the caller."""
 
 
+def _entry(entry: str) -> ipaddress.IPv4Network | ipaddress.IPv6Network | None:
+    """Return one entry of ``FORWARDED_ALLOW_IPS`` as a network, or ``None`` when it is none."""
+    try:
+        return ipaddress.ip_network(entry, strict=False)
+    except ValueError:
+        return None
+
+
 def _wide(entry: str) -> bool:
     """Return whether one entry of ``FORWARDED_ALLOW_IPS`` trusts more than a single host."""
     if entry == WILDCARD:
         return True
-    try:
-        network = ipaddress.ip_network(entry, strict=False)
-    except ValueError:
-        return False  # a literal (a socket path) names exactly one peer
-    return network.prefixlen < network.max_prefixlen
+    network = _entry(entry)
+    return network is not None and network.prefixlen < network.max_prefixlen
+
+
+def _unreadable(entry: str) -> bool:
+    """Return whether one entry is neither ``*`` nor an address nor a network.
+
+    That includes the literals uvicorn accepts for a peer without an address (a socket path):
+    what such a peer is cannot be judged here, so a list cannot be evaluated while one stands.
+    """
+    return entry != WILDCARD and _entry(entry) is None
 
 
 def _networks(entries: tuple[str, ...]) -> tuple[str, ...]:
     """Return the entries that are addresses or networks, as canonical networks."""
-    found: list[str] = []
-    for entry in entries:
-        try:
-            found.append(str(ipaddress.ip_network(entry, strict=False)))
-        except ValueError:
-            continue
-    return tuple(found)
+    found = (_entry(entry) for entry in entries)
+    return tuple(str(network) for network in found if network is not None)
 
 
 @dataclass(frozen=True)
 class ProxyChain:
     """What is known about the path from the caller to the application (ADR 0124 point 4).
+
+    The assumptions behind it: the server takes the right-most untrusted hop as the caller, and a
+    trusted proxy appends to or replaces the forwarded header, never passes a caller's value
+    through.
 
     Attributes:
         trusted: The peers the server takes the caller's address from (``FORWARDED_ALLOW_IPS``,
@@ -142,19 +214,22 @@ class ProxyChain:
         """
         return cls(
             trusted_proxy(forwarded_allow_ips, tls_proxy_bundled=tls_proxy_bundled),
-            address_is_public(webhook_base_url),
+            host_is_public(webhook_base_url),
             headers_ignored,
         )
 
     def standing_faults(self) -> tuple[ChainFault, ...]:
         """Return the faults that make every caller's address untrustworthy, if any.
 
-        Only what the installation's own settings say (a trust wider than single hosts); the
-        faults of one call are told by ``fault_for``.
+        Only what the installation's own settings say (a trust wider than single hosts, or an
+        entry that cannot be read); the faults of one call are told by ``fault_for``.
         """
+        faults: list[ChainFault] = []
         if any(_wide(entry) for entry in self.trusted):
-            return (ChainFault.WIDE_TRUST,)
-        return ()
+            faults.append(ChainFault.WIDE_TRUST)
+        if any(_unreadable(entry) for entry in self.trusted):
+            faults.append(ChainFault.UNREADABLE_TRUST)
+        return tuple(faults)
 
     def fault_for(self, caller: str | None) -> ChainFault | None:
         """Return why the address of ``caller`` cannot be trusted, or ``None`` when it can.
@@ -177,27 +252,29 @@ class ProxyChain:
 
 
 def check_source(
-    caller: str | None, networks: tuple[str, ...], *, required: bool, chain: ProxyChain
+    caller: str | None, sources: NetworkList, *, required: bool, chain: ProxyChain
 ) -> Refusal | None:
     """Decide whether the source of a call is acceptable (ADR 0124 points 3 and 4).
 
     Args:
         caller: The caller's address as the server derived it.
-        networks: The list that applies (``networks_that_apply``); empty: none.
+        sources: The list that applies (``source_list_that_applies``); empty: none.
         required: ``WEBHOOK_SOURCE_NETWORKS_REQUIRED``: an address without a list does not accept.
         chain: What is known about the proxy chain.
 
     Returns:
-        ``None`` to go on; ``Refusal.NETWORK`` for a caller outside the list, or any caller
-        while a list is required and missing; ``Refusal.SOURCE_UNKNOWN`` when a list applies
-        and the caller's address cannot be trusted. A call without a list is not asked about the
-        chain.
+        ``None`` to go on; ``Refusal.NETWORK`` for a caller outside the list, for any caller
+        while the list cannot be read, and for any caller while a list is required and missing;
+        ``Refusal.SOURCE_UNKNOWN`` when a list applies and the caller's address cannot be
+        trusted. A call without a list is not asked about the chain.
     """
-    if not networks:
+    if sources.unreadable:
+        return Refusal.NETWORK
+    if not sources.networks:
         return Refusal.NETWORK if required else None
     if chain.fault_for(caller) is not None:
         return Refusal.SOURCE_UNKNOWN
-    return None if in_any(caller, networks) else Refusal.NETWORK
+    return None if in_any(caller, sources.networks) else Refusal.NETWORK
 
 
 class SourceState(StrEnum):
@@ -209,10 +286,14 @@ class SourceState(StrEnum):
     """A list applies."""
     REQUIRED_MISSING = "required_missing"
     """The host demands a list and none applies: the address does not accept."""
+    UNREADABLE = "unreadable"
+    """A list is stored but cannot be read: the address accepts no call until it is set again."""
 
 
-def source_state(networks: tuple[str, ...], *, required: bool) -> SourceState:
+def source_state(sources: NetworkList, *, required: bool) -> SourceState:
     """Return the state of an address from the list that applies and the host's switch."""
-    if networks:
+    if sources.unreadable:
+        return SourceState.UNREADABLE
+    if sources.networks:
         return SourceState.RESTRICTED
     return SourceState.REQUIRED_MISSING if required else SourceState.UNRESTRICTED

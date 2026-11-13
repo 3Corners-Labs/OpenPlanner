@@ -644,6 +644,7 @@ async def test_a_list_that_cannot_be_evaluated_is_refused_not_passed(
     await attempt("proxy itself", "10.1.2.3", **listed, forwarded_allow_ips="10.1.2.3")
     await attempt("private hop", "10.1.2.3", **listed, forwarded_allow_ips="172.31.240.2")
     await attempt("loopback", "127.0.0.1", **listed)
+    await attempt("unreadable trust", SUPPLIER, **listed, forwarded_allow_ips="/run/proxy.sock")
 
     assert outcomes == {
         "sound": (204, 204),
@@ -651,6 +652,7 @@ async def test_a_list_that_cannot_be_evaluated_is_refused_not_passed(
         "proxy itself": (403, 204),
         "private hop": (403, 204),
         "loopback": (403, 204),
+        "unreadable trust": (403, 204),
     }
     assert {r for r, _ in await _refusals(database_url)} == {"source_unknown"}
 
@@ -735,3 +737,46 @@ async def test_source_refusals_count_against_the_refused_bucket_never_the_verifi
     assert len([k for k in keys if "webhook-refused" in k]) == 1
     assert not [k for k in keys if STRANGER in k and "refused" not in k]  # nothing verified
     assert ("rate", "source:webex") in await _refusals(database_url)
+
+
+@pytest.mark.parametrize(
+    ("update", "caller"),
+    [
+        ({"webhook_source_networks_video": SUPPLIER_RANGE}, STRANGER),  # outside the list
+        (
+            {"webhook_source_networks_video": SUPPLIER_RANGE, "forwarded_allow_ips": "*"},
+            SUPPLIER,  # the address cannot be trusted
+        ),
+    ],
+)
+async def test_a_flood_from_outside_the_list_writes_no_log_line_per_call_only_its_event(
+    settings: Settings,
+    database_url: str,
+    update: dict[str, object],
+    caller: str,
+) -> None:
+    """Passers-by cause these refusals, so like ``rate`` they are an event, not a line per call."""
+    async with _in_app(settings, database_url, **update) as app:
+        with structlog.testing.capture_logs() as flood:
+            for _ in range(30):
+                refused = await _from(app, caller, "/webhooks/webex", **_webex())
+                assert refused.status_code == 403
+
+    assert [e for e in flood if e["event"] == "webhook.rejected"] == []
+    assert len(await _refusals(database_url)) == 1  # one event for the caller, held back
+
+
+@pytest.mark.parametrize(
+    "key", ["webhook_source_networks_video", "webhook_source_networks_contact_center"]
+)
+async def test_an_installation_default_that_cannot_be_read_refuses_every_call_never_passes_it(
+    settings: Settings, database_url: str, key: str
+) -> None:
+    """Abuse case: a corrupted default is no empty list ("any source")."""
+    wxcc = wxcc_body("task:connected", at=NOW)
+    async with _in_app(settings, database_url, **{key: "not-a-network"}) as app:
+        video = await _from(app, SUPPLIER, "/webhooks/webex", **_webex())
+        cc = await _from(app, SUPPLIER, "/webhooks/wxcc", wxcc, **_wxcc_headers(wxcc))
+
+    expected = (403, 204) if key.endswith("video") else (204, 403)
+    assert (video.status_code, cc.status_code) == expected

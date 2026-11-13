@@ -31,8 +31,10 @@ from app.domain.contact_center import (
     Registration,
 )
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.networks import NetworkList
 from app.domain.ports import Clock, ConnectionRegistrar, ContactCenterConnections, UnitOfWork
 from app.domain.scheduling import is_slug
+from app.domain.webhook_sources import source_networks_of
 
 PERMISSION = Permission.INTEGRATIONS_MANAGE
 AUDIT_KEY = "contact_center_connection"
@@ -44,8 +46,8 @@ def _only_networks_changed(stored: OrganisationConnection, change: ConnectionCha
     """Whether a saved change differs from the stored connection in its allowed networks only.
 
     Nothing the registration at the platform depends on changed then: the kind, the API host,
-    the client and the secrets are as they were, so the webhook secret is kept and the
-    subscription is not made again.
+    the client and the secrets are as they were. Whether the webhook secret exists is asked
+    separately (``save``): a record without one is not left alone.
     """
     return (stored.kind, stored.api_base_url, stored.client_id) == (
         change.kind,
@@ -65,13 +67,13 @@ class WebhookTarget:
             no connection); ``None`` when it does not, so a slug a caller made up is never
             handed on.
         allowed_networks: The connection's own list of source networks (ADR 0124 point 3);
-            empty: the installation's default applies.
+            empty: the installation's default applies; unreadable: no call is accepted.
     """
 
     organisation_id: int | None = None
     secret: str | None = None
     organisation: str | None = None
-    allowed_networks: tuple[str, ...] = ()
+    allowed_networks: NetworkList = NetworkList()
 
     @property
     def found(self) -> bool:
@@ -147,34 +149,53 @@ class ContactCenterConnectionService:
         if secret is None:
             return WebhookTarget(organisation=slug)
         shown = await self._connections.get(organisation_id)
-        return WebhookTarget(organisation_id, secret, slug, shown.allowed_networks if shown else ())
+        return WebhookTarget(
+            organisation_id, secret, slug, shown.allowed_networks if shown else NetworkList()
+        )
 
     async def save(
         self, principal: Principal, organisation: str, change: ConnectionChange
     ) -> Registration:
         """Store the connection; audited by the names of the fields sent, never their values.
 
-        A change of the allowed networks alone (ADR 0124 point 3) is stored and audited, makes no
-        new webhook secret and does not register the address again (``Registration.UNTOUCHED``).
+        A change of the allowed networks alone (ADR 0124 point 3) on a connection that has its
+        webhook secret is stored and audited, makes no new webhook secret and does not register
+        the address again (``Registration.UNTOUCHED``). A record without a secret takes the
+        normal path: the secret is made and the address registered.
 
         Raises:
             DomainError: ``not_permitted``, ``organisation_not_found``, ``integration_not_ready``
-                (no settings key) or ``invalid_configuration`` naming ``client_secret`` when a
-                new connection comes without one.
+                (no settings key), ``invalid_configuration`` naming ``client_secret`` when a
+                new connection comes without one, or naming ``allowed_networks`` when the list
+                is no list of at most 32 networks or covers a whole address family.
         """
         organisation_id = await self._authorize(principal, organisation)
         connections = self._ready()
         stored = await connections.get(organisation_id)
+        networks = (
+            None
+            if change.allowed_networks is None
+            else source_networks_of(
+                change.allowed_networks, field=f"{CONNECTION_FIELD}{NETWORKS_AUDIT}"
+            )
+        )
         if change.client_secret is None and stored is None:
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}client_secret")
-        networks_changed = change.allowed_networks is not None and change.allowed_networks != (
-            stored.allowed_networks if stored else ()
+        networks_changed = networks is not None and NetworkList(networks) != (
+            stored.allowed_networks if stored else NetworkList()
         )
         sent = [*change.secrets_sent, *([NETWORKS_AUDIT] if networks_changed else [])]
         detail = ",".join([f"{AUDIT_KEY}.save", f"kind:{change.kind.value}", *sent])
+        # Asked before the save: the save makes a secret for a record that has none.
+        leave_alone = (
+            networks_changed
+            and stored is not None
+            and _only_networks_changed(stored, change)
+            and await connections.webhook_secret(organisation_id, stored.kind) is not None
+        )
         await self._audit(principal, organisation, detail)
         await connections.save(organisation_id, change, self._clock.now())
-        if networks_changed and stored is not None and _only_networks_changed(stored, change):
+        if leave_alone:
             # The subscription depends on the secret, the host and the client, not on who may call.
             return Registration.UNTOUCHED
         return await self._register(principal, organisation_id, organisation)

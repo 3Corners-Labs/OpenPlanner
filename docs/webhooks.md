@@ -282,9 +282,9 @@ cannot fill it from the shared address to lock real organisations out. Accepted 
 call to a made-up address still costs one indexed lookup, with no ceiling in the application; the
 proxy's connection limits are the ceiling.
 
-`rate` and `unknown_address` write no log line per call (a flood produces them by definition); their
-trace is the security event, held back when repeated. Every other reason also logs
-`webhook.rejected` once per call.
+`rate`, `unknown_address`, `network` and `source_unknown` write no log line per call (a flood or a
+passer-by produces them by definition); their trace is the security event, held back when
+repeated. Every other reason also logs `webhook.rejected` once per call.
 
 Every refusal answers with an **empty body**, never the HTML error page. Step 7 runs before step 9
 in the code, because the event key comes from the parsed body.
@@ -310,7 +310,15 @@ The host can demand a list: with `WEBHOOK_SOURCE_NETWORKS_REQUIRED=true` (class 
 by default; a protection is not switched off from the portal) an address without a list accepts no
 call and answers `network`; the findings say "a list is required and missing". Changing a
 connection's list alone makes no new webhook secret and does not register the address at the
-platform again; it is audited by field name, never by the networks.
+platform again (a record that has no webhook secret yet takes the normal path: the secret is made
+and the address registered); it is audited by field name, never by the networks. A network that
+covers a whole address family (prefix length 0, `0.0.0.0/0` or `::/0`) is refused when a list is
+saved, on the card and in the two defaults, because such a list is "any source" called
+"restricted"; a narrower, wide network (`0.0.0.0/1`) is the organisation's choice. A stored list
+that cannot be read (damaged, or an entry that does not parse) is never taken for an empty one:
+every call to that address is refused with `network`, and the card and System status say the list
+cannot be read; saving the list again repairs it. The same holds for an installation default that
+is stored in the portal but refused by these rules.
 
 A caller outside the list is refused with `network`. The address is only as good as the proxy
 chain, so when a list applies and the caller's address cannot be trusted the call is refused with
@@ -321,7 +329,8 @@ the trusted proxy (`FORWARDED_ALLOW_IPS`). The caller's address is held as the c
 call, unless:
 
 - `FORWARDED_ALLOW_IPS` is `*` or names a network wider than a single host (any peer could claim any
-  address);
+  address), or has an entry that is neither an address nor a network (a socket path, a name: who is
+  trusted is then unknown; it is a standing fault of its own on System status);
 - **this call** arrived with `X-Forwarded-For` or `X-Forwarded-Proto` that the server did not use,
   because the peer that sent it is not a trusted proxy (the address held is a hop that is not
   trusted). A header forged by someone else harms only that caller's own call;
@@ -335,7 +344,25 @@ request.
 
 An address without a list is not affected by any of this. System status (*Address and proxy*) and
 the connection card show the first (a standing fact of the installation's settings) while a list
-applies, with what to repair; the other two show as refusals in the events.
+applies; System status with what to repair, the card (for the organisation) only that deliveries
+are refused because of the installation's proxy setting and whom to ask. The per-call faults show as
+refusals in the events and nowhere else until the card shows *last refused* (a later step).
+
+**Three set-ups cannot use a list today.** They are refused, not passed, and the fix is not in
+the list:
+
+1. *A proxy trusted by a network instead of a single address*, such as a Kubernetes ingress whose
+   pods change: `FORWARDED_ALLOW_IPS` is then wider than a single host. (The Helm chart's
+   `forwardedAllowIps` takes the ingress pods; pin them as single addresses to use a list.)
+2. *A content delivery network in front of the proxy*: the caller the proxy sees is the network's
+   address, and listing it would admit all of the network's customers. Do not put a list on such
+   an address; the signature is the protection.
+3. *A supplier that calls a public name from a private address* (split DNS): the caller is then
+   private while the public address is public, so a call is refused as `source_unknown`.
+
+After you set a list, send a test delivery (`webhooks-health`) and read the events: the card does
+not yet show refused calls, so a list that locks the supplier out is found in the events, not on
+the card.
 
 A list is **defence in depth and no more**: the supplier's ranges are shared by all its customers,
 so a caller inside the list may be another customer of the same supplier; the signature (and the
@@ -343,7 +370,8 @@ time) is still checked for every call and is what stops a stranger. A list that 
 an outage of our own making: when the supplier changes its ranges, update the list (runbook,
 *Webhooks refused for their network*). The refusals are the security event `webhook.rejected` with
 reason `network` or `source_unknown`; they count against the bucket of refused calls and never
-against verified deliveries.
+against verified deliveries. A passer-by causes them, so like `rate` and `unknown_address` they
+write no log line per call: the event, held back when repeated, is the trace.
 
 Every refusal is also a security event `webhook.rejected` (ADR 0034, 0053) with the reason, the
 platform's code (`source:webex`, `source:wxcc`, or `source:unknown` when the platform in the path

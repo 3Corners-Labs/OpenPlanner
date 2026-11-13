@@ -13684,7 +13684,7 @@ msgid "admin.channels.cc_allowed_networks_hint"
 msgstr "De netwerken waarvandaan de webhooks van het platform naar dit adres mogen komen, één per regel (CIDR, bijvoorbeeld 203.0.113.0/24), hooguit {maximum}. Leeg: de standaardlijst van de installatie geldt. Dit is een extra laag: de handtekening houdt een vreemde buiten, en een verouderde lijst weigert het platform zelf."
 
 msgid "admin.form.error.cc_allowed_networks"
-msgstr "Vul netwerken in als CIDR, één per regel, hooguit 32."
+msgstr "Vul netwerken in als CIDR, één per regel, hooguit 32. Een netwerk dat een hele adresfamilie dekt (prefixlengte 0) is geen lijst."
 
 msgid "admin.done.contact_center_saved"
 msgstr "Opgeslagen. Het webhookgeheim en de aanmelding bij het platform zijn ongewijzigd gelaten."
@@ -13724,3 +13724,12 @@ msgstr "Videoplatform"
 
 msgid "admin.settings.address.sources.contact_center"
 msgstr "Contactcenter (standaard)"
+
+msgid "admin.source.fault.card"
+msgstr "Aanroepen naar dit adres worden geweigerd door de proxy-instelling van de installatie, waardoor de toegestane netwerken niet kunnen worden getoetst. Vraag de platformbeheerder het te herstellen; de details staan op Systeemstatus."
+
+msgid "admin.source.fault.unreadable_trust"
+msgstr "Aanroepen worden geweigerd (bron onbekend) zolang een regel van FORWARDED_ALLOW_IPS geen adres of netwerk is (een socketpad kan hier niet worden beoordeeld). Noem de proxy met het adres waarmee de web-container hem ziet verbinden en herstart web."
+
+msgid "admin.source.state.unreadable"
+msgstr "De opgeslagen lijst is niet te lezen, dus dit adres accepteert geen enkele aanroep. Stel de toegestane netwerken opnieuw in."

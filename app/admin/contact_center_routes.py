@@ -22,8 +22,8 @@ from app.admin.source_findings import source_finding
 from app.domain.contact_center import ContactCenterKind, OrganisationConnection, Registration
 from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.errors import DomainError
-from app.domain.networks import MAX_NETWORKS
-from app.domain.webhook_sources import networks_that_apply
+from app.domain.networks import NetworkList
+from app.domain.webhook_sources import MAX_WEBHOOK_NETWORKS, source_list_that_applies
 from app.i18n import BoundGettext
 from app.web.locale import RequestLocale
 from app.web.webhook_sources import contact_center_networks, proxy_chain
@@ -44,7 +44,6 @@ SAVED_DONE = {
 ROTATED_DONE = {
     Registration.REGISTERED: "webhook_secret_rotated",
     Registration.NOT_READY: "webhook_secret_rotated",
-    Registration.UNTOUCHED: "webhook_secret_rotated",
     Registration.REFUSED: "contact_center_not_registered",
     Registration.FAILED: "contact_center_not_registered",
 }
@@ -100,9 +99,11 @@ def _connection_fields(
             _("admin.channels.cc_allowed_networks"),
             "textarea",
             value_of(
-                form, "cc_allowed_networks", "\n".join(stored.allowed_networks) if stored else ""
+                form,
+                "cc_allowed_networks",
+                "\n".join(stored.allowed_networks.networks) if stored else "",
             ),
-            hint=_("admin.channels.cc_allowed_networks_hint", maximum=MAX_NETWORKS),
+            hint=_("admin.channels.cc_allowed_networks_hint", maximum=MAX_WEBHOOK_NETWORKS),
             error=form.error_for("cc_allowed_networks"),
             required=False,
             attributes={"rows": "4", "autocapitalize": "none", "spellcheck": "false"},
@@ -147,13 +148,14 @@ async def connection_view(
     settings = request.app.state.settings
     base = settings.webhook_base
     made = stored.webhook_secret_at if stored else None
-    own = stored.allowed_networks if stored else ()
+    own = stored.allowed_networks if stored else NetworkList()
     sources = source_finding(
         _,
-        networks_that_apply(own, contact_center_networks(settings)),
-        own=bool(own),
+        source_list_that_applies(own, contact_center_networks(request)),
+        own=bool(own.networks or own.unreadable),
         required=settings.webhook_source_networks_required,
         chain=proxy_chain(request),
+        detailed=False,
     )
     return {
         "available": service.available,

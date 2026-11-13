@@ -51,9 +51,10 @@ from app.adapters.webhooks import (
 from app.config import Settings
 from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.inbound_gate import MAX_BODY_BYTES, Refusal, accepts_content_type
+from app.domain.networks import NetworkList
 from app.domain.ports import Clock
 from app.domain.security_log import WEBHOOK_REJECTED
-from app.domain.webhook_sources import check_source, networks_that_apply
+from app.domain.webhook_sources import check_source, source_list_that_applies
 from app.web.caller import caller_of, client_address
 from app.web.protection import (
     webhook_retry_after,
@@ -73,9 +74,12 @@ caller's text)."""
 INSTALLATION = "-"
 """The organisation part of the rate-limit bucket of an address that belongs to no organisation."""
 
-FLOOD_REASONS = frozenset({Refusal.RATE, Refusal.UNKNOWN_ADDRESS})
-"""Reasons that a flood produces by definition: no log line per call, the security event (held
-back when repeated) is their trace."""
+FLOOD_REASONS = frozenset(
+    {Refusal.RATE, Refusal.UNKNOWN_ADDRESS, Refusal.NETWORK, Refusal.SOURCE_UNKNOWN}
+)
+"""Reasons that a passer-by produces by definition (a call to a made-up address, over a limit, from
+outside the list, or whose address cannot be trusted): no log line per call, the security event
+(held back when repeated) is their trace."""
 
 
 @dataclass(frozen=True)
@@ -88,7 +92,7 @@ class Address[W: InboundWebhook]:
         organisation_id: The organisation whose own connection this is; ``None`` for an
             address of the installation.
         organisation: That organisation's slug, public and no personal data.
-        networks: The list of allowed source networks that governs this address (the
+        sources: The list of allowed source networks that governs this address (the
             connection's own, else the installation's default for the platform); empty: none.
     """
 
@@ -96,7 +100,7 @@ class Address[W: InboundWebhook]:
     secret: str
     organisation_id: int | None = None
     organisation: str | None = None
-    networks: tuple[str, ...] = ()
+    sources: NetworkList = NetworkList()
 
 
 @dataclass(frozen=True)
@@ -188,7 +192,7 @@ async def _inspect(
     settings: Settings = request.app.state.settings
     source = check_source(
         client_address(request),
-        address.networks,
+        address.sources,
         required=settings.webhook_source_networks_required,
         chain=proxy_chain(request),
     )
@@ -264,7 +268,7 @@ async def webex_address(request: Request) -> Address[InboundWebhook] | Unresolve
     return Address(
         WEBEX_INBOUND,
         secret.get_secret_value(),
-        networks=video_networks(request.app.state.settings),
+        sources=video_networks(request),
     )
 
 
@@ -283,7 +287,7 @@ def _installation(
     return Address(
         handling,
         secret.get_secret_value(),
-        networks=contact_center_networks(request.app.state.settings),
+        sources=contact_center_networks(request),
     )
 
 
@@ -314,7 +318,5 @@ async def organisation_address(
     target = await service.webhook_target(org, handling.kind)
     if not target.found or target.secret is None:
         return Unresolved(handling.source, target.organisation)
-    networks = networks_that_apply(
-        target.allowed_networks, contact_center_networks(request.app.state.settings)
-    )
-    return Address(handling, target.secret, target.organisation_id, target.organisation, networks)
+    sources = source_list_that_applies(target.allowed_networks, contact_center_networks(request))
+    return Address(handling, target.secret, target.organisation_id, target.organisation, sources)

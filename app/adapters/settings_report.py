@@ -71,6 +71,18 @@ def describe(
     return [_state(_resolve(spec, settings, environ, names, portal, now)) for spec in REGISTRY]
 
 
+def state_of(
+    key: str,
+    settings: Settings,
+    environ: Mapping[str, str],
+    portal: PortalValues = EMPTY,
+    now: datetime | None = None,
+) -> SettingState:
+    """Return the state of the one registered setting ``key``: ``describe`` for a single key."""
+    names = {name.lower() for name in environ}
+    return _state(_resolve(BY_KEY[key], settings, environ, names, portal, now))
+
+
 def effective(
     settings: Settings,
     environ: Mapping[str, str],

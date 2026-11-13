@@ -69,7 +69,13 @@ installation with several organisations.
    connection's own list replaces it. An empty list means any source: that is today's
    behaviour, and from now on it is shown as a finding on the connection and on System status,
    never as a silent state. An installation can demand a list
-   (`WEBHOOK_SOURCE_NETWORKS_REQUIRED`): then an address without one does not accept. One
+   (`WEBHOOK_SOURCE_NETWORKS_REQUIRED`): then an address without one does not accept. The
+   switch demands that a list applies, not that it is narrow: the organisation's own list is the
+   organisation's choice and replaces the default. Only a network that covers a whole address
+   family (prefix length 0) is refused when a list is saved, on the card, in the two defaults
+   and in the `Settings` validator, because such a list is "any source" called "restricted"; a
+   stored list that cannot be read is never taken for an empty one: every call to that address
+   is refused with `network`, and the card and System status say so. One
    helper, `app/domain/networks.py`, parses and matches networks, handles an IPv4 address
    written as IPv6, and replaces the two near-copies that the machine API's clients and the
    display links use today (ADR 0005: extract at the second use). A list is defence in depth
@@ -77,8 +83,13 @@ installation with several organisations.
    stops a stranger, and a list that has gone stale is an outage of our own making. The
    portal therefore shows, next to a list, when the last delivery was accepted and when a call
    was last refused for its network, and a refusal for the network while deliveries were
-   recently accepted is one of the things the alert of point 10 counts. A caller cannot tell a
-   refusal for its network from one for an unknown source: both are 403 with an empty body.
+   recently accepted is one of the things the alert of point 10 counts. Until step 3 adds
+   *last accepted* and *last refused* to the card, the faults that are decided per call (point
+   4: the caller is the proxy, a hop did not hand it on, no address, headers its sender was not
+   trusted to send) are shown nowhere but in the security events. A caller cannot tell `network`
+   from `source_unknown`: both are 403 with an empty body. It can tell 403 from 401 (the
+   signature) and from 404 (no such address), so a refusal for the network does show that the
+   address exists and that a list applies.
 4. **The address is only as good as the proxy chain.** The gate takes the caller's address as
    the server derived it from the trusted proxy (`FORWARDED_ALLOW_IPS`) and reads no forwarded
    header for it. When an allow-list applies and the address held for a call cannot be the
@@ -94,8 +105,21 @@ installation with several organisations.
    forwarded headers once came from an untrusted sender, stays a finding on System status and
    refuses nothing, because a mark that lasts would let any stranger who reaches the
    application around its proxy switch every list off with one request (revised 2026-11-13,
-   found while building step 2b). The PROXY protocol, where a load balancer uses it, ends at
-   the proxy; the application never speaks it.
+   found while building step 2b). Two assumptions hold under all of it: the server takes the
+   right-most address of the forwarded chain that is not a trusted proxy as the caller, and a
+   trusted proxy appends to or replaces the forwarded header, never passes a caller's own value
+   through. An entry of `FORWARDED_ALLOW_IPS` that cannot be read (neither `*`, an address nor a
+   network, a socket path included) is a standing fault of its own, shown on System status and
+   refusing a list-governed address like wide trust, never skipped in silence. Three shapes
+   cannot use a list today, and are refused rather than passed: (1) a proxy trusted by a
+   network instead of a single address, such as a Kubernetes ingress whose pods change: trust
+   wider than single hosts is `source_unknown`, and step 5 gives the chart a way to pin the
+   ingress while step 6 writes the contract; (2) a content delivery network in front of the
+   proxy: the caller becomes its address, and listing it would admit all its customers, so no
+   list belongs there (step 6, the contract and the test delivery that shows the address seen);
+   (3) a supplier that calls a public name from a private address (split DNS): a private caller
+   while the public address is public is `source_unknown` (step 6, the same). The PROXY
+   protocol, where a load balancer uses it, ends at the proxy; the application never speaks it.
 5. **Limits that a stranger cannot turn against an organisation.** A supplier sends from
    addresses it shares among all its customers, and any customer can make those addresses call
    ours. So a call that fails a check never counts against the deliveries that pass:
@@ -234,10 +258,10 @@ counts per minute.
 | 1 | The gate, with today's checks moved into it and: the limit as a setting, with separate buckets for verified deliveries, refused calls and calls to addresses that do not exist, and a machine answer, the declared and the streamed size limit, the content type, refusal events with reason, platform and organisation; the route sweep; `docs/webhooks.md` corrected | #791 | merged |
 | 2a | The shared network helper `app/domain/networks.py`, with the machine API's clients and the display links moved onto it; one caller key for every limiter, an IPv6 caller counted by its /64 | #818 | merged |
 | 2b | Source networks: the list per connection and the installation's defaults, refusing on an untrusted proxy chain, `WEBHOOK_SOURCE_NETWORKS_REQUIRED`, the findings | #821 | merged |
-| 3 | Replays per organisation and by body hash; the pause; the refusal alert and the connection card's status | | planned |
+| 3 | Replays per organisation and by body hash; the pause; the refusal alert and the connection card's status, with *last accepted* and *last refused* and the per-call source faults on the card | | planned |
 | 4 | Secret rotation with an overlap | | planned |
-| 5 | The bundled proxy: the webhook rule, the host of its own, `WEBHOOK_PROXY_NETWORKS`, `check-proxy.sh`; the chart's webhook host and network policy | | planned |
-| 6 | The contract for an organisation's own proxy in the runbook and the Kubernetes guide; the signed test delivery that reports the source address it saw; the threat model's abuse cases, each with its test | | planned |
+| 5 | The bundled proxy: the webhook rule, the host of its own, `WEBHOOK_PROXY_NETWORKS`, `check-proxy.sh`; the chart's webhook host and network policy, and a way to pin the ingress as single addresses (shape 1 of point 4) | | planned |
+| 6 | The contract for an organisation's own proxy in the runbook and the Kubernetes guide; the signed test delivery that reports the source address it saw; the contract says why a content delivery network (shape 2) and a supplier calling a public name from a private address (shape 3) cannot use a list; the threat model's abuse cases, each with its test | | planned |
 | 7 | The outbound guard for an API host typed in the portal, at use | | planned |
 | 8 | An address per organisation for the video platform's webhooks | | follow-up |
 | 9 | Dropping the installation-wide contact-center addresses (ADR 0032 point 11) | | follow-up |

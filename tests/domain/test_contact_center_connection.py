@@ -8,6 +8,7 @@ from app.domain.admin import AdminService
 from app.domain.contact_center import ConnectionChange, ContactCenterKind, Registration
 from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.networks import NetworkList
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeContactCenterConnections, FakeOrganisationDispatchers
 from tests.fakes.persistence import InMemoryUnitOfWork
@@ -268,18 +269,20 @@ async def test_without_a_registrar_nothing_is_registered(
 
 
 SUPPLIER_NETWORKS = ("8.8.8.0/24", "2001:4860:4860::/48")
+SUPPLIER_TEXT = "\n".join(SUPPLIER_NETWORKS)
+SUPPLIED = NetworkList(SUPPLIER_NETWORKS)
 
 
 async def test_the_allowed_networks_are_kept_canonical_and_audited_by_name_only(
     service: ContactCenterConnectionService, uow: InMemoryUnitOfWork
 ) -> None:
     """ADR 0124 point 3: the field name is audited, the networks are not."""
-    await service.save(SUPER, "demo", change(allowed_networks=("8.8.8.8/24", "8.8.8.0/24")))
+    await service.save(SUPER, "demo", change(allowed_networks="8.8.8.8/24, 8.8.8.0/24"))
 
     shown = await service.view(SUPER, "demo")
 
     assert shown is not None
-    assert shown.allowed_networks == ("8.8.8.0/24",)
+    assert shown.allowed_networks == NetworkList(("8.8.8.0/24",))
     assert uow.state.audit[-1].detail == (
         "contact_center_connection.save,kind:webex_cc,client_secret,refresh_token,allowed_networks"
     )
@@ -289,34 +292,43 @@ async def test_the_allowed_networks_are_kept_canonical_and_audited_by_name_only(
 async def test_a_save_without_the_field_keeps_the_list_and_an_empty_one_clears_it(
     service: ContactCenterConnectionService, uow: InMemoryUnitOfWork
 ) -> None:
-    await service.save(SUPER, "demo", change(allowed_networks=SUPPLIER_NETWORKS))
+    await service.save(SUPER, "demo", change(allowed_networks=SUPPLIER_TEXT))
 
     await service.save(SUPER, "demo", change(client_secret=None, refresh_token=None))
     kept = await service.view(SUPER, "demo")
     await service.save(
-        SUPER, "demo", change(client_secret=None, refresh_token=None, allowed_networks=())
+        SUPER, "demo", change(client_secret=None, refresh_token=None, allowed_networks="")
     )
     cleared = await service.view(SUPER, "demo")
 
     assert kept is not None
-    assert kept.allowed_networks == SUPPLIER_NETWORKS
+    assert kept.allowed_networks == SUPPLIED
     assert cleared is not None
-    assert cleared.allowed_networks == ()
+    assert cleared.allowed_networks == NetworkList()
     assert uow.state.audit[-1].detail == (
         "contact_center_connection.save,kind:webex_cc,allowed_networks"
     )
 
 
 @pytest.mark.parametrize(
-    "networks", [("nonsense",), ("8.8.8.0/33",), tuple(f"10.0.{n}.0/24" for n in range(33))]
+    "networks",
+    [
+        "nonsense",
+        "8.8.8.0/33",
+        ",".join(f"10.0.{n}.0/24" for n in range(33)),
+        "8.8.8.0/24, 0.0.0.0/0",
+        "::/0",
+    ],
 )
-def test_a_list_that_is_no_list_of_at_most_32_networks_is_refused(
-    networks: tuple[str, ...],
+async def test_a_list_that_is_no_list_of_at_most_32_networks_or_covers_a_family_is_refused(
+    service: ContactCenterConnectionService, uow: InMemoryUnitOfWork, networks: str
 ) -> None:
     with pytest.raises(DomainError) as refused:
-        change(allowed_networks=networks)
+        await service.save(SUPER, "demo", change(allowed_networks=networks))
 
     assert refused.value.field == "contact_center_connection.allowed_networks"
+    assert await service.view(SUPER, "demo") is None  # nothing stored
+    assert not [e for e in uow.state.audit if "contact_center_connection" in e.detail]  # no audit
 
 
 async def test_changing_the_networks_alone_neither_makes_a_new_secret_nor_registers_again(
@@ -334,7 +346,7 @@ async def test_changing_the_networks_alone_neither_makes_a_new_secret_nor_regist
     outcome = await registering.save(
         SUPER,
         "demo",
-        change(client_secret=None, refresh_token=None, allowed_networks=SUPPLIER_NETWORKS),
+        change(client_secret=None, refresh_token=None, allowed_networks=SUPPLIER_TEXT),
     )
 
     after = await registering.view(SUPER, "demo")
@@ -347,19 +359,57 @@ async def test_changing_the_networks_alone_neither_makes_a_new_secret_nor_regist
     assert not [e for e in uow.state.audit if "register" in e.detail][1:]
 
 
+async def test_a_record_without_a_webhook_secret_takes_the_normal_path_for_a_list_only_save(
+    connections: FakeContactCenterConnections,
+    registrar: FakeOrganisationDispatchers,
+    registering: ContactCenterConnectionService,
+) -> None:
+    """``UNTOUCHED`` is only for a connection that has its secret: without one it is made."""
+    await registering.save(SUPER, "demo", change())
+    connections.secretless.add(1)
+
+    outcome = await registering.save(
+        SUPER,
+        "demo",
+        change(client_secret=None, refresh_token=None, allowed_networks=SUPPLIER_TEXT),
+    )
+
+    assert outcome is Registration.REGISTERED
+    assert registrar.registered == [(1, "demo")] * 2
+
+
+async def test_an_unreadable_stored_list_is_replaced_by_saving_a_list_or_an_empty_one(
+    connections: FakeContactCenterConnections, registering: ContactCenterConnectionService
+) -> None:
+    await registering.save(SUPER, "demo", change())
+    connections.unreadable.add(1)
+    shown = await registering.view(SUPER, "demo")
+    assert shown is not None
+    assert shown.allowed_networks == NetworkList(unreadable=True)
+
+    outcome = await registering.save(
+        SUPER, "demo", change(client_secret=None, refresh_token=None, allowed_networks="")
+    )
+
+    after = await registering.view(SUPER, "demo")
+    assert outcome is Registration.UNTOUCHED  # it differed from the unreadable list: a change
+    assert after is not None
+    assert after.allowed_networks == NetworkList()
+
+
 async def test_the_networks_with_another_field_still_register_again(
     registrar: FakeOrganisationDispatchers, registering: ContactCenterConnectionService
 ) -> None:
     await registering.save(SUPER, "demo", change())
 
     new_secret = await registering.save(
-        SUPER, "demo", change(client_secret="other-secret", allowed_networks=SUPPLIER_NETWORKS)
+        SUPER, "demo", change(client_secret="other-secret", allowed_networks=SUPPLIER_TEXT)
     )
     new_client = await registering.save(
-        SUPER, "demo", change(client_id="Other-client", client_secret=None, allowed_networks=())
+        SUPER, "demo", change(client_id="Other-client", client_secret=None, allowed_networks="")
     )
     nothing_new = await registering.save(
-        SUPER, "demo", change(client_id="Other-client", client_secret=None, allowed_networks=())
+        SUPER, "demo", change(client_id="Other-client", client_secret=None, allowed_networks="")
     )
 
     assert (new_secret, new_client, nothing_new) == (Registration.REGISTERED,) * 3
@@ -369,9 +419,9 @@ async def test_the_networks_with_another_field_still_register_again(
 async def test_the_webhook_target_carries_the_connections_own_list(
     service: ContactCenterConnectionService,
 ) -> None:
-    await service.save(SUPER, "demo", change(allowed_networks=SUPPLIER_NETWORKS))
+    await service.save(SUPER, "demo", change(allowed_networks=SUPPLIER_TEXT))
 
     target = await service.webhook_target("demo", WXCC)
 
-    assert target.allowed_networks == SUPPLIER_NETWORKS
-    assert (await service.webhook_target("andere", WXCC)).allowed_networks == ()
+    assert target.allowed_networks == SUPPLIED
+    assert (await service.webhook_target("andere", WXCC)).allowed_networks == NetworkList()

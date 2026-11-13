@@ -27,6 +27,7 @@ from app.domain.contact_center import (
     Registration,
 )
 from app.domain.guest_access import GuestAccess
+from app.domain.networks import NetworkList
 from app.domain.ports import (
     ContactCenterDispatcher,
     IntegrationError,
@@ -34,6 +35,7 @@ from app.domain.ports import (
     RequestRecord,
 )
 from app.domain.scheduling import Group
+from app.domain.webhook_sources import source_networks_of
 
 GUEST_EXPIRES = datetime(2026, 1, 1, 18, tzinfo=UTC)
 """When the fake's guest tokens expire."""
@@ -241,12 +243,21 @@ class FakeContactCenterConnections:
     def __init__(self) -> None:
         self.connections: dict[int, OrganisationConnection] = {}
         self.rotations = 0
+        self.secretless: set[int] = set()
+        """Organisations whose record has no webhook secret."""
+        self.unreadable: set[int] = set()
+        """Organisations whose stored list cannot be read (until a save replaces it)."""
 
     async def get(self, organisation_id: int) -> OrganisationConnection | None:
-        return self.connections.get(organisation_id)
+        shown = self.connections.get(organisation_id)
+        if shown is not None and organisation_id in self.unreadable:
+            return replace(shown, allowed_networks=NetworkList(unreadable=True))
+        return shown
 
     async def save(self, organisation_id: int, change: ConnectionChange, now: datetime) -> None:
         old = self.connections.get(organisation_id)
+        if change.allowed_networks is not None:
+            self.unreadable.discard(organisation_id)
         self.connections[organisation_id] = OrganisationConnection(
             change.kind,
             change.api_base_url,
@@ -255,9 +266,9 @@ class FakeContactCenterConnections:
             has_refresh_token=bool(change.refresh_token) or bool(old and old.has_refresh_token),
             webhook_secret_at=old.webhook_secret_at if old else now,
             allowed_networks=(
-                change.allowed_networks
+                NetworkList(source_networks_of(change.allowed_networks))
                 if change.allowed_networks is not None
-                else (old.allowed_networks if old else ())
+                else (old.allowed_networks if old else NetworkList())
             ),
         )
 
@@ -272,7 +283,9 @@ class FakeContactCenterConnections:
 
     async def webhook_secret(self, organisation_id: int, kind: ContactCenterKind) -> str | None:
         shown = self.connections.get(organisation_id)
-        return f"secret-of-{organisation_id}" if shown and shown.kind is kind else None
+        if organisation_id in self.secretless or shown is None or shown.kind is not kind:
+            return None
+        return f"secret-of-{organisation_id}"
 
 
 class FakeOrganisationDispatchers:
