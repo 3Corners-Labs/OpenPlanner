@@ -24,9 +24,9 @@ the PR that did it.
 
 | Item | What | Source | Blocks | Owner | Status |
 |---|---|---|---|---|---|
-| G01 | Interval accounting across the flows of one pool and staffing of counted pools: built by ADR 0122 steps 1 to 5; the row of ADR 0121 is closed against ADR 0122 once G03 is done (assumption of step 8: nothing else is meant by it) | 0121/3b | yes | build | done (#PRA) |
+| G01 | Interval accounting across the flows of one pool and staffing of counted pools: built by ADR 0122 steps 1 to 5; the row of ADR 0121 is closed against ADR 0122 once G03 is done (assumption of step 8: nothing else is meant by it) | 0121/3b | yes | build | done (#807) |
 | G02 | The double-counting overlap list and the shortfall per service for a reader who may see it (the notice where numbers are typed exists) | 0122/4 | no | build | planned |
-| G03 | Closing and reporting of pool bookings: `ended_slots`, usage closing and the facts skip pool slots until then, so a pool booking would never close. Built: a pool slot is closed by the pool rule of `app/domain/slot_close.py` | 0122/5 | yes | build | done (#PRA) |
+| G03 | Closing and reporting of pool bookings: `ended_slots`, usage closing and the facts skip pool slots until then, so a pool booking would never close. Built: a pool slot is closed by the pool rule of `app/domain/slot_close.py` | 0122/5 | yes | build | done (#807) |
 | G04 | The agent API's change-request check judges a requested time on the pool of a matched pool booking, without telling the caller whether anything matched | 0122/5 | yes | build | follow-up |
 | G05 | A list of work in recovery for supervisors, and an alert while any exists (design R9) | 0121/5e | yes | build | follow-up |
 | G06 | The participant's immediate pages and the claimed request's page in `e2e/pages.json` (axe, Lighthouse, keyboard). Not reachable while the gate is shut: the pages render an immediate form only for an active pool flow, which the flow resolver refuses while `ROLLBACK_SAFE` is `False`, and the e2e stack has no switch that opens it (a protection is never a setting). So the entries land in the PR that opens the gate, seeded from G08's fixture, and that PR runs with `ci:full` | 0121/32 | yes | build | follow-up |
