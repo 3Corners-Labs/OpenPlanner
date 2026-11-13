@@ -23,7 +23,7 @@ from enum import StrEnum
 from typing import Final, cast
 
 from app.domain.capacity import CapacityPool, PoolMode, guarantees, unguaranteed
-from app.domain.contact_center import ContactCenterCapabilities, uncarried
+from app.domain.contact_center import ContactCenterCapabilities
 from app.domain.errors import DomainError, ErrorCode, missing_object, outside_organisation
 from app.domain.interaction import InteractionKind as InteractionKind  # re-exported
 from app.domain.routing import SUBJECT_CODE, validate_labels
@@ -311,6 +311,24 @@ def requirement_of(revision: FlowRevision | None, subject: str | None) -> frozen
     return effective_requirements(revision.required_skill_ids, extra)
 
 
+def interaction_of(revision: FlowRevision | None, recorded: bool) -> InteractionKind:
+    """Return the interaction kind of a booking made under ``revision`` (ADR 0121 step 6).
+
+    A booking without a flow (``recorded`` false) is a video booking: it is dispatched with its
+    meeting. A recorded revision is a published one, which always names its interaction kind.
+
+    Raises:
+        DomainError: ``integration_not_ready`` (``interaction_kind``) for a recorded flow whose
+            revision is missing or names no interaction kind: the task is refused rather than
+            sent as a video task by guess.
+    """
+    if not recorded:
+        return InteractionKind.VIDEO
+    if revision is None or revision.interaction_kind is None:
+        raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "interaction_kind")
+    return revision.interaction_kind
+
+
 def check_code_kept(
     skill_id: int, before: str | None, after: str | None, flows: Iterable[ServiceFlow]
 ) -> None:
@@ -557,7 +575,7 @@ def _carrier_reason(
         return None
     if carrier is None:
         return ReadinessReason.CONTACT_CENTER_MISSING
-    if uncarried(carrier, kind, skills=False) is not None:
+    if not carrier.carries(kind):
         return ReadinessReason.INTERACTION_NOT_CARRIED
     return None
 

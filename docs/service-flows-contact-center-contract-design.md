@@ -87,7 +87,7 @@ ensure_task(booking, group)
       adapter: uncarried(DESCRIPTOR.capabilities, ...) ─► IntegrationError not_ready (not retryable)
 ```
 
-The refusal in the domain is the one that counts; the adapter's check is a second line for a caller that builds a task by hand. A refused task is handled like the existing `skill_codes` refusal: the dispatch job fails for good and the fallback of ADR 0082 takes the booking into the own queue.
+The interaction kind comes from `interaction_of(revision, recorded)` next to `requirement_of`: video for a booking without a flow, and a refusal (`interaction_kind`) for a recorded flow whose revision is gone or names no kind, never a guess. Step 6b must move the `meeting_missing` wait of `ensure_task` behind the interaction kind: a non-video task has no meeting to wait for. The refusal in the domain is the one that counts; the adapter's check is a second line for a caller that builds a task by hand. A refused task is handled like the existing `skill_codes` refusal: the dispatch job fails for good and the fallback of ADR 0082 takes the booking into the own queue.
 
 ## 6. Proof that nothing changes for existing flows
 

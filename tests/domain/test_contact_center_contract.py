@@ -31,6 +31,7 @@ from app.domain.service_flows import (
     InteractionKind,
     ReadinessCheck,
     ReadinessReason,
+    interaction_of,
     readiness,
 )
 from tests.support.contact_center_dispatch import (
@@ -208,3 +209,15 @@ def test_a_configuration_document_judges_with_the_routing_of_the_service() -> No
     world = flow_rules._read_world(tree, {k.value: d for k, d in DESCRIPTORS.items()})
 
     assert world.carriers == {"balie": WEBEX}
+
+
+def test_a_recorded_flow_gives_its_own_interaction_and_never_a_guess() -> None:
+    assert interaction_of(None, recorded=False) is InteractionKind.VIDEO
+    assert interaction_of(revision(), recorded=True) is InteractionKind.TELEPHONE
+    for broken in (None, revision(interaction_kind=None)):
+        with pytest.raises(DomainError) as excinfo:
+            interaction_of(broken, recorded=True)
+        assert (excinfo.value.code, excinfo.value.field) == (
+            ErrorCode.INTEGRATION_NOT_READY,
+            INTERACTION_KIND,
+        )

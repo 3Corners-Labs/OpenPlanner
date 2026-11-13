@@ -129,14 +129,14 @@ async def test_the_task_carries_the_codes_of_what_the_booking_requires() -> None
     plain = await dispatch_one(GERMAN, mapped, flow=SKILLED_FLOW)
     with_subject = await dispatch_one(GERMAN, mapped, flow=SKILLED_FLOW, subject="renewal")
 
-    assert plain.skills == ("lang_de",)  # type: ignore[attr-defined]
-    assert with_subject.skills == ("intake_1", "lang_de")  # type: ignore[attr-defined]
+    assert plain.skills == ("lang_de",)
+    assert with_subject.skills == ("intake_1", "lang_de")
 
 
 async def test_a_booking_without_skills_sends_no_codes() -> None:
     """Nothing changes for flows without skills: no flow, or a legacy wrapper."""
     for flow in (None, LEGACY_FLOW):
-        assert (await dispatch_one(flow=flow)).skills == ()  # type: ignore[attr-defined]
+        assert (await dispatch_one(flow=flow)).skills == ()
 
 
 async def test_an_unmapped_requirement_is_never_dropped_from_the_task() -> None:

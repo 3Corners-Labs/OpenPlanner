@@ -33,7 +33,7 @@ from app.domain.ports import (
     VideoProvider,
 )
 from app.domain.scheduling import Group
-from app.domain.service_flows import requirement_of
+from app.domain.service_flows import interaction_of, requirement_of
 from app.domain.skills import mapped_skill_codes
 
 StartLabel = Callable[[Booking, Group], str]
@@ -140,17 +140,14 @@ class CallService:
 
         Raises:
             DomainError: ``integration_not_ready`` (``skill_codes``) for a required skill
-                without a code: an unmapped requirement is never dropped.
+                without a code: an unmapped requirement is never dropped; (``interaction_kind``)
+                for a recorded flow whose revision is gone or names no interaction kind.
         """
         if booking.flow is None:
-            return InteractionKind.VIDEO, ()
+            return interaction_of(None, recorded=False), ()
         async with self._uow.read() as tx:
             revision = await tx.flow_revision(booking.flow.flow_id, booking.flow.revision)
-            interaction = (
-                revision.interaction_kind
-                if revision is not None and revision.interaction_kind is not None
-                else InteractionKind.VIDEO
-            )
+            interaction = interaction_of(revision, recorded=True)
             subject = booking.routing.subject if booking.routing else None
             required = requirement_of(revision, subject)
             if not required:

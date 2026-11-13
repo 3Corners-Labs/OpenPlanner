@@ -114,6 +114,10 @@ class ContactCenterCapabilities:
     interaction_kinds: frozenset[InteractionKind] = frozenset()
     skills: bool = False
 
+    def carries(self, interaction: InteractionKind) -> bool:
+        """Return whether the platform can hand work of ``interaction`` to an agent."""
+        return interaction in self.interaction_kinds
+
 
 INTERACTION_KIND = "interaction_kind"
 """What ``uncarried`` names for an interaction kind the platform does not carry."""
@@ -132,7 +136,7 @@ def uncarried(
     skill. The interaction kind is judged first: a platform that cannot take the work at all
     is the bigger gap.
     """
-    if interaction not in capabilities.interaction_kinds:
+    if not capabilities.carries(interaction):
         return INTERACTION_KIND
     if skills and not capabilities.skills:
         return SKILL_CODES

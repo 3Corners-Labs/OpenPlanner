@@ -353,7 +353,9 @@ def test_video_and_contact_center_wait_for_their_steps_unless_legacy() -> None:
     )
     assert reasons(video, pool())[dp] is R.NOT_BUILT_YET
     cc = revision(dispatch=DispatchKind.CONTACT_CENTER)
-    assert reasons(cc, pool())[dp] is R.NOT_BUILT_YET
+    # A service without a routing is something the administrator can fix, so it is named before
+    # what follows (ADR 0121 step 6); with a carrier it waits for step 6b.
+    assert reasons(cc, pool())[dp] is R.CONTACT_CENTER_MISSING
     assert reasons(legacy(dispatch=DispatchKind.CONTACT_CENTER), pool())[dp] is None
     assert reasons(legacy(), pool())[dp] is None
 
