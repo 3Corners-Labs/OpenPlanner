@@ -85,4 +85,32 @@
   </table>
   </div>
   {% endif %}
+  {#- Work in recovery (ADR 0121 step 5e): started work past its deadline, for a supervisor of
+      the queue; its appointment has ended, so the rows above no longer show it. -#}
+  {% if recovery %}
+  <h3 id="recovery-heading">{{ _("admin.queue.recovery.heading") }}</h3>
+  <p>{{ _("admin.queue.recovery.lead") }}</p>
+  <div class="table-scroll" role="region" aria-labelledby="recovery-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.queue.recovery.caption") }}</caption>
+    <thead>
+      <tr><th scope="col">{{ _("admin.queue.recovery.work") }}</th><th scope="col">{{ _("admin.queue.recovery.started") }}</th><th scope="col">{{ _("admin.queue.recovery.deadline") }}</th><th scope="col"><span class="visually-hidden">{{ _("admin.actions") }}</span></th></tr>
+    </thead>
+    <tbody>
+      {% for item in recovery %}
+      <tr>
+        <th scope="row">{{ item.work }}</th>
+        <td>{{ item.started }}</td>
+        <td>{{ item.deadline }}</td>
+        <td>
+          <form method="post" action="{{ item.complete_path }}">
+            <button type="submit" class="button button--secondary">{{ _("admin.queue.recovery.complete") }}<span class="visually-hidden"> {{ item.work }}</span></button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
 </div>

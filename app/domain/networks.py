@@ -41,6 +41,9 @@ NETWORKS_FIELD = "networks"
 INTERNAL_SUFFIXES = (".localhost", ".local", ".internal", ".lan", ".test")
 """Name endings that are never a public name."""
 
+_IDNA_DOTS = str.maketrans({"\u3002": ".", "\uff0e": ".", "\uff61": "."})
+"""The full stops IDNA treats as the label separator, next to ``.`` itself (UTS 46)."""
+
 
 @dataclass(frozen=True)
 class NetworkList:
@@ -123,10 +126,11 @@ def host_is_public(url: str) -> bool:
     ``localhost``, has no dot, ends in an internal suffix (``INTERNAL_SUFFIXES``) or has a
     number or hex as its last label (the short and integer IPv4 spellings a resolver still maps
     to an address, such as ``127.1``). One trailing dot (the absolute form, ``localhost.``) is
-    dropped first. A name cannot be resolved here: a name that points at an internal address is
-    not caught.
+    dropped first, and the other full stops a resolver reads as a label separator (IDNA) count
+    as a dot, so ``planner。internal`` is judged as ``planner.internal``. A name cannot be
+    resolved here: a name that points at an internal address is not caught.
     """
-    host = (urlsplit(url).hostname or "").lower().removesuffix(".")
+    host = (urlsplit(url).hostname or "").lower().translate(_IDNA_DOTS).removesuffix(".")
     if not host:
         return False
     parsed = address_of(host)

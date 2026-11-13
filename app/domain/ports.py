@@ -1840,6 +1840,13 @@ class Transaction(Protocol):
         """
         ...
 
+    async def requests_in_recovery(self, group_id: int | None) -> list[ServiceRequest]:
+        """Return the requests marked ``recovery_required``: of one service, or of every one.
+
+        ADR 0121 step 5e: the supervisors' list and the recovery watch, in id order.
+        """
+        ...
+
     async def unclaimed_pool_bookings(self, ended_before: datetime) -> list[UnclaimedBooking]:
         """Return confirmed pool bookings with a flow, ended before the moment, without request.
 

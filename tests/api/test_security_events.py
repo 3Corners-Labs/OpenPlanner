@@ -102,6 +102,19 @@ async def test_an_unknown_management_link_is_a_security_event(site: Site) -> Non
     assert "guessed-token" not in repr(event)
 
 
+async def test_a_visit_to_the_call_page_without_a_session_is_a_security_event(
+    demo_settings: Settings,
+) -> None:
+    on = demo_settings.model_copy(update={"embedded_call_enabled": True})
+    async for site in _site(on):
+        response = await site.client.get("/b/m/guessed-ref/call")
+
+        assert response.status_code == 403
+        event = _only(await site.security_events())
+        assert (event.action, event.reason) == ("token.rejected", "link_required")
+        assert "guessed-ref" not in repr(event)
+
+
 async def test_an_unknown_group_is_not_a_security_event(site: Site) -> None:
     await site.client.get("/g/nope")
 

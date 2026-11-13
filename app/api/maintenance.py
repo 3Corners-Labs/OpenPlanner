@@ -110,6 +110,7 @@ OPEN_ROUTES = frozenset(
         "/b/m/{public_ref}/confirm",
         "/b/m/{public_ref}/join",
         "/b/m/{public_ref}/join/go",
+        "/b/m/{public_ref}/call",
         "/b/m/{public_ref}/wait",
         "/b/m/{public_ref}/wait/status",
         "/r/{ref}",

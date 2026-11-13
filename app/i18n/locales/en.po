@@ -1651,6 +1651,12 @@ msgstr "This call has ended."
 msgid "join.back"
 msgstr "Back to your appointment"
 
+msgid "call.title"
+msgstr "Your video call"
+
+msgid "call.unavailable"
+msgstr "The call in this page is not available yet. Use the link below to go back to the appointment."
+
 msgid "error.direct_call_unavailable"
 msgstr "Starting a call is not possible right now. Please book an appointment."
 
@@ -13726,6 +13732,39 @@ msgstr "This connection's own list cannot be read, so this address accepts no ca
 
 msgid "admin.source.state.unreadable_default_card"
 msgstr "The installation's default list cannot be read, so this address accepts no call. Ask the platform administrator, or set a list of your own on this card."
+
+msgid "admin.alerts.source.recovery"
+msgstr "Work in recovery at {group}"
+
+msgid "admin.alerts.text.recovery"
+msgstr "Work of this service passed its deadline without being completed and holds a unit of the capacity pool. Complete it under Work in recovery on the queue."
+
+msgid "audit.event.request_recovery"
+msgstr "Work in recovery"
+
+msgid "admin.queue.recovery.heading"
+msgstr "Work in recovery"
+
+msgid "admin.queue.recovery.lead"
+msgstr "Started work that was not completed by its deadline. It holds a unit of the capacity pool until someone completes it."
+
+msgid "admin.queue.recovery.caption"
+msgstr "Work in recovery, oldest deadline first"
+
+msgid "admin.queue.recovery.work"
+msgstr "Work"
+
+msgid "admin.queue.recovery.started"
+msgstr "Started"
+
+msgid "admin.queue.recovery.deadline"
+msgstr "Deadline passed"
+
+msgid "admin.queue.recovery.without_appointment"
+msgstr "Without appointment"
+
+msgid "admin.queue.recovery.complete"
+msgstr "Complete"
 
 msgid "admin.channels.cc_inbound_enabled"
 msgstr "Handle events from the platform"

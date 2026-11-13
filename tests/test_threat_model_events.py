@@ -51,6 +51,7 @@ CLASSES: dict[str, EventClass] = {
             "tests/api/test_security_events.py::test_a_filled_in_honeypot_is_a_security_event_without_the_address",
             "tests/api/test_security_events.py::test_a_cross_site_post_is_a_security_event",
             "tests/api/test_security_events.py::test_an_unknown_management_link_is_a_security_event",
+            "tests/api/test_security_events.py::test_a_visit_to_the_call_page_without_a_session_is_a_security_event",
             "tests/api/test_security_events.py::test_a_rate_limit_flood_is_one_event_per_caller",
             "tests/api/test_security_events.py::test_an_unknown_bearer_token_on_the_machine_api_is_a_security_event",
             "tests/api/test_fault_injection_booking.py::test_a_failing_security_log_does_not_turn_a_refusal_into_a_server_error",
@@ -206,6 +207,7 @@ FLOWS: dict[str, Flow] = {
         no_event="static script files and CI gates; a refused request on a page is logged by the "
         "flow that serves it, and nothing is refused by the scripts themselves"
     ),
+    "## Flow: the call page as a third kind of page (ADR 0123 step 2)": Flow((PUBLIC,)),
     "## Flow: allowed origins for embedding (ADR 0035, EM-1)": Flow(ADMIN),
     "## Flow: video meetings, work items and direct calls (WP5/WP6)": Flow(
         (PUBLIC, WEBHOOK, JOB, DENIED, CHANGE)

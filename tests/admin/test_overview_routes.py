@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.db.models import JobRow
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.calls import CallStatus
-from app.web.templates import HTML_CSP, SCRIPT_CSP
+from app.web.security_policy import HTML_CSP, SCRIPT_CSP
 from tests.admin.conftest import (
     AGENT,
     AUDITOR,
