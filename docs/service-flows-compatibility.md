@@ -43,6 +43,7 @@ reach has no row for it.
 | P | Unchanged: every path of a service is the same with a pool flow beside it | `tests/domain/test_pool_booking_gate.py::test_every_path_of_the_service_is_the_same_with_a_pool_flow_beside_it` |
 | P | Gated: a pool flow cannot be named and nothing is stored while the gate is shut | `tests/domain/test_pool_booking_gate.py::test_with_the_gate_shut_the_pool_flow_cannot_be_named_and_nothing_is_stored` |
 | P | Gated: a pool flow made the default is ignored while the gate is shut | `tests/domain/test_pool_booking_gate.py::test_a_pool_flow_made_the_default_is_ignored_while_the_gate_is_shut` |
+| P | Intended (gated): a pool slot is closed for the reports by the pool rule (explicit outcome only, no capacity of the service), the legacy slot beside it as before | `tests/adapters/db/test_legacy_slot.py::test_the_closing_of_ended_slots_closes_the_pool_slot_as_a_pool_slot` |
 | R | Unchanged: a legacy booking gets no request and is never watched | `tests/domain/test_request_watch.py::test_a_legacy_booking_is_never_watched` |
 
 ### Direct call (start now, ADR 0072)
@@ -223,7 +224,7 @@ legacy paths). A row whose proof needs a released image or a browser names its c
 | A24 | A service closes with treatment active while another service shares the pool | open | `tests/domain/test_request_queue.py::test_a24_a_closure_keeps_running_treatment_and_leaves_the_pool_otherwise_alone` |
 | A25 | Cancel or move with pending jobs: no late meeting or task, allocations released once | open | `tests/domain/test_pool_booking.py::test_a25_cancelling_or_moving_releases_the_unit_once_and_plans_no_meeting` |
 | A26 | Refused, suspended, awaiting a new time: no jobs, no capacity leak, no retention change | open | `tests/domain/test_pool_booking.py::test_p4_a_suspended_appointment_keeps_its_unit_in_the_pool`; the request on hold: `tests/domain/test_request_watch.py::test_a_booking_on_hold_keeps_its_request_open_and_the_deadline_follows_a_new_time` |
-| A27 | Completion and no-show reports from explicit evidence only | n/a | `tests/domain/test_request_work.py::test_start_and_complete_release_the_unit_once_and_complete_the_booking`; the reports close a pool slot from that status only, and nothing sets `no_show` without evidence (the closing rule of #807 names its own tests) |
+| A27 | Completion and no-show reports from explicit evidence only | n/a | `tests/domain/test_request_work.py::test_start_and_complete_release_the_unit_once_and_complete_the_booking`; the reports: `tests/domain/test_slot_close.py::test_a_pool_booking_is_completed_only_by_the_operators_explicit_evidence` |
 | A28 | Archiving a referenced flow, skill or pool blocks new use, keeps history | n/a | `tests/domain/test_queue_skills.py::test_an_archived_skill_still_binds_accepted_work` |
 | A29 | Configuration export and import keep identities, mappings, revisions | n/a | `tests/adapters/db/test_config_flows.py::test_export_import_export_gives_the_same_document` |
 | A30 | The previous image on the expanded schema: book and claim stay safe | n/a | `tests/test_upgrade_train.py::test_the_previous_image_writes_and_the_current_code_reads_and_claims_it`; with released images: checklist G07 |
