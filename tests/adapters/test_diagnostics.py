@@ -4,6 +4,7 @@ The responses are recorded from the product owner's environment on 2026-10-24 (s
 only; bodies replaced by the documented error shape).
 """
 
+import json
 from collections.abc import Callable
 from datetime import UTC, datetime
 
@@ -17,6 +18,7 @@ from app.adapters.diagnostics import (
     probes,
     run_checks,
 )
+from app.domain.guest_access import CHECK_SUBJECT, NEUTRAL_TERM
 from tests.fakes.clock import FixedClock
 from tests.fakes.tokens import ACCESS_TOKEN, webex_client, webex_tokens
 
@@ -108,7 +110,7 @@ async def test_unreachable_host_is_reported_without_details() -> None:
         False,
         "unreachable (ConnectError)",
     )
-    assert not any(r.name.startswith(("GET /v2", "POST")) for r in results)  # no WxCC host
+    assert not any(r.name.startswith(("GET /v2", "POST /v")) for r in results)  # no WxCC host
 
 
 async def test_a_401_retries_once_with_a_fresh_token() -> None:
@@ -161,3 +163,46 @@ async def test_v2_is_primary_and_v1_probes_only_warn() -> None:
     report = format_report(results)
     assert "WARN  POST /v1/tasks/{nil}/end" in report
     assert "FAIL" not in report
+
+
+async def test_without_the_embedded_call_there_is_no_guest_probe() -> None:
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        return httpx.Response(200, json={})
+
+    tokens, http = webex_tokens(handler, CLOCK)
+    results = await run_checks(http, tokens, probes(WEBEX, None), CLOCK)
+
+    assert "/v1/guests/token" not in seen
+    assert not [r for r in results if "guest" in r.name]
+
+
+async def test_the_guest_probe_sends_the_one_fixed_subject_and_nothing_else() -> None:
+    bodies: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/guests/token":
+            bodies.append(json.loads(request.content))
+        return httpx.Response(200, json={})
+
+    tokens, http = webex_tokens(handler, CLOCK)
+    await run_checks(http, tokens, probes(WEBEX, None, guest=True), CLOCK)
+    await run_checks(http, tokens, probes(WEBEX, None, guest=True), CLOCK)
+
+    assert bodies == [{"subject": CHECK_SUBJECT, "displayName": NEUTRAL_TERM}] * 2
+
+
+async def test_a_refused_guest_token_fails_the_check() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403 if request.url.path == "/v1/guests/token" else 200, json={})
+
+    tokens, http = webex_tokens(handler, CLOCK)
+
+    results = await run_checks(http, tokens, probes(WEBEX, None, guest=True), CLOCK)
+
+    guest = next(r for r in results if r.name == "POST /guests/token")
+    assert (guest.ok, guest.required) == (False, True)
+    assert "guest-issuer:read" in guest.hint
+    assert passed(results) is False

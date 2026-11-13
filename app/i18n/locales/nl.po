@@ -13628,3 +13628,24 @@ msgstr "Grens van wachtenden zonder afspraak van een pool gewijzigd"
 
 msgid "admin.form.error.max_waiting"
 msgstr "Vul een heel getal van 1 tot en met 1000 in, of laat het veld leeg."
+
+msgid "settings.field.embedded_call_enabled.label"
+msgstr "Gesprek in de eigen pagina van de organisatie toestaan"
+
+msgid "settings.field.embedded_call_connect_seconds.label"
+msgstr "Wachttijd per poging om het gesprek te verbinden (seconden)"
+
+msgid "settings.field.embedded_call_connect_attempts.label"
+msgstr "Aantal pogingen om het gesprek te verbinden"
+
+msgid "settings.field.embedded_call_display_name.label"
+msgstr "Naam van de deelnemer voor de medewerker in het gesprek (voornaam of eigen woord)"
+
+msgid "settings.field.embedded_call_staff_name.label"
+msgstr "Naam van de medewerker voor de deelnemer in het gesprek (accountnaam of eigen woord)"
+
+msgid "admin.check.webex.guest_ok"
+msgstr "Een gasttoken voor het gesprek in de eigen pagina is aangemaakt (de vaste controlegast van de installatie)."
+
+msgid "admin.check.webex.guest_refused"
+msgstr "Webex gaf geen gasttoken ({error}). De Service App mist waarschijnlijk de scopes guest-issuer:read en guest-issuer:write; voeg ze toe in de ontwikkelaarsportal en autoriseer de app opnieuw in Control Hub. Tot dan kan geen deelnemer in de eigen pagina deelnemen."

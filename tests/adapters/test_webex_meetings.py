@@ -11,6 +11,7 @@ from structlog.testing import capture_logs
 from app.adapters.webex_meetings import WebexMeetings
 from app.domain.booking import MeetingRef
 from app.domain.calls import CallState, MeetingRequest, MeetingStatus
+from app.domain.guest_access import GuestAccess
 from app.domain.ports import IntegrationError
 from tests.fakes.clock import FixedClock
 from tests.fakes.tokens import authorized_client
@@ -263,3 +264,48 @@ async def test_a_timestamp_without_zone_is_read_as_utc_not_as_local_time() -> No
     status = await _meetings(handler).meeting_status("m-1", "host@example.nl")
 
     assert status.started_at == datetime(2026, 1, 5, 8, 0, 40, tzinfo=UTC)
+
+
+GUEST_TOKEN = {  # recorded shape of POST /v1/guests/token (token made up)
+    "accessToken": "made-up-guest-token-0123456789",
+    "expiresIn": 64799,
+}
+
+
+async def test_a_guest_token_is_asked_for_a_subject_and_a_name() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json=GUEST_TOKEN)
+
+    access = await _meetings(handler).guest_access("op1-abc", "Ada")
+
+    assert access == GuestAccess("made-up-guest-token-0123456789", NOW + timedelta(seconds=64799))
+    request = seen[0]
+    assert (request.method, request.url.path) == ("POST", "/v1/guests/token")
+    assert json.loads(request.content) == {"subject": "op1-abc", "displayName": "Ada"}
+    assert request.headers["authorization"].startswith("Bearer ")
+
+
+@pytest.mark.parametrize("body", [{}, {"accessToken": "t"}, {"expiresIn": 5}, ["x"]])
+async def test_an_answer_without_token_or_lifetime_is_unexpected(body: object) -> None:
+    meetings = _meetings(lambda request: httpx.Response(200, json=body))
+
+    with pytest.raises(IntegrationError, match="unexpected_response"):
+        await meetings.guest_access("op1-abc", "Ada")
+
+
+@pytest.mark.parametrize(
+    ("status", "code"), [(403, "rejected_403"), (400, "rejected_400"), (503, "server_error")]
+)
+async def test_a_refusal_names_no_subject_name_or_reason(status: int, code: str) -> None:
+    body = {"message": "Ada is not allowed", "trackingId": "ROUTER_1"}
+    meetings = _meetings(lambda request: httpx.Response(status, json=body))
+
+    with capture_logs() as logs, pytest.raises(IntegrationError, match=code) as error:
+        await meetings.guest_access("op1-abc", "Ada")
+
+    assert error.value.reason == ""
+    assert "Ada" not in str(logs)
+    assert "op1-abc" not in str(logs)

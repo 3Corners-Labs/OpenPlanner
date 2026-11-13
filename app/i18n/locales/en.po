@@ -13615,3 +13615,24 @@ msgstr "Waiting limit without appointment of a pool changed"
 
 msgid "admin.form.error.max_waiting"
 msgstr "Enter a whole number from 1 to 1000, or leave the field empty."
+
+msgid "settings.field.embedded_call_enabled.label"
+msgstr "Allow the call in the organisation's own page"
+
+msgid "settings.field.embedded_call_connect_seconds.label"
+msgstr "Wait per attempt to connect the call (seconds)"
+
+msgid "settings.field.embedded_call_connect_attempts.label"
+msgstr "Attempts to connect the call"
+
+msgid "settings.field.embedded_call_display_name.label"
+msgstr "Participant's name shown to staff in the call (first name or own word)"
+
+msgid "settings.field.embedded_call_staff_name.label"
+msgstr "Staff member's name shown to the participant in the call (account name or own word)"
+
+msgid "admin.check.webex.guest_ok"
+msgstr "A guest token for the call in the organisation's own page was minted (the installation's one fixed check guest)."
+
+msgid "admin.check.webex.guest_refused"
+msgstr "Webex gave no guest token ({error}). The Service App probably lacks the scopes guest-issuer:read and guest-issuer:write; add them in the developer portal and authorise the app again in Control Hub. Until then no participant can join in the own page."

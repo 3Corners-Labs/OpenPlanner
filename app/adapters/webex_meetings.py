@@ -15,13 +15,14 @@ becomes the moment of the request. The booking keeps its own start.
 """
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from app.adapters.webex_auth import AuthorizedClient
 from app.domain.booking import MeetingRef
 from app.domain.calls import CallState, MeetingRequest, MeetingStatus
+from app.domain.guest_access import GuestAccess
 from app.domain.ports import Clock, IntegrationError
 
 MEETING_OPTIONS: dict[str, Any] = {
@@ -147,6 +148,30 @@ class WebexMeetings:
         )
         items = participants.json().get("items", []) if participants.status_code == 200 else []
         return _aggregate(state, [i for i in items if isinstance(i, dict)])
+
+    async def guest_access(self, subject: str, display_name: str) -> GuestAccess:
+        """Mint a guest token for ``subject``: the one place that calls ``POST /guests/token``.
+
+        The service app needs the scopes ``guest-issuer:read`` and ``guest-issuer:write``; without
+        them Webex answers 401 or 403, which arrives as ``unauthorized`` or ``rejected_403``. The
+        request carries a name that may be a first name, so Webex's own reason is not asked for,
+        logged or kept (ADR 0065 reasons are for requests without participant data), and neither
+        the token, the subject nor the name is logged or put in an error.
+
+        Raises:
+            IntegrationError: If Webex refuses, answers without a token or cannot be reached.
+        """
+        response = await self._client.request(
+            "POST",
+            f"{self._base}/guests/token",
+            json={"subject": subject, "displayName": display_name},
+        )
+        data = response.json()
+        token = data.get("accessToken") if isinstance(data, dict) else None
+        lifetime = data.get("expiresIn") if isinstance(data, dict) else None
+        if not isinstance(token, str) or not token or not isinstance(lifetime, int):
+            raise IntegrationError("unexpected_response", retryable=False)
+        return GuestAccess(token, self._clock.now() + timedelta(seconds=lifetime))
 
 
 def _aggregate(state: CallState, items: list[dict[str, Any]]) -> MeetingStatus:

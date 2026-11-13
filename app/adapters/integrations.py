@@ -129,12 +129,14 @@ def build_integrations(
     security: SecurityLog | None = None,
     request_log: RequestLog | None = None,
     probe_timeout: Callable[[], timedelta] | None = None,
+    embedded_call_enabled: Callable[[], bool] | None = None,
 ) -> Integrations:
     """Return the adapters the settings allow.
 
     ``security`` records failing token refreshes; ``request_log`` receives every request the
     adapters make (ADR 0068); ``probe_timeout`` is how long the group check waits for its
-    probe work item's events (ADR 0082; the settings' value when not given).
+    probe work item's events (ADR 0082; the settings' value when not given);
+    ``embedded_call_enabled`` says whether the group check requires the guest token (ADR 0123).
     """
     client_id, secret, refresh = (
         settings.webex_client_id,
@@ -180,6 +182,7 @@ def build_integrations(
         probes=ProbeReports(ReportStore(engine)) if dispatcher else None,
         probe_timeout=probe_timeout
         or (lambda: timedelta(seconds=settings.integration_probe_timeout_seconds)),
+        embedded_call_enabled=embedded_call_enabled or (lambda: settings.embedded_call_enabled),
     )
     dispatchers: ContactCenterDispatchers = (
         {ContactCenterKind.WEBEX_CC: dispatcher} if dispatcher else {}

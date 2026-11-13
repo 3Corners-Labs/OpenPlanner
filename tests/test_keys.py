@@ -8,6 +8,7 @@ from app.config import Settings
 from app.keys import (
     agent_pseudonym_key,
     client_pseudonym_key,
+    guest_pseudonym_key,
     management_token_key,
     session_secret,
 )
@@ -57,7 +58,7 @@ def test_session_secret_follows_the_same_rules(tmp_path: Path) -> None:
         session_secret(dev.model_copy(update={"environment": "prod"}))
 
 
-@pytest.mark.parametrize("derive", [client_pseudonym_key, agent_pseudonym_key])
+@pytest.mark.parametrize("derive", [client_pseudonym_key, agent_pseudonym_key, guest_pseudonym_key])
 def test_pseudonym_keys_are_derived_and_differ_from_the_token_key(
     tmp_path: Path, derive: Callable[[Settings], bytes]
 ) -> None:
@@ -84,3 +85,5 @@ def test_each_purpose_has_its_own_key(tmp_path: Path) -> None:
     )
 
     assert agent_pseudonym_key(settings) != client_pseudonym_key(settings)
+    assert guest_pseudonym_key(settings) != agent_pseudonym_key(settings)
+    assert guest_pseudonym_key(settings) != client_pseudonym_key(settings)

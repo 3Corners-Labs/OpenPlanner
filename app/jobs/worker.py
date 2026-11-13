@@ -189,6 +189,7 @@ async def run_worker(
             probe_timeout=lambda: timedelta(
                 seconds=live.settings.integration_probe_timeout_seconds
             ),
+            embedded_call_enabled=lambda: live.settings.embedded_call_enabled,
         )
         # ADR 0065 step 2: the automatic group check, with the checker of this wiring.
         watch = IntegrationWatch(

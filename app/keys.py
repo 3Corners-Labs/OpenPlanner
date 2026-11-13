@@ -18,6 +18,9 @@ CLIENT_PSEUDONYM_INFO = b"openplanner/client-pseudonym/v1"
 AGENT_PSEUDONYM_INFO = b"openplanner/agent-pseudonym/v1"
 """HKDF label of the agent pseudonym key (ADR 0043); a new label makes new pseudonyms."""
 
+GUEST_PSEUDONYM_INFO = b"openplanner/guest-pseudonym/v1"
+"""HKDF label of the key behind the guest subjects at the video provider (ADR 0123 point 7)."""
+
 
 def _bootstrap_key(settings: Settings, value: SecretStr | None, name: str, dev_path: Path) -> bytes:
     """Return a bootstrap key: from the environment, or a shared development key file.
@@ -108,6 +111,11 @@ def agent_pseudonym_key_previous(settings: Settings) -> bytes | None:
     """
     previous = management_token_key_previous(settings)
     return None if previous is None else _derive_from(previous, AGENT_PSEUDONYM_INFO)
+
+
+def guest_pseudonym_key(settings: Settings) -> bytes:
+    """Return the key of the guest subjects sent to the video provider (ADR 0123)."""
+    return _derived(settings, GUEST_PSEUDONYM_INFO)
 
 
 def session_secret(settings: Settings) -> str:

@@ -23,6 +23,8 @@ FINDING_LABELS: dict[str, str] = {
     "webex.trial_lobby": "admin.check.webex.trial_lobby",
     "webex.trial_left": "admin.check.webex.trial_left",
     "webex.unreachable": "admin.check.webex.unreachable",
+    "webex.guest_ok": "admin.check.webex.guest_ok",
+    "webex.guest_refused": "admin.check.webex.guest_refused",
     "wxcc.not_configured": "admin.check.wxcc.not_configured",
     "wxcc.no_mapping": "admin.check.wxcc.no_mapping",
     "wxcc.config_refused": "admin.check.wxcc.config_refused",
