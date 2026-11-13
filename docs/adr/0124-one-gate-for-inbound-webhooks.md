@@ -263,7 +263,8 @@ counts per minute.
 | 1 | The gate, with today's checks moved into it and: the limit as a setting, with separate buckets for verified deliveries, refused calls and calls to addresses that do not exist, and a machine answer, the declared and the streamed size limit, the content type, refusal events with reason, platform and organisation; the route sweep; `docs/webhooks.md` corrected | #791 | merged |
 | 2a | The shared network helper `app/domain/networks.py`, with the machine API's clients and the display links moved onto it; one caller key for every limiter, an IPv6 caller counted by its /64 | #818 | merged |
 | 2b | Source networks: the list per connection and the installation's defaults, refusing on an untrusted proxy chain, `WEBHOOK_SOURCE_NETWORKS_REQUIRED`, the findings | #821 | merged |
-| 3 | Replays per organisation and by body hash; the pause; the refusal alert and the connection card's status, with *last accepted* and *last refused* and the per-call source faults on the card | | planned |
+| 3a | Replays per organisation and by body hash (`app/domain/webhook_replay.py`); the pause (`inbound_enabled` in the connection's record, set with a button of its own on the card through `set_inbound`, dropped in the gate after every check, the card's chip and sentence) | #823 | merged |
+| 3b | The refusal alert; the connection card's status, with *last accepted* and *last refused*, counts per reason and the per-call source faults; the count of events dropped while paused, and the pause on the status screens | | planned |
 | 4 | Secret rotation with an overlap | | planned |
 | 5 | The bundled proxy: the webhook rule, the host of its own, `WEBHOOK_PROXY_NETWORKS`, `check-proxy.sh`; the chart's webhook host and network policy, and a way to pin the ingress as single addresses (shape 1 of point 4) | | planned |
 | 6 | The contract for an organisation's own proxy in the runbook and the Kubernetes guide; the signed test delivery that reports the source address it saw; the contract says why a content delivery network (shape 2) and a supplier calling a public name from a private address (shape 3) cannot use a list; the threat model's abuse cases, each with its test | | planned |
@@ -279,8 +280,9 @@ Step 1 merges in the same pull request as this ADR (ADR 0119).
 - An organisation can narrow who may call its address, and sees when someone else tries.
 - An installation whose proxy does not hand on addresses is told so before a list locks its own
   supplier out, and is refused rather than passed when a list cannot be evaluated.
-- No migration in step 1. The replay key changes its derivation, not its table. A connection's
-  networks and pause live in the sealed record that holds the connection today.
+- No migration in step 1 or in step 3a. The replay key changes its derivation, not its table
+  (the old shape is read until 0.7.0, ADR 0116). A connection's networks and pause live in the
+  sealed record that holds the connection today.
 - `docs/webhooks.md`, `docs/threat-model.md` (abuse cases: a call from outside the list, a
   spoofed forwarded address, a flood per organisation, a replay across organisations, a secret
   used after its overlap, an oversized body sent slowly), `docs/dataflow.md`, the runbook, the

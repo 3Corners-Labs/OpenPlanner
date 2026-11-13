@@ -1293,6 +1293,17 @@ _OPERATIONS = (
         "A verified webhook of a contact-center platform was processed (ADR 0032).",
     ),
     _e(
+        "webhook.paused",
+        _OPS,
+        "info",
+        "source organisation",
+        "A verified {source} webhook of organisation {organisation} was dropped (paused).",
+        "The organisation paused its contact-center connection (ADR 0124 point 9): the call "
+        "passed every check and was answered 204, and its event was not handled or remembered.",
+        "Nothing, while the pause is intended. To resume, switch events on again on the "
+        "connection's card under *Channels*.",
+    ),
+    _e(
         "widget.invalid_request",
         _OPS,
         "info",

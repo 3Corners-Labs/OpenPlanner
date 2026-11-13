@@ -11,6 +11,8 @@ one minor (point 11, ADR 0116).
     save(org)   ─► audit ─► sealed record ─► register the address  (a blank secret keeps one;
                                               not when only the allowed networks changed)
     rotate(org) ─► audit ─► new webhook secret ─► register again     (CC-4d)
+    set_inbound ─► audit ─► the one field of the sealed record  (the pause, ADR 0124 point 9;
+                            no secret, no registration)
     remove(org) ─► audit ─► record deleted
 
 Registering tells the platform to send the organisation's events to its own address, signed
@@ -39,6 +41,9 @@ PERMISSION = Permission.INTEGRATIONS_MANAGE
 AUDIT_KEY = "contact_center_connection"
 NETWORKS_AUDIT = "allowed_networks"
 """The audit names the field that changed, never the networks (as it does for the secrets)."""
+PAUSE_AUDIT = {True: "resume", False: "pause"}
+"""The audit action of setting the pause (``contact_center_connection.pause`` or ``.resume``),
+written only when the state changes; never a value."""
 
 
 def _only_networks_changed(stored: OrganisationConnection, change: ConnectionChange) -> bool:
@@ -67,12 +72,15 @@ class WebhookTarget:
             handed on.
         allowed_networks: The connection's own list of source networks (ADR 0124 point 3);
             empty: the installation's default applies; unreadable: no call is accepted.
+        inbound_enabled: Whether the address handles its events (ADR 0124 point 9); off: a
+            verified event is dropped.
     """
 
     organisation_id: int | None = None
     secret: str | None = None
     organisation: str | None = None
     allowed_networks: NetworkList = NetworkList()
+    inbound_enabled: bool = True
 
     @property
     def found(self) -> bool:
@@ -149,7 +157,11 @@ class ContactCenterConnectionService:
             return WebhookTarget(organisation=slug)
         shown = await self._connections.get(organisation_id)
         return WebhookTarget(
-            organisation_id, secret, slug, shown.allowed_networks if shown else NetworkList()
+            organisation_id,
+            secret,
+            slug,
+            shown.allowed_networks if shown else NetworkList(),
+            shown.inbound_enabled if shown else True,
         )
 
     async def save(
@@ -190,6 +202,33 @@ class ContactCenterConnectionService:
             # The subscription depends on the secret, the host and the client, not on who may call.
             return Registration.UNTOUCHED
         return await self._register(principal, organisation_id, organisation)
+
+    async def set_inbound(self, principal: Principal, organisation: str, *, enabled: bool) -> bool:
+        """Pause or resume the organisation's webhook address (ADR 0124 point 9).
+
+        The state wanted is given, never toggled, so a stale page that presses the same button
+        twice does the same thing twice. Audited by name (``contact_center_connection.pause`` or
+        ``.resume``), and only when the state changes. It never makes a secret and never
+        registers: the platform keeps its subscription and gets its 204 either way.
+
+        Returns:
+            Whether the state changed.
+
+        Raises:
+            DomainError: ``not_permitted``, ``organisation_not_found``, ``integration_not_ready``
+                (no settings key) and ``invalid_configuration`` naming ``connection`` when the
+                organisation has no connection.
+        """
+        organisation_id = await self._authorize(principal, organisation)
+        connections = self._ready()
+        stored = await connections.get(organisation_id)
+        if stored is None:
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}connection")
+        if stored.inbound_enabled == enabled:
+            return False
+        await self._audit(principal, organisation, f"{AUDIT_KEY}.{PAUSE_AUDIT[enabled]}")
+        await connections.set_inbound_enabled(organisation_id, enabled, self._clock.now())
+        return True
 
     async def rotate_webhook_secret(self, principal: Principal, organisation: str) -> Registration:
         """Generate a new webhook secret; the old one stops verifying at once.
