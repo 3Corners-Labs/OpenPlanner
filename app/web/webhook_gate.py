@@ -8,8 +8,8 @@ fails for a ``/webhooks/`` route without a gate (``is_webhook_gate``).
 
     call ─► address exists ─► source network ─► content type ─► size ─► signature ─► time ─► shape
               404 / 429         403              415            413      401         401      400
-          ─► the limits
-              429
+          ─► the limits ─► paused?
+              429            204, the event is dropped
 
 The limits come last for an address that exists, so a call that cannot sign never uses up the
 budget of the authentic ones (ADR 0124 point 5): a call refused for any reason before them counts
@@ -24,11 +24,14 @@ the reason, the platform and, for an organisation's address, the organisation's 
 of an organisation that does not exist is never written: it comes from the caller. The source
 network (``app.domain.webhook_sources``, point 3 and 4) is checked first: a list that applies and a
 caller outside it is ``network``, one whose address cannot be trusted (decided for this call,
-never from a standing state) is ``source_unknown``; both
-answer 403 and count as refused calls. The replay
-check stays with the domain's event key (ADR 0124 point 7 is a later step). The caller's address
-is the one the server derived (``--proxy-headers``), counted by its /64 when it is IPv6
-(``caller_of``); nothing is read from a forwarded header here.
+never from a standing state) is ``source_unknown``; both answer 403 and count as refused calls.
+The replay check is the domain's (``app.domain.webhook_replay``, ADR 0124 point 7): the gate hands
+the route the identity of the verified body for an event without an identifier of its own. A
+paused address (point 9) passes every check above, signature included, and only then is its
+verified event dropped: the answer is 204, the route is not called and nothing is remembered, so a
+redelivery after resuming is handled; a call that would be refused is refused as for any address.
+The caller's address is the one the server derived (``--proxy-headers``), counted by its /64 when
+it is IPv6 (``caller_of``); nothing is read from a forwarded header here.
 """
 
 import json
@@ -54,6 +57,7 @@ from app.domain.inbound_gate import MAX_BODY_BYTES, Refusal, accepts_content_typ
 from app.domain.networks import NetworkList
 from app.domain.ports import Clock
 from app.domain.security_log import WEBHOOK_REJECTED
+from app.domain.webhook_replay import body_identity
 from app.domain.webhook_sources import check_source, source_list_that_applies
 from app.web.caller import caller_of, client_address
 from app.web.protection import (
@@ -94,6 +98,8 @@ class Address[W: InboundWebhook]:
         organisation: That organisation's slug, public and no personal data.
         sources: The list of allowed source networks that governs this address (the
             connection's own, else the installation's default for the platform); empty: none.
+        paused: Whether the connection is paused (ADR 0124 point 9): verified events are dropped.
+            An installation-wide address has no connection and is never paused.
     """
 
     inbound: W
@@ -101,6 +107,7 @@ class Address[W: InboundWebhook]:
     organisation_id: int | None = None
     organisation: str | None = None
     sources: NetworkList = NetworkList()
+    paused: bool = False
 
 
 @dataclass(frozen=True)
@@ -125,11 +132,14 @@ class Delivery[W: InboundWebhook]:
         address: The address it came in at.
         payload: The body as a JSON object.
         now: The time the gate used, for the route to reuse.
+        body_identity: The identity of the verified body, for an event without an identifier
+            of its own (``app.domain.webhook_replay``, ADR 0124 point 7).
     """
 
     address: Address[W]
     payload: dict[str, Any]
     now: datetime
+    body_identity: str
 
 
 class WebhookRefused(Exception):  # noqa: N818 - reads as an outcome, like HTTPException
@@ -143,6 +153,15 @@ class WebhookRefused(Exception):  # noqa: N818 - reads as an outcome, like HTTPE
         """Store the reason."""
         super().__init__(reason.value)
         self.reason = reason
+
+
+class WebhookPaused(Exception):  # noqa: N818 - reads as an outcome, like HTTPException
+    """A verified event for a paused address; the application answers 204 and drops it."""
+
+
+async def webhook_paused_response(request: Request, exc: Exception) -> Response:
+    """Answer a verified event of a paused address: 204, so the platform keeps its subscription."""
+    return Response(status_code=204)
 
 
 async def webhook_refused_response(request: Request, exc: Exception) -> Response:
@@ -179,7 +198,7 @@ def _json_object(body: bytes) -> dict[str, Any] | None:
 
 async def _inspect(
     request: Request, address: Address[InboundWebhook]
-) -> Refusal | tuple[dict[str, Any], datetime]:
+) -> Refusal | tuple[dict[str, Any], datetime, str]:
     """Run the checks of an address that exists, up to the shape; no limit is counted here.
 
     The source network comes first (ADR 0124 point 3): a caller from outside the list, or whose
@@ -187,7 +206,8 @@ async def _inspect(
     alike, and no forwarded header is read here: the address is the one the server derived.
 
     Returns:
-        The reason of the first check that fails, else the payload and the time used.
+        The reason of the first check that fails, else the payload, the time used and the
+        identity of the verified body.
     """
     settings: Settings = request.app.state.settings
     source = check_source(
@@ -211,7 +231,7 @@ async def _inspect(
     payload = _json_object(body)
     if payload is None:
         return Refusal.MALFORMED
-    return payload, now
+    return payload, now, body_identity(body)
 
 
 GATE_MARKER = "is_webhook_gate"
@@ -253,8 +273,12 @@ def webhook_gate[W: InboundWebhook](
             await _refuse(request, inspected, source, organisation)
         if not within_webhook_limit(source, bucket, caller):
             await _refuse(request, Refusal.RATE, source, organisation)
-        payload, now = inspected
-        return Delivery(address, payload, now)
+        payload, now, identity = inspected
+        if address.paused:
+            # Verified, so a stranger cannot get a 204 this way; dropped before any handling.
+            log.info("webhook.paused", source=source, organisation=organisation)
+            raise WebhookPaused
+        return Delivery(address, payload, now, identity)
 
     setattr(gate, GATE_MARKER, True)
     return gate
@@ -319,4 +343,11 @@ async def organisation_address(
     if not target.found or target.secret is None:
         return Unresolved(handling.source, target.organisation)
     sources = source_list_that_applies(target.allowed_networks, contact_center_networks(request))
-    return Address(handling, target.secret, target.organisation_id, target.organisation, sources)
+    return Address(
+        handling,
+        target.secret,
+        target.organisation_id,
+        target.organisation,
+        sources,
+        paused=not target.inbound_enabled,
+    )

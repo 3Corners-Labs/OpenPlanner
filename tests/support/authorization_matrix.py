@@ -588,6 +588,12 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             303, 403, 403, 403, 403, 403, 403
         ),
     },
+    # ADR 0124 point 9: the pause; without the state wanted the superuser gets a 422.
+    "POST /admin/organisations/{org}/channels/contact-center/inbound": {
+        "/admin/organisations/demo/channels/contact-center/inbound": statuses(
+            422, 403, 403, 403, 403, 403, 403
+        ),
+    },
     "POST /admin/organisations/{org}/channels/contact-center/delete": {
         "/admin/organisations/demo/channels/contact-center/delete": statuses(
             303, 403, 403, 403, 403, 403, 403

@@ -2,15 +2,17 @@
 
 Webhook handlers call ``record_meeting_event`` and ``record_task_event``; jobs call
 ``record``. Each call writes the event and the updated ``CallStatus`` in one transaction.
-Webex and WxCC events carry an ``event_key``: it is remembered for ``WEBHOOK_MEMORY`` in the
-same transaction, so a replayed or redelivered event changes nothing the second time.
+Webex and WxCC events carry an ``event_key`` (or, without one, the identity of their verified
+body): it is remembered per platform and organisation for ``WEBHOOK_MEMORY`` in the same
+transaction (``app.domain.webhook_replay``), so a replayed or redelivered event changes nothing
+the second time.
 Admins see a booking's timeline only with ``bookings.view`` on the group of the page's address,
 and only a booking of that group (ADR 0014).
 """
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Protocol
 
@@ -35,9 +37,7 @@ from app.domain.lookups import group_booking
 from app.domain.ports import REASON_LIMIT, Clock, ProbeRegistry, Transaction, UnitOfWork
 from app.domain.request_log import REQUEST_EVENT
 from app.domain.staff_usage import StaffUsage
-
-WEBHOOK_MEMORY = timedelta(days=30)
-"""How long a Webex event key is remembered; older keys are forgotten on the next event."""
+from app.domain.webhook_replay import WEBHOOK_MEMORY, replay_key
 
 WEBEX_SOURCE = "webex"
 
@@ -173,8 +173,14 @@ class IntegrationService:
         detail: str = "",
         *,
         event_key: str = "",
+        scope: str,
+        body_identity: str,
     ) -> EventOutcome:
-        """Record a meeting event once per ``event_key`` (none: always).
+        """Record a meeting event once per event (``event_key``, else its body's identity).
+
+        ``scope`` is the memory's scope of the address the event came in at
+        (``webhook_replay.scope_of``) and ``body_identity`` the identity of its verified body
+        (``""`` when there is no delivery, so no body to identify it by).
 
         Webex may report an instance id (``<meetingId>_I_<n>``); it is matched on the series.
         Keys are only remembered for OpenPlanner's meetings: org-owned webhooks also report
@@ -196,7 +202,7 @@ class IntegrationService:
                     return EventOutcome.IGNORED
                 detail = "host" if kind is EventKind.HOST_JOINED else detail
                 kind = TRIAL_MEETING_EVENTS[kind]
-            if not await _claim(tx, WEBEX_SOURCE, event_key, at):
+            if not await _claim(tx, WEBEX_SOURCE, event_key, scope, body_identity, at):
                 return EventOutcome.DUPLICATE
             await self._record(tx, booking.id, kind, at, detail)
         return EventOutcome.RECORDED
@@ -209,6 +215,8 @@ class IntegrationService:
         detail: str = "",
         *,
         event_key: str = "",
+        scope: str,
+        body_identity: str,
         origin: str = "",
         provider: ContactCenterKind,
         source: str,
@@ -244,7 +252,7 @@ class IntegrationService:
             if booking is not None and booking.id is not None:
                 if kind is EventKind.TASK_CREATED:
                     return EventOutcome.IGNORED
-                if not await _claim(tx, source, event_key, at):
+                if not await _claim(tx, source, event_key, scope, body_identity, at):
                     return EventOutcome.DUPLICATE
                 await self._record(tx, booking.id, kind, at, detail)
                 recorded = booking.id
@@ -326,13 +334,24 @@ class IntegrationService:
         await tx.save_call_status(after)
 
 
-async def _claim(tx: Transaction, source: str, event_key: str, at: datetime) -> bool:
-    """Remember ``event_key`` of ``source``; ``False`` when it was seen before (a replay).
+async def _claim(
+    tx: Transaction, source: str, event_key: str, scope: str, body_identity: str, at: datetime
+) -> bool:
+    """Remember the event of ``source``; ``False`` when it was seen before (a replay).
 
-    Without a key there is nothing to remember and the event always counts. Keys older than
-    ``WEBHOOK_MEMORY`` are forgotten in the same transaction.
+    The event is identified by its ``event_key`` or, without one, by its verified body
+    (``body_identity``), at the address's ``scope``: another organisation's address is another
+    event. Without either there is nothing to remember and the event always counts. Keys older
+    than ``WEBHOOK_MEMORY`` are forgotten in the same transaction.
     """
-    if not event_key:
+    identity = event_key or body_identity
+    if not identity:
         return True
     await tx.forget_webhook_events(at - WEBHOOK_MEMORY)
-    return await tx.claim_webhook_event(source, event_key, at)
+    # The shape before ADR 0124 step 3a was the bare ``event_key``. It is read installation-wide
+    # on purpose: an event remembered before the upgrade is a replay wherever it comes back, while
+    # a narrower reading would let a pre-upgrade event at an organisation's address be replayed
+    # once. Release 0.7.0 removes this check together with the port method.
+    if event_key and await tx.webhook_event_seen(source, event_key):
+        return False
+    return await tx.claim_webhook_event(source, replay_key(source, scope, identity), at)

@@ -1202,7 +1202,12 @@ class IntegrationReportRow(Base):
 
 
 class WebhookEventRow(Base):
-    """A Webex event key seen recently, so a replay is recorded once; no personal data."""
+    """An inbound event seen recently, so a replay is recorded once; no personal data.
+
+    ``event_key`` is a SHA-256 digest of the platform, the organisation's address and the event's
+    identity (``app.domain.webhook_replay``); before ADR 0124 step 3a it was the adapter's event
+    digest alone. A body is never kept.
+    """
 
     __tablename__ = "webhook_events"
 
