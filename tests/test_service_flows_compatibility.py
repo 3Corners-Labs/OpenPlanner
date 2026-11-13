@@ -42,6 +42,9 @@ OLD_BEHAVIOURS = (
 STEP_8 = "8"
 """This step's own row: it is the proof, not an item of the checklist."""
 TEST_REFERENCE = re.compile(r"`(tests/[\w/]+\.py)::(\w+)`")
+ACCEPTANCE = [f"A{n:02d}" for n in range(1, 37)]
+"""The rows of the acceptance matrix of ``docs/service-flows-handover.md`` (gate item G09)."""
+GATE_OPENERS = ("open_gate", "ROLLBACK_SAFE")
 ITEM = re.compile(r"\bG\d{2}\b")
 
 
@@ -61,7 +64,7 @@ def _table_rows(text: str) -> list[list[str]]:
         if not line.startswith("| ") or set(line) <= {"|", "-", " "}:
             continue
         cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        if cells[0] not in {"Change", "Claim", "Item", "Step"}:
+        if cells[0] not in {"Change", "Claim", "Item", "Row", "Step"}:
             rows.append(cells)
     return rows
 
@@ -123,7 +126,11 @@ def test_every_open_row_of_both_adrs_has_a_checklist_item() -> None:
         for cells in table_rows(path.read_text(encoding="utf-8")) or []:
             if state_of(cells) in OPEN_STATES and cells[0] != STEP_8:
                 wanted[f"{number}/{cells[0]}"] += 1
-    listed = Counter(item.source for item in _checklist().values() if "/" in item.source)
+    listed = Counter(
+        item.source
+        for item in _checklist().values()
+        if "/" in item.source and not item.status.startswith("done")
+    )
 
     assert wanted
     assert listed == wanted
@@ -145,3 +152,27 @@ def test_the_gate_stays_shut_while_a_blocking_item_is_open() -> None:
 
     if open_blocking:
         assert service_flows.ROLLBACK_SAFE is False, open_blocking
+
+
+def _acceptance() -> dict[str, list[str]]:
+    """Return the cells of the acceptance section's rows by row."""
+    text = MATRIX.read_text(encoding="utf-8").split("## 4. Acceptance matrix", 1)[1]
+    return {cells[0]: cells for cells in _table_rows(text) if cells[0].startswith("A")}
+
+
+def test_every_acceptance_row_names_its_test_and_how_it_meets_the_gate() -> None:
+    rows = _acceptance()
+
+    assert list(rows) == ACCEPTANCE
+    for name, (_row, _scenario, gate, proof) in rows.items():
+        assert gate in {"open", "both", "n/a"}, name
+        assert TEST_REFERENCE.search(proof), name
+
+
+def test_a_row_that_runs_with_the_gate_open_names_a_module_that_opens_it() -> None:
+    for name, (_row, _scenario, gate, proof) in _acceptance().items():
+        if gate not in {"open", "both"}:
+            continue
+        path, _test = TEST_REFERENCE.findall(proof)[0]
+        text = (ROOT / path).read_text(encoding="utf-8")
+        assert any(opener in text for opener in GATE_OPENERS), f"{name}: {path}"

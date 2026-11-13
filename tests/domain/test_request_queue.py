@@ -11,6 +11,7 @@ from datetime import timedelta
 
 import pytest
 
+from app.domain.closure import Closure
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.service_requests import HandlingState
 from tests.fakes.clock import FixedClock
@@ -231,3 +232,37 @@ async def test_a_check_in_outside_the_queues_window_is_refused(
     with pytest.raises(DomainError) as error:
         await queue(uow, clock).check_in(AGENT, "demo", booking_id)
     assert error.value.code is ErrorCode.OUTSIDE_BOOKING_WINDOW
+
+
+async def test_a24_a_closure_keeps_running_treatment_and_leaves_the_pool_otherwise_alone(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """A24: the service closes while its treatment runs on a pool another service may share.
+
+    The treatment keeps its one unit (it really occupies someone) and stays in progress; the
+    closure neither frees nor takes any other unit, so the pool's other unit stays for others.
+    Completing it releases the unit once.
+    """
+    booking_id = await appointment(uow, clock, at(10), NOW_FLOW, 30)
+    clock.advance(at(10) - clock.now())
+    appointments = queue(uow, clock)
+    await appointments.claim(AGENT, "demo", booking_id)
+    await appointments.start(AGENT, "demo", booking_id)
+    async with uow.locked() as tx:
+        notices = {"nl": "Gesloten.", "en": "Closed."}
+        closure = await tx.add_closure(Closure(None, 1, clock.now(), None, notices, clock.now()))
+        booking = await tx.get_booking(booking_id)
+        assert booking is not None
+        assert closure.id is not None
+        await tx.save_booking(booking.suspend(closure.id))
+
+    await watch(uow, clock).run()
+
+    request = next(iter(uow.state.requests.values()))
+    assert request.handling is HandlingState.IN_PROGRESS
+    async with uow.read() as tx:
+        held = await tx.get_pool_commitments(POOL, at(10), at(10, 30))
+    assert len({c.key for c in held}) == 1
+    await appointments.complete(AGENT, "demo", booking_id)
+    assert next(iter(uow.state.requests.values())).handling is HandlingState.COMPLETED
+    assert not any(i.ended_at is None for i in uow.state.work_items.values())
