@@ -48,6 +48,7 @@ from app.web.navigation import (
 )
 from app.web.organisation_settings import settings_for
 from app.web.protection import require_same_origin
+from app.web.security_policy import PageKind
 from app.web.templates import create_templates, kept_query, render
 from app.web.widgets import on_overview as overview_widgets
 
@@ -440,16 +441,16 @@ def page(
     principal: Principal,
     context: dict[str, object],
     *,
-    scripts: bool = False,
+    kind: PageKind = PageKind.DOCUMENT,
     help_link: bool = True,
 ) -> HTMLResponse:
     """Render an admin page with navigation and ``can()`` from the matrix.
 
     The menu, the top bar and the profile menu reach the template as ``render``'s ``frame``, so
     a page value under one of their names is refused instead of silently replaced.
-    ``scripts=True`` allows the page's own scripts (``SCRIPT_CSP``); only pages that enhance
-    themselves under an ADR do (the updates page, ADR 0048). ``help_link=False`` leaves out
-    the top bar's link to the manual (a message page: refusal, not found).
+    ``kind=PageKind.SCRIPTED`` allows the page's own scripts (``SCRIPT_CSP``); only pages that
+    enhance themselves under an ADR do (the updates page, ADR 0048). ``help_link=False`` leaves
+    out the top bar's link to the manual (a message page: refusal, not found).
     """
     can = can_function(principal)
     home = current_home(request)
@@ -505,7 +506,7 @@ def page(
             # Set by ``alerts.load_alerts`` for every admin page (ADR 0061 §7).
             "alert_banner": getattr(request.state, "alert_banner", None),
         },
-        scripts=scripts,
+        kind=kind,
     )
     if maintenance is not None:
         _freeze(request, principal, response)

@@ -90,6 +90,7 @@ from app.web.authz_labels import PERMISSION_LABELS
 from app.web.charts import Datum
 from app.web.job_labels import JOB_TYPE_LABELS
 from app.web.locale import RequestLocale
+from app.web.security_policy import PageKind
 from app.web.templates import ENVIRONMENT_LABELS, FragmentResponse, render
 from app.web.update_labels import STATUS_LABELS
 from app.web.widgets import OVERVIEW_PATH, View, Widget, on_overview, resolve_view, widget
@@ -846,7 +847,7 @@ async def overview(
                 can_function(principal)(Permission.ORGANISATION_VIEW),
             ),
         },
-        scripts=live,
+        kind=PageKind.SCRIPTED if live else PageKind.DOCUMENT,
     )
 
 

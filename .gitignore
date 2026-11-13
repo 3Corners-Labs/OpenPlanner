@@ -56,3 +56,7 @@ site/static/media/
 
 # role-manuals skill: its build tooling is installed locally (npm ci), never committed
 .claude/skills/role-manuals/node_modules/
+
+# The call page's vendored SDK (ADR 0123 point 3): not committed until Cisco's written answer on
+# the licence (point 18). An installation that tries the page places the file itself.
+app/web/static/vendor/webex/meetings.min.js

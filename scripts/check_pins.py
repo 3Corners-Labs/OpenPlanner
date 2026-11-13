@@ -17,11 +17,14 @@ Rules checked:
 Usage: ``python -m scripts.check_pins`` (``make pins``).
 """
 
+import json
 import re
 import sys
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
+
+from scripts import vendor
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -104,14 +107,52 @@ def files(root: Path) -> list[Path]:
     )
 
 
+def _python_groups(pattern: str) -> str:
+    """Return Renovate's regex with Python's spelling of a named group (``(?P<name>``)."""
+    return re.sub(r"\(\?<(?![=!])", "(?P<", pattern)
+
+
+def check_vendor(root: Path) -> Iterator[Violation]:
+    """Yield a violation for each vendored manifest whose version Renovate would not read.
+
+    A manifest is tracked when a custom manager of ``renovate.json`` matches its path, names
+    the manifest's package as ``depNameTemplate`` and its ``matchStrings`` capture exactly the
+    manifest's top-level ``version`` (not the ``version`` inside its ``checksum``). JSON has no
+    comment line for a ``# renovate:`` annotation, so this is the form of rule 2 for these files.
+    """
+    config = json.loads((root / "renovate.json").read_text(encoding="utf-8"))
+    managers = [m for m in config.get("customManagers", []) if "depNameTemplate" in m]
+    for manifest in vendor.manifests(root):
+        relative = manifest.path.relative_to(root).as_posix()
+        text = manifest.path.read_text(encoding="utf-8")
+        tracked = any(
+            manifest.name == manager["depNameTemplate"]
+            and any(
+                re.search(pattern.strip("/"), relative)
+                for pattern in manager["managerFilePatterns"]
+            )
+            and any(
+                (found := re.search(_python_groups(match), text))
+                and found["currentValue"] == manifest.version
+                for match in manager["matchStrings"]
+            )
+            for manager in managers
+        )
+        if not tracked:
+            yield Violation(relative, 1, "version no custom manager of renovate.json reads")
+
+
 def main() -> int:
     """Check every file, print each violation and return the process exit code."""
     violations = [
-        violation
-        for path in files(ROOT)
-        for violation in check_lines(
-            str(path.relative_to(ROOT)), path.read_text(encoding="utf-8").splitlines()
-        )
+        *(
+            violation
+            for path in files(ROOT)
+            for violation in check_lines(
+                str(path.relative_to(ROOT)), path.read_text(encoding="utf-8").splitlines()
+            )
+        ),
+        *check_vendor(ROOT),
     ]
     for violation in violations:
         print(violation)

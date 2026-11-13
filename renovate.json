@@ -36,6 +36,14 @@
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?\\s*\\n[^\\n]*?(?::=|:|=)\\s+\"?(?:[^\\s\":]+:)?(?<currentValue>[^\\s\"]+)\"?\\s*\\n"
       ]
+    },
+    {
+      "customType": "regex",
+      "description": "The vendored front-end file of the call page (ADR 0123 point 3): the version in its manifest is the npm package `webex`. A pull request moves the version only; tests/web/test_vendor.py then fails wherever the file is placed until the file and its checksum are replaced too. The match is the top-level version only (two spaces of indent), never the version inside `checksum`.",
+      "managerFilePatterns": ["/^app/web/static/vendor/webex/manifest\\.json$/"],
+      "matchStrings": ["\\n  \"version\": \"(?<currentValue>[^\"]+)\""],
+      "datasourceTemplate": "npm",
+      "depNameTemplate": "webex"
     }
   ],
   "packageRules": [

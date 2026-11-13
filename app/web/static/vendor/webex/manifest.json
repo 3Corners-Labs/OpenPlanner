@@ -1,0 +1,6 @@
+{
+  "name": "webex",
+  "version": "3.13.0",
+  "source": "npm package webex, umd/meetings.min.js",
+  "file": "meetings.min.js"
+}

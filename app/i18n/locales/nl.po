@@ -1651,6 +1651,12 @@ msgstr "Dit gesprek is voorbij."
 msgid "join.back"
 msgstr "Terug naar uw afspraak"
 
+msgid "call.title"
+msgstr "Uw videogesprek"
+
+msgid "call.unavailable"
+msgstr "Het gesprek in deze pagina is nog niet beschikbaar. Ga met de link hieronder terug naar uw afspraak."
+
 msgid "error.direct_call_unavailable"
 msgstr "Nu een gesprek starten kan op dit moment niet. Maak een afspraak."
 

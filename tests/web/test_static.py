@@ -1,4 +1,5 @@
 import gzip
+import json
 import re
 from pathlib import Path
 
@@ -14,7 +15,14 @@ SUSPICIOUS = re.compile(
 SCRIPT_COMMENT = re.compile(r"/\*.*?\*/|//[^\n]*", re.DOTALL)
 HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 
-SCRIPTS = sorted(Path("app/web/static").rglob("*.js"))
+STATIC = Path("app/web/static")
+VENDOR = STATIC / "vendor"
+"""Third-party files, one folder per library, each with a manifest (ADR 0118 point 6). They are
+exempt on purpose from the 30 KB and 100 KB budgets, the markup-sink scan and the comment scan
+below: the call page's SDK is 3.7 MB, has its own gate in ``tests/web/test_vendor.py`` and is
+not ours to rewrite (ADR 0123 point 3). Every script of ours is still checked by all of them."""
+SCRIPTS = sorted(path for path in STATIC.rglob("*.js") if VENDOR not in path.parents)
+VENDORED = sorted(VENDOR.rglob("*.js"))
 ISLANDS_DOC = Path("docs/islands.md")
 MAX_SCRIPT_BYTES = 30 * 1024
 MAX_ALL_SCRIPTS_BYTES = 100 * 1024
@@ -71,10 +79,16 @@ def _listed() -> set[str]:
 
 
 def test_the_islands_document_lists_every_script_and_only_those() -> None:
-    present = {path.relative_to("app/web/static").as_posix() for path in SCRIPTS}
+    present = {path.relative_to(STATIC).as_posix() for path in [*SCRIPTS, *VENDORED]}
+    # A vendored file may be listed before it is placed (ADR 0123 point 3: not committed until
+    # the licence answer), never a script of ours.
+    expected_later = {
+        f"vendor/{path.parent.name}/{json.loads(path.read_text())['file']}"
+        for path in VENDOR.glob("*/manifest.json")
+    }
 
     assert present - _listed() == set(), "add these scripts to docs/islands.md"
-    assert _listed() - present == set(), "docs/islands.md names a script that is gone"
+    assert _listed() - present - expected_later == set(), "docs/islands.md names a gone script"
 
 
 @pytest.mark.parametrize("path", SCRIPTS, ids=str)
