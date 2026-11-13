@@ -13504,3 +13504,114 @@ msgstr "We cannot help you without an appointment in the coming time. Please try
 
 msgid "error.not_checked_in"
 msgstr "This appointment has not been checked in yet. Check the participant in first."
+
+msgid "now.title"
+msgstr "Ask for help now"
+
+msgid "now.intro"
+msgstr "Fill in your details. You join the line of {group_name} and are helped as soon as someone is free."
+
+msgid "now.submit"
+msgstr "Join the line"
+
+msgid "now.expected"
+msgstr "The next person can probably be helped at {time}."
+
+msgid "request.title"
+msgstr "Your request"
+
+msgid "request.waiting"
+msgstr "You are in the line."
+
+msgid "request.called"
+msgstr "Your request has been taken up; you will be helped shortly."
+
+msgid "request.in_progress"
+msgstr "Your request is being handled now."
+
+msgid "request.done"
+msgstr "Your request has been handled."
+
+msgid "request.withdrawn"
+msgstr "You withdrew your request."
+
+msgid "request.expired"
+msgstr "Your request was not handled in time and has lapsed."
+
+msgid "request.again"
+msgstr "Ask for help again"
+
+msgid "request.leave.link"
+msgstr "Withdraw request"
+
+msgid "request.leave.title"
+msgstr "Withdraw your request?"
+
+msgid "request.leave.question"
+msgstr "If you withdraw your request, you leave the line. You can ask for help again afterwards."
+
+msgid "request.leave.confirm"
+msgstr "Yes, withdraw"
+
+msgid "admin.queue.check_in"
+msgstr "Check in"
+
+msgid "admin.queue.awaiting_check_in"
+msgstr "Not checked in yet"
+
+msgid "admin.done.checked_in"
+msgstr "The participant is checked in."
+
+msgid "admin.queue.request.heading"
+msgstr "Without an appointment"
+
+msgid "admin.queue.request.caption"
+msgstr "Requests without an appointment, oldest first"
+
+msgid "admin.queue.request.pick_up_next"
+msgstr "Pick up the next one without an appointment"
+
+msgid "admin.queue.request.since"
+msgstr "Since"
+
+msgid "admin.queue.request.waiting"
+msgstr "Waiting"
+
+msgid "admin.queue.request.in_progress"
+msgstr "In progress"
+
+msgid "admin.queue.request.recovery"
+msgstr "Not completed yet"
+
+msgid "admin.queue.request.title"
+msgstr "Request without an appointment"
+
+msgid "admin.queue.request.lead"
+msgstr "You picked up this request. Start when you help the participant and complete it when you are done."
+
+msgid "admin.retention.requests_holding"
+msgstr "Requests without an appointment holding data"
+
+msgid "admin.retention.requests_overdue"
+msgstr "Requests without an appointment overdue"
+
+msgid "admin.pool_staffing.waiting_heading"
+msgstr "Waiting without an appointment"
+
+msgid "admin.pool_staffing.waiting_lead"
+msgstr "How many people without an appointment may wait for this pool at once. Leave the field empty for no limit."
+
+msgid "admin.pool_staffing.max_waiting"
+msgstr "Limit"
+
+msgid "admin.pool_staffing.max_waiting_hint"
+msgstr "A whole number from 1 to 1000, or empty."
+
+msgid "admin.pool_staffing.waiting_button"
+msgstr "Save limit"
+
+msgid "admin.audit.detail.pool_staffing_max_waiting"
+msgstr "Waiting limit without appointment of a pool changed"
+
+msgid "admin.form.error.max_waiting"
+msgstr "Enter a whole number from 1 to 1000, or leave the field empty."

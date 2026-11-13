@@ -592,6 +592,24 @@ _OPERATIONS = (
         "A participant left a start-now call before or after it began.",
     ),
     _e(
+        "immediate.accepted",
+        _OPS,
+        "info",
+        "created request_id",
+        "An immediate request {request_id} was taken in (created: {created}).",
+        "A participant asked for help without an appointment (ADR 0121 step 7); a retried form "
+        "gives the same request.",
+        "Nothing to do; the line and its waiting limit are on the queue page.",
+    ),
+    _e(
+        "immediate.withdrawn",
+        _OPS,
+        "info",
+        "request_id",
+        "The participant withdrew immediate request {request_id}.",
+        "A participant left the line before treatment started (ADR 0121 step 7).",
+    ),
+    _e(
         "dns.lookup_failed",
         _OPS,
         "warning",

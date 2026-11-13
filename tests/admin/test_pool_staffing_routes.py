@@ -537,3 +537,21 @@ async def test_the_exception_list_scrolls_in_a_labelled_region(
     page = (await site.client.get(f"{path}/exceptions")).text
 
     assert 'class="table-scroll" role="region" aria-labelledby="list-heading" tabindex="0"' in page
+
+
+async def test_the_waiting_limit_is_saved_cleared_and_a_wrong_one_refused(site: Site) -> None:
+    """ADR 0121 step 7: the limit of people without an appointment, on the pool's page."""
+    path = await staffed(site)
+
+    saved = await post(site, f"{path}/waiting", {"max_waiting": "12"})
+    page = (await site.client.get(saved.headers["location"])).text
+    wrong = await post(site, f"{path}/waiting", {"max_waiting": "twelve"})
+    too_many = await post(site, f"{path}/waiting", {"max_waiting": "1001"})
+    cleared = await post(site, f"{path}/waiting", {"max_waiting": ""})
+
+    assert saved.headers["location"] == f"{path}/staffing?done=saved"
+    assert 'name="max_waiting"' in page
+    assert 'value="12"' in page
+    assert (wrong.status_code, too_many.status_code) == (422, 422)
+    assert 'href="#max_waiting"' in wrong.text
+    assert cleared.headers["location"] == f"{path}/staffing?done=saved"

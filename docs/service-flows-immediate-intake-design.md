@@ -125,7 +125,7 @@ No new section, top-level entry or seventh tab. No manual topic changes (existin
 
 | Flow | Threat | Mitigation | Test |
 |---|---|---|---|
-| Immediate intake | bots fill the line (slot exhaustion without slots) | rate limit `booking_limit` (the common limiter), honeypot, same origin, `max_waiting`, the look-ahead, one open request per browser and service | `test_waiting_limit_refuses`, `test_a_browser_holds_one_open_request`, route rate-limit test |
+| Immediate intake | bots fill the line (slot exhaustion without slots) | rate limit `booking_limit` (the common limiter), honeypot, same origin, `max_waiting`, the look-ahead (one open request per browser is a convenience, not a bound: a bot keeps no cookie) | `test_waiting_limit_refuses`, `test_a_browser_holds_one_open_request`, route rate-limit test |
 | Immediate intake | a retried POST makes two requests (A16) | the intake key, unique per service, returns the same request | `test_a_retried_intake_returns_the_same_request` |
 | Request page | someone reads or withdraws another's request (A31) | random 16-byte reference that authorises nothing; the cookie's hash on the request; `link_required` the same for a missing and a foreign request | `test_the_page_needs_its_cookie` |
 | Request page | personal data in an address or a log | reference only in the address; the record's fields are masked by the one list (`privacy.REQUEST_DATA_FIELDS`); the page shows the first name only | `test_no_personal_data_in_the_address` |
@@ -146,7 +146,7 @@ No new section, top-level entry or seventh tab. No manual topic changes (existin
 | A33 | yes | a never-claimed immediate request expires at its watchdog and its record is deleted 24 h later |
 | A11, A12 | yes | an immediate claim and an appointment admission on one pool share its units; another pool is untouched |
 | A21, A22 | not for immediate work | an immediate request is never dispatched to the contact center in this step (choice I8); readiness says so |
-| A32 | 7b | e2e pages in nl and en, keyboard, scripts off, 320 px |
+| A32 | partly (7b) | route tests in nl, scripts off (plain forms, a refresh button); the e2e suite (keyboard, axe, 320 px) once a pool flow can be active on the e2e stack (follow-up row 32) |
 
 ## 10. Choices this brief made (for the product owner; built with the default)
 
@@ -171,4 +171,4 @@ No new section, top-level entry or seventh tab. No manual topic changes (existin
 | PR | Content | Acceptance |
 |---|---|---|
 | 7a | This brief; migration 0115; `ServiceRequest` fields; `app/domain/immediate_intake.py` (admission, check-in rules, the participant's view of a request); `app/domain/immediate_requests.py` (accept, status, withdraw) and `app/domain/request_queue.py` (staff: list, claim, start, complete, release); check-in in `QueueService` and `RequestWork`; the assigned occupation in `open_occupations`; `max_waiting` in the configuration package; the on-demand gate (`pool_flows_bookable`), the legacy direct call refusing a pool flow, readiness `not_built_yet` for on-demand plus contact center; setting `on_demand_admission_lookahead_minutes`; error texts nl and en; ADR 0121 rows 7a, 7b and 30 | A11, A12, A15, A16, A17, A18, A20, A33 in the domain and the SQL adapter |
-| 7b | The participant's pages and cookie; immediate work and check-in on the queue page; `max_waiting` on the pool page; the retention overview counts (5d); `e2e/pages.json`; `docs/threat-model.md`, `docs/dataflow.md`, `docs/architecture.md`, `docs/widget.md` (unchanged: the widget books appointments only) | A31, A32, the routes' abuse cases |
+| 7b | The participant's pages and cookie; immediate work and check-in on the queue page; `max_waiting` on the pool page; the retention overview counts (5d); `e2e/pages.json` entries wait for an active pool flow on the e2e stack (follow-up row 32); `docs/threat-model.md`, `docs/dataflow.md`, `docs/architecture.md`, `docs/widget.md` (unchanged: the widget books appointments only) | A31, A32, the routes' abuse cases |

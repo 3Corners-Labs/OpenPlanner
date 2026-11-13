@@ -7,7 +7,7 @@ the updates are conditional on the state read, as in SQL.
 the fake's ``State`` (``requests``, ``work_items``, ``request_data``).
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import replace
 from datetime import datetime
 
@@ -78,13 +78,16 @@ class ServiceRequestStore(PoolStaffingStore):
             )
         return found
 
-    async def requests_holding_data(self) -> list[ServiceRequest]:
+    async def requests_holding_data(
+        self, group_ids: Collection[int] | None = None
+    ) -> list[ServiceRequest]:
         named = {i.request_id for i in self.state.work_items.values() if i.assigned_to}
         return [
             r
             for key, r in sorted(self.state.requests.items())
             if r.booking_id is None
             and (r.personal_data is PersonalDataState.PRESENT or key in named)
+            and (group_ids is None or r.group_id in group_ids)
         ]
 
     async def get_active_work_item(self, request_id: int) -> WorkItem | None:

@@ -84,6 +84,19 @@ class ImmediateRow:
 
 
 @dataclass(frozen=True)
+class ImmediateQueue:
+    """The immediate work of a service as an agent sees it.
+
+    Attributes:
+        rows: Open requests, oldest first.
+        next_request_id: The request *Pick up next* claims for the viewer; ``None`` when none.
+    """
+
+    rows: list[ImmediateRow]
+    next_request_id: int | None
+
+
+@dataclass(frozen=True)
 class ClaimedRequest:
     """Immediate work an agent holds, with what they may see of it.
 
@@ -133,8 +146,10 @@ class RequestQueue:
         self._keys = (pseudonym_key, *([previous_pseudonym_key] if previous_pseudonym_key else []))
         self._lease = lease_minutes
 
-    async def view(self, principal: Principal, slug: str) -> list[ImmediateRow]:
+    async def view(self, principal: Principal, slug: str) -> ImmediateQueue:
         """Return the service's open immediate requests, oldest first (choice I9).
+
+        ``next_request_id`` is the one *Pick up next* would claim: the rule of ``_first``.
 
         Raises:
             DomainError: ``not_permitted``, ``group_not_found`` or ``queue_not_enabled``.
@@ -161,7 +176,8 @@ class RequestQueue:
                         missing=await judge.skills(missing) if missing else (),
                     )
                 )
-        return rows
+        nxt = next((r.request_id for r in rows if _takes(r.handling, r.eligible)), None)
+        return ImmediateQueue(rows, nxt)
 
     async def claim(
         self, principal: Principal, slug: str, request_id: int | None = None
@@ -341,7 +357,8 @@ class RequestQueue:
         if not waiting:
             raise DomainError(ErrorCode.QUEUE_EMPTY)
         for request in waiting:
-            if not isinstance(await judge.of_work(request.flow, request.subject), Missing):
+            fits = not isinstance(await judge.of_work(request.flow, request.subject), Missing)
+            if _takes(request.handling, fits):
                 return request
         raise DomainError(ErrorCode.NOT_ELIGIBLE)
 
@@ -397,6 +414,11 @@ class RequestQueue:
             summary.group.slug,
             f"{detail}:{request.id}",
         )
+
+
+def _takes(handling: HandlingState, eligible: bool) -> bool:
+    """Return whether *Pick up next* may take a request: waiting and fit for the agent (I9)."""
+    return handling is HandlingState.QUEUED and eligible
 
 
 def _fixed_buffer(item: WorkItem, target: PoolTarget) -> int:

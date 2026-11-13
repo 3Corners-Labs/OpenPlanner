@@ -18,6 +18,7 @@
   <dl class="facts">
     <div><dt>{{ _("admin.retention.overdue") }}</dt><dd>{{ overview.overdue }}</dd></div>
     <div><dt>{{ _("admin.retention.failed") }}</dt><dd>{{ overview.failed_purges }}</dd></div>
+    <div><dt>{{ _("admin.retention.requests_overdue") }}</dt><dd>{{ overview.requests_overdue }}</dd></div>
     <div><dt>{{ _("admin.retention.last_purged") }}</dt><dd>{{ last_purged }}</dd></div>
     <div><dt>{{ _("admin.retention.checked_at") }}</dt><dd>{{ checked_at }}</dd></div>
   </dl>
@@ -32,6 +33,8 @@
       <th scope="col">{{ _("admin.retention.holding") }}</th>
       <th scope="col">{{ _("admin.retention.overdue") }}</th>
       <th scope="col">{{ _("admin.retention.failed") }}</th>
+      <th scope="col">{{ _("admin.retention.requests_holding") }}</th>
+      <th scope="col">{{ _("admin.retention.requests_overdue") }}</th>
       <th scope="col">{{ _("admin.retention.last_purged") }}</th>
       <th scope="col">{{ _("admin.retention.status") }}</th>
     </tr>
@@ -43,6 +46,8 @@
       <td>{{ row.holding }}</td>
       <td>{{ row.overdue }}</td>
       <td>{{ row.failed }}</td>
+      <td>{{ row.requests_holding }}</td>
+      <td>{{ row.requests_overdue }}</td>
       <td class="nowrap">{{ row.last_purged }}</td>
       <td>{% if row.attention %}<span class="chip chip--danger">{{ _("admin.retention.needs_attention") }}</span>{% else %}<span class="chip chip--success">{{ _("admin.retention.ok") }}</span>{% endif %}</td>
     </tr>

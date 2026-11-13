@@ -33,6 +33,8 @@ class GroupRow:
     failed: int
     last_purged: str
     attention: bool
+    requests_holding: int = 0
+    requests_overdue: int = 0
 
 
 @router.get("/retention", response_class=HTMLResponse)
@@ -54,6 +56,8 @@ async def retention(
             g.failed_purges,
             admin_moment(request, locale, g.last_purged_at) if g.last_purged_at else never,
             g.needs_attention,
+            g.requests_holding,
+            g.requests_overdue,
         )
         for g in overview.groups
     ]

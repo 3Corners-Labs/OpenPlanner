@@ -37,11 +37,11 @@ from app.domain.job_plan import PURGE_AFTER, JobType
 from app.domain.ports import Clock, UnitOfWork
 from app.domain.retention import (
     BACKLOG_AGE,
-    PURGE_GRACE,
     DueBooking,
     candidates_before,
     is_backlog,
     is_overdue,
+    is_record_overdue,
     purge_moment,
 )
 from app.domain.service_requests import ServiceRequest, data_deletion_at
@@ -152,7 +152,7 @@ class RetentionSweep:
                 for d in found
                 if is_overdue(d.candidate, now, self._retention_of(d.candidate.organisation_id))
             ]
-            records = [r for r in await tx.requests_holding_data() if _record_overdue(r, now)]
+            records = [r for r in await tx.requests_holding_data() if is_record_overdue(r, now)]
             per_group: dict[str, int] = {}
             for group_id in [d.candidate.group_id for d in overdue] + [r.group_id for r in records]:
                 group = await tx.get_group_by_id(group_id)
@@ -245,12 +245,6 @@ class RetentionSweep:
         except Exception as exc:  # one record must not stop the others; the event reports it
             return type(exc).__name__
         return _PURGED if deleted else _CHANGED
-
-
-def _record_overdue(request: ServiceRequest, now: datetime) -> bool:
-    """Return whether a request-level record is past its deletion moment and the grace."""
-    moment = data_deletion_at(request)
-    return moment is not None and moment + PURGE_GRACE < now
 
 
 def _record_backlog(request: ServiceRequest, now: datetime) -> bool:

@@ -22,11 +22,20 @@ from app.domain.admin import AdminService
 from app.domain.authorization import MATRIX, Role, Scope
 from app.domain.booking import ChangeReason, MeetingRef, TrialCall
 from app.domain.capacity import CapacityPool, PoolMode
+from app.domain.flow_resolution import FlowRef
 from app.domain.form_fields import FieldDefinition, FieldType, FormDefinition
+from app.domain.immediate_intake import new_access
 from app.domain.planning import PlanningService
 from app.domain.routing import GroupRouting, Subject
-from app.domain.scheduling import DispatchKind, ScheduleOverride, ScheduleRule, TimeWindow
+from app.domain.scheduling import (
+    DispatchKind,
+    Offer,
+    ScheduleOverride,
+    ScheduleRule,
+    TimeWindow,
+)
 from app.domain.service_flows import FlowState, ServiceFlow
+from app.domain.service_requests import RequestPersonalData, on_demand_request
 from app.domain.services import BookingService, ContactInput
 from app.domain.skills import Skill
 from app.domain.staff_directory import DirectoryUser
@@ -37,6 +46,7 @@ from tests.fakes.staff_directory import FakeStaffDirectory
 from tests.support.admin_site import post_form, site_app, site_uow
 from tests.support.domain import FRIDAY_0900, NOW, TEST_TOKEN_KEY, book_confirmed
 from tests.support.organisation_providers import NEW_PROVIDER, organisation_claims
+from tests.support.pool_flows import add_pool_flow
 from tests.support.service_flows import revision
 
 # The demo group is open on weekdays; the clock starts on Thursday 1 January 2026.
@@ -108,6 +118,8 @@ RELEASE = Release(Version(1, 4, 0), "https://github.com/acme/openplanner/release
 
 QUEUE_ITEM = "/admin/groups/demo/queue/{queued}"
 """The queued booking's page; the superuser picks it from the queue."""
+IMMEDIATE_ITEM = "/admin/groups/demo/queue/requests/{immediate}"
+"""A request without an appointment the superuser picks up (ADR 0121 step 7)."""
 LOG_DESTINATION = {
     "name": "Splunk",
     "kind": "splunk_hec",
@@ -127,6 +139,7 @@ class Fixture:
         self.rendered: set[str] = set()
         self.booking_id = 0
         self.queued_id = 0
+        self.immediate_id = 0
         self.on_hold_id = 0
         self.rule_id = 0
         self.override_id = 0
@@ -145,6 +158,7 @@ class Fixture:
         values = {
             "{id}": self.booking_id,
             "{queued}": self.queued_id,
+            "{immediate}": self.immediate_id,
             "{on_hold}": self.on_hold_id,
             "{rule}": self.rule_id,
             "{override}": self.override_id,
@@ -203,6 +217,42 @@ def _record_templates(monkeypatch: pytest.MonkeyPatch, into: set[str]) -> None:
         return original(self, name, parent, globals)
 
     monkeypatch.setattr(Environment, "get_template", recording)
+
+
+async def _immediate(site: Site, pool_id: int) -> int:
+    """Store a request without an appointment of the demo service on the sweep's pool.
+
+    The pool is staffed on Fridays for both kinds of work and a flow without contact takes
+    immediate work; the request carries the first-name marker (ADR 0121 step 7).
+    """
+    uow = site_uow(site)
+    everything = Scope(everything=True)
+    async with uow.locked() as tx:
+        friday = TimeWindow(time(8), time(17), 2, None, Offer.BOTH)
+        await tx.add_pool_rule(everything, pool_id, ScheduleRule(4, friday))
+        group = await tx.get_group("demo")
+        assert group is not None
+    flow = await add_pool_flow(uow, group.id, pool_id, code="nu", on_demand=True)
+    access, _ = new_access("s" * 43)
+    async with uow.locked() as tx:
+        stored = await tx.add_service_request(
+            on_demand_request(
+                organisation_id=group.organisation_id,
+                group_id=group.id,
+                flow=FlowRef(flow.flow_id, 1),
+                pool_id=pool_id,
+                subject=None,
+                access=access,
+                now=site.clock.now(),
+                unresolved_hours=24,
+            ),
+            RequestPersonalData(
+                first_name=MARKERS["first_name"],
+                last_name=MARKERS["last_name"],
+                email=f"{MARKERS['email']}-9@example.org",
+            ),
+        )
+    return stored.id or 0
 
 
 async def mark(site: Site, monkeypatch: pytest.MonkeyPatch) -> Fixture:
@@ -370,4 +420,7 @@ async def mark(site: Site, monkeypatch: pytest.MonkeyPatch) -> Fixture:
     picked = await post_form(site, "/admin/groups/demo/queue/next", {})
     assert picked.status_code == 303, picked.text
     assert picked.headers["location"] == found.fill(QUEUE_ITEM)
+    found.immediate_id = await _immediate(site, found.pool_id)
+    taken = await post_form(site, "/admin/groups/demo/queue/requests/next", {})
+    assert taken.headers["location"] == found.fill(IMMEDIATE_ITEM), taken.text
     return found

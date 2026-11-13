@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ _("request.title") }} – {{ group.name }}{% endblock %}
+{% block content %}
+<p class="eyebrow">{{ group.name }}</p>
+<h1 id="request-heading" tabindex="-1">{{ _("request.title") }}</h1>
+<div data-live data-heading="request-heading">
+  <p class="visually-hidden" role="status" data-live-announce>{{ status_text }}</p>
+  {% include "_request_status.html" %}
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ static_url('live-region.js') }}" defer></script>{% endblock %}

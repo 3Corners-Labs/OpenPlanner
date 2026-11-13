@@ -317,7 +317,7 @@ web ──> audit_events: queue.claimed / queue.released (actor subject, group, 
 
 A request of a flow on a counted pool (`service_requests`) and the attempts of staff to handle it
 (`work_items`). The personal data of a request with an appointment stays on its booking; a
-request without one keeps it in `request_personal_data` (decision D1), written from step 7
+request without one keeps it in `request_personal_data` (decision D1), written by step 7
 (on-demand intake) on. Nothing in production makes a request while the rollback gate
 `ROLLBACK_SAFE` is shut.
 
@@ -327,6 +327,8 @@ request without one keeps it in `request_personal_data` (decision D1), written f
 | Who took the work | `work_items.assigned_to` (pseudonym, not the subject) | the agent's login | emptied by the booking's purge, or with the request-level record | no |
 | Name, email, phone, answers of a request without an appointment | `request_personal_data` (the booking's column names, `privacy.REQUEST_DATA_FIELDS`) | intake without an appointment (step 7) | `min(resolved_at, watchdog_at) + 24 h`; the row is deleted and the request marked `deleted` | no |
 | Who holds the work, and a contact-center attempt (ADR 0121 step 6b) | `work_items.channel` and the attempt states; the task id on the booking (`wxcc_task_id`, as for every task) | the dispatch job and the platform's task events | as the work item; the task id is purged with the booking | the task (the outbound fields of the contact-center payload, plus `openplannerInteraction` for work without a meeting); an event's `origin` id (the booking reference) is read back, its name never |
+| A request without an appointment and its access (ADR 0121 step 7) | `service_requests` (`pool_id`, `subject`, `arrived_at`, `public_ref`, `access_hash`, `intake_key_hash`; hashes only, no personal data) and `request_personal_data` | the participant's immediate form (`/g/{slug}/direct` of a pool flow); the browser keeps `op_req` (a random reference and value) | the record and the hashes go at `min(resolved_at, watchdog_at) + 24 h`; the page closes then | no |
+| An appointment's arrival (ADR 0121 step 7) | `service_requests.arrived_at` | staff of the own queue (*Check in*) | as the request | no |
 
 ## Branding and the calendar script (WP3b)
 
