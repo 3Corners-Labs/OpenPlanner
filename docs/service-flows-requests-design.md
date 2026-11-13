@@ -16,7 +16,7 @@ The first complete demonstration (D3) is one flow without video on the own queue
 
 ## 2. Data model (migration 0113, expand only)
 
-Number 0113: `main` has 0111, the open #763 claims 0112. Checked again when the pull request opens.
+Number 0113, revising 0112 (`skills.contact_center_code`, #763).
 
 ### 2.1 `service_requests`
 

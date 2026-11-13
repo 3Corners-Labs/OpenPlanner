@@ -95,6 +95,7 @@ from app.domain.service_flows import (
     ServiceFlow,
     can_activate,
     check_built_choices,
+    check_code_kept,
     check_default_paths,
     check_draft_identity,
     check_flow_references,
@@ -183,6 +184,15 @@ class _World:
         """Every skill by its id."""
         return {skill.id: skill for skill in self.skills.values() if skill.id is not None}
 
+    @property
+    def coded_skills(self) -> frozenset[int]:
+        """The ids of the skills that have a contact-center code (ADR 0121 step 4b)."""
+        return frozenset(
+            skill.id
+            for skill in self.skills.values()
+            if skill.id is not None and skill.contact_center_code is not None
+        )
+
     def skill_ids(self, organisation: str, codes: list[str]) -> frozenset[int]:
         """Return the ids of the skills with these codes; a code without a skill is left out."""
         return frozenset(
@@ -190,6 +200,11 @@ class _World:
             for code in codes
             if (skill := self.skills.get((organisation, code))) is not None and skill.id is not None
         )
+
+
+def _contact_code(value: object) -> str | None:
+    """Return a skill's contact-center code as the document holds it (``None``: not mapped)."""
+    return None if value is None else str(value)
 
 
 def _read_world(root: Entity) -> _World:
@@ -205,6 +220,7 @@ def _read_world(root: Entity) -> _World:
                 address[1],
                 text_map(entity.fields.get("labels"), "skill_label"),
                 _ARCHIVED if flag_of(entity.fields, "archived", False) else None,
+                _contact_code(entity.fields.get("contact_center_code")),
             )
         except DomainError:
             continue
@@ -390,7 +406,8 @@ class _Run:
 
 
 def _skill_rules(run: _Run) -> Iterator[Refusal]:
-    """A skill is checked as the screen saves it."""
+    """A skill is checked as the screen saves it, its contact-center code kept while in use."""
+    stored_skills = dict(walk(run.resolution.current, SKILL_KIND))
     for change in run.resolution.changes:
         if change.kind != SKILL_KIND or change.action not in _WRITES:
             continue
@@ -398,10 +415,27 @@ def _skill_rules(run: _Run) -> Iterator[Refusal]:
         if skill is None:
             continue
         created = change.action is ChangeAction.CREATE
+        twins = skill.contact_center_code is not None and any(
+            other is not skill
+            and (key[0], other.contact_center_code)
+            == (change.address[0], skill.contact_center_code)
+            for key, other in run.world.skills.items()
+        )
         try:
             check_skill_save(
-                replace(skill, id=None) if created else skill, None if created else skill, False
+                replace(skill, id=None) if created else skill,
+                None if created else skill,
+                False,
+                same_contact_center_code_exists=twins,
             )
+            before = stored_skills.get(change.address)
+            if before is not None and skill.id is not None:
+                check_code_kept(
+                    skill.id,
+                    _contact_code(before.fields.get("contact_center_code")),
+                    skill.contact_center_code,
+                    run.built_flows().values(),
+                )
         except DomainError as error:
             yield _refusal(change.path, error)
 
@@ -709,7 +743,12 @@ def _check_publication(run: _Run, address: Address, number: int, built: FlowRevi
         # revision is history as it was recorded.
         pool = run.world.pool_by_id.get(built.capacity_pool_id or 0)
         check_publish_ready(
-            readiness(built, pool, offered_subjects=run.world.subjects.get(address[1], ()))
+            readiness(
+                built,
+                pool,
+                offered_subjects=run.world.subjects.get(address[1], ()),
+                coded_skills=run.world.coded_skills,
+            )
         )
 
 
@@ -733,7 +772,10 @@ def _check_state(run: _Run, address: Address, built: ServiceFlow) -> Iterator[Re
     if built.state is FlowState.ACTIVE and built.current is not None:
         pool = run.world.pool_by_id.get(built.current.capacity_pool_id or 0)
         items = readiness(
-            built.current, pool, offered_subjects=run.world.subjects.get(address[1], ())
+            built.current,
+            pool,
+            offered_subjects=run.world.subjects.get(address[1], ()),
+            coded_skills=run.world.coded_skills,
         )
         if not can_activate(items):
             for item in items:

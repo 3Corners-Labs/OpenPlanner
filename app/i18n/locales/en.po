@@ -12371,6 +12371,24 @@ msgstr "Archive skill"
 msgid "admin.skills.error.code_taken"
 msgstr "This code is already used in your organisation. Choose another."
 
+msgid "admin.skills.contact_center_code"
+msgstr "Code in the contact center (optional)"
+
+msgid "admin.skills.contact_center_code_hint"
+msgstr "What your contact center's flow checks for this skill: letters, digits and _ . : - (at most 64 characters). Blank: not mapped. A flow that sends work to the contact center and requires this skill is ready only once the skill has a code."
+
+msgid "admin.skills.contact_center_code_short"
+msgstr "Contact center: {code}"
+
+msgid "admin.skills.error.contact_center_code_taken"
+msgstr "Another skill of your organisation already has this code. Choose another."
+
+msgid "admin.skills.error.contact_center_code"
+msgstr "Use only letters, digits and _ . : - (at most 64 characters)."
+
+msgid "admin.skills.error.contact_center_code_in_use"
+msgstr "A flow that sends work to the contact center requires this skill, so the code cannot be taken away. Give another code, or change or archive that flow first."
+
 msgid "admin.skills.error.choice"
 msgstr "A chosen skill no longer exists or can no longer be newly chosen. Reload the page and choose again."
 
@@ -13042,6 +13060,9 @@ msgstr "Enter a valid expected duration."
 
 msgid "admin.flows.reason.pool_does_not_guarantee"
 msgstr "The capacity pool does not guarantee every skill that this flow or one of its subjects requires."
+
+msgid "admin.flows.reason.skill_unmapped"
+msgstr "This flow sends work to the contact center, but a skill that it or one of its subjects requires has no contact-center code yet. Give that skill a code under Skills and capacity."
 
 msgid "admin.flows.reason.missing_skills"
 msgstr "Missing in the pool: {skills}"

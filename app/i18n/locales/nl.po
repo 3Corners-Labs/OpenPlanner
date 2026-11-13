@@ -12384,6 +12384,24 @@ msgstr "Vaardigheid archiveren"
 msgid "admin.skills.error.code_taken"
 msgstr "Deze code is al in gebruik in uw organisatie. Kies een andere."
 
+msgid "admin.skills.contact_center_code"
+msgstr "Code in het contactcenter (optioneel)"
+
+msgid "admin.skills.contact_center_code_hint"
+msgstr "Wat de flow van uw contactcenter voor deze vaardigheid controleert: letters, cijfers en _ . : - (ten hoogste 64 tekens). Leeg: niet gekoppeld. Een flow die naar het contactcenter verdeelt en deze vaardigheid vraagt, is pas klaar als de vaardigheid een code heeft."
+
+msgid "admin.skills.contact_center_code_short"
+msgstr "Contactcenter: {code}"
+
+msgid "admin.skills.error.contact_center_code_taken"
+msgstr "Een andere vaardigheid van uw organisatie heeft deze code al. Kies een andere."
+
+msgid "admin.skills.error.contact_center_code"
+msgstr "Gebruik alleen letters, cijfers en _ . : - (ten hoogste 64 tekens)."
+
+msgid "admin.skills.error.contact_center_code_in_use"
+msgstr "Een flow die naar het contactcenter verdeelt vraagt deze vaardigheid, dus de code kan niet weg. Geef een andere code, of pas die flow eerst aan of archiveer hem."
+
 msgid "admin.skills.error.choice"
 msgstr "Een gekozen vaardigheid bestaat niet meer of kan niet meer nieuw worden gekozen. Laad de pagina opnieuw en kies opnieuw."
 
@@ -13055,6 +13073,9 @@ msgstr "Vul een geldige verwachte duur in."
 
 msgid "admin.flows.reason.pool_does_not_guarantee"
 msgstr "De capaciteitspool garandeert niet alle vaardigheden die deze flow of een van de onderwerpen vraagt."
+
+msgid "admin.flows.reason.skill_unmapped"
+msgstr "Deze flow verdeelt naar het contactcenter, maar een vaardigheid die hij of een van de onderwerpen vraagt heeft nog geen code in het contactcenter. Geef die vaardigheid een code onder Vaardigheden en capaciteit."
 
 msgid "admin.flows.reason.missing_skills"
 msgstr "Ontbreekt in de pool: {skills}"

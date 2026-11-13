@@ -41,7 +41,7 @@
       {% for row in skill_rows %}
       <tr>
         <th scope="row">{{ row.label }}<br><span class="muted">{{ row.other_label }}</span></th>
-        <td><code>{{ row.code }}</code></td>
+        <td><code>{{ row.code }}</code>{% if row.contact_center_code %}<br><span class="muted">{{ _("admin.skills.contact_center_code_short", code=row.contact_center_code) }}</span>{% endif %}</td>
         <td>{{ row.staff }}</td>
         <td>{{ _("admin.skills.used_by", pools=row.pools, flows=row.flows) }}</td>
         {% if skills_editable %}

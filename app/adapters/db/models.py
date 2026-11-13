@@ -1885,6 +1885,8 @@ class SkillRow(Base):
     """One skill of an organisation's catalogue (ADR 0121 point 5); no personal data.
 
     ``labels`` is a JSON object of locale to label, like the labels of a subject (ADR 0081).
+    ``contact_center_code`` is what the organisation's contact-center flow tests for the skill
+    (ADR 0121 step 4b, migration 0112), unique within the organisation where set.
     """
 
     __tablename__ = "skills"
@@ -1894,8 +1896,18 @@ class SkillRow(Base):
     code: Mapped[str] = mapped_column(String(40))
     labels: Mapped[str] = mapped_column(Text)
     archived_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    contact_center_code: Mapped[str | None] = mapped_column(String(64))
 
-    __table_args__ = (UniqueConstraint("organisation_id", "code"),)
+    __table_args__ = (
+        UniqueConstraint("organisation_id", "code"),
+        Index(
+            "uq_skills_organisation_id_contact_center_code",
+            "organisation_id",
+            "contact_center_code",
+            unique=True,
+            sqlite_where=text("contact_center_code IS NOT NULL"),
+        ),
+    )
 
 
 class StaffSkillRow(Base):

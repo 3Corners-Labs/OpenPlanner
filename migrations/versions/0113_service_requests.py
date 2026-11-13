@@ -17,7 +17,7 @@ is migration 0111 refusing while a slot carries a pool). Requests and work items
 go without asking.
 
 Revision ID: 0113
-Revises: 0111
+Revises: 0112
 """
 
 from collections.abc import Sequence
@@ -28,7 +28,7 @@ from alembic import op
 from app.adapters.db.types import UTCDateTime
 
 revision: str = "0113"
-down_revision: str | None = "0111"
+down_revision: str | None = "0112"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

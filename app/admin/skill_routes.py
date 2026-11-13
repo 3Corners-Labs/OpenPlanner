@@ -10,9 +10,12 @@ organisation, and an archived one, answer like a missing one.
     GET  /admin/organisations/{org}/skills                       organisation.view  both lists
     POST /admin/organisations/{org}/skills                       skills.manage      add a skill
     GET  /admin/organisations/{org}/skills/{skill_id}            skills.manage      edit the labels
-    POST /admin/organisations/{org}/skills/{skill_id}            skills.manage      save the labels
+    POST /admin/organisations/{org}/skills/{skill_id}            skills.manage      save it
     GET  /admin/organisations/{org}/skills/{skill_id}/archive    skills.manage      confirmation
     POST /admin/organisations/{org}/skills/{skill_id}/archive    skills.manage      archive it
+
+The page of one skill also carries its contact-center code (ADR 0121 step 4b): what the
+organisation's contact-center flow tests for the skill; blank means not mapped.
 
 The list has the archived skills behind ``?skills=archived``. There is no delete: a skill that
 anything refers to stays. The code is fixed after creation.
@@ -27,7 +30,7 @@ from app.admin.authz import AdminContext, RequirePermission, skill_service
 from app.admin.forms import FormData, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin, org_page, with_manual
 from app.admin.skill_inputs import raise_unknown, refuse
-from app.admin.skill_views import code_field, label_fields, skill_row
+from app.admin.skill_views import code_field, contact_center_field, label_fields, skill_row
 from app.admin.skills_capacity_page import SKILLS_ANCHOR, skills_capacity_page, url
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError
@@ -73,7 +76,11 @@ async def _edit_page(
             "fields": with_manual(
                 request,
                 locale,
-                [code_field(form, locale, found.line), *label_fields(form, locale, found.line)],
+                [
+                    code_field(form, locale, found.line),
+                    *label_fields(form, locale, found.line),
+                    contact_center_field(form, locale, found.line),
+                ],
             ),
             "errors": form.errors,
             "back": f"{url(org)}#{SKILLS_ANCHOR}",
@@ -126,7 +133,12 @@ async def save_skill(
     form = await read_form(request, locale)
     try:
         changed = await skill_service(request).relabel(
-            context.principal, org, skill_id, form.text("label_nl"), form.text("label_en")
+            context.principal,
+            org,
+            skill_id,
+            form.text("label_nl"),
+            form.text("label_en"),
+            form.text("contact_center_code"),
         )
     except DomainError as error:
         refuse(form, error, locale, "label_nl")
