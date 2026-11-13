@@ -327,14 +327,23 @@ async def _claimed(
     attempt: Awaitable[ClaimedBooking],
 ) -> Response:
     """Go to the claimed booking, or back to the list with the reason it did not work."""
-    try:
-        claimed = await attempt
-    except DomainError as error:
-        raise_refusal(error)
-        if error.code not in SHOWN_ON_THE_LIST:
-            raise
-        return await render_list(request, locale, context, slug, error.code)
+    claimed = await or_list(request, locale, context, slug, attempt)
+    if isinstance(claimed, HTMLResponse):
+        return claimed
     return RedirectResponse(f"{_url(slug)}/{claimed.booking_id}", status_code=303)
+
+
+async def or_done(
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    slug: str,
+    attempt: Awaitable[None],
+    outcome: str,
+) -> Response:
+    """Go back to the list with ``outcome``, or with the reason it did not work."""
+    done = await or_list(request, locale, context, slug, attempt)
+    return done if isinstance(done, HTMLResponse) else redirect_done(_url(slug), outcome)
 
 
 def _claimed_view(booking: ClaimedBooking, locale: RequestLocale, tz: tzinfo) -> ClaimedView:
@@ -375,13 +384,10 @@ async def _claimed_or_list(
     request: Request, locale: RequestLocale, context: AdminContext, slug: str, booking_id: int
 ) -> ClaimedView | HTMLResponse:
     """Return the claimed booking, or the list with the reason it cannot be shown."""
-    try:
-        booking = await _service(request).claimed(context.principal, slug, booking_id, locale.code)
-    except DomainError as error:
-        raise_refusal(error)
-        if error.code not in SHOWN_ON_THE_LIST:
-            raise
-        return await render_list(request, locale, context, slug, error.code)
+    attempt = _service(request).claimed(context.principal, slug, booking_id, locale.code)
+    booking = await or_list(request, locale, context, slug, attempt)
+    if isinstance(booking, HTMLResponse):
+        return booking
     return _claimed_view(booking, locale, context.group.group.tz)
 
 
@@ -504,14 +510,8 @@ async def release(
     request: Request, locale: Locale, slug: str, booking_id: int, _: SameOrigin, context: WorkQueue
 ) -> Response:
     """Put a claimed booking back in the queue."""
-    try:
-        await _service(request).release(context.principal, slug, booking_id)
-    except DomainError as error:
-        raise_refusal(error)
-        if error.code not in SHOWN_ON_THE_LIST:
-            raise
-        return await render_list(request, locale, context, slug, error.code)
-    return redirect_done(_url(slug), "released")
+    attempt = _service(request).release(context.principal, slug, booking_id)
+    return await or_done(request, locale, context, slug, attempt, "released")
 
 
 @router.post("/groups/{slug}/queue/{booking_id}/start", response_class=HTMLResponse)
@@ -528,14 +528,8 @@ async def complete(
     request: Request, locale: Locale, slug: str, booking_id: int, _: SameOrigin, context: WorkQueue
 ) -> Response:
     """Complete request work: its unit of the pool is released (ADR 0121 step 5)."""
-    try:
-        await _service(request).complete(context.principal, slug, booking_id)
-    except DomainError as error:
-        raise_refusal(error)
-        if error.code not in SHOWN_ON_THE_LIST:
-            raise
-        return await render_list(request, locale, context, slug, error.code)
-    return redirect_done(_url(slug), "completed")
+    attempt = _service(request).complete(context.principal, slug, booking_id)
+    return await or_done(request, locale, context, slug, attempt, "completed")
 
 
 @router.post("/groups/{slug}/queue/{booking_id}/check-in", response_class=HTMLResponse)
@@ -544,5 +538,4 @@ async def check_in(
 ) -> Response:
     """Check an appointment in: the participant has arrived (ADR 0121 step 7, choice I1)."""
     attempt = _service(request).check_in(context.principal, slug, booking_id)
-    done = await or_list(request, locale, context, slug, attempt)
-    return done if isinstance(done, HTMLResponse) else redirect_done(_url(slug), "checked_in")
+    return await or_done(request, locale, context, slug, attempt, "checked_in")

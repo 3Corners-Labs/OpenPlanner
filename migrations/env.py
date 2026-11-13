@@ -59,6 +59,11 @@ def _run(connection: Connection) -> None:
         render_as_batch=sqlite,
         compare_type=True,
         render_item=_render_item,
+        # One transaction for the whole run (ADR 0121 step 8): Alembic's SQLite default commits
+        # after every migration, so a downgrade refused half way used to stop between revisions
+        # with the steps above it undone. The engine emits BEGIN itself, so SQLite's schema
+        # statements are transactional and a refusal now rolls the whole run back.
+        transactional_ddl=True,
     )
     if sqlite:
         _pragma(connection, "PRAGMA foreign_keys=OFF")

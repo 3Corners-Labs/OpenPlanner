@@ -2141,6 +2141,29 @@ write lock only for a group that lacks something. On an error it prints one line
 above zero, and the log lines `flows.repair_failed` and `flows.repair_incomplete` say the same
 for the worker's own run.
 
+**Services, flows and requests (ADR 0121, ADR 0122; proof in `docs/service-flows-compatibility.md`).**
+Migrations 0109 to 0115 (minor 0.6) only add: tables, nullable or defaulted columns on
+`bookings` and `slots`, and a backfill of one legacy pool and the default flows per service.
+While the rollback gate `ROLLBACK_SAFE` is shut (it is, in every image so far) nothing in
+production writes a pool slot, a request-level record, a contact-center attempt or an immediate
+request, so:
+
+1. *Going forward* is `alembic upgrade head` as for any release; every booking, slot, job and
+   setting keeps its values, every old booking reads as its service's default flow.
+2. *Going back* is the normal rollback: start the previous image on the current schema, no
+   downgrade (ADR 0116 point 5). The previous image reads and writes as before; services it
+   creates get their pool and flows when the new image starts again (above).
+3. *Downgrading past the train* (`alembic downgrade 0108`) is the fallback only. Export the
+   configuration package first (*Configuration package* below): the downgrade drops the skill
+   catalogue, the pools and their staffing, the flows, the skills' contact-center codes and a
+   pool's waiting limit, and an upgrade gives each service its legacy pool and flows back, not
+   what an administrator configured. It refuses, naming the reason, while a pool slot (0111), a
+   request-level record holding personal data (0113), a contact-center attempt (0114) or an
+   immediate request (0115) exists. The whole downgrade is one transaction: after a refusal
+   the database is still at head with every row, and the new image starts as before. Check the
+   revision with `docker compose run --rm web alembic current`; either stay on the new image or
+   wait until the retention rules have deleted what the refusal named.
+
 ## Backup and restore
 
 OpenPlanner has two kinds of copies of the database, with different purposes (ADR 0102,

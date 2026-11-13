@@ -977,6 +977,12 @@ flowchart LR
     zap & mut --> publish[build, push to GHCR,<br/>cosign sign, SBOM attest]
 ```
 
+A schema change of a release is proven against data an older image wrote (ADR 0116 point 7):
+the upgrade fixture goes through `alembic upgrade head`, back and up again, with the invariants
+of `app/adapters/db/upgrade_fixture.py`. For the services-and-flows train this runs in
+`tests/test_upgrade_train.py` from revision 0108, and `tests/test_service_flows_compatibility.py`
+keeps the compatibility matrix and the gate checklist true to the code.
+
 Per work package the plan is reviewed (`/plan-eng-review`) and the diff is checked with the
 repository's `pre-pr-review` skill before the PR (`docs/skills.md`).
 
@@ -1134,6 +1140,7 @@ What is built of each decision is not kept here: it is in `docs/adr-status.md` (
 | ADR 0040 | Logging and storage: step 1 rotation, reclaim and disk watch; steps 2–4 schema and levels, filters and CSV export, diagnostic mode and retention | done (parts 1–4) |
 | O11 step 1 | Machine API for the WxCC AI Agent: clients, OAuth, scopes, free times, superuser page (ADR 0023) | done |
 | O11 step 2 | Change requests by phone number, confirmed by the participant by email/SMS (ADR 0023) | planned |
+| ADR 0121, 0122 | Services, named flows, skills and shared capacity pools: steps 0 to 8 built (step 8: the compatibility matrix and the upgrade and rollback proof, `docs/service-flows-compatibility.md`); every non-legacy flow stays shut behind the rollback gate `ROLLBACK_SAFE` until the items of `docs/service-flows-gate-checklist.md` that block it are done | partly done (gate shut) |
 
 Every other decision since ADR 0035 (settings layers, own queue, planner, staff directory, installer, releases and release candidates, TLS, the overview, troubleshooting and more) has its state in `docs/adr-status.md`; this table keeps the work packages only.
 
