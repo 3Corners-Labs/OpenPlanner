@@ -57,6 +57,13 @@ QUEUE_WAIT_EVENT = "queue.wait"
 QUEUE_WAIT_OVER = "wait_over_warning"
 """Reason of a ``queue.wait`` failure: the longest wait is above the warning threshold."""
 
+RECOVERY_EVENT = "requests.recovery"
+"""System event of a service with work in recovery (ADR 0121 step 5e): a failure while any
+exists, a success once none is left; written by ``app.domain.request_recovery``."""
+
+RECOVERY_REASON = "recovery_required"
+"""Reason of a ``requests.recovery`` failure."""
+
 WORKER_ALERT = "worker.heartbeat"
 """Action of the derived alert of a stale worker heartbeat; never stored as an event."""
 
@@ -169,6 +176,9 @@ ALERT_RULES: tuple[AlertRule, ...] = (
     AlertRule(WEBHOOKS_MISSING, Permission.AUDIT_VIEW),
     # ADR 0082 point 11: a group falls back to its own queue; its team must work it.
     AlertRule(FALLBACK_EVENT, Permission.QUEUE_WORK),
+    # ADR 0121 step 5e: started work passed its deadline and still holds a unit of its pool;
+    # whoever supervises the queue (who may view its bookings) completes it.
+    AlertRule(RECOVERY_EVENT, Permission.BOOKINGS_VIEW),
 )
 """Every condition event that raises an alert; a test checks that each watch writes one."""
 

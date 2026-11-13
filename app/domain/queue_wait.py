@@ -30,10 +30,10 @@ from datetime import datetime, timedelta
 from app.domain.alerts import QUEUE_WAIT_EVENT, QUEUE_WAIT_OVER
 from app.domain.audit import Outcome
 from app.domain.authorization import Scope
+from app.domain.condition_memory import GroupConditions
 from app.domain.own_queue import QueueEntry, summarise
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.queue_service import load_entries
-from app.domain.scheduling import GroupSummary
 from app.domain.system_log import SystemLog
 
 MINUTE = timedelta(minutes=1)
@@ -64,16 +64,11 @@ class QueueWaitWatch:
         """Start without memory; the first ``check`` reads the open alerts."""
         self._uow = uow
         self._clock = clock
-        self._system_log = system_log
         self._threshold = threshold
-        self._reported = reported
-        self._over: set[str] | None = None
+        self._over = GroupConditions(system_log, QUEUE_WAIT_EVENT, QUEUE_WAIT_OVER, reported)
 
     async def check(self) -> list[str]:
         """Measure every own queue and record each crossing; return the slugs that crossed."""
-        if self._over is None:
-            self._over = await self._reported()
-        over = self._over
         now = self._clock.now()
         everything = Scope(everything=True)
         async with self._uow.read() as tx:
@@ -84,30 +79,13 @@ class QueueWaitWatch:
             ]
         crossed = []
         for summary, wait in waits:
-            if await self._observe(over, summary, wait):
+            above = wait > self._threshold(summary.organisation_slug)
+            detail = f"minutes:{int(wait / MINUTE)}"
+            if await self._over.observe(summary.group.slug, above, detail):
                 crossed.append(summary.group.slug)
         # A queue switched off or a group erased keeps no memory here.
-        over.intersection_update(g.group.slug for g in groups)
+        await self._over.keep(g.group.slug for g in groups)
         return crossed
-
-    async def _observe(self, over: set[str], summary: GroupSummary, wait: timedelta) -> bool:
-        """Record the event of one group if it crossed the threshold either way; update ``over``."""
-        slug = summary.group.slug
-        above = wait > self._threshold(summary.organisation_slug)
-        if above == (slug in over):
-            return False
-        await self._system_log.record(
-            QUEUE_WAIT_EVENT,
-            Outcome.FAILURE if above else Outcome.SUCCESS,
-            group_slug=slug,
-            reason=QUEUE_WAIT_OVER if above else "",
-            detail=f"minutes:{int(wait / MINUTE)}",
-        )
-        if above:
-            over.add(slug)
-        else:
-            over.discard(slug)
-        return True
 
 
 class NotPickedUpWatch:

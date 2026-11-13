@@ -13630,3 +13630,36 @@ msgstr "Participant's name shown to staff in the call (first name or own word)"
 
 msgid "settings.field.embedded_call_staff_name.label"
 msgstr "Staff member's name shown to the participant in the call (account name or own word)"
+
+msgid "admin.alerts.source.recovery"
+msgstr "Work in recovery at {group}"
+
+msgid "admin.alerts.text.recovery"
+msgstr "Work of this service passed its deadline without being completed and holds a unit of the capacity pool. Complete it under Work in recovery on the queue."
+
+msgid "audit.event.request_recovery"
+msgstr "Work in recovery"
+
+msgid "admin.queue.recovery.heading"
+msgstr "Work in recovery"
+
+msgid "admin.queue.recovery.lead"
+msgstr "Started work that was not completed by its deadline. It holds a unit of the capacity pool until someone completes it."
+
+msgid "admin.queue.recovery.caption"
+msgstr "Work in recovery, oldest deadline first"
+
+msgid "admin.queue.recovery.work"
+msgstr "Work"
+
+msgid "admin.queue.recovery.started"
+msgstr "Started"
+
+msgid "admin.queue.recovery.deadline"
+msgstr "Deadline passed"
+
+msgid "admin.queue.recovery.without_appointment"
+msgstr "Without appointment"
+
+msgid "admin.queue.recovery.complete"
+msgstr "Complete"

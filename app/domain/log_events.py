@@ -807,6 +807,25 @@ _OPERATIONS = (
         "None; the alert is on the overview.",
     ),
     _e(
+        "requests.recovery_watch_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The check for work in recovery did not run: {error}.",
+        "The worker could not count the services' work in recovery (ADR 0121 step 5e).",
+        _CHECK_HOST,
+    ),
+    _e(
+        "requests.recovery_changed",
+        _OPS,
+        "info",
+        "groups",
+        "{groups} services started or stopped having work in recovery.",
+        "Work that passed its deadline still holds a unit of its pool; each change is a "
+        "`requests.recovery` system event.",
+        "None; the alert is on the overview.",
+    ),
+    _e(
         "alerts.read_failed",
         _OPS,
         "warning",
@@ -2098,6 +2117,17 @@ _AUDIT = (
         "Details corrected: booking {booking_id}, fields {fields}.",
         "The participant corrected name, phone or answers on the management page (ADR 0056 "
         "point 10); the event names the fields, never their values.",
+    ),
+    _e(
+        "requests.recovery",
+        _SYS,
+        "outcome",
+        "count",
+        "Work in recovery: {outcome} ({reason}); {count} requests.",
+        "A service has started work that passed its deadline and still holds a unit of its "
+        "pool (failure, the alert), or none is left (success) (ADR 0121 step 5e).",
+        "On failure: a supervisor of the queue completes the work listed under *Work in "
+        "recovery* on the service's queue.",
     ),
     _e(
         "queue.wait",

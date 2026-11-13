@@ -62,6 +62,7 @@ from app.domain.own_queue import (
     works_queue,
 )
 from app.domain.ports import Clock, Transaction, UnitOfWork
+from app.domain.request_recovery import RecoveryWork, recovery_of
 from app.domain.request_work import RequestWork, Work, WorkJudge, recovering
 from app.domain.routing import RoutingChoice
 from app.domain.scheduling import Group, GroupSummary
@@ -135,6 +136,9 @@ class QueueView:
     """The booking "pick up next" claims for the viewer: the first open one they may take."""
     free_pick: bool
     can_release_any: bool
+    recovery: tuple[RecoveryWork, ...] = ()
+    """Work of the service in recovery (ADR 0121 step 5e), for a viewer who supervises the
+    queue; its appointment has ended, so ``rows`` no longer lists it."""
 
 
 @dataclass(frozen=True)
@@ -235,6 +239,8 @@ class QueueService:
             unready = {
                 _id(e.booking) for e in entries if not await _ready(judge_work, self._work, e)
             }
+            supervisor = supervises(principal, summary)
+            recovery = tuple(await recovery_of(tx, group.id)) if supervisor else ()
         me = agent_pseudonyms(self._keys, principal.subject)
         limit = timedelta(minutes=group.not_picked_up_minutes)
         nxt = next_up(
@@ -255,7 +261,8 @@ class QueueService:
             rows,
             nxt.booking.id if nxt else None,
             group.queue_free_pick_allowed,
-            supervises(principal, summary),
+            supervisor,
+            recovery,
         )
 
     async def summaries(

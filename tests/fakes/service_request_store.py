@@ -56,6 +56,14 @@ class ServiceRequestStore(PoolStaffingStore):
             if not request.terminal and request.handling is not HandlingState.RECOVERY_REQUIRED
         )
 
+    async def requests_in_recovery(self, group_id: int | None) -> list[ServiceRequest]:
+        return [
+            request
+            for _key, request in sorted(self.state.requests.items())
+            if request.handling is HandlingState.RECOVERY_REQUIRED
+            and (group_id is None or request.group_id == group_id)
+        ]
+
     async def unclaimed_pool_bookings(self, ended_before: datetime) -> list[UnclaimedBooking]:
         found = []
         for booking_id, booking in sorted(self.state.bookings.items()):

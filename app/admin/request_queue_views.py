@@ -11,8 +11,10 @@ from datetime import tzinfo
 from fastapi import Request
 
 from app.admin.authz import AdminContext
+from app.admin.pages import admin_moment
 from app.admin.skill_inputs import skill_name
 from app.domain.request_queue import ClaimedRequest, ImmediateRow, RequestQueue
+from app.domain.request_recovery import RecoveryWork
 from app.domain.service_requests import HandlingState, WorkItem, WorkItemState
 from app.i18n.dates import format_clock
 from app.web.locale import RequestLocale
@@ -71,6 +73,52 @@ class ImmediateList:
 
     rows: list[ImmediateRowView]
     has_next: bool
+
+
+@dataclass(frozen=True)
+class RecoveryRowView:
+    """One request in recovery, written out for the supervisors' table (ADR 0121 step 5e).
+
+    Attributes:
+        work: The appointment's reference, or the words for work without one.
+        started: When treatment started, in the admin's clock.
+        deadline: When the deadline passed, in the admin's clock.
+        complete_path: Where *Complete* posts: the appointment's or the request's own route.
+        key: What the row shows, for the live fragment's key.
+    """
+
+    work: str
+    started: str
+    deadline: str
+    complete_path: str
+
+    @property
+    def key(self) -> tuple[str, str, str]:
+        """Return what changes the row."""
+        return (self.complete_path, self.started, self.deadline)
+
+
+def recovery_rows(
+    request: Request, locale: RequestLocale, slug: str, recovery: tuple[RecoveryWork, ...]
+) -> list[RecoveryRowView]:
+    """Write a service's work in recovery out; *Complete* uses the queue's existing routes."""
+    queue_path = f"/admin/groups/{slug}/queue"
+    rows = []
+    for work in recovery:
+        path = (
+            f"{queue_path}/{work.booking_id}/complete"
+            if work.booking_id is not None
+            else f"{queue_path}/requests/{work.request_id}/complete"
+        )
+        rows.append(
+            RecoveryRowView(
+                work.reference or locale.gettext("admin.queue.recovery.without_appointment"),
+                admin_moment(request, locale, work.started_at) if work.started_at else "–",
+                admin_moment(request, locale, work.watchdog_at),
+                path,
+            )
+        )
+    return rows
 
 
 def queue(request: Request) -> RequestQueue:

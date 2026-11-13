@@ -11,8 +11,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import BookingRow
+from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
-from tests.admin.conftest import AGENT, SAME_ORIGIN, Site
+from app.domain.request_watch import RequestWatch
+from tests.admin.conftest import AGENT, GROUP_ADMIN, SAME_ORIGIN, Site
 from tests.support.flows import engine_of
 from tests.support.queue import request_work
 
@@ -67,3 +69,26 @@ async def test_a_late_start_is_refused_with_a_message_on_the_list(site: Site) ->
     assert "te lang laten liggen" in late.text
     assert early.status_code == 409
     assert "nog niet begonnen" in early.text
+
+
+async def test_a_supervisor_lists_and_completes_work_in_recovery(site: Site) -> None:
+    """ADR 0121 step 5e: the appointment has ended, so only the recovery table shows it."""
+    booking_id = await request_work(site)
+    await site.login_as(AGENT)
+    await site.client.post(f"{QUEUE}/{booking_id}/claim", headers=SAME_ORIGIN)
+    await site.client.post(f"{QUEUE}/{booking_id}/start", headers=SAME_ORIGIN)
+    site.clock.advance(timedelta(days=3))
+    await RequestWatch(SqlUnitOfWork(engine_of(site.client)), site.clock, 24).run()
+
+    agent_page = (await site.client.get(QUEUE)).text
+    await site.login_as(GROUP_ADMIN)
+    page = (await site.client.get(QUEUE)).text
+    done = await site.client.post(f"{QUEUE}/{booking_id}/complete", headers=SAME_ORIGIN)
+    after = (await site.client.get(QUEUE)).text
+
+    assert "Werk in herstel" not in agent_page  # the list is for a supervisor of the queue
+    assert "Werk in herstel" in page
+    assert f"OP-{booking_id:06d}" in page
+    assert f'action="{QUEUE}/{booking_id}/complete"' in page
+    assert done.status_code == 303
+    assert "Werk in herstel" not in after

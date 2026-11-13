@@ -35,6 +35,7 @@ from app.admin.top_bar import COUNTS_ATTRIBUTE
 from app.domain.alerts import (
     FALLBACK_EVENT,
     QUEUE_WAIT_EVENT,
+    RECOVERY_EVENT,
     WORKER_ALERT,
     Alert,
     AlertLevel,
@@ -78,6 +79,7 @@ SOURCE_LABELS: dict[str, str] = {
     CONNECTION_HEALTH: "admin.alerts.source.connection",
     WEBHOOKS_MISSING: "admin.alerts.source.webhooks_missing",
     FALLBACK_EVENT: "admin.alerts.source.fallback",
+    RECOVERY_EVENT: "admin.alerts.source.recovery",
 }
 """What an alert is about, per action; the group-level ones name the group."""
 
@@ -97,6 +99,7 @@ OWN_TEXTS: dict[str, str] = {
     CONNECTION_HEALTH: "admin.alerts.text.connection",
     WEBHOOKS_MISSING: "admin.alerts.text.webhooks_missing",
     FALLBACK_EVENT: "admin.alerts.text.fallback",
+    RECOVERY_EVENT: "admin.alerts.text.recovery",
 }
 """Actions whose sentence is the alert's own rather than the reason's label."""
 

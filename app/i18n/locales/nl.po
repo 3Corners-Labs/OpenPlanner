@@ -13643,3 +13643,36 @@ msgstr "Naam van de deelnemer voor de medewerker in het gesprek (voornaam of eig
 
 msgid "settings.field.embedded_call_staff_name.label"
 msgstr "Naam van de medewerker voor de deelnemer in het gesprek (accountnaam of eigen woord)"
+
+msgid "admin.alerts.source.recovery"
+msgstr "Werk in herstel bij {group}"
+
+msgid "admin.alerts.text.recovery"
+msgstr "Werk van deze dienst is na de termijn nog niet afgerond en houdt een eenheid van de capaciteitspool bezet. Rond het af onder Werk in herstel in de wachtrij."
+
+msgid "audit.event.request_recovery"
+msgstr "Werk in herstel"
+
+msgid "admin.queue.recovery.heading"
+msgstr "Werk in herstel"
+
+msgid "admin.queue.recovery.lead"
+msgstr "Begonnen werk dat na de termijn nog niet is afgerond. Het houdt een eenheid van de capaciteitspool bezet tot iemand het afrondt."
+
+msgid "admin.queue.recovery.caption"
+msgstr "Werk in herstel, oudste termijn eerst"
+
+msgid "admin.queue.recovery.work"
+msgstr "Werk"
+
+msgid "admin.queue.recovery.started"
+msgstr "Begonnen"
+
+msgid "admin.queue.recovery.deadline"
+msgstr "Termijn verlopen"
+
+msgid "admin.queue.recovery.without_appointment"
+msgstr "Zonder afspraak"
+
+msgid "admin.queue.recovery.complete"
+msgstr "Afronden"
