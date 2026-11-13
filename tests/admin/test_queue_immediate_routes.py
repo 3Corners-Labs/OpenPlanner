@@ -6,7 +6,6 @@ A request without an appointment of the demo service, on a counted pool staffed 
 appointment that is request work offers *Check in*.
 """
 
-
 from app.domain.authorization import Scope
 from app.domain.flow_resolution import FlowRef
 from app.domain.immediate_intake import new_access
