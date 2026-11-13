@@ -173,8 +173,8 @@ accepted content types; the closed list of refusal reasons.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR proposed; the row in `docs/adr-status.md` | | planned |
-| 1 | The gate, with today's checks moved into it and: the limit as a setting with its own bucket and a machine answer, the declared and the streamed size limit, the content type, refusal events with reason, platform and organisation; the route sweep; `docs/webhooks.md` corrected | | planned |
+| 0 | ADR proposed; the row in `docs/adr-status.md` | #791 | merged |
+| 1 | The gate, with today's checks moved into it and: the limit as a setting with its own bucket and a machine answer, the declared and the streamed size limit, the content type, refusal events with reason, platform and organisation; the route sweep; `docs/webhooks.md` corrected | #791 | merged |
 | 2 | Source networks: the shared network helper (machine API clients and display links moved onto it), the list per connection and the installation's defaults, refusing on an untrusted proxy chain, `WEBHOOK_SOURCE_NETWORKS_REQUIRED`, the findings | | planned |
 | 3 | Replays per organisation and by body hash; the pause; the refusal alert and the connection card's status | | planned |
 | 4 | Secret rotation with an overlap | | planned |
