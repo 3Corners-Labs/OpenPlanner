@@ -1,7 +1,8 @@
 """ORM tables. Importing this module registers every table on ``Base.metadata``.
 
 Rows are persistence shapes only; ``app.adapters.db.uow`` maps them to domain objects.
-PII columns of participants exist only on ``bookings`` (CLAUDE.md privacy rules). ``staff`` holds
+PII columns of participants exist only on ``bookings`` and, for a request without an appointment,
+on ``request_personal_data`` (CLAUDE.md privacy rules, ADR 0121 decision D1). ``staff`` holds
 the display name of admins, from the identity provider (ADR 0046).
 
     audit_events (no foreign keys: events outlive what they describe)
@@ -33,6 +34,8 @@ the display name of admins, from the identity provider (ADR 0046).
                          │  └───* group_texts (message texts per locale and block)
                          └──* slots 1──* bookings 1──* jobs
                                          └──? closure (the one that suspended it)
+                                         └──? service_requests 1──* work_items (ADR 0121 step 5)
+                                                  └──? request_personal_data (no booking only)
 """
 
 from datetime import date, datetime, time
@@ -2108,3 +2111,126 @@ class SubjectFlowSkillRow(Base):
         ),
         Index("ix_subject_flow_skills_skill_id", "skill_id"),
     )
+
+
+REQUEST_HANDLING = (
+    "('queued', 'assigned', 'in_progress', 'recovery_required', 'completed', 'cancelled', "
+    "'expired')"
+)
+"""The stored values of ``service_requests.handling`` (``HandlingState``)."""
+
+WORK_ITEM_STATES = (
+    "('assigned', 'in_progress', 'recovery_required', 'completed', 'released', "
+    "'lease_expired', 'expired', 'cancelled')"
+)
+"""The stored values of ``work_items.state`` (``WorkItemState``)."""
+
+ACTIVE_WORK_ITEM = "state IN ('assigned', 'in_progress', 'recovery_required')"
+"""The predicate of a request's one active work item (``ACTIVE_ITEM``)."""
+
+
+class ServiceRequestRow(Base):
+    """One request for a service under one flow revision (ADR 0121 step 5); no personal data.
+
+    ``booking_id`` is the reservation, unique: one appointment never yields two requests (A15).
+    It cascades because the booking-row rollup (ADR 0102) deletes old purged bookings. The
+    revision has a foreign key with NO ACTION, checked at the end of the statement, like the
+    pool of a revision: a revision a request refers to is never deleted on its own, yet deleting
+    an organisation removes both in one statement.
+    """
+
+    __tablename__ = "service_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id", ondelete="CASCADE"))
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), index=True)
+    flow_id: Mapped[int] = mapped_column(Integer)
+    flow_revision: Mapped[int] = mapped_column(Integer)
+    intake: Mapped[str] = mapped_column(String(16))
+    booking_id: Mapped[int | None] = mapped_column(
+        ForeignKey("bookings.id", ondelete="CASCADE"), unique=True
+    )
+    handling: Mapped[str] = mapped_column(String(24))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    watchdog_at: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    personal_data: Mapped[str] = mapped_column(String(16), server_default=text("'not_collected'"))
+    data_deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["flow_id", "flow_revision"],
+            ["flow_revisions.flow_id", "flow_revisions.revision"],
+            ondelete="NO ACTION",
+        ),
+        CheckConstraint("intake IN ('appointment', 'on_demand')", name="intake"),
+        CheckConstraint(f"handling IN {REQUEST_HANDLING}", name="handling"),
+        CheckConstraint(
+            "personal_data IN ('not_collected', 'present', 'deleted')", name="personal_data"
+        ),
+        CheckConstraint(
+            "(intake = 'appointment') = (booking_id IS NOT NULL)", name="appointment_booking"
+        ),
+        Index("ix_service_requests_flow", "flow_id", "flow_revision"),
+    )
+
+
+class WorkItemRow(Base):
+    """One attempt of staff to handle a request, and the pool unit it occupies once started.
+
+    At most one active work item per request (``uq_work_items_active``). ``assigned_to`` is the
+    agent's pseudonym, emptied with the request's personal data. Started (``pool_id`` and
+    ``planned_until`` set) and not ended (``ended_at`` NULL), the row is a commitment of its pool
+    (``get_pool_commitments``); setting ``ended_at`` releases it, exactly once.
+    """
+
+    __tablename__ = "work_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    request_id: Mapped[int] = mapped_column(
+        ForeignKey("service_requests.id", ondelete="CASCADE"), index=True
+    )
+    state: Mapped[str] = mapped_column(String(24))
+    assigned_to: Mapped[str | None] = mapped_column(String(64))
+    assigned_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    lease_until: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    started_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    pool_id: Mapped[int | None] = mapped_column(Integer)
+    planned_until: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    start_conflict: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
+    ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+    __table_args__ = (
+        CheckConstraint(f"state IN {WORK_ITEM_STATES}", name="state"),
+        Index(
+            "uq_work_items_active",
+            "request_id",
+            unique=True,
+            sqlite_where=text(ACTIVE_WORK_ITEM),
+        ),
+        Index(
+            "ix_work_items_pool_open",
+            "pool_id",
+            "started_at",
+            sqlite_where=text("ended_at IS NULL AND pool_id IS NOT NULL"),
+        ),
+    )
+
+
+class RequestPersonalDataRow(Base):
+    """The personal data of a request without an appointment (ADR 0121 decision D1).
+
+    Its columns are ``privacy.REQUEST_DATA_FIELDS``, named and typed as on ``bookings``; every
+    one may be NULL (what a flow does not collect is not stored). The deletion removes the row.
+    """
+
+    __tablename__ = "request_personal_data"
+
+    request_id: Mapped[int] = mapped_column(
+        ForeignKey("service_requests.id", ondelete="CASCADE"), primary_key=True
+    )
+    first_name: Mapped[str | None] = mapped_column(String(100))
+    last_name: Mapped[str | None] = mapped_column(String(100))
+    email: Mapped[str | None] = mapped_column(String(254))
+    phone: Mapped[str | None] = mapped_column(String(16))
+    form_answers: Mapped[str | None] = mapped_column(Text)

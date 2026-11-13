@@ -13445,3 +13445,15 @@ msgstr "Uitzondering op de bezetting van een pool verwijderd"
 
 msgid "admin.pool_staffing.error.changed"
 msgstr "Iemand anders heeft dit inmiddels gewijzigd. De huidige waarden staan hieronder: controleer ze en sla opnieuw op."
+
+msgid "error.lease_expired"
+msgstr "U heeft dit werk te lang laten liggen zonder te beginnen. Het staat weer in de wachtrij: pak het opnieuw op om te beginnen."
+
+msgid "error.start_refused"
+msgstr "Beginnen kan nu niet: daarmee zou u tijd gebruiken die voor een andere afspraak is vrijgehouden, of er is nu niemand ingeroosterd."
+
+msgid "error.request_in_progress"
+msgstr "Dit werk is al begonnen. Rond het af in plaats van het terug te geven."
+
+msgid "error.request_not_started"
+msgstr "Dit werk is nog niet begonnen. Begin eerst, of geef het terug."

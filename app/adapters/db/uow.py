@@ -91,11 +91,13 @@ from app.adapters.db.models import (
     ReminderRuleRow,
     ScheduleOverrideRow,
     ScheduleRuleRow,
+    ServiceRequestRow,
     ShortfallAcceptanceRow,
     ShortfallWatchRow,
     SlotRow,
     StaffRow,
     WebhookEventRow,
+    WorkItemRow,
 )
 from app.adapters.db.overview_layouts import OverviewLayoutQueries
 from app.adapters.db.own_certificate import OwnCertificateQueries
@@ -124,6 +126,7 @@ from app.adapters.db.scenarios import ScenarioQueries
 from app.adapters.db.schedule_rules import rule_from_row
 from app.adapters.db.scope import scope_filter
 from app.adapters.db.service_flows import ServiceFlowQueries
+from app.adapters.db.service_requests import ServiceRequestQueries
 from app.adapters.db.skills import SkillQueries
 from app.adapters.db.staff import StaffQueries
 from app.adapters.db.updates import UpdateQueries
@@ -200,7 +203,7 @@ from app.domain.job_plan import (
 )
 from app.domain.participant_links import new_public_ref
 from app.domain.ports import EventSink
-from app.domain.privacy import PURGED_FIELDS
+from app.domain.privacy import PURGED_FIELDS, REQUEST_DERIVED_FIELDS
 from app.domain.routing import GroupRouting
 from app.domain.scheduling import (
     DispatchFallback,
@@ -488,6 +491,7 @@ class SqlTransaction(
     PoolStaffingQueries,
     CapacityPoolQueries,
     ServiceFlowQueries,
+    ServiceRequestQueries,
     AlertTargetQueries,
     ConfigurationDocumentQueries,
     HealthQueries,
@@ -1930,6 +1934,17 @@ class SqlTransaction(
             update(BookingEventRow)
             .where(BookingEventRow.booking_id == booking_id)
             .values(message="")
+        )
+        # ADR 0121 step 5: the pseudonym on the work items of the booking's request goes with it
+        # (``privacy.REQUEST_DERIVED_FIELDS``); the request's states and times stay.
+        await self._session.execute(
+            update(WorkItemRow)
+            .where(
+                WorkItemRow.request_id.in_(
+                    select(ServiceRequestRow.id).where(ServiceRequestRow.booking_id == booking_id)
+                )
+            )
+            .values({name: None for name in REQUEST_DERIVED_FIELDS})
         )
         # ADR 0093 point 5: a purged booking leaves every participant link session.
         await self._session.execute(

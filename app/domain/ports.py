@@ -96,6 +96,13 @@ from app.domain.scheduling import (
     ScheduleRule,
 )
 from app.domain.service_flows import FlowRevision, FlowState, ServiceFlow
+from app.domain.service_requests import (
+    HandlingState,
+    RequestPersonalData,
+    ServiceRequest,
+    WorkItem,
+    WorkItemState,
+)
 from app.domain.skills import Skill, SkillUsage
 from app.domain.slot_close import EndedSlots
 from app.domain.staff import (
@@ -1751,7 +1758,67 @@ class Transaction(Protocol):
         Not scoped: ``pool_id`` must come from a flow, never from request input.
 
         One per place taken in a pool slot: a booking that holds one and an open proposal of a
-        new time. Derived from the bookings, never a second ledger (ADR 0122 point 4).
+        new time. Derived from the bookings, never a second ledger (ADR 0122 point 4). After
+        them, the units occupied by started work items that have not ended (ADR 0121 step 5),
+        ``in_progress``, with their request's key, so a started appointment counts once
+        (``one_per_key``); an occupation past its planned end is returned whatever ``lower``
+        says, because an overrun lasts until it ends.
+        """
+        ...
+
+    async def get_request_of_booking(self, booking_id: int) -> ServiceRequest | None:
+        """Return the request of a booking (ADR 0121 step 5), or ``None`` when it has none.
+
+        Not scoped: the booking id comes from a scoped lookup of the booking.
+        """
+        ...
+
+    async def get_active_work_item(self, request_id: int) -> WorkItem | None:
+        """Return the request's one active work item, or ``None``."""
+        ...
+
+    async def add_service_request(
+        self, request: ServiceRequest, data: RequestPersonalData | None = None
+    ) -> ServiceRequest:
+        """Store a new request and return it with its id.
+
+        ``data`` is the request-level personal-data record of a request without a booking
+        (decision D1): stored, and the request marked ``present``, only when it holds something.
+        A request with a booking never takes one (its data stays on the booking).
+
+        Raises:
+            DomainError: ``invalid_configuration`` (field ``data``) for a record on a request
+                with a booking.
+        """
+        ...
+
+    async def add_work_item(self, item: WorkItem) -> WorkItem:
+        """Store a new work item and return it with its id; one active per request."""
+        ...
+
+    async def update_service_request(self, request: ServiceRequest, seen: HandlingState) -> bool:
+        """Write the request's handling and times if its handling is still ``seen``.
+
+        Returns ``False`` when another transaction changed it first (nothing written).
+        """
+        ...
+
+    async def update_work_item(self, item: WorkItem, seen: WorkItemState) -> bool:
+        """Write the work item's state, lease, start, occupation and end if its state is ``seen``.
+
+        Setting ``ended_at`` releases its occupation; the condition makes that happen once.
+        """
+        ...
+
+    async def get_request_personal_data(self, request_id: int) -> RequestPersonalData | None:
+        """Return the request-level record of a request without a booking, or ``None``."""
+        ...
+
+    async def delete_request_personal_data(self, request_id: int, now: datetime) -> bool:
+        """Delete the request-level record and mark the request ``deleted`` (decision D1).
+
+        Also empties the pseudonym on the request's work items. Returns ``False`` when the
+        request held no record (nothing written): idempotent.
         """
         ...
 

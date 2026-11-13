@@ -92,6 +92,7 @@ from app.domain.scheduling import (
 )
 from app.domain.security_log import TOKEN_REFRESH_FAILED
 from app.domain.service_flows import FlowRevision, ServiceFlow
+from app.domain.service_requests import RequestPersonalData, ServiceRequest, WorkItem
 from app.domain.skills import Skill
 from app.domain.slot_close import ClosedBooking, EndedSlot, EndedSlots
 from app.domain.staff import (
@@ -108,7 +109,7 @@ from app.domain.tls import CertificateCheck
 from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
 from app.domain.usage import StaffFact, UsageFact
 from app.domain.worker_check import WorkerHeartbeat
-from tests.fakes.pool_staffing_store import PoolStaffingStore
+from tests.fakes.service_request_store import ServiceRequestStore
 from tests.support.domain import NOW
 
 
@@ -205,10 +206,13 @@ class State:
     pool_overrides: dict[int, tuple[int, ScheduleOverride]] = field(default_factory=dict)
     flows: dict[int, ServiceFlow] = field(default_factory=dict)
     flow_revisions: dict[tuple[int, int], FlowRevision] = field(default_factory=dict)
+    requests: dict[int, ServiceRequest] = field(default_factory=dict)
+    work_items: dict[int, WorkItem] = field(default_factory=dict)
+    request_data: dict[int, RequestPersonalData] = field(default_factory=dict)
     next_id: int = 1
 
 
-class InMemoryTransaction(PoolStaffingStore):
+class InMemoryTransaction(ServiceRequestStore):
     def __init__(self, state: State) -> None:
         self.state = state
 
@@ -1201,6 +1205,7 @@ class InMemoryTransaction(PoolStaffingStore):
             replace(e, message="") for e in self.state.booking_events.get(booking_id, [])
         ]
         self.state.purged_at[booking_id] = now
+        self._forget_agents_of_booking(booking_id)
 
     async def due_for_purge(self, candidates_before: datetime) -> list[DueBooking]:
         due = []

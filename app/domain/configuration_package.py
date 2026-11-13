@@ -103,7 +103,9 @@ STATE_TABLES = frozenset(
         "release_listing",
         "report_digest_runs",
         "report_subscriptions",
+        "request_personal_data",
         "running_versions",
+        "service_requests",
         "shortfall_acceptances",
         "shortfall_watches",
         "slots",
@@ -119,6 +121,7 @@ STATE_TABLES = frozenset(
         "usage_rollup_state",
         "usage_staff_hour",
         "webhook_events",
+        "work_items",  # requests and their work: what happened, like bookings (ADR 0121 step 5)
     }
 )
 """The tables a package empties: bookings and their personal data, the log, staff, and what

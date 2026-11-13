@@ -30,6 +30,7 @@ from app.adapters.db.models import (
     SlotRow,
 )
 from app.adapters.db.proposals import open_proposal
+from app.adapters.db.service_requests import open_occupations
 from app.domain.authorization import Scope
 from app.domain.booking import HOLDS_PLACE, BookingKind, Slot
 from app.domain.capacity import PoolMode
@@ -275,7 +276,8 @@ class PoolStaffingQueries(CapacityPoolQueries):
             .where(*window, *open_proposal(owner))
             .order_by(SlotRow.start, RescheduleProposalRow.id)
         )
-        return found + [Commitment(("proposal", i), s, u) for i, s, u in held if u is not None]
+        proposals = [Commitment(("proposal", i), s, u) for i, s, u in held if u is not None]
+        return found + proposals + await open_occupations(self._session, pool_id, upper)
 
 
 async def read_all_pool_staffing(
