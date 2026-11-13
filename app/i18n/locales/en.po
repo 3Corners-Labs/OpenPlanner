@@ -13405,3 +13405,15 @@ msgstr "Exception of a pool's staffing removed"
 
 msgid "admin.pool_staffing.error.changed"
 msgstr "Someone else changed this in the meantime. The current values are shown: check them and save again."
+
+msgid "error.lease_expired"
+msgstr "You held this work too long without starting it. It is back in the queue: pick it up again to start."
+
+msgid "error.start_refused"
+msgstr "You cannot start now: it would use time kept free for another appointment, or nobody is scheduled now."
+
+msgid "error.request_in_progress"
+msgstr "This work has started. Complete it instead of handing it back."
+
+msgid "error.request_not_started"
+msgstr "This work has not started yet. Start it first, or hand it back."

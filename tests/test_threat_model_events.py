@@ -211,6 +211,10 @@ FLOWS: dict[str, Flow] = {
         (PUBLIC, WEBHOOK, JOB, DENIED, CHANGE)
     ),
     "## Flow: own queue (ADR 0043)": Flow(ADMIN),
+    "## Flow: requests and work items (ADR 0121 step 5)": Flow(
+        no_event="step 5a is persistence only: no route or job reaches the tables yet; the "
+        "claim, start and completion of step 5b are audited through the own queue's events"
+    ),
     "## Flow: overview and alerts (ADR 0061)": Flow(ADMIN),
     "## Flow: verify button and simulator (admin)": Flow(ADMIN),
     "## Flow: troubleshooting per booking (ADR 0068)": Flow(ADMIN),

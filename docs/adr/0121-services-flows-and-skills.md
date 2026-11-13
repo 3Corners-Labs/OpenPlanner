@@ -53,7 +53,9 @@ None in step 1: it changes labels only. The later steps add the following, each 
 | 3a | One flow resolver for the standalone page, the direct page and the widget API; every new booking records its flow and revision (NULL when no active default exists); an optional explicit flow on the pages, the widget attribute and the widget API (additive); the choice screen for several flows follows in step 5 | #747 | merged |
 | 3b | Interval accounting and admission across flows of one pool, staffing of counted pools | | planned |
 | 4 | P4: skill enforcement in the locked claim; pool guarantees; external skill mapping | | planned |
-| 5 | P5: generic request execution without video, optional contact data, watchdog and deletion | | planned |
+| 5a | P5, persistence: requests, work items with their pool occupation, the request-level personal-data record (D1) in `privacy.py` and CLAUDE.md, migration 0113, the pure lifecycle, watchdog and deletion rules (`app/domain/service_requests.py`); build brief `docs/service-flows-requests-design.md` | #PR5A | merged |
+| 5b | P5, execution: claim with a lease, start (`check_start`), complete and release in the own queue for a flow without video; the watchdog round and the deletion in the worker; the retention overview and sweep for request-level records; settings `assignment_start_lease_minutes` and `request_unresolved_hours`; `RETENTION_BUILT` true and the rollback point as its own readiness check | | planned |
+| 5c | The participant's choice between several flows of a service (the choice screen step 3a left for step 5; design R8) | | follow-up |
 | 6 | P6: channel-independent contact-center task contract, reconciliation and fencing | | planned |
 | 7 | P7: immediate intake and check-in on the same pool | | planned |
 | 8 | P8: compatibility matrix, upgrade and rollback proof, documentation | | planned |

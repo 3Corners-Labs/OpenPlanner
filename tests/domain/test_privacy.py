@@ -8,9 +8,13 @@ from app.domain.privacy import (
     ALIASES,
     DATA_FIELDS,
     DERIVED_FIELDS,
+    ENTITIES,
     ENTITY,
     PII_FIELDS,
     PURGED_FIELDS,
+    REQUEST_DATA_FIELDS,
+    REQUEST_DERIVED_FIELDS,
+    REQUEST_ENTITY,
     ROUTING_FIELDS,
     Classification,
     DataField,
@@ -92,3 +96,11 @@ def test_the_purge_clears_the_personal_fields_and_the_provider_links() -> None:
     )
     assert set(PURGED_FIELDS) == PII_FIELDS | set(DERIVED_FIELDS) | set(ROUTING_FIELDS)
     assert len(PURGED_FIELDS) == len(set(PURGED_FIELDS))
+
+
+def test_the_request_record_uses_the_booking_names_so_one_list_masks_both() -> None:
+    """ADR 0121 decision D1: the request-level record is a subset of the list, by name."""
+    assert REQUEST_DATA_FIELDS == ("first_name", "last_name", "email", "phone", "form_answers")
+    assert set(REQUEST_DATA_FIELDS) <= PII_FIELDS
+    assert REQUEST_DERIVED_FIELDS == ("assigned_to",)
+    assert ENTITIES == (ENTITY, REQUEST_ENTITY) == ("Booking", "ServiceRequest")

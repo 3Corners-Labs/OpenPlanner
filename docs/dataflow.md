@@ -313,6 +313,20 @@ web ──> audit_events: queue.claimed / queue.released (actor subject, group, 
 | Who claimed | `bookings.claimed_by` (pseudonym, not the subject) | the agent's login | removed by `purge_pii` with the contact; `claimed_at` stays for statistics | no |
 | Team invite: first name, booking reference, group, start/end, queue link | built in memory by the worker | `bookings`, the group | not stored by OpenPlanner; **in the team's mailbox outside our purge** (DPIA) | by email to `groups.calendar_invite_address` (own queue only), withdrawn with `METHOD:CANCEL` on cancel, move or suspension; never the meeting link, email or phone |
 
+## Requests and work items (ADR 0121 step 5)
+
+A request of a flow on a counted pool (`service_requests`) and the attempts of staff to handle it
+(`work_items`). The personal data of a request with an appointment stays on its booking; a
+request without one keeps it in `request_personal_data` (decision D1), written from step 7
+(on-demand intake) on. Nothing in production makes a request while the rollback gate
+`ROLLBACK_SAFE` is shut.
+
+| Data | Where | Source | Retention | Leaves OpenPlanner? |
+|---|---|---|---|---|
+| Request states and times | `service_requests` (flow and revision, handling, `watchdog_at`, `resolved_at`, personal-data state) | the claim and the watchdog round | as the booking row (cascade), or as the service; no personal data | no |
+| Who took the work | `work_items.assigned_to` (pseudonym, not the subject) | the agent's login | emptied by the booking's purge, or with the request-level record | no |
+| Name, email, phone, answers of a request without an appointment | `request_personal_data` (the booking's column names, `privacy.REQUEST_DATA_FIELDS`) | intake without an appointment (step 7) | `min(resolved_at, watchdog_at) + 24 h`; the row is deleted and the request marked `deleted` | no |
+
 ## Branding and the calendar script (WP3b)
 
 ```
@@ -568,6 +582,7 @@ with data held elsewhere. The row itself is deleted `booking_row_retention_days`
 | Table | Personal columns | Held for | Removed by | Restore |
 |---|---|---|---|---|
 | `bookings` | `first_name`, `last_name`, `email`, `phone`, `form_answers`, `guest_join_url`, `host_join_url`, `trial_join_url`; provider links `video_room_id`, `trial_room_id`, `contact_center_task_id`, `wxcc_task_id`; `claimed_by` (the list `privacy.PURGED_FIELDS`) | slot end + 24 h, cancellation + 24 h; a suspended booking at most until the earlier of closure end + 30 days and `closure_max_retention_days` after the slot end | the `purge_pii` job, else the daily retention sweep, else `python -m app.cli purge-overdue`; `management_token_hash` is replaced by a random value, `booking_events.message` emptied | `purge-overdue` runs before the system is back |
+| `request_personal_data` (ADR 0121 D1) | `first_name`, `last_name`, `email`, `phone`, `form_answers` (`privacy.REQUEST_DATA_FIELDS`); and `work_items.assigned_to` | the request's end or its watchdog deadline, whichever is first, + 24 h | the row is deleted and the request marked `deleted` (the deletion of step 5b); the pseudonym of an appointment request goes with the booking's purge | as `bookings` |
 | `bookings` (what stays after the purge) | `management_token_salt`, `public_ref` (random, names no one), `locale`, `consents`, times, `closure_id`, `change_reason`, status | until `booking_row_retention_days` (class C, default 730 days, 365 to 3650) after `pii_purged_at` | the worker's daily housekeeping (`booking_rows.rollup`): merges the row into a count per group, day and status, then deletes it with its events, call status and finished jobs; never a row that still holds personal data or has an open job | `purge-overdue` first; rows already merged stay merged |
 | `booking_day_counts` | none: group, UTC day of the slot, final status, a count and the latest `pii_purged_at` among them | for good: statistics without a person or an identifier | deleted with the group (cascade) | as the live system |
 | `usage_events` | none: fact kind, the UTC hour (never an exact time), organisation, group and the codes and numbers of `privacy.USAGE_FIELDS`; no booking id, reference or free text, so a row cannot be joined back to an appointment | the outbox of the rollup (ADR 0117, built from step 2): until the worker has rolled it up and `reporting_event_retention_days` (class C, default 35, 7 to 90) have passed | the worker's rollup (every `reporting_rollup_interval_minutes`, class C); no cascade, statistics outlive the group | as the live system |

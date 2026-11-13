@@ -5,7 +5,9 @@ time: the list is a constant, and the rest of the code base imports it from here
 mask, the purge job, the marker-value template test, the *Data fields* card). A fixed rule
 stays a constant on purpose (CLAUDE.md, ADR 0042).
 
-Personal data (PII) lives only on ``Booking``:
+Personal data (PII) lives only on ``Booking`` and, for a request without an appointment, on its
+request-level record (``request_personal_data``, ADR 0121 decision D1); the record uses the
+booking's field names (``REQUEST_DATA_FIELDS``), so this stays one list:
 
 - *direct* fields identify the participant on their own: first and last name, email, phone;
 - *sensitive* fields hold what the participant told us or give access to the conversation: the
@@ -125,7 +127,25 @@ fact types hold exactly these fields. The statistics hold no personal data; they
 of the appointments with the names taken out."""
 
 ENTITY = "Booking"
-"""The only entity that holds personal data (CLAUDE.md privacy rules)."""
+"""The entity that holds the personal data of an appointment (CLAUDE.md privacy rules)."""
+
+REQUEST_ENTITY = "ServiceRequest"
+"""The entity whose request-level record holds the personal data of a request without an
+appointment (ADR 0121 decision D1); a request with an appointment keeps it on ``Booking``."""
+
+ENTITIES: tuple[str, ...] = (ENTITY, REQUEST_ENTITY)
+"""Every entity that may hold personal data; nothing else does."""
+
+REQUEST_DATA_FIELDS: tuple[str, ...] = ("first_name", "last_name", "email", "phone", "form_answers")
+"""The columns of the request-level record (``request_personal_data``): a subset of
+``DATA_FIELDS`` by name, so the log mask and the semgrep rule cover them; a test checks that and
+that the table has exactly these personal columns. The deletion removes the record's row and
+marks the request ``deleted`` (``service_requests.PersonalDataState``)."""
+
+REQUEST_DERIVED_FIELDS: tuple[str, ...] = ("assigned_to",)
+"""Columns of ``work_items`` that find the personal data again: the pseudonym of the agent who
+took the work, like ``claimed_by`` on the booking. Emptied with the request's personal data: by
+the booking's purge for an appointment, by the record's deletion without one."""
 
 _BY_NAME = {f.name: f for f in DATA_FIELDS}
 
