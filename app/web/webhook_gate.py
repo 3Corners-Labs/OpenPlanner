@@ -30,8 +30,8 @@ the route the identity of the verified body for an event without an identifier o
 paused address (point 9) passes every check above, signature included, and only then is its
 verified event dropped: the answer is 204, the route is not called and nothing is remembered, so a
 redelivery after resuming is handled; a call that would be refused is refused as for any address.
-The caller's address is the one the server derived (``--proxy-headers``), counted by its /64 when it is IPv6
-(``caller_of``); nothing is read from a forwarded header here.
+The caller's address is the one the server derived (``--proxy-headers``), counted by its /64 when
+it is IPv6 (``caller_of``); nothing is read from a forwarded header here.
 """
 
 import json
