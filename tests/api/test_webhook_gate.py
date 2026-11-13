@@ -780,3 +780,38 @@ async def test_an_installation_default_that_cannot_be_read_refuses_every_call_ne
 
     expected = (403, 204) if key.endswith("video") else (204, 403)
     assert (video.status_code, cc.status_code) == expected
+
+
+@pytest.mark.parametrize("order", ["honoured first", "ignored first"])
+async def test_two_forwarded_for_lines_that_disagree_are_judged_by_the_least_safe_one(
+    settings: Settings, database_url: str, order: str
+) -> None:
+    """Pins the rule of ``forwarded_of`` for both readers, the gate and the proxy watch.
+
+    The caller is the supplier; one line names it as a hop (the server could have used it), the
+    other does not. Whichever comes first, the call is ``source_unknown`` with a list, is
+    untouched without one, and the proxy watch counts it.
+    """
+    lines = [("x-forwarded-for", f"{SUPPLIER}, 172.31.240.2"), ("x-forwarded-for", "8.8.4.4")]
+    lines = lines if order == "honoured first" else lines[::-1]
+    wxcc = wxcc_body("task:connected", at=NOW)
+    async with _in_app(
+        settings,
+        database_url,
+        webhook_source_networks_video=SUPPLIER_RANGE,
+        forwarded_allow_ips="172.31.240.2",
+    ) as app:
+        transport = httpx.ASGITransport(app=app, client=(SUPPLIER, 4711))
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
+            listed = await c.post(
+                "/webhooks/webex", content=b"{}", headers=[*lines, *_webex().items()]
+            )
+            open_call = await c.post(
+                "/webhooks/wxcc", content=wxcc, headers=[*lines, *_wxcc_headers(wxcc).items()]
+            )
+        counted = app.state.proxy_watch.sighting()
+
+    assert (listed.status_code, open_call.status_code) == (403, 204)
+    assert counted is not None
+    assert counted.count == 2  # both calls: the watch judged them the way the gate did
+    assert await _refusals(database_url) == [("source_unknown", "source:webex")]

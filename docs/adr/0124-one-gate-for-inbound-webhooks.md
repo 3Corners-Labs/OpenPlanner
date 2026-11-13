@@ -72,10 +72,15 @@ installation with several organisations.
    (`WEBHOOK_SOURCE_NETWORKS_REQUIRED`): then an address without one does not accept. The
    switch demands that a list applies, not that it is narrow: the organisation's own list is the
    organisation's choice and replaces the default. Only a network that covers a whole address
-   family (prefix length 0) is refused when a list is saved, on the card, in the two defaults
-   and in the `Settings` validator, because such a list is "any source" called "restricted"; a
+   family (prefix length 0), or an IPv6 network that holds the whole IPv4-mapped range
+   `::ffff:0:0/96` (matching also tries the mapped reading, so such a network admits every IPv4
+   caller), is refused when a list is saved, on the card, in the two defaults and in the
+   `Settings` validator, because such a list is "any source" called "restricted"; the two halves of
+   a family are not refused, on purpose, as how wide a list is, is its owner's choice; a
    stored list that cannot be read is never taken for an empty one: every call to that address
-   is refused with `network`, and the card and System status say so. One
+   is refused with `network`, and the card and System status say so, and say whose list it is
+   (the connection's own, to be set again on its card; the installation's default, for the
+   platform administrator, or the organisation sets a list of its own). One
    helper, `app/domain/networks.py`, parses and matches networks, handles an IPv4 address
    written as IPv6, and replaces the two near-copies that the machine API's clients and the
    display links use today (ADR 0005: extract at the second use). A list is defence in depth

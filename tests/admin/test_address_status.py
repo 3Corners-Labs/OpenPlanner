@@ -257,5 +257,6 @@ async def test_a_default_list_that_cannot_be_read_is_shown_as_unreadable(site: S
 
     part = await _part(site)
 
-    assert part.count("De opgeslagen lijst is niet te lezen") == 1
+    assert part.count("De standaardlijst van de installatie is niet te lezen") == 1
+    assert "Geavanceerde instellingen" in part
     assert part.count("Niet beperkt") == 1  # the other default is a readable, empty list

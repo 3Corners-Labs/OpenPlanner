@@ -24,7 +24,7 @@ readiness and the building of a task read that declaration through ``capabilitie
 
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from types import MappingProxyType
@@ -32,6 +32,7 @@ from types import MappingProxyType
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.interaction import InteractionKind
 from app.domain.networks import NetworkList, host_is_public
+from app.domain.source_networks import source_networks_of
 
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 _ATTRIBUTE_NAME = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
@@ -307,11 +308,11 @@ class ConnectionChange:
     """What an administrator submits for the organisation's connection.
 
     A ``None`` secret keeps the stored one (write-only fields render empty); so does ``None``
-    allowed networks. They are the text as typed, one network per line or comma separated; an
-    empty text clears the list, so the installation's default applies again. The domain splits and
-    parses it (``ContactCenterConnectionService.save``, with the rules of
-    ``app.domain.webhook_sources``): this class only carries it, because the rule lives in a
-    module that this one cannot import without a cycle.
+    allowed networks. The networks are given as the text typed, one per line or comma separated
+    (``allowed_networks_text``, an ``InitVar`` as the route has the text): ``__post_init__`` parses
+    it once, with the rule of ``app.domain.source_networks``, into ``allowed_networks``, the tuple
+    that everything after it uses. An empty text clears the list, so the installation's default
+    applies again. A tuple given directly is checked by the same rule.
 
     Raises:
         DomainError: ``invalid_configuration`` naming the refused field.
@@ -322,9 +323,10 @@ class ConnectionChange:
     client_id: str
     client_secret: str | None = None
     refresh_token: str | None = None
-    allowed_networks: str | None = None
+    allowed_networks: tuple[str, ...] | None = None
+    allowed_networks_text: InitVar[str | None] = None
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, allowed_networks_text: str | None) -> None:
         """Validate every field and drop a trailing slash; secrets are checked for shape only."""
         if not API_HOST.fullmatch(self.api_base_url) or not host_is_public(self.api_base_url):
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}api_base_url")
@@ -335,6 +337,12 @@ class ConnectionChange:
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}client_secret")
         if self.refresh_token is not None and not _secret_shape(self.refresh_token):
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}refresh_token")
+        typed = allowed_networks_text
+        if typed is None and self.allowed_networks is not None:
+            typed = "\n".join(self.allowed_networks)
+        if typed is not None:
+            networks = source_networks_of(typed, field=f"{CONNECTION_FIELD}allowed_networks")
+            object.__setattr__(self, "allowed_networks", networks)
 
     @property
     def secrets_sent(self) -> tuple[str, ...]:

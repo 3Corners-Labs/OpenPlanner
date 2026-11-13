@@ -129,7 +129,8 @@ address (a Kubernetes ingress, whose pods change), a content delivery network in
 calls a public name from a private address. For these, leave the list empty and rely on the
 signature, or ask your platform administrator.
 
-A network that covers a whole address family (`0.0.0.0/0` or `::/0`) is refused: that is no list.
+A network that covers a whole address family (`0.0.0.0/0` or `::/0`, or an IPv6 network such as
+`::/1` that also holds every IPv4 address written as IPv6) is refused: that is no list.
 If the stored list cannot be read, the card says so and the address accepts no call until you
 save the list again.
 

@@ -312,12 +312,18 @@ call and answers `network`; the findings say "a list is required and missing". C
 connection's list alone makes no new webhook secret and does not register the address at the
 platform again (a record that has no webhook secret yet takes the normal path: the secret is made
 and the address registered); it is audited by field name, never by the networks. A network that
-covers a whole address family (prefix length 0, `0.0.0.0/0` or `::/0`) is refused when a list is
-saved, on the card and in the two defaults, because such a list is "any source" called
-"restricted"; a narrower, wide network (`0.0.0.0/1`) is the organisation's choice. A stored list
-that cannot be read (damaged, or an entry that does not parse) is never taken for an empty one:
-every call to that address is refused with `network`, and the card and System status say the list
-cannot be read; saving the list again repairs it. The same holds for an installation default that
+covers a whole address family (prefix length 0, `0.0.0.0/0` or `::/0`), or an IPv6 network that
+holds the whole IPv4-mapped range (`::/1`, `::ffff:0:0/96`: such a network admits every IPv4
+caller), is refused when a list is saved, on the card and in the two defaults, because such a list
+is "any source" called "restricted"; a narrower, wide network (`0.0.0.0/1`, `128.0.0.0/1`) is the
+organisation's choice, the two halves of a family are not refused on purpose. A stored list
+that cannot be read (damaged, an entry that does not parse, or one that is not written the way
+this application writes it) is never taken for an empty one: every call to that address is refused
+with `network`, and the card and System status say the list cannot be read, and whose it is (the
+connection's own list: set it again on the card; the installation's default: ask the platform
+administrator, or set a list of your own on the card). Saving the list again repairs it: the card
+shows an unreadable own list as an empty field, and saving that clears it, an explicit and audited
+act of someone who has the right, on a state the card shows in red. The same holds for an installation default that
 is stored in the portal but refused by these rules.
 
 A caller outside the list is refused with `network`. The address is only as good as the proxy
@@ -333,7 +339,10 @@ call, unless:
   trusted is then unknown; it is a standing fault of its own on System status);
 - **this call** arrived with `X-Forwarded-For` or `X-Forwarded-Proto` that the server did not use,
   because the peer that sent it is not a trusted proxy (the address held is a hop that is not
-  trusted). A header forged by someone else harms only that caller's own call;
+  trusted). A header forged by someone else harms only that caller's own call. A call can carry
+  more than one such header line, and the lines can disagree: each is judged and the least safe
+  answer wins (*ignored* beats *honoured*), whichever line comes first, so a proxy that sends its
+  address as a second line instead of merging it into the first is refused, not passed;
 - the caller's address is one of the trusted proxies, or a loopback or private address while the
   address webhooks are registered at is public (a hop did not hand the caller on).
 

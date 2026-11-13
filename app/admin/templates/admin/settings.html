@@ -111,7 +111,7 @@
   <p>{{ _("admin.settings.address.sources.intro") }}</p>
   {% for row in address.sources %}
   <p><strong>{{ row.label }}</strong> <span class="chip chip--{{ row.finding.chip }}">{{ _("admin.source.finding") }}</span> {{ row.finding.text }}</p>
-  {% for fault in row.finding.faults %}<p role="alert"><span class="chip chip--danger">{{ _("admin.source.refused") }}</span> {{ fault }}</p>{% endfor %}
+  {% for fault in row.faults %}<p role="alert"><span class="chip chip--danger">{{ _("admin.source.refused") }}</span> {{ fault }}</p>{% endfor %}
   {% endfor %}
   <h3 id="tls-heading">{{ _("admin.settings.tls.title") }}</h3>
   {% if internal_ca %}<p>{{ _("admin.settings.tls.internal_ca") }} <a href="/admin/settings/tls/ca.crt">{{ _("admin.settings.tls.internal_ca.download") }}</a></p>{% endif %}

@@ -18,12 +18,13 @@ from app.admin.authz import AdminContext
 from app.admin.channel_fields import Manage, channels_url, secret_field, value_of
 from app.admin.forms import Field, FormData, moment_label
 from app.admin.pages import SameOrigin
-from app.admin.source_findings import source_finding
+from app.admin.source_findings import card_finding
 from app.domain.contact_center import ContactCenterKind, OrganisationConnection, Registration
 from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.errors import DomainError
 from app.domain.networks import NetworkList
-from app.domain.webhook_sources import MAX_WEBHOOK_NETWORKS, source_list_that_applies
+from app.domain.source_networks import MAX_WEBHOOK_NETWORKS
+from app.domain.webhook_sources import source_list_that_applies
 from app.i18n import BoundGettext
 from app.web.locale import RequestLocale
 from app.web.webhook_sources import contact_center_networks, proxy_chain
@@ -149,13 +150,12 @@ async def connection_view(
     base = settings.webhook_base
     made = stored.webhook_secret_at if stored else None
     own = stored.allowed_networks if stored else NetworkList()
-    sources = source_finding(
+    sources = card_finding(
         _,
         source_list_that_applies(own, contact_center_networks(request)),
-        own=bool(own.networks or own.unreadable),
+        own=own.configured,
         required=settings.webhook_source_networks_required,
         chain=proxy_chain(request),
-        detailed=False,
     )
     return {
         "available": service.available,

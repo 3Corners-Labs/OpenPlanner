@@ -536,7 +536,7 @@ async def save_contact_center(
                 form.text("cc_client_id"),
                 client_secret=form.values.get("cc_client_secret") or None,
                 refresh_token=form.values.get("cc_refresh_token") or None,
-                allowed_networks=form.values.get("cc_allowed_networks"),
+                allowed_networks_text=form.values.get("cc_allowed_networks"),
             )
             outcome = await connection_service(request).save(context.principal, org, change)
         except DomainError as error:

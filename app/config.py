@@ -30,12 +30,12 @@ from app.domain.connection_health import HealthPolicy
 from app.domain.event_schema import Envelope
 from app.domain.login_mapping import LOGIN_KEYS
 from app.domain.settings_registry import PHONE_REGIONS, REGISTRY, SettingClass
+from app.domain.source_networks import MAX_WEBHOOK_NETWORKS, valid_source_networks
 from app.domain.staff_directory import ADMIN_URL_PATTERN
 from app.domain.system_log import EventRetention
 from app.domain.update_policy import valid_line, valid_window
 from app.domain.updates import valid_release
 from app.domain.user_names import DEFAULT_SUFFIX, valid_suffix
-from app.domain.webhook_sources import valid_source_networks
 from app.i18n.dates import ClockStyle
 
 LogLevel = Literal["TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -930,9 +930,12 @@ class Settings(BaseSettings):
     @field_validator("webhook_source_networks_video", "webhook_source_networks_contact_center")
     @classmethod
     def _networks_are_networks(cls, value: str, info: ValidationInfo) -> str:
-        """Accept only a list of at most 32 networks; the message names no value (ADR 0124)."""
+        """Accept only a list of source networks; the message names no value (ADR 0124)."""
         if not valid_source_networks(value):
-            raise ValueError(f"{str(info.field_name).upper()} must be at most 32 networks")
+            raise ValueError(
+                f"{str(info.field_name).upper()} must be at most {MAX_WEBHOOK_NETWORKS} networks,"
+                " none of which lets a whole address family in"
+            )
         return value
 
     @field_validator("phone_default_region")

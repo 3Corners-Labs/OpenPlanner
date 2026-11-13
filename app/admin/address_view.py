@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from fastapi import Request
 
 from app.admin.pages import admin_moment
-from app.admin.source_findings import SourceFinding, source_finding
+from app.admin.source_findings import FAULT_TEXTS, SourceFinding, source_finding
 from app.config import Settings
 from app.domain.address_check import AddressStatus
 from app.domain.proxy_watch import ProxyHeaderWatch
@@ -88,6 +88,7 @@ class SourceRow:
 
     label: str
     finding: SourceFinding
+    faults: list[str]
 
 
 @dataclass(frozen=True)
@@ -143,15 +144,16 @@ def _source_rows(request: Request, locale: RequestLocale, settings: Settings) ->
     _ = locale.gettext
     chain = proxy_chain(request)
     required = settings.webhook_source_networks_required
-    return [
-        SourceRow(
-            _(label),
-            source_finding(_, networks, own=False, required=required, chain=chain, detailed=True),
-        )
+    findings = [
+        (label, source_finding(_, networks, own=False, required=required, chain=chain))
         for label, networks in (
             ("admin.settings.address.sources.video", video_networks(request)),
             ("admin.settings.address.sources.contact_center", contact_center_networks(request)),
         )
+    ]
+    return [
+        SourceRow(_(label), found, [_(FAULT_TEXTS[fault]) for fault in found.faults])
+        for label, found in findings
     ]
 
 

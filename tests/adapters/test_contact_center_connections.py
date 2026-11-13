@@ -112,7 +112,9 @@ async def test_the_allowed_networks_live_in_the_sealed_record_beside_the_other_f
     secrets = FakeSecrets()
     connections = SealedConnections(secrets)
     networks = ("8.8.8.0/24", "2001:4860:4860::/48")
-    change = ConnectionChange(WXCC, CHANGE.api_base_url, "client", "s", "r", "\n".join(networks))
+    change = ConnectionChange(
+        WXCC, CHANGE.api_base_url, "client", "s", "r", allowed_networks_text="\n".join(networks)
+    )
 
     await connections.save(1, change, NOW)
 
@@ -127,7 +129,7 @@ async def test_saving_the_networks_alone_keeps_the_webhook_secret_and_every_othe
     connections = SealedConnections(secrets)
     await connections.save(1, CHANGE, NOW)
     before = dict(secrets.values["contact-center:1"])
-    only = ConnectionChange(WXCC, CHANGE.api_base_url, "client", allowed_networks="8.8.8.0/24")
+    only = ConnectionChange(WXCC, CHANGE.api_base_url, "client", allowed_networks_text="8.8.8.0/24")
 
     await connections.save(1, only, NOW + timedelta(days=1))
 
@@ -138,13 +140,15 @@ async def test_saving_the_networks_alone_keeps_the_webhook_secret_and_every_othe
 async def test_a_save_without_the_field_keeps_the_list_and_an_empty_one_clears_it() -> None:
     secrets = FakeSecrets()
     connections = SealedConnections(secrets)
-    listed = ConnectionChange(WXCC, CHANGE.api_base_url, "client", allowed_networks="8.8.8.0/24")
+    listed = ConnectionChange(
+        WXCC, CHANGE.api_base_url, "client", allowed_networks_text="8.8.8.0/24"
+    )
     await connections.save(1, CHANGE, NOW)
     await connections.save(1, listed, NOW)
 
     await connections.save(1, ConnectionChange(WXCC, CHANGE.api_base_url, "client"), NOW)
     kept = await connections.get(1)
-    cleared = ConnectionChange(WXCC, CHANGE.api_base_url, "client", allowed_networks="")
+    cleared = ConnectionChange(WXCC, CHANGE.api_base_url, "client", allowed_networks_text="")
     await connections.save(1, cleared, NOW)
     emptied = await connections.get(1)
 
@@ -160,7 +164,9 @@ async def test_a_save_without_the_field_keeps_the_list_and_an_empty_one_clears_i
         ["not-a-network"],
         [""],
         ["8.8.8.9/24"],
+        ["8.8.8.8"],  # not canonical: nothing here wrote it
         ["0.0.0.0/0"],
+        ["::/1"],
         ["8.8.8.0/24", 7],
         "8.8.8.0/24",
         {"a": 1},
@@ -189,7 +195,9 @@ async def test_saving_a_list_replaces_an_unreadable_one() -> None:
     secrets.values["contact-center:1"]["allowed_networks"] = "damaged"
 
     await connections.save(
-        1, ConnectionChange(WXCC, CHANGE.api_base_url, "client", allowed_networks="8.8.8.0/24"), NOW
+        1,
+        ConnectionChange(WXCC, CHANGE.api_base_url, "client", allowed_networks_text="8.8.8.0/24"),
+        NOW,
     )
 
     shown = await connections.get(1)

@@ -27,9 +27,10 @@ class FakeLive:
 
 
 def request(settings: Settings, live: FakeLive | None = None) -> SimpleNamespace:
-    state = SimpleNamespace(settings=settings, clock=FixedClock(NOW))
-    if live is not None:
-        state.live_settings = live
+    """A bare request: every running application has ``live_settings`` (``app.main``)."""
+    state = SimpleNamespace(
+        settings=settings, clock=FixedClock(NOW), live_settings=live or FakeLive()
+    )
     return SimpleNamespace(app=SimpleNamespace(state=state))
 
 
@@ -59,6 +60,14 @@ class TestADefaultThatIsStored:
         shown = read(request(SETTINGS, FakeLive(frozenset({key}))))
 
         assert shown == NetworkList(unreadable=True)
+
+    def test_an_application_without_live_settings_fails_loudly(self, key: str, read) -> None:  # type: ignore[no-untyped-def]
+        bare = SimpleNamespace(
+            app=SimpleNamespace(state=SimpleNamespace(settings=SETTINGS, clock=FixedClock(NOW)))
+        )
+
+        with pytest.raises(AttributeError):
+            read(bare)
 
     def test_a_stored_value_the_settings_apply_is_read(self, key: str, read) -> None:  # type: ignore[no-untyped-def]
         shown = read(request(SETTINGS.model_copy(update={key: "8.8.8.0/24"}), FakeLive()))

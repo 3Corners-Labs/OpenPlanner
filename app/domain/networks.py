@@ -56,6 +56,16 @@ class NetworkList:
     networks: tuple[str, ...] = ()
     unreadable: bool = False
 
+    def __post_init__(self) -> None:
+        """Refuse the impossible: networks that are also unreadable."""
+        if self.networks and self.unreadable:
+            raise ValueError("a list that cannot be read has no networks")
+
+    @property
+    def configured(self) -> bool:
+        """Whether a list is there: it holds networks, or it is stored but cannot be read."""
+        return bool(self.networks) or self.unreadable
+
 
 def split_entries(text: str) -> list[str]:
     """Return the entries of ``text``: one per line or comma separated."""
@@ -112,10 +122,11 @@ def host_is_public(url: str) -> bool:
     address written as IPv6 is judged as the IPv4 one). A name is public unless it is
     ``localhost``, has no dot, ends in an internal suffix (``INTERNAL_SUFFIXES``) or has a
     number or hex as its last label (the short and integer IPv4 spellings a resolver still maps
-    to an address, such as ``127.1``). A name cannot be resolved here: a name that points at an
-    internal address is not caught.
+    to an address, such as ``127.1``). One trailing dot (the absolute form, ``localhost.``) is
+    dropped first. A name cannot be resolved here: a name that points at an internal address is
+    not caught.
     """
-    host = (urlsplit(url).hostname or "").lower()
+    host = (urlsplit(url).hostname or "").lower().removesuffix(".")
     if not host:
         return False
     parsed = address_of(host)

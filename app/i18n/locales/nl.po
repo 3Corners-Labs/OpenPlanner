@@ -13732,4 +13732,10 @@ msgid "admin.source.fault.unreadable_trust"
 msgstr "Aanroepen worden geweigerd (bron onbekend) zolang een regel van FORWARDED_ALLOW_IPS geen adres of netwerk is (een socketpad kan hier niet worden beoordeeld). Noem de proxy met het adres waarmee de web-container hem ziet verbinden en herstart web."
 
 msgid "admin.source.state.unreadable"
-msgstr "De opgeslagen lijst is niet te lezen, dus dit adres accepteert geen enkele aanroep. Stel de toegestane netwerken opnieuw in."
+msgstr "De standaardlijst van de installatie is niet te lezen, dus dit adres accepteert geen enkele aanroep. Stel hem opnieuw in onder Geavanceerde instellingen."
+
+msgid "admin.source.state.unreadable_own"
+msgstr "De eigen lijst van deze koppeling is niet te lezen, dus dit adres accepteert geen enkele aanroep. Stel de toegestane netwerken opnieuw in op deze kaart."
+
+msgid "admin.source.state.unreadable_default_card"
+msgstr "De standaardlijst van de installatie is niet te lezen, dus dit adres accepteert geen enkele aanroep. Vraag de platformbeheerder, of stel op deze kaart een eigen lijst in."

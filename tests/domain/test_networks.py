@@ -172,6 +172,12 @@ def test_a_network_list_is_unreadable_only_when_it_says_so() -> None:
         ("https://[::1]", False),
         ("https://[::ffff:10.0.0.1]", False),
         ("http://localhost:8000", False),
+        ("http://localhost.:8000", False),  # the absolute form of a name
+        ("https://planner.internal.", False),
+        ("https://planner.localhost.", False),
+        ("https://api.voorbeeld.nl.", True),
+        ("https://.", False),
+        ("https://voorbeeld.nl..", True),  # only one dot is dropped; the name stays a name
         ("https://planner.localhost", False),
         ("https://planner.internal", False),
         ("https://planner.local", False),

@@ -15,7 +15,8 @@ from starlette.requests import Request
 from app.config import Settings
 from app.domain.errors import DomainError
 from app.domain.networks import NetworkList
-from app.domain.webhook_sources import ProxyChain, source_networks_of
+from app.domain.source_networks import source_networks_of
+from app.domain.webhook_sources import ProxyChain
 from app.web.caller import forwarded_headers_ignored
 
 VIDEO_KEY = "webhook_source_networks_video"
@@ -23,9 +24,13 @@ CONTACT_CENTER_KEY = "webhook_source_networks_contact_center"
 
 
 def _stored_value_is_ignored(request: Request, key: str) -> bool:
-    """Return whether the settings ignore a stored portal value for ``key`` (``LiveSettings``)."""
-    live = getattr(request.app.state, "live_settings", None)
-    return live is not None and live.portal_ignored(key)
+    """Return whether the settings ignore a stored portal value for ``key`` (``LiveSettings``).
+
+    ``app.state.live_settings`` is set at start-up in every running application (``app.main``),
+    so a missing one is a defect that must fail loudly, not read as "nothing stored".
+    """
+    ignored: bool = request.app.state.live_settings.portal_ignored(key)
+    return ignored
 
 
 def _default(request: Request, key: str) -> NetworkList:

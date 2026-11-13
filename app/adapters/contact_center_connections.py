@@ -19,7 +19,7 @@ from app.adapters.db.credentials import Secrets
 from app.adapters.db.record_names import contact_center_credential_name, organisation_tokens_name
 from app.domain.contact_center import ConnectionChange, ContactCenterKind, OrganisationConnection
 from app.domain.networks import NetworkList
-from app.domain.webhook_sources import read_stored_networks, source_networks_of
+from app.domain.source_networks import read_stored_networks
 
 WEBHOOK_SECRET_BYTES = 32
 """Random bytes of a generated webhook secret: 43 URL-safe characters (WxCC wants 32–256)."""
@@ -109,8 +109,7 @@ class SealedConnections:
             "client_id": change.client_id,
         }
         if change.allowed_networks is not None:
-            # Validated by the service before it audits; the same rule, so it cannot fail here.
-            record["allowed_networks"] = list(source_networks_of(change.allowed_networks))
+            record["allowed_networks"] = list(change.allowed_networks)
         if change.client_secret is not None:
             record["client_secret"] = change.client_secret
         if change.refresh_token is not None:

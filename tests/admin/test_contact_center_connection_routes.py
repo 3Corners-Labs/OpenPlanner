@@ -7,7 +7,9 @@ import httpx
 import pytest
 
 from app.adapters.contact_center_connections import SealedConnections
+from app.adapters.db.credentials import CredentialStore
 from app.adapters.db.record_names import contact_center_credential_name
+from app.adapters.integrations import sealed_store
 from app.adapters.webhooks import sign_wxcc
 from app.domain.contact_center import ContactCenterKind, Registration
 from app.domain.networks import NetworkList
@@ -24,6 +26,14 @@ FORM = {
     "cc_client_secret": "client-secret-value",
     "cc_refresh_token": "refresh-token-value",
 }
+
+
+def _credentials(site: Site) -> CredentialStore:
+    """The sealed store the connections live in, as the application builds it."""
+    state = site_app(site).state
+    store = sealed_store(state.engine, state.settings)
+    assert store is not None
+    return store
 
 
 def _connections(site: Site) -> SealedConnections:
@@ -307,7 +317,9 @@ async def test_changing_the_networks_alone_keeps_the_webhook_secret_and_register
     assert not any("8.8.8" in e.event.detail for e in audit)
 
 
-@pytest.mark.parametrize("text", ["8.8.8.0/24\nnot-a-network", "8.8.8.0/24\n0.0.0.0/0", "::/0"])
+@pytest.mark.parametrize(
+    "text", ["8.8.8.0/24\nnot-a-network", "8.8.8.0/24\n0.0.0.0/0", "::/0", "::/1", "::ffff:0:0/96"]
+)
 async def test_a_refused_list_is_shown_at_its_input_and_stores_nothing(
     site: Site, text: str
 ) -> None:
@@ -418,8 +430,7 @@ async def test_a_co_tenant_inside_the_range_still_fails_the_signature_at_the_org
 
 async def _damage_the_stored_list(site: Site, value: object) -> None:
     """Write ``value`` where the sealed record keeps the list, as a damaged record would."""
-    store = _connections(site)._store  # noqa: SLF001
-    name = contact_center_credential_name(1)
+    store, name = _credentials(site), contact_center_credential_name(1)
     record = await store.get(name)
     assert record is not None
     await store.put(name, record | {"allowed_networks": value}, site.clock.now())
@@ -439,7 +450,7 @@ async def test_a_corrupted_stored_list_refuses_every_call_and_the_card_says_so(
     card = (await site.client.get(PAGE)).text
 
     assert [(r.status_code, r.content) for r in (inside, outside)] == [(403, b"")] * 2
-    assert "De opgeslagen lijst is niet te lezen" in card
+    assert "De eigen lijst van deze koppeling is niet te lezen" in card
     # one event per caller (ADR 0124 point 10), so one for each of the two callers
     assert await _webhook_refusals(site) == [("network", "source:wxcc,organisation:demo")] * 2
 
@@ -459,8 +470,7 @@ async def test_a_list_only_save_on_a_record_without_a_webhook_secret_makes_one_a
 ) -> None:
     """``UNTOUCHED`` is for a connection that has its secret; without one the normal path runs."""
     await _connect(site)
-    store = _connections(site)._store  # noqa: SLF001
-    name = contact_center_credential_name(1)
+    store, name = _credentials(site), contact_center_credential_name(1)
     record = await store.get(name)
     assert record is not None
     await store.put(
@@ -473,3 +483,22 @@ async def test_a_list_only_save_on_a_record_without_a_webhook_secret_makes_one_a
     assert "done=contact_center_registered" in saved.headers["location"]
     assert registrar.registered == [(1, "demo")]
     assert await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC) is not None
+
+
+async def test_an_unreadable_default_tells_the_card_whom_to_ask_and_an_own_list_repairs_it(
+    site: Site,
+) -> None:
+    """The organisation cannot repair the installation's default: the card says so."""
+    await _connect(site)
+    _set_settings(site, webhook_source_networks_contact_center="garbage")
+
+    card = (await site.client.get(PAGE)).text
+    refused = await _call_from(site, SUPPLIER)
+    await _save_networks(site, SUPPLIER_RANGE)
+    repaired = await _call_from(site, SUPPLIER)
+
+    assert "De standaardlijst van de installatie is niet te lezen" in card
+    assert "Vraag de platformbeheerder" in card
+    assert "Advanced" not in card
+    assert refused.status_code == 403
+    assert repaired.status_code == 204  # an own list replaces the default, however it reads

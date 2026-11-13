@@ -35,7 +35,6 @@ from app.domain.ports import (
     RequestRecord,
 )
 from app.domain.scheduling import Group
-from app.domain.webhook_sources import source_networks_of
 
 GUEST_EXPIRES = datetime(2026, 1, 1, 18, tzinfo=UTC)
 """When the fake's guest tokens expire."""
@@ -266,7 +265,7 @@ class FakeContactCenterConnections:
             has_refresh_token=bool(change.refresh_token) or bool(old and old.has_refresh_token),
             webhook_secret_at=old.webhook_secret_at if old else now,
             allowed_networks=(
-                NetworkList(source_networks_of(change.allowed_networks))
+                NetworkList(change.allowed_networks)
                 if change.allowed_networks is not None
                 else (old.allowed_networks if old else NetworkList())
             ),

@@ -34,7 +34,6 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.networks import NetworkList
 from app.domain.ports import Clock, ConnectionRegistrar, ContactCenterConnections, UnitOfWork
 from app.domain.scheduling import is_slug
-from app.domain.webhook_sources import source_networks_of
 
 PERMISSION = Permission.INTEGRATIONS_MANAGE
 AUDIT_KEY = "contact_center_connection"
@@ -166,24 +165,16 @@ class ContactCenterConnectionService:
         Raises:
             DomainError: ``not_permitted``, ``organisation_not_found``, ``integration_not_ready``
                 (no settings key), ``invalid_configuration`` naming ``client_secret`` when a
-                new connection comes without one, or naming ``allowed_networks`` when the list
-                is no list of at most 32 networks or covers a whole address family.
+                new connection comes without one.
         """
         organisation_id = await self._authorize(principal, organisation)
         connections = self._ready()
         stored = await connections.get(organisation_id)
-        networks = (
-            None
-            if change.allowed_networks is None
-            else source_networks_of(
-                change.allowed_networks, field=f"{CONNECTION_FIELD}{NETWORKS_AUDIT}"
-            )
-        )
         if change.client_secret is None and stored is None:
             raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}client_secret")
-        networks_changed = networks is not None and NetworkList(networks) != (
-            stored.allowed_networks if stored else NetworkList()
-        )
+        networks_changed = change.allowed_networks is not None and NetworkList(
+            change.allowed_networks
+        ) != (stored.allowed_networks if stored else NetworkList())
         sent = [*change.secrets_sent, *([NETWORKS_AUDIT] if networks_changed else [])]
         detail = ",".join([f"{AUDIT_KEY}.save", f"kind:{change.kind.value}", *sent])
         # Asked before the save: the save makes a secret for a record that has none.

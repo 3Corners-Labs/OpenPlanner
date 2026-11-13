@@ -1,21 +1,19 @@
-"""The source-network rule of the inbound webhook gate (ADR 0124 points 3 and 4)."""
+"""The gate's rule for where a webhook may come from (ADR 0124 points 3 and 4).
+
+What a list may hold, and how one is read back, is ``tests/domain/test_source_networks.py``.
+"""
 
 import pytest
 
-from app.domain.errors import DomainError, ErrorCode
 from app.domain.inbound_gate import Refusal
 from app.domain.networks import NetworkList
 from app.domain.webhook_sources import (
-    MAX_WEBHOOK_NETWORKS,
     ChainFault,
     ProxyChain,
     SourceState,
     check_source,
-    read_stored_networks,
     source_list_that_applies,
-    source_networks_of,
     source_state,
-    valid_source_networks,
 )
 
 SUPPLIER = "8.8.8.8"
@@ -27,78 +25,6 @@ SOUND = ProxyChain(("172.31.240.2",), address_is_public=True, headers_ignored=Fa
 
 def chain(*trusted: str, public: bool = True, headers_ignored: bool = False) -> ProxyChain:
     return ProxyChain(trusted, public, headers_ignored)
-
-
-def refused_field(text: str) -> str:
-    with pytest.raises(DomainError) as refused:
-        source_networks_of(text)
-    assert refused.value.code is ErrorCode.INVALID_CONFIGURATION
-    return refused.value.field
-
-
-def test_a_list_is_written_per_line_or_comma_separated_and_kept_canonical() -> None:
-    assert source_networks_of("8.8.8.8, 10.0.0.9/24\n2001:db8::1\n\n8.8.8.8") == (
-        "8.8.8.8/32",
-        "10.0.0.0/24",
-        "2001:db8::1/128",
-    )
-    assert source_networks_of("") == ()
-
-
-@pytest.mark.parametrize(
-    "text",
-    [
-        "not-a-network",
-        "203.0.113.0/33",
-        "8.8.8.0/24, nope",
-        "0.0.0.0/0",
-        "::/0",
-        "8.8.8.0/24\n0.0.0.0/0",
-        "0.0.0.1/0",  # host bits are cleared: this is 0.0.0.0/0
-    ],
-)
-def test_a_list_that_is_no_list_or_lets_a_whole_address_family_in_is_refused(text: str) -> None:
-    """A network covering a whole family is "any source" called "restricted"."""
-    assert refused_field(text) == "allowed_networks"
-    assert not valid_source_networks(text)
-
-
-def test_a_wide_network_is_a_choice_of_the_organisation_and_only_the_whole_family_is_refused() -> (
-    None
-):
-    assert valid_source_networks("0.0.0.0/1, ::/1, 8.0.0.0/8")
-
-
-def test_a_list_holds_at_most_32_networks() -> None:
-    nets = [f"10.0.{n}.0/24" for n in range(MAX_WEBHOOK_NETWORKS + 1)]
-
-    assert valid_source_networks(",".join(nets[:MAX_WEBHOOK_NETWORKS]))
-    assert not valid_source_networks(",".join(nets))
-    assert valid_source_networks(",".join(["10.0.0.0/24"] * 100))  # the same network is one
-
-
-@pytest.mark.parametrize(
-    ("stored", "expected"),
-    [
-        ([], NetworkList()),
-        (["8.8.8.0/24", "8.8.8.8"], NetworkList(("8.8.8.0/24", "8.8.8.8/32"))),
-        (["not-a-network"], UNREADABLE),
-        ([""], UNREADABLE),
-        (["8.8.8.9/24"], UNREADABLE),  # host bits: nothing wrote this
-        (["8.8.8.0/24", 7], UNREADABLE),
-        (["0.0.0.0/0"], UNREADABLE),
-        (["::/0"], UNREADABLE),
-        ("8.8.8.0/24", UNREADABLE),  # a string is not a list
-        ({"a": 1}, UNREADABLE),
-        (None, UNREADABLE),
-        (7, UNREADABLE),
-        ([f"10.0.{n}.0/24" for n in range(MAX_WEBHOOK_NETWORKS + 1)], UNREADABLE),
-    ],
-)
-def test_a_stored_list_is_read_back_or_is_unreadable_never_empty(
-    stored: object, expected: NetworkList
-) -> None:
-    assert read_stored_networks(stored) == expected
 
 
 def test_an_own_list_replaces_the_default_and_an_empty_one_falls_back_to_it() -> None:

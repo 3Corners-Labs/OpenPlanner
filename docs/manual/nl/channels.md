@@ -131,8 +131,8 @@ delivery network vóór de proxy (de aanroeper wordt het adres daarvan, en dat i
 al zijn klanten toe) en een leverancier die een publieke naam vanaf een privéadres aanroept. Laat de
 lijst dan leeg en vertrouw op de handtekening, of vraag het aan uw platformbeheerder.
 
-Een netwerk dat een hele adresfamilie dekt (`0.0.0.0/0` of `::/0`) wordt geweigerd: dat is geen
-lijst. Is de opgeslagen lijst niet te lezen, dan zegt de kaart dat en accepteert het adres geen
+Een netwerk dat een hele adresfamilie dekt (`0.0.0.0/0` of `::/0`, of een IPv6-netwerk als `::/1`
+dat ook elk als IPv6 geschreven IPv4-adres bevat) wordt geweigerd: dat is geen lijst. Is de opgeslagen lijst niet te lezen, dan zegt de kaart dat en accepteert het adres geen
 enkele aanroep tot u de lijst opnieuw opslaat.
 
 **Stuur nadat u een lijst hebt ingesteld een testbezorging** en controleer dat die wordt

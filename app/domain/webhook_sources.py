@@ -4,9 +4,6 @@ A connection carries a list of allowed networks, the installation a default per 
 host may demand a list (``WEBHOOK_SOURCE_NETWORKS_REQUIRED``). This module holds the decisions
 that make of that one answer, all pure:
 
-    text ─► ``source_networks_of`` ─► canonical networks (at most 32; none that covers a whole
-                                      address family: that is "any source" called "restricted")
-    stored value ─► ``read_stored_networks`` ─► a ``NetworkList``, readable or not
     own list, default list ─► ``source_list_that_applies`` ─► the list that governs an address
     caller, list, switch, chain ─► ``check_source`` ─► allow, ``network`` or ``source_unknown``
     list, switch ─► ``source_state`` ─► what the portal says about the address (a finding)
@@ -14,7 +11,8 @@ that make of that one answer, all pure:
 What an empty list means is decided here and nowhere else: *any source*, except while the host
 demands a list, when an address without one does not accept (``network``). ``app.domain.networks``
 gives no meaning to an empty list; this module is the one place that does for webhooks. A list that
-is stored but cannot be read is never an empty one: every call to that address is refused.
+is stored but cannot be read is never an empty one: every call to that address is refused. What a
+list may hold, and how one is read back, is ``app.domain.source_networks``.
 
 The address is only as good as the proxy chain (point 4). A list that cannot be evaluated is
 refused, not passed: ``ProxyChain`` says in which cases the caller's address cannot be trusted, and
@@ -33,86 +31,12 @@ import ipaddress
 from dataclasses import dataclass
 from enum import StrEnum
 
-from app.domain.errors import DomainError, ErrorCode
 from app.domain.inbound_gate import Refusal
-from app.domain.networks import (
-    NetworkList,
-    address_of,
-    host_is_public,
-    in_any,
-    networks_of,
-)
+from app.domain.networks import NetworkList, address_of, host_is_public, in_any
 from app.domain.public_address import PeerClass, classify_peer, trusted_proxy
-
-MAX_WEBHOOK_NETWORKS = 32
-"""The most networks one list of allowed webhook source networks holds, a connection's or an
-installation's default (ADR 0124 point 3). A fixed rule: a longer list is a sign that the wrong
-tool is being used."""
-
-NETWORKS_FIELD = "allowed_networks"
-"""``DomainError`` field of a refused list."""
 
 WILDCARD = "*"
 """The entry of ``FORWARDED_ALLOW_IPS`` that trusts every peer."""
-
-WHOLE_FAMILY_PREFIX = 0
-"""A network with this prefix length covers a whole address family (``0.0.0.0/0``, ``::/0``)."""
-
-
-def source_networks_of(text: str, *, field: str = NETWORKS_FIELD) -> tuple[str, ...]:
-    """Return the allowed source networks written in ``text``, canonical; the one validation.
-
-    The card, the two class C defaults and the ``Settings`` validator all go through here.
-
-    Raises:
-        DomainError: ``invalid_configuration`` for ``field`` when an entry is no network, there
-            are more than ``MAX_WEBHOOK_NETWORKS`` different ones, or one covers a whole address
-            family (a list that lets everything in is no list).
-    """
-    found = networks_of(text, maximum=MAX_WEBHOOK_NETWORKS, field=field)
-    if _covers_a_family(found):
-        raise DomainError(ErrorCode.INVALID_CONFIGURATION, field)
-    return found
-
-
-def _covers_a_family(networks: tuple[str, ...]) -> bool:
-    """Return whether one of ``networks`` covers a whole address family."""
-    return any(ipaddress.ip_network(n).prefixlen == WHOLE_FAMILY_PREFIX for n in networks)
-
-
-def valid_source_networks(text: str) -> bool:
-    """Return whether ``text`` is an acceptable list of source networks (may be empty)."""
-    try:
-        source_networks_of(text)
-    except DomainError:
-        return False
-    return True
-
-
-def read_stored_networks(value: object) -> NetworkList:
-    """Read a stored list back; anything that cannot be read is unreadable, never empty.
-
-    The caller decides what a missing field means (a record made before the field existed is an
-    empty list). A value that is there must be a list of at most ``MAX_WEBHOOK_NETWORKS`` strings
-    that are networks as written by this module: a wrong type (``None`` too), an entry that does
-    not parse (also a blank one, or one with host bits) or a network that covers a whole address
-    family makes the whole list unreadable.
-    """
-    unreadable = NetworkList(unreadable=True)
-    if not isinstance(value, list) or len(value) > MAX_WEBHOOK_NETWORKS:
-        return unreadable
-    found: list[str] = []
-    for entry in value:
-        if not isinstance(entry, str):
-            return unreadable
-        try:
-            network = ipaddress.ip_network(entry)
-        except ValueError:
-            return unreadable
-        if network.prefixlen == WHOLE_FAMILY_PREFIX:
-            return unreadable
-        found.append(str(network))
-    return NetworkList(tuple(found))
 
 
 def source_list_that_applies(own: NetworkList, default: NetworkList) -> NetworkList:
@@ -122,7 +46,7 @@ def source_list_that_applies(own: NetworkList, default: NetworkList) -> NetworkL
     unreadable own list stays unreadable: it is not an empty one, so the default does not
     replace it.
     """
-    return own if own.networks or own.unreadable else default
+    return own if own.configured else default
 
 
 class ChainFault(StrEnum):

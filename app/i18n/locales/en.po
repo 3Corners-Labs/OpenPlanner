@@ -13719,4 +13719,10 @@ msgid "admin.source.fault.unreadable_trust"
 msgstr "Calls are refused (source unknown) while an entry of FORWARDED_ALLOW_IPS is no address or network (a socket path cannot be judged here). Name the proxy by the address the web container sees it connect from, and restart web."
 
 msgid "admin.source.state.unreadable"
-msgstr "The stored list cannot be read, so this address accepts no call. Set the allowed networks again."
+msgstr "The installation's default list cannot be read, so this address accepts no call. Set it again under Advanced settings."
+
+msgid "admin.source.state.unreadable_own"
+msgstr "This connection's own list cannot be read, so this address accepts no call. Set the allowed networks again on this card."
+
+msgid "admin.source.state.unreadable_default_card"
+msgstr "The installation's default list cannot be read, so this address accepts no call. Ask the platform administrator, or set a list of your own on this card."

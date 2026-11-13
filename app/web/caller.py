@@ -25,6 +25,11 @@ def client_address(request: Request) -> str | None:
     return request.client.host if request.client else None
 
 
+_WORST_FIRST = (Forwarded.IGNORED, Forwarded.HONOURED, Forwarded.ABSENT)
+"""Which judgement wins when a request carries more than one header of a kind: the one that is
+least safe to rely on (an address that was not used can only be a hop that is not trusted)."""
+
+
 def forwarded_of(request: Request) -> Forwarded:
     """Return what the server did with the forwarded headers of *this* request (ADR 0086).
 
@@ -33,13 +38,23 @@ def forwarded_of(request: Request) -> Forwarded:
     is not the peer's), *ignored* (they are there and the client address and scheme are still the
     peer's, because the peer is not a trusted proxy) or *absent*. The instance probe, the proxy
     watch's middleware and the webhook gate all ask here. A value is never used as an address.
+
+    A request can carry more than one header of a kind, and a first and a last one can disagree.
+    Every one is judged on its own and the least safe answer wins: *ignored* beats *honoured*
+    beats *absent*. So a header that the server did not use cannot be hidden behind one that it
+    did: the gate then refuses the call as ``source_unknown``, and the proxy watch counts it.
+    A proxy that sends its forwarded address as a second header line instead of merging it into the
+    first is refused for it, not passed.
     """
-    return forwarded_state(
-        forwarded_for=request.headers.get("x-forwarded-for"),
-        forwarded_proto=request.headers.get("x-forwarded-proto"),
-        client=client_address(request),
-        scheme=request.url.scheme,
-    )
+    client, scheme = client_address(request), request.url.scheme
+    fors: list[str | None] = [*request.headers.getlist("x-forwarded-for")] or [None]
+    protos: list[str | None] = [*request.headers.getlist("x-forwarded-proto")] or [None]
+    judged = {
+        forwarded_state(forwarded_for=ff, forwarded_proto=fp, client=client, scheme=scheme)
+        for ff in fors
+        for fp in protos
+    }
+    return next(state for state in _WORST_FIRST if state in judged)
 
 
 def forwarded_headers_ignored(request: Request) -> bool:

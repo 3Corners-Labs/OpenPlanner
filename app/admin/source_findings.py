@@ -17,7 +17,7 @@ trusted to send) are decided per call and show in the events, not here. Texts ar
 ``app/i18n``; nothing here holds an address of a caller.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from app.domain.networks import NetworkList
 from app.domain.webhook_sources import ChainFault, ProxyChain, SourceState, source_state
@@ -38,9 +38,8 @@ FAULT_TEXTS = {
     ChainFault.WIDE_TRUST: "admin.source.fault.wide_trust",
     ChainFault.UNREADABLE_TRUST: "admin.source.fault.unreadable_trust",
 }
-"""The faults that hold for every call, with the detail for System status."""
-CARD_FAULT_TEXT = "admin.source.fault.card"
-"""What the organisation's card says of any standing fault: the cause is the installation's."""
+"""The faults that hold for every call, with the detail for System status. The card does not use
+them: it says one fixed line when there are any (``admin.source.fault.card``)."""
 
 
 @dataclass(frozen=True)
@@ -48,16 +47,18 @@ class SourceFinding:
     """One address's source networks as the page shows them.
 
     Attributes:
+        state: Which of the states the address is in.
         text: The state in words (not restricted, restricted to N networks, list missing or
             unreadable).
         chip: The tone of the chip: ``success``, ``warning`` or ``danger``.
-        faults: Words for each reason a list would be refused as unevaluable, with what to
-            repair; empty without a list or with a trustworthy chain.
+        faults: Why the gate would refuse a call for this list (standing faults of the proxy
+            chain); empty without a list or with a trustworthy chain. The page words them.
     """
 
+    state: SourceState
     text: str
     chip: str
-    faults: tuple[str, ...]
+    faults: tuple[ChainFault, ...]
 
 
 def source_finding(
@@ -67,9 +68,8 @@ def source_finding(
     own: bool,
     required: bool,
     chain: ProxyChain,
-    detailed: bool,
 ) -> SourceFinding:
-    """Return the finding for an address governed by ``sources``.
+    """Return the finding for an address governed by ``sources``, in System status's words.
 
     Args:
         _: The request's translator.
@@ -77,21 +77,37 @@ def source_finding(
         own: Whether the list is the connection's own rather than the installation's default.
         required: ``WEBHOOK_SOURCE_NETWORKS_REQUIRED``.
         chain: What is known about the proxy chain.
-        detailed: Whether the faults name the host's configuration (System status) or only say
-            that the installation's setting is the cause and whom to ask (the card).
     """
     state = source_state(sources, required=required)
+    faults: tuple[ChainFault, ...] = ()
     if state is SourceState.RESTRICTED:
         key = (
             "admin.source.state.restricted_own" if own else "admin.source.state.restricted_default"
         )
         text = _(key, count=len(sources.networks))
-        standing = chain.standing_faults()
-        faults = (
-            tuple(_(FAULT_TEXTS[f]) for f in standing)
-            if detailed
-            else (_(CARD_FAULT_TEXT),) * bool(standing)
-        )
+        faults = chain.standing_faults()
+    elif state is SourceState.UNREADABLE and own:
+        text = _("admin.source.state.unreadable_own")
     else:
-        text, faults = _(STATE_TEXTS[state]), ()
-    return SourceFinding(text, "danger" if faults else STATE_CHIPS[state], faults)
+        text = _(STATE_TEXTS[state])
+    return SourceFinding(state, text, "danger" if faults else STATE_CHIPS[state], faults)
+
+
+def card_finding(
+    _: BoundGettext,
+    sources: NetworkList,
+    *,
+    own: bool,
+    required: bool,
+    chain: ProxyChain,
+) -> SourceFinding:
+    """Return the finding for the organisation's card.
+
+    The same as ``source_finding`` except where whose list it is changes what to do: a default that
+    cannot be read is not the organisation's to repair, so the card says whom to ask, or to set a
+    list of its own.
+    """
+    found = source_finding(_, sources, own=own, required=required, chain=chain)
+    if found.state is SourceState.UNREADABLE and not own:
+        return replace(found, text=_("admin.source.state.unreadable_default_card"))
+    return found

@@ -23,9 +23,9 @@ from zoneinfo import available_timezones
 from app.domain.authorization import Scope
 from app.domain.ports import UnitOfWork
 from app.domain.settings_registry import Kind, SettingSpec, within_bounds
+from app.domain.source_networks import valid_source_networks
 from app.domain.update_policy import valid_line, valid_window
 from app.domain.user_names import valid_suffix
-from app.domain.webhook_sources import valid_source_networks
 
 RELOAD_SECONDS = 10
 """How stale the web process may be after a change: ADR 0042 §6 sets at most 10 seconds."""
