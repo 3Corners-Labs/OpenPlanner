@@ -14491,11 +14491,8 @@ msgstr "Provider {provider} claimt domein {domain}, maar staat uit. Dit adres lo
 msgid "admin.idp.check.host_switch_off"
 msgstr "Provider {provider} zou dit domein ({domain}) krijgen, maar de host staat providers van organisaties niet toe (ORGANISATION_IDPS_ENABLED). Dit adres logt daarom in bij de platformprovider."
 
-msgid "admin.idp.check.foreign_domain_not_verified"
-msgstr "Een provider van een andere organisatie claimt domein {domain}, maar het is nog niet geverifieerd. Dit adres logt in bij de platformprovider."
 
-msgid "admin.idp.check.foreign_provider_off"
-msgstr "Een provider van een andere organisatie claimt domein {domain}, maar staat uit. Dit adres logt in bij de platformprovider."
 
-msgid "admin.idp.check.foreign_host_switch_off"
-msgstr "Een provider van een andere organisatie zou domein {domain} krijgen, maar de host staat providers van organisaties niet toe. Dit adres logt in bij de platformprovider."
+
+msgid "admin.idp.check.refused"
+msgstr "Vul een e-mailadres of inlognaam in (hoogstens 320 tekens)."

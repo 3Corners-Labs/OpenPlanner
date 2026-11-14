@@ -24,7 +24,7 @@ from enum import StrEnum
 
 from app.domain.identity import PLATFORM
 from app.domain.identity_providers import OrganisationProvider
-from app.domain.login_domains import DomainClaim, covers, domain_of, route
+from app.domain.login_domains import DomainClaim, DomainState, covers, domain_of, route
 
 STEP_KEYS = ("host_switch", "register", "enable", "domain", "verify")
 """The steps in the order the work is done; the page translates each key."""
@@ -122,17 +122,17 @@ def setup_warnings(
                 SetupWarning("domain_provider_off", provider.key, c.domain) for c in routes
             )
         found.extend(
-            SetupWarning(_STATE_CODES[c.state.value], provider.key, c.domain)
+            SetupWarning(_STATE_CODES[c.state], provider.key, c.domain)
             for c in own
-            if c.state.value in _STATE_CODES
+            if c.state in _STATE_CODES
         )
     return found
 
 
 _STATE_CODES = {
-    "pending": "domain_pending",
-    "failing": "domain_failing",
-    "lapsed": "domain_lapsed",
+    DomainState.PENDING: "domain_pending",
+    DomainState.FAILING: "domain_failing",
+    DomainState.LAPSED: "domain_lapsed",
 }
 """Warning per domain state that is not fully verified."""
 

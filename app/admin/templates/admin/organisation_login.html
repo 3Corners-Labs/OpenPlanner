@@ -34,7 +34,7 @@
     {{ form_body(check_fields, _("admin.idp.check.button"), None) }}
   </form>
   {% if check %}
-  <div class="alert {% if check.platform %}alert--info{% else %}alert--success{% endif %}" role="status">
+  <div class="alert {% if check.error %}alert--error{% elif check.platform %}alert--info{% else %}alert--success{% endif %}" role="{% if check.error %}alert{% else %}status{% endif %}">
     <p>{{ check.message }}</p>
   </div>
   {% endif %}

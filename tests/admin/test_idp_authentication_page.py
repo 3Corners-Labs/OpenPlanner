@@ -10,7 +10,15 @@ from collections.abc import AsyncIterator
 import pytest
 
 from app.config import Settings
-from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site, _running_site
+from tests.admin.conftest import (
+    AUDITOR,
+    ORG_ADMIN,
+    OUTSIDER,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+    _running_site,
+)
 from tests.support.organisation_login import LOGIN, register, route_domain
 
 CHECK = f"{LOGIN}/_check"
@@ -31,10 +39,14 @@ async def superuser(site: Site) -> Site:
     return site
 
 
-async def _ask(site: Site, address: str) -> str:
-    response = await site.client.post(CHECK, data={"address": address}, headers=SAME_ORIGIN)
+async def _ask_at(url: str, site: Site, address: str) -> str:
+    response = await site.client.post(url, data={"address": address}, headers=SAME_ORIGIN)
     assert response.status_code == 200
     return response.text
+
+
+async def _ask(site: Site, address: str) -> str:
+    return await _ask_at(CHECK, site, address)
 
 
 async def test_the_tab_and_page_are_called_authentication(superuser: Site) -> None:
@@ -82,9 +94,7 @@ async def test_the_reserved_suffix_goes_to_the_platform(superuser: Site) -> None
 async def test_a_blank_address_shows_the_page_without_an_answer(superuser: Site) -> None:
     text = await _ask(superuser, "   ")
 
-    assert 'class="alert alert--info" role="status"><p>Geen' not in text
-    assert "Geen enkele provider claimt" not in text
-    assert "inlognaam zonder domein" not in text
+    assert "Vul een e-mailadres" in text
 
 
 async def test_a_verified_domain_on_a_live_provider_is_chosen(routed: Site) -> None:
@@ -111,13 +121,19 @@ async def test_the_check_says_when_the_provider_is_off(routed: Site) -> None:
     assert "routeert pas als de provider aan staat" in page
 
 
-@pytest.mark.parametrize("admin", [ORG_ADMIN, AUDITOR])
-async def test_those_who_may_look_may_check(site: Site, admin: str) -> None:
+@pytest.mark.parametrize(("admin", "status"), [(ORG_ADMIN, 200), (AUDITOR, 200), (OUTSIDER, 403)])
+async def test_those_who_may_look_may_check(site: Site, admin: str, status: int) -> None:
     await site.login_as(admin)
 
     response = await site.client.post(CHECK, data={"address": "x@y.nl"}, headers=SAME_ORIGIN)
 
-    assert response.status_code in (200, 403)
+    assert response.status_code == status
+
+
+async def test_a_too_long_address_is_refused_not_cut(superuser: Site) -> None:
+    text = await _ask(superuser, "a" * 330 + "@y.nl")
+
+    assert "Vul een e-mailadres" in text
 
 
 def test_every_step_reason_and_warning_has_its_text() -> None:
@@ -127,3 +143,30 @@ def test_every_step_reason_and_warning_has_its_text() -> None:
     assert set(STEP_TEXTS) == set(STEP_KEYS)
     assert set(CHECK_TEXTS) == set(RouteReason)
     assert len(WARNING_TEXTS) == 5
+
+
+async def test_b16_a_pending_claim_of_another_organisation_is_not_told_apart(
+    superuser: Site,
+) -> None:
+    await register(superuser)
+    await superuser.client.post(
+        f"{LOGIN}/org-a/domains", data={"domain": "acme-a.nl"}, headers=SAME_ORIGIN
+    )
+
+    text = await _ask_at("/admin/organisations/andere/login/_check", superuser, "x@acme-a.nl")
+
+    assert "Geen enkele provider claimt domein acme-a.nl" in text
+    assert "Acme A" not in text
+
+
+async def test_b12_the_address_is_in_neither_the_page_nor_the_log(
+    superuser: Site, capsys: pytest.CaptureFixture[str]
+) -> None:
+    capsys.readouterr()
+
+    text = await _ask(superuser, "ada.lovelace@nergens.nl")
+    seen = capsys.readouterr()
+
+    assert "ada.lovelace" not in text
+    assert "ada.lovelace" not in seen.out + seen.err
+    assert "nergens.nl" in text  # the domain is the answer

@@ -42,7 +42,7 @@ from app.domain.identity_providers import (
     jwks,
     validate_secret,
 )
-from app.domain.idp_setup import RouteCheck, check_route
+from app.domain.idp_setup import RouteCheck, RouteReason, check_route
 from app.domain.login_domains import (
     DEFAULT_GRACE,
     DomainClaim,
@@ -52,7 +52,6 @@ from app.domain.login_domains import (
     normalise_domain,
     refusal_of_claim,
     refusal_of_identity,
-    route,
     suffix_conflicts,
 )
 from app.domain.organisations import organisation_by_slug
@@ -112,6 +111,8 @@ class ProviderOverview:
     """How many providers the organisation may have (``idp_max_per_organisation``)."""
     claims: list[DomainClaim] = field(default_factory=list)
     """The domains claimed by those providers."""
+    routing: bool = False
+    """Whether the host allows organisation providers (``ORGANISATION_IDPS_ENABLED``)."""
 
 
 @dataclass(frozen=True)
@@ -202,15 +203,15 @@ class IdentityProviderService:
             ]
             keys = {p.key for p in providers}
             claims = [c for c in await tx.list_login_domains(_everything()) if c.provider in keys]
-        return ProviderOverview(organisation, providers, self._limit(), claims)
+        return ProviderOverview(organisation, providers, self._limit(), claims, self._routing())
 
     async def check_route(self, principal: Principal, slug: str, address: str) -> RouteCheck:
         """Return where a login with ``address`` would go and why, for the authentication page.
 
         Reads the same providers and domains as the login page, so the answer is the login's.
         The address is neither stored nor logged; the result holds its domain only. A provider
-        of another organisation is reported as ``foreign`` without its key, as the redirect on the
-        login page reveals no more (B11).
+        of another organisation is reported as ``foreign`` without its key when the login page
+        would send the address there, and as no claim at all otherwise (B11, B16).
 
         Raises:
             DomainError: ``not_permitted`` or ``organisation_not_found``.
@@ -225,7 +226,11 @@ class IdentityProviderService:
         )
         mine = {p.key for p in providers if p.organisation == slug}
         if found.provider and found.provider not in mine:
-            return replace(found, provider="", foreign=True)
+            if found.reason is RouteReason.PROVIDER:
+                return replace(found, provider="", foreign=True)
+            # No more than the login page shows: an unverified or switched-off claim of
+            # another organisation is not told apart from no claim at all (B16).
+            return RouteCheck(PLATFORM, RouteReason.NO_DOMAIN_MATCH, found.domain)
         return found
 
     async def provider(self, principal: Principal, slug: str, key: str) -> ProviderDetail:
@@ -555,15 +560,18 @@ class IdentityProviderService:
 
         Only the domain of the address counts; the address itself is neither stored nor
         logged (point 13, B12). The reserved suffix of the bundled provider and every address
-        without a routing domain go to the platform provider (``None``).
+        without a routing domain go to the platform provider (``None``). The decision is
+        ``check_route``, the same the authentication page shows.
         """
-        if not self._routing():
-            return None
         async with self._uow.read() as tx:
+            providers = await tx.list_identity_providers(_everything())
             claims = await tx.list_login_domains(_everything())
-            key = route(identifier, claims, self._login_suffix())
-            provider = None if key == PLATFORM else await tx.get_identity_provider(key)
-        return provider if provider is not None and provider.enabled else None
+        found = check_route(
+            identifier, providers, claims, self._login_suffix(), routing=self._routing()
+        )
+        if found.reason is not RouteReason.PROVIDER:
+            return None
+        return next((p for p in providers if p.key == found.target), None)
 
     async def live_provider(self, key: str) -> OrganisationProvider | None:
         """Return the switched-on provider ``key`` while the host allows them, else ``None``."""

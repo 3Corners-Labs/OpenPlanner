@@ -14478,11 +14478,8 @@ msgstr "Provider {provider} claims domain {domain} but is off. This address ther
 msgid "admin.idp.check.host_switch_off"
 msgstr "Provider {provider} would get this domain ({domain}), but the host does not allow organisation providers (ORGANISATION_IDPS_ENABLED). This address therefore logs in at the platform provider."
 
-msgid "admin.idp.check.foreign_domain_not_verified"
-msgstr "A provider of another organisation claims domain {domain}, but it is not verified yet. This address logs in at the platform provider."
 
-msgid "admin.idp.check.foreign_provider_off"
-msgstr "A provider of another organisation claims domain {domain} but is off. This address logs in at the platform provider."
 
-msgid "admin.idp.check.foreign_host_switch_off"
-msgstr "A provider of another organisation would get domain {domain}, but the host does not allow organisation providers. This address logs in at the platform provider."
+
+msgid "admin.idp.check.refused"
+msgstr "Enter an email address or user name (at most 320 characters)."

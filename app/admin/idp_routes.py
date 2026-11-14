@@ -474,16 +474,11 @@ CHECK_TEXTS: dict[RouteReason, str] = {
 }
 """Sentence per route reason; a test checks every reason has one."""
 
-FOREIGN_CHECK_TEXTS: dict[RouteReason, str] = {
-    RouteReason.PROVIDER: "admin.idp.check.foreign",
-    RouteReason.DOMAIN_NOT_VERIFIED: "admin.idp.check.foreign_domain_not_verified",
-    RouteReason.PROVIDER_OFF: "admin.idp.check.foreign_provider_off",
-    RouteReason.HOST_SWITCH_OFF: "admin.idp.check.foreign_host_switch_off",
-}
-"""The same without a provider name, for a domain of another organisation (B11)."""
+FOREIGN_CHECK_TEXT = "admin.idp.check.foreign"
+"""The sentence without a provider name, for a domain that goes to another organisation (B11)."""
 
 CHECK_ADDRESS_MAX = 320
-"""The longest e-mail address (RFC 5321); a longer entry is cut before it is checked."""
+"""The longest e-mail address (RFC 5321); a longer entry is refused, as at the login page."""
 
 
 @dataclass(frozen=True)
@@ -505,6 +500,7 @@ class CheckView:
     domain: str
     platform: bool
     message: str
+    error: bool = False
 
 
 def _steps(locale: RequestLocale, steps: list[SetupStep]) -> list[StepView]:
@@ -531,7 +527,7 @@ def _warnings(
     """Translate the warnings, each naming its provider and, where it applies, its domain."""
     return [
         locale.gettext(
-            f"admin.idp.warning.{w.code}",
+            WARNING_TEXTS[w.code],
             provider=names.get(w.provider, w.provider),
             domain=w.domain,
         )
@@ -542,8 +538,8 @@ def _warnings(
 def _check_view(locale: RequestLocale, found: RouteCheck, names: dict[str, str]) -> CheckView:
     """Say in one sentence where the address goes and why; a foreign provider stays unnamed."""
     provider = "" if found.foreign else names.get(found.provider, "")
-    keys = FOREIGN_CHECK_TEXTS if found.foreign else CHECK_TEXTS
-    text = locale.gettext(keys[found.reason], domain=found.domain, provider=provider)
+    key = FOREIGN_CHECK_TEXT if found.foreign else CHECK_TEXTS[found.reason]
+    text = locale.gettext(key, domain=found.domain, provider=provider)
     return CheckView(found.domain, found.target == "", text)
 
 
@@ -566,11 +562,13 @@ async def _login_page(
     org: str,
     context: AdminContext,
     check: RouteCheck | None = None,
+    *,
+    refused: bool = False,
 ) -> HTMLResponse:
     """Render the organisation's authentication page with its steps, warnings and check."""
     overview = await service(request).overview(context.principal, org)
     organisation = overview.organisation
-    routing = not routing_off(request)
+    routing = overview.routing
     names = {p.key: p.name for p in overview.providers}
     steps = setup_steps(routing=routing, providers=overview.providers, claims=overview.claims)
     return _page(
@@ -594,7 +592,13 @@ async def _login_page(
                 locale, setup_warnings(overview.providers, overview.claims), names
             ),
             "check_fields": _check_fields(locale),
-            "check": _check_view(locale, check, names) if check else None,
+            "check": (
+                CheckView("", True, locale.gettext("admin.idp.check.refused"), error=True)
+                if refused
+                else _check_view(locale, check, names)
+                if check
+                else None
+            ),
         },
     )
 
@@ -613,9 +617,9 @@ async def check_login_route(
 ) -> HTMLResponse:
     """Say where an e-mail address would log in; nothing of the address is kept."""
     form = await read_form(request, locale)
-    address = form.text("address").strip()[:CHECK_ADDRESS_MAX]
-    if not address:
-        return await _login_page(request, locale, org, context)
+    address = form.text("address").strip()
+    if not address or len(address) > CHECK_ADDRESS_MAX:
+        return await _login_page(request, locale, org, context, refused=True)
     found = await service(request).check_route(context.principal, org, address)
     return await _login_page(request, locale, org, context, found)
 
