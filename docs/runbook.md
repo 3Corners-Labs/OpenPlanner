@@ -162,6 +162,16 @@ section; the installer's default) nothing else is needed. Behind a reverse proxy
 
 ### Address and proxy (ADR 0086)
 
+**Behind another edge (ADR 0129).** A reverse proxy, WAF or load balancer of the organisation may
+sit in front of the bundled proxy. Without more, every visitor then arrives with the edge's
+address: one rate-limit bucket for everyone, one caller pseudonym, and webhook source networks
+that see the edge. Name the edge's own addresses in `PROXY_TRUSTED_NETWORKS` (`proxy.env`, or
+`--trusted-proxies` of the installer) and restart the proxy. It then takes the visitor's address
+from the edge's `X-Forwarded-For`, read right to left (`trusted_proxies_strict`), and hands web
+exactly that one address. The proxy's log says at start which networks it trusts; a range of
+length 0, a name or more than 32 entries stop it. The edge must send `X-Forwarded-For` and
+`X-Forwarded-Proto`, and speak https to the bundled proxy.
+
 *Advanced settings* → *System status* → **Address and proxy** shows what the installation
 believes about its own address: the shape (bundled proxy, own reverse proxy, no proxy), the
 public address and the webhook address, the proxy address that `FORWARDED_ALLOW_IPS` trusts, the
