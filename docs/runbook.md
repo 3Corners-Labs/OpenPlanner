@@ -562,14 +562,16 @@ act on the whole host, and adds a policy that lets a Keycloak page fetch and pos
 `http://idp:8080/idp/...` on the internal network and do not pass the proxy.
 
 A reverse proxy of your own in front of the bundled Keycloak must do the same: pass only those
-two paths, remove the `Cookie` pairs whose name starts with `__Host-` and the one named `lang`,
+two paths, and refuse a path that is one of them only once decoded or resolved (an encoded slash,
+dot or backslash, a dot segment, a `;`), remove the `Cookie` pairs whose name starts with `__Host-` and the one named `lang`,
 rewrite a `Set-Cookie` path outside `/idp/` to `/idp/` and drop its `Domain`, drop
 `Service-Worker-Allowed`, `Clear-Site-Data`, `Alt-Svc`, `NEL`, `Report-To`,
 `Reporting-Endpoints`, `Accept-CH` and `Critical-CH`, send the portal's own
 `Strict-Transport-Security` and `Permissions-Policy`,
 `Cross-Origin-Opener-Policy: same-origin-allow-popups` and the added `Content-Security-Policy`,
-and refuse a request with a `Service-Worker` header.
-`deploy/proxy/idp.caddy` is the reference.
+and refuse a request with a `Service-Worker` header. Every answer it makes itself (a refusal, an
+error page, a body over its limit) must carry the portal's own security headers, as
+`handle_errors` in `deploy/proxy/Caddyfile` does. `deploy/proxy/idp.caddy` is the reference.
 
 ### Test the certificate flow end to end (ADR 0064)
 
@@ -1090,7 +1092,8 @@ console, to it); it also served pages and script on
 the portal's own address. Nothing logs whether Keycloak's console was used in that time (the
 proxy keeps no access log, Keycloak no event log here), so assume it was. When the `idp`
 container was down and the reason is not known (an update or a restart you did yourself is
-known), work through these steps in this order:
+known), work through these steps in this order (Keycloak's admin console for them is on the
+host's loopback, *Opening the admin console*, ADR 0126; not under `https://<host>/idp`):
 
 1. **Realm `master` first, always**, before any new secret exists (a `master` administrator can
    read every client's secret):

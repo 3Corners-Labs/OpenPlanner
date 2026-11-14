@@ -17,6 +17,11 @@ Behaviour is set through files in ``FAKE_HOST_DIR``:
 - ``edge-ipv6``: whether the project's ``edge`` network has IPv6, as ``docker network inspect``
   says (default ``true``).
 - ``latest``: the tag of the latest GitHub release (default none: the API call fails).
+- ``idp-container``: what ``docker compose ps -q idp`` prints (default ``IDP``); an empty line
+  is a provider that is not running (ADR 0126).
+- ``idp-ports``: what ``docker port`` prints for that container, one binding per line (default
+  ``IDP_PORT``, the loopback of docker-compose.yml); ``fail`` may list ``idp-exec``, which makes
+  every ``docker compose exec -T idp`` (kcadm.sh in the provider) exit 1.
 - ``min-upgrade-from``: the ``MIN_UPGRADE_FROM`` every image's configuration carries (ADR
   0116; default none); ``fail`` may list ``upgrade-path-check`` (a database too old).
 - ``images``: the images on the host, one ``repository:tag`` per line, or ``repository@digest``

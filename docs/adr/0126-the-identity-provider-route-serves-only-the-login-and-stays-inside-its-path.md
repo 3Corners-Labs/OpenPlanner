@@ -53,8 +53,10 @@ in both directions. Measured on Keycloak 26.8.1 behind the bundled proxy (2026-1
    (the login, its OIDC endpoints and the account console) and `/idp/resources/*` (their
    assets) to the provider and answers 404 itself for every other path under `/idp`: the
    admin console and its REST API (`/idp/admin`), realm `master`, the welcome page, metrics
-   and health. `deploy/proxy/idp.caddy` holds the route; `entrypoint.sh` imports it when
-   `IDP_UPSTREAM` is set. `/.well-known/` (RFC 8414) is not passed: no client of the
+   and health. Caddy matches the decoded, cleaned path but forwards the raw one, so a path that
+   is a public one only once decoded or resolved (an encoded slash, dot or backslash, a dot
+   segment, a `;`) is refused as well. `deploy/proxy/idp.caddy` holds the route; `entrypoint.sh`
+   imports it when `IDP_UPSTREAM` is set. `/.well-known/` (RFC 8414) is not passed: no client of the
    installation reads it; the portal reads the realm's OIDC document on the internal network.
 2. **The admin console is on the host's loopback.** Realm `master`'s frontend URL is the
    loopback address the compose service publishes, `http://127.0.0.1:8080/idp`. The installer
@@ -91,7 +93,11 @@ in both directions. Measured on Keycloak 26.8.1 behind the bundled proxy (2026-1
      browser ignores the path after a redirect, so the login's return to `/admin/callback`
      stays allowed;
    - refuses with 403, before the provider sees it, a request that fetches a service worker
-     script (`Service-Worker` request header).
+     script (`Service-Worker` request header);
+   - gives every answer it makes itself (its refusals under `/idp`, a body over its limit, a 502
+     while a container restarts) the portal's own deny-by-default headers (`handle_errors` in
+     `deploy/proxy/Caddyfile`): such an empty page is a page of the portal's origin without the
+     added policy, which a script could otherwise frame or open and act from.
 5. **One origin stays (ADR 0112).** A host name of its own for the provider would give it its
    own origin, and the portal's Fetch Metadata check would then refuse its requests without
    any of point 4. Not chosen now: it needs a second name and certificate on every
@@ -147,6 +153,8 @@ None, after checking. Every value below is a fixed security rule or follows from
     reach: a `__Host-op_admin` too, while the browser holds none (after a logout, or once a full
     cookie jar dropped it). The portal reads only values it signed, so a planted one is at most a
     session of the attacker's own (a login CSRF);
+  - it can read and write the origin's storage (`localStorage`, `sessionStorage`, IndexedDB,
+    Cache Storage); the portal keeps only a `sessionStorage` flag there today;
   - the portal's `script-src 'self'` admits every script under `/idp/resources/`, a gadget for an
     injection in a portal page;
   - the provider's own scripts are not restricted (its themes use inline scripts), and it can

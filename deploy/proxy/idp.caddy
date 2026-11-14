@@ -8,7 +8,15 @@ handle @idp {
 	# `Service-Worker: script`; it is refused before the provider sees it.
 	@worker header Service-Worker *
 	handle @worker {
-		respond 403
+		error 403
+	}
+	# ADR 0126 point 1: Caddy matches the decoded, cleaned path but forwards the raw one, so a path
+	# that is one of the public paths only once decoded or resolved (an encoded slash, dot or
+	# backslash, a dot segment, a `;`) could reach another route of the provider. Keycloak's own
+	# paths have none of them; such a request is refused here.
+	@detour expression `{http.request.uri}.matches("^[^?]*(%2[eEfF]|%5[cC]|\\\\|;|/\\.\\.?(/|[?]|$))")`
+	handle @detour {
+		error 404
 	}
 	# ADR 0126 point 1: only what a browser needs. The login of realm openplanner, the account
 	# console of ADR 0100 point 7 and their assets are the two paths Keycloak's reverse proxy
@@ -58,7 +66,9 @@ handle @idp {
 			header_down +Content-Security-Policy "connect-src https://{http.request.host}:*/idp/; form-action https://{http.request.host}:*/idp/; worker-src 'none'"
 		}
 	}
+	# The proxy's own refusals are errors, so they get the headers of the site's handle_errors
+	# (Caddyfile): a page the proxy answers itself can be neither framed nor used from.
 	handle {
-		respond 404
+		error 404
 	}
 }

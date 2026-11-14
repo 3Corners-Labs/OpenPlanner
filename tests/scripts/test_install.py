@@ -983,6 +983,15 @@ KCADM = "exec -T idp sh /opt/openplanner/kcadm-as-admin.sh"
 """How the installer runs kcadm.sh as realm master's admin (deploy/keycloak/kcadm-as-admin.sh)."""
 
 
+def _after_start(host: Host, fragment: str) -> bool:
+    """Whether the call holding ``fragment`` came after `up -d` and the ready check."""
+    commands = host.commands()
+    started = max(i for i, c in enumerate(commands) if c.endswith(" up -d"))
+    ready = max(i for i, c in enumerate(commands) if "/readyz" in c)
+    called = min(i for i, c in enumerate(commands) if fragment in c)
+    return started < ready < called
+
+
 def test_the_realms_mail_server_is_set_after_the_start_without_a_password_in_an_argument(
     host: Host,
 ) -> None:
@@ -990,6 +999,7 @@ def test_the_realms_mail_server_is_set_after_the_start_without_a_password_in_an_
 
     assert result.returncode == 0, result.stderr
     assert host.ran(f"{KCADM} update realms/openplanner -f -")  # the body comes on stdin
+    assert _after_start(host, "update realms/openplanner")
     assert not host.ran("pass word #1")
     assert "mail server: smtp.example.nl" in result.stderr + result.stdout
 
@@ -1008,10 +1018,13 @@ def test_the_admin_console_is_put_on_the_loopback_after_the_start_adr_0126(host:
 
     assert result.returncode == 0, result.stderr
     assert host.ran("port idp-container-id")
-    # The published loopback port, with the proxy's path, as one argument of kcadm.sh's own.
+    # The published loopback port, with the proxy's path, as one argument of kcadm.sh's own,
+    # read from the container the start made.
     assert host.ran(
         f"{KCADM} update realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp"
     )
+    assert _after_start(host, "port idp-container-id")
+    assert _after_start(host, "update realms/master")
     output = result.stderr + result.stdout
     assert "admin console: http://127.0.0.1:8080/idp/admin/ on this host only" in output
 
@@ -1023,7 +1036,7 @@ def test_the_admin_console_is_put_on_the_loopback_after_the_start_adr_0126(host:
         pytest.param(("--mode", "lab", "--version", "1.4.0", "--non-interactive"), id="no proxy"),
     ],
 )
-def test_a_provider_published_beyond_the_loopback_is_refused_with_or_without_the_proxy(
+def test_a_provider_published_beyond_the_loopback_gets_a_warning_with_or_without_the_proxy(
     host: Host, run: tuple[str, ...]
 ) -> None:
     """One more port on every interface (an override's 8780) puts realm master on the network."""

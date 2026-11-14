@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 
 from app.api.security_headers import SECURITY_HEADERS
+from tests.support.idp_route import dropped_headers, set_headers
 
 REPO = Path(__file__).parents[2]
 SCRIPT = (REPO / "scripts/check-proxy.sh").read_text()
@@ -119,23 +120,26 @@ def test_pass_three_puts_a_hostile_provider_behind_the_route() -> None:
     probe = _program("idp_probe_code")
     body = _body("idp_route_checks")
 
-    # Every header the route drops, rewrites or sets, the probe sends, and a header the route
-    # sets comes from the probe with another value, or its value on the wire would prove nothing.
-    # At run time the probe is asked directly for the dropped ones before the proxy is judged.
-    route = (REPO / "deploy/proxy/idp.caddy").read_text()
-    for name in set(re.findall(r"^\s*header_down [-+]?([A-Za-z-]+)\b", route, re.MULTILINE)):
+    # Every header the route drops or sets, the probe sends, and a header the route sets comes
+    # from the probe with another value, or its value on the wire would prove nothing. At run time
+    # the probe is asked directly for the dropped ones before the proxy is judged.
+    for name in dropped_headers():
         assert f'("{name}", ' in probe, f"the probe does not send {name}"
-    set_by_route = re.findall(
-        r'^\s*header_down \+?([A-Za-z-]+) (?:"([^"]*)"|([^\s"`]+))$', route, re.MULTILINE
-    )
-    assert len(set_by_route) == 4  # HSTS, Permissions-Policy, the opener policy, the added CSP
-    for name, quoted, bare in set_by_route:
-        assert f'("{name}", "{quoted or bare}")' not in probe, f"the probe sends the route's {name}"
+    for name, value in set_headers().items():
+        assert f'("{name}", ' in probe, f"the probe does not send {name}"
+        assert f'("{name}", "{value}")' not in probe, f"the probe sends the route's own {name}"
     assert body.index("so its absence would prove nothing") < body.index("the proxy passes $header")
     assert '"__Host-op_admin=forged; Path=/;' in probe  # would replace the portal's session
-    # HSTS and the permissions on /idp must equal what the same proxy returns for the portal.
+    # HSTS and the permissions on /idp, and every header of the proxy's own refusals there, must
+    # equal what the same proxy returns for the portal itself.
     assert body.index('"$base/healthz"') < body.index("portal_hsts=")
     assert body.index('"$base/healthz"') < body.index("portal_permissions=")
+    assert body.index('"$base/healthz"') < body.index("portal_security=")
+    names = re.search(r"^security_names='([^']*)'$", SCRIPT, re.MULTILINE)
+    assert names, "the script names no security headers"
+    assert names.group(1).split() == [name.decode() for name in SECURITY_HEADERS]
+    assert "the proxy passes the detour" in body
+    assert body.index("the proxy passes the detour") < body.index("a detour reached the provider")
     assert re.search(
         r"^start_idp_probe\nexport PROXY_INTERNAL=true PROXY_IDP_UPSTREAM=idp-probe:8080$",
         SCRIPT,
@@ -170,6 +174,10 @@ def test_pass_four_proves_each_refusal_against_the_loopback_and_the_console_afte
     change = "compose exec -T idp sh /opt/openplanner/kcadm-as-admin.sh update realms/master"
     assert body.index("did not name the public address before the change") < body.index(change)
     assert body.index(change) < body.index("does not stay on the loopback")
+    # The helper itself still logs in once realm master's frontend URL is the loopback.
+    assert body.index("does not stay on the loopback") < body.index(
+        "kcadm.sh no longer works once realm master's frontend URL is the loopback"
+    )
     assert 'assets_load "$page" "the login page"' in body
     assert "the account console" in body
     # The staff directory as web builds it, from the values the render script wrote for web.

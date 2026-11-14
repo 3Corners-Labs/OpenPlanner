@@ -1,15 +1,14 @@
 """The bundled identity provider's route (ADR 0126): what ``deploy/proxy/idp.caddy`` lets through.
 
 The real Caddy runs the file in ``scripts/check-proxy.sh`` (passes 3 and 4, with Docker). These
-tests run without Docker: they read the file, tie its values to the application's own (the
-cookies it sets, its HSTS and opener policy, the realm of the template) and apply its regular
-expressions to the cookies and answers they are written for. The patterns use the syntax Go's
-RE2 and Python's ``re`` share, and Go's ``$1`` replacements become ``\\g<1>`` here.
+tests run without Docker: they read it through ``tests/support/idp_route.py``, tie its values to
+the application's own (the cookies it sets, its HSTS, permissions and opener policy, the realm of
+the template, the headers of the proxy's own answers) and apply its regular expressions to the
+cookies, answers and paths they are written for.
 """
 
 import json
 import re
-from pathlib import Path
 
 import pytest
 
@@ -21,9 +20,16 @@ from app.api.security_headers import SECURITY_HEADERS
 from app.web.cookies import cookie_for
 from app.web.locale import LANG_PARAM
 from app.web.security_policy import DEFAULT_PERMISSIONS_POLICY
+from tests.support.idp_route import (
+    REPO,
+    ROUTE,
+    detour_pattern,
+    dropped_headers,
+    error_headers,
+    replacements,
+    set_headers,
+)
 
-REPO = Path(__file__).parents[2]
-ROUTE = (REPO / "deploy/proxy/idp.caddy").read_text()
 REALM = json.loads((REPO / "deploy/keycloak/realm.template.json").read_text())["realm"]
 HTTPS = "https://afspraak.example.nl"
 KEYCLOAK_COOKIES = (
@@ -38,25 +44,11 @@ KEYCLOAK_COOKIES = (
 """The cookies Keycloak 26 sets for a realm; each must still reach it."""
 
 
-def _replacements(direction: str, field: str) -> list[tuple[str, str]]:
-    """Return the ``header_up``/``header_down`` regex replacements of ``field``, in order."""
-    found = re.findall(rf"^\s*{direction} {field} `([^`]+)` \"([^\"]*)\"$", ROUTE, re.M)
-    assert found, f"no {direction} {field} replacement in idp.caddy"
-    return [(pattern, re.sub(r"\$(\d)", r"\\g<\1>", replace)) for pattern, replace in found]
-
-
 def _apply(direction: str, field: str, value: str) -> str:
     """Return ``value`` after every replacement the route makes on ``field``."""
-    for pattern, replace in _replacements(direction, field):
+    for pattern, replace in replacements(direction, field):
         value = re.sub(pattern, replace, value)
     return value
-
-
-def _header_value(name: str) -> str:
-    """Return the value the route sets for a response header (``header_down Name value``)."""
-    found = re.search(rf"^\s*header_down \+?{name} (\"[^\"]*\"|\S+)$", ROUTE, re.M)
-    assert found, f"idp.caddy sets no {name}"
-    return found.group(1).strip('"')
 
 
 def _portal_cookies() -> list[str]:
@@ -75,12 +67,12 @@ def test_only_the_login_of_the_templates_realm_and_its_assets_are_passed() -> No
     assert public.group(1).split() == [f"/idp/realms/{REALM}/*", "/idp/resources/*"]
     assert re.search(r"^@idp path /idp /idp/\*$", ROUTE, re.M)
     # Everything else under /idp gets the proxy's own 404, the last of the route's handlers.
-    assert re.search(r"handle \{\s*respond 404\s*\}\s*\}\s*$", ROUTE)
+    assert re.search(r"handle \{\s*error 404\s*\}\s*\}\s*$", ROUTE)
 
 
 def test_a_service_worker_script_is_refused_before_the_provider_sees_it() -> None:
     """Point 4: a browser sends ``Service-Worker: script`` when it fetches one."""
-    assert re.search(r"@worker header Service-Worker \*\s*handle @worker \{\s*respond 403", ROUTE)
+    assert re.search(r"@worker header Service-Worker \*\s*handle @worker \{\s*error 403", ROUTE)
     assert ROUTE.index("handle @worker") < ROUTE.index("handle @login")
 
 
@@ -175,9 +167,7 @@ def test_no_mix_of_path_attributes_leaves_the_cookie_outside_idp() -> None:
 
 
 def test_the_headers_that_act_on_the_whole_origin_are_dropped() -> None:
-    dropped = set(re.findall(r"^\s*header_down -(\S+)$", ROUTE, re.M))
-
-    assert dropped == {
+    assert set(dropped_headers()) == {
         "Service-Worker-Allowed",
         "Clear-Site-Data",
         "Alt-Svc",
@@ -191,16 +181,16 @@ def test_the_headers_that_act_on_the_whole_origin_are_dropped() -> None:
 
 def test_no_page_of_the_provider_may_use_the_camera_or_microphone_of_the_origin() -> None:
     """A grant belongs to the origin, and the call page asks for both (ADR 0123)."""
-    assert _header_value("Permissions-Policy") == DEFAULT_PERMISSIONS_POLICY
+    assert set_headers()["Permissions-Policy"] == DEFAULT_PERMISSIONS_POLICY
     assert "publickey-credentials" not in DEFAULT_PERMISSIONS_POLICY  # WebAuthn stays usable
 
 
 def test_hsts_is_the_portals_own_and_the_opener_policy_never_is() -> None:
     """A provider's max-age=0 never ends HSTS; a portal window it opens is out of its reach."""
-    assert _header_value("Strict-Transport-Security") == (
+    assert set_headers()["Strict-Transport-Security"] == (
         SECURITY_HEADERS[b"strict-transport-security"].decode()
     )
-    opener = _header_value("Cross-Origin-Opener-Policy")
+    opener = set_headers()["Cross-Origin-Opener-Policy"]
     assert opener == "same-origin-allow-popups"
     assert opener != SECURITY_HEADERS[b"cross-origin-opener-policy"].decode()
 
@@ -209,7 +199,7 @@ def test_the_added_policy_keeps_fetches_posts_and_workers_under_idp() -> None:
     """Point 4: added next to the provider's own policy (``+``), so both are enforced."""
     policy = dict(
         directive.strip().split(" ", 1)
-        for directive in _header_value("Content-Security-Policy").split(";")
+        for directive in set_headers()["Content-Security-Policy"].split(";")
         if directive.strip()
     )
 
@@ -219,3 +209,44 @@ def test_the_added_policy_keeps_fetches_posts_and_workers_under_idp() -> None:
         "form-action": "https://{http.request.host}:*/idp/",
         "worker-src": "'none'",
     }
+
+
+@pytest.mark.parametrize(
+    ("path", "refused"),
+    [
+        ("/idp/admin/..%2Frealms/openplanner/x", True),
+        ("/idp/realms/master/account/..%2F..%2Fopenplanner%2Fx", True),
+        ("/idp/realms/openplanner/x;y", True),
+        ("/idp/realms/openplanner/..;/..;/admin/", True),
+        ("/idp/realms/openplanner/%2e%2e/x", True),
+        ("/idp/realms/openplanner/../openplanner/x", True),
+        ("/idp/realms/openplanner/./x", True),
+        ("/idp/realms/openplanner/..", True),
+        ("/idp/resources/..%5c..%5cadmin/", True),
+        ("/idp/resources/..\\..\\admin/", True),
+        # Keycloak's own addresses: an encoded slash in the query is the login's redirect_uri.
+        (
+            "/idp/realms/openplanner/protocol/openid-connect/auth?redirect_uri=https%3A%2F%2Fa",
+            False,
+        ),
+        ("/idp/resources/abc12/login/keycloak.v2/css/styles.css", False),
+        ("/idp/realms/openplanner/account/", False),
+        ("/idp/realms/openplanner/login-actions/authenticate?session_code=a.b-c", False),
+    ],
+)
+def test_a_detour_that_means_a_public_path_only_once_decoded_is_refused(
+    path: str, refused: bool
+) -> None:
+    """Point 1: Caddy matches the decoded, cleaned path and forwards the raw one."""
+    assert bool(re.search(detour_pattern(), path)) is refused
+    assert ROUTE.index("handle @detour") < ROUTE.index("handle @login")
+
+
+def test_every_answer_the_proxy_makes_itself_carries_the_portals_own_headers() -> None:
+    """Point 4: a refusal, a body over its limit or a 502 cannot be framed or used from."""
+    portal = {name.decode(): value.decode() for name, value in SECURITY_HEADERS.items()}
+
+    assert {name.lower(): value for name, value in error_headers().items()} == portal
+    # The route's refusals are errors, so they get these headers; a `respond` would not.
+    assert "respond" not in ROUTE
+    assert re.findall(r"^\s*error (\d+)$", ROUTE, re.MULTILINE) == ["403", "404", "404"]

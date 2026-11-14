@@ -364,6 +364,13 @@ values_of() { # values_of NAME: the values of one header of $head, a line each, 
   echo "$head" | grep -i "^$1:" | sed 's/^[^:]*: *//'
 }
 
+# The portal's deny-by-default headers (app/api/security_headers.py).
+security_names='content-security-policy strict-transport-security x-content-type-options x-frame-options referrer-policy permissions-policy cross-origin-opener-policy cross-origin-embedder-policy cross-origin-resource-policy'
+
+security_of() { # security_of: the portal's security headers of $head, a "name: value" line each
+  for name in $security_names; do printf '%s: %s\n' "$name" "$(values_of "$name")"; done
+}
+
 probe_saw() { # probe_saw PATTERN: whether a path matching the extended regex reached the probe
   docker logs "$project-idp-probe" 2>&1 | grep -E -q "$1"
 }
@@ -384,6 +391,12 @@ idp_route_checks() { # pass 3: the route of ADR 0126 in front of a provider that
   [ "$(status_of -H 'Service-Worker: script' "$base/idp/resources/sw.js")" = "403" ] \
     || fail "a service worker's script is fetched from the provider"
   ! probe_saw '^/idp/resources/sw\.js' || fail "the fetch of a service worker's script reached the provider"
+  # Detours that mean a public path only once Caddy has decoded or resolved them.
+  for path in '/idp/admin/..%2Frealms/openplanner/x' '/idp/realms/master/account/..%2F..%2Fopenplanner%2Fx' \
+    '/idp/realms/openplanner/x;y' '/idp/realms/openplanner/..;/..;/admin/' '/idp/resources/..%5c..%5cadmin/'; do
+    [ "$(status_of --path-as-is "$base$path")" = "404" ] || fail "the proxy passes the detour $path"
+  done
+  ! probe_saw '%2[Ff]|%5[cC]|;' || fail "a detour reached the provider"
   # shellcheck disable=SC2086
   given="$(curl -sk $resolve -H 'Cookie: __Host-op_admin=s1; KC_RESTART=k1; lang=nl; __Host-op_link=s2; AUTH_SESSION_ID=a1' \
     "$base/idp/realms/openplanner/x")"
@@ -397,6 +410,15 @@ idp_route_checks() { # pass 3: the route of ADR 0126 in front of a provider that
   head="$(curl -sk $resolve -D - -o /dev/null "$base/healthz" | tr -d '\r')"
   portal_hsts="$(values_of strict-transport-security)"
   portal_permissions="$(values_of permissions-policy)"
+  portal_security="$(security_of)"
+  # The proxy's own answers are pages of the portal's origin: the portal's headers, so a script
+  # on a provider page can neither frame nor open one and act from there.
+  for refusal in "$base/idp/admin/" "-H Service-Worker:script $base/idp/resources/sw.js"; do
+    # shellcheck disable=SC2086
+    head="$(curl -sk $resolve -D - -o /dev/null $refusal | tr -d '\r')"
+    [ "$(security_of)" = "$portal_security" ] \
+      || fail "the proxy's own answer to $refusal lacks the portal's headers: $(security_of)"
+  done
   [ -n "$portal_hsts" ] && [ -n "$portal_permissions" ] \
     || fail "the portal sends no HSTS or Permissions-Policy, so the ones on /idp have nothing to equal"
   # shellcheck disable=SC2086
@@ -473,7 +495,8 @@ keycloak_checks() { # pass 4: what a browser needs passes the route, the admin c
   for path in '/idp/realms/openplanner/..;/..;/admin/master/console/' '/idp/resources/..;/admin/master/console/' \
     '/idp/realms/openplanner/%2e%2e/%2e%2e/admin/master/console/' \
     '/idp/realms/openplanner/..;/..;/admin/realms/openplanner/users' '/idp/resources/..;/admin/realms/openplanner/users' \
-    '/idp/realms/openplanner/%2e%2e/%2e%2e/admin/realms/openplanner/users'; do
+    '/idp/realms/openplanner/%2e%2e/%2e%2e/admin/realms/openplanner/users' \
+    '/idp/admin/..%2Frealms/openplanner/x' '/idp/admin/realms/openplanner/users/..%2F..%2F..%2F..%2Frealms/openplanner/x'; do
     status="$(status_of --path-as-is "$base$path")"
     case $status in 200 | 401 | 403) fail "$path reaches the admin console or its API through the route ($status)" ;; esac
   done
@@ -490,6 +513,8 @@ keycloak_checks() { # pass 4: what a browser needs passes the route, the admin c
   curl -s "${master}http%3A%2F%2F127.0.0.1%3A18090%2Fidp%2Fadmin%2Fmaster%2Fconsole%2F" \
     | grep -q "action=\"$loopback/idp/realms/master/login-actions/" \
     || fail "realm master's login form does not stay on the loopback"
+  compose exec -T idp sh /opt/openplanner/kcadm-as-admin.sh get realms/master --fields realm </dev/null \
+    | grep -q '"realm" : "master"' || fail "kcadm.sh no longer works once realm master's frontend URL is the loopback"
   console="$(curl -s "$loopback/idp/admin/master/console/")"
   echo "$console" | grep -q "\"adminBaseUrl\": \"$loopback/idp\"" || fail "the console does not call its API on the loopback"
   ! echo "$console" | grep -q 'booking.test' || fail "the console on the loopback names the public address"

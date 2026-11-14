@@ -30,8 +30,10 @@
 #                      without a public name; ADR 0112)
 #      the identity provider (ADR 0106 step 5): by default the bundled Keycloak in every
 #                      mode (--idp bundled): the realm is rendered with generated secrets
-#                      (scripts/render-keycloak-realm.sh), the proxy serves it under /idp, and its
-#                      mail server is set at the first start. --idp own asks for the login of
+#                      (scripts/render-keycloak-realm.sh), the proxy serves its login under /idp
+#                      (ADR 0126), and after every start its mail server and its admin console's
+#                      loopback address are set (realm master's frontend URL; every published port
+#                      on the loopback, or nothing is set). --idp own asks for the login of
 #                      your own provider, as before, and on a host that ran the bundled one removes
 #                      its login (secrets/keycloak-app.env), its /idp route and its containers
 #                      (ADR 0125; volumes stay). Production runs Keycloak in production
@@ -958,8 +960,18 @@ start() {
   compose up -d
   healthy || die "not healthy within ${HEALTH_TIMEOUT}s; see: docker compose --env-file .env.update logs web worker"
   log "web and worker are healthy"
-  retire_bundled_provider
-  IDP_DEADLINE=$((SECONDS + HEALTH_TIMEOUT)) # one wait for every step on the provider below
+  idp_after_start
+}
+
+# The identity provider once web and worker run: with --idp own the bundled one is retired (ADR
+# 0125); with the bundled one its mail server and its admin console's loopback address are set
+# (ADR 0106 step 5, ADR 0126), sharing one wait (IDP_DEADLINE, which idp_kcadm reads).
+idp_after_start() {
+  if [[ $IDP != bundled ]]; then
+    retire_bundled_provider
+    return 0
+  fi
+  local IDP_DEADLINE=$((SECONDS + HEALTH_TIMEOUT))
   idp_mail
   idp_console
 }
@@ -982,7 +994,7 @@ idp_kcadm() {
 # the host's resolver while they run. Its volumes and secrets/keycloak.env stay for the way back
 # (--idp bundled; `compose rm` never removes a named volume).
 retire_bundled_provider() {
-  [[ $IDP != bundled && -f $DIR/secrets/keycloak.env ]] || return 0
+  [[ -f $DIR/secrets/keycloak.env ]] || return 0
   if compose --profile idp --profile idp-db rm --stop --force idp idp-db >/dev/null 2>&1; then
     log "the bundled identity provider's containers (idp, idp-db) are removed; its volumes and secrets/keycloak.env stay"
   else
@@ -995,7 +1007,6 @@ retire_bundled_provider() {
 # itself sends. The lab's Mailpit, else the installation's own SMTP settings; the password goes to
 # the container through stdin, never through an argument.
 idp_mail() {
-  [[ $IDP == bundled ]] || return 0
   local host port from user password starttls json
   host=$(value "$ENV_FILE" SMTP_HOST)
   if [[ -z $host ]]; then
@@ -1026,7 +1037,6 @@ idp_mail() {
 # address as its frontend URL, or its login form would send the browser to the public address,
 # where the proxy refuses it.
 idp_console() {
-  [[ $IDP == bundled ]] || return 0
   local container bindings outside published path console
   container=$(compose ps -q idp 2>/dev/null) || container=
   bindings=$([[ -z $container ]] || docker port "$container" 2>/dev/null) || bindings=
