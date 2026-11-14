@@ -112,8 +112,8 @@ class StaffScreenNames:
         name = parse_screen_name(text)
         now = self._clock.now()
         async with self._uow.locked() as tx:
-            found = await tx.list_staff(scope, StaffFilter(id=member_id))
-            if not found:
+            member = await _manageable(tx, scope, member_id)
+            if member is None:
                 await tx.add_audit_event(
                     AuditEvent(
                         now,
@@ -124,7 +124,20 @@ class StaffScreenNames:
                     )
                 )
                 return ScreenNameResult.OUT_OF_SCOPE
-            return await _store(tx, principal.subject, found[0], scope, name, now)
+            return await _store(tx, principal.subject, member, scope, name, now)
+
+    async def may_set(self, principal: Principal, member_id: int) -> bool:
+        """Return whether ``principal`` may set the screen name of ``member_id`` (the page asks).
+
+        The question of ``set_screen_name``: ``staff.manage`` for a person inside that
+        permission's scope (not merely one the viewer may see), and a record that is not erased.
+        """
+        scope = scope_for(principal, Permission.STAFF_MANAGE)
+        if scope.is_empty:
+            return False
+        async with self._uow.read() as tx:
+            member = await _manageable(tx, scope, member_id)
+        return member is not None and member.status is not StaffStatus.ERASED
 
     async def own(self, subject: str) -> StaffMember | None:
         """Return the staff record of ``subject`` for their own *My profile* page, or ``None``.
@@ -196,6 +209,16 @@ class StaffScreenNames:
         found = staff_ids_by_pseudonym(self._keys, ((m.id, m.subject) for m in members))
         self._index = _Index(found, now)
         return self._index.ids.get(pseudonym)
+
+
+async def _manageable(tx: Transaction, scope: Scope, member_id: int) -> StaffMember | None:
+    """Return the person if ``scope`` (that of ``staff.manage``) covers them, else ``None``.
+
+    The one place that says whether a manager may set a member's screen name; the write and
+    the page's offer of the form both use it.
+    """
+    found = await tx.list_staff(scope, StaffFilter(id=member_id))
+    return found[0] if found else None
 
 
 async def _store(

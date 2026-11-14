@@ -391,3 +391,17 @@ async def test_the_own_write_needs_a_role_a_record_and_a_record_that_is_not_eras
     _person(uow, "p-1", status=StaffStatus.ERASED)
     assert await service.set_own_screen_name(me, "Sanne") is ScreenNameResult.ERASED
     assert uow.state.audit == []
+
+
+async def test_the_page_may_offer_the_form_only_where_the_write_would_accept_it(
+    uow: InMemoryUnitOfWork, service: StaffScreenNames
+) -> None:
+    person = _person(uow)
+    erased = _person(uow, "p-2", status=StaffStatus.ERASED)
+
+    assert await service.may_set(ORG_ADMIN, person.id or 0)
+    assert await service.may_set(SUPER, person.id or 0)
+    assert not await service.may_set(OUTSIDER, person.id or 0)  # another organisation
+    assert not await service.may_set(AUDITOR, person.id or 0)  # may see, may not manage
+    assert not await service.may_set(ORG_ADMIN, erased.id or 0)
+    assert not await service.may_set(ORG_ADMIN, 9999)

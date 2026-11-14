@@ -1,5 +1,12 @@
 """The screen name of a staff member on their page (ADR 0123 step 5c)."""
 
+from collections.abc import AsyncIterator
+
+import httpx
+import pytest
+
+from app.config import Settings
+from app.domain.entitlements import LoginClaims
 from tests.admin.conftest import (
     AUDITOR,
     GROUP_ADMIN,
@@ -8,8 +15,10 @@ from tests.admin.conftest import (
     SAME_ORIGIN,
     SUPER,
     Site,
+    _running_site,
 )
 from tests.support.screen_names import audit_rows, id_of, login_each, stored
+from tests.support.skill_seed import add_skill, limit
 
 NAME = "Gina"
 
@@ -254,3 +263,109 @@ async def test_the_managers_refused_form_keeps_the_staff_entry_active(site: Site
 
     assert refused.status_code == 422
     assert 'href="/admin/staff" aria-current="page"' in refused.text
+
+
+async def _skills_post(site: Site, member: str, *skills: int) -> httpx.Response:
+    return await site.client.post(
+        f"/admin/staff/{member}/skills/demo",
+        data={f"skill-{i}": "on" for i in skills},
+        headers=SAME_ORIGIN,
+    )
+
+
+async def _gina_with_a_name_and_a_skill(site: Site) -> tuple[str, int]:
+    """Gina has the screen name and the skill saved; the viewer is Olaf."""
+    await login_each(site, GROUP_ADMIN, ORG_ADMIN)
+    gina = await id_of(site, "Gina Group")
+    skill = await add_skill(site, "passport", "Paspoort", "Passport")
+    await site.login_as(ORG_ADMIN)
+    assert (await _skills_post(site, gina, skill)).status_code == 303
+    named = await site.client.post(
+        f"/admin/staff/{gina}/screen-name", data={"screen_name": NAME}, headers=SAME_ORIGIN
+    )
+    assert named.status_code == 303
+    return gina, skill
+
+
+async def test_a_refused_skills_save_leaves_the_stored_name_in_its_input_and_unmarked(
+    site: Site,
+) -> None:
+    gina, skill = await _gina_with_a_name_and_a_skill(site)
+    limit(site, skills=2)
+
+    refused = await _skills_post(site, gina, *range(skill, skill + 5))
+
+    assert refused.status_code == 422
+    assert 'href="#skills-demo"' in refused.text  # the skills section is the one refused
+    assert 'id="screen_name"' in refused.text
+    assert f'value="{NAME}"' in refused.text
+    assert 'id="screen_name-error"' not in refused.text
+    unchanged = await site.client.post(
+        f"/admin/staff/{gina}/screen-name", data={"screen_name": NAME}, headers=SAME_ORIGIN
+    )
+    assert unchanged.headers["location"].startswith(
+        f"/admin/staff/{gina}?done=staff_screen_name_unchanged"
+    )
+    assert await stored(site, GROUP_ADMIN.subject) == NAME
+
+
+async def test_a_refused_screen_name_leaves_the_stored_skills_and_their_sections_unmarked(
+    site: Site,
+) -> None:
+    gina, skill = await _gina_with_a_name_and_a_skill(site)
+
+    refused = await site.client.post(
+        f"/admin/staff/{gina}/screen-name", data={"screen_name": "G"}, headers=SAME_ORIGIN
+    )
+
+    assert refused.status_code == 422
+    assert 'id="screen_name-error"' in refused.text
+    assert f'id="skill-{skill}" name="skill-{skill}" value="on" checked' in refused.text
+    assert 'href="#skills-demo"' not in refused.text
+    unchanged = await _skills_post(site, gina, skill)
+    assert unchanged.headers["location"].endswith("done=unchanged#skills")
+    assert await stored(site, GROUP_ADMIN.subject) == NAME
+
+
+@pytest.fixture
+async def entitled(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
+    async with _running_site(
+        settings.model_copy(update={"oidc_claim_mode": "entitlements"}), admin_db
+    ) as running:
+        yield running
+
+
+async def test_the_form_is_offered_only_for_a_person_the_viewer_may_manage(
+    entitled: Site,
+) -> None:
+    """A viewer who sees the person through one organisation and manages staff in another."""
+    gina = LoginClaims(
+        "sub-gina", "Gina Group", entitlements=frozenset({"openplanner:group_admin:demo/demo"})
+    )
+    vera = LoginClaims(
+        "sub-vera",
+        "Vera View",
+        entitlements=frozenset({"openplanner:auditor:demo", "openplanner:org_admin:andere"}),
+    )
+    olaf = LoginClaims(
+        "sub-olaf", "Olaf Org", entitlements=frozenset({"openplanner:org_admin:demo"})
+    )
+    for claims in (gina, vera):
+        entitled.client.cookies.clear()
+        assert (await entitled.login_with(claims)).status_code == 303
+    number = await id_of(entitled, "Gina Group")
+    url = f"/admin/staff/{number}"
+
+    page = await entitled.client.get(url)
+    denied = await entitled.client.post(
+        f"{url}/screen-name", data={"screen_name": NAME}, headers=SAME_ORIGIN
+    )
+
+    assert page.status_code == 200
+    assert 'id="screen_name"' not in page.text
+    assert f'action="{url}/screen-name"' not in page.text
+    assert denied.status_code == 403
+    assert await stored(entitled, "sub-gina") is None
+    entitled.client.cookies.clear()
+    await entitled.login_with(olaf)
+    assert f'action="{url}/screen-name"' in (await entitled.client.get(url)).text

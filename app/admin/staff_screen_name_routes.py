@@ -26,7 +26,7 @@ from app.admin.authz import AccessDenied, AdminContext, RequirePermission, scree
 from app.admin.forms import raise_refusal, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin
 from app.admin.screen_name_form import done_key, refusal_error
-from app.admin.staff_routes import member_page
+from app.admin.staff_routes import Refused, member_page
 from app.domain.authorization import Permission, scope_for
 from app.domain.errors import DomainError
 from app.domain.screen_name import ScreenNameError
@@ -50,7 +50,9 @@ async def save_screen_name(
         )
     except ScreenNameError as error:
         form.errors.append(refusal_error(locale, error))
-        return await member_page(request, locale, context, member_id, form=form, status=422)
+        return await member_page(
+            request, locale, context, member_id, form=form, refused=Refused.SCREEN_NAME, status=422
+        )
     except DomainError as error:
         raise_refusal(error)
         raise
