@@ -175,8 +175,7 @@ flowchart TB
   Keycloak runs next to `web`; staff are managed in it from the portal (ADR 0095). In a lab
   without a public name the proxy can issue its certificates from its own certificate authority
   (`TLS_INTERNAL=true`, ADR 0112), publish the root for download on *System status*, and serve
-  Keycloak under `/idp` on the same https address. Step 6 of ADR 0112 (the installer writes
-  `IDP_UPSTREAM`) is not built.
+  Keycloak under `/idp` on the same https address.
 - **Every hop with personal data is encrypted, or a recorded exception (ADR 0091).** The
   exceptions are all on one host: the bundled proxy to `web` on the `edge` network (ADR 0091),
   and the hops to the bundled Keycloak as `idp:8080`, from `web` and `worker` and from the proxy

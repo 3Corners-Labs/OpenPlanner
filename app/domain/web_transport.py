@@ -54,9 +54,9 @@ def bundled_idp_hop(discovery_url: str, issuer: str | None) -> bool:
 
     Only the exact address the render script writes counts, and only with an https issuer.
     The genuine provider derives the issuer and the endpoints it sends browsers to from one
-    host name (``KC_HOSTNAME``), so with an https issuer the password and the one-time code
-    travel over https. Any other http discovery URL, or this one with an http or derived
-    issuer, is not the exception.
+    host name (``KC_HOSTNAME``), so with an https issuer the browser reaches the proxy over
+    https; the proxy's own leg to the provider is the other hop of ADR 0125. Any other http
+    discovery URL, or this one with an http or derived issuer, is not the exception.
 
     Args:
         discovery_url: ``OIDC_DISCOVERY_URL``.

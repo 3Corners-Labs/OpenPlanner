@@ -974,6 +974,7 @@ def test_a_test_install_renders_the_bundled_realm_and_hands_over_the_login(host:
     assert host.file("secrets/keycloak-realm.json").is_file()
     assert "KC_SUPER_PASSWORD in" in result.stderr + result.stdout
     assert app["OIDC_CLIENT_SECRET"] not in result.stderr + result.stdout  # a path, never a value
+    assert "until ADR 0125 step 2" not in result.stderr  # the warning is production's (point 7)
 
 
 def test_the_realms_mail_server_is_set_after_the_start_without_a_password_in_an_argument(
@@ -1100,7 +1101,7 @@ def test_web_and_worker_start_on_what_a_production_install_with_the_bundled_keyc
     host: Host,
 ) -> None:
     """ADR 0125: the login is the bundled provider's internal hop, which production accepts."""
-    result = _production_bundled(host)
+    _production_bundled(host)
 
     settings = _container_settings(host)
 
@@ -1108,8 +1109,14 @@ def test_web_and_worker_start_on_what_a_production_install_with_the_bundled_keyc
     assert settings.oidc_discovery_url == BUNDLED_IDP_DISCOVERY_URL
     assert settings.oidc_issuer == "https://afspraak.example.nl/idp/realms/openplanner"
     assert settings.production_problems() == []
-    # Point 7: the host owner is told what production runs on until step 2.
+
+
+def test_production_with_the_bundled_provider_warns_until_adr_0125_step_2(host: Host) -> None:
+    """ADR 0125 point 7: the host owner is told what production runs on, and the way out."""
+    result = _production_bundled(host)
+
     assert "until ADR 0125 step 2" in result.stderr
+    assert "--idp own" in result.stderr
 
 
 def test_a_host_that_leaves_the_bundled_keycloak_logs_in_with_its_own_provider(
@@ -1128,8 +1135,10 @@ def test_a_host_that_leaves_the_bundled_keycloak_logs_in_with_its_own_provider(
     assert host.file("secrets/keycloak.env").is_file()  # the way back to --idp bundled
     assert "removed secrets/keycloak-app.env" in result.stderr + result.stdout
     assert "IDP_UPSTREAM" not in host.settings("proxy.env")  # no /idp route to the name idp
-    # Exactly these arguments: no -v, so the volumes idp-data and idp-db-data stay.
+    # After web and worker are healthy without it; `compose rm` never removes the named volumes
+    # idp-data and idp-db-data, which the fake docker cannot show.
     assert host.ran("--profile idp --profile idp-db rm --stop --force idp idp-db")
+    assert "stopped the bundled identity provider" in result.stderr + result.stdout
     assert "until ADR 0125 step 2" not in result.stderr
     settings = _container_settings(host)
     assert settings.oidc_discovery_url == own["OIDC_DISCOVERY_URL"]

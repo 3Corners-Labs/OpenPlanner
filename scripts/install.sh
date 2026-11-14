@@ -954,14 +954,26 @@ start() {
   log "starting (docker compose --env-file .env.update up -d)"
   # Without the tls profile a proxy started by hand earlier would restart for ever.
   ((TLS)) || compose --profile tls rm --stop --force proxy >/dev/null 2>&1 || true
-  # ADR 0125 point 6: a host that left the bundled provider stops it; its volumes and
-  # secrets/keycloak.env stay for the way back (--idp bundled).
-  [[ $IDP == bundled ]] || compose --profile idp --profile idp-db rm --stop --force idp idp-db >/dev/null 2>&1 || true
   edge_network
   compose up -d
   healthy || die "not healthy within ${HEALTH_TIMEOUT}s; see: docker compose --env-file .env.update logs web worker"
   log "web and worker are healthy"
+  retire_bundled_provider
   idp_mail
+}
+
+# ADR 0125 point 6: a host that left the bundled provider stops it, after `up -d` has replaced
+# the proxy, web and worker that still used its name: stopped first, the name idp would reach
+# the host's resolver while they run. Its volumes and secrets/keycloak.env stay for the way back
+# (--idp bundled; `compose rm` never removes a named volume).
+retire_bundled_provider() {
+  [[ $IDP != bundled && -f $DIR/secrets/keycloak.env ]] || return 0
+  if compose --profile idp --profile idp-db rm --stop --force idp idp-db >/dev/null 2>&1; then
+    log "stopped the bundled identity provider (idp, idp-db); its volumes and secrets/keycloak.env stay"
+  else
+    warn "could not remove the bundled identity provider's containers; run: docker compose --env-file .env.update --profile idp --profile idp-db rm --stop --force idp idp-db"
+  fi
+  ((TLS)) || warn "without the HTTPS proxy, remove any /idp route your own reverse proxy has to this host"
 }
 
 # ADR 0106 step 5: the realm's mail server, for the invitations and password resets that Keycloak

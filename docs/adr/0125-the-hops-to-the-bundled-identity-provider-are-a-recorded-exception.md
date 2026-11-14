@@ -59,7 +59,8 @@ the host's search domains. Whatever answers there receives both hops' traffic:
   superuser in the genuine realm afterwards.
 
 Test and lab installations have carried this since ADR 0112; production was spared only because
-it did not start.
+it did not start. The proxy's route to web (`web:8000`, ADR 0091 point 2) resolves its name in
+the same way, for the seconds web is recreated on an update.
 
 Two other ways out were weighed:
 
@@ -107,18 +108,21 @@ Two other ways out were weighed:
    moves an existing host over and gives it new client secrets, since a host that ran on the
    name may have handed the old ones out; and a check on a real Docker host
    (`scripts/check-proxy.sh`) shows that both hops fail closed while the container is down.
+   The proxy's route to web is pinned the same way, so no hop on the host is resolved by name.
 6. **Leaving the bundled provider removes it.** With `--idp own` the installer deletes
    `secrets/keycloak-app.env` (Compose reads it after `.env`, so its login and directory would
    otherwise override the ones the operator chose, now that production accepts that login),
-   removes `IDP_UPSTREAM` from `proxy.env`, and stops and removes the `idp` and `idp-db`
-   containers. The volumes and `secrets/keycloak.env` stay, so `--idp bundled` brings the
-   provider back with its accounts.
+   removes `IDP_UPSTREAM` from `proxy.env`, and, once the proxy, web and worker run without
+   them, stops and removes the `idp` and `idp-db` containers. The volumes and
+   `secrets/keycloak.env` stay, so `--idp bundled` brings the provider back with its accounts.
 7. **The host owner is told.** Until step 2 is built, the installer warns when it sets up
    production with the bundled provider, and names this ADR and `--idp own`; the install guide
    says the same.
 8. **A recovery for a host that ran on the name.** The runbook says what to do after an
    unexplained outage of the `idp` container on such a host: give both clients new secrets,
-   check the realm's accounts and the portal's audit log for the outage, and sign everyone out.
+   sign everyone out of Keycloak and of the portal, and check the realm's accounts and
+   credentials and the portal's audit log from the start of the outage until then, because
+   what was taken keeps working after it.
 
 ## Settings
 
@@ -133,7 +137,7 @@ want the hops chooses `--idp own`.
 |---|---|---|---|
 | 0 | ADR | #834 | merged |
 | 1 | `bundled_idp_hop` in the start-up check; the files a production install writes tested against it (`tests/scripts/test_install.py`), the render script tied to the same address; `--idp own` removes the bundled login, route and containers (point 6); the installer's warning (point 7); the recovery in the runbook (point 8); data flow, threat model, ASVS, architecture, runbook, install guide and the System status text (nl, en) | #834 | merged |
-| 2 | A fixed address for the bundled provider, used by the login, the staff directory, the exception and the proxy route; the installer moves a host over with new client secrets; the real-Docker check (point 5) | | planned |
+| 2 | A fixed address for the bundled provider, used by the login, the staff directory, the exception and the proxy route, and the proxy's route to web pinned the same way; the installer moves a host over with new client secrets; the real-Docker check (point 5) | | planned |
 
 ## Consequences
 
