@@ -49,7 +49,7 @@ const devicesButton = (page: Page) => page.getByRole('button', { name: 'Devices'
 const panel = (page: Page) => page.getByRole('group', { name: 'Your devices' });
 const pick = (page: Page, kind: 'camera' | 'microphone' | 'speaker') => page.locator(`[data-call-pick="${kind}"]`);
 const notice = (page: Page, kind: 'recording' | 'restoring') => page.locator(`[data-call-notice="${kind}"]`);
-const bar = (page: Page) => state(page, 'call').locator('.call-controls');
+const bar = (page: Page) => page.locator('.call-controls'); // one bar, for the lobby and the call
 const leave = (page: Page) => page.getByRole('button', { name: 'Leave the call' });
 
 /** Into the call, with the plan of the double. */
@@ -118,13 +118,17 @@ test('the panel of devices opens with the keyboard, lists camera, microphone and
   await expect(pick(page, 'microphone').locator('option')).toHaveText(['Microphone one', 'Microphone two']);
   await expect(pick(page, 'speaker').locator('option')).toHaveText(['Speaker one', 'Speaker two']);
 
+  // Tab forward until each control has focus, not one press each: in one engine a box that scrolls
+  // (the panel, when its content is higher than its cap) is a tab stop of its own, and rightly so.
   for (const kind of ['camera', 'microphone', 'speaker'] as const) {
-    await page.keyboard.press('Tab');
+    await tabTo(page, pick(page, kind));
     await expect(pick(page, kind)).toBeFocused();
   }
-  await page.keyboard.press('Tab'); // not a trap: on to the way out
+  await tabTo(page, leave(page)); // not a trap: on to the way out
   await expect(leave(page)).toBeFocused();
   await page.keyboard.press('Shift+Tab');
+  await expect(page.locator('body')).not.toBeFocused(); // focus is never lost to the document
+  await tabTo(page, pick(page, 'speaker'));
   await expect(pick(page, 'speaker')).toBeFocused();
 
   await page.keyboard.press('Escape');
@@ -448,38 +452,68 @@ test('a control that has focus is not under the bar on a low window, and the pag
   expect(padding).toBeGreaterThan(0); // a control scrolled into view comes to rest above the bar
 });
 
+/** The row of buttons: from the top of the highest to the bottom of the lowest of the toggles, the devices button and the way out. */
+async function rowOf(page: Page): Promise<{ top: number; bottom: number }> {
+  const boxes = await Promise.all([page.locator('.call-controls .call-toggles'), devicesButton(page), leave(page)].map((l) => l.boundingBox()));
+  const found = boxes.filter((b): b is NonNullable<typeof b> => b !== null);
+  expect(found, 'the toggles, the devices button and the way out are all there').toHaveLength(3);
+  return { top: Math.min(...found.map((b) => b.y)), bottom: Math.max(...found.map((b) => b.y + b.height)) };
+}
+
+/**
+ * The row of buttons is inside the window and at most half of it, where the page is, scrolled to
+ * its top and scrolled to its end (the bar is sticky and must hold at each); with `opened`, the
+ * panel's top is inside the window and its bottom at or above the row's top.
+ */
+async function barHolds(page: Page, height: number, what: string, opened: boolean): Promise<void> {
+  for (const at of ['as it is', 'at the top', 'at the end']) {
+    if (at === 'at the top') await page.evaluate(() => window.scrollTo(0, 0));
+    if (at === 'at the end') await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    const label = `${what}, page ${at}`;
+    const row = await rowOf(page);
+    expect(row.top, `${label}: row top`).toBeGreaterThanOrEqual(0);
+    expect(row.bottom, `${label}: row bottom`).toBeLessThanOrEqual(height);
+    expect(row.bottom - row.top, `${label}: row height`).toBeLessThanOrEqual(height / 2);
+    await inView(page, leave(page), `${label}: the way out`);
+    await inView(page, devicesButton(page), `${label}: the devices button`);
+    if (opened) {
+      const box = await panel(page).boundingBox();
+      expect(box?.y ?? -1, `${label}: panel top`).toBeGreaterThanOrEqual(0);
+      expect((box?.y ?? Number.POSITIVE_INFINITY) + (box?.height ?? 0), `${label}: panel bottom`).toBeLessThanOrEqual(row.top + 1);
+    }
+  }
+}
+
 for (const size of [
   { width: 1280, height: 400, name: 'a wide window 400 px high' },
   { width: 320, height: 640, name: '320 px wide and 640 px high' },
   { width: 320, height: 400, name: '320 px wide and 400 px high' },
   { width: 320, height: 256, name: '400 % zoom (a 1280 by 1024 window)' },
 ]) {
-  test(`with both notices and the panel shown the bar stays in view and takes at most half the window, ${size.name}`, async ({ page }) => {
-    await page.setViewportSize({ width: size.width, height: size.height });
-    await inCall(page);
-    await recording(page, true);
-    await reconnection(page, 'start');
-    await expect(notice(page, 'recording')).toBeVisible();
-    await expect(notice(page, 'restoring')).toBeVisible();
-    const half = async (what: string): Promise<void> => {
-      await inView(page, bar(page), what);
-      const box = await bar(page).boundingBox();
-      expect(box?.height ?? Number.POSITIVE_INFINITY, `${what}: height`).toBeLessThanOrEqual(size.height / 2 + 1);
-    };
-    await half('the bar');
-    await inView(page, leave(page), 'the way out');
-    await inView(page, devicesButton(page), 'the devices button');
+  for (const where of ['lobby', 'call'] as const) {
+    test(`the one bar holds in the ${where} with both notices and the panel shown, ${size.name}`, async ({ page }) => {
+      await page.setViewportSize({ width: size.width, height: size.height });
+      if (where === 'call') {
+        await inCall(page);
+      } else {
+        await stubToken(page, granted());
+        await open(page, { lobby: true });
+        await join(page);
+        await expect(heading(page, WAITING)).toBeFocused();
+      }
+      await recording(page, true);
+      await reconnection(page, 'start');
+      await expect(notice(page, 'recording')).toBeVisible();
+      await expect(notice(page, 'restoring')).toBeVisible();
+      await barHolds(page, size.height, 'panel closed', false);
 
-    await devicesButton(page).click();
-    await expect(panel(page)).toBeVisible();
-    await half('the bar with the panel open');
-    await inView(page, panel(page), 'the panel');
-    const above = await panel(page).boundingBox();
-    const under = await bar(page).boundingBox();
-    expect((above?.y ?? 0) + (above?.height ?? 0)).toBeLessThanOrEqual((under?.y ?? 0) + 1); // the panel opens above the bar
-    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
-    await expectNoAxeViolations(page);
-  });
+      await devicesButton(page).click();
+      await expect(panel(page)).toBeVisible();
+      await barHolds(page, size.height, 'panel open', true);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+      await expectNoAxeViolations(page);
+    });
+  }
 }
 
 test('every control of the call is at least 24 by 24 pixels, with the panel and the notices shown', async ({ page }) => {

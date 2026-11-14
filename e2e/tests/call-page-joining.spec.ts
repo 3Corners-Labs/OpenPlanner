@@ -563,7 +563,7 @@ test('the way out stands apart from the switches', async ({ page }) => {
   await open(page);
   await join(page);
   await expect(heading(page, IN_CALL)).toBeVisible();
-  const toggles = await page.locator('[data-call-state="call"] .call-toggles').boundingBox();
+  const toggles = await page.locator('.call-controls .call-toggles').boundingBox();
   const leave = await page.getByRole('button', { name: 'Leave the call' }).boundingBox();
   expect(toggles).not.toBeNull();
   expect(leave).not.toBeNull();

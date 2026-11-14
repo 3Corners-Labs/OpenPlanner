@@ -301,7 +301,7 @@
 
   // A device chosen in a list: the camera or the microphone is replaced, the speaker is used.
   function choose(kind, id) {
-    if (app.state.screen === "call") return chooseInCall(kind, id);
+    if (app.state.screen === "call" || app.state.screen === "lobby") return chooseInCall(kind, id);
     chosen[kind] = id;
     if (kind === "speaker") app.sound.useSpeaker();
     else if (app.state.has[kind]) replace(kind);

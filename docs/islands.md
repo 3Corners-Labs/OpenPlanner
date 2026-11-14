@@ -233,7 +233,13 @@ to another at run time goes through `app` and may reach a file loaded later.
   being restored last while they hold (in the lobby and the call) and are said once each way, a recording
   that began before the lobby is said once when its notice first shows; a connection lost for good ends in the
   failure state. Events of a connection that is over are ignored and what an event carries is never read.
-- The panel of devices (a disclosure of the bar) is wired in `call-page.js` with the page's other controls.
+- The controls of the lobby and the call are one bar, in the markup once, a child of the whole call area (`render`
+  shows it on those two screens): the toggles, the devices button with its panel and the way out. It is fixed at
+  the foot of the window (a sticky bar leaves the foot at the page's end), and the page keeps room for it at its end; its row of buttons is at most half the window
+  (on a window under 32 rem high the buttons are 2 rem high, under 20 rem the toggles' words "on" and "off" are
+  for assistive technology only), the panel of devices overlays the page above the row (out of flow, at most half the window less 1.5 rem),
+  and scrolls inside itself. `scroll-padding-bottom` and the page's bottom padding are 4.5 rem (narrow window: `min(50vh, 13rem)`), the bar's height at most. The panel
+  is a disclosure wired in `call-page.js` with the page's other controls.
 
 - **Keyboard:** every control is a native button, link or select in reading order; nothing is a pointer
   gesture. The panel of devices is a disclosure (Escape or its button closes it and focus returns to the button;

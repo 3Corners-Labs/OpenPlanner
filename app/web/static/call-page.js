@@ -256,7 +256,8 @@
       var held = restoring ? state.connection === "restoring" : state.recording !== "off";
       notice.hidden = !(inCall && held);
     });
-    var open = screen === "call" && state.panel;
+    $("[data-call-controls]").hidden = !inCall;
+    var open = inCall && state.panel;
     $("[data-call-devices-panel]").hidden = !open;
     $("[data-call-devices-button]").setAttribute("aria-expanded", String(open));
     $("[data-call-pick-speaker-field]").hidden = !(open && state.speaker);
@@ -363,12 +364,12 @@
   // looked at again when it opens), Escape closes it and returns focus to the button.
   function wireDevicesPanel() {
     $("[data-call-devices-button]").addEventListener("click", function () {
-      if (state.screen !== "call") return;
-      go("call", { panel: !state.panel });
+      if (state.screen !== "lobby" && state.screen !== "call") return;
+      go(state.screen, { panel: !state.panel });
       if (state.panel) app.devices.list();
     });
-    $(".call-bar__devices").addEventListener("keydown", function (event) {
-      if (event.key === "Escape" && state.panel) go("call", { panel: false, focus: "devices" });
+    $("[data-call-controls]").addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && state.panel) go(state.screen, { panel: false, focus: "devices" });
     });
   }
 
@@ -425,7 +426,8 @@
     });
   });
   media.addEventListener("devicechange", function () {
-    if (state.screen === "check" || (state.screen === "call" && state.panel)) app.devices.list();
+    var inCall = state.screen === "lobby" || state.screen === "call";
+    if (state.screen === "check" || (inCall && state.panel)) app.devices.list();
   });
   window.addEventListener("pagehide", leavePage);
   window.addEventListener("pageshow", pageBack);
