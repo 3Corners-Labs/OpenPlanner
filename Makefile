@@ -120,10 +120,10 @@ release-plan:
 	@git fetch --quiet --tags origin
 	$(UV) python -m scripts.release_plan
 
-# ADR 0078: before the release PR of a minor or major version merges, a second model reviews
-# everything since the last release (the Codex CLI in a read-only sandbox, as /codex does).
-# Paste the findings into the release PR under "## Release audit", ending with "Verdict: pass".
-release-audit: ## Independent review of everything since the last release (needs codex)
+# ADR 0128: optional and occasional. A second model reviews everything since the last release
+# (the Codex CLI in a read-only sandbox, as /codex does), on the machine of whoever runs it.
+# No check waits for it; findings may be pasted into the release PR under "## Release audit".
+release-audit: ## Optional review of everything since the last release by a second model (needs codex)
 	scripts/release-audit.sh
 
 # TLS proxy (ADR 0030) against Let's Encrypt's test CA; needs docker.

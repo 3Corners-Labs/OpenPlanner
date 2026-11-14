@@ -16,7 +16,7 @@ green CI and a decision with the product owner's label (ADR 0078), never through
 | Bug or failing test | `/investigate` | Find the root cause before fixing |
 | Before the PR | `make deadcode`, then `pre-pr-review` (repo) | The review CLAUDE.md asks for before every PR, in one command; see *Repo skills* |
 | End | `/context-save` | Hand over to the next session |
-| Release of a minor or major version | `/codex review` via `make release-audit` | Independent review of everything since the last release by a second model, pasted into the release PR (ADR 0078). Since ADR 0079 the `audit` job of the `release` workflow runs it and writes the section; the laptop form is the fallback (`docs/runbook.md`, *Releasing a version*) |
+| Now and then, before a release (optional) | `/codex review` via `make release-audit` | Review of everything since the last release by a second model, on the machine of whoever runs it; findings may be pasted into the release PR. Optional and gating nothing since ADR 0128 (it was a required step under ADR 0078); no workflow runs it |
 
 ## Repo skills
 
