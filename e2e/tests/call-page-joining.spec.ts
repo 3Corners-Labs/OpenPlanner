@@ -132,6 +132,29 @@ async function join(page: Page): Promise<void> {
   await joinButton(page).click();
 }
 
+/**
+ * The page's contract is what it does with the answer of `play()` on the other side's sound, not
+ * what an engine does with a made-up stream: the stub decides for that element, in both phases
+ * (`window.__blockPlay`: refuse with NotAllowedError; else resolve; `__hangPlay`: never settle), and
+ * counts the calls (`__plays`). The engines' own autoplay rules are seen only in a real meeting.
+ */
+async function stubRemoteSound(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __blockPlay: boolean; __hangPlay: boolean; __plays: number };
+    w.__blockPlay = true;
+    w.__hangPlay = false;
+    w.__plays = 0;
+    const original = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      if (!this.hasAttribute('data-call-remote-audio')) return original.call(this);
+      w.__plays += 1;
+      if (w.__hangPlay) return new Promise<void>(() => {});
+      return w.__blockPlay ? Promise.reject(new DOMException('blocked', 'NotAllowedError')) : Promise.resolve();
+    };
+  });
+}
+const plays = (page: Page): Promise<number> => page.evaluate(() => (window as unknown as { __plays: number }).__plays);
+
 /** The live region has said something that matches `re` (the page keeps no history, the spy does). */
 const saidLike = (page: Page, re: RegExp): Promise<void> =>
   expect.poll(async () => (await statuses(page)).some((s) => re.test(s)), { timeout: 20_000, message: String(re) }).toBe(true);
@@ -523,17 +546,7 @@ test('the other side switching its camera off and on is announced once each, and
 });
 
 test('a browser that blocks the sound gets a button and one message, and the button plays', async ({ page }) => {
-  await page.addInitScript(() => {
-    const w = window as unknown as { __blockPlay: boolean };
-    w.__blockPlay = true;
-    const original = HTMLMediaElement.prototype.play;
-    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
-      if (w.__blockPlay && this.hasAttribute('data-call-remote-audio')) {
-        return Promise.reject(new DOMException('blocked', 'NotAllowedError'));
-      }
-      return original.call(this);
-    };
-  });
+  await stubRemoteSound(page);
   await stubToken(page, granted());
   await open(page);
   await join(page);
@@ -552,18 +565,33 @@ test('a browser that blocks the sound gets a button and one message, and the but
   await expectNoAxeViolations(page);
 });
 
-test('when the sound starts on its own, the button goes and focus stays where it was', async ({ page }) => {
-  await page.addInitScript(() => {
-    const w = window as unknown as { __blockPlay: boolean };
-    w.__blockPlay = true;
-    const original = HTMLMediaElement.prototype.play;
-    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
-      if (w.__blockPlay && this.hasAttribute('data-call-remote-audio')) {
-        return Promise.reject(new DOMException('blocked', 'NotAllowedError'));
-      }
-      return original.call(this);
-    };
+test('a press while an earlier try never settles plays at once, and the button goes when that one succeeds', async ({ page }) => {
+  await stubRemoteSound(page);
+  await stubToken(page, granted());
+  await open(page);
+  await join(page);
+  const hear = page.getByRole('button', { name: 'Tap to hear the other person' });
+  await expect(hear).toBeVisible();
+
+  // A new try that never settles (a browser that keeps the promise), then the browser lets it play.
+  await page.evaluate(() => ((window as unknown as { __hangPlay: boolean }).__hangPlay = true));
+  const before = await plays(page);
+  await control(page, 'remoteAgain');
+  await expect.poll(() => plays(page)).toBe(before + 1);
+  await page.evaluate(() => {
+    const w = window as unknown as { __hangPlay: boolean; __blockPlay: boolean };
+    w.__hangPlay = false;
+    w.__blockPlay = false;
   });
+  // The press calls play() inside the press itself, whatever is still pending, and its outcome counts.
+  await hear.click();
+  await expect.poll(() => plays(page)).toBe(before + 2);
+  await expect(hear).toBeHidden();
+  await expect(heading(page, IN_CALL)).toBeFocused();
+});
+
+test('when the sound starts on its own, the button goes and focus stays where it was', async ({ page }) => {
+  await stubRemoteSound(page);
   await stubToken(page, granted());
   await open(page);
   await join(page);

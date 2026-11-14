@@ -271,17 +271,14 @@
   }
 
   // The other side's picture and sound play. A browser that refuses (it wants a tap first) is
-  // answered with a button and one message; the button calls this again.
-  var playing = false; // one try at a time; a stream that comes meanwhile is tried after it
-  var again = false;
+  // answered with a button and one message. Every call starts a try at once, so a press calls
+  // `play()` inside the press itself, which is what a browser that wants a tap allows; only the
+  // latest try's outcome is applied, so a `play()` that never settles blocks nothing.
+  var tries = 0;
   var pressed = false; // the participant pressed the button: focus has to land somewhere
   function playRemote() {
     if (state.screen !== "call") return Promise.resolve();
-    if (playing) {
-      again = true;
-      return Promise.resolve();
-    }
-    playing = true;
+    var mine = (tries += 1);
     var plays = [remoteAudio, remoteVideo].map(function (element) {
       if (!element.srcObject) return Promise.resolve(true);
       return Promise.resolve(element.play()).then(
@@ -294,7 +291,7 @@
       );
     });
     return Promise.all(plays).then(function (played) {
-      playing = false;
+      if (mine !== tries) return;
       var blocked = played.indexOf(false) !== -1;
       // Said once per blocked start. When the participant's press makes the button go, focus goes
       // to the heading, not nowhere; when the sound starts on its own, focus stays put.
@@ -306,26 +303,21 @@
             : { soundBlocked: false, focus: pressed ? "state" : undefined },
         );
       }
-      if (!again) {
-        pressed = false;
-        return;
-      }
-      again = false;
-      return playRemote();
+      pressed = false;
     });
   }
   app.playRemote = playRemote;
 
   // ---- the other side's picture ------------------------------------------------------------------
   // The other side's picture, and whether it moves: waiting until it has moved once, then live
-  // or off. A change after that is said once.
-  function syncRemote(playing) {
+  // or off. A change after that is said once. The track decides: it moves when a video track of
+  // the stream is live and not muted. Events only ask for a new look (the video element's
+  // `playing` arrives after a mute in some browsers and must not turn it back to live).
+  function syncRemote() {
     var tracks = app.streams.remote ? app.streams.remote.getVideoTracks() : [];
-    var moving =
-      playing ||
-      tracks.some(function (track) {
-        return !track.muted && track.readyState === "live";
-      });
+    var moving = tracks.some(function (track) {
+      return !track.muted && track.readyState === "live";
+    });
     var before = state.remote;
     var after = moving ? "live" : before === "live" || before === "off" ? "off" : "waiting";
     var patch = { remote: after };
@@ -344,14 +336,14 @@
     if (kind === "remote" && stream) {
       stream.getVideoTracks().forEach(function (track) {
         track.addEventListener("mute", function () {
-          syncRemote(false);
+          syncRemote();
         });
         track.addEventListener("unmute", function () {
-          syncRemote(false);
+          syncRemote();
         });
       });
     }
-    syncRemote(false);
+    syncRemote();
     playRemote();
   }
   app.setRemote = setRemote;
@@ -409,7 +401,7 @@
     playRemote();
   });
   remoteVideo.addEventListener("playing", function () {
-    if (state.screen === "call") syncRemote(true);
+    if (state.screen === "call") syncRemote();
   });
   KINDS.forEach(function (kind) {
     toggles[kind].forEach(function (button) {
