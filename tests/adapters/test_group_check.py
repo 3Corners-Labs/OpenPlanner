@@ -761,6 +761,19 @@ async def test_a_group_that_uses_the_call_page_mints_the_one_fixed_guest() -> No
 
 
 @pytest.mark.usefixtures("wxcc_ok")
+async def test_a_held_embedded_group_acts_as_browser_while_the_switch_is_off() -> None:
+    """Its participants get the redirect then, so the browser link is checked like a browser's."""
+    platforms = Platforms()
+
+    findings = await _checker(platforms, CONFIG).check_group(EMBEDDED, [EMBEDDED])
+
+    (get,) = _gets(platforms)
+    assert str(get.url) == "https://w.example/j?launchApp=true"
+    assert _codes(findings)["webex.browser_link_ok"] is CheckStatus.OK
+    assert _guest_requests(platforms) == []  # and no guest is made while the switch is off
+
+
+@pytest.mark.usefixtures("wxcc_ok")
 async def test_a_refusal_fails_with_the_code_and_no_token_is_in_a_finding() -> None:
     platforms = Platforms()
     platforms.guest_status = 403

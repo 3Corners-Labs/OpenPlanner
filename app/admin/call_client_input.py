@@ -97,6 +97,15 @@ def _offered(current: JoinClient, offer: EmbeddedOffer) -> tuple[JoinClient, ...
     )
 
 
+def _option_offered(current: GroupSettings, offer: EmbeddedOffer) -> bool:
+    """Return whether the option's select is shown: ``embedded`` is offered or held.
+
+    The same test decides what is read back, so a post that names a field the page did not show
+    is ignored.
+    """
+    return offer.enabled or current.join_client is JoinClient.EMBEDDED
+
+
 def with_call_client_fields(
     fields: Sequence[Field],
     form: FormData,
@@ -137,14 +146,15 @@ def with_call_client_fields(
             ),
         )
     ]
-    if offer.enabled or held:
+    if _option_offered(current, offer):
         own = current.embedded_call_webex_option
         value = (
             form.values[OPTION_FIELD]
             if OPTION_FIELD in form.values
             else (own.value if own else FOLLOW_ORGANISATION)
         )
-        follow = _("admin.group.webex_option_follow", value=_(OPTION_LABELS[organisation_option]))
+        named = _(OPTION_LABELS[organisation_option])
+        follow = _("admin.group.webex_option_follow", value=named[:1].lower() + named[1:])
         extra.append(
             Field(
                 OPTION_FIELD,
@@ -182,7 +192,7 @@ def read_call_client(
             form.reject(CLIENT_FIELD, BLOCKER_MESSAGES[blocker])
             client = None
     option = current.embedded_call_webex_option
-    if OPTION_FIELD in form.values:
+    if _option_offered(current, offer) and OPTION_FIELD in form.values:
         picked = (
             None
             if form.values[OPTION_FIELD] == FOLLOW_ORGANISATION

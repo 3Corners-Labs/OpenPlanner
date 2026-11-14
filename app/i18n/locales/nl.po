@@ -1226,7 +1226,7 @@ msgid "admin.field.embedded_call_webex_option"
 msgstr "Weg naar Webex naast onze pagina"
 
 msgid "admin.field.embedded_call_webex_option_hint"
-msgstr "Geldt als hierboven 'In de eigen pagina van de organisatie' is gekozen. De deelnemer krijgt naast onze gesprekspagina een weg naar de webversie van Webex te zien: nooit, alleen als de pagina het gesprek niet kan geven, of altijd. De tekst noemt Webex niet bij naam. 'Zoals de organisatie' volgt de instelling van de organisatie."
+msgstr "Geldt alleen als hierboven 'In de eigen pagina van de organisatie' is gekozen. De deelnemer krijgt naast onze gesprekspagina een weg naar de webversie van Webex te zien: nooit, alleen als de pagina het gesprek niet kan geven, of altijd. De tekst van die link op de pagina van de deelnemer noemt Webex niet bij naam. 'Zoals de organisatie' volgt de instelling van de organisatie."
 
 msgid "admin.group.webex_option_hidden"
 msgstr "Nooit"

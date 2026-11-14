@@ -97,7 +97,7 @@ async def test_the_form_offers_the_organisations_own_page_while_the_switch_is_on
     # the option is there wherever embedded is offered; "as the organisation" is first and chosen
     assert _options(page, OPTION) == ["", "hidden", "on_failure", "always"]
     assert '<option value="" selected' in page
-    assert "As the organisation (now: Never)" in page
+    assert "As the organisation (now: never)" in page
 
 
 # --- choosing it ------------------------------------------------------------------------------
@@ -231,7 +231,7 @@ async def test_a_service_without_a_value_follows_its_organisation_and_says_what_
 
     assert (await _stored(site)).embedded_call_webex_option is None
     assert '<option value="" selected' in page  # nothing pinned
-    assert "As the organisation (now: Always, also before joining)" in page
+    assert "As the organisation (now: always, also before joining)" in page
 
 
 async def test_a_save_that_did_not_touch_the_option_never_pins_the_organisations_value(
@@ -257,6 +257,18 @@ async def test_choosing_as_the_organisation_again_takes_the_services_own_value_a
 
     await _post(site, {**SETTINGS_FORM, CLIENT: "embedded", OPTION: ""})
 
+    assert (await _stored(site)).embedded_call_webex_option is None
+
+
+async def test_a_posted_option_is_ignored_where_its_select_was_not_shown(site: Site) -> None:
+    """Abuse case: the switch is off and the group does not hold ``embedded``."""
+    await site.login_as(SUPER)
+
+    saved = await _post(site, {**SETTINGS_FORM, "name": "R", OPTION: "always"})
+    refused = await _post(site, {**SETTINGS_FORM, OPTION: "sometimes"})
+
+    assert saved.status_code == 303  # type: ignore[attr-defined]
+    assert refused.status_code == 303  # type: ignore[attr-defined]  # not read, so not refused
     assert (await _stored(site)).embedded_call_webex_option is None
 
 

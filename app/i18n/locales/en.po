@@ -1226,7 +1226,7 @@ msgid "admin.field.embedded_call_webex_option"
 msgstr "Way into Webex next to our page"
 
 msgid "admin.field.embedded_call_webex_option_hint"
-msgstr "Applies when 'In the organisation's own page' is chosen above. The participant is shown a way into Webex's web version next to our call page: never, only when the page cannot give the call, or always. The text does not name Webex. 'As the organisation' follows the organisation's setting."
+msgstr "Applies when 'In the organisation's own page' is chosen above. The participant is shown a way into Webex's web version next to our call page: never, only when the page cannot give the call, or always. The link's text on the participant's page does not name Webex. 'As the organisation' follows the organisation's setting."
 
 msgid "admin.group.webex_option_hidden"
 msgstr "Never"
