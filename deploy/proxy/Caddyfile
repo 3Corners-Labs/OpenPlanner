@@ -65,7 +65,9 @@ http://{$TLS_DOMAIN}:8080 {
 	# The bundled identity provider (ADR 0112) is served under /idp when IDP_UPSTREAM is set;
 	# entrypoint.sh renders IDP_DIRECTIVE, empty otherwise.
 	{$IDP_DIRECTIVE}
+	# Everything else goes to web at its fixed address on edge (WEB_UPSTREAM, docker-compose.yml),
+	# never to a name this host's DNS could answer while web is down (ADR 0125 step 2).
 	handle {
-		reverse_proxy web:8000
+		reverse_proxy {$WEB_UPSTREAM}
 	}
 }

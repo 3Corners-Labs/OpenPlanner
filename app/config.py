@@ -36,6 +36,7 @@ from app.domain.system_log import EventRetention
 from app.domain.update_policy import valid_line, valid_window
 from app.domain.updates import valid_release
 from app.domain.user_names import DEFAULT_SUFFIX, valid_suffix
+from app.domain.web_transport import bundled_idp_hop
 from app.i18n.dates import ClockStyle
 
 LogLevel = Literal["TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -316,10 +317,11 @@ class Settings(BaseSettings):
     # the queue, fixed into the work item at the claim. Class D organisation.
     assignment_start_lease_minutes: int = Field(default=5, ge=1, le=30)
     # ADR 0123 point 7 and the *Settings* table: what the participant is called to staff (the
-    # first name, or the organisation's word) and what staff are called to the participant (their
-    # account name, or the organisation's word). Class D organisation.
+    # first name, or the organisation's word) and what staff are called to the participant (the
+    # screen name kept with their record, their account name, or the organisation's word).
+    # Class D organisation.
     embedded_call_display_name: Literal["first_name", "term"] = "first_name"
-    embedded_call_staff_name: Literal["name", "term"] = "name"
+    embedded_call_staff_name: Literal["screen_name", "name", "term"] = "screen_name"
     # ADR 0123 point 11 and the *Settings* table: whether the participant of an embedded call is
     # ever shown a way into the video platform's own app. Class D organisation (per service from
     # step 6, which puts it on the service's form).
@@ -447,6 +449,9 @@ class Settings(BaseSettings):
     embedded_call_connect_attempts: int = Field(default=3, ge=1, le=5)
     # ADR 0123 point 6: guest tokens one booking may ask for in an hour (step 4a). Class C.
     embedded_call_token_per_booking_per_hour: int = Field(default=10, ge=5, le=30)
+    # ADR 0123 step 5c: how often the call page asks who is in the call (and, from step 7c, for the
+    # chat's new messages), in seconds. One poll for the page. Class C.
+    embedded_call_chat_poll_seconds: int = Field(default=3, ge=2, le=10)
     # ADR 0046, staff directory. An admin's "last seen" is written at most once per this many
     # seconds (class C, platform; ADR 0042 registry).
     staff_last_seen_interval_seconds: int = Field(default=300, ge=60, le=3600)
@@ -839,12 +844,17 @@ class Settings(BaseSettings):
         check(
             self.oidc_discovery_url is not None
             and (
-                not self.oidc_discovery_url.startswith("https://")
+                not (
+                    self.oidc_discovery_url.startswith("https://")
+                    # ADR 0125: the bundled provider's internal hop, a recorded exception.
+                    or bundled_idp_hop(self.oidc_discovery_url, self.oidc_issuer)
+                )
                 or self.oidc_client_secret is None
             ),
             "oidc_incomplete",
             "OIDC_DISCOVERY_URL",
-            "OIDC needs an https discovery URL and a client secret",
+            "OIDC needs an https discovery URL, or the bundled provider's internal one with an "
+            "https OIDC_ISSUER, and a client secret",
         )
         return found
 

@@ -1,5 +1,5 @@
 /*
- * The call of the participant's call page (ADR 0123 steps 4c and 5).
+ * The call of the participant's call page (ADR 0123 steps 4c, 5a and 5b).
  *
  * Owns: everything that follows the click that joins, except the participant's own devices
  * (call-media.js). It loads the video SDK file (with its checksum as integrity), asks our server
@@ -23,8 +23,9 @@
 
   // What the SDK is told: its logs are never uploaded and the registration of this browser is
   // temporary (ADR 0123 point 16). The automatic link to the real-time data service is off: it
-  // carries captions, which this step does not show (step 5 turns it on when it builds them), and
-  // nothing in the prototype's notes needs it to join. The first real meeting must confirm that.
+  // carries captions and nothing else the page needs. It is asked for only when the participant
+  // switches captions on (call-captions.js), if the SDK allows that; the first real meeting must
+  // confirm it, and if the link has to exist at the join, the first real meeting decides.
   var SDK_CONFIG = {
     logger: { level: "warn" },
     device: { ephemeral: true },
@@ -41,8 +42,6 @@
 
   var tokenUrl = "", sdkSource = "", sdkIntegrity = ""; // read out of the markup in `init`
   var attemptsMax = 0, attemptMs = 0;
-  var choice = { cameraId: "", microphoneId: "" };
-  app.choice = choice; // the devices the participant chose in the check, for call-media.js
 
   // `epoch` moves whenever a connection starts, ends or is taken over; every step and every
   // event of the SDK checks it, so nothing of an old attempt reaches the page. The token is kept
@@ -52,9 +51,9 @@
   // withdraw it, and a new one for every attempt would spend three of the booking's ten an hour
   // on one failed click; "try again" asks a new one.
   var call = { epoch: 0, token: "", link: "", expires: 0, loading: null, abort: null };
-  call.client = call.meeting = call.camera = call.microphone = call.capturing = null;
+  call.client = call.meeting = call.camera = call.microphone = call.screen = call.capturing = null;
   call.joined = false;
-  call.making = { camera: null, microphone: null }; // the device being made, as a promise
+  call.making = { camera: null, microphone: null, screen: null }; // the stream being made, as a promise
   call.sent = null; // the streams that addMedia took along
   call.adding = null; // the media is being added: a device press waits for it
   app.call = call; // shared with call-media.js, which takes and releases the streams
@@ -87,6 +86,8 @@
       );
     });
   }
+
+  app.within = within; // for call-media.js: the same time limit for taking a stream out or sending it
 
   function giveUp(promise) {
     var limit = new Promise(function (resolve) {
@@ -201,8 +202,10 @@
       })
       .then(function () {
         check(epoch);
-        app.go("call", { media: "added", say: "say_admitted" });
-        app.playRemote();
+        app.go("call", { media: "added", can: app.events.offers(), say: "say_admitted" });
+        // The staff member may have been sharing before the participant came in.
+        if (app.state.share === "theirs") app.say("say_share_theirs");
+        app.remote.play();
       });
     // A press of a toggle waits for this (call-media.js).
     var done = function () {
@@ -211,27 +214,6 @@
     call.adding = adding;
     adding.then(done, done);
     return adding;
-  }
-
-  // What the meeting tells the page, for this connection only.
-  function follow(epoch) {
-    var client = call.client;
-    var meeting = call.meeting;
-    meeting.on("meeting:self:guestAdmitted", function () {
-      if (epoch !== call.epoch) return;
-      enter(epoch).then(null, function () {
-        if (epoch === call.epoch) fail("generic");
-      });
-    });
-    meeting.on("media:ready", function (media) {
-      if (epoch !== call.epoch) return;
-      if (media.type === "remoteVideo") app.setRemote("remote", media.stream);
-      if (media.type === "remoteAudio") app.setRemote("audio", media.stream);
-    });
-    client.meetings.on("meeting:removed", function () {
-      var screen = app.state.screen;
-      if (epoch === call.epoch && (screen === "lobby" || screen === "call")) finish("ended");
-    });
   }
 
   // A step that answers after its attempt was given up is undone when it arrives: a late
@@ -279,7 +261,7 @@
       .then(function (meeting) {
         check(epoch);
         call.meeting = meeting;
-        follow(epoch);
+        app.events.follow(client, meeting, epoch);
         var joining = undoLate(meeting.join(), epoch, function () {
           meeting.leave().then(noop, noop);
         });
@@ -301,12 +283,16 @@
     [call.microphone, call.camera].forEach(function (stream) {
       if (stream) stream.stop();
     });
+    // A running share and running captions are given back with the call, whatever ends it.
+    app.callMedia.endShare(call.screen, null);
+    if (app.state.captions !== "off") app.captions.release(meeting);
     call.microphone = null;
     call.camera = null;
     call.client = null;
     call.meeting = null;
     call.joined = false;
     call.capturing = null;
+    call.making = { camera: null, microphone: null, screen: null }; // a stream being made or taken out is given up with the call
     call.sent = null;
     call.epoch += 1;
     if (call.abort) {
@@ -316,6 +302,8 @@
     app.streams.self = null;
     app.streams.remote = null;
     app.streams.audio = null;
+    app.streams.share = null;
+    app.remote.offered(null);
     var leaving = joined && meeting ? giveUp(meeting.leave()) : Promise.resolve();
     return leaving.then(function () {
       if (client && client.meetings && client.meetings.registered) {
@@ -379,10 +367,6 @@
 
   // ---- what the page asks of the call ---------------------------------------------------------
   function start(picked) {
-    if (picked) {
-      choice.cameraId = picked.cameraId;
-      choice.microphoneId = picked.microphoneId;
-    }
     var moved = app.go("connecting", {
       attempt: 1,
       failure: "",
@@ -401,6 +385,24 @@
 
   function leave() {
     finish("left");
+  }
+
+  // What the meeting tells the page (call-events.js, which checks the epoch first): the staff
+  // member let the participant in (the media goes in; if it cannot, the call fails), the meeting
+  // was removed (the staff member ended it), or the connection is lost for good.
+  function admitted(epoch) {
+    enter(epoch).then(null, function () {
+      if (epoch === call.epoch) fail("media");
+    });
+  }
+
+  function ended() {
+    var screen = app.state.screen;
+    if (screen === "lobby" || screen === "call") finish("ended");
+  }
+
+  function lost() {
+    fail("lost");
   }
 
   // The page goes away or comes back out of the browser's memory: nothing of a call stays.
@@ -426,6 +428,9 @@
     start: start,
     again: again,
     leave: leave,
+    admitted: admitted,
+    ended: ended,
+    lost: lost,
     hangUp: hangUp,
     setLive: function (kind, on) {
       return app.callMedia.setLive(kind, on);

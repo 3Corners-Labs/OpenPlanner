@@ -15,7 +15,8 @@ from app.domain.request_queue import RequestQueue
 from app.domain.request_watch import RequestWatch
 from app.domain.request_work import RequestWork
 from app.domain.services import BookingService
-from app.keys import management_token_key, management_token_key_previous
+from app.domain.staff_screen_names import StaffScreenNames
+from app.keys import agent_pseudonym_keys, management_token_key, management_token_key_previous
 from app.policies import confirm_policy, proposal_hours, reach
 
 
@@ -119,3 +120,8 @@ def request_services(
 ) -> tuple[ImmediateRequests, RequestQueue]:
     """Return immediate intake and immediate work in the own queue (ADR 0121 step 7)."""
     return immediate_requests(uow, clock, live), request_queue(uow, clock, admin, live, keys)
+
+
+def staff_screen_names(uow: UnitOfWork, clock: Clock, settings: Settings) -> StaffScreenNames:
+    """Return the screen names of staff, found by the pseudonym of a claim (ADR 0123 step 5c)."""
+    return StaffScreenNames(uow, clock, agent_pseudonym_keys(settings))

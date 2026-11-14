@@ -215,6 +215,7 @@ organisation provider ──ID token (sub, name, email, email_verified, entitlem
 |---|---|---|---|---|
 | Admin subject identifier | `audit_events.actor`, `staff.subject`, `admin_sessions.subject`; `audit_events.detail` of the two volume warnings (`planner.changes_alert`, `booking.contact_reveals_alert`: `actor:<subject>,…`, ADR 0044) | identity provider | admin actions: `AUDIT_RETENTION_DAYS` (default 2 years, product owner 2026-10-29); system 90 days, security 1 year, debug 7 days (ADR 0040) | no |
 | Admin display name | `staff.display_name`, `admin_sessions.claims` | identity provider | replaced at every login; erased daily by the worker for people without a login for `staff_retention_days` (class C, 365 days, 90–1825; ADR 0046 step 2), or by the superuser for a suspended person; the session row follows the session clean-up | no |
+| Staff screen name (ADR 0123 step 5c) | `staff.screen_name` | typed by someone with `staff.manage` on the staff page, or by the staff member themselves on *My profile* (`rights.view`, step 5d; the staff member's own choice of name for the participant's side) | kept until cleared, replaced or the record is erased (manual, or `staff_retention_days`: erasure empties it); shown to `staff.manage` in the form, to the person on *My profile* and, through `GET /b/m/{ref}/call/staff`, to the participant of a booking this staff member accepted; never in a log, audit event (the event says that it changed, not to what), job payload or URL | no |
 | Admin email address (ADR 0117 step 10b) | `staff.email`, `staff.email_at` (not `admin_sessions.claims`) | identity provider claim `email`, kept only when `email_verified` is true | replaced or cleared at every login; removed with the display name at erasure (manual, or `staff_retention_days`); shown on the staff page to `staff.view`; read by the digest at send time, never in a log, audit event or job payload | no; mail to the person for the usage digest only |
 | Admin roles and memberships | `staff.roles`, `staff_memberships` (role key, organisation and group slugs: one row per grant, ADR 0049) | identity provider claims | replaced at every login; changes audited as `staff.membership_changed`; removed with the display name at erasure | no |
 | Staff skills (ADR 0121) | `staff_skills` (staff id, skill id, when and by whom granted; who granted a skill is kept as a staff id and is emptied when that person is erased; so is `published_by` on a flow revision, the staff id of whoever published it); the skill catalogue `skills` holds codes and labels only | granted by an administrator with `skills.manage` | data about staff, not about participants; replaced as a set on every grant; deleted with the staff record at erasure (`erase_staff`); a skill that is archived stays on the grants that held it | no |
@@ -365,6 +366,76 @@ The SDK is told not to upload its logs after the call and to register the browse
 
 Nothing of this is stored by OpenPlanner: not the token, not the link beyond the booking's own
 field, not the picture or the sound.
+
+### In the call: devices, notices, the end (ADR 0123 points 10 and 13, step 5a)
+
+Inside the call the page sends nothing of its own anywhere: no request, no storage. What it
+does is told to the SDK and shown from the SDK's events.
+
+| What happens | What leaves the browser | What comes in | Stored by us |
+|---|---|---|---|
+| The participant chooses another camera or microphone in the panel of devices | the new stream goes to the supplier's call hosts through the SDK, as the first one did; the old stream is stopped | nothing | no: the choice lives in the page's memory until the call ends |
+| The participant chooses a speaker | nothing: the browser routes the other side's sound to that output | nothing | no |
+| The meeting is recorded | nothing; the recording is made at the supplier's side by the meeting, not by this page | one event (the recording started or stopped); the page shows its own sentence and reads nothing the event carries | no |
+| The connection is interrupted, restored or lost | the SDK's own reconnection traffic to the call hosts | events (restoring, back, lost); same | no |
+| The call ends (the meeting is removed, the participant leaves, the connection is lost for good) | the SDK leaves the meeting and unregisters the browser; every stream is stopped | nothing | no; the personal data of the booking is deleted by the purge 24 hours after the end of the appointment, and the ended state says so |
+
+The recording itself, its place and its retention belong to the supplier's site settings and the
+organisation's own rules; the page only tells the participant that it runs. That is input for the
+DPIA, not something this page controls.
+
+### Sharing a screen and closed captions (ADR 0123 points 10 and 12, step 5b)
+
+Still no request of its own, no storage. The page asks the browser for a screen only when the
+participant presses the share button; the browser's own picker is the second decision.
+
+| What happens | What leaves the browser | What comes in | Stored by us |
+|---|---|---|---|
+| The participant shares a screen | the screen's picture, encrypted in transit, to the supplier's call hosts through the SDK; never to us | nothing | no |
+| The participant stops sharing (the button, the browser's own control, the staff member, the end of the call) | the SDK takes the stream out of the meeting; the capture is stopped | one event at most | no |
+| The staff member shares a screen | nothing | their screen's picture, shown in place of their picture | no |
+| Captions are switched on | the SDK asks the meeting to start them and, at that press, for its real-time data link; the page's language is passed on; the call's sound reaches the platform as it did | text made by the platform from the sound of the call, with a speaker; the page shows the text and a word of its own for who spoke, and reads nothing else of the speaker | no: shown and not kept, not logged, not sent to us; gone when switched off or the call ends |
+
+The speaker of a caption is named by the page, not by the platform: the participant's own lines "You", the other side's the name described under *The staff member's name* below, or the team's word for staff.
+
+The real-time data link is asked for at the press, not at the join (`enableAutomaticLLM` stays off,
+see step 4c); a participant who never switches captions on never opens it, if the SDK allows that
+(a first real meeting shows it). The text of a caption is personal data of the call by nature; the
+platform makes it at its side, and what it keeps is for the DPIA, not for this page to control.
+
+| Open until a real meeting | What the page does | What is not known |
+|---|---|---|
+| Whose speech becomes text | The participant's press asks the meeting to start captions. It is probably meeting-wide: the platform turns the whole call's speech into text, the staff member's too, and a stop by the participant may end the captions for the staff member as well. | Who is affected, who sees the captions, and whether the platform keeps a transcript of the meeting (where, how long): asked of the supplier (`docs/research/call-page-on-the-meetings-sdk.md`, section 14, questions 10 and 11). The staff member is not told by this page. |
+| The real-time link and the transcription are closed | Switching captions off stops the transcription; leaving, the end of the call and a failure stop it too, then the meeting is left. The page knows no call that closes the link itself (the prototype has none): the link stays open until the meeting is left. | Whether the SDK has such a call, and whether leaving the meeting closes the link. |
+| A shared screen | The page asks the SDK for a display stream and gives no option for sound. Stopping it stops the track the browser gave; the stream is then taken out of the meeting. | That the SDK's display stream asks for no sound of the screen, and that stopping it ends the browser's capture on every browser. |
+
+
+### The staff member's name (ADR 0123 point 10, step 5c)
+
+Who the participant talks to is learnt from our own server and from nobody else. The video platform
+is asked nothing and told nothing for this; the name on the picture is never the name the platform
+reports for a member of the meeting.
+
+    staff.screen_name (typed by a manager)          booking claim (pseudonym of who accepted)
+                 │                                              │
+                 └────────► StaffScreenNames ◄───────────────────┘
+                                 │  by the organisation's embedded_call_staff_name:
+                                 │  screen_name (default) · name · term
+                                 ▼
+          GET /b/m/{ref}/call/staff  (the participant's link session, no-store)
+                                 ▼
+                 {"name": "..."} or {}  ─►  the page's state  ─►  text on the picture and in the captions
+
+| What happens | What leaves the browser | What comes in | Stored by us |
+|---|---|---|---|
+| The page asks who the participant talks to, on entering the lobby and the call and then every `embedded_call_chat_poll_seconds` while it is there | one `GET` to our own address, the participant's session cookie; no identifier of the staff member | a name (at most 40 characters) or nothing | no: the name lives in the page's state and is gone with the call; nothing in the browser's storage |
+| The server resolves the claim | nothing | nothing | the pseudonym-to-row-id map in the web process's memory, rebuilt at most once a minute and only on a miss; it holds pseudonyms and row ids, never a name |
+
+After the booking's purge the claim is gone and so is the name; erasing the staff record clears the
+screen name and the account name, and the endpoint answers `{}` for it. The account's name is shown
+only where the organisation chose `name`; with the default a staff member without a screen name is shown
+by the organisation's word for staff alone.
+
 
 ## Own queue (ADR 0043)
 
@@ -546,7 +617,7 @@ and must be https (or the named secure transport) in production.
 | Webex Meetings | web, worker → `webexapis.com/v1` (OAuth token from the same host) | HTTPS | Required | B (`WEBEX_API_BASE_URL`, default Webex; changed only for test doubles); credentials A/B or sealed | no | Group name and times; host, never participants. For the call page's guest (ADR 0123): a pseudonymous subject and the first name or the organisation's word, nothing else |
 | Webex Messaging API | worker → `webexapis.com/v1/messages` with the bot token of the platform or the organisation (ADR 0082 points 9 and 12) | HTTPS | Required | The superuser on *Koppelingen* and per organisation on *Kanalen* (token sealed, write-only); the room id per alert target or per group (`fallback_space_room_id`, `group.edit`) | no | Alerts: codes, slugs, times, a count, the version, a portal link (no participant data). During a fallback: a booking's start time and first name and a link to the queue, never the host join link; kept in Webex after the purge |
 | Webex Contact Center | web, worker → the WxCC API of the region: the organisation's own host and Service App when it has a connection (ADR 0032 point 9), else the installation's | HTTPS | Required: https only; internal hosts refused for an organisation's connection | C (`WXCC_API_BASE_URL`, superuser) or the organisation's sealed connection (superuser); service app sealed | no | First name, host join URL, routing variables (ADR 0081), contact-center codes of the required skills (ADR 0121 step 4b; catalogue codes, no personal data) |
-| Identity provider, platform | web → `OIDC_DISCOVERY_URL`, token and key endpoints | HTTPS | Required: production refuses an http discovery URL | A (environment) | no | OIDC protocol: authorisation code, PKCE, client secret; no participant data |
+| Identity provider, platform | web → `OIDC_DISCOVERY_URL`, token and key endpoints | HTTPS | Required: production refuses an http discovery URL, except the bundled provider's internal address with an https `OIDC_ISSUER` (row *Bundled identity provider, internal*, ADR 0125) | A (environment) | no | OIDC protocol: authorisation code, PKCE, client secret; no participant data |
 | Identity providers, organisation | web → discovery, token and key endpoints of an organisation's IdP (ADR 0083) | HTTPS | Required | The superuser per organisation (`identity_providers.manage`; confined to its own domains) | yes | OIDC protocol only |
 | Log destinations | web, worker → syslog, Splunk, Elastic or an HTTP collector (ADR 0085) | `syslog+tls` or `https`; `syslog+tcp`, `syslog+udp` and `http` only outside production | Required: production refuses clear-text transports when saving | C (superuser, portal; credentials sealed) | no | Masked log lines and audit, system and security events: no PII fields (ADR 0034, 0040) |
 | ACME | proxy → the ACME CA (Let's Encrypt) and CA → proxy challenge on 80/443 | HTTPS (ACME); HTTP-01 on 80 | Required towards the CA | B (`ACME_CA`, `ACME_EMAIL` in `proxy.env`) | no | Domain name, operator email address, public key |
@@ -555,7 +626,10 @@ and must be https (or the named secure transport) in production.
 | Certificate probe | worker → the public address, port 443 | TLS handshake, no request | Is the TLS check itself | B (`PUBLIC_BASE_URL`) | no | Nothing; reads the public certificate (ADR 0064) |
 | Public address round trip | worker, and `address-check` → `PUBLIC_BASE_URL` and, when set, `WEBHOOK_BASE_URL`: `GET /api/v1/instance?probe={nonce}` | HTTPS | Required: the address must be https in production; the certificate is verified against the host's CA bundle | B (`PUBLIC_BASE_URL`, `WEBHOOK_BASE_URL`); kill switch `PUBLIC_ADDRESS_CHECK_ENABLED` (B) | no | Nothing about participants: a random nonce out, the instance id (a random UUID), the scheme seen and whether the forwarded headers were honoured back; no address in the answer (ADR 0086) |
 | DNS checks | worker → the host's resolver (`/etc/resolv.conf`): TXT lookups of the sender domain (SPF, DKIM, DMARC; ADR 0073) and, from ADR 0083 step 3, the organisation's domain claims | DNS (UDP/TCP 53) | Not encrypted by the application; the answers only fill a status, they gate nothing | Names: the superuser (sender domain, domain claims); resolver: the host | no | Domain names only, never personal data |
-| Proxy to web, bundled | proxy → `web:8000` on the `edge` network of one host | HTTP | **Recorded exception** (ADR 0091 point 2): the hop never leaves the host, and whoever reads the bridge already has the host and the TLS keys | B (`docker-compose.yml`, fixed addresses) | n/a | Everything the visitor sends |
+| Proxy to web, bundled | proxy → web at its fixed address `172.31.240.3:8000` on the `edge` network of one host (`WEB_UPSTREAM`) | HTTP | **Recorded exception** (ADR 0091 point 2): the hop is meant never to leave the host, and whoever reads the bridge already has the host and the TLS keys. The proxy reaches web at its address, never by the name `web`, so while web is not running (recreated on an update, stopped by the updater for a restore, restarting) the hop fails and nothing else receives it (ADR 0125 step 2), with `--idp own` too | B (`docker-compose.yml`, fixed addresses) | n/a | Everything the visitor sends |
+| Bundled identity provider, internal | web, worker → the provider at its fixed address `172.31.240.4:8080` on the `edge` network of one host: the login's discovery, token and key endpoints (`http://172.31.240.4:8080/idp/realms/openplanner/...`) and the staff directory's admin API (`KEYCLOAK_ADMIN_URL`, ADR 0095) | HTTP | **Recorded exception** (ADR 0125, next to ADR 0091 point 2): the hop is meant never to leave the host, and whoever reads that network already has the host, the secrets files and the provider's database. Browsers reach the provider through the proxy over https; production accepts an http discovery URL only when it is exactly this address and `OIDC_ISSUER` is https. No name is resolved, so while the container is down the hop fails and nothing else receives it (ADR 0125 step 2, threat model) | A and B, written by `scripts/render-keycloak-realm.sh` into `secrets/keycloak-app.env` (`OIDC_DISCOVERY_URL` and `KEYCLOAK_ADMIN_URL` A, `OIDC_ISSUER` B); the address is fixed | n/a | Client secret, authorisation code, ID token (a staff member's name, e-mail address and roles); the directory's client secret and staff accounts (names, user names, e-mail addresses, roles) |
+| Proxy to the bundled identity provider | proxy → the provider at `172.31.240.4:8080` on the `edge` network (`IDP_UPSTREAM`, the `/idp` route of ADR 0112) | HTTP | **Recorded exception** (ADR 0125): the browser's leg to the proxy is https; the leg on one host is not. The route names the address, never `idp`, so while the container is down `/idp` answers 502 and nothing else receives it (ADR 0125 step 2, threat model) | B (`proxy.env`, written by the installer with `--idp bundled`, removed with `--idp own`) | n/a | Everything browsers send to `/idp/*`: staff passwords, one-time codes, Keycloak's cookies, and the portal's session cookie (`__Host-op_admin`, `Path=/` on the same host name) |
+| Bundled identity provider to its database | `idp` → the database at its fixed address `172.31.240.18:5432` on the internal network `idp-store`, which only these two containers join and which has no way out (production, ADR 0106 point 4) | PostgreSQL, no TLS | **Recorded exception** (ADR 0125): the hop is meant never to leave the host; Keycloak reaches the database at its address (`KC_DB_URL_HOST`), never by the name `idp-db`, so while the database is not running the hop fails and nothing else receives it (ADR 0125 step 2) | A (`secrets/keycloak.env`, `secrets/idp-db.env`, written by `scripts/render-keycloak-realm.sh`) | n/a | Staff accounts with their password hashes, sessions, the database login |
 | Proxy to web, own proxy | an own reverse proxy on another machine → `web:8000` | HTTP, or HTTPS when `WEB_TLS_CERT_FILE` and `WEB_TLS_KEY_FILE` are set | HTTPS expected: *System status* warns while `FORWARDED_ALLOW_IPS` names another address than the bundled proxy's and web serves no TLS (ADR 0091 point 3) | B | n/a | Everything the visitor sends |
 
 Not outbound but listed so the picture is complete: webhooks from Webex and WxCC reach `web`

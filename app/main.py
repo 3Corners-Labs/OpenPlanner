@@ -14,6 +14,7 @@ import structlog
 from fastapi import Depends, FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
+from app import service_wiring as wiring
 from app.adapters import internal_ca
 from app.adapters.alert_senders import BotSpacePoster, ConfiguredAlertSenders, alert_bots
 from app.adapters.certificate_pem import CryptographyPemReader
@@ -162,11 +163,13 @@ from app.domain.usage_report_service import UsageReportService
 from app.domain.wallboard_link import parse_networks
 from app.domain.wallboard_link_service import WallboardLinkService
 from app.domain.wallboard_service import WallboardService
+from app.domain.web_transport import BUNDLED_REALM_PATH
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
 from app.keys import (
     agent_pseudonym_key,
     agent_pseudonym_key_previous,
+    agent_pseudonym_keys,
     client_pseudonym_key,
     guest_pseudonym_keys,
     management_token_key,
@@ -242,10 +245,6 @@ def _change_policy(settings: Settings) -> ChangePolicy:
 def _keycloak_directory(settings: Settings) -> StaffDirectory | None:
     """Return the staff directory of the bundled Keycloak, or ``None`` without its settings."""
     return directory_from_settings(settings)
-
-
-BUNDLED_REALM_PATH = "/realms/openplanner/"
-"""Where the bundled provider's realm sits in its discovery URL (ADR 0090, the realm template)."""
 
 
 def _directory_missing(settings: Settings) -> tuple[str, ...]:
@@ -513,6 +512,7 @@ def create_app(
         )
         app.state.admin_session_service = AdminSessionService(uow, clock)
         app.state.staff_lifecycle_service = StaffLifecycleService(uow, clock)
+        app.state.staff_names = wiring.staff_screen_names(uow, clock, settings)
         # ADR 0049: claims become grants per request; the mode is class B, the prefix C.
         app.state.login_service = LoginService(
             uow,
@@ -657,11 +657,7 @@ def create_app(
         app.state.planning_service = PlanningService(uow, clock, app.state.admin_service)
         # ADR 0117 point 9: a team member's usage facts, only while the organisation has them on.
         staff_usage = StaffUsage(
-            [
-                k
-                for k in (agent_pseudonym_key(settings), agent_pseudonym_key_previous(settings))
-                if k is not None
-            ],
+            agent_pseudonym_keys(settings),
             lambda organisation: per_organisation(organisation).reporting_staff_view_enabled,
         )
         app.state.queue_service = QueueService(

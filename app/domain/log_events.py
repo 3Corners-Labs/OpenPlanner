@@ -2141,6 +2141,16 @@ _AUDIT = (
         _ADMIN_SEEN,
     ),
     _e(
+        "staff.screen_name_changed",
+        _AUD,
+        "outcome",
+        "",
+        "A staff member's screen name was set or cleared.",
+        "The name the participant of a call sees for the staff member (ADR 0123 step 5c); the "
+        "event says that it changed and never to what.",
+        _ADMIN_SEEN,
+    ),
+    _e(
         "staff.suspended",
         _AUD,
         "outcome",

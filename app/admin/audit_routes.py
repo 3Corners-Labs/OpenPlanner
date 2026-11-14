@@ -184,6 +184,7 @@ EVENT_LABELS: dict[str, str] = {
     staff.SUSPENDED_EVENT: "audit.event.staff_suspended",
     staff.REINSTATED_EVENT: "audit.event.staff_reinstated",
     staff.ERASED_EVENT: "audit.event.staff_erased",
+    staff.SCREEN_NAME_EVENT: "audit.event.staff_screen_name_changed",
     # Admin sessions (ADR 0098): the system ended one, a person ended theirs, an administrator
     # ended a person's, or all were ended at once.
     SESSION_ENDED_EVENT: "audit.event.session_ended",

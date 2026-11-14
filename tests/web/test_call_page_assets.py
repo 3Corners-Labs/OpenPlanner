@@ -1,11 +1,12 @@
-"""The call page's own scripts and styles (ADR 0123 steps 4b and 4c).
+"""The call page's own scripts and styles (ADR 0123 steps 4b, 4c, 5a, 5b and 5c).
 
-The three scripts are checked for what they must never do (reach anything but the token and the
-SDK file, set a style, build markup, log), for the texts they read (the server renders every one,
-once), for their shape (each under 500 lines, each with a header that says what it owns and never
-does) and the catalogue's texts of the page for the supplier's name (point 14). The behaviour
-itself is in ``e2e/tests/call-page-device-check.spec.ts`` and ``call-page-joining.spec.ts``, the
-way this repository tests its scripts.
+The scripts are checked for what they must never do (reach anything but the token, the staff
+name's address and the SDK file, set a style, build markup, log), for the texts they read (the
+server renders every one, once), for their shape (each under 500 lines, each with a header that
+says what it owns and never does) and the catalogue's texts of the page for the supplier's name
+(point 14). The behaviour itself is in ``e2e/tests/call-page-device-check.spec.ts``,
+``call-page-joining.spec.ts`` and ``call-page-staff-name.spec.ts``, the way this repository tests
+its scripts.
 """
 
 import re
@@ -14,8 +15,20 @@ from pathlib import Path
 from app.i18n import CATALOGUE_DIR, load_catalogues
 
 STATIC = Path("app/web/static")
-SCRIPT_FILES = ("call-devices.js", "call-connection.js", "call-media.js", "call-page.js")
-"""In the order the page loads them: the three that only define, then the page that starts them."""
+SCRIPT_FILES = (
+    "call-status.js",
+    "call-sound.js",
+    "call-devices.js",
+    "call-connection.js",
+    "call-media.js",
+    "call-captions.js",
+    "call-remote.js",
+    "call-render.js",
+    "call-events.js",
+    "call-poll.js",
+    "call-page.js",
+)
+"""In the order the page loads them: the ten that only define, then the page that starts them."""
 SOURCES = {name: (STATIC / name).read_text() for name in SCRIPT_FILES}
 SCRIPT = "\n".join(SOURCES.values())
 STYLES = (STATIC / "call-page.css").read_text()
@@ -32,7 +45,7 @@ def _code() -> str:
     )
 
 
-def test_the_script_reaches_nothing_outside_the_browser_but_the_token_and_the_sdk() -> None:
+def test_the_script_reaches_nothing_outside_the_browser_but_our_two_addresses_and_the_sdk() -> None:
     forbidden = re.compile(
         r"XMLHttpRequest|WebSocket|EventSource|sendBeacon|importScripts"
         r"|\bimport\s*\(|\bimport\s+\w|localStorage|sessionStorage|indexedDB|document\.cookie"
@@ -40,8 +53,10 @@ def test_the_script_reaches_nothing_outside_the_browser_but_the_token_and_the_sd
     )
 
     assert forbidden.search(_code()) is None
-    # One request, to the address the server gave; one other file, with its checksum.
-    assert re.findall(r"\bfetch\s*\(([^,)]*)", _code()) == ["tokenUrl"]
+    # Two requests, each to an address the server gave and each to our own server (the token, and
+    # the name of who the participant talks to); one other file, with its checksum.
+    assert re.findall(r"\bfetch\s*\(([^,)]*)", _code()) == ["tokenUrl", "url"]
+    assert 'url = app.root.dataset.callStaffUrl || "";' in SOURCES["call-poll.js"]
     assert re.findall(r'createElement\("script"\)', _code()) == ['createElement("script")']
     assert re.findall(r"\.src\s*=\s*(\w+)", _code()) == ["sdkSource"]
     assert re.findall(r"\.integrity\s*=\s*(\w+)", _code()) == ["sdkIntegrity"]
@@ -82,7 +97,15 @@ def _read_by_the_script() -> set[str]:
     names |= {f"say_without_{kind}" for kind in ("camera", "microphone", "both")}
     names |= {  # "say_failed_" + reason of fail()
         f"say_failed_{reason}"
-        for reason in ("attempts", "generic", "not_open", "rate_limited", "unavailable")
+        for reason in (
+            "attempts",
+            "generic",
+            "media",
+            "lost",
+            "not_open",
+            "rate_limited",
+            "unavailable",
+        )
     }
     return {name for name in names if not name.endswith("_")}
 

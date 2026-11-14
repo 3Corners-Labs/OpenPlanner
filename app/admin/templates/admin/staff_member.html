@@ -45,6 +45,19 @@
   {% endfor %}
 </section>
 {% endif %}
+{% if screen_name_field %}
+<section class="card" id="screen-name" aria-labelledby="screen-name-heading">
+  <h2 id="screen-name-heading">{{ _("admin.staff.screen_name.heading") }}</h2>
+  <p class="muted">{{ _("admin.staff.screen_name.intro") }}</p>
+  {% if screen_name_done %}<div class="alert alert--success" role="status"><p>{{ screen_name_done }}</p></div>{% endif %}
+  <form method="post" action="/admin/staff/{{ person.id }}/screen-name" novalidate>
+    {{ field(screen_name_field) }}
+    <div class="form-actions">
+      <button type="submit" class="button">{{ _("admin.staff.screen_name.save") }}</button>
+    </div>
+  </form>
+</section>
+{% endif %}
 {% if manage %}{% set back = "/admin/staff/" ~ person.id %}{% include "admin/_staff_manage.html" %}{% endif %}
 {% if person.refused %}
 <section class="card" aria-labelledby="refused-heading">

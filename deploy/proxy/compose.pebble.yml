@@ -53,3 +53,29 @@ services:
       # A visitor over IPv6 (ipv6_client_check): the gateway of the probe network the script
       # makes, an address on this machine only.
       - "[${PROBE6_ADDRESS:?set by scripts/check-proxy.sh}]:18444:8443"
+  # Pass 4 (ADR 0125 step 2): stand-ins at the addresses docker-compose.yml gives the bundled
+  # identity provider and its database, so the check needs neither Keycloak nor PostgreSQL. The
+  # application image answers every request with the stand-in's name (responder.py, written by
+  # the script next to the test CA); the networks and fixed addresses stay those of
+  # docker-compose.yml.
+  idp:
+    image: ${OPENPLANNER_IMAGE:-openplanner:local}
+    profiles: [tls]
+    command: ["python", "-I", "/pebble/responder.py", "stand-in idp", "8080"]
+    env_file: !reset []
+    volumes: !override
+      - ${PEBBLE_CERTS:?set by scripts/check-proxy.sh}:/pebble:ro
+    ports: !reset []
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8080), 2)"]
+      interval: 2s
+  idp-db:
+    image: ${OPENPLANNER_IMAGE:-openplanner:local}
+    profiles: [tls]
+    command: ["python", "-I", "/pebble/responder.py", "stand-in idp-db", "5432"]
+    env_file: !reset []
+    volumes: !override
+      - ${PEBBLE_CERTS:?set by scripts/check-proxy.sh}:/pebble:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 5432), 2)"]
+      interval: 2s

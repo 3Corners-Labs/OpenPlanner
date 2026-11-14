@@ -1,8 +1,15 @@
-"""The hop from a reverse proxy to web (ADR 0091 point 3)."""
+"""The hops inside one host that stay plain HTTP (ADR 0091 point 3, ADR 0125)."""
 
 import pytest
 
-from app.domain.web_transport import BUNDLED_PROXY_ADDRESS, proxy_hop_unencrypted
+from app.domain.web_transport import (
+    BUNDLED_IDP_ADDRESS,
+    BUNDLED_IDP_DISCOVERY_URL,
+    BUNDLED_IDP_UPSTREAM,
+    BUNDLED_PROXY_ADDRESS,
+    bundled_idp_hop,
+    proxy_hop_unencrypted,
+)
 
 
 @pytest.mark.parametrize(
@@ -22,3 +29,45 @@ def test_another_proxy_without_tls_is_flagged(trusted: str) -> None:
 @pytest.mark.parametrize("trusted", ["10.0.0.5", "*", None])
 def test_tls_to_web_clears_the_flag(trusted: str | None) -> None:
     assert proxy_hop_unencrypted(trusted, web_tls=True) is False
+
+
+ISSUER = "https://afspraak.example.nl/idp/realms/openplanner"
+
+
+def test_the_bundled_provider_behind_the_proxy_is_the_recorded_exception_adr_0125() -> None:
+    assert bundled_idp_hop(BUNDLED_IDP_DISCOVERY_URL, ISSUER) is True
+
+
+@pytest.mark.parametrize("issuer", [None, "", "http://afspraak.example.nl/idp/realms/openplanner"])
+def test_without_an_https_issuer_the_bundled_address_is_no_exception(issuer: str | None) -> None:
+    """The issuer is where the browser goes: an http one would carry the password in clear."""
+    assert bundled_idp_hop(BUNDLED_IDP_DISCOVERY_URL, issuer) is False
+
+
+PINNED = BUNDLED_IDP_UPSTREAM
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://idp.example.nl/idp/realms/openplanner/.well-known/openid-configuration",
+        f"http://{BUNDLED_IDP_ADDRESS}:8081/idp/realms/openplanner/.well-known/openid-configuration",
+        "http://172.31.240.5:8080/idp/realms/openplanner/.well-known/openid-configuration",
+        f"http://{PINNED}/idp/realms/other/.well-known/openid-configuration",
+        f"http://{PINNED}/realms/openplanner/.well-known/openid-configuration",
+        f"http://{PINNED}@idp.example.nl/idp/realms/openplanner/.well-known/openid-configuration",
+        f"{BUNDLED_IDP_DISCOVERY_URL}?next=http://idp.example.nl",
+        BUNDLED_IDP_DISCOVERY_URL.upper(),
+    ],
+)
+def test_any_other_http_discovery_url_is_no_exception(url: str) -> None:
+    """Keyed on the address the render script writes, never on plain http as such."""
+    assert bundled_idp_hop(url, ISSUER) is False
+
+
+def test_the_name_idp_is_no_exception_since_the_address_is_fixed_adr_0125_step_2() -> None:
+    """The name the host's resolver may answer while the container is down: refused at start."""
+    by_name = BUNDLED_IDP_DISCOVERY_URL.replace(PINNED, "idp:8080")
+
+    assert by_name == "http://idp:8080/idp/realms/openplanner/.well-known/openid-configuration"
+    assert bundled_idp_hop(by_name, ISSUER) is False
