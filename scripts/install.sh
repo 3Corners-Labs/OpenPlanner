@@ -397,24 +397,17 @@ ask() {
 
 put() { [[ -z $2 ]] || printf "%s='%s'\n" "$1" "$2"; }
 
-# Write a file through a private temporary one, so a half-written settings file never exists.
+# write_private FILE [COMMAND...]: replace FILE, mode 600, with what COMMAND prints (standard
+# input when no command is given), through a private temporary file, so a half-written settings
+# file never exists. FILE is replaced only when the command succeeded, so a filter that cannot
+# read it (a file left to root by a render under sudo) never empties it: status 1, FILE as it was.
 write_private() {
   local target=$1 tmp
-  tmp=$(mktemp "$target.XXXXXX")
-  chmod 600 "$tmp"
-  cat >"$tmp"
-  mv "$tmp" "$target"
-}
-
-# filter_private FILE COMMAND...: replace FILE, mode 600, with what `COMMAND... FILE` prints. The
-# file is replaced only when the command succeeded, so a filter that cannot read it (a file left
-# to root by a render under sudo) never empties it; status 1 then, with FILE as it was.
-filter_private() {
-  local target=$1 tmp
   shift
+  (($#)) || set -- cat
   tmp=$(mktemp "$target.XXXXXX")
   chmod 600 "$tmp"
-  if "$@" "$target" >"$tmp"; then
+  if "$@" >"$tmp"; then
     mv "$tmp" "$target"
   else
     rm -f "$tmp"
@@ -423,10 +416,12 @@ filter_private() {
 }
 
 # drop_lines FILE PATTERN: rewrite FILE without the lines that match the extended regular
-# expression PATTERN (filter_private); the run stops if that fails, with FILE as it was.
+# expression PATTERN (write_private); the run stops if that fails, with FILE as it was. The
+# pattern reaches awk through its environment, where no backslash in it is rewritten.
 drop_lines() {
   # shellcheck disable=SC2016 # an awk program
-  filter_private "$1" awk -v pattern="$2" '$0 !~ pattern' || die "could not rewrite $1"
+  write_private "$1" env DROP_PATTERN="$2" awk '$0 !~ ENVIRON["DROP_PATTERN"]' "$1" \
+    || die "could not rewrite $1"
 }
 
 # public_address HINT DEFAULT: with the HTTPS proxy the address follows the host name.
@@ -518,7 +513,7 @@ rewrite_env() {
   local backup
   backup=$ENV_FILE.bak.$(date -u +%Y%m%dT%H%M%SZ)
   [[ -f $backup ]] || { cp "$ENV_FILE" "$backup" && chmod 600 "$backup"; }
-  filter_private "$ENV_FILE" awk "$@" || die "could not rewrite $ENV_FILE; it is as it was (backup: $backup)"
+  write_private "$ENV_FILE" awk "$@" "$ENV_FILE" || die "could not rewrite $ENV_FILE; it is as it was (backup: $backup)"
   printf '%s' "$backup"
 }
 
