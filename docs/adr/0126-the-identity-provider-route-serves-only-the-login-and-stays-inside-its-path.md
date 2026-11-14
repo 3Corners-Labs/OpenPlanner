@@ -3,7 +3,7 @@
 Status: proposed (2026-11-14), found by the security review of PR #834 (ADR 0125). Amends ADR
 0112 point 4 (the `/idp` route passed every path, every cookie and every answer) and restores
 what ADR 0090 point 3 and ADR 0106 point 4 promised: the provider's admin console on the host
-only. Partly built: steps 0 and 1 merged (#844); step 2 open.
+only. Partly built: steps 0 and 1 merged (#845); step 2 open.
 
 ## Context
 
@@ -114,8 +114,8 @@ None, after checking. Every value below is a fixed security rule or follows from
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR | #844 | merged |
-| 1 | `deploy/proxy/idp.caddy` (public paths, cookies, answers, service worker) imported by the entrypoint; the installer sets realm `master`'s frontend URL to the loopback (`idp_console`); `scripts/check-proxy.sh` pass 3 (probe) and pass 4 (Keycloak); runbook, threat model and data flow corrected; ADR 0112's Status line | #844 | merged |
+| 0 | ADR | #845 | merged |
+| 1 | `deploy/proxy/idp.caddy` (public paths, cookies, answers, service worker) imported by the entrypoint; the installer sets realm `master`'s frontend URL to the loopback (`idp_console`); `scripts/check-proxy.sh` pass 3 (probe) and pass 4 (Keycloak); runbook, threat model and data flow corrected; ADR 0112's Status line | #845 | merged |
 | 2 | docker01 takes the release with step 1: realm `master`'s frontend URL set with the runbook's command, `idp` published on the loopback only (no port 8780); checked from outside (`/idp/admin/` 404, the login works) and through the tunnel (the console) | | planned |
 
 ## Consequences
