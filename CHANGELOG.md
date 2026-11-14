@@ -19,8 +19,11 @@ All notable changes are listed here, generated from Conventional Commits on rele
   the items of `docs/service-flows-gate-checklist.md`; contact-center flows additionally stay
   inactive until G13 to G15 are done.
 - The participant's call in OpenPlanner's own page (ADR 0123 steps 1 to 4c): the guest-token
-  endpoint, the start state, the device check and joining with the Meetings SDK. Off until the
-  platform setting `embedded_call_enabled` is switched on (default off).
+  endpoint, the start state, the device check and joining with the Meetings SDK; in the call
+  (steps 5a to 5c): devices, recording and connection notices, the ended state, sharing a
+  screen both ways, closed captions and the staff member's screen name. Off until the platform
+  setting `embedded_call_enabled` is switched on (default off). A staff member sets their own
+  screen name on *My profile* (step 5d).
 
 ### Features
 
@@ -63,9 +66,15 @@ All notable changes are listed here, generated from Conventional Commits on rele
   `release/X.Y`, line, window, `apply_after`, support status and upgrade stop on the updates
   page, and every release `vX.Y.Z` in the public packages.
 - Process: a decision merges with its first build step (ADR 0119).
+- Releases: the independent audit by a second model is optional and gates nothing (ADR 0128).
 
 ### Fixes
 
+- Login: a production install with the bundled identity provider starts; production accepts an
+  http discovery URL only for the exact internal address of the bundled provider with an https
+  issuer (ADR 0125). Every hop on the host to the bundled provider goes to a fixed address, and
+  a host that ran on the name gets new client secrets (ADR 0125 step 2). `--idp own` removes the
+  bundled route and stops its containers.
 - Updates: an update request whose updater went silent ends, so auto-apply goes on; design
   and documentation lines are marked in the version picker.
 - Admin: pages fit a 1280 px screen and System status names the environment; another group's
