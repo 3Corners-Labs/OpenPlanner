@@ -2,8 +2,13 @@
   "policy": "N-1 from 1.0.0, latest only before (SECURITY.md, ADR 0116 point 2)",
   "lines": [
     {
-      "line": "0.5",
+      "line": "0.6",
       "status": "supported",
+      "until": null
+    },
+    {
+      "line": "0.5",
+      "status": "ended",
       "until": null
     },
     {
