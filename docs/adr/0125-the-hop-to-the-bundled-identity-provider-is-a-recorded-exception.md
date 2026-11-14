@@ -110,8 +110,8 @@ want the hop chooses `--idp own`.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR | #833 | merged |
-| 1 | `bundled_idp_hop` in the start-up check; the files a production install writes tested against it (`tests/scripts/test_install.py`), the render script tied to the same address; `--idp own` deletes `secrets/keycloak-app.env` (point 6); data flow, threat model, ASVS, runbook and the System status text (nl, en) | #833 | merged |
+| 0 | ADR | #834 | merged |
+| 1 | `bundled_idp_hop` in the start-up check; the files a production install writes tested against it (`tests/scripts/test_install.py`), the render script tied to the same address; `--idp own` deletes `secrets/keycloak-app.env` (point 6); data flow, threat model, ASVS, runbook and the System status text (nl, en) | #834 | merged |
 | 2 | A fixed address for the bundled provider, used by the login, the staff directory, the exception and the proxy route; the installer moves a host over; the real-Docker check (point 5) | | planned |
 
 ## Consequences
