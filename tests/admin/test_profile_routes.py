@@ -13,8 +13,8 @@ from tests.admin.conftest import (
     SUPER,
     Site,
 )
-from tests.admin.test_staff_screen_name_routes import _events, _id_of, _login, _stored
 from tests.support.principals import principal
+from tests.support.screen_names import audit_rows, id_of, login_each, stored
 
 PAGE = "/admin/rights/profile"
 POST = "/admin/rights/profile/screen-name"
@@ -25,7 +25,7 @@ TWO_ORGS = principal(
 
 
 async def test_the_page_shows_the_account_name_apart_from_the_screen_name_form(site: Site) -> None:
-    await _login(site, GROUP_ADMIN)
+    await login_each(site, GROUP_ADMIN)
 
     page = (await site.client.get(PAGE)).text
 
@@ -45,13 +45,13 @@ async def test_every_role_sets_and_clears_the_own_name_and_it_is_audited_without
     site: Site,
 ) -> None:
     for person in (SUPER, ORG_ADMIN, GROUP_ADMIN, AUDITOR, AGENT):
-        await _login(site, person)
+        await login_each(site, person)
 
         saved = await site.client.post(POST, data={"screen_name": f" {NAME} "}, headers=SAME_ORIGIN)
 
         assert saved.status_code == 303, person.subject
         assert saved.headers["location"] == f"{PAGE}?done=staff_screen_name_saved#screen-name"
-        assert await _stored(site, person.subject) == NAME
+        assert await stored(site, person.subject) == NAME
         shown = (await site.client.get(saved.headers["location"])).text
         assert 'value="Sanne"' in shown
         assert "De schermnaam is opgeslagen." in shown
@@ -65,9 +65,9 @@ async def test_every_role_sets_and_clears_the_own_name_and_it_is_audited_without
             "De schermnaam is verwijderd."
             in (await site.client.get(cleared.headers["location"])).text
         )
-        assert await _stored(site, person.subject) is None
+        assert await stored(site, person.subject) is None
 
-    events = [e for e in await _events(site) if e[1] == "staff.screen_name_changed"]
+    events = [e for e in await audit_rows(site) if e[1] == "staff.screen_name_changed"]
     assert events
     for actor, _action, outcome, _reason, _organisation, detail in events:
         assert outcome == "success"
@@ -78,7 +78,7 @@ async def test_every_role_sets_and_clears_the_own_name_and_it_is_audited_without
 
 
 async def test_the_page_keeps_the_typed_text_and_ties_each_refusal_to_the_field(site: Site) -> None:
-    await _login(site, GROUP_ADMIN)
+    await login_each(site, GROUP_ADMIN)
     cases = (
         ('<script>alert("x")</script>', "alleen letters, cijfers"),
         ("G", "minstens 2 tekens"),
@@ -101,12 +101,12 @@ async def test_the_page_keeps_the_typed_text_and_ties_each_refusal_to_the_field(
             await site.client.post(POST, data={"screen_name": cases[0][0]}, headers=SAME_ORIGIN)
         ).text
     )
-    assert await _stored(site, GROUP_ADMIN.subject) is None
+    assert await stored(site, GROUP_ADMIN.subject) is None
 
 
 async def test_the_form_never_reaches_another_persons_record(site: Site) -> None:
     """Abuse case: a staff member sets another's name through the own-profile form."""
-    await _login(site, ORG_ADMIN, GROUP_ADMIN)
+    await login_each(site, ORG_ADMIN, GROUP_ADMIN)
     forged = {
         "screen_name": NAME,
         "member_id": "1",
@@ -120,18 +120,18 @@ async def test_the_form_never_reaches_another_persons_record(site: Site) -> None
     )
 
     assert response.status_code == 303
-    assert await _stored(site, GROUP_ADMIN.subject) == NAME
-    assert await _stored(site, ORG_ADMIN.subject) is None
+    assert await stored(site, GROUP_ADMIN.subject) == NAME
+    assert await stored(site, ORG_ADMIN.subject) is None
     for other in ("/admin/rights/profile/1/screen-name", "/admin/staff/1/profile"):
         assert (await site.client.post(other, data=forged, headers=SAME_ORIGIN)).status_code in (
             404,
             405,
         )
-    assert await _stored(site, ORG_ADMIN.subject) is None
+    assert await stored(site, ORG_ADMIN.subject) is None
 
 
 async def test_without_a_session_the_login_answers_and_nothing_is_written(site: Site) -> None:
-    await _login(site, GROUP_ADMIN)
+    await login_each(site, GROUP_ADMIN)
     site.client.cookies.clear()
 
     page = await site.client.get(PAGE, follow_redirects=False)
@@ -142,11 +142,11 @@ async def test_without_a_session_the_login_answers_and_nothing_is_written(site: 
     for answer in (page, posted):
         assert answer.status_code == 303
         assert answer.headers["location"].startswith("/admin/login")
-    assert await _stored(site, GROUP_ADMIN.subject) is None
+    assert await stored(site, GROUP_ADMIN.subject) is None
 
 
 async def test_a_cross_site_post_is_refused(site: Site) -> None:
-    await _login(site, GROUP_ADMIN)
+    await login_each(site, GROUP_ADMIN)
 
     refused = await site.client.post(
         POST,
@@ -155,38 +155,38 @@ async def test_a_cross_site_post_is_refused(site: Site) -> None:
     )
 
     assert refused.status_code == 403
-    assert await _stored(site, GROUP_ADMIN.subject) is None
+    assert await stored(site, GROUP_ADMIN.subject) is None
 
 
 async def test_a_person_in_two_organisations_has_the_event_in_each_of_them(site: Site) -> None:
-    await _login(site, TWO_ORGS)
+    await login_each(site, TWO_ORGS)
 
     await site.client.post(POST, data={"screen_name": NAME}, headers=SAME_ORIGIN)
 
     where = sorted(
         str(e[4])
-        for e in await _events(site)
+        for e in await audit_rows(site)
         if e[1] == "staff.screen_name_changed" and e[0] == TWO_ORGS.subject
     )
     assert where == ["andere", "demo"]
 
 
 async def test_a_login_without_a_role_has_no_page(site: Site) -> None:
-    await _login(site, NO_ROLE)
+    await login_each(site, NO_ROLE)
 
     page = await site.client.get(PAGE, follow_redirects=False)
     posted = await site.client.post(POST, data={"screen_name": NAME}, headers=SAME_ORIGIN)
 
     assert page.status_code in (302, 303, 403)
     assert posted.status_code in (302, 303, 403)
-    assert await _stored(site, NO_ROLE.subject) is None
+    assert await stored(site, NO_ROLE.subject) is None
 
 
 async def test_an_erased_record_keeps_no_name_and_the_service_refuses_the_write(site: Site) -> None:
-    await _login(site, GROUP_ADMIN, ORG_ADMIN)
-    gina = await _id_of(site, "Gina Group")
+    await login_each(site, GROUP_ADMIN, ORG_ADMIN)
+    gina = await id_of(site, "Gina Group")
     await site.client.post(f"/admin/staff/{gina}/suspend", headers=SAME_ORIGIN)
-    await _login(site, SUPER)
+    await login_each(site, SUPER)
     await site.client.post(f"/admin/staff/{gina}/erase", headers=SAME_ORIGIN)
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
 
@@ -197,25 +197,25 @@ async def test_an_erased_record_keeps_no_name_and_the_service_refuses_the_write(
     assert member is not None
     assert member.screen_name is None
     assert result.value == "erased"
-    assert await _stored(site, GROUP_ADMIN.subject) is None
+    assert await stored(site, GROUP_ADMIN.subject) is None
 
 
 async def test_a_suspended_record_may_still_set_its_name(site: Site) -> None:
-    await _login(site, GROUP_ADMIN, ORG_ADMIN)
-    gina = await _id_of(site, "Gina Group")
+    await login_each(site, GROUP_ADMIN, ORG_ADMIN)
+    gina = await id_of(site, "Gina Group")
     await site.client.post(f"/admin/staff/{gina}/suspend", headers=SAME_ORIGIN)
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
 
     result = await app.state.staff_names.set_own_screen_name(GROUP_ADMIN, NAME)
 
     assert result.value == "done"
-    assert await _stored(site, GROUP_ADMIN.subject) == NAME
+    assert await stored(site, GROUP_ADMIN.subject) == NAME
 
 
 async def test_without_a_staff_record_the_page_says_so_and_the_post_is_a_conflict(
     site: Site,
 ) -> None:
-    await _login(site, GROUP_ADMIN)
+    await login_each(site, GROUP_ADMIN)
     app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     async with app.state.engine.begin() as conn:
         await conn.execute(text("delete from staff where subject = :s"), {"s": GROUP_ADMIN.subject})
@@ -230,7 +230,7 @@ async def test_without_a_staff_record_the_page_says_so_and_the_post_is_a_conflic
 
 
 async def test_the_page_and_the_menu_are_in_english_too(site: Site) -> None:
-    await _login(site, GROUP_ADMIN)
+    await login_each(site, GROUP_ADMIN)
 
     page = (await site.client.get(f"{PAGE}?lang=en")).text
 
@@ -245,22 +245,22 @@ async def test_a_name_that_imitates_a_colleague_is_allowed_but_never_an_address_
     site: Site,
 ) -> None:
     """Abuse case: a name that imitates a colleague or a function. Uniqueness is not enforced."""
-    await _login(site, ORG_ADMIN)
+    await login_each(site, ORG_ADMIN)
     await site.client.post(POST, data={"screen_name": NAME}, headers=SAME_ORIGIN)
-    await _login(site, GROUP_ADMIN)
+    await login_each(site, GROUP_ADMIN)
 
     same = await site.client.post(POST, data={"screen_name": NAME}, headers=SAME_ORIGIN)
     function = await site.client.post(POST, data={"screen_name": "Helpdesk"}, headers=SAME_ORIGIN)
 
     assert (same.status_code, function.status_code) == (303, 303)
-    assert await _stored(site, ORG_ADMIN.subject) == NAME  # two people hold the same name
+    assert await stored(site, ORG_ADMIN.subject) == NAME  # two people hold the same name
     for typed in ("sanne@voorbeeld.nl", "https://voorbeeld.nl", "Sanne: manager", "Sanne/Admin"):
         refused = await site.client.post(POST, data={"screen_name": typed}, headers=SAME_ORIGIN)
         assert refused.status_code == 422, typed
 
 
 async def test_the_refused_form_keeps_its_tab_row_with_the_right_tab_active(site: Site) -> None:
-    await _login(site, GROUP_ADMIN)
+    await login_each(site, GROUP_ADMIN)
 
     refused = await site.client.post(POST, data={"screen_name": "G"}, headers=SAME_ORIGIN)
 
@@ -271,7 +271,7 @@ async def test_the_refused_form_keeps_its_tab_row_with_the_right_tab_active(site
 
 
 async def test_the_refused_form_echoes_at_most_twice_the_longest_name(site: Site) -> None:
-    await _login(site, GROUP_ADMIN)
+    await login_each(site, GROUP_ADMIN)
 
     refused = await site.client.post(POST, data={"screen_name": "x" * 5000}, headers=SAME_ORIGIN)
 
