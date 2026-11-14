@@ -1032,8 +1032,9 @@ known), work through these steps in this order:
      in with it to set the realm's mail server);
    - remove what nobody can explain among what gives administrator rights in `master`: users
      and groups with the realm role `admin` or with roles of the clients `master-realm` and
-     `openplanner-realm`, clients with a service account, identity providers and authentication
-     flows (a fresh installation has `admin` and none of the rest);
+     `openplanner-realm`, clients with a service account, identity providers, and authentication
+     flows added or changed (a fresh installation has the user `admin`, Keycloak's built-in
+     clients and flows, and nothing else);
    - sign out every session of realm `master` (*Sessions* → *Sign out all active sessions*).
 2. **New client secrets.** In realm `openplanner` → *Clients* → `openplanner-admin`, then
    `openplanner-directory` → *Credentials* → *Regenerate*. The old secrets stop working at once.
