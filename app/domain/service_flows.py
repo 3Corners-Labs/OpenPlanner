@@ -108,7 +108,7 @@ RETENTION_BUILT = True
 Each later step of ADR 0121 widens exactly these five constants and nothing else here. A
 legacy revision skips all five tests.
 """
-ROLLBACK_SAFE: Final = False
+ROLLBACK_SAFE: Final = True
 """The rollback gate of ADR 0122 (design section 5.2): may a non-legacy flow be activated?
 
 A non-legacy flow writes pool slots (and later occupations and requests) that the previous
