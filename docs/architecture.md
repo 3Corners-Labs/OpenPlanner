@@ -134,9 +134,10 @@ flowchart TB
     worker <--> volume
     worker -- "SMTP, STARTTLS or TLS" --> smtp
     web -- "OIDC, https" --> idp
-    web -- "OIDC and directory API (ADR 0095)" --> keycloak
+    web -- "OIDC and directory API (ADR 0095), http, one host (recorded exception, ADR 0125)" --> keycloak
+    worker -- "directory API, http, one host (ADR 0125)" --> keycloak
     keycloak <--> idpdata
-    proxy -- "/idp route: the login only (ADR 0112, 0126)" --> keycloak
+    proxy -- "/idp route: the login only (ADR 0112, 0126), http, one host (ADR 0125)" --> keycloak
     web -- https --> cisco
     worker -- https --> cisco
     web -- "syslog+tls or https" --> logs
@@ -178,8 +179,12 @@ flowchart TB
   0112 step 6). The route passes only the login of realm `openplanner` and its assets, keeps the
   portal's cookies from Keycloak and drops what an answer could do to the whole origin; the
   admin console is on the host's loopback (ADR 0126).
-- **Every hop with personal data is encrypted, or a recorded exception (ADR 0091).** The one
-  exception is the bundled proxy to `web` on the `edge` network of one host. An own reverse proxy
+- **Every hop with personal data is encrypted, or a recorded exception (ADR 0091).** The
+  exceptions are all on one host: the bundled proxy to `web` on the `edge` network (ADR 0091),
+  and the hops to the bundled Keycloak as `idp:8080`, from `web` and `worker` and from the proxy,
+  and from Keycloak to its database `idp-db` (ADR 0125; the browser reaches the proxy over
+  https, and production accepts no other http login; until its step 2 these names, and `web`,
+  can leave the host while their container is not running). An own reverse proxy
   on another machine gets HTTPS from uvicorn (`WEB_TLS_CERT_FILE`, `WEB_TLS_KEY_FILE`, class B;
   the image's healthcheck follows), and *System status* warns while `FORWARDED_ALLOW_IPS` names
   another proxy and web serves no TLS. All outbound connections are listed in `docs/dataflow.md`

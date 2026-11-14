@@ -4,7 +4,8 @@ Status: accepted (2026-11-01), requested by the product owner after the ASVS 5.0
 1 November 2026 (V4.1.2, V12.3.1, V12.3.3, V1.3.6, V13.1.1). Amends ADR 0030 and ADR 0064
 (the bundled proxy), ADR 0022 (SMTP channel) and ADR 0086 (own reverse proxy). Partly built
 (step 2: SMTP without TLS refused when saving in production; steps 3 and 4: TLS from an own proxy to
-web and the list of outbound connections); see *Build status*.
+web and the list of outbound connections); see *Build status*. Point 2 amended by ADR 0125 (more
+recorded exceptions: the hops to the bundled identity provider on one host).
 
 ## Context
 

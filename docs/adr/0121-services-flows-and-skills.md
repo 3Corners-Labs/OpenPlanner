@@ -95,6 +95,7 @@ None in step 1: it changes labels only. The later steps add the following, each 
 | 34 | Every row of the acceptance matrix A01 to A36 names its test, green with the gate opened in the test (checklist G09). Built: section 4 of `docs/service-flows-compatibility.md`, held by `tests/test_service_flows_compatibility.py`; new tests for A24 and A25 | #819 | merged |
 | 35 | The generated OpenAPI document diffed against a stored copy (checklist G12) | | follow-up |
 | 36 | Video for a new flow: `BUILT_KINDS` gains `video` (a meeting per pool booking, readiness by media presence), so the video flow of the demonstration fixture (*Samen bespreken*) can be stored and activated (found by step 10) | | follow-up |
+| 37 | A fixed rule keeps a flow that dispatches to the contact center from being activated, once `ROLLBACK_SAFE` is open, until rows 27 to 29 (checklist G13 to G15) are done: `CONTACT_CENTER_FLOWS_READY` in `app/domain/service_flows.py`, applied in the rollback point of `app/domain/flow_readiness.py` (reason `contact_center_not_ready`, portal and configuration import alike); flows on the own queue and legacy flows are unaffected (product owner, 2026-11-14) | #844 | merged |
 
 ## Consequences
 

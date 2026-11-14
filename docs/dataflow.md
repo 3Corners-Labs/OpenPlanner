@@ -346,6 +346,43 @@ today for a name typed into the Webex app (ADR 0102), and a name it has already 
 stays in what they saw. The rename is a job with retries and one system event when it gives up;
 until it has run, the first name is still held at the platform.
 
+### The call itself, from the click (ADR 0123 points 5 and 16, step 4c)
+
+After the click that joins, the call page adds one script element, the vendored SDK file of the
+video supplier, with its checksum as subresource integrity, from our own origin. From that moment
+the SDK, not our server, talks to the supplier's hosts (the five of `CALL_HOSTS`): it registers this
+browser (temporarily), joins the meeting with the guest token and sends the participant's picture
+and sound. Nothing is sent before the click, and the page's own script makes no other request.
+The SDK is told not to upload its logs after the call and to register the browser as temporary
+(`autoUploadLogs` off, `device.ephemeral`).
+
+| What the supplier receives | When | Can it be switched off |
+|---|---|---|
+| The SDK's registration of the browser, and its signalling and telemetry on the call's own hosts | from the SDK's initialisation, after the click | no |
+| The guest identity (the keyed subject and the first name or the organisation's word) | at the token request of step 4a | no; renamed at the purge (step 4a) |
+| The participant's picture and sound | during the call, encrypted in transit | the participant switches either off in the page |
+| The SDK's logs | never: `autoUploadLogs` is off | it is the SDK's default and our choice to turn it off |
+
+Nothing of this is stored by OpenPlanner: not the token, not the link beyond the booking's own
+field, not the picture or the sound.
+
+### In the call: devices, notices, the end (ADR 0123 points 10 and 13, step 5a)
+
+Inside the call the page sends nothing of its own anywhere: no request, no storage. What it
+does is told to the SDK and shown from the SDK's events.
+
+| What happens | What leaves the browser | What comes in | Stored by us |
+|---|---|---|---|
+| The participant chooses another camera or microphone in the panel of devices | the new stream goes to the supplier's call hosts through the SDK, as the first one did; the old stream is stopped | nothing | no: the choice lives in the page's memory until the call ends |
+| The participant chooses a speaker | nothing: the browser routes the other side's sound to that output | nothing | no |
+| The meeting is recorded | nothing; the recording is made at the supplier's side by the meeting, not by this page | one event (the recording started or stopped); the page shows its own sentence and reads nothing the event carries | no |
+| The connection is interrupted, restored or lost | the SDK's own reconnection traffic to the call hosts | events (restoring, back, lost); same | no |
+| The call ends (the meeting is removed, the participant leaves, the connection is lost for good) | the SDK leaves the meeting and unregisters the browser; every stream is stopped | nothing | no; the personal data of the booking is deleted by the purge 24 hours after the end of the appointment, and the ended state says so |
+
+The recording itself, its place and its retention belong to the supplier's site settings and the
+organisation's own rules; the page only tells the participant that it runs. That is input for the
+DPIA, not something this page controls.
+
 ## Own queue (ADR 0043)
 
 A group with dispatch kind `openplanner_queue` sends nothing to a contact center. Its agents
@@ -526,7 +563,7 @@ and must be https (or the named secure transport) in production.
 | Webex Meetings | web, worker → `webexapis.com/v1` (OAuth token from the same host) | HTTPS | Required | B (`WEBEX_API_BASE_URL`, default Webex; changed only for test doubles); credentials A/B or sealed | no | Group name and times; host, never participants. For the call page's guest (ADR 0123): a pseudonymous subject and the first name or the organisation's word, nothing else |
 | Webex Messaging API | worker → `webexapis.com/v1/messages` with the bot token of the platform or the organisation (ADR 0082 points 9 and 12) | HTTPS | Required | The superuser on *Koppelingen* and per organisation on *Kanalen* (token sealed, write-only); the room id per alert target or per group (`fallback_space_room_id`, `group.edit`) | no | Alerts: codes, slugs, times, a count, the version, a portal link (no participant data). During a fallback: a booking's start time and first name and a link to the queue, never the host join link; kept in Webex after the purge |
 | Webex Contact Center | web, worker → the WxCC API of the region: the organisation's own host and Service App when it has a connection (ADR 0032 point 9), else the installation's | HTTPS | Required: https only; internal hosts refused for an organisation's connection | C (`WXCC_API_BASE_URL`, superuser) or the organisation's sealed connection (superuser); service app sealed | no | First name, host join URL, routing variables (ADR 0081), contact-center codes of the required skills (ADR 0121 step 4b; catalogue codes, no personal data) |
-| Identity provider, platform | web → `OIDC_DISCOVERY_URL`, token and key endpoints | HTTPS | Required: production refuses an http discovery URL | A (environment) | no | OIDC protocol: authorisation code, PKCE, client secret; no participant data |
+| Identity provider, platform | web → `OIDC_DISCOVERY_URL`, token and key endpoints | HTTPS | Required: production refuses an http discovery URL, except the bundled provider's internal address with an https `OIDC_ISSUER` (row *Bundled identity provider, internal*, ADR 0125) | A (environment) | no | OIDC protocol: authorisation code, PKCE, client secret; no participant data |
 | Identity providers, organisation | web → discovery, token and key endpoints of an organisation's IdP (ADR 0083) | HTTPS | Required | The superuser per organisation (`identity_providers.manage`; confined to its own domains) | yes | OIDC protocol only |
 | Log destinations | web, worker → syslog, Splunk, Elastic or an HTTP collector (ADR 0085) | `syslog+tls` or `https`; `syslog+tcp`, `syslog+udp` and `http` only outside production | Required: production refuses clear-text transports when saving | C (superuser, portal; credentials sealed) | no | Masked log lines and audit, system and security events: no PII fields (ADR 0034, 0040) |
 | ACME | proxy → the ACME CA (Let's Encrypt) and CA → proxy challenge on 80/443 | HTTPS (ACME); HTTP-01 on 80 | Required towards the CA | B (`ACME_CA`, `ACME_EMAIL` in `proxy.env`) | no | Domain name, operator email address, public key |
@@ -535,7 +572,10 @@ and must be https (or the named secure transport) in production.
 | Certificate probe | worker → the public address, port 443 | TLS handshake, no request | Is the TLS check itself | B (`PUBLIC_BASE_URL`) | no | Nothing; reads the public certificate (ADR 0064) |
 | Public address round trip | worker, and `address-check` → `PUBLIC_BASE_URL` and, when set, `WEBHOOK_BASE_URL`: `GET /api/v1/instance?probe={nonce}` | HTTPS | Required: the address must be https in production; the certificate is verified against the host's CA bundle | B (`PUBLIC_BASE_URL`, `WEBHOOK_BASE_URL`); kill switch `PUBLIC_ADDRESS_CHECK_ENABLED` (B) | no | Nothing about participants: a random nonce out, the instance id (a random UUID), the scheme seen and whether the forwarded headers were honoured back; no address in the answer (ADR 0086) |
 | DNS checks | worker → the host's resolver (`/etc/resolv.conf`): TXT lookups of the sender domain (SPF, DKIM, DMARC; ADR 0073) and, from ADR 0083 step 3, the organisation's domain claims | DNS (UDP/TCP 53) | Not encrypted by the application; the answers only fill a status, they gate nothing | Names: the superuser (sender domain, domain claims); resolver: the host | no | Domain names only, never personal data |
-| Proxy to web, bundled | proxy → `web:8000` on the `edge` network of one host | HTTP | **Recorded exception** (ADR 0091 point 2): the hop never leaves the host, and whoever reads the bridge already has the host and the TLS keys | B (`docker-compose.yml`, fixed addresses) | n/a | Everything the visitor sends |
+| Proxy to web, bundled | proxy → `web:8000` on the `edge` network of one host | HTTP | **Recorded exception** (ADR 0091 point 2): the hop is meant never to leave the host, and whoever reads the bridge already has the host and the TLS keys. The proxy finds web by its name, which reaches the host's resolver while web is not running (recreated on an update, stopped by the updater for a restore, or restarting), with `--idp own` too; ADR 0125 step 2 pins it | B (`docker-compose.yml`, fixed addresses) | n/a | Everything the visitor sends |
+| Bundled identity provider, internal | web, worker → `idp:8080` on the compose network of one host: the login's discovery, token and key endpoints (`http://idp:8080/idp/realms/openplanner/...`) and the staff directory's admin API (`KEYCLOAK_ADMIN_URL`, ADR 0095) | HTTP | **Recorded exception** (ADR 0125, next to ADR 0091 point 2): the hop is meant never to leave the host, and whoever reads that network already has the host, the secrets files and the provider's database. Browsers reach the provider through the proxy over https; production accepts an http discovery URL only when it is exactly this address and `OIDC_ISSUER` is https. Until ADR 0125 step 2 the name `idp` can leave the host while the container is down (threat model) | A and B, written by `scripts/render-keycloak-realm.sh` into `secrets/keycloak-app.env` (`OIDC_DISCOVERY_URL` and `KEYCLOAK_ADMIN_URL` A, `OIDC_ISSUER` B); the address is fixed | n/a | Client secret, authorisation code, ID token (a staff member's name, e-mail address and roles); the directory's client secret and staff accounts (names, user names, e-mail addresses, roles) |
+| Proxy to the bundled identity provider | proxy → `idp:8080` on the `edge` network (`IDP_UPSTREAM`, the `/idp` route of ADR 0112, its login paths only, ADR 0126) | HTTP | **Recorded exception** (ADR 0125): the browser's leg to the proxy is https; the leg on one host is not. Until ADR 0125 step 2 the name `idp` can leave the host while the container is down (threat model) | B (`proxy.env`, written by the installer with `--idp bundled`, removed with `--idp own`) | n/a | What browsers send to `/idp/realms/openplanner/*` and `/idp/resources/*`: staff passwords, one-time codes and Keycloak's cookies. Not the portal's cookies: the proxy removes every `__Host-` cookie and `lang` before the request leaves it (ADR 0126 point 3) |
+| Bundled identity provider to its database | `idp` → `idp-db:5432` on the compose network (production, ADR 0106 point 4) | PostgreSQL, no TLS | **Recorded exception** (ADR 0125): the hop is meant never to leave the host; Keycloak finds the database by its name, which reaches the host's resolver while `idp-db` is not running, until ADR 0125 step 2 | A (`secrets/keycloak.env`, `secrets/idp-db.env`, written by `scripts/render-keycloak-realm.sh`) | n/a | Staff accounts with their password hashes, sessions, the database login |
 | Proxy to web, own proxy | an own reverse proxy on another machine → `web:8000` | HTTP, or HTTPS when `WEB_TLS_CERT_FILE` and `WEB_TLS_KEY_FILE` are set | HTTPS expected: *System status* warns while `FORWARDED_ALLOW_IPS` names another address than the bundled proxy's and web serves no TLS (ADR 0091 point 3) | B | n/a | Everything the visitor sends |
 
 Not outbound but listed so the picture is complete: webhooks from Webex and WxCC reach `web`

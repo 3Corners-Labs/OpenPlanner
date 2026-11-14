@@ -11,6 +11,14 @@ in CLAUDE.md), merged only with `po:approved`, and only in an image whose previo
 already holds the readers and the accounting of every record a non-legacy flow writes (ADR 0122,
 consequences): at the earliest the first minor after 0.6.0.
 
+Items G13 to G15 (*Blocks* `cc`) are enforced by code, not only listed (product owner,
+2026-11-14): while the fixed constant `CONTACT_CENTER_FLOWS_READY` in `app/domain/service_flows.py`
+is `False`, the readiness checklist refuses to activate a non-legacy flow that dispatches to the
+contact center, with the reason `contact_center_not_ready`, in the portal and in the
+configuration import alike (one rule, in the rollback point of `app/domain/flow_readiness.py`).
+Flows on the own queue and the legacy flows of existing services are not affected. The constant
+is a protection, never a setting; the PR that closes G13 to G15 flips it to `True`.
+
 `tests/test_service_flows_compatibility.py` reads this table: every open row of either ADR has an
 item here, and `ROLLBACK_SAFE` must be `False` while any item with *Blocks* `yes` is not `done`.
 
@@ -36,9 +44,9 @@ the PR that did it.
 | G10 | The product owner's decision to open the gate, after G01 to G09 | step 8 | yes | po | open |
 | G11 | A downgrade refused part way stopped between revisions (Alembic committed every SQLite migration on its own); the migration run is now one transaction (`transactional_ddl=True` in `migrations/env.py`) | step 8 | no | build | done (#786) |
 | G12 | Diff the generated OpenAPI document against a stored copy (CLAUDE.md asks for it); today one test holds that `/api/v1` requires no `flow` | 0121/35 | no | build | open |
-| G13 | The watchdog ends the task at the platform when it expires or cancels a contact-center attempt | 0121/27 | cc | build | follow-up |
-| G14 | The own queue shows work the contact center holds as held, not as open | 0121/28 | cc | build | follow-up |
-| G15 | See on the test host that Webex Contact Center's task events carry the origin, so a late task is matched | 0121/29 | cc | operator | follow-up |
+| G13 | The watchdog ends the task at the platform when it expires or cancels a contact-center attempt | 0121/27 | cc | build | follow-up (enforced by code until done) |
+| G14 | The own queue shows work the contact center holds as held, not as open | 0121/28 | cc | build | follow-up (enforced by code until done) |
+| G15 | See on the test host that Webex Contact Center's task events carry the origin, so a late task is matched | 0121/29 | cc | operator | follow-up (enforced by code until done) |
 | G16 | Immediate work dispatched to the contact center: a reference for work without a booking and the matching of its late events | 0121/30 | no | build | follow-up |
 | G17 | The staff detail's table "what this person may pick up, and why" | 0121/4c | no | build | planned |
 | G18 | The participant's choice between several flows of a service (one default per path and an explicit `flow` work without it) | 0121/5c | no | build | follow-up |

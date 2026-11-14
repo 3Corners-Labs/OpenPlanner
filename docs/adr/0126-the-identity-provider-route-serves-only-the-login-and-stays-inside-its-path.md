@@ -157,6 +157,10 @@ None, after checking. Every value below is a fixed security rule or follows from
 
   A host name of its own (point 5) removes all of them. The product owner accepts them with this
   decision, or decides on that host name instead.
+- What ADR 0125 counts as caught by whatever answers the name `idp` while its container is down
+  shrinks: through the proxy it no longer gets the portal's cookies, and the directory's secret
+  no longer reaches the admin REST API over the public route. The threat model and the
+  runbook's recovery say so; ADR 0125 itself stays as recorded.
 - A reverse proxy of the operator's own in front of the bundled provider must do the same; the
   runbook lists what.
 - Updated with this decision: `docs/runbook.md`, `docs/threat-model.md`, `docs/dataflow.md`,

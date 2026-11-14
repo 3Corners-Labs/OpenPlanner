@@ -12,6 +12,8 @@
  * the loop below as every other page: before the click that joins it makes no request to any
  * origin but its own, whatever its policy allows. Its policy is the one recorded exception, and
  * exactly that one: the five host sources of ADR 0123 point 4 in `connect-src` and nothing else.
+ * What happens after the click is walked in call-page-joining.spec.ts, which also asks that the
+ * page and the SDK stand-in stay on the page's own origin.
  */
 import { expect, test, type Page } from '@playwright/test';
 

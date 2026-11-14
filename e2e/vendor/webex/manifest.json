@@ -1,0 +1,10 @@
+{
+  "name": "webex",
+  "version": "0.0.0-test-double",
+  "source": "the test double of e2e/vendor/webex/meetings.min.js (ADR 0123 step 4c), not the SDK",
+  "file": "meetings.min.js",
+  "checksum": {
+    "version": "0.0.0-test-double",
+    "sha256": "28390d87ebe197d0197d123cd73a8680e375bd96dadfdea38a1721f9b4acd430"
+  }
+}

@@ -6187,7 +6187,7 @@ msgid "admin.settings.problem.webex_incomplete"
 msgstr "Webex needs WEBEX_CLIENT_SECRET, WEBEX_REFRESH_TOKEN and SETTINGS_ENCRYPTION_KEY in production."
 
 msgid "admin.settings.problem.oidc_incomplete"
-msgstr "login (OIDC) needs an https discovery URL and a client secret in production."
+msgstr "login (OIDC) needs an https discovery URL and a client secret in production; only the bundled identity provider may use its internal address, with an https OIDC_ISSUER."
 
 msgid "admin.settings.problem.update_channel"
 msgstr "the rc update channel is not allowed in production: production follows releases."
@@ -13232,6 +13232,9 @@ msgstr "This completion is only for existing services and cannot be chosen."
 msgid "admin.flows.reason.rollback_not_safe"
 msgstr "Activation waits until the previous version of OpenPlanner can also keep track of appointments on a shared capacity pool. This follows in a later version."
 
+msgid "admin.flows.reason.contact_center_not_ready"
+msgstr "Activating a flow that dispatches to the contact center waits until the contact center is released for go-live. This follows in a later version."
+
 msgid "admin.flows.summary.none"
 msgstr "Not set"
 
@@ -13979,7 +13982,7 @@ msgid "callpage.check.body"
 msgstr "Can you see yourself, and does the bar move when you talk? Then you can join."
 
 msgid "callpage.check.preview"
-msgstr "Your own picture"
+msgstr "Preview of your camera"
 
 msgid "callpage.check.camera_off"
 msgstr "Your camera is off"
@@ -14112,3 +14115,155 @@ msgstr "Microphone on."
 
 msgid "callpage.say.microphone_off"
 msgstr "Microphone off."
+
+#. The participant's call page from the click that joins (ADR 0123 step 4c). No text names the video platform.
+
+msgid "callpage.connecting.heading"
+msgstr "We are connecting you"
+
+msgid "callpage.connecting.body"
+msgstr "One moment. Your call is being set up. There is nothing you need to do."
+
+msgid "callpage.connecting.retry"
+msgstr "The last attempt did not work. We are trying again. This happens by itself."
+
+msgid "callpage.connecting.attempt"
+msgstr "Attempt {n} of {total}"
+
+msgid "callpage.lobby.heading"
+msgstr "You are here. The {agent} will let you in shortly"
+
+msgid "callpage.lobby.body"
+msgstr "There is nothing you need to do. The call starts by itself."
+
+msgid "callpage.call.heading"
+msgstr "You are in the call"
+
+msgid "callpage.call.remote"
+msgstr "Picture of the {agent}"
+
+msgid "callpage.call.remote_off"
+msgstr "The {agent} has the camera off"
+
+msgid "callpage.control.leave"
+msgstr "Leave the call"
+
+msgid "callpage.left.heading"
+msgstr "You left the call"
+
+msgid "callpage.left.body"
+msgstr "You can close this window, or go back to your appointment."
+
+msgid "callpage.ended.heading"
+msgstr "The call has ended"
+
+msgid "callpage.ended.body"
+msgstr "Thank you for the call. You can close this window, or go back to your appointment."
+
+msgid "callpage.failed.heading"
+msgstr "We cannot connect"
+
+msgid "callpage.failed.attempts"
+msgstr "The video call could not be set up. We tried {total} times. You can try again."
+
+msgid "callpage.failed.generic"
+msgstr "The video call could not be set up. You can try again."
+
+msgid "callpage.failed.not_open"
+msgstr "The call is not open yet, or it is no longer open. Check the time of your appointment and try again then."
+
+msgid "callpage.failed.rate_limited"
+msgstr "You tried too many times in a short while. Wait a few minutes and try again."
+
+msgid "callpage.failed.unavailable"
+msgstr "The call is not available right now. Try again in a moment."
+
+msgid "callpage.failed.retry"
+msgstr "Try again"
+
+msgid "callpage.say.connecting"
+msgstr "Setting up your call."
+
+msgid "callpage.say.waiting"
+msgstr "Waiting for the {agent} to let you in."
+
+msgid "callpage.say.admitted"
+msgstr "The {agent} let you in. The call has started."
+
+msgid "callpage.say.device_failed"
+msgstr "That did not work. Check your camera or microphone and try again."
+
+msgid "callpage.self.picture"
+msgstr "Your picture"
+
+msgid "callpage.contact.none"
+msgstr "Get in touch with the organisation."
+
+msgid "callpage.hear.button"
+msgstr "Tap to hear the other person"
+
+msgid "callpage.say.remote_on"
+msgstr "The {agent} turned the camera on."
+
+msgid "callpage.say.remote_off"
+msgstr "The {agent} turned the camera off."
+
+msgid "callpage.say.sound_blocked"
+msgstr "Your browser blocked the sound. Use the button to hear the other person."
+
+msgid "callpage.say.device_kept"
+msgstr "It is off for the other side, but your browser may still show the device as in use."
+
+msgid "callpage.ended.deleted"
+msgstr "The personal data of this call is deleted 24 hours after the end of your appointment."
+
+msgid "callpage.control.devices"
+msgstr "Devices"
+
+msgid "callpage.devices.heading"
+msgstr "Your devices"
+
+msgid "callpage.devices.hint"
+msgstr "A choice applies at once."
+
+msgid "callpage.notice.recording.word"
+msgstr "Recording"
+
+msgid "callpage.notice.recording.body"
+msgstr "This call is being recorded. The picture and sound are saved."
+
+msgid "callpage.notice.restoring.word"
+msgstr "Reconnecting"
+
+msgid "callpage.notice.restoring.body"
+msgstr "The connection was interrupted. It is being restored by itself. Stay on this page."
+
+msgid "callpage.say.recording_on"
+msgstr "This call is being recorded."
+
+msgid "callpage.say.recording_off"
+msgstr "The recording has stopped."
+
+msgid "callpage.say.restoring"
+msgstr "The connection was interrupted. We are restoring it."
+
+msgid "callpage.say.restored"
+msgstr "The connection is back."
+
+msgid "callpage.say.device_changed"
+msgstr "Device changed."
+
+msgid "callpage.say.device_change_failed"
+msgstr "That device did not work. Your previous device stays in use."
+
+msgid "callpage.failed.media"
+msgstr "The picture or sound of the call could not be set up. You can try again."
+
+msgid "callpage.failed.lost"
+msgstr "The connection was lost and could not be restored. You can try again."
+
+msgid "callpage.control.leave_lobby"
+msgstr "Leave the waiting room"
+
+msgid "callpage.control.bar"
+msgstr "Call controls"
