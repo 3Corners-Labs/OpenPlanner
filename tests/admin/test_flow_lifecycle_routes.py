@@ -25,6 +25,7 @@ from tests.support.domain import NOW
 from tests.support.flow_pages import BASE, act, create, create_ready, form_data, save
 from tests.support.flow_seed import add_subjects
 from tests.support.locales import nl_locale
+from tests.support.pool_flows import shut_gate
 from tests.support.skill_seed import add_pool, add_skill
 
 SUPER_SCOPE = Scope(everything=True)
@@ -144,8 +145,9 @@ async def test_a_default_for_a_path_the_flow_does_not_offer_is_a_field_error(sit
 
 
 async def test_the_subjects_are_offered_and_their_extra_skills_are_chosen_on_a_page_of_their_own(
-    site: Site,
+    site: Site, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     await site.login_as(ORG_ADMIN)
     await add_subjects(site, {"contract": "Contract", "aanvraag": "Aanvraag"})
     general = await add_skill(site, "general-advice", "Algemeen advies", "General advice")
@@ -246,8 +248,9 @@ async def test_an_offered_subject_that_is_not_saved_yet_says_to_save_first(site:
 
 
 async def test_a_pool_that_does_not_guarantee_the_skills_is_a_missing_point_on_the_checklist(
-    site: Site,
+    site: Site, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     await site.login_as(ORG_ADMIN)
     general = await add_skill(site, "general-advice", "Algemeen advies", "General advice")
     pool = await add_pool(site, "Leeg")
@@ -262,6 +265,7 @@ async def test_a_pool_that_does_not_guarantee_the_skills_is_a_missing_point_on_t
 async def test_the_checklist_says_every_state_in_words_and_which_part_follows(
     site: Site, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     built = service_flows.BUILT_DISPATCH
     monkeypatch.setattr(
         service_flows,
@@ -293,8 +297,9 @@ async def test_the_checklist_says_every_state_in_words_and_which_part_follows(
 
 
 async def test_the_checklist_names_what_it_judges_and_where_it_stands_in_its_heading(
-    site: Site,
+    site: Site, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     await site.login_as(ORG_ADMIN)
     pool = await add_pool(site, "Advies")
     await create(site, capacity_pool_id=str(pool))
@@ -321,6 +326,7 @@ async def test_the_checklist_names_what_it_judges_and_where_it_stands_in_its_hea
 async def test_activation_has_no_disabled_button_but_says_why_not_and_a_refusal_lists_the_points(
     site: Site, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     await site.login_as(ORG_ADMIN)
     pool = await add_pool(site, "Advies")
     await create(site, capacity_pool_id=str(pool))

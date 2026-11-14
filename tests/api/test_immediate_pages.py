@@ -21,7 +21,7 @@ from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW
 from tests.support.flows import engine_of
 from tests.support.participant import ADA, SAME_ORIGIN
-from tests.support.pool_flows import block, open_gate, seed_pool_flow
+from tests.support.pool_flows import block, open_gate, seed_pool_flow, shut_gate
 
 FORM = {**ADA, "flow": "nu"}
 
@@ -56,8 +56,9 @@ async def ask(site: httpx.AsyncClient) -> httpx.Response:
 
 
 async def test_with_the_gate_shut_the_flow_is_refused_and_the_direct_call_stays(
-    site: httpx.AsyncClient,
+    site: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     named = await site.get("/g/demo/direct", params={"flow": "nu"})
     plain = await site.get("/g/demo/direct")
 

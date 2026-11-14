@@ -774,6 +774,7 @@ carry the closure's contact options and a link to the closure page.
 | Information disclosure | The closure page reveals a closure participants should not see yet, or a past one | It shows only what the banner shows (active, or upcoming and announced); the URL has only the slug, so past closures cannot be listed; without one it redirects to the calendar | `tests/api/test_closure_pages.py::test_the_closure_page_of_an_open_team_goes_back_to_the_calendar`, `test_an_upcoming_closure_keeps_the_calendar_and_links_to_its_page` |
 | Information disclosure | The page of a booking on hold shows the participant's details next to the contact options | The management page shows the appointment, never contact details | `tests/api/test_closure_pages.py::test_a_booking_on_hold_shows_the_contact_options_above_its_actions` |
 | Information disclosure | The e2e example booking (a made-up participant) ends up in a production database | `seed-closures` refuses when `ENVIRONMENT=prod` | `tests/test_cli.py::test_seed_closures_refuses_production` |
+| Elevation of privilege | A development seed brings non-legacy flows live in production past the readiness checklist (ADR 0121 gate item G06), or writes records the rollback gate holds back (G07) | `seed-demonstration` and `seed-gated-records` refuse when `ENVIRONMENT=prod`; neither opens `ROLLBACK_SAFE`, so the flows stay dark to participants while it is false | `tests/test_cli.py::test_seed_demonstration_refuses_production`, `tests/test_cli.py::test_seed_gated_records_reports_the_ids_and_refuses_production`, `tests/adapters/db/test_demonstration_stack.py::test_participants_see_it_only_with_the_gate_open` |
 | Tampering (stored XSS) | An HTML or SVG file named `.png` uploaded as closure image runs script on our origin | Type recognised from the magic bytes (PNG, JPEG, WebP only, `app/domain/images.py`, shared with the logo); served with that type, `nosniff` and `default-src 'none'`; the page links it only in an `<img>` | `tests/domain/test_images.py::test_html_svg_gif_and_other_files_are_refused`, `tests/admin/test_closure_image_routes.py::test_html_or_svg_named_png_is_refused`, `test_group_admin_adds_an_image_that_participants_see_without_metadata` |
 | Denial of service | A huge upload fills memory or disk | `Content-Length` above 500 kB + 16 kB refused unread (413); one file read up to the limit; malformed files refused, never stored | `tests/admin/test_closure_image_routes.py::test_a_file_above_the_limit_is_refused_unread`, `tests/domain/test_images.py::test_malformed_files_are_refused` |
 | Information disclosure (privacy) | A photo publishes where it was taken or who took it (EXIF GPS, XMP creator, PNG text) | Metadata stripped on upload without decoding the image: PNG keeps only display chunks, JPEG drops APP1, APP3–13, APP15 and COM (also after a scan), WebP drops EXIF and XMP and their flags | `tests/domain/test_images.py::test_metadata_is_stripped`, `tests/admin/test_closure_image_routes.py::test_group_admin_adds_an_image_that_participants_see_without_metadata` |
@@ -1013,6 +1014,67 @@ What the controls do not cover, said plainly:
   lacks; whether any of it runs on the path of a call is shown only by a join into a real meeting.
 - **The SDK's own storage** (what it keeps in the browser after it starts) has not been examined
   against the real file; the end-to-end tests run a stand-in that keeps nothing.
+
+## Flow: the guest token of the call page (ADR 0123 step 4a)
+
+`POST /b/m/{ref}/call/token` hands the call page a guest token of the video platform for the
+participant's click that joins, and `rename_guest` jobs rename the guest after the purge. Inputs
+from outside: the reference in the path, the participant's session cookie, the form-protection
+headers, the platform's answer. The answer carries `token`, `expires_at` and the meeting's guest
+`link`. Until step 6 the endpoint is dark behind the platform switch alone.
+
+| Abuse case | Control | Test |
+|---|---|---|
+| A token is asked without the participant's session, or for a reference that does not exist | The same session check as every page under the link: `403`, the same answer for a booking that does not exist, one `token.rejected` security event and a draw on the budget for links that match nothing; nothing is sent to the platform | `tests/api/test_call_token.py::test_without_the_session_the_answer_is_the_one_for_a_booking_that_does_not_exist` |
+| A token is asked with the session of another booking | The session holds a set of bookings; one that does not hold this booking is answered as no session | `tests/api/test_call_token.py::test_another_bookings_session_gets_nothing` |
+| A token is asked outside the join window, or for a booking that is cancelled or has no meeting | The rule of `/join/go` (`join_state`) and its https-only link decide: `409` with `not_open`, nothing is sent to the platform, no mark is written | `tests/api/test_call_token.py::test_outside_the_join_window_there_is_no_token`, `::test_the_window_is_the_one_of_the_join_page`, `::test_a_cancelled_booking_gets_no_token`, `::test_a_booking_without_a_meeting_gets_no_token` |
+| The endpoint shows that the feature exists, or works, while the platform switch is off | While `embedded_call_enabled` is off the route answers `404` as an address that does not exist, read live, before the session is looked at | `tests/api/test_call_token.py::test_it_does_not_exist_while_the_switch_is_off` |
+| Many tokens for one booking (a script in the participant's browser, or a leaked link session) | A bucket per booking, `embedded_call_token_per_booking_per_hour` (class C, 5 to 30, default 10: a token lives for hours and cannot be withdrawn, and a participant needs a handful an hour at most), counted only for a real attempt, that is after the session check and for a booking that is open now, so neither a caller who knows the (not secret) reference but has no session nor a call outside the join window uses the budget up; over it a JSON `429` (`rate_limited`, `Retry-After`) and one `request.rate_limited` event | `tests/api/test_call_token.py::test_one_booking_may_ask_a_limited_number_of_times_an_hour`, `::test_a_caller_without_the_session_cannot_use_a_bookings_budget_up`, `::test_attempts_outside_the_window_do_not_use_the_bookings_budget_up`, `::test_the_default_budget_of_a_booking_is_a_handful_an_hour` |
+| Many tokens from one address (many bookings of one person, or a bot with several sessions) | The common read limit of the route (`rate_limit_reads`), keyed by the caller as every limited participant route | `tests/api/test_call_token.py::test_one_address_is_held_by_the_common_read_limit` |
+| The token or a link ends up in a log line, an event, an audit row, a job or a stored field | The token is returned to the caller and nowhere else: not stored, not on the timeline (a failure leaves the code only), not in any job (the rename job holds the booking's id and nothing else). The link is the booking's own stored link, purged with it; it is in no log line, event or job | `tests/api/test_call_token.py::test_the_token_is_in_no_log_line_and_in_no_stored_field`, `::test_the_token_and_the_links_are_in_no_event_audit_row_or_job`, `tests/jobs/test_rename_guest.py::test_the_job_holds_the_booking_id_and_no_name_or_token` |
+| A page of another site posts to the endpoint on the participant's behalf | The form protection of every participant post (`require_same_origin`): a cross-site post is `403` with one `request.rejected` security event, before anything is sent to the platform | `tests/api/test_call_token.py::test_a_cross_site_post_is_refused_before_anything_happens` |
+| The host's link, or the answer's headers, give staff access or are cached | The answer carries the guest link only; the host link is never read by the route. `Cache-Control: no-store` on every answer the endpoint builds (the token, `409`, `429`, `503`); the `403` and `404` pages are the site's own, as for every page under the link, and carry no token | `tests/api/test_call_token.py::test_the_host_link_never_leaves_the_server`, `::test_the_answer_is_never_cacheable_and_never_in_an_address` |
+| A provider failure tells the page, or leaves, more than it should | The page gets `503` with `unavailable` and no code; the booking's timeline gets the usual `integration_error` with the code, without the provider's reason (it may echo a name) and without a token | `tests/api/test_call_token.py::test_a_provider_failure_is_a_plain_not_available_now`, `::test_a_provider_failure_leaves_the_usual_trace_without_the_token` |
+| The participant's first name stays at the platform after the purge | A booking for which a guest was minted gets one `rename_guest` job, added by the domain rule `jobs_after_purge` in the purge's own transaction (the adapter only stores); the job mints again for the same subject with the neutral word, under the current and, during a key rotation, the previous key. The purge never waits for it; a booking purged twice enqueues once; a booking without a guest enqueues nothing; the straggler sweep and `replace_jobs` keep the job (`OUTLIVES_PURGE`) | `tests/jobs/test_rename_guest.py`, `tests/domain/test_retention.py::test_a_purge_adds_one_rename_for_a_booking_whose_guest_was_minted`, `::test_a_purge_adds_nothing_without_a_guest_or_for_a_booking_purged_before`, `tests/adapters/db/test_purge_remains.py::test_a_purge_enqueues_one_rename_for_a_booking_with_a_minted_guest`, `::test_replace_jobs_never_deletes_the_job_that_outlives_a_purge`, `tests/domain/test_retention_sweep.py::test_the_sweep_keeps_the_rename_of_a_guest` |
+| The rename fails for good and nobody notices | A retryable failure is retried after 1, 5 and 15 minutes; when the job gives up (a refusal, or the last attempt) the runner writes one system event `job.rename_guest` with the code and the booking's timeline gets the `integration_error` | `tests/jobs/test_rename_guest.py::test_a_retryable_failure_is_retried_with_the_usual_backoff`, `::test_a_refusal_gives_up_at_once_with_one_system_event`, `::test_a_retry_that_runs_out_gives_up` |
+| The way into a running appointment is closed by maintenance | The route is on the list of open routes (a confirmed appointment takes place during maintenance, ADR 0038); it marks the booking and mints at the platform, as `/join/go` records the click | `tests/api/test_call_token.py::test_the_way_into_a_call_stays_open_during_maintenance`, `tests/api/test_maintenance_pages.py` (every public route is closed or open) |
+
+What an attack on this flow leaves in the log: a request without a session is one `token.rejected`
+security event; a cross-site post is one `request.rejected` event; too many requests are one
+`request.rate_limited` event per caller; a failed rename is the system event of the job. A request
+outside the join window, for a cancelled booking or while the switch is off leaves no event: it
+is refused as `/join/go` refuses it, without a caller to attribute, and the switch off is an
+unknown address.
+
+What the controls do not cover, said plainly:
+
+- **The per-booking limit is per web process.** The count is held in the process's memory: two
+  web processes double the limit and a restart resets it. The per-address limit has the same
+  property. The bound is a brake on a script, not an accounting of tokens.
+- **A booking is marked before the provider is asked** (`guest_minted_at`), so that a guest that
+  exists always has the mark the purge needs. A mint that fails leaves the mark for a guest that
+  was never made, and the purge then names one nameless guest at the platform: the safe
+  direction.
+- **A mark can be lost.** A restore of the database from before the mint (a rollback during a
+  restore-style maintenance) loses the mark of a guest minted after it, and no rename follows for
+  that booking: the guest keeps its first name at the platform. The runbook names the same for a
+  key that is no longer configured (`MANAGEMENT_TOKEN_KEY_PREVIOUS`).
+
+**Named risk, without a mitigation in this step: the token is a credential of a limited account
+at the video platform.** A guest token can create rooms and webhooks of its own, and its holder
+keeps it for hours: a participant who takes it from the page, which the page cannot prevent, holds
+it until it expires, and a new token does not withdraw an earlier one (lab tenant, 2026-11-13,
+`docs/research/call-page-on-the-meetings-sdk.md` section 16). It cannot look up people, list the
+organisation, create meetings or read recordings. It **can write to any account whose address it
+knows**, staff included: on the lab tenant one message from a test guest to an account whose
+owner agreed was accepted and arrived (2026-11-14). Our server can neither withdraw a token nor
+narrow what it may do, so ADR 0123 point 18 makes it a condition before production: the supplier
+gives a way to deny messaging to these guests, shown to hold on the lab tenant, or the
+organisation accepts the risk in writing. What limits it today: the token is handed out only for a
+confirmed booking inside its join window, only to the participant's own session, at most the
+number of times of `embedded_call_token_per_booking_per_hour` an hour per booking and the common
+read limit per address, and nothing links it to a name but the participant's first name or the
+organisation's word; beyond that the limits are the organisation's own policy at the platform.
 
 ## Flow: widget script on host websites (ADR 0035, EM-3)
 

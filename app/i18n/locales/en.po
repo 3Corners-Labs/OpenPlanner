@@ -4383,6 +4383,9 @@ msgstr "After the update, the requested version is not running."
 msgid "admin.updates.reason.updater_error"
 msgstr "Unexpected error in the updater. Check the updater's log on the server."
 
+msgid "admin.updates.reason.updater_stalled"
+msgstr "The updater stopped reporting (for example a full disk), so the request was ended and the next update can start."
+
 msgid "admin.updates.reason.other"
 msgstr "The updater reported an unknown reason."
 
@@ -6452,6 +6455,9 @@ msgstr "Update automatically"
 
 msgid "settings.field.update_check_minutes.label"
 msgstr "Minutes between two version checks"
+
+msgid "settings.field.update_stalled_minutes.label"
+msgstr "Minutes before a silent update is ended"
 
 msgid "settings.field.update_line.label"
 msgstr "Follow one minor only (X.Y)"

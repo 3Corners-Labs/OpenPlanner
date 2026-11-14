@@ -602,6 +602,11 @@ class Settings(BaseSettings):
     # page asks for one ahead of time. GitHub allows 60 anonymous calls per hour per address,
     # so the portal floor is 5 minutes.
     update_check_minutes: int = Field(default=60, ge=1, le=1440)
+    # Class C: minutes a request the host updater claimed may stay silent (no step reported)
+    # before the application ends it as failed (`updater_stalled`). A dead updater (disk full,
+    # host restart) otherwise blocks every later request for ever. An update takes minutes;
+    # the updater's own health wait is 5 minutes.
+    update_stalled_minutes: int = Field(default=120, ge=15, le=1440)
 
     # Maintenance mode (ADR 0038). MAINTENANCE_MODE (class B, deployment: needed while the
     # database is unavailable or being restored) switches it on from the environment; the

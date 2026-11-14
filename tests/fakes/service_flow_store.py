@@ -416,7 +416,7 @@ class ServiceFlowStore:
         return saved
 
     async def publish_draft(
-        self, scope: Scope, flow_id: int, *, by: int, at: datetime
+        self, scope: Scope, flow_id: int, *, by: int | None, at: datetime
     ) -> ServiceFlow:
         flow = self._scoped_flow(scope, flow_id)
         if flow is None:

@@ -2021,9 +2021,12 @@ class Transaction(Protocol):
         ...
 
     async def publish_draft(
-        self, scope: Scope, flow_id: int, *, by: int, at: datetime
+        self, scope: Scope, flow_id: int, *, by: int | None, at: datetime
     ) -> ServiceFlow:
-        """Make the flow's draft its current revision, stamped with who and when."""
+        """Make the flow's draft its current revision, stamped with who and when.
+
+        ``by`` is ``None`` only for a development seed nobody stands behind (as the backfill).
+        """
         ...
 
     async def discard_draft(self, scope: Scope, flow_id: int) -> None:

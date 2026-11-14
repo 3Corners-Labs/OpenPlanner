@@ -8,6 +8,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
+  // ADR 0121 gate item G06: the immediate request pages need a request and a claim first.
+  globalSetup: './requests.ts',
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: process.env.CI ? [['github'], ['list']] : 'list',
