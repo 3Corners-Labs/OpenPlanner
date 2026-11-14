@@ -215,6 +215,7 @@ organisation provider ──ID token (sub, name, email, email_verified, entitlem
 |---|---|---|---|---|
 | Admin subject identifier | `audit_events.actor`, `staff.subject`, `admin_sessions.subject`; `audit_events.detail` of the two volume warnings (`planner.changes_alert`, `booking.contact_reveals_alert`: `actor:<subject>,…`, ADR 0044) | identity provider | admin actions: `AUDIT_RETENTION_DAYS` (default 2 years, product owner 2026-10-29); system 90 days, security 1 year, debug 7 days (ADR 0040) | no |
 | Admin display name | `staff.display_name`, `admin_sessions.claims` | identity provider | replaced at every login; erased daily by the worker for people without a login for `staff_retention_days` (class C, 365 days, 90–1825; ADR 0046 step 2), or by the superuser for a suspended person; the session row follows the session clean-up | no |
+| Staff screen name (ADR 0123 step 5c) | `staff.screen_name` | typed by someone with `staff.manage` on the staff page (the staff member's own choice of name for the participant's side) | kept until cleared, replaced or the record is erased (manual, or `staff_retention_days`: erasure empties it); shown to `staff.manage` in the form and, through `GET /b/m/{ref}/call/staff`, to the participant of a booking this staff member accepted; never in a log, audit event (the event says that it changed, not to what), job payload or URL | no |
 | Admin email address (ADR 0117 step 10b) | `staff.email`, `staff.email_at` (not `admin_sessions.claims`) | identity provider claim `email`, kept only when `email_verified` is true | replaced or cleared at every login; removed with the display name at erasure (manual, or `staff_retention_days`); shown on the staff page to `staff.view`; read by the digest at send time, never in a log, audit event or job payload | no; mail to the person for the usage digest only |
 | Admin roles and memberships | `staff.roles`, `staff_memberships` (role key, organisation and group slugs: one row per grant, ADR 0049) | identity provider claims | replaced at every login; changes audited as `staff.membership_changed`; removed with the display name at erasure | no |
 | Staff skills (ADR 0121) | `staff_skills` (staff id, skill id, when and by whom granted; who granted a skill is kept as a staff id and is emptied when that person is erased; so is `published_by` on a flow revision, the staff id of whoever published it); the skill catalogue `skills` holds codes and labels only | granted by an administrator with `skills.manage` | data about staff, not about participants; replaced as a set on every grant; deleted with the staff record at erasure (`erase_staff`); a skill that is archived stays on the grants that held it | no |
@@ -395,6 +396,8 @@ participant presses the share button; the browser's own picker is the second dec
 | The staff member shares a screen | nothing | their screen's picture, shown in place of their picture | no |
 | Captions are switched on | the SDK asks the meeting to start them and, at that press, for its real-time data link; the page's language is passed on; the call's sound reaches the platform as it did | text made by the platform from the sound of the call, with a speaker; the page shows the text and a word of its own for who spoke, and reads nothing else of the speaker | no: shown and not kept, not logged, not sent to us; gone when switched off or the call ends |
 
+The speaker of a caption is named by the page, not by the platform: the participant's own lines "You", the other side's the name described under *The staff member's name* below, or the team's word for staff.
+
 The real-time data link is asked for at the press, not at the join (`enableAutomaticLLM` stays off,
 see step 4c); a participant who never switches captions on never opens it, if the SDK allows that
 (a first real meeting shows it). The text of a caption is personal data of the call by nature; the
@@ -405,6 +408,33 @@ platform makes it at its side, and what it keeps is for the DPIA, not for this p
 | Whose speech becomes text | The participant's press asks the meeting to start captions. It is probably meeting-wide: the platform turns the whole call's speech into text, the staff member's too, and a stop by the participant may end the captions for the staff member as well. | Who is affected, who sees the captions, and whether the platform keeps a transcript of the meeting (where, how long): asked of the supplier (`docs/research/call-page-on-the-meetings-sdk.md`, section 14, questions 10 and 11). The staff member is not told by this page. |
 | The real-time link and the transcription are closed | Switching captions off stops the transcription; leaving, the end of the call and a failure stop it too, then the meeting is left. The page knows no call that closes the link itself (the prototype has none): the link stays open until the meeting is left. | Whether the SDK has such a call, and whether leaving the meeting closes the link. |
 | A shared screen | The page asks the SDK for a display stream and gives no option for sound. Stopping it stops the track the browser gave; the stream is then taken out of the meeting. | That the SDK's display stream asks for no sound of the screen, and that stopping it ends the browser's capture on every browser. |
+
+
+### The staff member's name (ADR 0123 point 10, step 5c)
+
+Who the participant talks to is learnt from our own server and from nobody else. The video platform
+is asked nothing and told nothing for this; the name on the picture is never the name the platform
+reports for a member of the meeting.
+
+    staff.screen_name (typed by a manager)          booking claim (pseudonym of who accepted)
+                 │                                              │
+                 └────────► StaffScreenNames ◄───────────────────┘
+                                 │  by the organisation's embedded_call_staff_name:
+                                 │  screen_name (default) · name · term
+                                 ▼
+          GET /b/m/{ref}/call/staff  (the participant's link session, no-store)
+                                 ▼
+                 {"name": "..."} or {}  ─►  the page's state  ─►  text on the picture and in the captions
+
+| What happens | What leaves the browser | What comes in | Stored by us |
+|---|---|---|---|
+| The page asks who the participant talks to, on entering the lobby and the call and then every `embedded_call_chat_poll_seconds` while it is there | one `GET` to our own address, the participant's session cookie; no identifier of the staff member | a name (at most 40 characters) or nothing | no: the name lives in the page's state and is gone with the call; nothing in the browser's storage |
+| The server resolves the claim | nothing | nothing | the pseudonym-to-row-id map in the web process's memory, rebuilt at most once a minute and only on a miss; it holds pseudonyms and row ids, never a name |
+
+After the booking's purge the claim is gone and so is the name; erasing the staff record clears the
+screen name and the account name, and the endpoint answers `{}` for it. The account's name is shown
+only where the organisation chose `name`; with the default a staff member without a screen name is shown
+by the organisation's word for staff alone.
 
 
 ## Own queue (ADR 0043)

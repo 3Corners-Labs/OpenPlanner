@@ -5865,6 +5865,9 @@ msgstr "Schorsing opgeheven"
 msgid "audit.event.staff_erased"
 msgstr "Gegevens van medewerker gewist"
 
+msgid "audit.event.staff_screen_name_changed"
+msgstr "Schermnaam ingesteld of gewist"
+
 msgid "admin.audit.detail.role_add"
 msgstr "rol erbij: {value}"
 
@@ -5948,6 +5951,39 @@ msgstr "Nog niet"
 
 msgid "admin.staff.dormant"
 msgstr "Lang niet ingelogd"
+
+msgid "admin.staff.screen_name.heading"
+msgstr "Schermnaam"
+
+msgid "admin.staff.screen_name.intro"
+msgstr "De deelnemer ziet deze naam in het gesprek bij het beeld van de medewerker, naast het woord van de organisatie voor medewerkers. Heeft de medewerker geen schermnaam, dan ziet de deelnemer alleen dat woord en nooit de accountnaam, tenzij de organisatie anders kiest."
+
+msgid "admin.staff.screen_name.label"
+msgstr "Schermnaam voor de deelnemer"
+
+msgid "admin.staff.screen_name.hint"
+msgstr "Wat de deelnemer in het gesprek ziet. Kies een voornaam of een verzonnen naam, niet de volledige naam. Laat leeg om geen schermnaam te hebben."
+
+msgid "admin.staff.screen_name.save"
+msgstr "Schermnaam opslaan"
+
+msgid "admin.staff.screen_name.none"
+msgstr "Geen schermnaam"
+
+msgid "admin.staff.screen_name.error.too_short"
+msgstr "Een schermnaam heeft minstens {min} tekens."
+
+msgid "admin.staff.screen_name.error.too_long"
+msgstr "Een schermnaam heeft hoogstens {max} tekens."
+
+msgid "admin.staff.screen_name.error.no_letter"
+msgstr "Een schermnaam heeft minstens één letter of cijfer."
+
+msgid "admin.staff.screen_name.error.bad_marks"
+msgstr "Een schermnaam gebruikt accenten alleen op een letter, en hoogstens {marks} achter elkaar."
+
+msgid "admin.staff.screen_name.error.bad_character"
+msgstr "Een schermnaam bevat alleen letters, cijfers, spaties, een koppelteken, een apostrof en een punt."
 
 msgid "admin.staff.no_role"
 msgstr "Geen rol"
@@ -12714,6 +12750,12 @@ msgstr "De capaciteitspool is gearchiveerd."
 msgid "admin.done.staff_skills_saved"
 msgstr "De vaardigheden zijn opgeslagen. Ze gelden vanaf het volgende verzoek dat wordt opgepakt of gestart."
 
+msgid "admin.done.staff_screen_name_saved"
+msgstr "De schermnaam is opgeslagen."
+
+msgid "admin.done.staff_screen_name_unchanged"
+msgstr "De schermnaam is niet gewijzigd."
+
 msgid "admin.form.error.skill_code"
 msgstr "Gebruik alleen kleine letters, cijfers en streepjes, beginnend met een letter of cijfer (hoogstens 40 tekens)."
 
@@ -13725,8 +13767,11 @@ msgstr "Aantal keer per uur dat één afspraak toegang tot het gesprek mag vrage
 msgid "settings.field.embedded_call_display_name.label"
 msgstr "Naam van de deelnemer voor de medewerker in het gesprek (voornaam of eigen woord)"
 
+msgid "settings.field.embedded_call_chat_poll_seconds.label"
+msgstr "Seconden tussen twee keer kijken van de gesprekspagina wie er in het gesprek zit (en later naar nieuwe berichten)"
+
 msgid "settings.field.embedded_call_staff_name.label"
-msgstr "Naam van de medewerker voor de deelnemer in het gesprek (accountnaam of eigen woord)"
+msgstr "Naam van de medewerker voor de deelnemer in het gesprek (schermnaam van de medewerker, accountnaam of alleen het eigen woord)"
 
 msgid "settings.field.webhook_source_networks_video.label"
 msgstr "Netwerken waarvandaan de webhooks van het videoplatform mogen komen (CIDR, kommagescheiden of één per regel, hooguit 32; leeg: elke bron)"
@@ -14152,8 +14197,14 @@ msgstr "U hoeft niets te doen. Het gesprek begint vanzelf."
 msgid "callpage.call.heading"
 msgstr "U bent in gesprek"
 
-msgid "callpage.call.remote"
-msgstr "Beeld van uw {agent}"
+msgid "callpage.staff.term"
+msgstr "{agent}"
+
+msgid "callpage.staff.named"
+msgstr "{name} · {agent}"
+
+msgid "callpage.say.staff_name"
+msgstr "U spreekt met {name}."
 
 msgid "callpage.call.remote_off"
 msgstr "Uw {agent} heeft de camera uit"
@@ -14310,9 +14361,6 @@ msgstr "Scherm gedeeld door uw {agent}"
 
 msgid "callpage.captions.you"
 msgstr "U"
-
-msgid "callpage.captions.other"
-msgstr "{Agent}"
 
 msgid "callpage.say.share_mine"
 msgstr "U deelt uw scherm."

@@ -333,6 +333,11 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     # ADR 0046 step 2: suspend and reinstate under staff.manage (organisation level, like
     # ending sessions); erasing is the superuser's alone (staff.erase, locked). An unknown
     # number is a 404 for the superuser only.
+    # ADR 0123 step 5c: the screen name of a person, staff.manage like suspending (organisation
+    # level); a person outside the scope, or an unknown number, is a 404 for the superuser only.
+    "POST /admin/staff/{member_id}/screen-name": {
+        "/admin/staff/999/screen-name": statuses(404, 403, 403, 403, 403, 403, 403)
+    },
     "POST /admin/staff/{member_id}/suspend": {
         "/admin/staff/999/suspend": statuses(404, 403, 403, 403, 403, 403, 403)
     },

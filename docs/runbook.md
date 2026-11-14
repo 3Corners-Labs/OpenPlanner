@@ -2873,6 +2873,24 @@ Refused origins are logged as `widget.origin_refused` with the origin and the gr
 personal data). Many refusals from one unknown origin mean a copied tag: nothing to do, it
 cannot book.
 
+## Upgrading: who the participant is told they talk to (ADR 0123 step 5c)
+
+The default of `embedded_call_staff_name` (class D, per organisation) changed on 2026-11-14 from
+`name` (the staff member's account name) to `screen_name`: the participant sees the screen name kept
+with the staff record, or the organisation's word for staff alone when there is none, and never the
+account name. An organisation that stored `name` or `term` keeps it. An organisation that stored
+nothing now shows the word alone until a manager fills in the screen names on the staff page (the
+staff list marks who has none); it is no loss while the call page is dark behind
+`embedded_call_enabled`. To keep showing the account name, set the setting to `name` under
+*Organisation settings*.
+
+*Rate limit of the poll.* The call page asks who the participant talks to at the interval of
+`embedded_call_chat_poll_seconds` (class C, platform: an organisation cannot change it). The route's
+limits follow it and are no setting of their own: a bound per booking of three times the poll rate
+(18 a minute at 10 seconds, 60 at the default 3, 90 at 2) and a bound per address of fifty times that
+(900, 3000, 4500: fifty calls at three times their normal rate behind one address). From step 7c the chat is asked for in the same poll and counts against the same
+per-booking bound.
+
 ## The call page's SDK does not work (ADR 0123 step 4c)
 
 The call page (`/b/m/{ref}/call`, only while `embedded_call_enabled` is on) joins a call with the

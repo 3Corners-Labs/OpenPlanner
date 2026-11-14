@@ -219,6 +219,9 @@ FLOWS: dict[str, Flow] = {
         "so an attack on it (a device, a notice, an event of a call that is over) reaches no "
         "server, and there is nothing to attribute"
     ),
+    "## Flow: the staff member's name on the participant's call page (ADR 0123 step 5c)": Flow(
+        (PUBLIC, DENIED, CHANGE)
+    ),
     "## Flow: sharing a screen and closed captions in the call (ADR 0123 step 5b)": Flow(
         no_event="everything in it happens in the browser: the screen goes to the video platform "
         "and the captions come from it, the page makes no request of its own, so an attack on it "

@@ -7,8 +7,8 @@
  * the page's state (the last few lines and one interim line, each marked as the participant's own
  * or the other side's) and saying which of them are shown (`shown`; call-render.js draws them as
  * ordinary text). A caption is only its text: the
- * name the video platform gives a speaker is never read, so the page names the other side with its
- * own words only.
+ * name the video platform gives a speaker is never read, so the page names the other side with the
+ * name our own server gave (call-poll.js; step 5c) or, without one, the team's word for staff.
  *
  * Never: it makes no request, loads no file and stores nothing. Captions live in the page's memory
  * (`app.state.lines` and `app.state.interim`) and are gone when they are switched off or the call

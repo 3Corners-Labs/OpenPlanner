@@ -141,6 +141,40 @@ Wissen gebeurt ook vanzelf. Wie 365 dagen niet heeft ingelogd (de superuser stel
 worker eenmaal per dag gewist, als systeemgebeurtenis `staff.erased`. Wie vóór dat moment
 terugkomt, blijft staan.
 
+<!-- field: screen_name -->
+## Schermnaam
+
+Op de pagina van een medewerker stelt u onder **Schermnaam** de naam in die de deelnemer ziet in
+een gesprek op de eigen gesprekspagina van de organisatie: bij het beeld van de medewerker, met het
+eigen woord van de organisatie voor medewerkers erbij ("Sanne · medewerker"), en in de
+ondertitels. Wie `staff.manage` heeft (organisatiebeheerders en de superuser) vult het in voor de
+mensen die zij zien; een leeg veld haalt de naam weg.
+
+De medewerker mag niet te vinden zijn op de accountnaam, dus de deelnemer ziet standaard een
+schermnaam en nooit de accountnaam. Kies een **voornaam of een verzonnen naam**, niet de volledige
+naam. Een schermnaam heeft 2 tot 40 tekens: letters van elk schrift, cijfers, spaties, een
+koppelteken, een apostrof en een punt. Een medewerker zonder schermnaam wordt alleen met het woord
+van de organisatie voor medewerkers getoond.
+
+De organisatie kiest in de *Organisatie-instellingen* wat de deelnemer te zien krijgt (de
+instelling *embedded_call_staff_name*): de schermnaam (de standaard), de naam van het account of
+alleen het woord. Zolang de schermnaam gekozen is, markeert de medewerkerslijst iedereen zonder
+schermnaam met **Geen schermnaam**, zodat u ziet wie nog alleen met het woord getoond wordt.
+
+Een schermnaam heeft minstens één letter of cijfer, en een accent alleen op een letter. De
+portal bewaart hem in de normaalvorm van Unicode en telt de tekens daarna. Tekens van nulbreedte
+en tekens die de schrijfrichting veranderen worden geweigerd, en daarmee voorlopig ook een naam die alleen met een
+nulbreedte-verbindings- of -scheidingsteken te schrijven is (sommige Perzische namen); hoogstens vier
+accenten achter elkaar worden geaccepteerd.
+
+Er is één schermnaam per persoon, ongeacht van welke organisatie de deelnemers hem zien: een
+beheerder van één organisatie stelt in wat de deelnemers van elke organisatie van die persoon
+zien. De lijst markeert iemand met **Geen schermnaam** zodra een van zijn organisaties (die u
+ziet) de schermnaam toont.
+
+De schermnaam is persoonsgegeven van de medewerker. Wordt het medewerkersrecord gewist, dan gaat de
+schermnaam mee, en de auditlog zegt dat hij is ingesteld of gewist, nooit welke het is.
+
 ## Tweede factor (MFA)
 
 Medewerkers loggen in met een tweede factor naast het wachtwoord: een code uit een

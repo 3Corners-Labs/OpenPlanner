@@ -373,6 +373,7 @@ class AdminService:
                 last_logout_at=old.last_logout_at if old else None,
                 email=email,
                 email_at=now if email else None,
+                screen_name=old.screen_name if old else None,  # a login never loses the name
                 refused=tuple(
                     RefusedEntitlement(r.value, r.reason.value, r.organisation, now)
                     for r in refused

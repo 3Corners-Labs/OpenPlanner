@@ -1,5 +1,5 @@
 /*
- * The participant's call page: its one state and its one view (ADR 0123 steps 4b, 4c, 5a and 5b).
+ * The participant's call page: its one state and its one view (ADR 0123 steps 4b, 4c, 5a, 5b and 5c).
  *
  * Owns: the page's single `state` and the one way to change it, `go(screen, patch)`, which checks
  * the move against a table of allowed transitions, renders, moves focus to the new heading and
@@ -13,11 +13,12 @@
  * devices (the check, the lists, the choice), call-connection.js the call (token, SDK, attempts,
  * lobby, leaving), call-media.js the participant's camera, microphone and screen in the call,
  * call-captions.js the captions, call-remote.js the other side's picture, sound and screen,
- * call-render.js how the call's parts look, call-events.js what the meeting tells the page. They only define; this file, loaded last,
- * starts them.
+ * call-render.js how the call's parts look, call-events.js what the meeting tells the page,
+ * call-poll.js the one poll of our own server for who the participant talks to. They only define;
+ * this file, loaded last, starts them.
  *
- * Never: it makes no request, loads no file, stores nothing, sets no inline style and builds no
- * markup out of text. Without the script, or in a browser without the needed features, the page
+ * Never: it makes no request of its own (the token is call-connection.js's, the name call-poll.js's),
+ * loads no file, stores nothing, sets no inline style and builds no markup out of text. Without the script, or in a browser without the needed features, the page
  * keeps the start state with the sentence that says what the call needs.
  */
 (function () {
@@ -96,6 +97,8 @@
       lines: [], // the captions in view: their final lines (in memory only, gone with the call)
       interim: null, // the caption being spoken, until its final text arrives
       can: { share: false, captions: false }, // what the meeting offers this participant
+      staffName: "", // who the participant talks to, as our server says (call-poll.js); "" for no name
+      staffSaid: "", // the name the polite region last said, "" for none: a name is said once
     };
   }
   var state = fresh();
@@ -270,6 +273,7 @@
     view.sharing(state);
     view.captions(state);
     view.bar(state);
+    app.poll.sync(state);
   }
   // ---- what the participant does -----------------------------------------------------------------
   function join() {
@@ -320,6 +324,7 @@
   app.devices.init();
   app.connection.init();
   app.remote.init();
+  app.poll.init();
 
   $$("[data-call-browser]").forEach(function (step) {
     step.hidden = step.dataset.callBrowser !== (safari ? "safari" : "other");
