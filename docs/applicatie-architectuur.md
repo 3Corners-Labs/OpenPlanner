@@ -299,7 +299,8 @@ onjuist blijkt, verandert het hoofdstuk dat haar gebruikt.
 
 Het diagram zet OpenPlanner tussen drie groepen: de mensen en systemen van de organisatie, de
 voorzieningen uit haar eigen omgeving, en de diensten van leveranciers. Elke pijl is een stroom
-uit 3.3.
+uit 3.3. Cisco Meeting Server staat er met een gestippelde rand bij: verkend als videoplatform
+on-premises, niet gebouwd (8.2).
 
 ```mermaid
 flowchart LR
@@ -322,6 +323,7 @@ flowchart LR
         logs[Logplatform of SIEM<br/>syslog, Splunk,<br/>Elastic, HTTP]
         dns[DNS-resolver en tijdbron]
         hosting[Hosting<br/>Docker of Kubernetes,<br/>blokopslag, back-up]
+        cms[Cisco Meeting Server<br/>on-premises, verkend]
     end
 
     subgraph leverancier [Diensten van leveranciers]
@@ -353,6 +355,10 @@ flowchart LR
     dienst -- "releasecheck, images" --> gh
     dienst -. "certificaat" .-> acme
     hosting -.- dienst
+    dienst -. "verkend: ruimte per afspraak" .-> cms
+    deelnemer -. "verkend: gesprek in de belpagina" .-> cms
+    classDef verkend stroke-dasharray: 5 5
+    class cms verkend
 ```
 
 ### 3.3 Koppelvlakken en datastromen
@@ -1847,7 +1853,7 @@ en O15 (Genesys) tellen zwaar.
 | R-8 | Organisaties binnen één installatie delen superuser, database en sleutels | Een fout of compromis bij de superuser raakt elke organisatie | Vertrouwensgrenzen in het dreigingsmodel; een tweede verwerkingsverantwoordelijke krijgt een eigen installatie | privacyofficer |
 | R-9 | `httpx` kende in 2026 een stille periode in onderhoud | Een kwetsbaarheid zonder patch zou de hele uitgaande laag raken | Gemarkeerd als *watch* in `docs/dependencies.md`; één client, dus één vervangpunt | productteam |
 | R-10 | Een deel van de besluiten is deels gebouwd (zie 10.2), en `docs/adr-status.md` loopt op enkele rijen achter op de bouwtabel van de ADR zelf | Een lezer kan meer of minder verwachten dan er draait | Bouwstatus per ADR en het overzicht; de vraag "wat draait op de testhost" wordt uit de code beantwoord | productteam |
-| R-11 | De platen in `docs/diagrams/` tonen de stand van 5 november 2026 | Rapportage, diensten en flows, de belpagina en de webhookpoort ontbreken op de platen | De platen opnieuw genereren uit `scripts/diagrams/content.py`; de test van de platen controleert alleen de poorten | productteam |
+| R-11 | De platen in `docs/diagrams/` tonen de stand van 5 november 2026; op 14 november zijn de belpagina en het verkende Cisco Meeting Server toegevoegd | Rapportage, diensten en flows en de webhookpoort ontbreken nog op de platen | De platen opnieuw genereren uit `scripts/diagrams/content.py`; de test van de platen controleert alleen de poorten | productteam |
 | R-12 | De geschiedenis van de repository is op 4 november 2026 herschreven (ADR 0115) | Oudere clones, images van eerdere releases en externe verwijzingen wijzen naar commits die niet meer bestaan | Eenmalig, vastgelegd; iedereen begint van een verse clone | productteam |
 | R-13 | ADR 0116 noemt een mogelijk gedeeld model: één installatie met meer klanten als organisaties. Het dreigingsmodel zegt dat een tweede verwerkingsverantwoordelijke een eigen installatie krijgt | Zolang niet is vastgelegd wie in een gedeelde installatie verwerkingsverantwoordelijke is, spreken de twee elkaar tegen | Een besluit nemen voordat het gedeelde model wordt aangeboden; zie V-13 | productowner, privacyofficer |
 | R-14 | Inkomende webhooks vragen een adres dat vanaf internet bereikbaar is; bronnetwerken zijn standaard optioneel | Een omgeving zonder inkomend verkeer mist de status van meetings en werkitems; een te open adres krijgt ongewenst verkeer | De poort van ADR 0124 (handtekening, tijdvenster, grootte, rate limit, pauze, replay); bronnetwerken per leverancier, verplicht te maken met `WEBHOOK_SOURCE_NETWORKS_REQUIRED` (B); een eigen naam via `WEBHOOK_BASE_URL` | hosting, netwerkbeheer |
@@ -2068,4 +2074,4 @@ document. Zo'n ontwerp vult ten minste dit in:
 | 5 november 2026 | Concept 1c: de platen zijn bijgewerkt (#547); risico R-11, paragraaf 5.1 en bijlage A volgen |
 | 5 november 2026 | Concept 1d: elke fake staat in `tests/fakes/` (#549); paragraaf 5.4 en 11.3 volgen |
 | 14 november 2026 | Concept 2: bijgewerkt naar releasekandidaat `v0.6.0-rc.117` (ADR 0117 tot en met 0124, 37 poorten, 54 permissies, 29 taaksoorten, 224 instellingen) en de term *dienst*. Voor het hostingteam: elke datastroom met nummer, poort en richting (3.3), de ingangen met hun blootstelling (5.6), netwerk en zones zonder websockets (7.7), Docker, Kubernetes en OpenStack (7.8), de impactanalyse van hosten in de eigen infrastructuur of bij een hoster (7.9), wat het platformteam levert (7.10), OIDC met de claims en JIT (8.5), en elke bewaartermijn met haar instelling (8.6). Aannames A-6 en A-7, risico's R-14 tot en met R-16, vragen V-16 tot en met V-22 en het kader voor een ontwerp per organisatie (13.5) zijn nieuw |
-| 14 november 2026 | Concept 2a: ADR 0125 (#834) verwerkt. De hops naar de meegeleverde Keycloak en haar database zijn vastgelegde uitzonderingen (3.3, 9.1). Tot stap 2 van die ADR vinden de containers elkaar op naam (7.2, 7.7). Productie start met de meegeleverde provider, en de installer waarschuwt (7.3, 8.5). Risico R-17, vraag V-23, de roadmap en een voorbehoud bij A-3, V-2 en 13.5 zijn nieuw. Verder is de belpagina beschreven als bouwblok dat niet aan Webex hangt, met een verkenning van Cisco Meeting Server (8.2, R-3, 13.1) |
+| 14 november 2026 | Concept 2a: ADR 0125 (#834) verwerkt. De hops naar de meegeleverde Keycloak en haar database zijn vastgelegde uitzonderingen (3.3, 9.1). Tot stap 2 van die ADR vinden de containers elkaar op naam (7.2, 7.7). Productie start met de meegeleverde provider, en de installer waarschuwt (7.3, 8.5). Risico R-17, vraag V-23, de roadmap en een voorbehoud bij A-3, V-2 en 13.5 zijn nieuw. Verder is de belpagina beschreven als bouwblok dat niet aan Webex hangt, met een verkenning van Cisco Meeting Server (8.2, R-3, 13.1). Cisco Meeting Server staat gestippeld op de systeemcontext (3.2) en op de platen (R-11) |
