@@ -48,7 +48,7 @@
 
 {#- The two notices that last while they hold (the recording, the connection being restored): an
     icon and a word, never colour alone; text, not a live region (the one polite region says each
-    change once). Shown in the call; the lobby only keeps what the meeting says. -#}
+    change once). One place for both, shown in the lobby and the call (the participant is recorded in both). -#}
 {% macro notices() -%}
 <div class="call-notices">
   <p class="call-notice" data-call-notice="recording" hidden>
@@ -96,6 +96,7 @@
 {% block content %}
 <div class="call" data-call data-call-token-url="{{ token_url }}" data-call-seconds="{{ connect_seconds }}" data-call-attempts="{{ connect_attempts }}"{% if sdk_src %} data-call-sdk="{{ sdk_src }}" data-call-sdk-integrity="{{ sdk_integrity }}"{% endif %}>
   <p class="visually-hidden" role="status" aria-live="polite" data-call-status></p>
+  {{ notices() }}
 
   <section class="call-state" aria-labelledby="call-start-heading" data-call-state="start">
     <p class="eyebrow">{{ group.name }}</p>
@@ -188,7 +189,6 @@
 
   <section class="call-state" aria-labelledby="call-call-heading" data-call-state="call" hidden>
     <h1 class="call-quiet" id="call-call-heading" tabindex="-1">{{ _("callpage.call.heading") }}</h1>
-    {{ notices() }}
     <div class="call-stage">
       <video class="call-remote" playsinline autoplay muted aria-label="{{ _("callpage.call.remote") }}" data-call-remote></video>
       <p class="call-remote__off" data-call-remote-off hidden>{{ _("callpage.call.remote_off") }}</p>
@@ -300,11 +300,14 @@
   <p data-call-back><a href="/b/m/{{ ref }}/join">{{ _("join.back") }}</a></p>
 </div>
 {% endblock %}
-{#- Five own scripts that share one object, in this order: the four that only define (the call's
-    media is taken and released by the file loaded after the connection it works on, the controls
-    and notices after the media), then the page, which starts them. -#}
-{% block scripts %}<script src="{{ static_url('call-devices.js') }}" defer></script>
+{#- Seven own scripts that share one object, in this order. Each only defines when it loads, and what
+    it needs at that moment comes from a file before it: the status line, the sound of the check, the
+    devices (which make the store of chosen ids), the call, the call's media (which uses that store),
+    what the meeting tells the page, then the page, which starts them. -#}
+{% block scripts %}<script src="{{ static_url('call-status.js') }}" defer></script>
+<script src="{{ static_url('call-sound.js') }}" defer></script>
+<script src="{{ static_url('call-devices.js') }}" defer></script>
 <script src="{{ static_url('call-connection.js') }}" defer></script>
 <script src="{{ static_url('call-media.js') }}" defer></script>
-<script src="{{ static_url('call-controls.js') }}" defer></script>
+<script src="{{ static_url('call-events.js') }}" defer></script>
 <script src="{{ static_url('call-page.js') }}" defer></script>{% endblock %}

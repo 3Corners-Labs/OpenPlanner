@@ -130,3 +130,26 @@ export async function join(page: Page): Promise<void> {
 export const saidLike = (page: Page, re: RegExp): Promise<void> =>
   expect.poll(async () => (await statuses(page)).some((s) => re.test(s)), { timeout: 20_000, message: String(re) }).toBe(true);
 export const timesSaid = async (page: Page, text: string): Promise<number> => (await statuses(page)).filter((s) => s === text).length;
+
+/**
+ * The page's contract is what it does with the answer of `play()` on the other side's sound, not
+ * what an engine does with a made-up stream: the stub decides for that element, in both phases
+ * (`window.__blockPlay`: refuse with NotAllowedError; else resolve; `__hangPlay`: never settle), and
+ * counts the calls (`__plays`). The engines' own autoplay rules are seen only in a real meeting.
+ */
+export async function stubRemoteSound(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __blockPlay: boolean; __hangPlay: boolean; __plays: number };
+    w.__blockPlay = true;
+    w.__hangPlay = false;
+    w.__plays = 0;
+    const original = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      if (!this.hasAttribute('data-call-remote-audio')) return original.call(this);
+      w.__plays += 1;
+      if (w.__hangPlay) return new Promise<void>(() => {});
+      return w.__blockPlay ? Promise.reject(new DOMException('blocked', 'NotAllowedError')) : Promise.resolve();
+    };
+  });
+}
+export const plays = (page: Page): Promise<number> => page.evaluate(() => (window as unknown as { __plays: number }).__plays);

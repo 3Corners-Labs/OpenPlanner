@@ -4,15 +4,15 @@
  * Owns: the page's single `state` and the one way to change it, `go(screen, patch)`, which checks
  * the move against a table of allowed transitions, renders, moves focus to the new heading and
  * hands one sentence to the polite status line. It also owns `render` (every hidden flag, pressed
- * state, picture and word of the page), the status queue, the texts and the wiring of the
- * buttons. Every word is the server's own markup (the sections of the page and [data-text]); the
+ * state, picture and word of the page), the texts and the wiring of the buttons. Every word is the server's own markup (the sections of the page and [data-text]); the
  * script only shows and hides it and sets text with textContent.
  *
- * Split in five files that share the one object `window.openplannerCall` (no build step):
- * call-devices.js lists and chooses devices (the check and the call's panel), call-connection.js
- * is the call (token, SDK, attempts, lobby, leaving), call-media.js is the participant's camera
- * and microphone in the call, call-controls.js is the call's devices panel and its notices. They
- * only define; this file, loaded last, starts them.
+ * Split in files that share the one object `window.openplannerCall` (no build step): call-status.js
+ * is the polite status line, call-sound.js the level meter and test sound, call-devices.js the
+ * devices (the check, the lists, the choice), call-connection.js the call (token, SDK, attempts,
+ * lobby, leaving), call-media.js the participant's camera and microphone in the call,
+ * call-events.js what the meeting tells the page. They only define; this file, loaded last,
+ * starts them.
  *
  * Never: it makes no request, loads no file, stores nothing, sets no inline style and builds no
  * markup out of text. Without the script, or in a browser without the needed features, the page
@@ -50,7 +50,6 @@
   });
   app.texts = texts;
 
-  var statusLine = $("[data-call-status]");
   var preview = $("[data-call-preview]");
   var joinButton = $("[data-call-join]");
   var beginButton = $("[data-call-begin]");
@@ -85,7 +84,7 @@
       remote: "unknown", // unknown, waiting, live or off: the other side's picture
       soundBlocked: false, // the browser refused to play the other side's sound
       panel: false, // the panel of devices in the call is open
-      recording: false, // the meeting is being recorded
+      recording: "off", // off, pending (being recorded, not yet said) or on (said): the meeting is recorded
       connection: "ok", // ok or restoring: the connection of the call is being restored
     };
   }
@@ -106,41 +105,6 @@
     unavailable: [],
   };
 
-  // ---- the status line: one sentence at a time -----------------------------------------------
-  // The polite region gets one sentence at a time, each kept on screen for a minimum time, so a
-  // new sentence never replaces one that has not been read out: none is dropped, none repeats
-  // (a sentence equal to the one waiting last is not queued twice). "" clears region and queue.
-  var SAY_MS = 1500;
-  var queue = [];
-  var sayTimer = 0;
-  var sayBusy = false;
-  function pump() {
-    if (sayBusy || !queue.length) return;
-    sayBusy = true;
-    statusLine.textContent = "";
-    var next = queue.shift();
-    // Emptied first, so a sentence equal to the one before is read out again.
-    window.setTimeout(function () {
-      statusLine.textContent = next;
-    }, 60);
-    sayTimer = window.setTimeout(function () {
-      sayBusy = false;
-      pump();
-    }, SAY_MS);
-  }
-  function say(key) {
-    if (!key) {
-      window.clearTimeout(sayTimer);
-      queue = [];
-      sayBusy = false;
-      statusLine.textContent = "";
-      return;
-    }
-    var text = texts[key] || "";
-    if (text && queue[queue.length - 1] !== text) queue.push(text);
-    pump();
-  }
-
   // ---- go: the one way the state changes -------------------------------------------------------
   // `patch` holds fields of the state and, besides them, `say` (the key of the one sentence for
   // the live region, "" to clear it) and `focus` ("denied" for the panel of a refused device,
@@ -158,11 +122,19 @@
     delete fields.focus;
     Object.assign(state, fields);
     state.screen = screen;
-    if (changed && screen !== "lobby" && screen !== "call") {
-      Object.assign(state, { panel: false, recording: false, connection: "ok" });
+    var inCall = screen === "lobby" || screen === "call";
+    // A new screen outside the lobby and the call, or a new attempt, starts the call's panel and
+    // notices afresh.
+    if (!inCall && (changed || fields.attempt !== undefined)) {
+      Object.assign(state, { panel: false, recording: "off", connection: "ok" });
     }
     render();
-    if (sentence !== undefined) say(sentence);
+    if (sentence !== undefined) app.say(sentence);
+    // A recording is said once, when its notice first shows: it may have started while connecting.
+    if (state.recording === "pending" && inCall) {
+      state.recording = "on";
+      app.say("say_recording_on");
+    }
     var target = null;
     if (focus === "denied") {
       target = $('[data-call-denied="' + app.deniedKind(state.refused) + '"] h2');
@@ -184,7 +156,7 @@
     });
     Object.assign(state, fresh());
     render();
-    say("");
+    app.say("");
   }
 
   // Which panel of a refused permission is shown: one kind, both, or none.
@@ -281,7 +253,8 @@
     // Notices last while they hold; the panel of devices is a disclosure of the call's bar.
     $$("[data-call-notice]").forEach(function (notice) {
       var restoring = notice.dataset.callNotice === "restoring";
-      notice.hidden = !(screen === "call" && (restoring ? state.connection === "restoring" : state.recording));
+      var held = restoring ? state.connection === "restoring" : state.recording !== "off";
+      notice.hidden = !(inCall && held);
     });
     var open = screen === "call" && state.panel;
     $("[data-call-devices-panel]").hidden = !open;
@@ -386,6 +359,19 @@
     }
   }
 
+  // The panel of the call's devices is a disclosure: its button opens and closes it (the lists are
+  // looked at again when it opens), Escape closes it and returns focus to the button.
+  function wireDevicesPanel() {
+    $("[data-call-devices-button]").addEventListener("click", function () {
+      if (state.screen !== "call") return;
+      go("call", { panel: !state.panel });
+      if (state.panel) app.devices.list();
+    });
+    $(".call-bar__devices").addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && state.panel) go("call", { panel: false, focus: "devices" });
+    });
+  }
+
   // The page goes away: the devices of the check and the call, if any, are given back.
   function leavePage() {
     app.devices.release();
@@ -399,9 +385,9 @@
     restart();
   }
 
+  app.sound.init();
   app.devices.init();
   app.connection.init();
-  app.controls.init();
 
   $$("[data-call-browser]").forEach(function (step) {
     step.hidden = step.dataset.callBrowser !== (safari ? "safari" : "other");
@@ -411,7 +397,8 @@
   });
   beginButton.addEventListener("click", app.devices.begin);
   joinButton.addEventListener("click", join);
-  $("[data-call-test-sound]").addEventListener("click", app.devices.playTestSound);
+  $("[data-call-test-sound]").addEventListener("click", app.sound.playTestSound);
+  wireDevicesPanel();
   $$("[data-call-leave]").forEach(function (button) {
     button.addEventListener("click", app.connection.leave);
   });

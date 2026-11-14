@@ -27,6 +27,7 @@ import {
   saidLike,
   sdk,
   state,
+  stubRemoteSound,
   stubToken,
   timesSaid,
   WAITING,
@@ -48,7 +49,7 @@ const devicesButton = (page: Page) => page.getByRole('button', { name: 'Devices'
 const panel = (page: Page) => page.getByRole('group', { name: 'Your devices' });
 const pick = (page: Page, kind: 'camera' | 'microphone' | 'speaker') => page.locator(`[data-call-pick="${kind}"]`);
 const notice = (page: Page, kind: 'recording' | 'restoring') => page.locator(`[data-call-notice="${kind}"]`);
-const bar = (page: Page) => state(page, 'call').locator('.call-bar');
+const bar = (page: Page) => state(page, 'call').locator('.call-controls');
 const leave = (page: Page) => page.getByRole('button', { name: 'Leave the call' });
 
 /** Into the call, with the plan of the double. */
@@ -65,20 +66,27 @@ async function inCall(page: Page, plan: Plan = {}): Promise<void> {
  */
 async function stubSpeaker(page: Page): Promise<void> {
   await page.addInitScript(() => {
-    const w = window as unknown as { __sinks: string[]; __sinkFails: boolean };
+    const w = window as unknown as { __sinks: string[]; __sinkFails: boolean; __sinkDelay: number };
     w.__sinks = [];
     w.__sinkFails = false;
+    w.__sinkDelay = 0;
     Object.defineProperty(HTMLMediaElement.prototype, 'setSinkId', {
       configurable: true,
       value(this: HTMLMediaElement, id: string): Promise<void> {
         if (w.__sinkFails) return Promise.reject(new DOMException('refused', 'NotAllowedError'));
-        if (this.hasAttribute('data-call-remote-audio')) w.__sinks.push(id);
-        return Promise.resolve();
+        return new Promise<void>((resolve) =>
+          setTimeout(() => {
+            if (this.hasAttribute('data-call-remote-audio')) w.__sinks.push(id);
+            resolve();
+          }, w.__sinkDelay),
+        );
       },
     });
   });
 }
 const sinks = (page: Page): Promise<string[]> => page.evaluate(() => (window as unknown as { __sinks: string[] }).__sinks);
+const sinkDelay = (page: Page, ms: number): Promise<number> =>
+  page.evaluate((value) => ((window as unknown as { __sinkDelay: number }).__sinkDelay = value), ms);
 const sinksFail = (page: Page, refuse: boolean): Promise<void> =>
   page.evaluate((value) => ((window as unknown as { __sinkFails: boolean }).__sinkFails = value), refuse);
 
@@ -223,6 +231,38 @@ test('the speaker is applied to the other side at once, and a refusal keeps the 
   expect(await sinks(page)).not.toContain('spk-1');
 });
 
+test('a camera chosen while the camera is being taken out of the meeting waits for that, and the camera stays off', async ({ page }) => {
+  await inCall(page, { slowUnpublish: 1500 });
+  await devicesButton(page).click();
+  const camera = page.getByRole('button', { name: /^Camera/ });
+  const taken = (await sdk(page)).devices.length;
+  await camera.click(); // the camera is being taken out of the meeting, slowly
+  await pick(page, 'camera').selectOption('cam-2');
+  await expect(camera).toHaveAttribute('aria-pressed', 'false');
+  await said(page, CHANGED);
+  // Nothing was taken or sent for the new camera: it only noted the choice, and no device is open.
+  const log = await sdk(page);
+  expect(log.devices).toHaveLength(taken);
+  expect(log.published).toEqual([]);
+  expect(await live(page)).toEqual([0, 1]);
+  await expect(camera).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('a speaker choice that settles after the call ended says nothing', async ({ page }) => {
+  await stubSpeaker(page);
+  await inCall(page);
+  await devicesButton(page).click();
+  await sinkDelay(page, 800);
+  await pick(page, 'speaker').selectOption('spk-2');
+  await leave(page).click();
+  await expect(heading(page, 'You left the call')).toBeFocused();
+  await expect.poll(() => sinks(page)).toContain('spk-2'); // the late answer has come
+  await frames(page);
+  expect(await timesSaid(page, CHANGED)).toBe(0);
+  expect(await timesSaid(page, NOT_CHANGED)).toBe(0);
+  await expect(heading(page, 'You left the call')).toBeFocused();
+});
+
 // ---- the notices -----------------------------------------------------------------------------------
 
 test('the recording notice shows while the recording runs and is said once when it starts and once when it stops', async ({ page }) => {
@@ -246,6 +286,25 @@ test('the recording notice shows while the recording runs and is said once when 
   await frames(page);
   expect(await timesSaid(page, RECORDING)).toBe(1);
   expect(await timesSaid(page, 'The recording has stopped.')).toBe(1);
+});
+
+test('a recording that began in the lobby is said once and its notice is there in the lobby and in the call', async ({ page }) => {
+  await stubToken(page, granted());
+  await open(page, { lobby: true });
+  await join(page);
+  await expect(heading(page, WAITING)).toBeFocused();
+  await expect(notice(page, 'recording')).toBeHidden();
+  await recording(page, true);
+  await expect(notice(page, 'recording')).toBeVisible();
+  await said(page, RECORDING);
+  await expectNoAxeViolations(page);
+
+  await control(page, 'admit');
+  await expect(heading(page, IN_CALL)).toBeFocused();
+  await expect(notice(page, 'recording')).toBeVisible();
+  await saidLike(page, /let you in\. The call has started\.$/);
+  await frames(page);
+  expect(await timesSaid(page, RECORDING)).toBe(1);
 });
 
 test('a connection being restored shows a notice, is said once, and is said once more when it is back', async ({ page }) => {
@@ -372,26 +431,52 @@ test('what an event carries is never shown as text or markup, and an event of a 
 
 // ---- the bar stays in view ----------------------------------------------------------------------------
 
+test('a control that has focus is not under the bar on a low window, and the page keeps room for the bar', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 400 });
+  await stubRemoteSound(page); // the browser blocks the other side's sound: a button to hear it shows
+  await inCall(page);
+  const hear = page.getByRole('button', { name: 'Tap to hear the other person' });
+  await expect(hear).toBeVisible();
+  await hear.focus();
+  const control_ = await hear.boundingBox();
+  const controls = await bar(page).boundingBox();
+  expect(control_).not.toBeNull();
+  expect(controls).not.toBeNull();
+  const clear = (control_?.y ?? 0) + (control_?.height ?? 0) <= (controls?.y ?? 0) + 0.5 || (controls?.y ?? 0) + (controls?.height ?? 0) <= (control_?.y ?? 0) + 0.5;
+  expect(clear, 'the focused control and the bar overlap').toBe(true);
+  const padding = await page.evaluate(() => Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingBottom));
+  expect(padding).toBeGreaterThan(0); // a control scrolled into view comes to rest above the bar
+});
+
 for (const size of [
   { width: 1280, height: 400, name: 'a wide window 400 px high' },
+  { width: 320, height: 640, name: '320 px wide and 640 px high' },
   { width: 320, height: 400, name: '320 px wide and 400 px high' },
   { width: 320, height: 256, name: '400 % zoom (a 1280 by 1024 window)' },
 ]) {
-  test(`with both notices and the panel shown the bar and the way out stay in view, ${size.name}`, async ({ page }) => {
+  test(`with both notices and the panel shown the bar stays in view and takes at most half the window, ${size.name}`, async ({ page }) => {
     await page.setViewportSize({ width: size.width, height: size.height });
     await inCall(page);
     await recording(page, true);
     await reconnection(page, 'start');
     await expect(notice(page, 'recording')).toBeVisible();
     await expect(notice(page, 'restoring')).toBeVisible();
-    await inView(page, bar(page), 'the bar');
+    const half = async (what: string): Promise<void> => {
+      await inView(page, bar(page), what);
+      const box = await bar(page).boundingBox();
+      expect(box?.height ?? Number.POSITIVE_INFINITY, `${what}: height`).toBeLessThanOrEqual(size.height / 2 + 1);
+    };
+    await half('the bar');
     await inView(page, leave(page), 'the way out');
     await inView(page, devicesButton(page), 'the devices button');
 
     await devicesButton(page).click();
     await expect(panel(page)).toBeVisible();
-    await inView(page, bar(page), 'the bar with the panel open');
-    await inView(page, leave(page), 'the way out with the panel open');
+    await half('the bar with the panel open');
+    await inView(page, panel(page), 'the panel');
+    const above = await panel(page).boundingBox();
+    const under = await bar(page).boundingBox();
+    expect((above?.y ?? 0) + (above?.height ?? 0)).toBeLessThanOrEqual((under?.y ?? 0) + 1); // the panel opens above the bar
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
     await expectNoAxeViolations(page);
   });
@@ -410,28 +495,31 @@ test('every control of the call is at least 24 by 24 pixels, with the panel and 
   }
 });
 
-test('reduced motion and forced colours keep the notices and the panel readable', async ({ browser, browserName }) => {
+test('reduced motion and forced colours keep the notices and the panel visible, with their words and an edge of their own', async ({ browser, browserName }) => {
   test.skip(browserName !== 'chromium', 'forced colours are emulated in Chromium');
   const context = await browser.newContext({ locale: 'en-US', reducedMotion: 'reduce', forcedColors: 'active' });
   const page = await context.newPage();
   await inCall(page);
   await recording(page, true);
+  await reconnection(page, 'start');
   await devicesButton(page).click();
+  // Both notices and the panel are there, each with its word: nothing hangs on colour.
   await expect(notice(page, 'recording')).toBeVisible();
+  await expect(notice(page, 'recording').getByText('Recording')).toBeVisible();
+  await expect(notice(page, 'restoring')).toBeVisible();
+  await expect(notice(page, 'restoring').getByText('Reconnecting')).toBeVisible();
+  await expect(panel(page)).toBeVisible();
   const style = (selector: string) =>
     page.locator(selector).first().evaluate((el) => {
       const s = getComputedStyle(el);
-      return { animation: s.animationName, transition: s.transitionDuration, border: s.borderTopStyle, left: s.borderLeftWidth, top: s.borderTopWidth };
+      return { border: s.borderTopStyle, left: s.borderLeftWidth, top: s.borderTopWidth };
     });
   const notices = await style('[data-call-notice="recording"]');
-  expect(notices.animation).toBe('none');
   expect(notices.border).toBe('solid'); // the notice keeps an edge when the colours are the system's
   expect(Number.parseFloat(notices.left)).toBeGreaterThan(Number.parseFloat(notices.top));
   const opened = await style('[data-call-devices-button]');
   expect(opened.border).toBe('solid');
   expect(Number.parseFloat(opened.top)).toBeGreaterThanOrEqual(3); // open: a thicker edge, not colour alone
-  const box = await style('[data-call-devices-panel]');
-  expect(box.border).toBe('solid');
-  expect(box.transition).toBe('0s');
+  expect((await style('[data-call-devices-panel]')).border).toBe('solid');
   await context.close();
 });

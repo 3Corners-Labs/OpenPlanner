@@ -17,18 +17,18 @@
 
   var app = (window.openplannerCall = window.openplannerCall || {});
   var call = app.call; // call-connection.js is loaded first and has made both
-  var choice = app.choice;
+  var choice = app.choice; // the chosen device ids; call-devices.js is loaded first and has made it
   var PICTURE = { width: 1280, height: 720 }; // the size the picture is asked for
 
   function createStream(kind) {
     var helpers = call.client.meetings.mediaHelpers;
     if (kind === "microphone") {
       var sound = { echoCancellation: true, noiseSuppression: true };
-      if (choice.microphoneId) sound.deviceId = choice.microphoneId;
+      if (choice.microphone) sound.deviceId = choice.microphone;
       return helpers.createMicrophoneStream(sound);
     }
     var picture = { width: PICTURE.width, height: PICTURE.height };
-    if (choice.cameraId) picture.deviceId = choice.cameraId;
+    if (choice.camera) picture.deviceId = choice.camera;
     return helpers.createCameraStream(picture);
   }
 
@@ -77,6 +77,19 @@
     app.go(app.state.screen, { live: live, say: say || "say_" + kind + (on ? "_on" : "_off") });
   }
 
+  // A press or a choice while the devices are being taken, the media is being added or this device
+  // is being made or taken out waits for that and then runs `again`; it is dropped if the call
+  // ended meanwhile. Returns that waiting, or null when nothing is going on.
+  function whenIdle(kind, again) {
+    var epoch = call.epoch;
+    var busy = call.adding || call.capturing || call.making[kind];
+    if (!busy) return null;
+    var replay = function () {
+      return epoch === call.epoch ? again() : undefined;
+    };
+    return busy.then(replay, replay);
+  }
+
   // One device of the call switched on or off. Off gives the device back, as in the check: in
   // the call the stream is taken out of the meeting and stopped (the camera light goes out), and
   // switching on takes a new one and sends it. If the SDK refuses to take it out, it is only
@@ -84,18 +97,15 @@
   // show the device as in use). Before the media is in (the lobby) the device is simply stopped or
   // taken. One rule for sending: a new stream is sent when it arrives and the media is in (after
   // an adding that is under way, unless that adding took it along); never earlier, never twice.
-  // A press while the devices are being taken, the media is being added or this device is being
-  // made waits for that, and is dropped if the call ended meanwhile. A stream that cannot be sent
-  // is stopped again and the page says that it did not work.
+  // A press waits (`whenIdle`). A stream that cannot be sent is stopped again and the page says
+  // that it did not work. Taking a device out of the meeting counts as making it, so a choice of
+  // another device made meanwhile waits for it.
   function setLive(kind, on) {
     var epoch = call.epoch;
-    var busy = call.adding || call.capturing || call.making[kind];
-    if (busy) {
-      var replay = function () {
-        return epoch === call.epoch ? setLive(kind, on) : undefined;
-      };
-      return busy.then(replay, replay);
-    }
+    var waiting = whenIdle(kind, function () {
+      return setLive(kind, on);
+    });
+    if (waiting) return waiting;
     var stream = call[kind];
     var drop = function () {
       if (epoch !== call.epoch) return;
@@ -111,7 +121,9 @@
     };
     if (!on) {
       if (!stream) switched(kind, false);
-      else if (app.state.media === "added") return call.meeting.unpublishStreams([stream]).then(drop, mute);
+      else if (app.state.media === "added") {
+        return track(kind, call.meeting.unpublishStreams([stream]).then(drop, mute));
+      }
       else drop();
       return Promise.resolve();
     }
@@ -147,23 +159,21 @@
   // the choice kept. A device that cannot be taken or sent is stopped again, the old one stays
   // and the choice is as it was. A device that is off only has its choice noted. Resolves true
   // (changed), false (the old one stays) or undefined (the call ended meanwhile). A press while a
-  // device is being made or the media added waits, like a toggle.
+  // device is being made, taken out or the media added waits, like a toggle, and looks again
+  // afterwards: if the device went off or is no longer the stream this started with, the new
+  // stream is stopped and nothing changes.
   function change(kind, id) {
     var epoch = call.epoch;
-    var busy = call.adding || call.capturing || call.making[kind];
-    if (busy) {
-      var replay = function () {
-        return epoch === call.epoch ? change(kind, id) : undefined;
-      };
-      return busy.then(replay, replay);
-    }
-    var key = kind + "Id";
-    var previous = choice[key];
+    var waiting = whenIdle(kind, function () {
+      return change(kind, id);
+    });
+    if (waiting) return waiting;
+    var previous = choice[kind];
     var old = call[kind];
-    choice[key] = id;
+    choice[kind] = id;
     if (!app.state.live[kind] || !old) return Promise.resolve(true);
     var kept = function () {
-      choice[key] = previous;
+      choice[kind] = previous;
       return epoch === call.epoch ? false : undefined;
     };
     var changing = createStream(kind).then(function (created) {
@@ -171,6 +181,10 @@
       return send(kind, created, epoch).then(
         function () {
           if (epoch !== call.epoch) return created.stop();
+          if (call[kind] !== old || !app.state.live[kind]) {
+            created.stop();
+            return kept();
+          }
           call[kind] = created;
           old.stop();
           showSelf();

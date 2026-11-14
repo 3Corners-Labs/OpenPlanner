@@ -5,6 +5,11 @@
  * tokens of the organisation's theme (ADR 0020, ADR 0041). Only the picture's own dark ground
  * is a constant of this page. No inline styles and no forced declarations; the page works from 320 px.
  */
+/* A focused control is scrolled clear of the bar that stays at the foot of the window (WCAG 2.4.11). */
+html {
+  scroll-padding-bottom: min(50vh, 12rem);
+}
+
 .call {
   --call-stage: #101214;
   --call-on-stage: #ffffff;
@@ -391,8 +396,8 @@
   left: 0;
   box-sizing: border-box;
   max-width: 28rem;
-  max-height: calc(100vh - 8rem);
-  max-height: calc(100dvh - 8rem);
+  max-height: calc(100vh - 9rem);
+  max-height: calc(100dvh - 9rem);
   margin: 0 auto var(--booking-space-s);
   padding: var(--booking-space-m);
   overflow: auto;
@@ -437,8 +442,36 @@
 }
 
 .call-hear {
-  display: block;
-  margin: var(--booking-space-s) auto 0;
+  position: absolute;
+  top: var(--booking-space-s);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* On a low window the bar takes at most about half of it (WCAG 1.4.4, 1.4.10): smaller buttons
+   (still above 24 by 24 pixels), closer rows, a leaner frame. The picture gives way. */
+@media (max-height: 32rem) {
+  .call-controls {
+    margin-top: var(--booking-space-s);
+    padding: 2px 0;
+  }
+
+  .call-bar,
+  .call-bar .call-toggles {
+    gap: 4px;
+  }
+
+  .call-bar .call-toggle,
+  .call-bar .call-more,
+  .call-bar .call-leave {
+    min-height: 2rem;
+    padding: 2px var(--booking-space-s);
+  }
+
+  .call-notice {
+    margin-bottom: 4px;
+    padding: 2px var(--booking-space-s);
+  }
 }
 
 /* --- Preferences ------------------------------------------------------------------------ */

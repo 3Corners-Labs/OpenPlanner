@@ -1,5 +1,6 @@
 """The call page (ADR 0123 steps 2 and 4b): route, switch, policy, start state, references."""
 
+import re
 from typing import Any
 
 import httpx
@@ -160,10 +161,12 @@ async def test_the_page_refers_only_to_files_of_its_own_and_has_no_inline_code(
         assert url.startswith(("/", "?")), url
         assert not url.startswith("//"), url
     for name in (
+        "call-status.js",
+        "call-sound.js",
         "call-devices.js",
         "call-connection.js",
         "call-media.js",
-        "call-controls.js",
+        "call-events.js",
         "call-page.js",
     ):
         assert any(url.startswith(f"/static/{name}?v=") for url in page.references)
@@ -184,10 +187,12 @@ async def test_the_script_is_served_with_the_page_and_nothing_else_is_loaded(
         scripts = [await client.get(source) for source in page.script_sources]
 
     assert [s.split("?")[0] for s in page.script_sources] == [
+        "/static/call-status.js",
+        "/static/call-sound.js",
         "/static/call-devices.js",
         "/static/call-connection.js",
         "/static/call-media.js",
-        "/static/call-controls.js",
+        "/static/call-events.js",
         "/static/call-page.js",
     ]
     for script in scripts:
@@ -358,6 +363,10 @@ async def test_the_failure_state_has_a_sentence_for_a_call_that_was_lost_and_for
         base = await open_link(client, await booked(client))
         failed = Page((await client.get(f"{base}/call?lang=en")).text).state("failed")
 
-    for kind in ("media", "lost"):
-        assert f'data-call-failure="{kind}"' in failed.raw
-    assert "try again" in failed.text().lower() or "Try again" in failed.text()
+    sentences = {
+        "media": "The picture or sound of the call could not be set up. You can try again.",
+        "lost": "The connection was lost and could not be restored. You can try again.",
+    }
+    for kind, sentence in sentences.items():
+        assert re.search(rf'data-call-failure="{kind}"[^>]*>{re.escape(sentence)}<', failed.raw)
+    assert [b.text for b in failed.buttons()] == ["Try again"]

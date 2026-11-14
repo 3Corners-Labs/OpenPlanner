@@ -118,3 +118,7 @@ export const said = (page: Page, text: string): Promise<void> =>
 export const begin = (page: Page) => page.getByRole('button', { name: 'Test camera and microphone' });
 export const checkHeading = (page: Page) => page.getByRole('heading', { level: 1, name: 'Check picture and sound' });
 export const READY = 'Your camera and microphone are ready.';
+
+/** The list of cameras or microphones of the device check (the call's panel has lists of its own). */
+export const checkList = (page: Page, label: 'Camera' | 'Microphone') =>
+  page.locator('[data-call-state="check"]').getByLabel(label, { exact: true });

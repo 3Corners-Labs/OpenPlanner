@@ -174,10 +174,13 @@ subresource integrity (entry below).
 
 ### `call-page.js`
 
-The call page's script is five files that share one object, `window.openplannerCall` (no build step,
+The call page's script is seven files that share one object, `window.openplannerCall` (no build step,
 each under 500 lines, each with a header that says what it owns and never does). The page loads them
-in this order: `call-devices.js`, `call-connection.js`, `call-media.js` and `call-controls.js` only define,
-`call-page.js` starts them.
+in this order: `call-status.js`, `call-sound.js`, `call-devices.js`, `call-connection.js`, `call-media.js` and
+`call-events.js` only define, `call-page.js` starts them. A file needs nothing at load time that a later file
+makes (`call-devices.js` makes the store of chosen device ids, `app.choice`, which `call-media.js` uses;
+`call-connection.js` makes `app.call`, which `call-media.js` and `call-events.js` use); a call from one file
+to another at run time goes through `app` and may reach a file loaded later.
 
 - **ADR:** 0123 points 3, 5, 6, 10, 11, 13, 14, 15 and 16 (build steps 4b, 4c and 5a). Not an island: the call page is a kind of page
   of its own (above), and the scripts are the page's, loaded by no other.
@@ -195,13 +198,17 @@ in this order: `call-devices.js`, `call-connection.js`, `call-media.js` and `cal
   of allowed moves, one `render`, focus on the new heading and one sentence for the live region. It also
   owns the status queue, the texts, the other side's picture and the wiring of the buttons. The state also
   holds `panel`, `recording` and `connection`; leaving the lobby and the call closes the panel and ends the notices.
-- **`call-devices.js` owns** the device check: after the begin button it asks the browser for the camera
-  and the microphone (never on load); shows the participant's own picture, a level meter with a text that
-  says whether they are heard, a test sound, native selects for camera, microphone and (where the browser
-  allows it) speaker, and toggles to join with either off. A refused permission is told apart from a
-  missing device and explained in the panel of that kind. It is the one home of the lists of devices: the
-  panel of devices in the call is filled by the same list, and a choice made there goes to `call-media.js`
-  (camera, microphone) or to the other side's sound (speaker, `setSinkId`, at once).
+- **`call-status.js` owns** the queue behind the one polite status element: one sentence at a time, each
+  kept on screen for a minimum time, none dropped, none repeated.
+- **`call-sound.js` owns** the level meter (a bar and a text that says whether the participant is heard) and
+  the test sound of the check, with the audio context. The call has neither.
+- **`call-devices.js` owns** the devices: after the begin button it asks the browser for the camera and the
+  microphone (never on load); shows the participant's own picture, native selects for camera, microphone and
+  (where the browser allows it) speaker, and toggles to join with either off. A refused permission is told
+  apart from a missing device and explained in the panel of that kind. It is the one home of the lists of
+  devices and of the one store of chosen device ids: the panel of devices in the call is filled by the same
+  list, and a choice made there goes to `call-media.js` (camera, microphone) or to the other side's sound
+  (speaker, `setSinkId`, at once; a choice that settles after the call ended says nothing).
 - **`call-connection.js` owns** the call from the click that joins on, except the participant's own devices:
   it loads the SDK file with its checksum as `integrity`, then asks `POST …/call/token` (the one request
   the scripts make), initialises the SDK with the token (logs never uploaded, registration temporary, no
@@ -221,10 +228,12 @@ in this order: `call-devices.js`, `call-connection.js`, `call-media.js` and `cal
   that cannot be sent. Choosing another camera or microphone in the call takes the new one, sends it by the
   same rule as a toggle and only then stops the old one; a choice that fails keeps the old device. A press
   while the media is being added waits, and is dropped if the call ended.
-- **`call-controls.js` owns** the panel of devices in the call (a disclosure; Escape closes it and returns
-  focus to its button) and the notices: the recording and the connection being restored last while they
-  hold and are said once each way; a connection lost for good ends in the failure state. Events of a
-  connection that is over are ignored.
+- **`call-events.js` owns** every registration on the meeting: the staff member letting the participant in,
+  the other side's picture and sound, the meeting's end, and the notices: the recording and the connection
+  being restored last while they hold (in the lobby and the call) and are said once each way, a recording
+  that began before the lobby is said once when its notice first shows; a connection lost for good ends in the
+  failure state. Events of a connection that is over are ignored and what an event carries is never read.
+- The panel of devices (a disclosure of the bar) is wired in `call-page.js` with the page's other controls.
 
 - **Keyboard:** every control is a native button, link or select in reading order; nothing is a pointer
   gesture. The panel of devices is a disclosure (Escape or its button closes it and focus returns to the button;
@@ -244,38 +253,46 @@ in this order: `call-devices.js`, `call-connection.js`, `call-media.js` and `cal
   with JavaScript, a camera and a microphone, the organisation's contact details (or one plain sentence
   when it has none) and, where the organisation allows it, the link to join another way.
 - **Used by:** the call page only (`call.html`, with `call-page.css`).
-- **Size** (lines): `call-devices.js` 481, `call-connection.js` 441, `call-page.js` 449, `call-media.js` 212,
-  `call-controls.js` 68; about 5.0, 5.3, 2.6, 1.2 and 5.9 KB gzipped (in the order of the loading), about 2.9 KB
-  gzipped (styles). Step 5b (sharing, captions) and the chat of 7c add to the same state and `render`;
-  `call-devices.js` and `call-page.js` are close to the 500 lines, so the next step splits where the concern splits.
+- **Size** (lines): `call-status.js` 53, `call-sound.js` 130, `call-devices.js` 389, `call-connection.js` 428,
+  `call-media.js` 226, `call-events.js` 65, `call-page.js` 436; about 0.8, 1.8, 4.1, 5.1, 2.7, 1.1 and 5.9 KB
+  gzipped (in the order of the loading), about 3.1 KB gzipped (styles). Step 5b (sharing, captions) and the chat
+  of 7c add to the same state and `render`; `call-page.js` and `call-connection.js` are the files to watch.
+
+### `call-status.js`
+
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c and 5a). The polite status line; one of the seven files described under
+  `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
+- **Used by:** the call page only. **Size:** see `call-page.js`.
+
+### `call-sound.js`
+
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c and 5a). The level meter and the test sound of the check; one of the seven files described under
+  `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
+- **Used by:** the call page only. **Size:** see `call-page.js`.
 
 ### `call-devices.js`
 
-- **ADR:** 0123 point 10 (steps 4b and 4c). The device check of the call page; one of the four files described under
-  `call-page.js` (what it owns and never does is in its header). Loaded before `call-page.js`, which starts it.
-- **Used by:** the call page only. **Size:** about 4.5 KB gzipped.
-
-### `call-controls.js`
-
-- **ADR:** 0123 points 10, 13 and 15 (step 5a). The panel of devices in the call and its notices (recording,
-  connection restored or lost); one of the five files described under `call-page.js`. Loaded after
-  `call-media.js`, before `call-page.js`, which starts it.
-- **Used by:** the call page only. **Size:** about 1.2 KB gzipped.
-
-### `call-media.js`
-
-- **ADR:** 0123 points 10 and 16 (steps 4c and 5). The camera and the microphone of the call: taking the
-  streams, switching them on and off in the lobby and the call, giving a device back when it is off (a
-  device that cannot be taken out of the meeting is only muted, and the page says so); one of the four
-  files described under `call-page.js`. Loaded after `call-connection.js`, whose `call` object it works on.
-- **Used by:** the call page only. **Size:** about 1.8 KB gzipped.
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c and 5a). The devices, their lists and the choice; one of the seven files described under
+  `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
+- **Used by:** the call page only. **Size:** see `call-page.js`.
 
 ### `call-connection.js`
 
-- **ADR:** 0123 points 3, 5, 6, 10, 11 and 16 (step 4c). The call of the call page (token, SDK, attempts,
-  lobby, leaving); one of the four files described under `call-page.js` (what it owns and never does is in
-  its header). Loaded before `call-page.js`, which starts it.
-- **Used by:** the call page only. **Size:** about 4.8 KB gzipped.
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c and 5a). The call: token, SDK, attempts, lobby, leaving; one of the seven files described under
+  `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
+- **Used by:** the call page only. **Size:** see `call-page.js`.
+
+### `call-media.js`
+
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c and 5a). The participant's camera and microphone in the lobby and the call; one of the seven files described under
+  `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
+- **Used by:** the call page only. **Size:** see `call-page.js`.
+
+### `call-events.js`
+
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c and 5a). What the meeting tells the page; one of the seven files described under
+  `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
+- **Used by:** the call page only. **Size:** see `call-page.js`.
 
 ### `vendor/webex/meetings.min.js`
 

@@ -21,7 +21,7 @@ import { readFileSync } from 'node:fs';
 
 import { expect, test, type Page } from '@playwright/test';
 
-import { begin, live, openCallPage, READY, said, spy, statuses } from '../call-page';
+import { begin, checkList, live, openCallPage, READY, said, spy, statuses } from '../call-page';
 import {
   APP,
   CONNECTING,
@@ -40,9 +40,11 @@ import {
   saidLike,
   sdk,
   state,
+  stubRemoteSound,
   stubToken,
   timesSaid,
   TOKEN,
+  plays,
   WAITING,
   type Plan,
 } from '../call-sdk';
@@ -50,28 +52,6 @@ import { expectNoAxeViolations, tabTo } from '../helpers';
 
 test.use({ locale: 'en-US' });
 
-/**
- * The page's contract is what it does with the answer of `play()` on the other side's sound, not
- * what an engine does with a made-up stream: the stub decides for that element, in both phases
- * (`window.__blockPlay`: refuse with NotAllowedError; else resolve; `__hangPlay`: never settle), and
- * counts the calls (`__plays`). The engines' own autoplay rules are seen only in a real meeting.
- */
-async function stubRemoteSound(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    const w = window as unknown as { __blockPlay: boolean; __hangPlay: boolean; __plays: number };
-    w.__blockPlay = true;
-    w.__hangPlay = false;
-    w.__plays = 0;
-    const original = HTMLMediaElement.prototype.play;
-    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
-      if (!this.hasAttribute('data-call-remote-audio')) return original.call(this);
-      w.__plays += 1;
-      if (w.__hangPlay) return new Promise<void>(() => {});
-      return w.__blockPlay ? Promise.reject(new DOMException('blocked', 'NotAllowedError')) : Promise.resolve();
-    };
-  });
-}
-const plays = (page: Page): Promise<number> => page.evaluate(() => (window as unknown as { __plays: number }).__plays);
 
 
 test('before the click nothing leaves the origin; the click loads the file, asks for the token once and starts the SDK', async ({ page }) => {
@@ -597,7 +577,7 @@ test('what the participant left off at the check stays off, and can be switched 
   await begin(page).click();
   await said(page, READY);
   await page.getByRole('button', { name: /^Camera/ }).click();
-  await page.getByLabel('Microphone', { exact: true }).selectOption('mic-2');
+  await checkList(page, 'Microphone').selectOption('mic-2');
   await said(page, 'Microphone on.');
   await joinButton(page).click();
 

@@ -15,13 +15,15 @@ from app.i18n import CATALOGUE_DIR, load_catalogues
 
 STATIC = Path("app/web/static")
 SCRIPT_FILES = (
+    "call-status.js",
+    "call-sound.js",
     "call-devices.js",
     "call-connection.js",
     "call-media.js",
-    "call-controls.js",
+    "call-events.js",
     "call-page.js",
 )
-"""In the order the page loads them: the four that only define, then the page that starts them."""
+"""In the order the page loads them: the six that only define, then the page that starts them."""
 SOURCES = {name: (STATIC / name).read_text() for name in SCRIPT_FILES}
 SCRIPT = "\n".join(SOURCES.values())
 STYLES = (STATIC / "call-page.css").read_text()
