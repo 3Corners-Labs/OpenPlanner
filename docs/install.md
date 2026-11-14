@@ -69,9 +69,10 @@ need neither.
 in a `lab`, the installation's `SMTP_*` otherwise. Staff are then managed in the portal
 (*Manage › Staff*). The first password of the user `super` is `KC_SUPER_PASSWORD` in
 `secrets/keycloak.env`; Keycloak asks for a new one and an authenticator at the first login.
-**`own`** asks for the login of your provider (PingFederate, Entra, ...), as before; on a host
+**`own`** asks for the login of your provider (PingFederate, Entra, ...), as before. On a host
 that ran the bundled provider it also deletes `secrets/keycloak-app.env`, whose login would
-otherwise win over the one in `.env` (ADR 0125).
+otherwise win over the one in `.env`, removes the `/idp` route from `proxy.env` and stops the
+`idp` and `idp-db` containers; their volumes and `secrets/keycloak.env` stay (ADR 0125).
 
 In `production` Keycloak runs in production mode (`start`, not `start-dev`) on its own
 PostgreSQL container `idp-db` (the application's database stays SQLite), the second factor is
@@ -82,9 +83,11 @@ moves it, and the users are re-invited. Without the HTTPS proxy the bundled prov
 host only (`127.0.0.1:8080`): logging in from another machine needs `--tls-domain`. The choice is
 remembered in `.env.update` (`OPENPLANNER_IDP`). `web` and `worker` reach the bundled provider on
 the internal network as `http://idp:8080/idp/...`, a recorded exception that production accepts
-for exactly that address with an https `OIDC_ISSUER` (ADR 0125); until its step 2 gives the
-provider a fixed address, that name can leave the host while the `idp` container is down (see
-the ADR before choosing it for production).
+for exactly that address with an https `OIDC_ISSUER` (ADR 0125). **Until its step 2 gives the
+provider a fixed address, that name can leave the host while the `idp` container is down**,
+and whatever answers it can receive staff passwords and log in as a superuser: the installer
+warns in `production`, and the advice for a production host that goes live before step 2 is
+`--idp own`.
 
 ## Prerequisites
 

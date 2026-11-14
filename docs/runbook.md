@@ -642,10 +642,14 @@ In production also set `SESSION_SECRET` (at least 32 random bytes); the image re
 without it, and with an `http` discovery URL or without `OIDC_CLIENT_SECRET` (ADR 0013). The one
 http discovery URL production accepts is the bundled identity provider's internal address,
 `http://idp:8080/idp/realms/openplanner/...` with an https `OIDC_ISSUER`, as
-`scripts/render-keycloak-realm.sh` writes it (a recorded exception, ADR 0125). A host that
+`scripts/render-keycloak-realm.sh` writes it (a recorded exception, ADR 0125). Until ADR 0125
+step 2 that address is the name `idp`, which this host's DNS may answer while the container is
+down: read the ADR before a production host goes live on the bundled provider (the installer
+warns), and see *After an unexplained outage of the bundled provider* below. A host that
 leaves the bundled provider runs the installer with `--idp own`, which deletes
-`secrets/keycloak-app.env`: Compose reads that file after `.env`, so its login would otherwise
-win over yours.
+`secrets/keycloak-app.env` (Compose reads that file after `.env`, so its login would otherwise
+win over yours), removes the `/idp` route from `proxy.env` and stops the `idp` and `idp-db`
+containers; their volumes and `secrets/keycloak.env` stay for the way back.
 
 In PingFederate, create an OIDC client:
 
@@ -1010,6 +1014,24 @@ back it up with the database volume, and treat it as personal data (`docs/datafl
 Deleting it and starting again re-imports the rendered realm, so `super` gets the first
 password of `secrets/keycloak.env` back; a changed `KC_OPENPLANNER_CLIENT_SECRET` needs a new
 render and a restart of `idp` and `web`.
+
+**After an unexplained outage of the bundled provider (ADR 0125 point 8).** Until ADR 0125
+step 2, web, worker and the proxy reach Keycloak by the name `idp`. While its container is
+down, this host's DNS may answer that name, and whoever answered may hold staff passwords, the
+portal's session cookie and both client secrets. When the `idp` container was down and the
+reason is not known (an update or a restart you did yourself is known):
+
+1. In Keycloak's admin console (realm `openplanner` → *Clients* → `openplanner-admin`, then
+   `openplanner-directory` → *Credentials* → *Regenerate*), give both clients a new secret.
+2. Put the two new values in `secrets/keycloak.env` (`KC_OPENPLANNER_CLIENT_SECRET`,
+   `KC_DIRECTORY_CLIENT_SECRET`) with an editor on the host, never on a command line, and run
+   `scripts/render-keycloak-realm.sh`, which writes `secrets/keycloak-app.env` from them.
+3. Restart web and worker (`docker compose --env-file .env.update up -d web worker`) and end
+   every admin session (`... exec web python -m app.cli sessions end-all --reason cli`,
+   *Ending all admin sessions*).
+4. Compare the realm's users and their entitlements with *Manage › Staff* (an account nobody
+   invited, a role nobody granted), and read the audit log for logins and staff changes during
+   the outage. Staff whose password may have been typed then reset it.
 
 ## Webex meetings and Webex Contact Center
 

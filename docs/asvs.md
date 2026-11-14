@@ -41,8 +41,8 @@ by itself.
 
 **Limitation** (5): V3.5.4 (one origin for all organisations), V5.4.3 (no virus scan, ADR 0092),
 V11.4.1 and V11.4.3 (the provider-imposed HMAC-SHA1 of Webex webhooks), V12.3.3 (plain HTTP on one
-host from the bundled proxy to web, ADR 0091, and from web and worker to the bundled identity
-provider, ADR 0125).
+host from the bundled proxy to web, ADR 0091, and to the bundled identity provider from web,
+worker and the proxy, ADR 0125).
 
 **Open** (10): V2.4.1, V6.1.1, V6.3.1, V6.3.2, V7.1.3, V7.6.1, V12.3.1, V13.3.1, V13.3.2 and
 V15.2.2. The reason of each is in its row. V6.3.1 and V6.3.2 also have their row in the identity
@@ -185,7 +185,7 @@ The inventory of every key, algorithm, owner, rotation and destruction is `docs/
 |---|---|---|---|
 | V12.3.1 | Every outbound connection encrypted and validated | Saving an SMTP server without TLS is refused in production and shown as an error on System status; logging and the others are https only. Sending from an already saved plain configuration is refused only from the next minor release (ADR 0091 point 4), so this is not closed yet. `app/domain/channel_settings.py`, `tests/domain/test_channel_settings.py`, `docs/dataflow.md` (#383) | Open |
 | V12.3.2 | Certificates verified | httpx and SMTP verify by default; a test pins it. `tests/adapters/test_certificate_verification.py` (#338) | Closed |
-| V12.3.3 | Encryption between internal services | **Recorded exceptions in ADR 0091 point 2 and ADR 0125**: the hop from the bundled proxy to web is plain HTTP on the bridge of one host, and so is the hop from web and worker to the bundled identity provider (production accepts exactly its internal address with an https issuer; until ADR 0125 step 2 gives it a fixed address, its name can leave the host while the container is down). A proxy on another machine uses `WEB_TLS_CERT_FILE` and `WEB_TLS_KEY_FILE`, and System status warns while it does not. `docs/adr/0091-every-hop-that-carries-personal-data-is-encrypted.md`, `docs/adr/0125-the-hop-to-the-bundled-identity-provider-is-a-recorded-exception.md`, `app/domain/web_transport.py`, `tests/domain/test_web_transport.py`, `docs/runbook.md` (#386, #834) | Limitation |
+| V12.3.3 | Encryption between internal services | **Recorded exceptions in ADR 0091 point 2 and ADR 0125**: the hop from the bundled proxy to web is plain HTTP on the bridge of one host, and so are the hops to the bundled identity provider from web and worker and from the proxy's `/idp` route (production accepts exactly its internal address with an https issuer; until ADR 0125 step 2 gives it a fixed address, its name can leave the host while the container is down). A proxy on another machine uses `WEB_TLS_CERT_FILE` and `WEB_TLS_KEY_FILE`, and System status warns while it does not. `docs/adr/0091-every-hop-that-carries-personal-data-is-encrypted.md`, `docs/adr/0125-the-hops-to-the-bundled-identity-provider-are-a-recorded-exception.md`, `app/domain/web_transport.py`, `tests/domain/test_web_transport.py`, `docs/runbook.md` (#386, #834) | Limitation |
 
 ## V13 Configuration
 

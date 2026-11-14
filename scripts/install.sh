@@ -32,8 +32,9 @@
 #                      mode (--idp bundled): the realm is rendered with generated secrets
 #                      (scripts/render-keycloak-realm.sh), the proxy serves it under /idp, and its
 #                      mail server is set at the first start. --idp own asks for the login of
-#                      your own provider, as before, and removes the bundled login a host had
-#                      (secrets/keycloak-app.env, ADR 0125). Production runs Keycloak in production
+#                      your own provider, as before, and on a host that ran the bundled one removes
+#                      its login (secrets/keycloak-app.env), its /idp route and its containers
+#                      (ADR 0125; volumes stay). Production runs Keycloak in production
 #                      mode on its own PostgreSQL container (idp-db, ADR 0106 point 4), and a
 #                      host that already has a login in .env keeps it
 #   4. .env.update     pull <image>:<version> -> digest -> cosign verify -> pin digest, profiles
@@ -173,6 +174,9 @@ parse_args() {
     if [[ $MODE == production && -n ${OIDC_DISCOVERY_URL:-$(value "$ENV_FILE" OIDC_DISCOVERY_URL)} ]]; then IDP=own; else IDP=bundled; fi
   fi
   case $IDP in bundled | own) ;; *) die "--idp must be bundled or own, not '$IDP'" ;; esac
+  # ADR 0125 point 7: until its step 2 gives the bundled provider a fixed address, production
+  # reaches it by the name idp, which this host's DNS may answer while its container is down.
+  [[ $MODE != production || $IDP != bundled ]] || warn "production with the bundled identity provider: until ADR 0125 step 2, its name idp can be answered by this host's DNS while its container is down; read ADR 0125 before going live, or install with --idp own"
   REPOSITORY=${REPOSITORY:-$(value "$ENV_FILE" UPDATE_REPOSITORY)}
   REPOSITORY=${REPOSITORY:-3Corners-Labs/OpenPlanner}
   [[ $REPOSITORY =~ $REPOSITORY_RE ]] || die "--repository must be owner/name"
@@ -787,9 +791,13 @@ proxy_settings() {
       fi
     } | write_private "$PROXY_ENV"
   fi
-  # ADR 0112: the proxy serves the bundled Keycloak under /idp.
+  # ADR 0112: the proxy serves the bundled Keycloak under /idp. A host that leaves it (--idp own,
+  # ADR 0125 point 6) drops the route, which would otherwise keep sending /idp/* to the name idp.
   if [[ $IDP == bundled && -z $(value "$PROXY_ENV" IDP_UPSTREAM) ]]; then
     printf '# The bundled identity provider, under /idp on this host name (ADR 0112).\nIDP_UPSTREAM=idp:8080\n' >>"$PROXY_ENV"
+  elif [[ $IDP != bundled && -n $(value "$PROXY_ENV" IDP_UPSTREAM) ]]; then
+    sed -i.bak '/^# The bundled identity provider, under \/idp/d; /^IDP_UPSTREAM=/d' "$PROXY_ENV" && rm -f "$PROXY_ENV.bak"
+    log "removed IDP_UPSTREAM from $PROXY_ENV: with --idp own the proxy serves no /idp route"
   fi
   [[ -n $TLS_DOMAIN ]] || die "$PROXY_ENV needs TLS_DOMAIN"
   [[ -n $(value "$PROXY_ENV" ACME_EMAIL) || -n $(value "$PROXY_ENV" TLS_CERT_FILE) \
@@ -946,6 +954,9 @@ start() {
   log "starting (docker compose --env-file .env.update up -d)"
   # Without the tls profile a proxy started by hand earlier would restart for ever.
   ((TLS)) || compose --profile tls rm --stop --force proxy >/dev/null 2>&1 || true
+  # ADR 0125 point 6: a host that left the bundled provider stops it; its volumes and
+  # secrets/keycloak.env stay for the way back (--idp bundled).
+  [[ $IDP == bundled ]] || compose --profile idp --profile idp-db rm --stop --force idp idp-db >/dev/null 2>&1 || true
   edge_network
   compose up -d
   healthy || die "not healthy within ${HEALTH_TIMEOUT}s; see: docker compose --env-file .env.update logs web worker"

@@ -1,7 +1,6 @@
 """The host installer (docs/install.md), run against fake docker, cosign, curl, sudo and systemd."""
 
 import json
-import os
 import re
 import shutil
 import stat
@@ -12,6 +11,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 
 from app.adapters.bootstrap import GENERATED
 from app.config import Settings
@@ -1044,10 +1044,11 @@ def test_a_changed_public_address_moves_the_realm_along(host: Host) -> None:
     assert host.settings("secrets/keycloak.env")["KC_HOSTNAME"] == "https://nieuw.example.nl/idp"
 
 
-def _production_bundled(host: Host) -> None:
+def _production_bundled(host: Host) -> subprocess.CompletedProcess[str]:
     settings = {k: v for k, v in PRODUCTION.items() if not k.startswith("OIDC_")}
     result = host.run("--mode", "production", "--non-interactive", **settings)
     assert result.returncode == 0, result.stderr
+    return result
 
 
 def test_production_runs_the_bundled_keycloak_on_its_own_database(host: Host) -> None:
@@ -1066,41 +1067,55 @@ def test_production_runs_the_bundled_keycloak_on_its_own_database(host: Host) ->
     assert host.settings(".env")["ADMIN_MFA_REQUIRED"] == "true"
 
 
-def _container_settings(host: Host, monkeypatch: pytest.MonkeyPatch) -> Settings:
+class _ContainerSettings(Settings):
+    """The settings from the values given, never from the environment of the test run."""
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Read the arguments only: no variable, ``X_FILE`` or alias of the shell gets in."""
+        return (init_settings,)
+
+
+def _container_settings(host: Host) -> Settings:
     """Build the settings web and worker would start with on this host.
 
     The fake compose never runs the image, so the start-up check runs here: on the env files
-    the containers read, in the order ``docker-compose.yml`` lists them (a later file wins),
-    and on nothing from the environment of the test run itself.
+    the containers read, in the order ``docker-compose.yml`` lists them (a later file wins).
     """
-    for name in list(os.environ):
-        if name.lower().removesuffix("_file") in Settings.model_fields:
-            monkeypatch.delenv(name)
     values: dict[str, str] = {}
     for entry in yaml.safe_load((REPO / "docker-compose.yml").read_text())["x-app"]["env_file"]:
         if host.file(entry["path"]).is_file():
             values |= host.settings(entry["path"])
-    return Settings(**{key.lower(): value for key, value in values.items()})
+    return _ContainerSettings(**{key.lower(): value for key, value in values.items()})
 
 
 def test_web_and_worker_start_on_what_a_production_install_with_the_bundled_keycloak_wrote(
-    host: Host, monkeypatch: pytest.MonkeyPatch
+    host: Host,
 ) -> None:
     """ADR 0125: the login is the bundled provider's internal hop, which production accepts."""
-    _production_bundled(host)
+    result = _production_bundled(host)
 
-    settings = _container_settings(host, monkeypatch)
+    settings = _container_settings(host)
 
     assert settings.environment == "prod"
     assert settings.oidc_discovery_url == BUNDLED_IDP_DISCOVERY_URL
     assert settings.oidc_issuer == "https://afspraak.example.nl/idp/realms/openplanner"
     assert settings.production_problems() == []
+    # Point 7: the host owner is told what production runs on until step 2.
+    assert "until ADR 0125 step 2" in result.stderr
 
 
 def test_a_host_that_leaves_the_bundled_keycloak_logs_in_with_its_own_provider(
-    host: Host, monkeypatch: pytest.MonkeyPatch
+    host: Host,
 ) -> None:
-    """ADR 0125 point 6: the rendered login, read after .env, must not outvote the own one."""
+    """ADR 0125 point 6: the bundled login, route and containers go; the volumes stay."""
     _production_bundled(host)
     own = {key: PRODUCTION[key] for key in ("OIDC_DISCOVERY_URL", "OIDC_CLIENT_SECRET")}
     with host.file(".env").open("a") as env:
@@ -1112,7 +1127,11 @@ def test_a_host_that_leaves_the_bundled_keycloak_logs_in_with_its_own_provider(
     assert not host.file("secrets/keycloak-app.env").exists()
     assert host.file("secrets/keycloak.env").is_file()  # the way back to --idp bundled
     assert "removed secrets/keycloak-app.env" in result.stderr + result.stdout
-    settings = _container_settings(host, monkeypatch)
+    assert "IDP_UPSTREAM" not in host.settings("proxy.env")  # no /idp route to the name idp
+    # Exactly these arguments: no -v, so the volumes idp-data and idp-db-data stay.
+    assert host.ran("--profile idp --profile idp-db rm --stop --force idp idp-db")
+    assert "until ADR 0125 step 2" not in result.stderr
+    settings = _container_settings(host)
     assert settings.oidc_discovery_url == own["OIDC_DISCOVERY_URL"]
     assert settings.keycloak_admin_url is None
     assert settings.production_problems() == []
