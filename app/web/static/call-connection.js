@@ -205,7 +205,7 @@
         app.go("call", { media: "added", can: app.events.offers(), say: "say_admitted" });
         // The staff member may have been sharing before the participant came in.
         if (app.state.share === "theirs") app.say("say_share_theirs");
-        app.playRemote();
+        app.remote.play();
       });
     // A press of a toggle waits for this (call-media.js).
     var done = function () {
@@ -280,12 +280,14 @@
     var client = call.client;
     var meeting = call.meeting;
     var joined = call.joined;
-    [call.microphone, call.camera, call.screen].forEach(function (stream) {
+    [call.microphone, call.camera].forEach(function (stream) {
       if (stream) stream.stop();
     });
+    // A running share and running captions are given back with the call, whatever ends it.
+    app.callMedia.endShare(call.screen, null);
+    if (app.state.captions !== "off") app.captions.release(meeting);
     call.microphone = null;
     call.camera = null;
-    call.screen = null;
     call.client = null;
     call.meeting = null;
     call.joined = false;

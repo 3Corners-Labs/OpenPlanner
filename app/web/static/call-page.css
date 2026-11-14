@@ -8,8 +8,9 @@
 /* The bar is fixed at the foot of the window, so a page needs room at its end for it, and a focused
    control is scrolled to rest above it (WCAG 2.4.11); both exist only while the bar shows. From 48 rem
    wide the row of buttons is one line, about 4.5 rem with its frame; the captions and sharing buttons of
-   step 5b make the row longer, so below 66 rem it wraps to two rows (8 rem is room enough) and below
-   40 rem to as many as five (the lesser of half the window and 17.5 rem). `body` is a plain block, so a
+   step 5b make the row longer, so below 72 rem it wraps to two rows (7.5 rem), below 46 rem to three
+   (11.5 rem) and below 40 rem to as many as five (17.5 rem), each the lesser of that and half the window;
+   the three are estimates from the buttons' widths, to be measured. `body` is a plain block, so a
    bottom padding is the room after the footer. A browser without `:has()` only loses the room at the end. */
 html:has([data-call-controls]:not([hidden])) {
   scroll-padding-bottom: 4.5rem;
@@ -19,13 +20,23 @@ html:has([data-call-controls]:not([hidden])) body {
   padding-bottom: 4.5rem;
 }
 
-@media (max-width: 66rem) {
+@media (max-width: 72rem) {
   html:has([data-call-controls]:not([hidden])) {
-    scroll-padding-bottom: min(50vh, 8rem);
+    scroll-padding-bottom: min(50vh, 7.5rem);
   }
 
   html:has([data-call-controls]:not([hidden])) body {
-    padding-bottom: min(50vh, 8rem);
+    padding-bottom: min(50vh, 7.5rem);
+  }
+}
+
+@media (max-width: 46rem) {
+  html:has([data-call-controls]:not([hidden])) {
+    scroll-padding-bottom: min(50vh, 11.5rem);
+  }
+
+  html:has([data-call-controls]:not([hidden])) body {
+    padding-bottom: min(50vh, 11.5rem);
   }
 }
 
@@ -373,16 +384,16 @@ html:has([data-call-controls]:not([hidden])) body {
   font-size: 0.875rem;
 }
 
-/* The captions are ordinary text under the picture, their size the page's own (rem), the newest
-   line at the foot; what does not fit leaves at the top, so they can never take the picture's place. */
+/* The captions are ordinary text under the picture, their size the page's own (rem). The box has a
+   height of its own and scrolls inside itself (the script scrolls it to the start of the newest line
+   and gives it focus only when it can scroll), so a long line is read to its start and the box can
+   never take the picture's place. */
 .call-captions {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+  position: relative;
   max-height: 6.5rem;
   margin: var(--booking-space-s) 0 0;
   padding: var(--booking-space-xs) var(--booking-space-m);
-  overflow: hidden;
+  overflow-y: auto;
   border-radius: var(--booking-radius);
   background: var(--call-stage);
   color: var(--call-on-stage);

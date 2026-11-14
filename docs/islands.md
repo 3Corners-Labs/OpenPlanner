@@ -174,12 +174,12 @@ subresource integrity (entry below).
 
 ### `call-page.js`
 
-The call page's script is eight files that share one object, `window.openplannerCall` (no build step,
+The call page's script is ten files that share one object, `window.openplannerCall` (no build step,
 each under 500 lines, each with a header that says what it owns and never does). The page loads them
 in this order: `call-status.js`, `call-sound.js`, `call-devices.js`, `call-connection.js`, `call-media.js`,
-`call-captions.js` and `call-events.js` only define, `call-page.js` starts them. A file needs nothing at load time that a later file
+`call-captions.js`, `call-remote.js`, `call-render.js` and `call-events.js` only define, `call-page.js` starts them. A file needs nothing at load time that a later file
 makes (`call-devices.js` makes the store of chosen device ids, `app.choice`, which `call-media.js` uses;
-`call-connection.js` makes `app.call`, which `call-media.js`, `call-captions.js` and `call-events.js` use); a call from one file
+`call-connection.js` makes `app.call`, which `call-media.js`, `call-captions.js`, `call-remote.js` and `call-events.js` use; `call-render.js` makes `app.view`, which `call-page.js` uses); a call from one file
 to another at run time goes through `app` and may reach a file loaded later.
 
 - **ADR:** 0123 points 3, 5, 6, 10, 11, 13, 14, 15 and 16 (build steps 4b, 4c, 5a and 5b). Not an island: the call page is a kind of page
@@ -198,13 +198,15 @@ to another at run time goes through `app` and may reach a file loaded later.
   pinned version, equal bytes), `data-call-sdk` and `data-call-sdk-integrity`.
 - **`call-page.js` owns** the page's one `state` and the one way to change it, `go(screen, patch)`: a table
   of allowed moves, one `render`, focus on the new heading and one sentence for the live region. It also
-  owns the status queue, the texts, the other side's picture and the wiring of the buttons. The state also
+  owns the texts and the wiring of the buttons. The state also
   holds `panel`, `recording` and `connection` and, from step 5b, `share` (off, asking, mine, theirs),
   `captions` (off, starting, on), `lines`, `interim` and `can` (what the meeting offers); leaving the lobby and
   the call closes the panel, ends the notices, stops showing a share and drops the captions with their lines
   (one function, `inCallParts`, is the start of all of them). `render` shows the two toggles only in the call
   and only where the meeting offers them, sets `data-call-share` on the stage (a hook for the style only) and
-  asks `call-captions.js` to draw the lines.
+  asks `call-render.js` (pure drawing of the call's parts out of the state) to draw the pictures, the notices,
+  the sharing switches and the captions' lines. Where focus goes for the stop button that went away with a
+  share is decided in `render` out of the state (`stopHeld`, the last place of focus).
 - **`call-status.js` owns** the queue behind the one polite status element: one sentence at a time, each
   kept on screen for a minimum time, none dropped, none repeated.
 - **`call-sound.js` owns** the level meter (a bar and a text that says whether the participant is heard) and
@@ -241,10 +243,19 @@ to another at run time goes through `app` and may reach a file loaded later.
   theirs (one share in a meeting; one sentence says both) or the end of the call; the capture is stopped
   first, taking it out of the meeting follows. A share that cannot be sent is stopped and said.
 - **`call-captions.js` owns** the captions: whether the meeting offers them, the toggle's press (the meeting is
-  asked for its real-time link and then to start; in the page's language where the meeting offers that), each
-  caption into the state (the last three lines, an interim line until its final text; "You" for the
-  participant's own member and the team's term for the rest, never the name the platform reports) and the lines
-  drawn as text nodes. Captions are in memory only, are never put in a live region, and go with the call.
+  asked for its real-time link and then to start, in the page's language where the meeting offers that; a start
+  that was given up and completes later is stopped again), each caption into the state (the last three lines, an
+  interim line until its final text; "You" for the participant's own member and the team's term for the rest,
+  never the name the platform reports) and which lines are shown (`shown`; `call-render.js` draws them as text
+  nodes in a box that scrolls inside itself and takes focus only when it can). Captions are in memory only,
+  are never put in a live region, and are stopped when switched off and when the call ends.
+- **`call-remote.js` owns** the other side's picture, sound and screen: whether their picture moves (said once
+  each way), playing their sound (and the button when the browser wants a tap), and the staff member's screen,
+  which takes the place of their picture; their start ends the participant's own share through
+  `app.callMedia.endShare`, and one sentence says both. A screen that arrives when their share is over is not kept.
+- **`call-render.js` owns** the drawing of the call's parts out of the state, as pure functions: the pictures,
+  the notices, the sharing switches and the staff member's screen, the captions' lines and the bar with its
+  panel. It decides nothing and moves no focus; `render` in `call-page.js` is the one caller.
 - **`call-events.js` owns** every registration on the meeting: the staff member letting the participant in,
   the other side's picture and sound, the meeting's end, the staff member's screen starting and stopping, the
   meeting ending the participant's share, what the meeting offers (read each time it says it changed), the
@@ -258,7 +269,7 @@ to another at run time goes through `app` and may reach a file loaded later.
   the foot of the window (a sticky bar leaves the foot at the page's end), and the page keeps room for it at its end; its row of buttons is at most half the window
   (on a window under 32 rem high the buttons are 2 rem high, under 20 rem the toggles' words "on" and "off" are
   for assistive technology only; up to 40 rem wide "Share screen" shows as "Share" and keeps its full name for assistive technology), the panel of devices overlays the page above the row (out of flow, at most half the window less 1.5 rem),
-  and scrolls inside itself. `scroll-padding-bottom` and the page's bottom padding exist only while the bar shows and are 4.5 rem (under 66 rem wide, where the longer row of step 5b wraps to two rows: `min(50vh, 8rem)`; under 40 rem: `min(50vh, 17.5rem)`), the bar's height at most. The panel
+  and scrolls inside itself. `scroll-padding-bottom` and the page's bottom padding exist only while the bar shows and are 4.5 rem (under 72 rem wide, where the longer row of step 5b wraps to two rows: `min(50vh, 7.5rem)`; under 46 rem, three rows: 11.5 rem; under 40 rem, up to five: 17.5 rem; estimates from the buttons' widths, to be measured), the bar's height at most. The panel
   is a disclosure wired in `call-page.js` with the page's other controls.
 
 - **Keyboard:** every control is a native button, link or select in reading order; nothing is a pointer
@@ -282,45 +293,44 @@ to another at run time goes through `app` and may reach a file loaded later.
   with JavaScript, a camera and a microphone, the organisation's contact details (or one plain sentence
   when it has none) and, where the organisation allows it, the link to join another way.
 - **Used by:** the call page only (`call.html`, with `call-page.css`).
-- **Size** (lines): `call-status.js` 53, `call-sound.js` 130, `call-devices.js` 389, `call-connection.js` 436,
-  `call-media.js` 354, `call-captions.js` 185, `call-events.js` 105, `call-page.js` 494; about 0.8, 1.8, 4.1, 5.2, 4.2,
-  2.5, 1.6 and 6.5 KB gzipped (in the order of the loading), about 4.5 KB gzipped (styles). `call-page.js` is
-  within six lines of the 500 that the test allows: the chat of 7c must take its own rendering out of it
-  (a file of its own for the call's picture and sound is the natural cut) before it adds a line.
+- **Size** (lines): `call-status.js` 53, `call-sound.js` 130, `call-devices.js` 389, `call-connection.js` 438,
+  `call-media.js` 325, `call-captions.js` 187, `call-remote.js` 134, `call-render.js` 123, `call-events.js` 110,
+  `call-page.js` 372; about 0.8, 1.8, 4.1, 5.2, 4.0, 2.6, 2.0, 2.0, 1.7 and 5.1 KB gzipped (in the order of
+  the loading), about 4.6 KB gzipped (styles). `call-connection.js` and `call-devices.js` are the files to watch.
 
 ### `call-status.js`
 
-- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a and 5b). The polite status line; one of the eight files described under
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a and 5b). The polite status line; one of the ten files described under
   `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
 - **Used by:** the call page only. **Size:** see `call-page.js`.
 
 ### `call-sound.js`
 
-- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a and 5b). The level meter and the test sound of the check; one of the eight files described under
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a and 5b). The level meter and the test sound of the check; one of the ten files described under
   `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
 - **Used by:** the call page only. **Size:** see `call-page.js`.
 
 ### `call-devices.js`
 
-- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a and 5b). The devices, their lists and the choice; one of the eight files described under
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a and 5b). The devices, their lists and the choice; one of the ten files described under
   `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
 - **Used by:** the call page only. **Size:** see `call-page.js`.
 
 ### `call-connection.js`
 
-- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a and 5b). The call: token, SDK, attempts, lobby, leaving; one of the eight files described under
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a and 5b). The call: token, SDK, attempts, lobby, leaving; one of the ten files described under
   `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
 - **Used by:** the call page only. **Size:** see `call-page.js`.
 
 ### `call-media.js`
 
-- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a and 5b). The participant's camera, microphone and screen in the lobby and the call; one of the eight files described under
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a and 5b). The participant's camera, microphone and screen in the lobby and the call; one of the ten files described under
   `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
 - **Used by:** the call page only. **Size:** see `call-page.js`.
 
 ### `call-events.js`
 
-- **ADR:** 0123 points 3, 5, 6, 10, 11, 12, 13 and 16 (steps 4b, 4c, 5a and 5b). What the meeting tells the page; one of the eight files described under
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 12, 13 and 16 (steps 4b, 4c, 5a and 5b). What the meeting tells the page; one of the ten files described under
   `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
 - **Used by:** the call page only. **Size:** see `call-page.js`.
 
@@ -342,7 +352,21 @@ to another at run time goes through `app` and may reach a file loaded later.
 
 ### `call-captions.js`
 
-- **ADR:** 0123 points 12, 13 and 16 (step 5b). The closed captions: the toggle, the lines, who speaks; one of the eight
+- **ADR:** 0123 points 12, 13 and 16 (step 5b). The closed captions: the toggle, the lines, who speaks; one of the ten
   files described under `call-page.js` (what it owns and never does is in its header), loaded before `call-events.js`
   and `call-page.js`, which starts it.
+- **Used by:** the call page only. **Size:** see `call-page.js`.
+
+### `call-remote.js`
+
+- **ADR:** 0123 points 10 and 13 (steps 4c, 5a and 5b). The other side's picture, sound and screen; one of the ten
+  files described under `call-page.js` (what it owns and never does is in its header), loaded before
+  `call-events.js` and `call-page.js`, which starts it.
+- **Used by:** the call page only. **Size:** see `call-page.js`.
+
+### `call-render.js`
+
+- **ADR:** 0123 points 10, 12, 13 and 15 (steps 5a and 5b). How the call's parts look, as functions of the state; one
+  of the ten files described under `call-page.js` (what it owns and never does is in its header), loaded before
+  `call-page.js`, which starts it.
 - **Used by:** the call page only. **Size:** see `call-page.js`.

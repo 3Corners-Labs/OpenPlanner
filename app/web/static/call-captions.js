@@ -5,14 +5,15 @@
  * meeting is asked to start them, in the page's language when it offers it, and the real-time link
  * they need is asked for only now, at the press), taking each caption the meeting hands out into
  * the page's state (the last few lines and one interim line, each marked as the participant's own
- * or the other side's) and drawing those lines as ordinary text. A caption is only its text: the
+ * or the other side's) and saying which of them are shown (`shown`; call-render.js draws them as
+ * ordinary text). A caption is only its text: the
  * name the video platform gives a speaker is never read, so the page names the other side with its
  * own words only.
  *
  * Never: it makes no request, loads no file and stores nothing. Captions live in the page's memory
  * (`app.state.lines` and `app.state.interim`) and are gone when they are switched off or the call
  * ends; they are never logged, sent to our server, set as markup or put in a live region. It
- * changes the page only through `app.go` and its own text nodes, and it runs only when asked.
+ * draws nothing, changes the page only through `app.go`, and runs only when asked.
  */
 (function () {
   "use strict";
@@ -21,7 +22,6 @@
 
   var MAX_LINES = 3; // the lines that stay in view, an interim one included; older ones leave
   var MAX_CHARS = 400; // a longer caption is cut
-  var drawn = { lines: null, interim: null, on: false, count: 0 };
 
   function quiet(step) {
     try {
@@ -41,7 +41,11 @@
 
   // ---- on and off --------------------------------------------------------------------------------
   // The real-time link is asked for here, at the press, and not at the join (the page's SDK
-  // configuration leaves it off); a meeting that has no such call starts the captions without it.
+  // configuration leaves it off). ASSUMED name, not in the spike's prototype (which had the link on
+  // at the join): `updateLLMConnection`; a meeting that has no such call starts the captions
+  // without it. The prototype knows no call that closes the link again: switching captions off
+  // stops the transcription, and the link stays until the meeting is left (written in
+  // docs/dataflow.md as unproven).
   function start() {
     var state = app.state;
     var epoch = app.call.epoch;
@@ -50,10 +54,12 @@
     app.go("call", { captions: "starting" });
     var failed = function () {
       if (epoch !== app.call.epoch) return;
-      quiet(function () {
-        return meeting.stopTranscription();
-      });
+      release(meeting);
       app.go(app.state.screen, { captions: "off", lines: [], interim: null, say: "say_captions_failed" });
+    };
+    // A start that was given up (the time of an attempt) may still complete: it is stopped again.
+    var late = function () {
+      if (epoch !== app.call.epoch || app.state.captions === "off") release(meeting);
     };
     var starting = Promise.resolve()
       .then(function () {
@@ -62,6 +68,7 @@
       .then(function () {
         return meeting.startTranscription();
       });
+    starting.then(late, function () {});
     return app.within(starting).then(function () {
       if (epoch === app.call.epoch && app.state.captions === "starting") {
         app.go("call", { captions: "on", say: "say_captions_on" });
@@ -69,11 +76,16 @@
     }, failed);
   }
 
-  function stop() {
-    var meeting = app.call.meeting;
+  // The transcription is stopped: when the captions go off, when a start did not work and when
+  // the call is left, ended or fails (call-connection.js).
+  function release(meeting) {
     quiet(function () {
       return meeting.stopTranscription();
     });
+  }
+
+  function stop() {
+    release(app.call.meeting);
     app.go("call", { captions: "off", lines: [], interim: null, say: "say_captions_off" });
   }
 
@@ -101,6 +113,9 @@
 
   // ---- what arrives ------------------------------------------------------------------------------
   // The participant's own words are those of the speaker that is this participant's own member.
+  // ASSUMED, not seen in the prototype: that the meeting's `selfId` (or its members' `selfId`) is
+  // the id the caption's speaker carries as `speakerId`, `memberId` or `id`. If not, every line
+  // reads as the other side's.
   function isOwn(speaker) {
     var meeting = app.call.meeting;
     var self = meeting && (meeting.selfId || (meeting.members && meeting.members.selfId));
@@ -153,33 +168,20 @@
     app.go(state.screen, { lines: lines.slice(-MAX_LINES), interim: interimOf(payload.interimCaptions) });
   }
 
-  // ---- what is shown -------------------------------------------------------------------------------
-  function row(line) {
-    var paragraph = document.createElement("p");
-    paragraph.classList.add("call-caption");
-    if (line.interim) paragraph.classList.add("call-caption--interim");
-    var who = document.createElement("strong");
-    who.classList.add("call-caption__who");
-    who.textContent = line.own ? app.texts.captions_you : app.texts.captions_other;
-    var words = document.createElement("span");
-    words.classList.add("call-caption__text");
-    words.textContent = line.text;
-    paragraph.append(who, " ", words);
-    return paragraph;
+  // The lines to show: the final lines and, last, the interim line, together at most MAX_LINES.
+  function shown(state) {
+    if (state.captions !== "on") return [];
+    var lines = state.lines;
+    if (state.interim) lines = lines.slice(-(MAX_LINES - 1)).concat([state.interim]);
+    return lines;
   }
 
-  // The lines in `box`, as text nodes only; returns how many there are (the page hides an empty box).
-  // The box is rebuilt only when the lines changed.
-  function draw(box) {
-    var state = app.state;
-    var on = state.captions === "on";
-    if (drawn.on === on && drawn.lines === state.lines && drawn.interim === state.interim) return drawn.count;
-    var shown = on ? state.lines.slice() : [];
-    if (on && state.interim) shown = shown.slice(-(MAX_LINES - 1)).concat([state.interim]);
-    box.replaceChildren.apply(box, shown.map(row));
-    drawn = { lines: state.lines, interim: state.interim, on: on, count: shown.length };
-    return shown.length;
-  }
-
-  app.captions = { supported: supported, press: press, language: language, received: received, draw: draw };
+  app.captions = {
+    supported: supported,
+    press: press,
+    language: language,
+    received: received,
+    release: release,
+    shown: shown,
+  };
 })();

@@ -14281,7 +14281,7 @@ msgid "callpage.notice.sharing.word"
 msgstr "Sharing"
 
 msgid "callpage.notice.sharing.body"
-msgstr "You are sharing your screen. The {agent} can see what you open on that screen."
+msgstr "You are sharing your screen. The {agent} can see what you open on that screen. The Share screen button in the bar at the foot of the page stops it too."
 
 msgid "callpage.notice.sharing.stop"
 msgstr "Stop sharing"

@@ -17,16 +17,26 @@
 <a class="{{ ("call-other-way " ~ class)|trim }}" href="{{ other_way_href }}">{{ _("callpage.other_way") }}</a>
 {%- endmacro %}
 
+{#- One icon, drawn once; a path of the 24 by 24 grid. -#}
+{% macro icon(path) -%}
+<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="{{ path }}"/></svg>
+{%- endmacro %}
+{% set ICON_SHARE = "M3 4h18v12H3V4Zm9 2-4 4h3v4h2v-4h3l-4-4ZM8 18h8v2H8v-2Z" %}
+
+{#- One toggle of the bar and of the check: an icon, a name, and its state in words (the state of the
+    caller's choice is set by the script; `short` is a shorter name for a narrow window, which the full
+    name keeps for assistive technology). -#}
+{% macro toggle(attribute, value, label, path, pressed="true", state=None, short="", hidden=False) -%}
+<button type="button" class="call-toggle" aria-pressed="{{ pressed }}" {{ attribute }}="{{ value }}"{% if hidden %} hidden{% endif %}>
+  {{ icon(path) }}
+  <span>{% if short %}<span class="call-label-long">{{ label }}</span><span class="call-label-short" aria-hidden="true">{{ short }}</span>{% else %}{{ label }}{% endif %}</span> <span class="call-toggle__state" data-call-toggle-state>{{ state or _("callpage.control.on") }}</span>
+</button>
+{%- endmacro %}
+
 {% macro toggles() -%}
 <div class="call-toggles" role="group" aria-label="{{ _("callpage.check.toggles") }}">
-  <button type="button" class="call-toggle" aria-pressed="true" data-call-toggle="microphone">
-    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12h-2Z"/></svg>
-    <span>{{ _("callpage.control.microphone") }}</span> <span class="call-toggle__state" data-call-toggle-state>{{ _("callpage.control.on") }}</span>
-  </button>
-  <button type="button" class="call-toggle" aria-pressed="true" data-call-toggle="camera">
-    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M4 6h10a2 2 0 0 1 2 2v1.5l4-2.5v10l-4-2.5V16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"/></svg>
-    <span>{{ _("callpage.control.camera") }}</span> <span class="call-toggle__state" data-call-toggle-state>{{ _("callpage.control.on") }}</span>
-  </button>
+  {{ toggle("data-call-toggle", "microphone", _("callpage.control.microphone"), "M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12h-2Z") }}
+  {{ toggle("data-call-toggle", "camera", _("callpage.control.camera"), "M4 6h10a2 2 0 0 1 2 2v1.5l4-2.5v10l-4-2.5V16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z") }}
 </div>
 {%- endmacro %}
 
@@ -65,7 +75,7 @@
     <strong>{{ _("callpage.notice.restoring.word") }}</strong> <span>{{ _("callpage.notice.restoring.body") }}</span>
   </p>
   <p class="call-notice" data-call-notice="sharing" hidden>
-    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M3 4h18v12H3V4Zm9 2-4 4h3v4h2v-4h3l-4-4ZM8 18h8v2H8v-2Z"/></svg>
+    {{ icon(ICON_SHARE) }}
     <strong>{{ _("callpage.notice.sharing.word") }}</strong> <span>{{ _("callpage.notice.sharing.body") }}</span>
     <button type="button" class="call-more call-notice__stop" data-call-share-stop>{{ _("callpage.notice.sharing.stop") }}</button>
   </p>
@@ -250,14 +260,8 @@
     <div class="call-bar">
       {{ toggles() }}
       <div class="call-extras" data-call-extras>
-        <button type="button" class="call-toggle" aria-pressed="false" data-call-switch="captions" hidden>
-          <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm3 5v4h2.5v-1.5H8.8v-1H9.5V10H7Zm6 0v4h2.5v-1.5h-.7v-1h.7V10H13Z"/></svg>
-          <span>{{ _("callpage.control.captions") }}</span> <span class="call-toggle__state" data-call-toggle-state>{{ _("callpage.control.off") }}</span>
-        </button>
-        <button type="button" class="call-toggle" aria-pressed="false" data-call-switch="share" hidden>
-          <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M3 4h18v12H3V4Zm9 2-4 4h3v4h2v-4h3l-4-4ZM8 18h8v2H8v-2Z"/></svg>
-          <span><span class="call-label-long">{{ _("callpage.control.share") }}</span><span class="call-label-short" aria-hidden="true">{{ _("callpage.control.share_short") }}</span></span> <span class="call-toggle__state" data-call-toggle-state>{{ _("callpage.control.off") }}</span>
-        </button>
+        {{ toggle("data-call-switch", "captions", _("callpage.control.captions"), "M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm3 5v4h2.5v-1.5H8.8v-1H9.5V10H7Zm6 0v4h2.5v-1.5h-.7v-1h.7V10H13Z", pressed="false", state=_("callpage.control.off"), hidden=True) }}
+        {{ toggle("data-call-switch", "share", _("callpage.control.share"), ICON_SHARE, pressed="false", state=_("callpage.control.off"), short=_("callpage.control.share_short"), hidden=True) }}
       </div>
       <div class="call-bar__devices">
         <button type="button" class="call-more" aria-expanded="false" aria-controls="call-devices-panel" data-call-devices-button>
@@ -340,15 +344,17 @@
   <p data-call-back><a href="/b/m/{{ ref }}/join">{{ _("join.back") }}</a></p>
 </div>
 {% endblock %}
-{#- Eight own scripts that share one object, in this order. Each only defines when it loads, and what
+{#- Ten own scripts that share one object, in this order. Each only defines when it loads, and what
     it needs at that moment comes from a file before it: the status line, the sound of the check, the
     devices (which make the store of chosen ids), the call, the call's media (which uses that store),
-    the captions, what the meeting tells the page, then the page, which starts them. -#}
+    the captions, the other side's streams, how the call's parts look, what the meeting tells the page, then the page, which starts them. -#}
 {% block scripts %}<script src="{{ static_url('call-status.js') }}" defer></script>
 <script src="{{ static_url('call-sound.js') }}" defer></script>
 <script src="{{ static_url('call-devices.js') }}" defer></script>
 <script src="{{ static_url('call-connection.js') }}" defer></script>
 <script src="{{ static_url('call-media.js') }}" defer></script>
 <script src="{{ static_url('call-captions.js') }}" defer></script>
+<script src="{{ static_url('call-remote.js') }}" defer></script>
+<script src="{{ static_url('call-render.js') }}" defer></script>
 <script src="{{ static_url('call-events.js') }}" defer></script>
 <script src="{{ static_url('call-page.js') }}" defer></script>{% endblock %}

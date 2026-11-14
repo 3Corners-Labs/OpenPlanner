@@ -51,27 +51,32 @@
     });
     meeting.on("media:ready", function (media) {
       if (!current()) return;
-      if (media.type === "remoteVideo") app.setRemote("remote", media.stream);
-      if (media.type === "remoteAudio") app.setRemote("audio", media.stream);
+      if (media.type === "remoteVideo") app.remote.set("remote", media.stream);
+      if (media.type === "remoteAudio") app.remote.set("audio", media.stream);
       if (media.type === "remoteShare") {
-        app.streams.share = media.stream;
+        app.remote.offered(media.stream);
         mark(epoch, {});
       }
     });
+    // The staff member's screen starts and stops: both names are the prototype's.
     meeting.on("meeting:startedSharingRemote", function () {
-      if (current()) app.callMedia.staffShare(true);
+      if (current()) app.remote.staffShare(true);
     });
     meeting.on("meeting:stoppedSharingRemote", function () {
-      if (current()) app.callMedia.staffShare(false);
+      if (current()) app.remote.staffShare(false);
     });
+    // ASSUMED name, not in the prototype: the meeting ends the participant's own share (the staff
+    // member stopped it). If the real name differs, the share ends by the track's own `ended`.
     meeting.on("meeting:stoppedSharingLocal", function () {
-      if (current()) app.callMedia.sharedEnded();
+      if (current()) app.callMedia.endShare(app.call.screen, { say: "say_share_off" });
     });
+    // ASSUMED name, not in the prototype: what the meeting offers changed (the prototype only read
+    // `inMeetingActions` once, after joining). A share the meeting no longer allows ends.
     meeting.on("meeting:actionsUpdate", function () {
       if (!current() || app.state.screen !== "call") return;
       var now = offers();
       mark(epoch, { can: now });
-      if (!now.share && state.share === "mine") app.callMedia.share(false);
+      if (!now.share) app.callMedia.endShare(app.call.screen, { say: "say_share_off" });
     });
     meeting.on("meeting:receiveTranscription:started", function () {
       app.captions.language(epoch);

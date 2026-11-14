@@ -400,6 +400,13 @@ see step 4c); a participant who never switches captions on never opens it, if th
 (a first real meeting shows it). The text of a caption is personal data of the call by nature; the
 platform makes it at its side, and what it keeps is for the DPIA, not for this page to control.
 
+| Open until a real meeting | What the page does | What is not known |
+|---|---|---|
+| Whose speech becomes text | The participant's press asks the meeting to start captions. It is probably meeting-wide: the platform turns the whole call's speech into text, the staff member's too, and a stop by the participant may end the captions for the staff member as well. | Who is affected, who sees the captions, and whether the platform keeps a transcript of the meeting (where, how long): asked of the supplier (`docs/research/call-page-on-the-meetings-sdk.md`, section 14, questions 10 and 11). The staff member is not told by this page. |
+| The real-time link and the transcription are closed | Switching captions off stops the transcription; leaving, the end of the call and a failure stop it too, then the meeting is left. The page knows no call that closes the link itself (the prototype has none): the link stays open until the meeting is left. | Whether the SDK has such a call, and whether leaving the meeting closes the link. |
+| A shared screen | The page asks the SDK for a display stream and gives no option for sound. Stopping it stops the track the browser gave; the stream is then taken out of the meeting. | That the SDK's display stream asks for no sound of the screen, and that stopping it ends the browser's capture on every browser. |
+
+
 ## Own queue (ADR 0043)
 
 A group with dispatch kind `openplanner_queue` sends nothing to a contact center. Its agents

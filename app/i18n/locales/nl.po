@@ -14294,7 +14294,7 @@ msgid "callpage.notice.sharing.word"
 msgstr "Delen"
 
 msgid "callpage.notice.sharing.body"
-msgstr "U deelt uw scherm. Uw {agent} ziet wat u op dat scherm opent."
+msgstr "U deelt uw scherm. Uw {agent} ziet wat u op dat scherm opent. De knop Scherm delen onderaan de pagina stopt het delen ook."
 
 msgid "callpage.notice.sharing.stop"
 msgstr "Stoppen met delen"

@@ -183,17 +183,23 @@ for (const way of ['the stop button', "the browser's own control", 'the staff me
 
 test('a picker that is closed is no error: nothing is said and the toggle stays off', async ({ page }) => {
   await inCall(page, {}, 'cancel');
-  const said_before = (await statuses(page)).length;
   await shareToggle(page).click();
   await expect.poll(async () => (await displayLog(page)).requests).toBe(1);
   await frames(page);
   await pressed(shareToggle(page), false);
   await expect(notice(page, 'sharing')).toBeHidden();
-  expect((await statuses(page)).length).toBe(said_before);
   expect(await callsOf(page, 'unpublishStreams')).toBe(0);
-  // Not stuck: the next press asks again.
+  // Not stuck: the next press asks again. The sentences of the call's first moments (connecting,
+  // let in) may still wait in the region's queue, so what the closed picker said is read by order:
+  // the one polite region says its sentences one after the other, so everything the closed picker
+  // had said comes before the start of the next share.
   await displayMode(page, 'ok');
   await shareNow(page);
+  await said(page, SHARING);
+  const spoken = await statuses(page);
+  expect(spoken.slice(0, spoken.indexOf(SHARING))).not.toContain(SHARE_FAILED);
+  expect(spoken.slice(0, spoken.indexOf(SHARING))).not.toContain(STOPPED);
+  expect(spoken.filter((sentence) => /screen/i.test(sentence))).toEqual([SHARING]);
 });
 
 test('a screen the browser cannot give is said honestly, and so is one that cannot be sent (and then the capture is given back)', async ({ page }) => {
@@ -215,6 +221,7 @@ test('a screen the browser cannot give is said honestly, and so is one that cann
   await expect(notice(refusing, 'sharing')).toBeHidden();
   expect((await displayLog(refusing)).stops).toBeGreaterThan(0);
   expect((await sdk(refusing)).published).not.toContain('screenShare');
+  expect(await callsOf(refusing, 'unpublishStreams')).toBe(1); // a half-sent stream is taken out of the meeting
 });
 
 test('leaving, the meeting ending and the connection failing each stop a share that is running', async ({ page }) => {
@@ -280,9 +287,11 @@ test('a staff member who shares while the participant does ends the participant\
   await expect.poll(async () => (await displayLog(page)).stops).toBeGreaterThan(before.stops);
   await pressed(shareToggle(page), false);
   await expect(shareToggle(page)).toHaveAttribute('aria-disabled', 'true');
-  // A press while their screen is shared does nothing: no second picker, no second share.
-  await shareToggle(page).click();
-  await frames(page);
+  // A press while their screen is shared (with the keyboard: a mouse cannot press a button that says
+  // it is disabled) starts no second picker and no second share, and says why, in the one region.
+  await shareToggle(page).focus();
+  await page.keyboard.press('Space');
+  await said(page, `The ${who} is sharing their screen.`);
   expect((await displayLog(page)).requests).toBe(1);
   await pressed(shareToggle(page), false);
   expect(await timesSaid(page, SHARING)).toBe(1); // said once at the start, never again
@@ -305,6 +314,28 @@ test('a screen the staff member already shares when the participant is let in is
   await expect(notice(page, 'theirs')).toBeVisible();
   await expect(shareView(page)).toBeVisible();
   await said(page, `The ${await term(page)} is sharing their screen.`);
+});
+
+test('the notice says that the button in the bar stops the share too, and a stop button that had focus hands it to the toggle', async ({ page }) => {
+  await inCall(page);
+  await shareNow(page);
+  await expect(notice(page, 'sharing')).toContainText('The Share screen button in the bar at the foot of the page stops it too.');
+  await stopButton(page).focus();
+  await page.keyboard.press('Enter');
+  await said(page, STOPPED);
+  await expect(shareToggle(page)).toBeFocused();
+  // Ended by the browser's own control while the stop button had focus: the same.
+  await shareNow(page);
+  await stopButton(page).focus();
+  await endDisplay(page);
+  await pressed(shareToggle(page), false);
+  await expect(shareToggle(page)).toBeFocused();
+  // Ended while focus was elsewhere: focus stays where it was.
+  await shareNow(page);
+  await page.getByRole('button', { name: /^Microphone/ }).focus();
+  await stopLocalShare(page);
+  await pressed(shareToggle(page), false);
+  await expect(page.getByRole('button', { name: /^Microphone/ })).toBeFocused();
 });
 
 // ---- closed captions -----------------------------------------------------------------------------------
@@ -424,6 +455,66 @@ test('captions switched off stop, the lines go and the toggle says so; switched 
   expect(await timesSaid(page, CAPTIONS_OFF)).toBe(1);
 });
 
+test('the transcription is stopped when captions go off and when the call is left, ended or fails', async ({ page }) => {
+  await inCall(page);
+  await captionsToggle(page).click();
+  await said(page, CAPTIONS_ON);
+  await captionsToggle(page).click();
+  await said(page, CAPTIONS_OFF);
+  expect(await callsOf(page, 'stopTranscription')).toBe(1);
+  expect((await captioning(page)).on).toBe(false);
+
+  for (const how of ['leave', 'end', 'fail'] as const) {
+    const other = await page.context().newPage();
+    await inCall(other);
+    await captionsToggle(other).click();
+    await said(other, CAPTIONS_ON);
+    expect(await callsOf(other, 'stopTranscription')).toBe(0);
+    if (how === 'leave') await leave(other).click();
+    else if (how === 'end') await control(other, 'end');
+    else await reconnection(other, 'fail');
+    await expect.poll(async () => callsOf(other, 'stopTranscription'), how).toBe(1);
+    expect((await captioning(other)).on).toBe(false);
+  }
+});
+
+test('a long caption can be read to its start, at twice the text size on a narrow window', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await inCall(page);
+  await page.evaluate(() => (document.documentElement.style.fontSize = '200%'));
+  await captionsToggle(page).click();
+  await said(page, CAPTIONS_ON);
+  const long = Array.from({ length: 40 }, (_, n) => `word${n}`).join(' ');
+  await caption(page, [{ id: '1', text: 'A short line' }, { id: '2', text: long }]);
+  await expect(rowsOf(page)).toHaveCount(2);
+  const box = captionBox(page);
+  const measure = () =>
+    box.evaluate((el) => {
+      const last = el.lastElementChild as HTMLElement;
+      const b = el.getBoundingClientRect();
+      const r = last.getBoundingClientRect();
+      return { scrolls: el.scrollHeight > el.clientHeight, top: r.top - b.top, scrollTop: el.scrollTop, max: el.scrollHeight - el.clientHeight, tab: el.getAttribute('tabindex') };
+    });
+  const m = await measure();
+  expect(m.scrolls).toBe(true);
+  expect(m.tab).toBe('0'); // it can scroll, so the keyboard can reach it
+  expect(m.top).toBeGreaterThanOrEqual(-1); // the newest line begins inside the box
+  // The keyboard reads on to its end, and back to its start.
+  await box.focus();
+  await page.keyboard.press('End');
+  expect((await measure()).scrollTop).toBeGreaterThan(m.scrollTop);
+  await page.keyboard.press('Home');
+  expect((await measure()).scrollTop).toBe(0);
+  // A box with nothing to scroll is no tab stop.
+  await captionsToggle(page).click();
+  await pressed(captionsToggle(page), false);
+  await captionsToggle(page).click();
+  await pressed(captionsToggle(page), true);
+  await caption(page, [{ id: '3', text: 'Short' }]);
+  await expect(rowsOf(page).last().locator('.call-caption__text')).toHaveText('Short');
+  expect(await box.getAttribute('tabindex')).toBeNull();
+});
+
 test('captions that cannot be started leave the toggle off and say so in one sentence', async ({ page }) => {
   await inCall(page, { captionsFail: true });
   await captionsToggle(page).click();
@@ -478,13 +569,12 @@ test('captions and sharing are reachable and work with the keyboard alone, in th
   await pressed(shareToggle(page), true);
   await expect(shareToggle(page)).toBeFocused();
 
-  // The stop button comes with the notice, before the picture; Shift+Tab reaches it.
-  for (let i = 0; i < 80 && !(await stopButton(page).evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press('Shift+Tab');
-  await expect(stopButton(page)).toBeFocused();
-  await page.keyboard.press('Enter');
+  // The toggle stops the share too, so no one has to leave the bar for the notice's button.
+  await page.keyboard.press('Space');
   await said(page, STOPPED);
-  await expect(shareToggle(page)).toBeFocused(); // focus is never lost to the document
   await pressed(shareToggle(page), false);
+  await expect(shareToggle(page)).toBeFocused();
+  await expect(notice(page, 'sharing')).toBeHidden();
 });
 
 // ---- axe on each new state -----------------------------------------------------------------------------
@@ -535,12 +625,14 @@ async function barHolds(page: Page, height: number, what: string): Promise<void>
 
 for (const size of [
   { width: 1280, height: 400, name: 'a wide window 400 px high' },
+  { width: 1056, height: 600, name: '1056 px wide (66 rem) and 600 px high' },
   { width: 768, height: 600, name: '768 px wide and 600 px high' },
+  { width: 641, height: 600, name: '641 px wide (just over 40 rem) and 600 px high' },
   { width: 320, height: 640, name: '320 px wide and 640 px high' },
   { width: 320, height: 400, name: '320 px wide and 400 px high' },
   { width: 320, height: 256, name: '400 % zoom (a 1280 by 1024 window)' },
 ]) {
-  test(`the one bar holds in the call with sharing, captions and every notice shown, ${size.name}`, async ({ page }) => {
+  test(`the one bar holds in the call with sharing, captions, every notice and the panel shown, ${size.name}`, async ({ page }) => {
     await page.setViewportSize({ width: size.width, height: size.height });
     await inCall(page);
     await captionsToggle(page).click();
@@ -555,6 +647,14 @@ for (const size of [
     // The captions are capped: they never take the picture's place or push the bar.
     const box = await captionBox(page).boundingBox();
     expect(box?.height ?? 0).toBeLessThanOrEqual(size.height / 2);
+
+    // The panel of devices above the row: inside the window, its foot at the row's top.
+    await page.getByRole('button', { name: 'Devices' }).click();
+    const panel = await page.getByRole('group', { name: 'Your devices' }).boundingBox();
+    const row = await rowOf(page);
+    expect(panel?.y ?? -1, 'panel top').toBeGreaterThanOrEqual(0);
+    expect((panel?.y ?? 0) + (panel?.height ?? 0), 'panel foot').toBeLessThanOrEqual(row.top + 1);
+    await page.keyboard.press('Escape');
 
     await remoteShare(page, true); // the staff member's screen instead
     await expect(notice(page, 'theirs')).toBeVisible();

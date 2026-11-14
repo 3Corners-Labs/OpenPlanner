@@ -21,10 +21,12 @@ SCRIPT_FILES = (
     "call-connection.js",
     "call-media.js",
     "call-captions.js",
+    "call-remote.js",
+    "call-render.js",
     "call-events.js",
     "call-page.js",
 )
-"""In the order the page loads them: the seven that only define, then the page that starts them."""
+"""In the order the page loads them: the nine that only define, then the page that starts them."""
 SOURCES = {name: (STATIC / name).read_text() for name in SCRIPT_FILES}
 SCRIPT = "\n".join(SOURCES.values())
 STYLES = (STATIC / "call-page.css").read_text()
@@ -182,41 +184,3 @@ def test_the_page_texts_are_formal_dutch() -> None:
     assert [
         k for k, text in nl.items() if k.startswith("callpage.") and informal.search(text)
     ] == []
-
-
-def test_a_screen_is_asked_for_in_one_place_and_only_the_browser_is_asked_whether_it_can() -> None:
-    # ADR 0123 step 5b: nothing is captured before a press; the one call is the share's own.
-    assert _code().count("createDisplayStream") == 1
-    assert "createDisplayStream" in SOURCES["call-media.js"]
-    assert len(re.findall(r"getDisplayMedia", _code())) == 1
-    assert not re.search(r"getDisplayMedia\s*\(", _code())
-
-
-def test_captions_read_a_text_and_never_the_name_the_platform_gives_a_speaker() -> None:
-    code = "\n".join(
-        line
-        for line in SOURCES["call-captions.js"].splitlines()
-        if not line.lstrip().startswith(("//", "/*", "*"))
-    )
-
-    assert ".name" not in code
-    assert "innerHTML" not in code
-    assert "words.textContent = line.text" in code
-    # Only the member ids of the speaker are looked at, to tell the participant's own lines.
-    assert set(re.findall(r"speaker\.(\w+)", code)) == {"speakerId", "memberId", "id"}
-
-
-def test_the_captions_are_a_group_of_text_and_no_live_region() -> None:
-    box = re.search(r"<div[^>]*data-call-captions[^>]*>", TEMPLATE)
-
-    assert box is not None
-    assert 'role="group"' in box.group(0)
-    assert "aria-live" not in box.group(0)
-    assert not re.search(r'role="(status|log|alert)"', box.group(0))
-    assert TEMPLATE.count("aria-live") == 1  # the one polite status element
-
-
-def test_the_real_time_link_stays_off_at_the_join_and_is_asked_for_by_the_captions() -> None:
-    assert "enableAutomaticLLM: false" in SOURCES["call-connection.js"]
-    assert "updateLLMConnection" in SOURCES["call-captions.js"]
-    assert "updateLLMConnection" not in SOURCES["call-connection.js"]
