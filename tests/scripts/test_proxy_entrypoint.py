@@ -270,9 +270,11 @@ def test_the_identity_provider_is_routed_only_when_an_upstream_is_named(
     )
 
     assert plain.idp == ["run:"]
-    directive = "\n".join(routed.idp)  # a multi-line directive: one log line per line of it
-    assert directive.startswith("run:handle /idp/* {")
-    assert "reverse_proxy idp:8080" in directive
+    # The route and its rules are one file (ADR 0126), which reads IDP_UPSTREAM itself.
+    assert routed.idp == ["run:import /etc/caddy/idp.caddy"]
+    dockerfile = (ENTRYPOINT.parent / "Dockerfile").read_text()
+    assert "COPY idp.caddy /etc/caddy/idp.caddy" in dockerfile
+    assert "reverse_proxy {$IDP_UPSTREAM}" in (ENTRYPOINT.parent / "idp.caddy").read_text()
 
 
 def test_an_upstream_with_an_odd_character_is_refused(bin_dir: Path, tmp_path: Path) -> None:

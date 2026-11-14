@@ -109,3 +109,78 @@ def test_a_visitor_over_ipv6_must_reach_web_with_their_own_address() -> None:
     match = re.search(r"^ipv6_client_code='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
     assert match, "the IPv6 client program is not in the script"
     compile(match.group(1), "ipv6 client", "exec")
+
+
+IDP_ROUTE = (REPO / "deploy/proxy/idp.caddy").read_text()
+
+
+def _program(name: str) -> str:
+    """Return the Python program the script keeps in the shell variable ``name``."""
+    match = re.search(rf"^{name}='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
+    assert match, f"{name} is not in the script"
+    compile(match.group(1), name, "exec")
+    return match.group(1)
+
+
+def test_pass_three_puts_a_hostile_provider_behind_the_route() -> None:
+    """ADR 0126: the probe sends every header the route drops, so their absence proves the drop."""
+    probe = _program("idp_probe_code")
+    dropped = set(re.findall(r"^\s*header_down -(\S+)$", IDP_ROUTE, re.MULTILINE))
+    listed = re.search(r"^dropped_headers='([^']*)'$", SCRIPT, re.MULTILINE)
+    assert listed, "the script lists no dropped headers"
+
+    assert {name.lower() for name in dropped} == set(listed.group(1).split())
+    for name in dropped:
+        assert f'("{name}", ' in probe, f"the probe does not send {name}"
+    assert '"__Host-op_admin=forged; Path=/;' in probe  # would replace the portal's session
+    assert '"Strict-Transport-Security", "max-age=0"' in probe
+    assert '"Cross-Origin-Opener-Policy", "same-origin"' in probe
+    assert re.search(
+        r"^start_idp_probe\nexport PROXY_INTERNAL=true PROXY_IDP_UPSTREAM=idp-probe:8080$",
+        SCRIPT,
+        re.M,
+    )
+    assert re.search(r"^idp_route_checks$", SCRIPT, re.MULTILINE)
+    # A control first: the probe is asked directly before the proxy's answer is judged.
+    body = _body("idp_route_checks")
+    assert body.index("so its absence would prove nothing") < body.index("the proxy passes $header")
+
+
+def test_the_hsts_the_route_must_send_is_the_portals_own() -> None:
+    expected = re.search(r"^portal_hsts='([^']*)'", SCRIPT, re.MULTILINE)
+    assert expected, "the script names no HSTS value for /idp"
+
+    assert expected.group(1) == SECURITY_HEADERS[b"strict-transport-security"].decode()
+
+
+def test_pass_four_runs_the_pinned_keycloak_as_compose_defines_it() -> None:
+    """The overlay changes the realm, the data and the port; image and command stay compose's."""
+    overlay = (REPO / "deploy/proxy/compose.pebble.yml").read_text()
+    idp = overlay[overlay.index("\n  idp:\n") :]
+
+    assert "image:" not in idp
+    assert "command:" not in idp
+    assert "${KEYCLOAK_CHECK_DIR:?set by scripts/check-proxy.sh}/secrets/keycloak-realm.json" in idp
+    assert '"127.0.0.1:18090:8080"' in idp
+    assert re.search(r"^keycloak_up\nexport PROXY_IDP_UPSTREAM=idp:8080$", SCRIPT, re.MULTILINE)
+    assert re.search(r"^keycloak_checks$", SCRIPT, re.MULTILINE)
+    assert "--profile idp" in _body("compose")
+
+
+def test_pass_four_proves_each_refusal_against_the_loopback_and_the_console_after_the_change() -> (
+    None
+):
+    body = _body("keycloak_checks")
+
+    # A 404 through the route counts only when the loopback serves the same path.
+    assert "so its 404 proves nothing" in body
+    # Realm master's login names the public address first: the control for the installer's change.
+    assert body.index("did not name the public address before the change") < body.index(
+        "attributes.frontendUrl=http://127.0.0.1:18090/idp"
+    )
+    assert body.index("attributes.frontendUrl") < body.index("does not stay on the loopback")
+    assert 'assets_load "$page" "the login page"' in body
+    assert "the account console" in body
+    directory = _program("directory_code")
+    assert "http://idp:8080/idp/admin/realms/openplanner/users" in directory
+    assert 'print("users listed", len(' in directory  # a count, never a name

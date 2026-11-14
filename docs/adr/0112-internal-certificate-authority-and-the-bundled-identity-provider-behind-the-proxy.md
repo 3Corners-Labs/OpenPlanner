@@ -1,8 +1,11 @@
 # 0112. An internal certificate authority for labs, and the bundled identity provider behind the proxy
 
-Status: proposed (2026-11-03), requested by the product owner. Amends ADR 0064 (two certificate
+Status: accepted (2026-11-03), requested by the product owner. Amends ADR 0064 (two certificate
 sources become three), ADR 0090 step 2 (the bundled Keycloak is reached through the proxy) and
-ADR 0106 step 5 (the installer's https default covers the identity provider). Partly built: steps 0 to 5 merged or live (#476, docker01 since 2026-11-03); step 6 open.
+ADR 0106 step 5 (the installer's https default covers the identity provider). Point 4 amended by
+ADR 0126: the `/idp` route serves only the login and keeps the portal's cookies and origin out of
+the provider's reach. Built: steps 0 to 4 and 6 merged (#476, #483), step 5 live on docker01
+since 2026-11-03.
 
 ## Context
 

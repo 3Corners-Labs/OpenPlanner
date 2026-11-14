@@ -11,24 +11,29 @@
 # network of docker-compose.yml); a
 # pair handed over through the portal-certs volume is served within the poll interval and ACME
 # applies again when it is withdrawn; then the same proxy serves an own certificate from files and
-# one issued by its internal authority (ADR 0112; the root is published, trusted by `tls-check`,
-# and /idp/ is routed),
-# and `tls-check` from the web container reads either certificate and judges it. Used by CI
-# and by `make proxy-check`. Needs docker with compose v2, curl and openssl.
+# one issued by its internal authority (ADR 0112; the root is published, trusted by `tls-check`),
+# and `tls-check` from the web container reads either certificate and judges it. The /idp route
+# of ADR 0126 is proven twice: against a probe that answers like a hostile provider (only the
+# login passes, the portal's cookies stay out, nothing in an answer acts on the whole origin) and
+# against the Keycloak image docker-compose.yml pins (what a browser needs loads, the admin console
+# and realm master do not, the console works on the loopback, the staff directory's calls work).
+# Used by CI and by `make proxy-check`. Needs docker with compose v2, curl and openssl.
 set -eu
 
 project=openplanner-proxy-check
 certs="$(mktemp -d)"
+keycloak_dir="$certs/keycloak" # the realm of pass 4, rendered for this check's address
 # A visitor over IPv6 (ipv6_client_check): the proxy is also published on the gateway address of
 # a probe network made below, without masquerading, so a request from that address keeps it.
 probe6_network=$project-ipv6
 probe6_subnet=fdf2:d3f5:96ab:1::/64
 probe6=fdf2:d3f5:96ab:1::1
 compose() {
-  PEBBLE_CERTS="$certs" PROBE6_ADDRESS="$probe6" docker compose -p "$project" \
-    -f docker-compose.yml -f deploy/proxy/compose.pebble.yml --profile tls "$@"
+  PEBBLE_CERTS="$certs" PROBE6_ADDRESS="$probe6" KEYCLOAK_CHECK_DIR="$keycloak_dir" docker compose \
+    -p "$project" -f docker-compose.yml -f deploy/proxy/compose.pebble.yml --profile tls --profile idp "$@"
 }
 cleanup() {
+  docker rm -f "$project-idp-probe" >/dev/null 2>&1 || true
   compose down -v >/dev/null 2>&1 || true
   docker network rm "$probe6_network" >/dev/null 2>&1 || true
   rm -rf "$certs"
@@ -280,6 +285,196 @@ edge_checks() { # redirect, machine paths, body limit, non-root, standards: the 
   forged_header_check
 }
 
+# The provider of pass 3 (ADR 0126): it answers every request with 200 and the Cookie header it was
+# given, sets every header an answer must not get through to the browser, and prints each path it
+# serves. It runs in web's image on the edge network as idp-probe:8080.
+idp_probe_code='
+import http.server, json
+FORGED = [
+    ("Set-Cookie", "__Host-op_admin=forged; Path=/; Secure; HttpOnly"),
+    ("Set-Cookie", "tossed=1; Path=/admin; Domain=booking.test"),
+    ("Set-Cookie", "KC_PROBE=1; Path=/idp/realms/openplanner/; Secure"),
+    ("Strict-Transport-Security", "max-age=0"),
+    ("Cross-Origin-Opener-Policy", "same-origin"),
+    ("Content-Security-Policy", "frame-ancestors https://booking.test"),
+    ("Service-Worker-Allowed", "/"),
+    ("Clear-Site-Data", json.dumps("cookies")),
+    ("Alt-Svc", "h2=\":9443\""),
+    ("NEL", json.dumps({"report_to": "probe", "max_age": 86400})),
+    ("Report-To", json.dumps({"group": "probe", "max_age": 86400, "endpoints": [{"url": "https://probe.invalid/"}]})),
+    ("Reporting-Endpoints", "probe=\"https://probe.invalid/\""),
+    ("Accept-CH", "Sec-CH-UA-Model"),
+    ("Critical-CH", "Sec-CH-UA-Model"),
+]
+
+
+class Probe(http.server.BaseHTTPRequestHandler):
+    def answer(self):
+        print(self.path, flush=True)
+        body = json.dumps({"cookie": self.headers.get_all("Cookie") or []}).encode()
+        self.send_response(200)
+        for name, value in FORGED:
+            self.send_header(name, value)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    do_GET = do_POST = answer
+
+    def log_message(self, *args):
+        pass
+
+
+http.server.ThreadingHTTPServer(("", 8080), Probe).serve_forever()
+'
+
+# Asks the probe directly, from web, which headers it sends: the control for their absence later.
+probe_direct_code='
+import urllib.request
+answer = urllib.request.urlopen("http://idp-probe:8080/idp/realms/openplanner/x")
+for name, value in answer.headers.items():
+    print(name + ": " + value)
+'
+
+# The staff directory's two calls (ADR 0095) on the internal network, as web makes them: a token for
+# the service account, then the realm's users. Prints a count, never a name or the token.
+directory_code='
+import json, os, urllib.parse, urllib.request
+data = urllib.parse.urlencode({"grant_type": "client_credentials", "client_id": "openplanner-directory", "client_secret": os.environ["SECRET"]}).encode()
+token = json.load(urllib.request.urlopen("http://idp:8080/idp/realms/openplanner/protocol/openid-connect/token", data))["access_token"]
+request = urllib.request.Request("http://idp:8080/idp/admin/realms/openplanner/users?max=1", headers={"Authorization": "Bearer " + token})
+print("users listed", len(json.load(urllib.request.urlopen(request))))
+'
+
+portal_hsts='max-age=63072000; includeSubDomains' # app/api/security_headers.py, tied by a test
+dropped_headers='service-worker-allowed clear-site-data alt-svc nel report-to reporting-endpoints accept-ch critical-ch'
+
+start_idp_probe() { # the provider of pass 3, on the edge network as idp-probe:8080
+  image="$(docker inspect -f '{{.Config.Image}}' "$(compose ps -q web)")"
+  docker rm -f "$project-idp-probe" >/dev/null 2>&1 || true
+  docker run -d --rm --name "$project-idp-probe" --network "${project}_edge" --network-alias idp-probe \
+    --entrypoint python "$image" -I -c "$idp_probe_code" >/dev/null
+}
+
+values_of() { # values_of NAME: the values of one header of $head, a line each, whatever its case
+  echo "$head" | grep -i "^$1:" | sed 's/^[^:]*: *//'
+}
+
+probe_saw() { # probe_saw PATTERN: whether a path matching the extended regex reached the probe
+  docker logs "$project-idp-probe" 2>&1 | grep -E -q "$1"
+}
+
+idp_route_checks() { # pass 3: the route of ADR 0126 in front of a provider that tries everything
+  base=https://booking.test:18443
+  for path in /idp/realms/openplanner/protocol/openid-connect/auth /idp/resources/x/login.css; do
+    [ "$(status_of "$base$path")" = "200" ] || fail "$path does not reach the provider"
+  done
+  # The probe answers 200 to anything, so a 404 is the proxy's own refusal.
+  for path in /idp /idp/ /idp/admin/ /idp/admin/master/console/ /idp/admin/realms/openplanner/users \
+    /idp/realms/master/ /idp/realms/master/protocol/openid-connect/token /idp/metrics /idp/health \
+    /IDP/admin/ /idp/realms/openplanner/../../admin/ /idp/realms/openplanner/%2e%2e/%2e%2e/admin/; do
+    [ "$(status_of --path-as-is "$base$path")" = "404" ] || fail "the proxy passes $path to the provider"
+  done
+  ! probe_saw '^/(idp|IDP)/?$|^/(idp|IDP)/(admin|realms/master|metrics|health)' \
+    || fail "a path the proxy should refuse reached the provider"
+  [ "$(status_of -H 'Service-Worker: script' "$base/idp/resources/sw.js")" = "403" ] \
+    || fail "a service worker's script is fetched from the provider"
+  ! probe_saw '^/idp/resources/sw\.js' || fail "the fetch of a service worker's script reached the provider"
+  # shellcheck disable=SC2086
+  given="$(curl -sk $resolve -H 'Cookie: __Host-op_admin=s1; KC_RESTART=k1; lang=nl; __Host-op_link=s2; AUTH_SESSION_ID=a1' \
+    "$base/idp/realms/openplanner/x")"
+  echo "  the provider was given: $given"
+  for kept in KC_RESTART=k1 AUTH_SESSION_ID=a1; do
+    echo "$given" | grep -q "$kept" || fail "the provider's own cookie $kept does not reach it ($given)"
+  done
+  ! echo "$given" | grep -q -e '__Host-' -e 'lang=' || fail "a cookie of the portal reaches the provider ($given)"
+  direct="$(compose exec -T web python -I -c "$probe_direct_code" | tr -d '\r')"
+  # shellcheck disable=SC2086
+  head="$(curl -sk $resolve -D - -o /dev/null "$base/idp/realms/openplanner/x" | tr -d '\r')"
+  for header in $dropped_headers; do
+    echo "$direct" | grep -qi "^$header:" || fail "the probe sends no $header, so its absence would prove nothing"
+    ! echo "$head" | grep -qi "^$header:" || fail "the proxy passes $header from the provider"
+  done
+  cookies="$(values_of set-cookie)"
+  [ "$(echo "$cookies" | grep -c .)" = "3" ] || fail "the provider's three cookies do not all arrive ($cookies)"
+  ! echo "$cookies" | grep -iv '; path=/idp/' | grep -q . || fail "a cookie of the provider leaves /idp/ ($cookies)"
+  ! echo "$cookies" | grep -qi 'domain=' || fail "a cookie of the provider keeps its Domain ($cookies)"
+  [ "$(values_of strict-transport-security)" = "$portal_hsts" ] || fail "HSTS on /idp is not the portal's own"
+  [ "$(values_of cross-origin-opener-policy)" = "same-origin-allow-popups" ] \
+    || fail "the opener policy on /idp is not same-origin-allow-popups alone"
+  values_of content-security-policy | grep -qx 'frame-ancestors https://booking.test' \
+    || fail "the provider's own policy does not arrive next to the added one"
+  values_of content-security-policy \
+    | grep -qx "connect-src https://booking.test:\\*/idp/; form-action https://booking.test:\\*/idp/; worker-src 'none'" \
+    || fail "the policy the proxy adds on /idp is missing"
+}
+
+keycloak_up() { # pass 4: the bundled provider of docker-compose.yml, with a realm for this check
+  mkdir -p "$keycloak_dir/deploy/keycloak"
+  cp deploy/keycloak/realm.template.json "$keycloak_dir/deploy/keycloak/"
+  printf 'PUBLIC_BASE_URL=https://booking.test:18443\n' >"$keycloak_dir/.env"
+  scripts/render-keycloak-realm.sh --dir "$keycloak_dir" >/dev/null 2>&1 || fail "the check's realm could not be rendered"
+  compose up -d idp
+  for _ in $(seq 1 60); do
+    curl -sf -o /dev/null http://127.0.0.1:18090/idp/realms/openplanner/.well-known/openid-configuration && return 0
+    sleep 2
+  done
+  compose logs idp >&2
+  fail "the bundled identity provider did not start"
+}
+
+assets_load() { # assets_load HTML WHAT: every asset under /idp/ that a page names loads through the route
+  assets="$(echo "$1" | grep -o -E '(href|src)="/idp/[^"]*"' | sed -E 's/^(href|src)="//; s/"$//' | sort -u)"
+  [ -n "$assets" ] || fail "$2 names no asset under /idp/"
+  for asset in $assets; do
+    [ "$(status_of "https://booking.test:18443$asset")" = "200" ] || fail "$2 needs $asset, which does not load through the route"
+  done
+}
+
+keycloak_checks() { # pass 4: what a browser needs passes the route, the admin console does not
+  base=https://booking.test:18443
+  loopback=http://127.0.0.1:18090
+  pkce='response_type=code&scope=openid&state=s&nonce=n&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256'
+  # shellcheck disable=SC2086
+  issuer="$(curl -sk $resolve "$base/idp/realms/openplanner/.well-known/openid-configuration" \
+    | sed -n 's/.*"issuer":"\([^"]*\)".*/\1/p')"
+  [ "$issuer" = "$base/idp/realms/openplanner" ] || fail "the login's discovery document does not pass the route ($issuer)"
+  # shellcheck disable=SC2086
+  page="$(curl -sk $resolve "$base/idp/realms/openplanner/protocol/openid-connect/auth?client_id=openplanner-admin&$pkce&redirect_uri=https%3A%2F%2Fbooking.test%3A18443%2Fadmin%2Fcallback")"
+  echo "$page" | grep -q "action=\"$base/idp/realms/openplanner/login-actions/authenticate" \
+    || fail "the login page does not pass the route"
+  assets_load "$page" "the login page"
+  # shellcheck disable=SC2086
+  assets_load "$(curl -sk $resolve "$base/idp/realms/openplanner/account/")" "the account console"
+  for path in /idp/admin/master/console/ /idp/realms/master/.well-known/openid-configuration; do
+    [ "$(status_of "$base$path")" = "404" ] || fail "$path passes the route"
+    [ "$(curl -s -o /dev/null -w '%{http_code}' "$loopback$path")" = "200" ] \
+      || fail "$path is not served on the loopback either, so its 404 proves nothing"
+  done
+  [ "$(status_of "$base/idp/admin/realms/openplanner/users")" = "404" ] || fail "the admin REST API passes the route"
+  for path in '/idp/realms/openplanner/..;/..;/admin/master/console/' '/idp/resources/..;/admin/master/console/' \
+    '/idp/realms/openplanner/%2e%2e/%2e%2e/admin/master/console/'; do
+    [ "$(status_of --path-as-is "$base$path")" != "200" ] || fail "$path reaches the admin console through the route"
+  done
+  # The console on the loopback (ADR 0126 point 2): realm master's login form goes to the public
+  # address, where the route refuses it, until the realm's frontend URL is the loopback.
+  master="$loopback/idp/realms/master/protocol/openid-connect/auth?client_id=security-admin-console&$pkce&redirect_uri=http%3A%2F%2F127.0.0.1%3A18090%2Fidp%2Fadmin%2Fmaster%2Fconsole%2F"
+  curl -s "$master" | grep -q "action=\"$base/idp/realms/master/login-actions/" \
+    || fail "realm master's login form did not name the public address before the change, so the next check proves nothing"
+  # shellcheck disable=SC2016 # the password is the container's own
+  compose exec -T idp sh -c '/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080/idp --realm master --user admin --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" >/dev/null && /opt/keycloak/bin/kcadm.sh update realms/master -s attributes.frontendUrl=http://127.0.0.1:18090/idp' \
+    || fail "realm master did not take the loopback as its frontend URL"
+  curl -s "$master" | grep -q "action=\"$loopback/idp/realms/master/login-actions/" \
+    || fail "realm master's login form does not stay on the loopback"
+  console="$(curl -s "$loopback/idp/admin/master/console/")"
+  echo "$console" | grep -q "\"adminBaseUrl\": \"$loopback/idp\"" || fail "the console does not call its API on the loopback"
+  ! echo "$console" | grep -q 'booking.test' || fail "the console on the loopback names the public address"
+  secret="$(sed -n 's/^KC_DIRECTORY_CLIENT_SECRET=//p' "$keycloak_dir/secrets/keycloak.env")"
+  compose exec -T -e SECRET="$secret" web python -I -c "$directory_code" | grep -q '^users listed' \
+    || fail "the staff directory cannot use the provider on the internal network"
+}
+
 tls_check() { # tls_check EXPECTED_FINDING EXPECTED_ISSUER_FRAGMENT: run the CLI from web
   set +e
   report="$(compose exec -T web python -m app.cli tls-check --host booking.test --port 8443)"
@@ -359,9 +554,11 @@ tls_check untrusted "OpenPlanner own CA check"
 echo "pass 2 ok: own certificate from files, redirect, body limit, non-root, TLS versions, HSTS, round trip, tls-check"
 
 # Pass 3: Caddy's internal authority (ADR 0112). No ACME, no mailbox; the public root is
-# published to the internal-ca volume, the app's checks trust it, and /idp/ is routed.
+# published to the internal-ca volume and the app's checks trust it. The /idp route of ADR 0126
+# leads to a probe that answers like a hostile provider.
 unset PROXY_CERT_FILE PROXY_KEY_FILE
-export PROXY_INTERNAL=true PROXY_IDP_UPSTREAM=127.0.0.1:9
+start_idp_probe
+export PROXY_INTERNAL=true PROXY_IDP_UPSTREAM=idp-probe:8080
 compose up -d --force-recreate --wait proxy
 wait_for_proxy
 issuer | grep -q 'Caddy Local Authority' || fail "the internal authority did not issue the certificate ($(issuer))"
@@ -376,14 +573,23 @@ report="$(compose exec -T web python -m app.cli tls-check --host booking.test --
   || fail "tls-check does not trust the internal root ($report)"
 echo "$report" | sed 's/^/  tls-check: /'
 echo "$report" | grep -q "^finding  *ok" || fail "tls-check did not find 'ok' for the internal certificate"
-# shellcheck disable=SC2086
-[ "$(curl -sk $resolve -o /dev/null -w '%{http_code}' https://booking.test:18443/idp/realms/x)" = "502" ] \
-  || fail "/idp/ is not routed to IDP_UPSTREAM"
+idp_route_checks
 # shellcheck disable=SC2086
 [ "$(curl -sk $resolve -o /dev/null -w '%{http_code}' https://booking.test:18443/healthz)" = "200" ] \
   || fail "the app is not served next to /idp/"
 edge_checks
-echo "pass 3 ok: internal authority, root published without a key, tls-check ok, /idp routed, redirect, body limit, non-root, TLS versions, HSTS"
+docker rm -f "$project-idp-probe" >/dev/null
+echo "pass 3 ok: internal authority, root published without a key, tls-check ok, /idp passes only the login and keeps the portal's cookies and the whole origin out of the provider's reach, redirect, body limit, non-root, TLS versions, HSTS"
+
+# Pass 4: the bundled identity provider itself behind the route (ADR 0126), the Keycloak image and
+# service docker-compose.yml define. A Keycloak update (Renovate) runs it too.
+keycloak_up
+export PROXY_IDP_UPSTREAM=idp:8080
+compose up -d --force-recreate --wait proxy
+wait_for_proxy
+keycloak_checks
+compose stop idp >/dev/null 2>&1
+echo "pass 4 ok: the bundled Keycloak's login, assets and account console pass the route; its admin console, REST API and realm master do not; the console works on the loopback; the staff directory works on the internal network"
 unset PROXY_INTERNAL PROXY_IDP_UPSTREAM
 
 # A half-configured own certificate must stop the container, never serve plain HTTP.

@@ -534,6 +534,10 @@ Moving docker01 from plain http to this took these steps, all without root, beca
    `http://localhost:8080/idp`).
 7. `docker compose --env-file .env.update up -d --force-recreate web worker proxy`.
 8. Verify with `oidc-check`, `tls-check` and `address-check` from `web`.
+9. Since ADR 0126 (with the release that brings it): run the command of *Opening the admin
+   console*, check that `docker compose --env-file .env.update port idp 8080` prints
+   `127.0.0.1:8080` and nothing on 8780, and that `https://<host>/idp/admin/` answers 404 from
+   another machine.
 
 #### The bundled identity provider behind the proxy
 
@@ -544,8 +548,27 @@ is `https://<host>`: it writes `KC_HOSTNAME=https://<host>/idp`, `KC_HTTP_RELATI
 `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, the admin URL) into
 `secrets/keycloak-app.env`, which web and worker read after `.env`. Remove the same names from
 `.env` so one place holds them, recreate `idp`, `web` and `worker`, and log in at
-`https://<host>/idp/realms/openplanner`. Keycloak's admin console is then
-`https://<host>/idp/admin/` (user `admin`). Port 8780 is no longer needed.
+`https://<host>/idp/realms/openplanner`. Port 8780 is no longer needed: remove any published
+port of `idp` other than `127.0.0.1:8080` from `docker-compose.override.yml`.
+
+Only the login is public (ADR 0126, `deploy/proxy/idp.caddy`): the proxy passes
+`/idp/realms/openplanner/*` (the login, its OIDC endpoints and the account console) and
+`/idp/resources/*`, and answers 404 itself for the rest of `/idp`, the admin console
+(`/idp/admin`) and realm `master` among it. It removes the portal's cookies before a request
+reaches Keycloak, keeps every cookie Keycloak sets under `/idp/`, drops the answers' headers that
+act on the whole host, and adds a policy that lets a Keycloak page fetch and post only under
+`/idp/`. The admin console is on the host's loopback: see *Opening the admin console* under
+*Bundled identity provider*. The staff directory and the login's back channel use
+`http://idp:8080/idp/...` on the internal network and do not pass the proxy.
+
+A reverse proxy of your own in front of the bundled Keycloak must do the same: pass only those
+two paths, remove the `Cookie` pairs whose name starts with `__Host-` and the one named `lang`,
+rewrite a `Set-Cookie` path outside `/idp/` to `/idp/` and drop its `Domain`, drop
+`Service-Worker-Allowed`, `Clear-Site-Data`, `Alt-Svc`, `NEL`, `Report-To`,
+`Reporting-Endpoints`, `Accept-CH` and `Critical-CH`, send the portal's own
+`Strict-Transport-Security`, `Cross-Origin-Opener-Policy: same-origin-allow-popups` and the
+added `Content-Security-Policy`, and refuse a request with a `Service-Worker` header.
+`deploy/proxy/idp.caddy` is the reference.
 
 ### Test the certificate flow end to end (ADR 0064)
 
@@ -782,8 +805,9 @@ the security log `admin.login` with reason `mfa_required`; neither holds a claim
 
 **MFA locks the superuser out** (lost phone, a policy that does not emit `amr`). There is no
 break-glass login. Fix it at the identity provider: with the bundled Keycloak open the admin
-console (realm `openplanner` → *Users* → `super` → *Credentials*, delete the OTP credential;
-the next login asks to register a new one). If the IdP cannot be fixed in time, use the host
+console on the host (*Opening the admin console* under *Bundled identity provider*; realm
+`openplanner` → *Users* → `super` → *Credentials*, delete the OTP credential; the next login
+asks to register a new one). If the IdP cannot be fixed in time, use the host
 CLI of the next section (closure, `oidc-check`); lowering the requirement is a deployment
 change in `.env` (`ADMIN_MFA_REQUIRED=false` and a restart of `web`), a decision for the
 product owner.
@@ -921,7 +945,29 @@ Keycloak announces its token endpoint and key set as `http://`, and `oidc-check`
 them as expected. Keycloak's own address
 for browsers is `KC_HOSTNAME` in the same file (default `http://127.0.0.1:8080`): a lab on the
 host itself needs nothing more; reaching the login from another machine goes through the proxy
-and is step 2. The admin console is bound to the host's loopback and is never published.
+and is step 2. The admin console is never published: the proxy serves the login and nothing
+else under `/idp` (ADR 0126), and the console is opened on the host's loopback.
+
+**Opening the admin console (ADR 0126).** Keycloak publishes its port on the host's loopback
+only (`127.0.0.1:8080`). From another machine, open a tunnel to it, with that same local port:
+
+```bash
+ssh -L 8080:127.0.0.1:8080 <host>
+```
+
+Then open `http://127.0.0.1:8080/idp/admin/` (`http://127.0.0.1:8080/admin/` on a host without
+the proxy) and log in as `admin` with `KC_BOOTSTRAP_ADMIN_PASSWORD` from
+`secrets/keycloak.env`. With the proxy, realm `master` must have the loopback as its frontend
+address, or its login form sends the browser to the public address, where the proxy refuses
+it. The installer sets it after every start; on a host installed before ADR 0126, run once:
+
+```bash
+docker compose --env-file .env.update exec idp sh -c '/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080/idp --realm master --user admin --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" && /opt/keycloak/bin/kcadm.sh update realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp'
+```
+
+Realm `openplanner` keeps its public address and issuer; the staff directory and the login are
+unaffected. Every step below that names the console uses this one; `kcadm.sh` inside the
+container works without it.
 
 **Mail from Keycloak.** Invitations and password resets of the Staff screen are sent by
 Keycloak itself, not by OpenPlanner. The rendered realm has no mail server yet; set one in the
@@ -977,8 +1023,8 @@ docker compose exec idp /opt/keycloak/bin/kcadm.sh add-roles -r openplanner \
 Read the generated secret in the admin console (*Clients* → `openplanner-directory` →
 *Credentials*), never in a shell history.
 
-**Resetting the password of `super`.** On the host, open the admin console at
-http://127.0.0.1:8080 (over an SSH tunnel from elsewhere), log in as `admin` with
+**Resetting the password of `super`.** Open the admin console on the host (*Opening the admin
+console*, above), log in as `admin` with
 `KC_BOOTSTRAP_ADMIN_PASSWORD`, open realm `openplanner` → *Users* → `super` →
 *Credentials* → *Reset password*, tick *Temporary* so the next login asks for a new one. The
 CLI of ADR 0042 §10 creates no user and starts no session; the admin console is the only way.
@@ -987,7 +1033,8 @@ CLI of ADR 0042 §10 creates no user and starts no session; the admin console is
 `start` on its own PostgreSQL container `idp-db` (profile `idp-db`, volume `idp-db-data`, user
 and password in `secrets/idp-db.env`, the same password as `KC_DB_PASSWORD` in
 `secrets/keycloak.env`). The admin console stays on the host's loopback (`127.0.0.1:8080`,
-`/idp` there), the login is served by the proxy. Back the database up next to the application's:
+`/idp` there; *Opening the admin console*), the login is served by the proxy and nothing else
+under `/idp` (ADR 0126). Back the database up next to the application's:
 
 ```bash
 docker compose --env-file .env.update exec -T idp-db pg_dump -U keycloak keycloak | gzip > idp-$(date +%F).sql.gz

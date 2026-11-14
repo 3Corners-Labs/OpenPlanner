@@ -1,0 +1,54 @@
+# The bundled identity provider under /idp (ADR 0112 point 4, ADR 0126), imported into the
+# https site by entrypoint.sh when IDP_UPSTREAM names it. The provider shares the portal's host
+# name, certificate and origin, so this block keeps it to the login, keeps the portal's cookies
+# away from it, and drops what an answer from it could do to the whole origin.
+@idp path /idp /idp/*
+handle @idp {
+	# ADR 0126 point 4: no service worker from here. A browser fetches the script of one with
+	# `Service-Worker: script`; it is refused before the provider sees it.
+	@worker header Service-Worker *
+	handle @worker {
+		respond 403
+	}
+	# ADR 0126 point 1: only what a browser needs. The login of realm openplanner, the account
+	# console of ADR 0100 point 7 and their assets are the two paths Keycloak's reverse proxy
+	# guide marks as exposed, narrowed to the one realm. The admin console and its REST API
+	# (/idp/admin), realm master (whose `admin` rules every realm), the welcome page and every
+	# other path answer 404 here; the admin console is on the host's loopback (runbook).
+	@login path /idp/realms/openplanner/* /idp/resources/*
+	handle @login {
+		reverse_proxy {$IDP_UPSTREAM} {
+			# ADR 0126 point 2: none of the portal's cookies reaches the provider. On https every
+			# cookie of the portal is a `__Host-` cookie (app/web/cookies.py), besides `lang`
+			# (app/web/locale.py); a provider's cookie can never be one, its path is /idp/....
+			header_up Cookie `(?i)(^|;\s*)(__host-[^=;]*|lang)=[^;]*` ""
+			header_up Cookie `^;\s*` ""
+			# ADR 0126 point 3: a cookie the provider sets stays under /idp/ and on this host.
+			# A Path outside /idp/ becomes /idp/ (a `__Host-` name is then refused by the
+			# browser, so the portal's session cannot be overwritten); Domain is dropped.
+			header_down Set-Cookie `(;\s*(?i:path)=)(/|/[^i;][^;]*|/i|/i[^d;][^;]*|/id|/id[^p;][^;]*|/idp[^/;][^;]*)(;|$)` "$1/idp/$3"
+			header_down Set-Cookie `;\s*(?i:domain)=[^;]*` ""
+			# ADR 0126 point 3: what a browser applies to the whole origin or host. HSTS is the
+			# portal's own (app/api/security_headers.py), so a provider's max-age=0 never ends it.
+			header_down -Service-Worker-Allowed
+			header_down -Clear-Site-Data
+			header_down -Alt-Svc
+			header_down -NEL
+			header_down -Report-To
+			header_down -Reporting-Endpoints
+			header_down -Accept-CH
+			header_down -Critical-CH
+			header_down Strict-Transport-Security "max-age=63072000; includeSubDomains"
+			# Never the portal's `same-origin`: a window this page opens on the portal gets a
+			# browsing context group of its own, so a script here cannot reach into it.
+			header_down Cross-Origin-Opener-Policy same-origin-allow-popups
+			# ADR 0126 point 3: a policy next to the provider's own (a browser enforces both). A
+			# page here may fetch and post only under /idp/, and may start no worker. After a
+			# redirect a browser ignores the path, so the login's return to /admin/callback stays.
+			header_down +Content-Security-Policy "connect-src https://{http.request.host}:*/idp/; form-action https://{http.request.host}:*/idp/; worker-src 'none'"
+		}
+	}
+	handle {
+		respond 404
+	}
+}

@@ -62,8 +62,9 @@ http://{$TLS_DOMAIN}:8080 {
 	}
 	# Caddy sets X-Forwarded-For to the visitor's address and drops any value the client sent
 	# (no trusted_proxies), so rate limits in the app see the real IP.
-	# The bundled identity provider (ADR 0112) is served under /idp when IDP_UPSTREAM is set;
-	# entrypoint.sh renders IDP_DIRECTIVE, empty otherwise.
+	# The bundled identity provider (ADR 0112) is served under /idp when IDP_UPSTREAM is set:
+	# entrypoint.sh renders IDP_DIRECTIVE as `import /etc/caddy/idp.caddy` (ADR 0126: only the
+	# login, none of the portal's cookies, nothing that acts on the whole origin), empty otherwise.
 	{$IDP_DIRECTIVE}
 	handle {
 		reverse_proxy web:8000

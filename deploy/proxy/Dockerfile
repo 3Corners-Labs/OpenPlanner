@@ -35,6 +35,8 @@ RUN setcap -r /usr/bin/caddy \
  && mkdir -p /internal-ca \
  && chown -R 10001:10001 /data /config /internal-ca
 COPY Caddyfile /etc/caddy/Caddyfile
+# The /idp route of the bundled identity provider (ADR 0126); imported only with IDP_UPSTREAM.
+COPY idp.caddy /etc/caddy/idp.caddy
 COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
 USER 10001:10001
 EXPOSE 8080 8443

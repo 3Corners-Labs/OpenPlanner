@@ -992,6 +992,41 @@ def test_without_an_smtp_host_the_install_says_keycloak_cannot_mail(host: Host) 
 
     assert result.returncode == 0, result.stderr
     assert "Keycloak cannot mail invitations" in result.stderr
+    assert not host.ran("op-smtp.json")
+
+
+def test_the_admin_console_is_put_on_the_loopback_after_the_start_adr_0126(host: Host) -> None:
+    """Behind the proxy realm master's login must stay on the loopback, where the console is."""
+    settings = {k: v for k, v in PRODUCTION.items() if not k.startswith(("OIDC_", "SMTP_"))}
+
+    result = host.run("--mode", "test", "--non-interactive", **settings)
+
+    assert result.returncode == 0, result.stderr
+    assert host.ran("port idp 8080")
+    # The published loopback port, with the proxy's path.
+    assert host.ran("realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp")
+    assert not host.ran("KC_BOOTSTRAP_ADMIN_PASSWORD=")  # the password stays in the container
+    output = result.stderr + result.stdout
+    assert "admin console: http://127.0.0.1:8080/idp/admin/ on this host only" in output
+
+
+def test_a_provider_published_beyond_the_loopback_gets_no_console_address(host: Host) -> None:
+    """A port on every interface would put the console on the network: say so, set nothing."""
+    host.given("idp-port", "0.0.0.0:8780\n")
+    settings = {k: v for k, v in PRODUCTION.items() if not k.startswith(("OIDC_", "SMTP_"))}
+
+    result = host.run("--mode", "test", "--non-interactive", **settings)
+
+    assert result.returncode == 0, result.stderr
+    assert not host.ran("frontendUrl")
+    assert "published as '0.0.0.0:8780', not on 127.0.0.1 only" in result.stderr + result.stdout
+
+
+def test_an_own_provider_gets_no_console_step(host: Host) -> None:
+    result = host.run("--mode", "test", "--idp", "own", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode == 0, result.stderr
+    assert not host.ran("port idp")
     assert not host.ran("exec -T idp")
 
 
