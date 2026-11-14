@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Betreft | OpenPlanner 0.6.0, releasekandidaat `v0.6.0-rc.117` (commit `a9406441` op `main`, 13 november 2026). De laatst uitgebrachte release is `v0.5.1` van 7 november 2026. Wat deze kandidaat meer heeft, komt in productie met `v0.6.0`: een productie-installatie weigert een kandidaat (7.3) |
-| Stand | Concept 2 van 14 november 2026, beschreven tegen de code van `v0.6.0-rc.117` en `docs/adr-status.md` (bijgewerkt op 8 november 2026 onder ADR 0119). Concept 1 beschreef `v0.4.0` |
+| Stand | Concept 2a van 14 november 2026, beschreven tegen de code van `v0.6.0-rc.117` en `docs/adr-status.md` (bijgewerkt op 8 november 2026 onder ADR 0119), aangevuld met ADR 0125 (#834), die na deze kandidaat op `main` kwam, en met de belpagina als bouwblok (8.2). Concept 1 beschreef `v0.4.0` |
 | Taal | Nederlands, als stakeholderdocument naast `docs/HANDOVER.md`. Code, ADR's en de overige documentatie zijn Engels |
 | Lezers | Architecten en ontwikkelaars van een organisatie die OpenPlanner in haar landschap inpast; het team dat de applicatie host op een container- of cloudplatform; identity-, netwerk-, security- en privacybeheer; het productteam |
 | Bron van waarheid | De code op `main`, de ADR's en `docs/adr-status.md`. Dit document beschrijft en verwijst; het beslist niets |
@@ -270,7 +270,7 @@ onjuist blijkt, verandert het hoofdstuk dat haar gebruikt.
 |---|---|---|---|
 | A-1 | Het volume blijft in de orde van 80 boekingen per werkdag met pieken van 20 per minuut, zoals het ontwerp aannam | 2.3, 7, 12 | de organisatie die inpast |
 | A-2 | Eén installatie bedient één verwerkingsverantwoordelijke; organisaties binnen die installatie delen de superuser, de database en de sleutels | 3.5, 9 | herzien op 5 november 2026 (V-13): de applicatie is multi-tenant en de hoster bepaalt de indeling; wat organisaties delen, blijft gelden |
-| A-3 | De organisatie beschikt over een OIDC-identity provider, of aanvaardt de meegeleverde Keycloak | 3.3, 8.5 | beantwoord op 5 november 2026 (V-2): standaard de meegeleverde Keycloak, daarna elke OIDC-provider per organisatie |
+| A-3 | De organisatie beschikt over een OIDC-identity provider, of aanvaardt de meegeleverde Keycloak | 3.3, 8.5 | beantwoord op 5 november 2026 (V-2): standaard de meegeleverde Keycloak, daarna elke OIDC-provider per organisatie; voor productie tot stap 2 van ADR 0125 een eigen provider (R-17) |
 | A-4 | Het contactcenter is Webex Contact Center, of de dienst gebruikt de eigen wachtrij; een ander platform vraagt een adapter achter ADR 0032 | 3.3, 6.2, 12 | beantwoord op 5 november 2026 (V-3): ook Genesys (O15) |
 | A-5 | De host levert versleutelde opslag, back-up en herstel buiten de applicatie om (O7) | 7, 9.3 | beantwoord voor zelf hosten op 5 november 2026 (V-7): het platformteam van de afnemer |
 | A-6 | De omgeving laat HTTPS vanaf internet toe op de deelnemerspaden en op het webhookadres. Zonder inkomende webhooks werken boeken, berichten en dispatch, maar ziet de applicatie niet wanneer een meeting begint of eindigt en wat het contactcenter met een werkitem doet | 3.3, 7.7, 12 | hosting- en netwerkbeheer |
@@ -299,7 +299,8 @@ onjuist blijkt, verandert het hoofdstuk dat haar gebruikt.
 
 Het diagram zet OpenPlanner tussen drie groepen: de mensen en systemen van de organisatie, de
 voorzieningen uit haar eigen omgeving, en de diensten van leveranciers. Elke pijl is een stroom
-uit 3.3.
+uit 3.3. Cisco Meeting Server staat er met een gestippelde rand bij: verkend als videoplatform
+on-premises, niet gebouwd (8.2).
 
 ```mermaid
 flowchart LR
@@ -322,6 +323,7 @@ flowchart LR
         logs[Logplatform of SIEM<br/>syslog, Splunk,<br/>Elastic, HTTP]
         dns[DNS-resolver en tijdbron]
         hosting[Hosting<br/>Docker of Kubernetes,<br/>blokopslag, back-up]
+        cms[Cisco Meeting Server<br/>on-premises, verkend]
     end
 
     subgraph leverancier [Diensten van leveranciers]
@@ -353,6 +355,10 @@ flowchart LR
     dienst -- "releasecheck, images" --> gh
     dienst -. "certificaat" .-> acme
     hosting -.- dienst
+    dienst -. "verkend: ruimte per afspraak" .-> cms
+    deelnemer -. "verkend: gesprek in de belpagina" .-> cms
+    classDef verkend stroke-dasharray: 5 5
+    class cms verkend
 ```
 
 ### 3.3 Koppelvlakken en datastromen
@@ -424,13 +430,19 @@ medewerker, niet in dat van de hosting.
 
 | ID | Van, naar | Protocol, poort | Opmerking |
 |---|---|---|---|
-| INT-01 | proxy naar `web` | HTTP 8000 op het netwerk `edge`, of HTTPS met `WEB_TLS_CERT_FILE` | Vastgelegde uitzondering op één host (ADR 0091); `web` vertrouwt doorgestuurde headers alleen van `FORWARDED_ALLOW_IPS` |
+| INT-01 | proxy naar `web` | HTTP 8000 op het netwerk `edge`, of HTTPS met `WEB_TLS_CERT_FILE` | Vastgelegde uitzondering op één host (ADR 0091); `web` vertrouwt doorgestuurde headers alleen van `FORWARDED_ALLOW_IPS`. De proxy vindt `web` op naam (7.7) |
 | INT-02 | `web` en `worker` naar het SQLite-bestand | bestandstoegang op volume `data` | Eén schrijver onder een schrijfslot; geen netwerkpoort, geen databaseserver |
-| INT-03 | proxy naar de meegeleverde Keycloak | HTTP 8080, pad `/idp` | Alleen met de meegeleverde provider |
-| INT-04 | `web`, `worker` naar de meegeleverde Keycloak | HTTP 8080 (`http://idp:8080/idp`) | OIDC en admin-API over het interne netwerk; de browser gebruikt `https://<publiek adres>/idp` |
-| INT-05 | Keycloak naar PostgreSQL | TCP 5432 | Alleen in productie (`idp-db`); niet gepubliceerd |
+| INT-03 | proxy naar de meegeleverde Keycloak | HTTP 8080 op het netwerk `edge`, pad `/idp` | Vastgelegde uitzondering op één host (ADR 0125): de browser praat https met de proxy, de proxy http met `idp`. Draagt wachtwoorden, eenmalige codes en de sessiecookie van het portaal. Alleen met de meegeleverde provider |
+| INT-04 | `web`, `worker` naar de meegeleverde Keycloak | HTTP 8080 (`http://idp:8080/idp`) | Vastgelegde uitzondering op één host (ADR 0125): OIDC en de admin-API van de medewerkersdirectory over het interne netwerk. Productie aanvaardt over http alleen dit adres, en alleen met een https-`OIDC_ISSUER`. De browser gebruikt `https://<publiek adres>/idp` |
+| INT-05 | Keycloak naar PostgreSQL | TCP 5432, zonder TLS | Vastgelegde uitzondering op één host (ADR 0125): de accounts met hun wachtwoordhashes. Alleen in productie (`idp-db`); niet gepubliceerd |
 | INT-06 | `web` naar volume `portal-certs`, proxy leest | bestand | Een certificaat uit het portaal; de proxy herlaadt bij een wijziging |
 | INT-07 | host-updater naar Docker en `web` | lokaal | Images trekken, controleren en starten; verzoeken lezen via de command line in `web`; gezondheid via `127.0.0.1:8000/readyz` |
+
+INT-01 met de meegeleverde proxy en INT-03 tot en met INT-05 zijn niet versleuteld. Het zijn
+vastgelegde uitzonderingen op één host (ADR 0091, 0125), omdat die netwerken alleen de containers
+van deze installatie dragen.
+Op een host met Docker Compose vinden de containers elkaar op naam. Wat dat betekent als een
+container niet draait, staat in 7.7 en R-17.
 
 Drie dingen zijn bewust **niet** nodig. OpenPlanner heeft geen websocket-, SSE- of andere
 langlopende verbinding: live pagina's vragen elke paar seconden een fragment op (7.7). De
@@ -512,7 +524,7 @@ Zes eigenschappen bepalen hoe de applicatie in zo'n geheel past:
 - **Gesloten naar buiten, open naar de eigen omgeving.** Deelnemerspagina's roepen geen derden
   aan, met straks de belpagina als enige uitzondering. Alles wat de installatie verlaat, staat in
   3.3 en in `docs/dataflow.md`. Elke verbinding met persoonsgegevens is versleuteld of een
-  vastgelegde uitzondering (ADR 0091).
+  vastgelegde uitzondering (ADR 0091, 0125).
 - **Kleine, zelfstandige voetafdruk.** Twee processen en één bestand als database; geen
   afhankelijkheid van een message broker, cache of databaseserver. De prijs is dat de installatie
   op één host of in één pod draait en niet horizontaal schaalt (ADR 0036, hoofdstuk 12).
@@ -971,6 +983,7 @@ Vaste eigenschappen van deze vorm:
 - Het netwerk `edge` (172.31.240.0/28 plus een IPv6-reeks) verbindt proxy, `web` en Keycloak.
   `web` vertrouwt `X-Forwarded-For` alleen van het vaste adres van de proxy (172.31.240.2); een
   eigen proxy op een andere machine krijgt HTTPS van uvicorn (`WEB_TLS_CERT_FILE`, ADR 0091).
+  De proxy heeft een vast adres; `web`, `idp` en `idp-db` worden op naam gevonden (7.7, R-17).
 - Containerlogs roteren (vijf bestanden van 20 MB); het `json-file`-stuurprogramma blijft, zodat
   een logagent van de host de bestanden kan lezen.
 - De private sleutel van een eigen certificaat uit het portaal leeft in het volume `portal-certs`
@@ -982,7 +995,7 @@ Vaste eigenschappen van deze vorm:
 
 | Vorm | Hoe | Diensten | Voor |
 |---|---|---|---|
-| Host, modus `production` | `scripts/install.sh --mode production` op Ubuntu 24.04 of Debian 12; installeert pakketten, schrijft `.env`, `proxy.env`, `secrets/`, pint de ondertekende release, installeert de host-updater; een tweede run repareert; een releasekandidaat wordt geweigerd | web, worker, proxy (Let's Encrypt of een eigen certificaat; de interne CA is voor labs en geeft in productie een waarschuwing), meegeleverde Keycloak op PostgreSQL of een eigen provider (`--idp own`) | Echte deelnemers; publieke DNS-naam, poorten 80 en 443 |
+| Host, modus `production` | `scripts/install.sh --mode production` op Ubuntu 24.04 of Debian 12; installeert pakketten, schrijft `.env`, `proxy.env`, `secrets/`, pint de ondertekende release, installeert de host-updater; een tweede run repareert; een releasekandidaat wordt geweigerd | web, worker, proxy (Let's Encrypt of een eigen certificaat; de interne CA is voor labs en geeft in productie een waarschuwing), meegeleverde Keycloak op PostgreSQL, met een waarschuwing van de installer tot stap 2 van ADR 0125, of een eigen provider (`--idp own`) | Echte deelnemers; publieke DNS-naam, poorten 80 en 443 |
 | Host, modus `test` | Idem, `ENVIRONMENT=test` | Idem, meegeleverde Keycloak in ontwikkelmodus onder `/idp`; `--no-tls` achter een eigen proxy | Acceptatie op een eigen DNS-naam |
 | Host, modus `lab` | Idem | web, worker, Keycloak, Mailpit; proxy alleen met `--tls-domain` | Interne demo en integratietests |
 | Kubernetes (proef) | Helm-chart `deploy/helm/openplanner`: één pod met `web` en `worker`, één replica, `Recreate`, één `ReadWriteOnce`-volume, ingress en certificaten van het cluster, eigen identity provider, het publieke image | web, worker | Hosting op een cluster; alleen door rendering getest, de eerste echte run is open (ADR 0114) |
@@ -1131,6 +1144,22 @@ of naar https doorverwijst. Binnen de installatie luisteren `web` op 8000, Keycl
 PostgreSQL op 5432; geen van drieën hoort op een publieke interface. Uitgaand: 443 voor bijna
 alles, 587, 465 of 25 voor SMTP, 53 voor DNS, 123 voor NTP en de poort van elke syslogbestemming.
 
+**Namen binnen de installatie.** Op een host met Docker Compose heeft de proxy een vast adres.
+Verder vinden de containers elkaar op naam: de proxy zoekt `web` en `idp`, `web` en `worker`
+zoeken `idp`, en Keycloak zoekt `idp-db` (INT-01, INT-03 tot en met INT-05). Docker beantwoordt
+zo'n naam alleen zolang de container aan het netwerk hangt. Draait hij niet, door een update, een
+herstel of een herstart, dan gaat de vraag naar de resolver van de host. Die kan er een zoekdomein
+achter zetten (ADR 0125). Wie daar antwoordt, krijgt het verkeer:
+
+- voor `idp`: wachtwoorden en eenmalige codes van medewerkers, de sessiecookie van het portaal en
+  beide client secrets, die na de uitval blijven werken. Omdat `web` ook de sleutelset bij die
+  naam haalt, kan hij bovendien een login als superuser ondertekenen;
+- voor `web`: alles wat de proxy doorgeeft, ook bij een eigen provider (`--idp own`).
+
+Stap 2 van ADR 0125 geeft deze containers een vast adres en is gepland. Tot dan waarschuwt de
+installer in productie, en raadt de ADR een eigen provider aan voor een productiehost die live
+gaat. Het runbook beschrijft het herstel na een onverklaarde uitval van `idp` (R-17, V-23).
+
 **Geen websockets.** OpenPlanner gebruikt geen websockets, server-sent events of andere
 langlopende verbindingen. Live pagina's vragen met een gewoon HTTP-verzoek een fragment op: de
 wachtrij, het overzicht en het wallboard standaard elke 10 seconden, de meetingstatus elke 30.
@@ -1264,7 +1293,7 @@ toetsbare kenmerk van een goede uitbreiding, en de reviewvraag bij elke PR.
 | Een sms-gateway | `SmsProvider` + `SMS_GATEWAYS` | Webex Connect; gevraagd: gateways via de open standaard SMPP (O18) | ja | ADR 0028 |
 | Een logbestemming | `DestinationKind` + `build_sender` | syslog, Splunk HEC, Elastic, HTTP NDJSON | ja | ADR 0085 |
 | Een contactcenterplatform | `ContactCenterKind` + `ContactCenterDispatcher` + descriptor | Webex Contact Center; poort, taak, routering, webhookroute en verbinding per organisatie zijn neutraal; gevraagd: Genesys Engage via GMS nu en Genesys Cloud CX later (O15) | grotendeels: CC-1 tot en met CC-5 zijn gebouwd; de WxCC-kolommen zijn nog de bron tot een volgende expand- en contractstap | ADR 0032 |
-| Een videoplatform | `VideoProvider` | Webex Meetings | beperkt: poort bestaat, contract volgt Webex; tweede platform vraagt een ADR naar het model van 0032 | ADR 0017 |
+| Een videoplatform | `VideoProvider` + de belpagina | Webex Meetings; de belpagina op de Webex Meetings SDK. Verkend: een on-premises platform zoals Cisco Meeting Server (hieronder) | beperkt: poort bestaat, contract volgt Webex; tweede platform vraagt een ADR naar het model van 0032 | ADR 0017, 0123 |
 | Een wachtrijgedrag | `DispatchKind` | contactcenter, eigen wachtrij | een derde soort raakt het domein (regels voor zicht en claim) | ADR 0043 |
 | Een identity provider | registratie in het portaal, geen code | elke OIDC-provider met asymmetrische handtekening; keuze op e-maildomein met DNS-bewijs | ja | ADR 0083 |
 | Een medewerkersdirectory | `StaffDirectory` | Keycloak; SCIM 2.0 ontworpen, niet gebouwd | beperkt | ADR 0046, 0095 |
@@ -1275,6 +1304,23 @@ toetsbare kenmerk van een goede uitbreiding, en de reviewvraag bij elke PR.
 | Een beheerscherm of instelling | navigatieregister + permissie in de matrix + registeringang + handleidingonderwerp | scope, object, tabblad | ja, binnen de bestaande objecten; een nieuwe sectie of zevende tab vraagt een ADR | ADR 0042, 0047 |
 | Een rapport of export | gebruiksfeiten en uurtellingen, de rapportage-API | rapportscherm, CSV, API, samenvatting, wallboard, auditexport, bewijsrapport | ja, binnen het schema zonder persoonsgegevens | ADR 0040, 0102, 0117 |
 | Een releasebron | `ReleaseSource` | GitHub releases | beperkt: updater verwacht GHCR en cosign | ADR 0029 |
+
+**De belpagina als bouwblok.** De belpagina van ADR 0123 heeft twee doelen. De deelnemer ziet het
+platform van de leverancier niet, en de pagina draagt de huisstijl en de teksten van de organisatie.
+Die doelen hangen niet aan Webex. De pagina, de toegang per afspraak met een pseudoniem, het
+proefgesprek en de status blijven van OpenPlanner. Per platform verschilt alleen hoe het gesprek in
+de pagina komt. Op 14 november 2026 is verkend hoe dat gaat met een on-premises platform:
+
+| Hoe het gesprek in de pagina komt | Voorbeeld | Afscherming en eigen huisstijl | Wat de leverancier krijgt | Stand |
+|---|---|---|---|---|
+| Eigen bediening op de SDK van het platform | Webex Meetings SDK | Volledig: eigen bediening, teksten, ondertiteling en toegankelijkheid | Een gastidentiteit per afspraak in de cloud van de leverancier | besloten, als huls gebouwd (ADR 0123) |
+| De web-app van het platform, ingebed in de pagina | Cisco Meeting Server: geen client-SDK ([Cisco](https://developer.cisco.com/cisco-meeting-server/)); de web-app mag vanaf versie 3.2 in een iframe ([Cisco](https://www.cisco.com/c/en/us/support/docs/conferencing/meeting-server-1000/217201-how-to-customize-content-security-policy.html)) | Deels: logo, achtergrond, teksten per taal en links; het belscherm zelf blijft van Cisco ([Cisco](https://www.cisco.com/c/dam/en/us/td/docs/conferencing/ciscoMeetingServer/Customisation/Version-4-0/Cisco-Meeting-Server-4-0-Customization-Guidelines.pdf)) | Niets buiten de eigen servers; beeld en geluid blijven on-premises | verkend, niet besloten |
+| Doorverwijzing naar de app of webclient van het platform | De link van Webex | Geen | Als bij de SDK, plus wat de app van de leverancier verzamelt | gebouwd |
+
+Een tweede platform vraagt een adapter achter `VideoProvider`. Die maakt een ruimte per afspraak,
+geeft een gastlink in plaats van een gasttoken, en leest de status uit de events van het platform in
+plaats van uit webhooks. Een on-premises platform vraagt bovendien dat deelnemers van internet de
+webserver en een TURN-server van dat platform bereiken. Dat besluit volgt in een eigen ADR (R-3).
 
 ### 8.3 Recepten
 
@@ -1457,6 +1503,13 @@ beëindigen of de persoon opschorten. Een wijziging van rollen geldt bij de volg
   `openplanner-directory` beheert medewerkers via de admin-API (UIT-08). Gebruikersnamen hebben de
   vorm `<naam>@<organisatie>.openplanner.internal` (`BUNDLED_IDP_LOGIN_SUFFIX`, C). De tweede
   factor is TOTP of WebAuthn.
+- `web` en `worker` bereiken de meegeleverde Keycloak binnen de host op
+  `http://idp:8080/idp/...` (INT-04). Dat is een vastgelegde uitzondering: productie aanvaardt
+  over http alleen dit adres, en alleen met een `OIDC_ISSUER` op https, die vastgepind blijft (ADR
+  0097, 0125). Tot stap 2 van ADR 0125 is het advies voor een productiehost die live gaat een
+  eigen provider (7.7, R-17). Kiest een host later `--idp own`, dan verwijdert de installer de
+  login, de route `/idp` en de containers van de meegeleverde provider. De volumes blijven, zodat
+  `--idp bundled` haar met haar accounts terugbrengt.
 - Wie de accounts in de eigen provider van de organisatie wil houden, kan die provider registreren
   per organisatie, of de meegeleverde Keycloak laten federeren met de eigen provider. Dat laatste
   is configuratie van Keycloak en geen functie van OpenPlanner.
@@ -1635,7 +1688,7 @@ detectief (D) of correctief (C). Elke rij heeft een thuis in de code of de CI en
 | Laag | Control | Soort | Thuis | Besluit |
 |---|---|---|---|---|
 | Rand | TLS met automatisch vernieuwd of eigen certificaat; certificaat en publiek adres periodiek geproefd en getoond | P, D | `deploy/proxy/`, `tls_check`, `address_check` | ADR 0030, 0064, 0086 |
-| Rand | Elke hop met persoonsgegevens versleuteld, of een vastgelegde uitzondering (proxy naar `web` op één host); productie weigert een mailserver zonder TLS, tenzij de host `SMTP_PLAINTEXT_RELAY_ALLOWED` zet | P | `docs/dataflow.md`, `web_transport` | ADR 0091 |
+| Rand | Elke hop met persoonsgegevens versleuteld, of een vastgelegde uitzondering op één host: de proxy naar `web`, en de hops naar de meegeleverde Keycloak en haar database. Over http aanvaardt productie voor de login alleen het interne adres van die provider. Productie weigert een mailserver zonder TLS, tenzij de host `SMTP_PLAINTEXT_RELAY_ALLOWED` zet | P | `docs/dataflow.md`, `web_transport` | ADR 0091, 0125 |
 | Rand | Responsheaders standaard dicht: CSP die alleen eigen scripts toelaat, en alleen op de pagina's die ze gebruiken, HSTS, frame-weigering, COOP, COEP, CORP, Permissions-Policy; de belpagina krijgt een eigen CSP met alleen de domeinen van Webex | P | `api/security_headers.py`, `web/security_policy.py` | dreigingsmodel, ADR 0123 |
 | Rand | Doorgestuurde headers alleen van de bekende proxy; een onbekende afzender is een event | P, D | `proxy_watch`, compose | ADR 0086 |
 | Verzoek | CSRF in drie lagen: Fetch Metadata, Origin-terugval, `SameSite=Lax` | P | `web/protection.py` | dreigingsmodel |
@@ -1714,7 +1767,8 @@ alles sinds de vorige release (ADR 0078, 0079).
 ### 10.2 Besluiten per thema en hun bouwstand
 
 De stand volgt `docs/adr-status.md` van 8 november 2026. "Deels" betekent dat ten minste één stap
-van het besluit nog niet in de code staat; het overzicht zegt welke.
+van het besluit nog niet in de code staat; het overzicht zegt welke. ADR 0125 kwam na rc.117 op
+`main` (#834).
 
 | Thema | Besluiten | Stand in rc.117 |
 |---|---|---|
@@ -1725,7 +1779,7 @@ van het besluit nog niet in de code staat; het overzicht zegt welke.
 | Deelnemerspagina's en widget | 0016 zonder JavaScript, 0020 kalender en tokens, 0035 inbedding, 0037 sluitingspagina, 0041 huisstijl, 0060 productlogo, 0080 paginabreedte, 0093 link naar cookie, 0118 eilanden | deels: 0080, 0118; de rest gebouwd |
 | Beheerportaal | 0014 matrix, 0015 verse login, 0033 handleiding, 0038 onderhoudsmodus, 0039 rollen en auditor, 0042 instellingen, 0047 structuur, 0061 overzicht, 0062 persoonlijke indeling, 0063 persoonsgegevens, 0096 widgets, 0101 subtabbladen, 0105 deelnemerstab | deels: 0042, 0047; 0062 vervangen door 0096; de rest gebouwd |
 | Identiteit | 0013 OIDC, 0046 medewerkersdirectory en SCIM, 0049 claim, 0083 provider per organisatie, 0090 meegeleverde provider, 0095 medewerkers in de provider, 0097 issuer, 0098 serversessies, 0100 tweede factor, 0106 standaard meegeleverd | deels: 0046, 0049, 0090, 0095, 0100, 0106; de rest gebouwd |
-| Privacy en beveiliging | 0008 secrets, 0023 machine-API, 0053 securityevents, 0091 versleutelde hops, 0092 uploads, 0094 cryptografie-inventaris, 0102 retentie | deels: 0008, 0091; de rest gebouwd |
+| Privacy en beveiliging | 0008 secrets, 0023 machine-API, 0053 securityevents, 0091 versleutelde hops, 0092 uploads, 0094 cryptografie-inventaris, 0102 retentie, 0125 hops naar de meegeleverde provider (na rc.117) | deels: 0008, 0091, 0125; de rest gebouwd |
 | Logging en rapportage | 0031 audit per niveau, 0034 events naar logplatform, 0040 schema en opslag, 0085 logbestemmingen, 0103 zelfbeschrijvende regels, 0117 rapportage zonder persoonsgegevens | deels: 0103, 0117; de rest gebouwd |
 | Levering en beheer | 0006 ondertekening, 0029 updates, 0030 HTTPS, 0048 live voortgang, 0050 installer, 0052 releases, 0059 kandidaten, 0064 HTTPS standaard, 0067 versiebeheer, 0070 certificaatbron, 0079 release als workflow, 0086 publiek adres, 0089 configuratiepakket, 0099 configuratie als JSON, 0108 publieke images, 0112 interne CA, 0114 Kubernetes, 0116 één editie en geteste upgradepaden | deels: 0067, 0089, 0099, 0112, 0114, 0116; de rest gebouwd |
 | Schaal | 0036 schaalgrenzen en naden | niet gebouwd (de triggers zijn beleid) |
@@ -1791,7 +1845,7 @@ en O15 (Genesys) tellen zwaar.
 |---|---|---|---|---|
 | R-1 | Eén host of pod, één SQLite-bestand: geen horizontale schaal en geen hoge beschikbaarheid | Een uitval is uitval tot herstel; de eis "RTO onder 15 minuten" is niet haalbaar in deze vorm | ADR 0036 noemt de triggers en het pad (Postgres, meer `web`-replica's); de naden (rate-limitopslag, contracttest schrijfslot, back-upinterface) en de metingen zijn niet gebouwd | productowner |
 | R-2 | Het contactcenterkoppelvlak is neutraal gemaakt, maar de WxCC-kolommen zijn nog de bron | Genesys Engage via GMS en later Genesys Cloud CX zijn gevraagd (V-3); elk vraagt een adapter | ADR 0032 grotendeels gebouwd (CC-1 tot en met CC-5); de contractstap en per Genesys-variant een adapter met een eigen ADR (CC-6, O15) volgen | productowner |
-| R-3 | Het videokoppelvlak is niet leveranciersneutraal | Een tweede videoplatform vraagt een ADR en een aanpassing van het contract van `VideoProvider` | Hetzelfde patroon als ADR 0032; nog geen besluit | productowner |
+| R-3 | Het videokoppelvlak is niet leveranciersneutraal | Een tweede videoplatform vraagt een ADR en een aanpassing van het contract van `VideoProvider` | Hetzelfde patroon als ADR 0032. De belpagina is als bouwblok neutraal opgezet; een on-premises platform zoals Cisco Meeting Server is verkend (8.2). Nog geen besluit | productowner |
 | R-4 | Kubernetes alleen door rendering getest | De eerste echte run kan verrassingen geven; updates uit het portaal werken daar niet; egress per CIDR is bewerkelijk voor clouddiensten | ADR 0114 stappen 3 tot en met 5 | hostingpartij |
 | R-5 | Hosting, back-up, herstelproef en verwerkingsverantwoordelijke zijn niet overal belegd (O7); de database van de meegeleverde Keycloak zit nog niet in de terugdraaikopie | Zonder eigenaar geen aantoonbaar herstel en geen DPIA | Checklists in `docs/assurance/`; 7.10; ADR 0106 stap 5c | opdrachtgever |
 | R-6 | Pentest, toegankelijkheidsonderzoek met schermlezers en menselijke reviewer niet belegd (O10) | Geen livegang zonder | HANDOVER §12 | opdrachtgever |
@@ -1799,12 +1853,13 @@ en O15 (Genesys) tellen zwaar.
 | R-8 | Organisaties binnen één installatie delen superuser, database en sleutels | Een fout of compromis bij de superuser raakt elke organisatie | Vertrouwensgrenzen in het dreigingsmodel; een tweede verwerkingsverantwoordelijke krijgt een eigen installatie | privacyofficer |
 | R-9 | `httpx` kende in 2026 een stille periode in onderhoud | Een kwetsbaarheid zonder patch zou de hele uitgaande laag raken | Gemarkeerd als *watch* in `docs/dependencies.md`; één client, dus één vervangpunt | productteam |
 | R-10 | Een deel van de besluiten is deels gebouwd (zie 10.2), en `docs/adr-status.md` loopt op enkele rijen achter op de bouwtabel van de ADR zelf | Een lezer kan meer of minder verwachten dan er draait | Bouwstatus per ADR en het overzicht; de vraag "wat draait op de testhost" wordt uit de code beantwoord | productteam |
-| R-11 | De platen in `docs/diagrams/` tonen de stand van 5 november 2026 | Rapportage, diensten en flows, de belpagina en de webhookpoort ontbreken op de platen | De platen opnieuw genereren uit `scripts/diagrams/content.py`; de test van de platen controleert alleen de poorten | productteam |
+| R-11 | De platen in `docs/diagrams/` tonen de stand van 5 november 2026; op 14 november zijn de belpagina en het verkende Cisco Meeting Server toegevoegd | Rapportage, diensten en flows en de webhookpoort ontbreken nog op de platen | De platen opnieuw genereren uit `scripts/diagrams/content.py`; de test van de platen controleert alleen de poorten | productteam |
 | R-12 | De geschiedenis van de repository is op 4 november 2026 herschreven (ADR 0115) | Oudere clones, images van eerdere releases en externe verwijzingen wijzen naar commits die niet meer bestaan | Eenmalig, vastgelegd; iedereen begint van een verse clone | productteam |
 | R-13 | ADR 0116 noemt een mogelijk gedeeld model: één installatie met meer klanten als organisaties. Het dreigingsmodel zegt dat een tweede verwerkingsverantwoordelijke een eigen installatie krijgt | Zolang niet is vastgelegd wie in een gedeelde installatie verwerkingsverantwoordelijke is, spreken de twee elkaar tegen | Een besluit nemen voordat het gedeelde model wordt aangeboden; zie V-13 | productowner, privacyofficer |
 | R-14 | Inkomende webhooks vragen een adres dat vanaf internet bereikbaar is; bronnetwerken zijn standaard optioneel | Een omgeving zonder inkomend verkeer mist de status van meetings en werkitems; een te open adres krijgt ongewenst verkeer | De poort van ADR 0124 (handtekening, tijdvenster, grootte, rate limit, pauze, replay); bronnetwerken per leverancier, verplicht te maken met `WEBHOOK_SOURCE_NETWORKS_REQUIRED` (B); een eigen naam via `WEBHOOK_BASE_URL` | hosting, netwerkbeheer |
 | R-15 | Updates en de releasecheck vragen uitgaand verkeer naar GitHub, GHCR en Sigstore; een offline bundel is niet gebouwd en een uitgaande proxy is niet beproefd | Een afgesloten omgeving kan niet zonder handwerk bijwerken | ADR 0116 stap 7; een eigen register als bron; de proxyroute beproeven en documenteren | productteam, hosting |
 | R-16 | Uitdiensttreding werkt via de identity provider en de sessieduur: zonder SCIM of back-channel logout blijft een open sessie tot 60 minuten inactiviteit of 8 uur geldig | Iemand die vertrekt, kan kort na het blokkeren nog in een open sessie werken | Beheerders beëindigen sessies of schorten op; SCIM (ADR 0046) en back-channel logout zijn niet gebouwd | identity-beheer, productowner |
+| R-17 | Op een host met Docker Compose vinden de containers elkaar op naam (`web`, `idp`, `idp-db`). Draait een container niet, dan kan de resolver van de host die naam beantwoorden (ADR 0125) | Wie dan voor `idp` antwoordt, krijgt wachtwoorden, eenmalige codes, de sessiecookie van het portaal en beide client secrets, en kan als superuser inloggen. Wie voor `web` antwoordt, krijgt al het verkeer van de proxy, ook bij een eigen provider | Vastgelegde uitzondering met een waarschuwing van de installer en een herstel in het runbook; vaste adressen in stap 2 van ADR 0125 (gepland); tot dan een eigen provider voor een productiehost die live gaat (V-23) | productowner, hosting |
 
 ## 13. Transitie en roadmap
 
@@ -1819,8 +1874,12 @@ Wat na `v0.6.0-rc.117` nog openstaat, zoals `docs/adr-status.md` en de ADR's het
   productie aan zodra terugdraaien bewezen is (ADR 0121, 0122).
 - Het gesprek in een eigen pagina: de SDK na de licentie, het gastentoken, chat via het
   contactcenter (ADR 0123).
+- Verkend, niet gepland: een on-premises videoplatform zoals Cisco Meeting Server achter
+  `VideoProvider`, met de web-app van dat platform in de belpagina (8.2, R-3).
 - De webhookpoort: melding bij weigeringen, rotatie van secrets met overlap, een regel voor de
   proxy en een ondertekende proeflevering (ADR 0124).
+- Vaste adressen voor de meegeleverde Keycloak, haar database en de route van de proxy naar
+  `web` (ADR 0125, stap 2). Een host die op naam draaide, krijgt daarbij nieuwe client secrets.
 - Eilanden op pagina's: browsertests en regels voor `live-region.js` (ADR 0118).
 - Configuratie als JSON-document afronden (ADR 0099, stap 5).
 - Rapportage: de bezetting van een team, die een nieuw feit vraagt (ADR 0117, S2).
@@ -1854,7 +1913,7 @@ hieronder is het voorstel voor het vervolg, met per stap het resultaat.
 De antwoorden bepalen de inpassing. Per vraag staat de voorgestelde eigenaar en wat het antwoord
 in dit document of in de applicatie verandert. Een vraag die een besluit vraagt, wordt na het
 antwoord een open punt in HANDOVER §11 of een ADR. V-1 tot en met V-15 zijn op 5 november 2026
-beantwoord (13.4); V-16 tot en met V-22 zijn de vragen aan een hostingteam.
+beantwoord (13.4); V-16 tot en met V-23 zijn de vragen aan een hostingteam.
 
 | ID | Onderwerp | Vraag | Eigenaar (voorstel) | Raakt |
 |---|---|---|---|---|
@@ -1880,6 +1939,7 @@ beantwoord (13.4); V-16 tot en met V-22 zijn de vragen aan een hostingteam.
 | V-20 | Namen en certificaten | Welke publieke naam, eventueel een aparte voor webhooks; welke certificaatbron (ACME, eigen PKI)? | hosting | 7.10 |
 | V-21 | Tijd en logging | Welke tijdbron; welke logbestemmingen met welk filter; welke bewaartermijnen gelden daar? | hosting, security operations | 8.7, 8.8 |
 | V-22 | Hostingvariant | Binnen de eigen infrastructuur of bij een hoster (7.9); wie heeft toegang tot host, sleutels en de rol superuser; welke verwerkersafspraken gelden? | opdrachtgever, privacyofficer | 7.9, 8.6 |
+| V-23 | Interne namen | Gaat een productiehost live voordat stap 2 van ADR 0125 is gebouwd, en dan met de meegeleverde Keycloak of met een eigen provider? Welke zoekdomeinen vult de resolver van de host aan, en wie beheert de namen daarin? | hosting, identity-beheer | 7.7, 8.5, R-17 |
 
 ### 13.4 Antwoorden van 5 november 2026
 
@@ -1891,7 +1951,7 @@ vragen, staan als open punt O15 tot en met O18 in HANDOVER §11.
 | ID | Antwoord | Gevolg voor de architectuur |
 |---|---|---|
 | V-1 | Een link per onderwerp vanuit de keuzeboom, en daarnaast de widget op de website. | Beide routes van 3.3 blijven nodig. Een organisatie die inbedt, registreert haar toegestane origins (ADR 0035). |
-| V-2 | Standaard de meegeleverde Keycloak, waarin de organisatie medewerkers en rollen volledig zelf beheert. Daarna elke OIDC-provider per organisatie, gekozen op het domeinsuffix van gebruikersnaam of e-mailadres. Standaarden gaan boven één leverancier. | Bevestigt ADR 0083 en 0106. Claimnamen (O3) zijn alleen nodig voor een eigen provider; een koppeling voor één leverancier komt er niet. |
+| V-2 | Standaard de meegeleverde Keycloak, waarin de organisatie medewerkers en rollen volledig zelf beheert. Daarna elke OIDC-provider per organisatie, gekozen op het domeinsuffix van gebruikersnaam of e-mailadres. Standaarden gaan boven één leverancier. | Bevestigt ADR 0083 en 0106. Claimnamen (O3) zijn alleen nodig voor een eigen provider; een koppeling voor één leverancier komt er niet. Sinds ADR 0125 (14 november 2026) geldt voor productie een voorbehoud: tot haar stap 2 is het advies een eigen provider (R-17, V-23). |
 | V-3 | Alle vier: Webex Contact Center, Genesys Engage via GMS, de eigen wachtrij en de agenda-uitnodiging aan een teamadres. Van Genesys worden beide varianten ondersteund: nu Engage via GMS, later ook Genesys Cloud CX. | Een tweede contactcenterplatform vraagt de neutrale basis van ADR 0032, met per Genesys-variant een adapter en een eigen ADR (O15). |
 | V-4 | De bestaande Webex-site van de afnemer, met hostaccounts per dienst. | Een eigen site met afgedwongen beleid (ADR 0045) is niet nodig. Het meetingbeleid ligt bij de Webex-beheerder van de afnemer. |
 | V-5 | De SMTP-server van de afnemer. | Elke organisatie mailt vanaf haar eigen afzender; de controle van ADR 0073 laat zien of SPF, DKIM en DMARC kloppen. |
@@ -1917,7 +1977,7 @@ document. Zo'n ontwerp vult ten minste dit in:
 | Kanaal | Welke websites en front-ends van derden naar welke diensten, onderwerpen en flows verwijzen; welke URL's dat zijn; of de widget wordt ingebed en vanaf welke origins | 3.1, 3.5, 5.6 |
 | Hostingvariant | Eigen infrastructuur of hoster, platform (Docker, Kubernetes, OpenStack), exploitatievorm, en de impactpunten uit 7.9 met de keuze per punt | 7.8, 7.9 |
 | Netwerk | Zones, de rand, en per stroom uit 3.3 de firewallregel of netwerkpolicy, met bron, bestemming, poort en eigenaar | 3.3, 7.7 |
-| Identiteit | Provider, claimmodus, de mapping naar entitlements per rol, tweede factor, termijnen voor uitdiensttreding | 8.5 |
+| Identiteit | Provider (de meegeleverde of een eigen, met het voorbehoud van R-17 voor productie), claimmodus, de mapping naar entitlements per rol, tweede factor, termijnen voor uitdiensttreding | 8.5 |
 | Contactcenter en video | Platform, verbinding per organisatie, flows en wachtrijen, Webex-site en hostaccounts, netwerk van de werkplek | 6.2, BUI-01 tot en met BUI-03 |
 | Mail, sms en logging | Relay, afzenderdomeinen, gateway, logbestemmingen met filters en bewaartermijnen | 3.3, 8.7 |
 | Gegevens | Retentie-instellingen binnen de grenzen, back-up en herstel, verwerkersovereenkomsten, DPIA | 8.6, 9.3 |
@@ -2014,3 +2074,4 @@ document. Zo'n ontwerp vult ten minste dit in:
 | 5 november 2026 | Concept 1c: de platen zijn bijgewerkt (#547); risico R-11, paragraaf 5.1 en bijlage A volgen |
 | 5 november 2026 | Concept 1d: elke fake staat in `tests/fakes/` (#549); paragraaf 5.4 en 11.3 volgen |
 | 14 november 2026 | Concept 2: bijgewerkt naar releasekandidaat `v0.6.0-rc.117` (ADR 0117 tot en met 0124, 37 poorten, 54 permissies, 29 taaksoorten, 224 instellingen) en de term *dienst*. Voor het hostingteam: elke datastroom met nummer, poort en richting (3.3), de ingangen met hun blootstelling (5.6), netwerk en zones zonder websockets (7.7), Docker, Kubernetes en OpenStack (7.8), de impactanalyse van hosten in de eigen infrastructuur of bij een hoster (7.9), wat het platformteam levert (7.10), OIDC met de claims en JIT (8.5), en elke bewaartermijn met haar instelling (8.6). Aannames A-6 en A-7, risico's R-14 tot en met R-16, vragen V-16 tot en met V-22 en het kader voor een ontwerp per organisatie (13.5) zijn nieuw |
+| 14 november 2026 | Concept 2a: ADR 0125 (#834) verwerkt. De hops naar de meegeleverde Keycloak en haar database zijn vastgelegde uitzonderingen (3.3, 9.1). Tot stap 2 van die ADR vinden de containers elkaar op naam (7.2, 7.7). Productie start met de meegeleverde provider, en de installer waarschuwt (7.3, 8.5). Risico R-17, vraag V-23, de roadmap en een voorbehoud bij A-3, V-2 en 13.5 zijn nieuw. Verder is de belpagina beschreven als bouwblok dat niet aan Webex hangt, met een verkenning van Cisco Meeting Server (8.2, R-3, 13.1). Cisco Meeting Server staat gestippeld op de systeemcontext (3.2) en op de platen (R-11) |
