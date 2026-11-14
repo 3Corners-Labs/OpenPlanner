@@ -47,7 +47,9 @@ jobs:
     name: lint, types, tests, migrations
     runs-on: ubuntu-26.04
     # Every test but the authorisation matrix sweeps, with the coverage gates (ADR 0058).
-    timeout-minutes: 30
+    # The suite has grown to about 14300 tests: 17 to 21 minutes on a pull request, but a merge-queue
+    # run of the same suite was cancelled at the old limit of 30. 45 leaves room for the next steps.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
