@@ -14,8 +14,8 @@ A vendored file lives under ``app/web/static/vendor/<name>/`` next to a ``manife
 only, so a checksum whose own ``version`` differs belongs to an older file: ``checksum_is_current``
 is false until the file and the checksum are replaced together.
 
-This module is the one reader of that shape, for the server and for the repository's scripts
-(``scripts.vendor`` re-exports it). The server asks ``VendoredFile`` whether the call page may
+This module is the one reader of that shape, for the server and for the repository's scripts and
+tests (they import it from here). The server asks ``VendoredFile`` whether the call page may
 offer the file: only a file that is placed, whose checksum is of the pinned version and whose
 bytes equal it is offered, and then with its checksum as subresource integrity. Nothing here
 reads the file's content for anything but its hash.
@@ -90,15 +90,20 @@ def load(path: Path) -> Manifest:
 
     Raises:
         KeyError: A required field is missing.
+        ValueError: ``file`` is not a bare file name (it is empty or holds a path separator, so
+            the manifest could point out of its folder).
     """
     data = json.loads(path.read_text(encoding="utf-8"))
+    name = str(data["file"])
+    if not name or Path(name).name != name or name in {".", ".."}:
+        raise ValueError("the manifest's file must be a bare file name")
     checksum = data.get("checksum") or {}
     return Manifest(
         path=path,
         name=data["name"],
         version=data["version"],
         source=data["source"],
-        file=data["file"],
+        file=name,
         checksum_version=checksum.get("version"),
         sha256=checksum.get("sha256"),
     )
@@ -126,11 +131,21 @@ class Offer:
     integrity: str
 
 
+def _stamp(path: Path) -> tuple[int, int]:
+    """Return the modification time and size of ``path`` ((-1, -1) when it cannot be read)."""
+    try:
+        stat = path.stat()
+    except OSError:
+        return (-1, -1)
+    return (stat.st_mtime_ns, stat.st_size)
+
+
 class VendoredFile:
     """The vendored file of one folder, and whether its bytes are the ones the manifest names.
 
-    The answer is recomputed only when the file's or the manifest's size or modification time
-    changes, so a page request costs two ``stat`` calls and not a read of megabytes.
+    The manifest is read again only when its own modification time or size changes, and the file
+    is hashed again only when its own does (or the manifest's), so a page request costs two
+    ``stat`` calls and not a read of megabytes.
 
     Args:
         folder: The folder with ``manifest.json`` and the file.
@@ -139,33 +154,22 @@ class VendoredFile:
     def __init__(self, folder: Path) -> None:
         """Remember ``folder``."""
         self._folder = folder
-        self._seen: tuple[tuple[int, ...], FileTrust, Offer | None] | None = None
+        self._manifest: tuple[tuple[int, int], Manifest | None] | None = None
+        self._seen: tuple[tuple[int, int], Manifest, FileTrust, Offer | None] | None = None
 
-    def _stamp(self) -> tuple[int, ...]:
-        """Return the modification times and sizes of the manifest and the file (-1: absent)."""
-        stamp: list[int] = []
-        for name in (MANIFEST, self._file_name()):
+    def _read(self) -> Manifest | None:
+        """Return the manifest, read again only when it changed; ``None`` when unusable."""
+        stamp = _stamp(self._folder / MANIFEST)
+        if self._manifest is None or self._manifest[0] != stamp:
             try:
-                stat = (self._folder / name).stat()
-            except OSError:
-                stamp.extend((-1, -1))
-            else:
-                stamp.extend((stat.st_mtime_ns, stat.st_size))
-        return tuple(stamp)
+                manifest: Manifest | None = load(self._folder / MANIFEST)
+            except (OSError, KeyError, ValueError):
+                manifest = None
+            self._manifest = (stamp, manifest)
+        return self._manifest[1]
 
-    def _file_name(self) -> str:
-        """Return the manifest's file name; empty when there is no readable manifest."""
-        try:
-            return load(self._folder / MANIFEST).file
-        except (OSError, KeyError, ValueError):
-            return ""
-
-    def _evaluate(self) -> tuple[FileTrust, Offer | None]:
-        """Read the manifest and hash the file; the one place that does either."""
-        try:
-            manifest = load(self._folder / MANIFEST)
-        except (OSError, KeyError, ValueError):
-            return FileTrust.NOT_PLACED, None
+    def _evaluate(self, manifest: Manifest) -> tuple[FileTrust, Offer | None]:
+        """Hash the file against ``manifest``; the one place that reads the file."""
         if not manifest.placed:
             return FileTrust.NOT_PLACED, None
         if not manifest.checksum_is_current or manifest.sha256 is None:
@@ -178,12 +182,15 @@ class VendoredFile:
         )
 
     def _current(self) -> tuple[FileTrust, Offer | None]:
-        """Return the cached verdict, recomputed when a stamp moved."""
-        stamp = self._stamp()
-        if self._seen is None or self._seen[0] != stamp:
-            trust, offer = self._evaluate()
-            self._seen = (stamp, trust, offer)
-        return self._seen[1], self._seen[2]
+        """Return the cached verdict, recomputed when the manifest or the file moved."""
+        manifest = self._read()
+        if manifest is None:
+            return FileTrust.NOT_PLACED, None
+        stamp = _stamp(manifest.vendored)
+        if self._seen is None or self._seen[0] != stamp or self._seen[1] is not manifest:
+            trust, offer = self._evaluate(manifest)
+            self._seen = (stamp, manifest, trust, offer)
+        return self._seen[2], self._seen[3]
 
     def trust(self) -> FileTrust:
         """Return whether the file may be used and, when not, why."""

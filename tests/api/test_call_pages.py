@@ -159,7 +159,8 @@ async def test_the_page_refers_only_to_files_of_its_own_and_has_no_inline_code(
     for url in page.references:
         assert url.startswith(("/", "?")), url
         assert not url.startswith("//"), url
-    assert any(url.startswith("/static/call-page.js?v=") for url in page.references)
+    for name in ("call-devices.js", "call-connection.js", "call-page.js"):
+        assert any(url.startswith(f"/static/{name}?v=") for url in page.references)
     assert any(url.startswith("/static/call-page.css?v=") for url in page.references)
     assert page.inline_code == []
     assert "<style" not in page.raw
@@ -174,11 +175,18 @@ async def test_the_script_is_served_with_the_page_and_nothing_else_is_loaded(
     async with app_client(call_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         page = Page((await client.get(f"{base}/call")).text)
-        script = await client.get(page.script_sources[0])
+        scripts = [await client.get(source) for source in page.script_sources]
 
-    assert len(page.script_sources) == 1
-    assert script.status_code == 200
-    assert script.headers["content-type"].startswith(("text/javascript", "application/javascript"))
+    assert [s.split("?")[0] for s in page.script_sources] == [
+        "/static/call-devices.js",
+        "/static/call-connection.js",
+        "/static/call-page.js",
+    ]
+    for script in scripts:
+        assert script.status_code == 200
+        assert script.headers["content-type"].startswith(
+            ("text/javascript", "application/javascript")
+        )
 
 
 async def test_no_link_to_another_way_in_while_the_setting_is_hidden(

@@ -68,6 +68,31 @@ def test_a_method_called_eval_is_not_the_global_one() -> None:
     assert scan("model.eval(1); retrieval(2)") == []
 
 
+def test_frames_blob_and_data_sources_and_hidden_hosts_are_found() -> None:
+    source = (
+        'f = document.createElement("iframe"); h = "<IFrame src=x>";'
+        'w = "blob:https://x/1"; d = "data:text/javascript,1"; i = "data:image/png;base64,AA";'
+        'u = "https://a.wbx2.com@evil.example/path"'
+    )
+
+    kinds = sorted(f.kind for f in scan(source))
+
+    assert kinds == ["blob_url", "data_url", "data_url", "host", "iframe", "iframe", "userinfo"]
+
+
+def test_an_address_with_user_information_is_not_taken_for_an_allowed_host() -> None:
+    # The host before the "@" looks allowed; the address really names what follows it.
+    assert [f.kind for f in scan('"https://a.wbx2.com@evil.example/"')] == ["userinfo"]
+    assert [f.kind for f in scan('"https://a.wbx2.com/path@x"')] == []
+
+
+def test_the_report_names_what_a_text_scan_cannot_see() -> None:
+    text = report([])
+
+    for blind in ("built at run time", "eval reached indirectly", "dynamic import()"):
+        assert blind in text
+
+
 def test_the_report_says_what_only_a_real_meeting_shows() -> None:
     text = report(scan('x = "https://cdn.example.net/";'))
 

@@ -105,6 +105,12 @@ async def call_page(request: Request, public_ref: str) -> HTMLResponse:
     offer = OtherWayOffer.of(current.embedded_call_webex_option)
     sdk: VendoredFile = request.app.state.call_sdk
     sdk_file = sdk.offer()
+    sdk_src = ""
+    if sdk_file is not None:
+        try:
+            sdk_src = ASSETS.url(sdk_file.path)
+        except FileNotFoundError:
+            sdk_file = None  # gone between the check and the address: no offer, not an error
     context = {
         "group": group,
         "ref": public_ref,
@@ -119,7 +125,7 @@ async def call_page(request: Request, public_ref: str) -> HTMLResponse:
         "other_way_failed": shows_other_way(offer, failed=True),
         # The server decides whether the page may load the SDK at all: a file that is not
         # placed, or whose bytes are not the manifest's, is never named in the markup.
-        "sdk_src": ASSETS.url(sdk_file.path) if sdk_file else "",
+        "sdk_src": sdk_src,
         "sdk_integrity": sdk_file.integrity if sdk_file else "",
         "token_url": f"/b/m/{public_ref}/call/token",
         "connect_seconds": current.embedded_call_connect_seconds,

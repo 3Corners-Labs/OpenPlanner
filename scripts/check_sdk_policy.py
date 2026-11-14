@@ -9,9 +9,18 @@ and no meeting: it reads the vendored file's text and reports
   candidate for a person to judge, not proof of a request;
 - ``blob_worker``: a worker started from a blob, which ``worker-src 'self'`` refuses;
 - ``wasm``: use of WebAssembly, which needs ``wasm-unsafe-eval`` that the policy does not have;
-- ``eval``: ``eval(`` or ``new Function(``, which need ``unsafe-eval``.
+- ``eval``: ``eval(`` or ``new Function(``, which need ``unsafe-eval``;
+- ``iframe``: a frame, which the page's ``default-src 'none'`` and ``frame-ancestors`` leave no
+  room for;
+- ``blob_url`` and ``data_url``: ``blob:`` and ``data:`` sources, which the script, worker and
+  image sources of the policy do not allow;
+- ``userinfo``: an address written with user information (``https://a.example@host/``), which
+  hides which host it really names.
 
-What it cannot show is whether the file *runs* any of these on the path of a call: only a join
+A text scan is blind to addresses built at run time (pieces joined, decoded or read out of
+data), to ``eval`` reached indirectly (``window["ev" + "al"]``, a ``setTimeout`` with a string)
+and to dynamic ``import()``. What it cannot show is whether the file *runs* any of these on the
+path of a call: only a join
 into a real meeting under the page's headers, with the browser's console open for policy
 violations, shows that. A clean report here narrows that run; it does not replace it.
 
@@ -35,6 +44,10 @@ URL = re.compile(r"\b(https?|wss?)://([A-Za-z0-9.-]+)", re.IGNORECASE)
 BLOB_WORKER = re.compile(r"new\s+(?:Shared)?Worker\s*\([^)]{0,200}(?:blob:|createObjectURL)")
 WASM = re.compile(r"WebAssembly\s*\.\s*(?:instantiate|compile|Module|Instance|validate)|\.wasm\b")
 EVAL = re.compile(r"(?<![\w.])eval\s*\(|new\s+Function\s*\(")
+IFRAME = re.compile(r"<iframe\b|createElement\(\s*[\"']iframe[\"']", re.IGNORECASE)
+BLOB_URL = re.compile(r"\bblob:", re.IGNORECASE)
+DATA_URL = re.compile(r"\bdata:(?:[a-z]+/[a-z0-9.+-]+|;base64|,)", re.IGNORECASE)
+USERINFO = re.compile(r"\b(?:https?|wss?)://[^/\s\"'`?#]*@", re.IGNORECASE)
 IGNORED_HOSTS = frozenset({"www.w3.org", "w3.org", "localhost", "127.0.0.1"})
 """Hosts that are namespaces or the machine itself: never a request to someone else."""
 EXCERPT = 60
@@ -46,7 +59,8 @@ class Finding:
     """One thing the policy would refuse or lacks.
 
     Attributes:
-        kind: ``host``, ``blob_worker``, ``wasm`` or ``eval``.
+        kind: ``host``, ``blob_worker``, ``wasm``, ``eval``, ``iframe``, ``blob_url``,
+            ``data_url`` or ``userinfo``.
         detail: The host, or a short excerpt around the match.
     """
 
@@ -79,7 +93,15 @@ def scan(source: str) -> list[Finding]:
             continue
         seen.add(host)
         found.append(Finding("host", f"{scheme.lower()}://{host}"))
-    for kind, pattern in (("blob_worker", BLOB_WORKER), ("wasm", WASM), ("eval", EVAL)):
+    for kind, pattern in (
+        ("blob_worker", BLOB_WORKER),
+        ("wasm", WASM),
+        ("eval", EVAL),
+        ("iframe", IFRAME),
+        ("blob_url", BLOB_URL),
+        ("data_url", DATA_URL),
+        ("userinfo", USERINFO),
+    ):
         for match in pattern.finditer(source):
             start, end = max(0, match.start() - EXCERPT), match.end() + EXCERPT
             found.append(Finding(kind, " ".join(source[start:end].split())))
@@ -95,8 +117,9 @@ def report(findings: list[Finding]) -> str:
         + (", ".join(f"{sum(f.kind == k for f in findings)} {k}" for k in kinds) or "nothing")
     )
     lines.append(
-        "only a join into a real meeting under the page's headers shows whether the file runs "
-        "any of this (see docs/runbook.md, the call page's SDK)"
+        "a text scan cannot see addresses built at run time, eval reached indirectly or dynamic "
+        "import(); only a join into a real meeting under the page's headers shows whether the "
+        "file runs any of this (see docs/runbook.md, the call page's SDK)"
     )
     return "\n".join(lines)
 

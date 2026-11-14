@@ -30,6 +30,7 @@ import {
   said,
   spy,
   statuses,
+  type Spied,
 } from '../call-page';
 import { expectNoAxeViolations, tabTo } from '../helpers';
 
@@ -41,7 +42,7 @@ test('the start state shows the appointment and one button, and asks for no devi
   await expect(begin(page)).toBeVisible();
   await expect(page.getByText('a browser with JavaScript, a camera and a microphone')).toBeHidden();
   await expect(page.locator('dl.details')).toContainText('Team');
-  await page.waitForTimeout(500);
+  // The button is shown by the page's own script when it has started: nothing was asked by then.
   expect(await requests(page)).toBe(0);
   await expectNoAxeViolations(page);
 });
@@ -53,7 +54,7 @@ test('the device check with the real fake devices: picture, meter, test sound', 
   await begin(page).click();
 
   await expect(checkHeading(page)).toBeFocused();
-  await expect(page.getByLabel('Your own picture')).toBeVisible();
+  await expect(page.getByLabel('Preview of your camera')).toBeVisible();
   await said(page, 'Checking your camera and microphone.');
   await said(page, READY);
   expect(await requests(page)).toBeGreaterThan(0);
@@ -140,7 +141,10 @@ test('leaving the page gives the devices back, and a stream that arrives late is
   await openCallPage(slow);
   await begin(slow).click();
   await slow.evaluate(() => window.dispatchEvent(new Event('pagehide')));
-  await slow.waitForTimeout(2000);
+  // Wait for the state, not the clock: the slow stream has arrived, and was stopped at once.
+  await expect
+    .poll(() => slow.evaluate(() => (window as unknown as { spied: Spied }).spied.streams.length))
+    .toBe(1);
   expect(await live(slow)).toEqual([0, 0]);
 });
 

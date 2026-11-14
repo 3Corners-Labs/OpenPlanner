@@ -88,8 +88,8 @@ async def test_a_whole_sdk_file_is_named_in_an_attribute_and_never_as_a_tag(
     digest = base64.b64encode(hashlib.sha256(CONTENT).digest()).decode()
     assert str(root["data-call-sdk"]).startswith("/static/vendor/webex/meetings.min.js?v=")
     assert root["data-call-sdk-integrity"] == f"sha256-{digest}"
-    # Nothing the browser would fetch or run before the click: one script tag, our own.
-    assert len(page.script_sources) == 1
+    # Nothing the browser would fetch or run before the click: our three scripts, no SDK.
+    assert len(page.script_sources) == 3  # our own, never the SDK
     assert not any("vendor" in url for url in page.references)
 
 
@@ -125,7 +125,7 @@ async def test_every_failure_has_its_own_sentence_and_the_failed_state_its_ways_
 
     failed = page.state("failed")
     reasons = re.findall(r'data-call-failure="(\w+)"', failed.raw)
-    sentences = re.findall(r'data-call-failure="\w+" hidden>([^<]+)<', failed.raw)
+    sentences = re.findall(r'data-call-failure="\w+" data-text="\w+" hidden>([^<]+)<', failed.raw)
     assert reasons == ["attempts", "generic", "not_open", "rate_limited", "unavailable"]
     assert len(set(sentences)) == 5
     assert [b.text for b in failed.buttons()] == ["Try again"]
@@ -175,3 +175,64 @@ async def test_the_states_after_the_click_have_their_headings_and_name_no_suppli
         # Each state has one heading; the one the script moves focus to.
         for name in expected:
             assert len(re.findall(r"<h1\b", page.state(name).raw)) == 1
+
+
+async def test_an_organisation_without_contacts_gets_one_plain_sentence_in_the_failure_states(
+    call_settings: Settings,
+) -> None:
+    async with app_client(call_settings, FixedClock(NOW)) as client:
+        base = await open_link(client, await booked(client))
+        english = Page((await client.get(f"{base}/call?lang=en")).text)
+        dutch = Page((await client.get(f"{base}/call?lang=nl")).text)
+
+    for page, sentence in (
+        (english, "Get in touch with the organisation."),
+        (dutch, "Neem contact op met de organisatie."),
+    ):
+        for state in ("failed", "unavailable"):
+            assert sentence in page.state(state).text()
+
+
+async def test_each_own_picture_has_a_name_of_its_own_and_each_sentence_is_in_the_markup_once(
+    call_settings: Settings,
+) -> None:
+    async with app_client(call_settings, FixedClock(NOW)) as client:
+        base = await open_link(client, await booked(client))
+        page = Page((await client.get(f"{base}/call?lang=en")).text)
+
+    labels = re.findall(r'<video[^>]*aria-label="([^"]+)"[^>]*data-call-(?:preview|self)', page.raw)
+    assert labels == ["Preview of your camera", "Your picture", "Your picture"]
+    assert len(set(labels)) == 2
+    # The check's, the lobby's and the call's picture are told apart by the state they are in.
+    assert page.state("check").raw.count("Preview of your camera") == 1
+    for sentence in ("We tried 3 times", "The call is over.", "The last attempt did not work."):
+        assert page.raw.count(sentence) == 1, sentence
+
+
+async def test_the_way_to_hear_the_other_side_is_in_the_call_state_and_hidden(
+    call_settings: Settings,
+) -> None:
+    async with app_client(call_settings, FixedClock(NOW)) as client:
+        base = await open_link(client, await booked(client))
+        page = Page((await client.get(f"{base}/call?lang=en")).text)
+
+    call = page.state("call")
+    assert [b.text for b in call.buttons() if "data-call-hear" in b.attrs] == [
+        "Tap to hear the other person"
+    ]
+    assert "hidden" in [b for b in call.buttons() if "data-call-hear" in b.attrs][0].attrs
+
+
+async def test_a_file_that_goes_missing_between_the_check_and_the_address_is_no_offer(
+    call_settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The verdict was "whole", the static folder no longer has it: the page, not a 500.
+    monkeypatch.setattr("app.api.call_pages.ASSETS", StaticAssets(tmp_path / "elsewhere"))
+    async with app_client(call_settings, FixedClock(NOW)) as client:
+        app: Any = client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+        app.state.call_sdk = _place(tmp_path)
+        base = await open_link(client, await booked(client))
+        response = await client.get(f"{base}/call")
+
+    assert response.status_code == 200
+    assert "data-call-sdk" not in response.text

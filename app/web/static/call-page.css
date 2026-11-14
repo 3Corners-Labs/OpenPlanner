@@ -332,6 +332,17 @@
   min-height: var(--booking-target);
 }
 
+/* The way out stands apart from the switches: room before it, and on the far side when it fits. */
+.call-bar__leave {
+  margin-left: auto;
+  padding-left: calc(var(--booking-space-l) * 2);
+}
+
+.call-hear {
+  margin: var(--booking-space-s) 0 0;
+  text-align: center;
+}
+
 /* --- Preferences ------------------------------------------------------------------------ */
 @media (prefers-reduced-motion: reduce) {
   /* A ring that stands still still says that something is going on: the words say it too. */

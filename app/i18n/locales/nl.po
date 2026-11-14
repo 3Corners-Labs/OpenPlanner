@@ -13875,7 +13875,7 @@ msgid "callpage.check.body"
 msgstr "Ziet u uzelf en beweegt de balk als u praat? Dan kunt u deelnemen."
 
 msgid "callpage.check.preview"
-msgstr "Uw eigen beeld"
+msgstr "Voorbeeld van uw camera"
 
 msgid "callpage.check.camera_off"
 msgstr "Uw camera staat uit"
@@ -14083,11 +14083,23 @@ msgstr "Wachten tot uw {agent} u binnenlaat."
 msgid "callpage.say.admitted"
 msgstr "Uw {agent} heeft u binnengelaten. Het gesprek is begonnen."
 
-msgid "callpage.say.left"
-msgstr "U hebt het gesprek verlaten."
-
-msgid "callpage.say.ended"
-msgstr "Het gesprek is afgelopen."
-
 msgid "callpage.say.device_failed"
 msgstr "Dat is niet gelukt. Controleer uw camera of microfoon en probeer het opnieuw."
+
+msgid "callpage.self.picture"
+msgstr "Uw beeld"
+
+msgid "callpage.contact.none"
+msgstr "Neem contact op met de organisatie."
+
+msgid "callpage.hear.button"
+msgstr "Tik om de andere persoon te horen"
+
+msgid "callpage.say.remote_on"
+msgstr "Uw {agent} heeft de camera aangezet."
+
+msgid "callpage.say.remote_off"
+msgstr "Uw {agent} heeft de camera uitgezet."
+
+msgid "callpage.say.sound_blocked"
+msgstr "Uw browser heeft het geluid geblokkeerd. Gebruik de knop om de andere persoon te horen."

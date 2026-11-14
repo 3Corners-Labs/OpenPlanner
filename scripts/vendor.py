@@ -1,4 +1,4 @@
-"""The manifests of the vendored front-end files of this repository (ADR 0118 point 6).
+"""Where the repository keeps its vendored front-end files, and a walk over their manifests.
 
 A vendored file lives under ``app/web/static/vendor/<name>/`` next to a ``manifest.json``::
 
@@ -12,15 +12,14 @@ A vendored file lives under ``app/web/static/vendor/<name>/`` next to a ``manife
 
 ``checksum`` is absent until the file is placed (ADR 0123 point 3). Renovate moves ``version``
 only, so a checksum whose own ``version`` differs belongs to an older file: ``checksum_is_current``
-is false until the file and the checksum are replaced together. ``scripts.check_pins``,
-``scripts.vendor_sbom`` and ``tests/web/test_vendor.py`` read manifests through this module only.
+is false until the file and the checksum are replaced together. The shape and its reader
+are ``app.adapters.vendored_files`` (the server uses them too); this module only finds the
+manifests of the repository, for the scripts that read them.
 """
 
 from pathlib import Path
 
-from app.adapters.vendored_files import MANIFEST, Manifest, file_matches, load
-
-__all__ = ["MANIFEST", "ROOT", "VENDOR_DIRECTORY", "Manifest", "file_matches", "load", "manifests"]
+from app.adapters.vendored_files import MANIFEST, Manifest, load
 
 ROOT = Path(__file__).resolve().parent.parent
 VENDOR_DIRECTORY = "app/web/static/vendor"

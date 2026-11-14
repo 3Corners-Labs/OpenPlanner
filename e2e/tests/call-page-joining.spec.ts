@@ -1,18 +1,20 @@
 /**
- * The call page from the click that joins (ADR 0123 step 4c), walked in a browser: the token asked
- * only on the click, the SDK loaded with its checksum, connecting with retries, the lobby, the first
+ * The call page from the click that joins (ADR 0123 step 4c), walked in a browser: the SDK loaded
+ * with its checksum, the token asked on the click, connecting with retries, the lobby, the first
  * moment of the call, leaving, the meeting's end, the failure state after the last attempt and each
- * refusal of the token endpoint, the keyboard alone, what is announced and where focus goes, and
- * that the token never reaches the page, an address or a storage.
+ * refusal of the token endpoint, the keyboard alone, what is announced and where focus goes, and that
+ * the token never reaches the page, an address or a storage.
  *
  * The stack places a test double of the video SDK over the vendored file (e2e/vendor/webex/, see
  * .github/actions/e2e-stack); what it does is chosen per test with `window.__sdkPlan` before the
- * page loads and read back from `window.__sdk`. A stack without it offers no SDK at all and these
- * tests skip themselves. The token endpoint is answered by the tests (the example booking is two
- * hours away, outside the join window), except in the one test that asks the real endpoint.
+ * page loads and read back from `window.__sdk`. A stack without it makes these tests FAIL, with the
+ * sentence that says how to place it: a green run must mean the joining was walked. The token
+ * endpoint is answered by the tests (the example booking is two hours away, outside the join
+ * window), except in the one test that asks the real endpoint.
  *
- * The devices are the made-up ones of `../call-page` ("made-up": two cameras, two microphones, a
- * canvas picture and an oscillator sound, in every browser).
+ * The devices are the made-up ones of `../call-page` (two cameras, two microphones, a canvas
+ * picture and an oscillator sound, in every browser). Nothing here waits for a fixed time to prove
+ * that something did not happen: every wait is for a state of the page or of the stand-in.
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -27,18 +29,33 @@ test.use({ locale: 'en-US' });
 const TOKEN = 'guest-token-0123456789abcdef';
 const LINK = 'https://meeting.example.test/guest/abcdef';
 const APP = new URL(process.env.BASE_URL ?? 'http://127.0.0.1:8000').origin;
+const NO_STAND_IN =
+  'this stack offers no SDK file, so the joining cannot be walked: the CI stack (.github/actions/e2e-stack) ' +
+  'mounts e2e/vendor/webex/meetings.min.js and manifest.json read-only over ' +
+  '/srv/app/web/static/vendor/webex/ of the app container and sets EMBEDDED_CALL_CONNECT_SECONDS=10; ' +
+  'a local stack needs the same two -v options and that variable';
 
-type Plan = { failures?: number; hang?: number; always?: boolean; delay?: number; lobby?: boolean; remote?: boolean };
+type Plan = {
+  failures?: number;
+  hang?: number;
+  always?: boolean;
+  delay?: number;
+  late?: number;
+  mediaFailures?: number;
+  lobby?: boolean;
+  remote?: boolean;
+};
 type Log = {
   calls: string[];
   inits: { token: string; autoUploadLogs: boolean; ephemeral: boolean }[];
   devices: { kind: string; deviceId: string }[];
   published: string[];
+  unpublished: number[];
   added?: string[];
   link?: string;
   left: boolean;
 };
-type Answer = { status: number; body?: unknown; abort?: boolean };
+type Answer = { status: number; body?: unknown; abort?: boolean; hang?: boolean };
 
 const granted = (): Answer => ({
   status: 200,
@@ -51,6 +68,7 @@ async function stubToken(page: Page, ...answers: Answer[]): Promise<Request[]> {
   await page.route('**/call/token', async (route) => {
     const answer = answers[Math.min(seen.length, answers.length - 1)];
     seen.push(route.request());
+    if (answer.hang) return; // never answered: the page's own time limit ends it
     if (answer.abort) return route.abort();
     return route.fulfill({
       status: answer.status,
@@ -66,26 +84,39 @@ async function stubToken(page: Page, ...answers: Answer[]): Promise<Request[]> {
 const sdk = (page: Page): Promise<Log> =>
   page.evaluate(() => {
     const s = (window as unknown as { __sdk: Log }).__sdk;
-    return { calls: s.calls, inits: s.inits, devices: s.devices, published: s.published, added: s.added, link: s.link, left: s.left };
+    return {
+      calls: s.calls,
+      inits: s.inits,
+      devices: s.devices,
+      published: s.published,
+      unpublished: s.unpublished,
+      added: s.added,
+      link: s.link,
+      left: s.left,
+    };
   });
 const control = (page: Page, action: 'admit' | 'end'): Promise<void> =>
   page.evaluate((what) => (window as unknown as { __sdk: Record<string, () => void> }).__sdk[what](), action);
+const remoteCamera = (page: Page, on: boolean): Promise<void> =>
+  page.evaluate((value) => (window as unknown as { __sdk: { remoteCamera: (v: boolean) => void } }).__sdk.remoteCamera(value), on);
 
-/** Open the call page with the made-up devices and the stand-in's plan; skip where the stack offers no SDK. */
+/** Open the call page with the made-up devices and the stand-in's plan; fail where the stack offers no SDK. */
 async function open(page: Page, plan: Plan = {}): Promise<void> {
   await spy(page, { devices: 'made-up' });
   await page.addInitScript((p) => ((window as unknown as { __sdkPlan: Plan }).__sdkPlan = p), plan);
   await openCallPage(page);
   const offered = await page.locator('[data-call]').getAttribute('data-call-sdk');
-  test.skip(offered === null, 'this stack has no SDK file: the stand-in of e2e/vendor/webex is not placed');
+  expect(offered, NO_STAND_IN).not.toBeNull();
 }
 
 const joinButton = (page: Page) => page.getByRole('button', { name: 'Join', exact: true });
 const heading = (page: Page, name: string | RegExp) => page.getByRole('heading', { level: 1, name });
+const state = (page: Page, name: string) => page.locator(`[data-call-state="${name}"]`);
 const CONNECTING = 'We are connecting you';
 const WAITING = /You are here\. The .+ will let you in shortly/;
 const IN_CALL = 'You are in the call';
 const FAILED = 'We cannot connect';
+const RETRY = 'The last attempt did not work. We are trying again. This happens by itself.';
 
 /** Through the check to the click that joins. */
 async function join(page: Page): Promise<void> {
@@ -94,24 +125,26 @@ async function join(page: Page): Promise<void> {
   await joinButton(page).click();
 }
 
-/** The sentences the live region got, in order, that match `re`: a sentence is read out when it is in this list. */
+/** The live region has said something that matches `re` (the page keeps no history, the spy does). */
 const saidLike = (page: Page, re: RegExp): Promise<void> =>
   expect.poll(async () => (await statuses(page)).some((s) => re.test(s)), { timeout: 20_000, message: String(re) }).toBe(true);
+const timesSaid = async (page: Page, text: string): Promise<number> => (await statuses(page)).filter((s) => s === text).length;
 
-test('before the click nothing leaves the origin; the click asks for the token once and then loads the file', async ({ page }) => {
+test('before the click nothing leaves the origin; the click loads the file, asks for the token once and starts the SDK', async ({ page }) => {
   const asked: string[] = [];
   page.on('request', (request) => asked.push(`${request.method()} ${request.url()}`));
   const tokens = await stubToken(page, granted());
   await open(page);
   await begin(page).click();
   await said(page, READY);
-  await page.waitForTimeout(500);
+  await page.getByRole('button', { name: 'Play a test sound' }).click();
+  await expect(page.getByText('You now hear two tones.')).toBeVisible();
 
   // The page, the check, a test sound: no token, no SDK file, nobody else.
-  await page.getByRole('button', { name: 'Play a test sound' }).click();
   expect(tokens).toHaveLength(0);
   expect(asked.filter((line) => /call\/token|vendor\/webex/.test(line))).toEqual([]);
-  expect(asked.map((line) => new URL(line.split(' ')[1]).origin).filter((o) => !['null', APP].includes(o))).toEqual([]);
+  const strangers = (): string[] => asked.map((line) => new URL(line.split(' ')[1]).origin).filter((o) => !['null', APP].includes(o));
+  expect(strangers()).toEqual([]);
 
   await joinButton(page).click();
   await expect(heading(page, IN_CALL)).toBeVisible();
@@ -120,7 +153,21 @@ test('before the click nothing leaves the origin; the click asks for the token o
   expect(tokens[0].postData()).toBeNull();
   expect(asked.filter((line) => /vendor\/webex/.test(line))).toHaveLength(1);
   // Everything the page and the SDK stand-in asked stays on the page's own origin.
-  expect(asked.map((line) => new URL(line.split(' ')[1]).origin).filter((o) => !['null', APP].includes(o))).toEqual([]);
+  expect(strangers()).toEqual([]);
+});
+
+test('the SDK file comes first and the token second: a file the browser refuses costs no token', async ({ page }) => {
+  const tokens = await stubToken(page, granted());
+  // The server names the file with a checksum; a swapped file in the browser's hands is refused.
+  await page.route('**/static/vendor/webex/meetings.min.js*', (route) =>
+    route.fulfill({ status: 200, contentType: 'text/javascript', body: 'window.Webex = {};' }),
+  );
+  await open(page);
+  await join(page);
+
+  await expect(heading(page, FAILED)).toBeFocused({ timeout: 40_000 });
+  await expect(page.getByText('We tried 3 times').first()).toBeVisible();
+  expect(tokens).toHaveLength(0);
 });
 
 test('the script tag carries the manifest checksum and the SDK is started with the token, the link and its logs off', async ({ page }) => {
@@ -161,37 +208,80 @@ test('the token and the link are nowhere in the page, an address, a storage or a
   }
 });
 
-test('connecting is visible and says so when it tries again by itself; the token is reused', async ({ page }) => {
+test('connecting is visible and says so, once, when it tries again by itself; a new token is asked for each attempt', async ({ page }) => {
   const tokens = await stubToken(page, granted());
-  await open(page, { failures: 1, delay: 1500 });
+  // Two attempts fail at once; the third takes a moment, so the page can be looked at while it runs.
+  await open(page, { failures: 2, delay: 3000 });
   await join(page);
 
   await expect(heading(page, CONNECTING)).toBeVisible();
+  await expect(page.getByText('Attempt 3 of 3')).toBeVisible();
+  await expect(state(page, 'connecting').getByText(RETRY)).toBeVisible();
   await saidLike(page, /^Setting up your call\.$/);
-  // The first attempt fails at once; the second takes a moment, and the page says what happens.
-  await expect(page.getByText('The last attempt did not work. We are trying again. This happens by itself.').first()).toBeVisible();
-  await expect(page.getByText('Attempt 2 of 3')).toBeVisible();
-  await saidLike(page, /^The last attempt did not work\. We are trying again/);
-
+  await saidLike(page, new RegExp(`^${RETRY.replace(/\./g, '\\.')}$`));
   await expect(heading(page, IN_CALL)).toBeFocused();
+
   const log = await sdk(page);
-  expect(log.calls.filter((c) => c === 'register')).toHaveLength(2);
-  expect(log.calls.filter((c) => c === 'init')).toHaveLength(2);
-  expect(tokens).toHaveLength(1);
+  expect(log.calls.filter((c) => c === 'register')).toHaveLength(3);
+  // The count stays on the page for every retry, the sentence is said once per joining.
+  expect(await timesSaid(page, RETRY)).toBe(1);
+  // A token the platform did not take is not asked for again with the same value.
+  expect(tokens).toHaveLength(3);
   // No countdown and no clock on the page.
-  await expect(page.getByText(/\b\d+ ?(s|sec|seconds)\b/)).toHaveCount(0);
+  await expect(state(page, 'connecting').getByText(/\b\d+ ?(s|sec|seconds)\b/)).toHaveCount(0);
 });
 
 test('a registration that never answers is given up on and tried again', async ({ page }) => {
   test.setTimeout(90_000);
   await stubToken(page, granted());
-  await open(page, { hang: 1 });
+  await open(page, { hang: 1, delay: 3000 });
   const seconds = Number(await page.locator('[data-call]').getAttribute('data-call-seconds'));
-  test.skip(seconds > 15, 'this stack waits longer than 15 seconds for one attempt (EMBEDDED_CALL_CONNECT_SECONDS)');
+  expect(seconds, NO_STAND_IN).toBeLessThanOrEqual(15);
   await join(page);
   await expect(heading(page, CONNECTING)).toBeVisible();
   await expect(page.getByText('Attempt 2 of 3')).toBeVisible({ timeout: (seconds + 10) * 1000 });
   await expect(heading(page, IN_CALL)).toBeVisible({ timeout: 20_000 });
+});
+
+test('a token request that never answers is given up on with the attempt and asked again', async ({ page }) => {
+  test.setTimeout(90_000);
+  const tokens = await stubToken(page, { status: 200, hang: true }, granted());
+  await open(page);
+  const seconds = Number(await page.locator('[data-call]').getAttribute('data-call-seconds'));
+  expect(seconds, NO_STAND_IN).toBeLessThanOrEqual(15);
+  await join(page);
+  await expect(heading(page, IN_CALL)).toBeVisible({ timeout: (seconds + 20) * 1000 });
+  expect(tokens).toHaveLength(2);
+  expect((await sdk(page)).inits).toHaveLength(1);
+});
+
+test('a failed attempt leaves the meeting and unregisters before the next one joins', async ({ page }) => {
+  await stubToken(page, granted());
+  await open(page, { mediaFailures: 1 });
+  await join(page);
+  await expect(heading(page, IN_CALL)).toBeFocused();
+
+  const { calls } = await sdk(page);
+  const first = calls.indexOf('join');
+  const second = calls.indexOf('init', calls.indexOf('addMedia'));
+  expect(calls.indexOf('addMedia')).toBeGreaterThan(first);
+  // Between the refused media and the second initialisation: left, then unregistered.
+  const between = calls.slice(calls.indexOf('addMedia') + 1, second);
+  expect(between).toEqual(['leave', 'unregister']);
+});
+
+test('a registration that answers after its attempt was given up is unregistered when it arrives', async ({ page }) => {
+  test.setTimeout(90_000);
+  await stubToken(page, granted());
+  await open(page, { late: 12_000 });
+  const seconds = Number(await page.locator('[data-call]').getAttribute('data-call-seconds'));
+  expect(seconds, NO_STAND_IN).toBeLessThanOrEqual(10);
+  await join(page);
+  await expect(heading(page, IN_CALL)).toBeVisible({ timeout: 40_000 });
+  // The first registration answers at 12 s, after its attempt ended at 10 s: it is undone.
+  await expect
+    .poll(async () => (await sdk(page)).calls.filter((c) => c === 'unregister').length, { timeout: 30_000 })
+    .toBeGreaterThanOrEqual(1);
 });
 
 test('after the last attempt the failure state says so, without the other way, and trying again works', async ({ page }) => {
@@ -209,10 +299,12 @@ test('after the last attempt the failure state says so, without the other way, a
   await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
   await expectNoAxeViolations(page);
 
+  // The token of the failed attempts is forgotten: the next try asks for a new one.
+  const before = tokens.length;
   await page.evaluate(() => ((window as unknown as { __sdkPlan: Plan }).__sdkPlan.always = false));
   await page.getByRole('button', { name: 'Try again' }).click();
   await expect(heading(page, IN_CALL)).toBeFocused();
-  expect(tokens).toHaveLength(1);
+  expect(tokens).toHaveLength(before + 1);
 });
 
 /** The server renders the link out only when the organisation allows it; the page's own rule is what these tests need. */
@@ -242,7 +334,9 @@ test('the other way is offered when the page cannot connect, and not for a call 
   await expect(page.getByRole('link', { name: 'Join this call another way' })).toBeVisible();
   await expect(page.locator('[data-call-failed-contacts]')).toBeHidden();
 
-  // A call that is not open would not open through the link either: contact details only.
+  // A call that is not open would not open through the link either, and cannot be tried again:
+  // the organisation's contact details, or the one plain sentence when it has none (the example
+  // organisation has none).
   const closed = await page.context().newPage();
   await withOtherWay(closed);
   await stubToken(closed, { status: 409, body: { error: 'not_open' } });
@@ -250,30 +344,29 @@ test('the other way is offered when the page cannot connect, and not for a call 
   await join(closed);
   await expect(heading(closed, FAILED)).toBeVisible();
   await expect(closed.getByRole('link', { name: 'Join this call another way' })).toBeHidden();
-  await expect(closed.locator('[data-call-failed-contacts]')).toBeVisible();
+  await expect(closed.getByRole('button', { name: 'Try again' })).toBeHidden();
+  await expect(closed.locator('[data-call-failed-contacts]')).toContainText('Get in touch with the organisation.');
 });
 
-for (const [status, body, sentence] of [
-  [409, { error: 'not_open' }, 'The call is not open yet, or it is no longer open.'],
-  [429, { error: 'rate_limited' }, 'You tried too many times in a short while.'],
-  [503, { error: 'unavailable' }, 'The call is not available right now.'],
-  [500, undefined, 'The video call could not be set up. You can try again.'],
+for (const [status, body, sentence, retry] of [
+  [409, { error: 'not_open' }, 'The call is not open yet, or it is no longer open.', false],
+  [429, { error: 'rate_limited' }, 'You tried too many times in a short while.', true],
+  [503, { error: 'unavailable' }, 'The call is not available right now.', true],
+  [500, undefined, 'The video call could not be set up. You can try again.', true],
 ] as const) {
-  test(`the token endpoint answering ${status} ends in its own sentence, before the SDK is loaded`, async ({ page }) => {
-    const asked: string[] = [];
-    page.on('request', (request) => asked.push(request.url()));
+  test(`the token endpoint answering ${status} ends in its own sentence, and the SDK is never started`, async ({ page }) => {
     const tokens = await stubToken(page, { status, body });
     await open(page);
     await join(page);
 
     await expect(heading(page, FAILED)).toBeFocused();
-    await expect(page.getByText(sentence).first()).toBeVisible();
+    await expect(state(page, 'failed').getByText(sentence)).toBeVisible();
     await saidLike(page, new RegExp(`^${sentence.replace(/[.]/g, '\\.')}`));
     expect(tokens).toHaveLength(1);
-    // Nothing of the video platform was asked for, and no SDK file was fetched.
-    expect(asked.filter((url) => /vendor\/webex/.test(url))).toEqual([]);
-    expect((await page.evaluate(() => typeof (window as unknown as { __sdk?: unknown }).__sdk))).toBe('undefined');
-    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+    // The file was loaded (it comes first), but nothing of the video platform was started or asked.
+    expect((await sdk(page)).calls).toEqual([]);
+    // Trying again is offered where it can work: not for a call that is not open.
+    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible({ visible: retry });
     await expectNoAxeViolations(page);
   });
 }
@@ -283,18 +376,18 @@ test('a token request that does not arrive ends in the plain failure sentence', 
   await open(page);
   await join(page);
   await expect(heading(page, FAILED)).toBeFocused();
-  await expect(page.getByText('The video call could not be set up. You can try again.').first()).toBeVisible();
+  await expect(state(page, 'failed').getByText('The video call could not be set up. You can try again.')).toBeVisible();
 });
 
 test('the real endpoint answers an appointment outside the join window as not open', async ({ page }) => {
   await open(page);
   await join(page);
   await expect(heading(page, FAILED)).toBeFocused();
-  await expect(page.getByText('The call is not open yet, or it is no longer open.').first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+  await expect(state(page, 'failed').getByText('The call is not open yet, or it is no longer open.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Try again' })).toBeHidden();
 });
 
-test('the lobby: waiting words, own picture, working toggles, a way to leave, and admission', async ({ page }) => {
+test('the lobby: waiting words, own picture, working toggles that give the device back, a way to leave, and admission', async ({ page }) => {
   await stubToken(page, granted());
   await open(page, { lobby: true });
   await join(page);
@@ -302,22 +395,24 @@ test('the lobby: waiting words, own picture, working toggles, a way to leave, an
   await expect(heading(page, WAITING)).toBeFocused();
   await expect(page.getByText('There is nothing you need to do. The call starts by itself.')).toBeVisible();
   await saidLike(page, /^Waiting for the .+ to let you in\.$/);
-  await expect(page.locator('[data-call-self="lobby"]')).toBeVisible();
-  await expect(page.getByLabel('Your own picture')).toBeVisible();
+  await expect(state(page, 'lobby').getByLabel('Your picture')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Leave the call' })).toBeVisible();
   // Not in the call yet: no media was added, the other side is not shown.
   expect((await sdk(page)).calls).not.toContain('addMedia');
-  await expect(page.locator('[data-call-state="call"]')).toBeHidden();
+  await expect(state(page, 'call')).toBeHidden();
+  expect(await live(page)).toEqual([1, 1]);
 
   const camera = page.getByRole('button', { name: /^Camera/ });
   await camera.click();
   await expect(camera).toHaveAttribute('aria-pressed', 'false');
   await expect(camera).toContainText('off');
   await said(page, 'Camera off.');
-  await expect(page.locator('[data-call-state="lobby"]').getByText('Your camera is off')).toBeVisible();
+  await expect(state(page, 'lobby').getByText('Your camera is off')).toBeVisible();
+  expect(await live(page)).toEqual([0, 1]); // the camera is given back, the light goes out
   await camera.click();
   await expect(camera).toHaveAttribute('aria-pressed', 'true');
   await said(page, 'Camera on.');
+  expect(await live(page)).toEqual([1, 1]);
   await expectNoAxeViolations(page);
 
   await control(page, 'admit');
@@ -326,7 +421,7 @@ test('the lobby: waiting words, own picture, working toggles, a way to leave, an
   expect((await sdk(page)).calls.at(-1)).toBe('addMedia');
 });
 
-test('in the call: the other side, the own picture, the toggles, leaving', async ({ page }) => {
+test('in the call: the other side, the own picture, the toggles that give the device back, leaving', async ({ page }) => {
   await stubToken(page, granted());
   await open(page);
   await join(page);
@@ -338,28 +433,91 @@ test('in the call: the other side, the own picture, the toggles, leaving', async
   await expect(page.getByLabel(/^Picture of the /)).toBeVisible();
   await expect.poll(() => remote.evaluate((v) => (v as HTMLVideoElement).srcObject !== null)).toBe(true);
   await expect.poll(() => page.locator('[data-call-remote-audio]').evaluate((a) => (a as HTMLAudioElement).srcObject !== null)).toBe(true);
-  await expect(page.locator('[data-call-self="call"]')).toBeVisible();
+  await expect(state(page, 'call').getByLabel('Your picture')).toBeVisible();
   // The way back is not a link on the page while the call runs: it would end the call.
   await expect(page.getByRole('link', { name: 'Back to your appointment' })).toBeHidden();
 
+  // Off gives the device back (taken out of the meeting and stopped); on takes a new one and sends it.
+  expect(await live(page)).toEqual([1, 1]);
   const microphone = page.getByRole('button', { name: /^Microphone/ });
   await microphone.click();
   await expect(microphone).toHaveAttribute('aria-pressed', 'false');
   await said(page, 'Microphone off.');
+  expect(await live(page)).toEqual([1, 0]);
+  expect((await sdk(page)).unpublished).toEqual([1]);
   await microphone.click();
   await said(page, 'Microphone on.');
+  expect(await live(page)).toEqual([1, 1]);
+  expect((await sdk(page)).published).toEqual(['microphone']);
   await expectNoAxeViolations(page);
 
-  expect(await live(page)).toEqual([1, 1]);
   await page.getByRole('button', { name: 'Leave the call' }).click();
   await expect(heading(page, 'You left the call')).toBeFocused();
-  await saidLike(page, /^You have left the call\.$/);
+  await saidLike(page, /^You can close this window, or go back to your appointment\.$/);
   await expect(page.getByRole('link', { name: 'Back to your appointment' }).first()).toBeVisible();
   const log = await sdk(page);
   expect(log.left).toBe(true);
   expect(log.calls.slice(-2)).toEqual(['leave', 'unregister']);
   expect(await live(page)).toEqual([0, 0]);
   await expectNoAxeViolations(page);
+});
+
+test('the other side switching its camera off and on is announced once each, and shown', async ({ page }) => {
+  await stubToken(page, granted());
+  await open(page);
+  await join(page);
+  await expect(heading(page, IN_CALL)).toBeFocused();
+  await expect(state(page, 'call').locator('[data-call-remote-off]')).toBeHidden();
+
+  await remoteCamera(page, false);
+  await expect(state(page, 'call').locator('[data-call-remote-off]')).toBeVisible();
+  await saidLike(page, /^The .+ turned the camera off\.$/);
+  await remoteCamera(page, true);
+  await expect(state(page, 'call').locator('[data-call-remote-off]')).toBeHidden();
+  await saidLike(page, /^The .+ turned the camera on\.$/);
+  const said_ = await statuses(page);
+  expect(said_.filter((s) => /turned the camera off/.test(s))).toHaveLength(1);
+  expect(said_.filter((s) => /turned the camera on/.test(s))).toHaveLength(1);
+});
+
+test('a browser that blocks the sound gets a button and one message, and the button plays', async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __blockPlay: boolean };
+    w.__blockPlay = true;
+    const original = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      if (w.__blockPlay && this.hasAttribute('data-call-remote-audio')) {
+        return Promise.reject(new DOMException('blocked', 'NotAllowedError'));
+      }
+      return original.call(this);
+    };
+  });
+  await stubToken(page, granted());
+  await open(page);
+  await join(page);
+  await expect(heading(page, IN_CALL)).toBeFocused();
+
+  const hear = page.getByRole('button', { name: 'Tap to hear the other person' });
+  await expect(hear).toBeVisible();
+  await saidLike(page, /blocked the sound/);
+  expect(await timesSaid(page, 'Your browser blocked the sound. Use the button to hear the other person.')).toBe(1);
+  await page.evaluate(() => ((window as unknown as { __blockPlay: boolean }).__blockPlay = false));
+  await hear.click();
+  await expect(hear).toBeHidden();
+  await expectNoAxeViolations(page);
+});
+
+test('the way out stands apart from the switches', async ({ page }) => {
+  await stubToken(page, granted());
+  await open(page);
+  await join(page);
+  await expect(heading(page, IN_CALL)).toBeVisible();
+  const toggles = await page.locator('[data-call-state="call"] .call-toggles').boundingBox();
+  const leave = await page.getByRole('button', { name: 'Leave the call' }).boundingBox();
+  expect(toggles).not.toBeNull();
+  expect(leave).not.toBeNull();
+  // Side by side on a wide window: at least a button's width of room between them.
+  expect((leave?.x ?? 0) - ((toggles?.x ?? 0) + (toggles?.width ?? 0))).toBeGreaterThanOrEqual(48);
 });
 
 test('what the participant left off at the check stays off, and can be switched on in the call', async ({ page }) => {
@@ -398,7 +556,7 @@ test('the meeting ended by the staff member shows the plain ended state', async 
   await control(page, 'end');
 
   await expect(heading(page, 'The call has ended')).toBeFocused();
-  await saidLike(page, /^The call is over\.$/);
+  await saidLike(page, /^The call is over\. You can close this window, or go back to your appointment\.$/);
   await expect(page.getByRole('link', { name: 'Back to your appointment' }).first()).toBeVisible();
   expect(await live(page)).toEqual([0, 0]);
   await expectNoAxeViolations(page);
@@ -411,8 +569,8 @@ test('leaving the page in the lobby leaves the meeting and gives the devices bac
   await expect(heading(page, WAITING)).toBeVisible();
   expect(await live(page)).toEqual([1, 1]);
   await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
-  expect((await sdk(page)).left).toBe(true);
-  expect(await live(page)).toEqual([0, 0]);
+  await expect.poll(async () => (await sdk(page)).left).toBe(true);
+  await expect.poll(() => live(page)).toEqual([0, 0]);
 });
 
 test('the keyboard alone leads from the start through the lobby and the call to leaving', async ({ page }) => {

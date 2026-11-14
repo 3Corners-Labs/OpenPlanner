@@ -1,7 +1,8 @@
 {#- The participant's call page (ADR 0123): the start state and the device check (step 4b), then
     connecting, the lobby, the first moment in the call, leaving and failing (step 4c).
     Everything the page says is rendered here, in the reader's language; call-page.js only shows
-    and hides it and reads the words it needs from [data-call-texts]. Without the script the
+    and hides it and reads the words it needs from [data-text] (each sentence is in the markup
+    once). Without the script the
     start state stands, with the sentence that says what the call needs.
     The root carries what the script needs and nothing secret: the token address of this booking,
     the two connection values and, only when the server found the vendored SDK file whole, the
@@ -27,6 +28,19 @@
 </div>
 {%- endmacro %}
 
+{#- The participant's own picture, in the check, the lobby and the call: one markup, a name of its
+    own for each place (a screen reader user must tell them apart). -#}
+{% macro own_picture(where, label, note=True) -%}
+<video muted playsinline autoplay hidden aria-label="{{ label }}" {% if where == "check" %}data-call-preview{% else %}data-call-self="{{ where }}"{% endif %}></video>
+{%- if note %}
+<p class="call-preview__off">{{ _("callpage.check.camera_off") }}</p>{% endif %}
+{%- endmacro %}
+
+{#- The organisation's contact details, or one plain sentence when it has none. -#}
+{% macro contact(id) -%}
+{% if contacts %}{{ contact_block(contacts, level=2, id=id) }}{% else %}<p>{{ _("callpage.contact.none") }}</p>{% endif %}
+{%- endmacro %}
+
 {% macro leave_button() -%}
 <button type="button" class="button button--danger call-leave" data-call-leave>{{ _("callpage.control.leave") }}</button>
 {%- endmacro %}
@@ -34,7 +48,7 @@
 {% macro over(name, heading, body) -%}
 <section class="call-state" aria-labelledby="call-{{ name }}-heading" data-call-state="{{ name }}" hidden>
   <h1 id="call-{{ name }}-heading" tabindex="-1">{{ heading }}</h1>
-  <p>{{ body }}</p>
+  <p data-text="say_{{ name }}">{{ body }}</p>
   <p><a class="button button--secondary" href="/b/m/{{ ref }}/join">{{ _("join.back") }}</a></p>
 </section>
 {%- endmacro %}
@@ -75,7 +89,7 @@
     <div class="notice notice--warning call-needs" data-call-needs>
       <p>{{ _("callpage.needs") }}</p>
       {% if other_way_failed and not other_way_before %}<p>{{ other_way() }}</p>{% endif %}
-      {{ contact_block(contacts, level=2, id="call-needs-contacts") }}
+      {{ contact("call-needs-contacts") }}
     </div>
     <p class="actions">
       <button type="button" class="button button--large" data-call-begin hidden>{{ _("callpage.start.button") }}</button>
@@ -91,8 +105,7 @@
     {{ denied_panel("both", _("callpage.denied.both.heading"), _("callpage.denied.both.step"), _("callpage.denied.both.without")) }}
     <div class="call-check">
       <div class="call-preview">
-        <video muted playsinline autoplay hidden aria-label="{{ _("callpage.check.preview") }}" data-call-preview></video>
-        <p class="call-preview__off" data-call-preview-off>{{ _("callpage.check.camera_off") }}</p>
+        {{ own_picture("check", _("callpage.check.preview")) }}
       </div>
       <div class="call-check__side">
         {{ toggles() }}
@@ -136,7 +149,7 @@
       <h1 id="call-connecting-heading" tabindex="-1">{{ _("callpage.connecting.heading") }}</h1>
       <p>{{ _("callpage.connecting.body") }}</p>
       <div class="notice notice--warning" data-call-retry-note hidden>
-        <p>{{ _("callpage.connecting.retry") }}</p>
+        <p data-text="say_retry">{{ _("callpage.connecting.retry") }}</p>
       </div>
       <p class="hint" data-call-attempt></p>
     </div>
@@ -147,8 +160,7 @@
       <h1 id="call-lobby-heading" tabindex="-1">{{ _("callpage.lobby.heading") }}</h1>
       <p>{{ _("callpage.lobby.body") }}</p>
       <div class="call-preview">
-        <video muted playsinline autoplay hidden aria-label="{{ _("callpage.check.preview") }}" data-call-self="lobby"></video>
-        <p class="call-preview__off">{{ _("callpage.check.camera_off") }}</p>
+        {{ own_picture("lobby", _("callpage.self.picture")) }}
       </div>
       {{ toggles() }}
       <p>{{ leave_button() }}</p>
@@ -161,30 +173,31 @@
       <video class="call-remote" playsinline autoplay aria-label="{{ _("callpage.call.remote") }}" data-call-remote></video>
       <p class="call-remote__off" data-call-remote-off hidden>{{ _("callpage.call.remote_off") }}</p>
       <audio autoplay data-call-remote-audio></audio>
+      <p class="call-hear" data-call-hear-note><button type="button" class="button" data-call-hear hidden>{{ _("callpage.hear.button") }}</button></p>
       <div class="call-self">
-        <video muted playsinline autoplay hidden aria-label="{{ _("callpage.check.preview") }}" data-call-self="call"></video>
+        {{ own_picture("call", _("callpage.self.picture"), note=False) }}
       </div>
     </div>
     <div class="call-bar">
       {{ toggles() }}
-      {{ leave_button() }}
+      <div class="call-bar__leave">{{ leave_button() }}</div>
     </div>
   </section>
 
   <section class="call-state" aria-labelledby="call-failed-heading" data-call-state="failed" hidden>
     <h1 id="call-failed-heading" tabindex="-1">{{ _("callpage.failed.heading") }}</h1>
     <div class="notice notice--warning">
-      <p data-call-failure="attempts" hidden>{{ _("callpage.failed.attempts", total=connect_attempts) }}</p>
-      <p data-call-failure="generic" hidden>{{ _("callpage.failed.generic") }}</p>
-      <p data-call-failure="not_open" hidden>{{ _("callpage.failed.not_open") }}</p>
-      <p data-call-failure="rate_limited" hidden>{{ _("callpage.failed.rate_limited") }}</p>
-      <p data-call-failure="unavailable" hidden>{{ _("callpage.failed.unavailable") }}</p>
+      <p data-call-failure="attempts" data-text="say_failed_attempts" hidden>{{ _("callpage.failed.attempts", total=connect_attempts) }}</p>
+      <p data-call-failure="generic" data-text="say_failed_generic" hidden>{{ _("callpage.failed.generic") }}</p>
+      <p data-call-failure="not_open" data-text="say_failed_not_open" hidden>{{ _("callpage.failed.not_open") }}</p>
+      <p data-call-failure="rate_limited" data-text="say_failed_rate_limited" hidden>{{ _("callpage.failed.rate_limited") }}</p>
+      <p data-call-failure="unavailable" data-text="say_failed_unavailable" hidden>{{ _("callpage.failed.unavailable") }}</p>
     </div>
     <p class="actions">
       <button type="button" class="button button--large" data-call-again>{{ _("callpage.failed.retry") }}</button>
       {% if other_way_failed %}<span data-call-failed-other-way>{{ other_way() }}</span>{% endif %}
     </p>
-    <div data-call-failed-contacts>{{ contact_block(contacts, level=2, id="call-failed-contacts") }}</div>
+    <div data-call-failed-contacts>{{ contact("call-failed-contacts") }}</div>
   </section>
 
   {{ over("left", _("callpage.left.heading"), _("callpage.left.body")) }}
@@ -194,7 +207,7 @@
     <h1 id="call-unavailable-heading" tabindex="-1">{{ _("callpage.unavailable.heading") }}</h1>
     <div class="notice"><p>{{ _("call.unavailable") }}</p></div>
     {% if other_way_failed %}<p>{{ other_way("button button--secondary") }}</p>{% endif %}
-    {{ contact_block(contacts, level=2, id="call-unavailable-contacts") }}
+    {{ contact("call-unavailable-contacts") }}
   </section>
 
   <div hidden data-call-texts>
@@ -223,20 +236,18 @@
     <span data-text="device_speaker">{{ _("callpage.check.speaker") }}</span>
     <span data-text="attempt">{{ _("callpage.connecting.attempt", n="{n}", total=connect_attempts) }}</span>
     <span data-text="say_connecting">{{ _("callpage.say.connecting") }}</span>
-    <span data-text="say_retry">{{ _("callpage.connecting.retry") }}</span>
     <span data-text="say_waiting">{{ _("callpage.say.waiting") }}</span>
     <span data-text="say_admitted">{{ _("callpage.say.admitted") }}</span>
-    <span data-text="say_left">{{ _("callpage.say.left") }}</span>
-    <span data-text="say_ended">{{ _("callpage.say.ended") }}</span>
+    <span data-text="say_remote_on">{{ _("callpage.say.remote_on") }}</span>
+    <span data-text="say_remote_off">{{ _("callpage.say.remote_off") }}</span>
+    <span data-text="say_sound_blocked">{{ _("callpage.say.sound_blocked") }}</span>
     <span data-text="say_device_failed">{{ _("callpage.say.device_failed") }}</span>
-    <span data-text="say_failed_attempts">{{ _("callpage.failed.attempts", total=connect_attempts) }}</span>
-    <span data-text="say_failed_generic">{{ _("callpage.failed.generic") }}</span>
-    <span data-text="say_failed_not_open">{{ _("callpage.failed.not_open") }}</span>
-    <span data-text="say_failed_rate_limited">{{ _("callpage.failed.rate_limited") }}</span>
-    <span data-text="say_failed_unavailable">{{ _("callpage.failed.unavailable") }}</span>
   </div>
 
   <p data-call-back><a href="/b/m/{{ ref }}/join">{{ _("join.back") }}</a></p>
 </div>
 {% endblock %}
-{% block scripts %}<script src="{{ static_url('call-page.js') }}" defer></script>{% endblock %}
+{#- Three own scripts that share one object, in this order: the two that only define, then the page, which starts them. -#}
+{% block scripts %}<script src="{{ static_url('call-devices.js') }}" defer></script>
+<script src="{{ static_url('call-connection.js') }}" defer></script>
+<script src="{{ static_url('call-page.js') }}" defer></script>{% endblock %}

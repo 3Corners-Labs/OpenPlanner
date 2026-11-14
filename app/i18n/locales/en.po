@@ -13862,7 +13862,7 @@ msgid "callpage.check.body"
 msgstr "Can you see yourself, and does the bar move when you talk? Then you can join."
 
 msgid "callpage.check.preview"
-msgstr "Your own picture"
+msgstr "Preview of your camera"
 
 msgid "callpage.check.camera_off"
 msgstr "Your camera is off"
@@ -14070,11 +14070,23 @@ msgstr "Waiting for the {agent} to let you in."
 msgid "callpage.say.admitted"
 msgstr "The {agent} let you in. The call has started."
 
-msgid "callpage.say.left"
-msgstr "You have left the call."
-
-msgid "callpage.say.ended"
-msgstr "The call is over."
-
 msgid "callpage.say.device_failed"
 msgstr "That did not work. Check your camera or microphone and try again."
+
+msgid "callpage.self.picture"
+msgstr "Your picture"
+
+msgid "callpage.contact.none"
+msgstr "Get in touch with the organisation."
+
+msgid "callpage.hear.button"
+msgstr "Tap to hear the other person"
+
+msgid "callpage.say.remote_on"
+msgstr "The {agent} turned the camera on."
+
+msgid "callpage.say.remote_off"
+msgstr "The {agent} turned the camera off."
+
+msgid "callpage.say.sound_blocked"
+msgstr "Your browser blocked the sound. Use the button to hear the other person."

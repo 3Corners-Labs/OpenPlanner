@@ -174,49 +174,71 @@ subresource integrity (entry below).
 
 ### `call-page.js`
 
+The call page's script is three files that share one object, `window.openplannerCall` (no build step,
+each under 500 lines, each with a header that says what it owns and never does). The page loads them
+in this order: `call-devices.js` and `call-connection.js` only define, `call-page.js` starts them.
+
 - **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (build steps 4b and 4c). Not an island: the call page is a kind of page
-  of its own (above), and the script is the page's, loaded by no other.
+  of its own (above), and the scripts are the page's, loaded by no other.
 - **Server renders:** the start state (the appointment, the sentence of what the call needs, the begin
   button, `hidden`), the device check with its three refused-permission panels, the states connecting,
   lobby, call, failed, left and ended, the unavailable state, one polite status element
-  `[data-call-status]` and every word the script needs in `[data-call-texts]`. All of it in the page's
-  language; the script has no text of its own. The root carries `data-call-token-url`,
-  `data-call-seconds` and `data-call-attempts` (the two connection settings) and, only when the server
-  found the vendored file whole (placed, checksum of the pinned version, equal bytes),
-  `data-call-sdk` and `data-call-sdk-integrity`.
-- **Does:** after the begin button asks the browser for the camera and the microphone (never on load);
-  shows the participant's own picture, a level meter with a text that says whether they are heard, a test
-  sound, native selects for camera, microphone and (where the browser allows it) speaker, and toggle
-  buttons to join with either off. A refused permission is told apart from a missing device and explained
-  in the panel of that kind. The click that joins gives the check's devices back, asks
-  `POST …/call/token` (the one request the script makes), adds the script element of the SDK file with
-  its checksum as `integrity`, initialises the SDK with the token (logs never uploaded, registration
-  temporary), creates the meeting from the guest link and joins with the devices the participant left on;
-  an attempt that fails or takes longer than `data-call-seconds` is given up and the next starts by itself,
-  up to `data-call-attempts`. The lobby, the first moment of the call (the other side's picture and sound,
-  the own picture, microphone and camera toggles, leave), leaving, the meeting's end and the failure state
-  with an honest sentence per refusal of the endpoint follow. Without the attributes the join button leads
-  to the unavailable state. The token lives in memory only: never in storage, an address, the page or a
-  log. Before the click it makes no request and loads no file; it stores nothing.
-  `tests/web/test_call_page_assets.py` fails on any other network, storage, style, markup or console
-  call, and on the token going anywhere but the SDK.
+  `[data-call-status]` and every sentence the scripts say as `[data-text]`, once (a failure or ended
+  sentence is the state's own paragraph). All of it in the page's language; the scripts have no text of
+  their own. The root carries `data-call-token-url`, `data-call-seconds` and `data-call-attempts` (the two
+  connection settings) and, only when the server found the vendored file whole (placed, checksum of the
+  pinned version, equal bytes), `data-call-sdk` and `data-call-sdk-integrity`.
+- **`call-page.js` owns** the page's one `state` and the one way to change it, `go(screen, patch)`: a table
+  of allowed moves, one `render`, focus on the new heading and one sentence for the live region. It also
+  owns the status queue, the texts, the other side's picture and the wiring of the buttons.
+- **`call-devices.js` owns** the device check: after the begin button it asks the browser for the camera
+  and the microphone (never on load); shows the participant's own picture, a level meter with a text that
+  says whether they are heard, a test sound, native selects for camera, microphone and (where the browser
+  allows it) speaker, and toggles to join with either off. A refused permission is told apart from a
+  missing device and explained in the panel of that kind.
+- **`call-connection.js` owns** the click that joins: it loads the SDK file with its checksum as
+  `integrity`, then asks `POST …/call/token` (the one request the scripts make), initialises the SDK with
+  the token (logs never uploaded, registration temporary, no real-time data link until captions exist),
+  creates the meeting from the guest link and joins with the devices the participant left on. An attempt
+  that fails or takes longer than `data-call-seconds` leaves the meeting and unregisters, and the next
+  starts by itself, up to `data-call-attempts`; a token the platform did not take is forgotten. Then the
+  lobby, the first moment of the call (the other side's picture and sound, the own picture, microphone and
+  camera toggles that give the device back when off, leave), the meeting's end and the failure state with a
+  sentence per refusal of the endpoint. The token lives in memory only: never in storage, an address, the
+  page or a log. Before the click nothing is requested and no file is loaded; nothing is stored.
+  `tests/web/test_call_page_assets.py` fails on any other network, storage, style, markup or console call.
 - **Keyboard:** every control is a native button, link or select in reading order; nothing is a pointer
   gesture. Focus moves to the heading of each state (`h1`, or `h2` of a refused-permission panel) and, after
   a successful try again, back to the heading of the check.
 - **Live regions:** the one polite status element: checking, ready, no device found, test sound playing,
-  camera and microphone on or off, setting up the call, a new attempt, waiting to be let in, admitted,
-  left, ended, and the sentence of why it failed (the heading, which has focus, is never repeated). The level meter is never in a live region; its words change only after
-  a short while of quiet or sound.
-- **Browser features:** `getUserMedia`, `enumerateDevices`, `AudioContext`, `MediaStream` (Baseline widely
-  available); `setSinkId` for the speaker choice where it exists. A browser without them keeps the start
-  state with the sentence of what the call needs.
-- **Without the script:** the start state, the appointment, the sentence that says the call needs a browser
-  with JavaScript, a camera and a microphone, the organisation's contact details and, where the
-  organisation allows it, the link to join another way.
+  camera and microphone on or off, setting up the call, the first new attempt (the count stays visible),
+  waiting to be let in, admitted, left, ended, the other side's camera going off or on, the browser
+  blocking the sound (with a button to hear), and the sentence of why it failed (the heading, which has
+  focus, is never repeated). The level meter is never in a live region; its words change only after a short
+  while of quiet or sound.
+- **Browser features:** `getUserMedia`, `enumerateDevices`, `AudioContext`, `MediaStream`, `AbortController`
+  (Baseline widely available); `setSinkId` for the speaker choice where it exists. A browser without them
+  keeps the start state with the sentence of what the call needs.
+- **Without the scripts:** the start state, the appointment, the sentence that says the call needs a browser
+  with JavaScript, a camera and a microphone, the organisation's contact details (or one plain sentence
+  when it has none) and, where the organisation allows it, the link to join another way.
 - **Used by:** the call page only (`call.html`, with `call-page.css`).
-- **Size:** about 10.5 KB gzipped (script), about 2.2 KB gzipped (styles). At about 1,100 lines it is the
-  largest script of ours: the next steps (step 5, the chat of 7c) add to the same `view` and `render`, and
-  a split of the call's connection part from the check is a decision for step 5, not a second script.
+- **Size:** about 4.6 KB, 5.3 KB and 5.2 KB gzipped (`call-devices.js`, `call-connection.js`,
+  `call-page.js`), about 2.2 KB gzipped (styles). Step 5 and the chat of 7c add to the same state and
+  `render`; the connection part is the file that will grow, and splitting it again is a decision for then.
+
+### `call-devices.js`
+
+- **ADR:** 0123 point 10 (steps 4b and 4c). The device check of the call page; one of the three files described under
+  `call-page.js` (what it owns and never does is in its header). Loaded before `call-page.js`, which starts it.
+- **Used by:** the call page only. **Size:** about 4.6 KB gzipped.
+
+### `call-connection.js`
+
+- **ADR:** 0123 points 3, 5, 6, 10, 11 and 16 (step 4c). The call of the call page (token, SDK, attempts,
+  lobby, leaving); one of the three files described under `call-page.js` (what it owns and never does is in
+  its header). Loaded before `call-page.js`, which starts it.
+- **Used by:** the call page only. **Size:** about 5.3 KB gzipped.
 
 ### `vendor/webex/meetings.min.js`
 
@@ -224,7 +246,7 @@ subresource integrity (entry below).
   every script under `app/web/static/` has one entry.
 - **Server renders:** nothing as a tag. Its address (`/static/vendor/webex/meetings.min.js?v=…`) and its
   checksum are attributes of the call page's root, only when the file is placed and equal to the manifest's
-  checksum; `call-page.js` adds the script element, with `integrity`, at the click that joins.
+  checksum; `call-connection.js` adds the script element, with `integrity`, at the click that joins.
 - **Does:** runs the call for the participant, loaded only after that click. The end-to-end stack replaces it
   with a test double (`e2e/vendor/webex/`, mounted over it in the test container only).
 - **Without the script:** the page says the call is not available and links back to the join page; the
