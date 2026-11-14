@@ -222,6 +222,8 @@ services:
       KC_HEALTH_ENABLED: "true"
     volumes:
       - ./secrets/keycloak-realm.json:/opt/keycloak/data/import/openplanner-realm.json:ro
+      # kcadm.sh as realm master's admin, for the installer and the runbook (ADR 0126).
+      - ./deploy/keycloak/kcadm-as-admin.sh:/opt/openplanner/kcadm-as-admin.sh:ro
       # Staff accounts and their passwords live here (the DPIA input, docs/dataflow.md): back it
       # up with the database volume, never copy it off the host. The whole data directory, not
       # its h2 subdirectory: the image owns this one, so the volume starts with its ownership.

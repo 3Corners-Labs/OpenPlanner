@@ -26,7 +26,8 @@ lint:
 	$(UV) ruff format --check .
 	$(UV) ruff check .
 
-# The host's shell scripts (the root-run updater among them), the git hooks and the shell
+# The host's shell scripts (the root-run updater among them, and the one run inside the bundled
+# identity provider's container, deploy/keycloak), the git hooks and the shell
 # scripts that repo skills ship (.claude/skills/<skill>/scripts/*.sh). The shell expands the
 # skill pattern, so a file name stays one argument and is never read as code (make's wildcard
 # would paste it into the command as text); `set --` drops the pattern only when nothing
@@ -37,7 +38,7 @@ lint:
 SHELLCHECK_VERSION := 0.11.0.1
 shellcheck:
 	set -- .claude/skills/*/scripts/*.sh; [ -e "$$1" ] || [ -L "$$1" ] || set --; \
-	uvx --from shellcheck-py==$(SHELLCHECK_VERSION) shellcheck scripts/*.sh scripts/updater/*.sh deploy/proxy/*.sh .githooks/* "$$@"
+	uvx --from shellcheck-py==$(SHELLCHECK_VERSION) shellcheck scripts/*.sh scripts/updater/*.sh deploy/proxy/*.sh deploy/keycloak/*.sh .githooks/* "$$@"
 
 type:
 	$(UV) mypy

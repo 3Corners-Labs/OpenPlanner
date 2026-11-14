@@ -337,18 +337,17 @@ for name, value in answer.headers.items():
     print(name + ": " + value)
 '
 
-# The staff directory's two calls (ADR 0095) on the internal network, as web makes them: a token for
-# the service account, then the realm's users. Prints a count, never a name or the token.
+# The staff directory (ADR 0095) through web's own adapter, with the address and secret the render
+# script wrote for web (secrets/keycloak-app.env): prints whether one listing works, nothing else.
 directory_code='
-import json, os, urllib.parse, urllib.request
-data = urllib.parse.urlencode({"grant_type": "client_credentials", "client_id": "openplanner-directory", "client_secret": os.environ["SECRET"]}).encode()
-token = json.load(urllib.request.urlopen("http://idp:8080/idp/realms/openplanner/protocol/openid-connect/token", data))["access_token"]
-request = urllib.request.Request("http://idp:8080/idp/admin/realms/openplanner/users?max=1", headers={"Authorization": "Bearer " + token})
-print("users listed", len(json.load(urllib.request.urlopen(request))))
+import asyncio, os
+from app.adapters.keycloak_directory import KeycloakDirectory
+directory = KeycloakDirectory(os.environ["ADMIN_URL"], os.environ["CLIENT_ID"], os.environ["CLIENT_SECRET"])
+print("reachable" if asyncio.run(directory.reachable()) else "unreachable")
 '
 
-portal_hsts='max-age=63072000; includeSubDomains' # app/api/security_headers.py, tied by a test
-dropped_headers='service-worker-allowed clear-site-data alt-svc nel report-to reporting-endpoints accept-ch critical-ch'
+# The headers the route drops, read from where they are written (deploy/proxy/idp.caddy).
+dropped_headers="$(sed -n 's/^[[:space:]]*header_down -\([^[:space:]]*\)$/\1/p' deploy/proxy/idp.caddy)"
 
 start_idp_probe() { # the provider of pass 3, on the edge network as idp-probe:8080
   image="$(docker inspect -f '{{.Config.Image}}' "$(compose ps -q web)")"
@@ -391,7 +390,12 @@ idp_route_checks() { # pass 3: the route of ADR 0126 in front of a provider that
   ! echo "$given" | grep -q -e '__Host-' -e 'lang=' || fail "a cookie of the portal reaches the provider ($given)"
   direct="$(compose exec -T web python -I -c "$probe_direct_code" | tr -d '\r')"
   # shellcheck disable=SC2086
+  head="$(curl -sk $resolve -D - -o /dev/null "$base/healthz" | tr -d '\r')"
+  portal_hsts="$(values_of strict-transport-security)"
+  [ -n "$portal_hsts" ] || fail "the portal sends no HSTS, so the one on /idp has nothing to equal"
+  # shellcheck disable=SC2086
   head="$(curl -sk $resolve -D - -o /dev/null "$base/idp/realms/openplanner/x" | tr -d '\r')"
+  [ -n "$dropped_headers" ] || fail "no dropped header found in deploy/proxy/idp.caddy"
   for header in $dropped_headers; do
     echo "$direct" | grep -qi "^$header:" || fail "the probe sends no $header, so its absence would prove nothing"
     ! echo "$head" | grep -qi "^$header:" || fail "the proxy passes $header from the provider"
@@ -457,21 +461,27 @@ keycloak_checks() { # pass 4: what a browser needs passes the route, the admin c
     '/idp/realms/openplanner/%2e%2e/%2e%2e/admin/master/console/'; do
     [ "$(status_of --path-as-is "$base$path")" != "200" ] || fail "$path reaches the admin console through the route"
   done
-  # The console on the loopback (ADR 0126 point 2): realm master's login form goes to the public
-  # address, where the route refuses it, until the realm's frontend URL is the loopback.
-  master="$loopback/idp/realms/master/protocol/openid-connect/auth?client_id=security-admin-console&$pkce&redirect_uri=http%3A%2F%2F127.0.0.1%3A18090%2Fidp%2Fadmin%2Fmaster%2Fconsole%2F"
-  curl -s "$master" | grep -q "action=\"$base/idp/realms/master/login-actions/" \
+  # The console on the loopback (ADR 0126 point 2). Until realm master's frontend URL is the
+  # loopback, Keycloak serves the console's login for the public address, where the route refuses
+  # it; afterwards for the loopback. Set as the installer and the runbook set it.
+  master="$loopback/idp/realms/master/protocol/openid-connect/auth?client_id=security-admin-console&$pkce&redirect_uri="
+  curl -s "${master}https%3A%2F%2Fbooking.test%3A18443%2Fidp%2Fadmin%2Fmaster%2Fconsole%2F" \
+    | grep -q "action=\"$base/idp/realms/master/login-actions/" \
     || fail "realm master's login form did not name the public address before the change, so the next check proves nothing"
-  # shellcheck disable=SC2016 # the password is the container's own
-  compose exec -T idp sh -c '/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080/idp --realm master --user admin --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" >/dev/null && /opt/keycloak/bin/kcadm.sh update realms/master -s attributes.frontendUrl=http://127.0.0.1:18090/idp' \
+  compose exec -T idp sh /opt/openplanner/kcadm-as-admin.sh update realms/master \
+    -s attributes.frontendUrl=http://127.0.0.1:18090/idp </dev/null \
     || fail "realm master did not take the loopback as its frontend URL"
-  curl -s "$master" | grep -q "action=\"$loopback/idp/realms/master/login-actions/" \
+  curl -s "${master}http%3A%2F%2F127.0.0.1%3A18090%2Fidp%2Fadmin%2Fmaster%2Fconsole%2F" \
+    | grep -q "action=\"$loopback/idp/realms/master/login-actions/" \
     || fail "realm master's login form does not stay on the loopback"
   console="$(curl -s "$loopback/idp/admin/master/console/")"
   echo "$console" | grep -q "\"adminBaseUrl\": \"$loopback/idp\"" || fail "the console does not call its API on the loopback"
   ! echo "$console" | grep -q 'booking.test' || fail "the console on the loopback names the public address"
-  secret="$(sed -n 's/^KC_DIRECTORY_CLIENT_SECRET=//p' "$keycloak_dir/secrets/keycloak.env")"
-  compose exec -T -e SECRET="$secret" web python -I -c "$directory_code" | grep -q '^users listed' \
+  app="$keycloak_dir/secrets/keycloak-app.env"
+  [ "$(compose exec -T -e ADMIN_URL="$(sed -n 's/^KEYCLOAK_ADMIN_URL=//p' "$app")" \
+    -e CLIENT_ID="$(sed -n 's/^KEYCLOAK_DIRECTORY_CLIENT_ID=//p' "$app")" \
+    -e CLIENT_SECRET="$(sed -n 's/^KEYCLOAK_DIRECTORY_CLIENT_SECRET=//p' "$app")" \
+    web python -c "$directory_code" | tr -d '\r')" = "reachable" ] \
     || fail "the staff directory cannot use the provider on the internal network"
 }
 

@@ -939,18 +939,17 @@ start() {
   idp_console
 }
 
-# idp_kcadm SCRIPT [INPUT]: run SCRIPT in the idp container once kcadm.sh is logged in to realm
-# master as `admin`, retrying until Keycloak answers or HEALTH_TIMEOUT passes (status 1). INPUT
-# goes to SCRIPT on stdin, so a secret in it is never an argument; the admin password comes from
-# the container's own environment.
+# idp_kcadm INPUT ARGS...: kcadm.sh ARGS as realm master's admin in the idp container, through
+# deploy/keycloak/kcadm-as-admin.sh (ADR 0126), retried until Keycloak answers or HEALTH_TIMEOUT
+# passes (status 1). INPUT goes to it on stdin, for a body read with `-f -`, so a secret in it is
+# never an argument. Once Keycloak has not answered in time, later calls give up at once.
+IDP_SILENT=0
 idp_kcadm() {
-  local path deadline=$((SECONDS + HEALTH_TIMEOUT))
-  path=$(value "$DIR/secrets/keycloak.env" KC_HTTP_RELATIVE_PATH)
-  [[ $path =~ ^(/[A-Za-z0-9_-]+)*$ ]] || { warn "KC_HTTP_RELATIVE_PATH in secrets/keycloak.env is not a plain path"; return 1; }
-  until printf '%s' "${2:-}" | compose exec -T idp sh -c "
-      /opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080${path} --realm master \
-        --user admin --password \"\$KC_BOOTSTRAP_ADMIN_PASSWORD\" >/dev/null 2>&1 && { $1; }" >/dev/null 2>&1; do
-    ((SECONDS < deadline)) || return 1
+  local input=$1 deadline=$((SECONDS + HEALTH_TIMEOUT))
+  shift
+  ((!IDP_SILENT)) || return 1
+  until printf '%s' "$input" | compose exec -T idp sh /opt/openplanner/kcadm-as-admin.sh "$@" >/dev/null 2>&1; do
+    ((SECONDS < deadline)) || { IDP_SILENT=1; return 1; }
     sleep 5
   done
 }
@@ -976,8 +975,7 @@ idp_mail() {
     "$(json_escape "$host")" "${port:-587}" "$(json_escape "$from")" "${starttls:-true}" \
     "$([[ -n $user ]] && echo true || echo false)" \
     "$([[ -n $user ]] && printf ',"user":"%s","password":"%s"' "$(json_escape "$user")" "$(json_escape "$password")")")
-  # shellcheck disable=SC2016 # $? and $rc belong to the container's shell
-  if ! idp_kcadm 'cat >/tmp/op-smtp.json && /opt/keycloak/bin/kcadm.sh update realms/openplanner -f /tmp/op-smtp.json >/dev/null 2>&1; rc=$?; rm -f /tmp/op-smtp.json; exit $rc' "$json"; then
+  if ! idp_kcadm "$json" update realms/openplanner -f -; then
     warn "the bundled identity provider did not take its mail server within ${HEALTH_TIMEOUT}s; set it in its console (docs/runbook.md)"
     return 0
   fi
@@ -991,19 +989,24 @@ idp_mail() {
 # address is the loopback already.
 idp_console() {
   [[ $IDP == bundled ]] || return 0
-  local path published
+  local path published console
   path=$(value "$DIR/secrets/keycloak.env" KC_HTTP_RELATIVE_PATH)
   [[ -n $path ]] || return 0
-  published=$(compose port idp 8080 2>/dev/null | head -n 1)
-  if [[ ! $published =~ ^127\.0\.0\.1:[0-9]+$ ]]; then
-    warn "the bundled identity provider's port is published as '${published:-nothing}', not on 127.0.0.1 only: its admin console is not set up for the loopback (docs/runbook.md, Opening the admin console)"
+  if ! published=$(compose port idp 8080 2>/dev/null) || [[ -z $published ]]; then
+    warn "the bundled identity provider publishes no port, or is not running: its admin console is not set up for the loopback (docs/runbook.md, Opening the admin console)"
     return 0
   fi
-  if ! idp_kcadm "/opt/keycloak/bin/kcadm.sh update realms/master -s attributes.frontendUrl=http://${published}${path} >/dev/null 2>&1"; then
+  published=${published%%$'\n'*}
+  if [[ ! $published =~ ^127\.0\.0\.1:[0-9]+$ ]]; then
+    warn "the bundled identity provider's port is published as '$published', not on 127.0.0.1 only: its admin console is not set up for the loopback (docs/runbook.md, Opening the admin console)"
+    return 0
+  fi
+  console=http://$published$path
+  if ! idp_kcadm '' update realms/master -s "attributes.frontendUrl=$console"; then
     warn "the bundled identity provider did not take the loopback address of its admin console within ${HEALTH_TIMEOUT}s (docs/runbook.md, Opening the admin console)"
     return 0
   fi
-  log "the bundled identity provider's admin console: http://${published}${path}/admin/ on this host only (ADR 0126)"
+  log "the bundled identity provider's admin console: $console/admin/ on this host only (ADR 0126)"
 }
 
 # 6. Host updater -------------------------------------------------------------------------------

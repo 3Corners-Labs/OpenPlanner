@@ -60,9 +60,12 @@ in both directions. Measured on Keycloak 26.8.1 behind the bundled proxy (2026-1
    loopback address the compose service publishes, `http://127.0.0.1:8080/idp`. The installer
    sets it after the start, with the realm's mail server (ADR 0112 point 6), when the provider
    is behind the proxy; it refuses to point it at a port published beyond the loopback and
-   says so. On an existing host one command in the runbook sets it. The console is opened on
-   the host, or from elsewhere through an SSH tunnel to that port; `kcadm.sh` inside the
-   container works with or without it. `KC_HOSTNAME_ADMIN` is not used (context point 4).
+   says so. On a host set up by hand one command in the runbook sets it. Both go through
+   `deploy/keycloak/kcadm-as-admin.sh`, mounted read-only into the container: the one place that
+   logs `kcadm.sh` in as `admin`, with the container's own password, so no secret is an
+   argument on the host. The console is opened on the host, or from elsewhere through an SSH
+   tunnel to that port; `kcadm.sh` inside the container works with or without it.
+   `KC_HOSTNAME_ADMIN` is not used (context point 4).
 3. **None of the portal's cookies reaches the provider.** On the route the proxy removes
    from the `Cookie` header every `__Host-` cookie (every cookie of the portal on https; never
    one of the provider's, whose path is under `/idp/`) and `lang`.
@@ -115,7 +118,7 @@ None, after checking. Every value below is a fixed security rule or follows from
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR | #845 | merged |
-| 1 | `deploy/proxy/idp.caddy` (public paths, cookies, answers, service worker) imported by the entrypoint; the installer sets realm `master`'s frontend URL to the loopback (`idp_console`); `scripts/check-proxy.sh` pass 3 (probe) and pass 4 (Keycloak); runbook, threat model and data flow corrected; ADR 0112's Status line | #845 | merged |
+| 1 | `deploy/proxy/idp.caddy` (public paths, cookies, answers, service worker) imported by the entrypoint; `deploy/keycloak/kcadm-as-admin.sh` mounted into the container; the installer sets realm `master`'s frontend URL to the loopback (`idp_console`); `scripts/check-proxy.sh` pass 3 (probe) and pass 4 (Keycloak); runbook, threat model and data flow corrected; ADR 0112's Status line | #845 | merged |
 | 2 | docker01 takes the release with step 1: realm `master`'s frontend URL set with the runbook's command, `idp` published on the loopback only (no port 8780); checked from outside (`/idp/admin/` 404, the login works) and through the tunnel (the console) | | planned |
 
 ## Consequences
@@ -129,7 +132,7 @@ None, after checking. Every value below is a fixed security rule or follows from
   console in three engines, no violation) is the record for 26.8.1.
 - What remains with one origin: a script on a provider page can still make the browser load a
   portal address by navigation or as an image, so a `GET` that has an effect (an audited
-  download, ADR 0044) runs in the admin's name, without the script reading the result; the
+  download) runs in the admin's name, without the script reading the result; the
   provider's own scripts are not restricted (its themes use inline scripts); the provider can
   show any page under `/idp`. A host name of its own (point 5) removes all three.
 - A reverse proxy of the operator's own in front of the bundled provider must do the same; the

@@ -959,15 +959,18 @@ Then open `http://127.0.0.1:8080/idp/admin/` (`http://127.0.0.1:8080/admin/` on 
 the proxy) and log in as `admin` with `KC_BOOTSTRAP_ADMIN_PASSWORD` from
 `secrets/keycloak.env`. With the proxy, realm `master` must have the loopback as its frontend
 address, or its login form sends the browser to the public address, where the proxy refuses
-it. The installer sets it after every start; on a host installed before ADR 0126, run once:
+it. The installer sets it after every start (run it again after updating the checkout, as for
+every release that changes the host side). On a host set up by hand, run once, with the address
+`docker compose --env-file .env.update port idp 8080` prints (`127.0.0.1:8080` by default):
 
 ```bash
-docker compose --env-file .env.update exec idp sh -c '/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080/idp --realm master --user admin --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" && /opt/keycloak/bin/kcadm.sh update realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp'
+docker compose --env-file .env.update exec -T idp sh /opt/openplanner/kcadm-as-admin.sh update realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp
 ```
 
-Realm `openplanner` keeps its public address and issuer; the staff directory and the login are
-unaffected. Every step below that names the console uses this one; `kcadm.sh` inside the
-container works without it.
+`deploy/keycloak/kcadm-as-admin.sh` logs `kcadm.sh` in as `admin` inside the container with the
+container's own password, so no secret is typed. Realm `openplanner` keeps its public address and
+issuer; the staff directory and the login are unaffected. Every step below that names the console
+uses this one; `kcadm.sh` inside the container works without it.
 
 **Mail from Keycloak.** Invitations and password resets of the Staff screen are sent by
 Keycloak itself, not by OpenPlanner. The rendered realm has no mail server yet; set one in the

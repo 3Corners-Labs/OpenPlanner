@@ -62,5 +62,7 @@ services:
         required: false
     volumes: !override
       - ${KEYCLOAK_CHECK_DIR:?set by scripts/check-proxy.sh}/secrets/keycloak-realm.json:/opt/keycloak/data/import/openplanner-realm.json:ro
+      # Relative to the project directory (the first -f file), as compose resolves every path.
+      - ./deploy/keycloak/kcadm-as-admin.sh:/opt/openplanner/kcadm-as-admin.sh:ro
     ports: !override
       - "127.0.0.1:18090:8080"

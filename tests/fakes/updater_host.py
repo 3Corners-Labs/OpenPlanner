@@ -166,6 +166,8 @@ def _compose(args: list[str]) -> int:
         print(PROXY)
     elif command == ["port", "idp", "8080"]:  # where the bundled provider is published
         print(next(iter(_lines("idp-port")), "127.0.0.1:8080"))
+    elif command[:3] == ["exec", "-T", "idp"]:  # kcadm.sh inside the bundled provider
+        return _failing("idp-exec")
     elif command[:2] == ["alembic", "current"]:
         print(f"{(_host() / 'revision').read_text().strip()} (head)")
     elif command[:2] == ["alembic", "downgrade"]:

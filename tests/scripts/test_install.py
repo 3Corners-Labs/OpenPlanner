@@ -821,6 +821,8 @@ def _with_package(host: Host, *args: str, **settings: str) -> subprocess.Complet
 
 
 HOST_SETTINGS = {k: v for k, v in PRODUCTION.items() if not k.startswith("OIDC_")}
+WITHOUT_MAIL = {k: v for k, v in HOST_SETTINGS.items() if not k.startswith("SMTP_")}
+"""A host with the bundled provider and no SMTP server of its own."""
 
 
 def test_the_configuration_and_passphrase_options_go_together(host: Host) -> None:
@@ -972,40 +974,39 @@ def test_a_test_install_renders_the_bundled_realm_and_hands_over_the_login(host:
     assert app["OIDC_CLIENT_SECRET"] not in result.stderr + result.stdout  # a path, never a value
 
 
+KCADM = "exec -T idp sh /opt/openplanner/kcadm-as-admin.sh"
+"""How the installer runs kcadm.sh as realm master's admin (deploy/keycloak/kcadm-as-admin.sh)."""
+
+
 def test_the_realms_mail_server_is_set_after_the_start_without_a_password_in_an_argument(
     host: Host,
 ) -> None:
-    settings = {k: v for k, v in PRODUCTION.items() if not k.startswith("OIDC_")}
-
-    result = host.run("--mode", "test", "--non-interactive", **settings)
+    result = host.run("--mode", "test", "--non-interactive", **HOST_SETTINGS)
 
     assert result.returncode == 0, result.stderr
-    assert host.ran("exec -T idp sh -c")
-    assert not host.ran("pass word #1")  # the password goes through stdin
+    assert host.ran(f"{KCADM} update realms/openplanner -f -")  # the body comes on stdin
+    assert not host.ran("pass word #1")
     assert "mail server: smtp.example.nl" in result.stderr + result.stdout
 
 
 def test_without_an_smtp_host_the_install_says_keycloak_cannot_mail(host: Host) -> None:
-    settings = {k: v for k, v in PRODUCTION.items() if not k.startswith(("OIDC_", "SMTP_"))}
-
-    result = host.run("--mode", "test", "--non-interactive", **settings)
+    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
 
     assert result.returncode == 0, result.stderr
     assert "Keycloak cannot mail invitations" in result.stderr
-    assert not host.ran("op-smtp.json")
+    assert not host.ran("realms/openplanner")
 
 
 def test_the_admin_console_is_put_on_the_loopback_after_the_start_adr_0126(host: Host) -> None:
     """Behind the proxy realm master's login must stay on the loopback, where the console is."""
-    settings = {k: v for k, v in PRODUCTION.items() if not k.startswith(("OIDC_", "SMTP_"))}
-
-    result = host.run("--mode", "test", "--non-interactive", **settings)
+    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
 
     assert result.returncode == 0, result.stderr
     assert host.ran("port idp 8080")
-    # The published loopback port, with the proxy's path.
-    assert host.ran("realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp")
-    assert not host.ran("KC_BOOTSTRAP_ADMIN_PASSWORD=")  # the password stays in the container
+    # The published loopback port, with the proxy's path, as one argument of kcadm.sh's own.
+    assert host.ran(
+        f"{KCADM} update realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp"
+    )
     output = result.stderr + result.stdout
     assert "admin console: http://127.0.0.1:8080/idp/admin/ on this host only" in output
 
@@ -1013,13 +1014,36 @@ def test_the_admin_console_is_put_on_the_loopback_after_the_start_adr_0126(host:
 def test_a_provider_published_beyond_the_loopback_gets_no_console_address(host: Host) -> None:
     """A port on every interface would put the console on the network: say so, set nothing."""
     host.given("idp-port", "0.0.0.0:8780\n")
-    settings = {k: v for k, v in PRODUCTION.items() if not k.startswith(("OIDC_", "SMTP_"))}
 
-    result = host.run("--mode", "test", "--non-interactive", **settings)
+    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
 
     assert result.returncode == 0, result.stderr
     assert not host.ran("frontendUrl")
     assert "published as '0.0.0.0:8780', not on 127.0.0.1 only" in result.stderr + result.stdout
+
+
+def test_a_provider_that_publishes_nothing_is_named_as_such(host: Host) -> None:
+    """`docker compose port` prints nothing while idp is not running: not a port problem."""
+    host.given("idp-port", "\n")
+
+    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
+
+    assert result.returncode == 0, result.stderr
+    assert not host.ran("frontendUrl")
+    assert "publishes no port, or is not running" in result.stderr
+
+
+def test_a_provider_that_never_answers_is_waited_for_once(host: Host) -> None:
+    """After the mail server's attempt runs out of time, the console's gives up at once."""
+    host.given("fail", "idp-exec\n")
+
+    result = host.run("--mode", "test", "--non-interactive", HEALTH_TIMEOUT="5", **HOST_SETTINGS)
+
+    assert result.returncode == 0, result.stderr
+    assert host.ran(f"{KCADM} update realms/openplanner")
+    assert not host.ran("realms/master")
+    assert "did not take its mail server" in result.stderr
+    assert "did not take the loopback address of its admin console" in result.stderr
 
 
 def test_an_own_provider_gets_no_console_step(host: Host) -> None:
