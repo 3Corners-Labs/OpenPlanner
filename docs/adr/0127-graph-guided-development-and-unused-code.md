@@ -73,7 +73,7 @@ framework entry points; a higher one would miss unused variables.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR | #TBD | merged |
-| 1 | `make deadcode` and `[tool.vulture]`, in `make fast` and the CI `python` job, pinned and tracked by Renovate; the points of the process in CLAUDE.md, `docs/skills.md`, `pre-pr-review` and `code-quality-review` (reuse list, unused code) | #TBD | merged |
+| 0 | ADR | #855 | merged |
+| 1 | `make deadcode` and `[tool.vulture]`, in `make fast` and the CI `python` job, pinned and tracked by Renovate; the points of the process in CLAUDE.md, `docs/skills.md`, `pre-pr-review` and `code-quality-review` (reuse list, unused code) | #855 | merged |
 | 2 | The first graph sweep of the 60% candidates, deleted in `refactor:` pull requests | | planned |
 | 3 | The hotspot list in the release pull request (`scripts/release_pr.py`) | | planned |
