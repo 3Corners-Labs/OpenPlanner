@@ -13245,6 +13245,9 @@ msgstr "Deze afronding is alleen voor bestaande diensten en kan niet worden geko
 msgid "admin.flows.reason.rollback_not_safe"
 msgstr "Activeren wacht tot ook de vorige versie van OpenPlanner afspraken op een gedeelde capaciteitspool kan bijhouden. Dat volgt in een latere versie."
 
+msgid "admin.flows.reason.contact_center_not_ready"
+msgstr "Activeren van een flow die naar het contactcenter stuurt wacht tot het contactcenter is vrijgegeven voor livegang. Dat volgt in een latere versie."
+
 msgid "admin.flows.summary.none"
 msgstr "Niet ingesteld"
 
