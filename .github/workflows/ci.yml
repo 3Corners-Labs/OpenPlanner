@@ -295,20 +295,26 @@ jobs:
           name: sbom
           path: sbom.cdx.json
 
-  e2e:
-    name: accessibility (Playwright, axe-core, Lighthouse)
+  # The suite grows with every admin page: pages x 3 widths x 3 browsers x 2 locales. In one job it took
+  # 20 minutes in early November, 45 with the call page's specs, and 58.6 minutes (1,670 tests, the
+  # Playwright step alone) in the merge-queue run of pull request 851, which the queue put out
+  # because required checks have 60 minutes there. So each browser runs as its own job, in parallel,
+  # with its own stack and seed: about a third of the time each. The three together are exactly
+  # `npm test`. The job `e2e` below carries the name of the required check
+  # (.github/guardrails.json) and is the id that `deprecations` waits for.
+  e2e-browser:
+    name: "accessibility: ${{ matrix.browser }}"
     if: >-
       github.event_name != 'pull_request'
       || contains(github.event.pull_request.labels.*.name, 'ci:full')
       || startsWith(github.base_ref, 'release/')
     runs-on: ubuntu-26.04
-    # The suite grows with every admin page: pages x 3 widths x 3 browsers x 2 locales. It took 20
-    # minutes in early November and 28 to 30 with the skills, pools and flows pages of ADR 0121, which
-    # cancelled a merge-queue run at the old limit of 30 while the Lighthouse step was still running.
-    # 45 left room for the pages of the next steps, but the call page's specs (ADR 0123 steps 4b to
-    # 5b) brought the Playwright step alone to about 45 minutes; 75 leaves room. Sharding the suite is
-    # still the lasting answer.
-    timeout-minutes: 75
+    timeout-minutes: 30
+    strategy:
+      # One browser's failure must not hide another's.
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
     env:
       # Official image with browsers and their system packages preinstalled, so the job does not
       # depend on apt mirrors (`playwright install --with-deps` timed out on them). The tag must
@@ -326,16 +332,22 @@ jobs:
             || { echo "PLAYWRIGHT_IMAGE does not match @playwright/test in e2e/package.json" >&2; exit 1; }
           docker run --rm -v "$PWD/e2e:/e2e" -w /e2e "$PLAYWRIGHT_IMAGE" npm ci
       - name: keyboard flows, admin roles + axe (WCAG 2.2 AA, zero violations)
+        env:
+          BROWSER: ${{ matrix.browser }}
         run: >-
           docker run --rm --network host --ipc host -e CI=true
-          -v "$PWD/e2e:/e2e" -w /e2e "$PLAYWRIGHT_IMAGE" npm test
+          -v "$PWD/e2e:/e2e" -w /e2e "$PLAYWRIGHT_IMAGE" npm test -- "--project=$BROWSER"
+      # Lighthouse and the maintenance page run once, in the Chromium job, after its tests. Lighthouse
+      # reads e2e/requests.json, which the global set-up of that job's own test run wrote.
       - name: Lighthouse accessibility >= 95
+        if: matrix.browser == 'chromium'
         run: >-
           docker run --rm --network host -e CI=true
           -v "$PWD/e2e:/e2e" -w /e2e "$PLAYWRIGHT_IMAGE"
           sh -c "node host/serve.mjs & npm run lighthouse"
       # ADR 0038: maintenance closes every participant page, so its page is checked last, alone.
       - name: maintenance page + axe (switches maintenance on and off again)
+        if: matrix.browser == 'chromium'
         run: >-
           docker run --rm --network host --ipc host -e CI=true -e MAINTENANCE_E2E=1
           -v "$PWD/e2e:/e2e" -w /e2e "$PLAYWRIGHT_IMAGE"
@@ -343,8 +355,28 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
-          name: playwright-traces
+          name: playwright-traces-${{ matrix.browser }}
           path: e2e/test-results/
+
+  # The required check (ADR 0058, .github/guardrails.json) is this name; it passes only when all three
+  # browsers passed. Same condition as the matrix: where that is skipped, so is this, and skipped is
+  # what the required check accepts on a pull request without `ci:full`.
+  e2e:
+    name: accessibility (Playwright, axe-core, Lighthouse)
+    needs: [e2e-browser]
+    if: >-
+      always() && (github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'ci:full')
+      || startsWith(github.base_ref, 'release/'))
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - name: every browser passed
+        env:
+          RESULT: ${{ needs.e2e-browser.result }}
+        run: |
+          echo "accessibility jobs: $RESULT"
+          [ "$RESULT" = success ]
 
   # ADR 0116 point 7: databases that released versions wrote (the fixture attached to every
   # release) go through this checkout's migrations, back to their revision, through the
