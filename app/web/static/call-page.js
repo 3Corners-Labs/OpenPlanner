@@ -1,17 +1,19 @@
 /*
- * The participant's call page: its one state and its one view (ADR 0123 steps 4b, 4c and 5a).
+ * The participant's call page: its one state and its one view (ADR 0123 steps 4b, 4c, 5a and 5b).
  *
  * Owns: the page's single `state` and the one way to change it, `go(screen, patch)`, which checks
  * the move against a table of allowed transitions, renders, moves focus to the new heading and
- * hands one sentence to the polite status line. It also owns `render` (every hidden flag, pressed
- * state, picture and word of the page), the texts and the wiring of the buttons. Every word is the server's own markup (the sections of the page and [data-text]); the
+ * hands one sentence to the polite status line. It also owns `render` (what is shown and the place
+ * focus goes; the lobby's and the call's parts are drawn by call-render.js), the texts and the
+ * wiring of the buttons. Every word is the server's own markup (the sections of the page and [data-text]); the
  * script only shows and hides it and sets text with textContent.
  *
  * Split in files that share the one object `window.openplannerCall` (no build step): call-status.js
  * is the polite status line, call-sound.js the level meter and test sound, call-devices.js the
  * devices (the check, the lists, the choice), call-connection.js the call (token, SDK, attempts,
- * lobby, leaving), call-media.js the participant's camera and microphone in the call,
- * call-events.js what the meeting tells the page. They only define; this file, loaded last,
+ * lobby, leaving), call-media.js the participant's camera, microphone and screen in the call,
+ * call-captions.js the captions, call-remote.js the other side's picture, sound and screen,
+ * call-render.js how the call's parts look, call-events.js what the meeting tells the page. They only define; this file, loaded last,
  * starts them.
  *
  * Never: it makes no request, loads no file, stores nothing, sets no inline style and builds no
@@ -57,19 +59,16 @@
     camera: $$('[data-call-toggle="camera"]'),
     microphone: $$('[data-call-toggle="microphone"]'),
   };
-  var selfVideos = $$("[data-call-self]");
-  var remoteVideo = $("[data-call-remote]");
-  var remoteAudio = $("[data-call-remote-audio]");
   var safari =
     /Safari/.test(navigator.userAgent) &&
     !/Chrome|Chromium|Edg|Firefox|FxiOS|CriOS/.test(navigator.userAgent);
 
   // The pictures and the sound of the call. They are streams, not state: `render` shows them.
-  app.streams = { self: null, remote: null, audio: null };
+  app.streams = { self: null, remote: null, audio: null, share: null }; // share: the staff member's screen
 
   // ---- the one state ---------------------------------------------------------------------------
   function fresh() {
-    return {
+    return Object.assign({
       screen: "start", // start, check, connecting, lobby, call, failed, left, ended or unavailable
       refused: [], // kinds the browser refuses
       missing: [], // kinds with no device
@@ -83,9 +82,20 @@
       media: "none", // none, adding or added: the call's picture and sound go in
       remote: "unknown", // unknown, waiting, live or off: the other side's picture
       soundBlocked: false, // the browser refused to play the other side's sound
+    }, inCallParts());
+  }
+
+  // What belongs to the call alone and starts afresh with every screen outside it.
+  function inCallParts() {
+    return {
       panel: false, // the panel of devices in the call is open
       recording: "off", // off, pending (being recorded, not yet said) or on (said): the meeting is recorded
       connection: "ok", // ok, pending (being restored, not yet said) or restoring (said)
+      share: "off", // off, asking (the browser's picker is open), mine or theirs: whose screen is shared
+      captions: "off", // off, starting or on
+      lines: [], // the captions in view: their final lines (in memory only, gone with the call)
+      interim: null, // the caption being spoken, until its final text arrives
+      can: { share: false, captions: false }, // what the meeting offers this participant
     };
   }
   var state = fresh();
@@ -107,10 +117,13 @@
 
   // ---- go: the one way the state changes -------------------------------------------------------
   // `patch` holds fields of the state and, besides them, `say` (the key of the one sentence for
-  // the live region, "" to clear it) and `focus` ("denied" for the panel of a refused device,
-  // "devices" for the button that opens the panel of the call's devices, "state" or, on a change
-  // of screen, nothing for the new heading, false for none). Returns whether the move was
-  // allowed. Leaving the lobby and the call closes the panel and ends its notices.
+  // the live region, "" to clear it) and `focus`, which names the place focus goes to: "denied" (the panel
+  // of a refused device), "devices" (the button that opens the panel of the call's devices),
+  // "state" (the heading of the screen, which is also what a change of screen without `focus`
+  // does), or nothing else: any other move of focus is decided in `render` out of the
+  // state (the toggle of sharing when its stop button went away with the share). Returns whether
+  // the move was allowed. Leaving the lobby and the call closes the panel and ends its notices,
+  // sharing and captions.
   function go(screen, patch) {
     var from = state.screen;
     var changed = screen !== from;
@@ -126,7 +139,7 @@
     // A new screen outside the lobby and the call, or a new attempt, starts the call's panel and
     // notices afresh.
     if (!inCall && (changed || fields.attempt !== undefined)) {
-      Object.assign(state, { panel: false, recording: "off", connection: "ok" });
+      Object.assign(state, inCallParts());
     }
     render();
     if (sentence !== undefined) app.say(sentence);
@@ -179,11 +192,11 @@
   }
 
   // ---- render: what the state looks like ---------------------------------------------------------
-  function show(video, stream) {
-    if (video.srcObject !== stream) video.srcObject = stream;
-  }
+  var view = app.view; // call-render.js, loaded before this file
 
   function render() {
+    // Taken before anything is hidden: did the notice's stop button, which goes with the share, have focus?
+    var stopHad = document.activeElement === $("[data-call-share-stop]");
     var screen = state.screen;
     var checking = screen === "check";
     var inCall = screen === "lobby" || screen === "call";
@@ -223,6 +236,13 @@
     $("[data-call-sound-note]").hidden = !state.soundPlayed;
     joinButton.textContent = joinLabel();
     renderCall(inCall);
+    // The stop button went away with the share; focus does not fall to the page: it goes to the
+    // switch of sharing when that is shown, else to the heading of the screen.
+    if (stopHad && state.share !== "mine") {
+      var toggle = $('[data-call-switch="share"]');
+      var target = toggle.hidden ? $('[data-call-state="' + screen + '"] h1') : toggle;
+      if (target) target.focus();
+    }
   }
 
   // The parts of the page that begin at the click that joins.
@@ -245,110 +265,12 @@
     $("[data-call-failed-contacts]").hidden = offered;
     // Leaving through a link would end the call: the way back appears when it is over.
     $("[data-call-back]").hidden = screen === "connecting" || inCall;
-    selfVideos.forEach(function (video) {
-      var here = video.dataset.callSelf === screen;
-      video.hidden = !(here && state.live.camera && app.streams.self);
-      show(video, here ? app.streams.self : null);
-    });
-    show(remoteVideo, screen === "call" ? app.streams.remote : null);
-    show(remoteAudio, screen === "call" ? app.streams.audio : null);
-    $("[data-call-remote-off]").hidden = state.remote === "live";
-    $("[data-call-hear]").hidden = !(screen === "call" && state.soundBlocked);
-    // Notices last while they hold; the panel of devices is a disclosure of the call's bar.
-    $$("[data-call-notice]").forEach(function (notice) {
-      var restoring = notice.dataset.callNotice === "restoring";
-      var held = restoring ? state.connection !== "ok" : state.recording !== "off";
-      notice.hidden = !(inCall && held);
-    });
-    $("[data-call-controls]").hidden = !inCall;
-    // The way out says what it leaves: in the lobby the participant is not in the call yet.
-    $$("[data-call-leave-label]").forEach(function (label) {
-      label.hidden = label.dataset.callLeaveLabel !== screen;
-    });
-    var open = inCall && state.panel;
-    $("[data-call-devices-panel]").hidden = !open;
-    $("[data-call-devices-button]").setAttribute("aria-expanded", String(open));
-    $("[data-call-pick-speaker-field]").hidden = !(open && state.speaker);
+    view.pictures(state);
+    view.notices(state);
+    view.sharing(state);
+    view.captions(state);
+    view.bar(state);
   }
-
-  // The other side's picture and sound play. A browser that refuses (it wants a tap first) is
-  // answered with a button and one message. Every call starts a try at once, so a press calls
-  // `play()` inside the press itself, which is what a browser that wants a tap allows; only the
-  // latest try's outcome is applied, so a `play()` that never settles blocks nothing.
-  var tries = 0;
-  var pressed = false; // the participant pressed the button: focus has to land somewhere
-  function playRemote() {
-    if (state.screen !== "call") return Promise.resolve();
-    var mine = (tries += 1);
-    var plays = [remoteAudio, remoteVideo].map(function (element) {
-      if (!element.srcObject) return Promise.resolve(true);
-      return Promise.resolve(element.play()).then(
-        function () {
-          return true;
-        },
-        function (error) {
-          return !(error && error.name === "NotAllowedError");
-        },
-      );
-    });
-    return Promise.all(plays).then(function (played) {
-      if (mine !== tries) return;
-      var blocked = played.indexOf(false) !== -1;
-      // Said once per blocked start. When the participant's press makes the button go, focus goes
-      // to the heading, not nowhere; when the sound starts on its own, focus stays put.
-      if (state.screen === "call" && blocked !== state.soundBlocked) {
-        go(
-          "call",
-          blocked
-            ? { soundBlocked: true, say: "say_sound_blocked" }
-            : { soundBlocked: false, focus: pressed ? "state" : undefined },
-        );
-      }
-      pressed = false;
-    });
-  }
-  app.playRemote = playRemote;
-
-  // ---- the other side's picture ------------------------------------------------------------------
-  // The other side's picture, and whether it moves: waiting until it has moved once, then live
-  // or off. A change after that is said once. The track decides: it moves when a video track of
-  // the stream is live and not muted. Events only ask for a new look (the video element's
-  // `playing` arrives after a mute in some browsers and must not turn it back to live).
-  function syncRemote() {
-    var tracks = app.streams.remote ? app.streams.remote.getVideoTracks() : [];
-    var moving = tracks.some(function (track) {
-      return !track.muted && track.readyState === "live";
-    });
-    var before = state.remote;
-    var after = moving ? "live" : before === "live" || before === "off" ? "off" : "waiting";
-    var patch = { remote: after };
-    if (state.screen === "call" && before !== after) {
-      if (before === "live" && after === "off") patch.say = "say_remote_off";
-      if (before === "off" && after === "live") patch.say = "say_remote_on";
-    }
-    go(state.screen, patch);
-  }
-
-  function setRemote(kind, stream) {
-    app.streams[kind] = stream;
-    if (kind === "audio" && app.devices.speaker() && remoteAudio.setSinkId) {
-      remoteAudio.setSinkId(app.devices.speaker()).catch(function () {});
-    }
-    if (kind === "remote" && stream) {
-      stream.getVideoTracks().forEach(function (track) {
-        track.addEventListener("mute", function () {
-          syncRemote();
-        });
-        track.addEventListener("unmute", function () {
-          syncRemote();
-        });
-      });
-    }
-    syncRemote();
-    playRemote();
-  }
-  app.setRemote = setRemote;
-
   // ---- what the participant does -----------------------------------------------------------------
   function join() {
     var picked = app.devices.snapshot();
@@ -397,6 +319,7 @@
   app.sound.init();
   app.devices.init();
   app.connection.init();
+  app.remote.init();
 
   $$("[data-call-browser]").forEach(function (step) {
     step.hidden = step.dataset.callBrowser !== (safari ? "safari" : "other");
@@ -412,12 +335,23 @@
     button.addEventListener("click", app.connection.leave);
   });
   $("[data-call-again]").addEventListener("click", app.connection.again);
-  $("[data-call-hear]").addEventListener("click", function () {
-    pressed = true;
-    playRemote();
+  // One share in a meeting: while the staff member's is shown, a press on the share switch says so.
+  $('[data-call-switch="share"]').addEventListener("click", function () {
+    if (state.share === "theirs") app.say("say_share_theirs");
+    else app.callMedia.share(state.share === "off");
   });
-  remoteVideo.addEventListener("playing", function () {
-    if (state.screen === "call") syncRemote();
+  $("[data-call-share-stop]").addEventListener("click", function () {
+    app.callMedia.share(false);
+  });
+  $('[data-call-switch="captions"]').addEventListener("click", app.captions.press);
+  // The captions' box may start or stop to scroll with the window's size: one render a frame.
+  var resizing = 0;
+  window.addEventListener("resize", function () {
+    if (resizing) return;
+    resizing = window.requestAnimationFrame(function () {
+      resizing = 0;
+      render();
+    });
   });
   KINDS.forEach(function (kind) {
     toggles[kind].forEach(function (button) {

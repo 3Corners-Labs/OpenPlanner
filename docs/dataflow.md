@@ -384,6 +384,30 @@ The recording itself, its place and its retention belong to the supplier's site 
 organisation's own rules; the page only tells the participant that it runs. That is input for the
 DPIA, not something this page controls.
 
+### Sharing a screen and closed captions (ADR 0123 points 10 and 12, step 5b)
+
+Still no request of its own, no storage. The page asks the browser for a screen only when the
+participant presses the share button; the browser's own picker is the second decision.
+
+| What happens | What leaves the browser | What comes in | Stored by us |
+|---|---|---|---|
+| The participant shares a screen | the screen's picture, encrypted in transit, to the supplier's call hosts through the SDK; never to us | nothing | no |
+| The participant stops sharing (the button, the browser's own control, the staff member, the end of the call) | the SDK takes the stream out of the meeting; the capture is stopped | one event at most | no |
+| The staff member shares a screen | nothing | their screen's picture, shown in place of their picture | no |
+| Captions are switched on | the SDK asks the meeting to start them and, at that press, for its real-time data link; the page's language is passed on; the call's sound reaches the platform as it did | text made by the platform from the sound of the call, with a speaker; the page shows the text and a word of its own for who spoke, and reads nothing else of the speaker | no: shown and not kept, not logged, not sent to us; gone when switched off or the call ends |
+
+The real-time data link is asked for at the press, not at the join (`enableAutomaticLLM` stays off,
+see step 4c); a participant who never switches captions on never opens it, if the SDK allows that
+(a first real meeting shows it). The text of a caption is personal data of the call by nature; the
+platform makes it at its side, and what it keeps is for the DPIA, not for this page to control.
+
+| Open until a real meeting | What the page does | What is not known |
+|---|---|---|
+| Whose speech becomes text | The participant's press asks the meeting to start captions. It is probably meeting-wide: the platform turns the whole call's speech into text, the staff member's too, and a stop by the participant may end the captions for the staff member as well. | Who is affected, who sees the captions, and whether the platform keeps a transcript of the meeting (where, how long): asked of the supplier (`docs/research/call-page-on-the-meetings-sdk.md`, section 14, questions 10 and 11). The staff member is not told by this page. |
+| The real-time link and the transcription are closed | Switching captions off stops the transcription; leaving, the end of the call and a failure stop it too, then the meeting is left. The page knows no call that closes the link itself (the prototype has none): the link stays open until the meeting is left. | Whether the SDK has such a call, and whether leaving the meeting closes the link. |
+| A shared screen | The page asks the SDK for a display stream and gives no option for sound. Stopping it stops the track the browser gave; the stream is then taken out of the meeting. | That the SDK's display stream asks for no sound of the screen, and that stopping it ends the browser's capture on every browser. |
+
+
 ## Own queue (ADR 0043)
 
 A group with dispatch kind `openplanner_queue` sends nothing to a contact center. Its agents

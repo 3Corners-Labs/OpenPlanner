@@ -130,6 +130,7 @@ Weekly: Renovate updates (security updates immediately, majors as their own PR),
 
 ## How to work in this repo (for Claude Code)
 - Read `docs/HANDOVER.md` §3 (domain) and §5 (flows) before touching domain code.
+- Code graph (Graphify MCP, repository `3Corners-Labs/OpenPlanner`): for structure, ask the graph before grepping or reading files. Definition → `graphify_find` then `graphify_node`; how something works → `query_graph`; who calls it → `graphify_callers`; what a change touches → `graphify_impact` with `include_risk=true`; which tests cover it → `graphify_tests_for`; a file's imports and dependents → `graphify_file_neighbors`. Use grep only for literal strings, settings values, templates, i18n keys and files the graph does not index. The graph describes the commit it was built from (every answer carries `freshness`): read the file itself for anything edited in this branch or after that commit, and never quote the graph as proof of the current code. Run `graphify_impact` before changing a widely used symbol (`Settings`, `Transaction`, `create_app`, shared test helpers) and `graphify_tests_for` before choosing which tests to write or run. Graphify's automated PR review is advisory; its result is read with `review_status`, and a finding is checked against the code like any other.
 - Start every task by writing or updating the failing test. Domain first, adapter second, HTTP last.
 - Do not add a dependency without saying why in the PR and checking its license and maintenance.
 - Do not stub external calls inside `app/`; put fakes in `tests/fakes/`.
