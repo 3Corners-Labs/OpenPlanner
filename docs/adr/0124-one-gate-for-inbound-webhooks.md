@@ -180,6 +180,12 @@ installation with several organisations.
     is off), and, for a connection with a list of networks, any refusal from inside that list.
     When those pass `webhook_refusal_alert_count` inside the event window, one system event for
     that organisation says so. Refusals from strangers show in the counts and raise nothing.
+    *As built (step 3b):* the refusal for the network of point 3 is the one counted kind that a
+    stranger can cause, once a real delivery arrived in the window. It is therefore counted
+    apart, against the same threshold and with an event of its own, so that it cannot spend
+    the alert for the rest: at most two events per address and window, each naming its group
+    (`list`, `signed`). What the gate saw is kept in memory in the web process, like the
+    security log: a restart empties it, and no refused call makes the platform write.
 11. **Behind a proxy.** *The bundled proxy* gets a rule for `/webhooks/*`: `POST` only, the size
     limit, and, when `WEBHOOK_PROXY_NETWORKS` is set, only those source networks, refused before
     the application sees the call. When `WEBHOOK_BASE_URL` names a host of its own, the proxy
@@ -264,7 +270,7 @@ counts per minute.
 | 2a | The shared network helper `app/domain/networks.py`, with the machine API's clients and the display links moved onto it; one caller key for every limiter, an IPv6 caller counted by its /64 | #818 | merged |
 | 2b | Source networks: the list per connection and the installation's defaults, refusing on an untrusted proxy chain, `WEBHOOK_SOURCE_NETWORKS_REQUIRED`, the findings | #821 | merged |
 | 3a | Replays per organisation and by body hash (`app/domain/webhook_replay.py`); the pause (`inbound_enabled` in the connection's record, set with a button of its own on the card through `set_inbound`, dropped in the gate after every check, the card's chip and sentence) | #823 | merged |
-| 3b | The refusal alert; the connection card's status, with *last accepted* and *last refused*, counts per reason and the per-call source faults; the count of events dropped while paused, and the pause on the status screens (`app/domain/webhook_ledger.py`: the in-memory delivery ledger, the alert rule and its system event `webhook.refusal_alert`, two alerts per window, one per group (`list` and `signed`); `webhook_refusal_alert_count`, class C; the gate and the routes tell the ledger; *Deliveries seen* on the card and on System status; the paused addresses on *Koppelingen* and the overview's status widget) | #PENDING | merged |
+| 3b | The refusal alert; the connection card's status, with *last accepted* and *last refused*, counts per reason and the per-call source faults; the count of events dropped while paused, and the pause on the status screens (`app/domain/webhook_ledger.py`: the in-memory delivery ledger, the alert rule and its system event `webhook.refusal_alert`, two alerts per window, one per group (`list` and `signed`); `webhook_refusal_alert_count`, class C; the gate and the routes tell the ledger; *Deliveries seen* on the card and on System status; the paused addresses on *Koppelingen* and the overview's status widget) | #840 | merged |
 | 4 | Secret rotation with an overlap | | planned |
 | 5 | The bundled proxy: the webhook rule, the host of its own, `WEBHOOK_PROXY_NETWORKS`, `check-proxy.sh`; the chart's webhook host and network policy, and a way to pin the ingress as single addresses (shape 1 of point 4) | | planned |
 | 6 | The contract for an organisation's own proxy in the runbook and the Kubernetes guide; the signed test delivery that reports the source address it saw; the contract says why a content delivery network (shape 2) and a supplier calling a public name from a private address (shape 3) cannot use a list; the threat model's abuse cases, each with its test | | planned |
