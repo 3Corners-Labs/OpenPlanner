@@ -17,6 +17,7 @@ from app.domain.audit import AuditEvent, Category
 from app.main import create_app
 from tests.fakes.clock import FixedClock
 from tests.support.admin import SUPER
+from tests.support.app_client import in_process
 from tests.support.domain import NOW
 from tests.support.participant import ADA, FRIDAY_0900, SAME_ORIGIN, confirm_newest
 
@@ -46,7 +47,7 @@ class Site:
     def client(self, address: str = "203.0.113.7") -> httpx.AsyncClient:
         """A client whose requests come from ``address``."""
         return httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=self.app, client=(address, 4711)),
+            transport=in_process(self.app, address),
             base_url="http://testserver",
         )
 

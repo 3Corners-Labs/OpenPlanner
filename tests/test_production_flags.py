@@ -7,12 +7,12 @@ starts. The machine API publishes its own docs only when the superuser allows it
 
 from pathlib import Path
 
-import httpx
 import pytest
 from pydantic import SecretStr
 
 from app.config import Settings
 from app.main import create_app
+from tests.support.app_client import served
 
 FRAMEWORK_DOC_PATHS = {"/docs", "/redoc", "/docs/oauth2-redirect"}
 
@@ -51,12 +51,8 @@ async def test_the_production_app_answers_404_on_the_doc_paths(
     production: Settings, path: str
 ) -> None:
     app = create_app(production)
-    transport = httpx.ASGITransport(app=app)
 
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(transport=transport, base_url="https://afspraak.example.nl") as client,
-    ):
+    async with served(app, "https://afspraak.example.nl") as client:
         response = await client.get(path)
 
     assert response.status_code == 404
