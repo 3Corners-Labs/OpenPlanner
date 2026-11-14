@@ -24,6 +24,18 @@ from tests.support.participant import booked, open_link
 DEFAULT_POLICY = SECURITY_HEADERS[b"permissions-policy"].decode()
 SUPPLIER = ("webex", "cisco")
 _ALWAYS = {"embedded_call_webex_option": "always"}
+STATES = [
+    "start",
+    "check",
+    "connecting",
+    "lobby",
+    "call",
+    "failed",
+    "left",
+    "ended",
+    "unavailable",
+]
+"""Every state of the page, in the order of the markup; all but the first are hidden at first."""
 
 
 @pytest.fixture
@@ -72,8 +84,8 @@ async def test_the_start_state_shows_the_appointment_and_one_button_to_begin(
         assert "hidden" in start.buttons()[0].attrs
         assert f'href="{base}/join"' in page.raw
     # Every other state is rendered, hidden, so the script only has to show it.
-    assert english.state_names() == ["start", "check", "unavailable"]
-    assert [n for n in english.state_names() if english.state(n).hidden] == ["check", "unavailable"]
+    assert english.state_names() == STATES
+    assert [n for n in english.state_names() if english.state(n).hidden] == STATES[1:]
 
 
 async def test_without_javascript_the_page_says_what_the_call_needs(
@@ -130,7 +142,7 @@ async def test_the_page_has_no_supplier_name_in_any_locale_and_any_state(
 
     for page in pages:
         # The hidden states are in the markup, the shared texts and the contact block with them.
-        assert page.state_names() == ["start", "check", "unavailable"]
+        assert page.state_names() == STATES
         for name in page.state_names():
             assert not any(word in page.state(name).raw.lower() for word in SUPPLIER)
         assert not any(word in page.raw.lower() for word in SUPPLIER)
@@ -147,7 +159,8 @@ async def test_the_page_refers_only_to_files_of_its_own_and_has_no_inline_code(
     for url in page.references:
         assert url.startswith(("/", "?")), url
         assert not url.startswith("//"), url
-    assert any(url.startswith("/static/call-page.js?v=") for url in page.references)
+    for name in ("call-devices.js", "call-connection.js", "call-media.js", "call-page.js"):
+        assert any(url.startswith(f"/static/{name}?v=") for url in page.references)
     assert any(url.startswith("/static/call-page.css?v=") for url in page.references)
     assert page.inline_code == []
     assert "<style" not in page.raw
@@ -162,11 +175,19 @@ async def test_the_script_is_served_with_the_page_and_nothing_else_is_loaded(
     async with app_client(call_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         page = Page((await client.get(f"{base}/call")).text)
-        script = await client.get(page.script_sources[0])
+        scripts = [await client.get(source) for source in page.script_sources]
 
-    assert len(page.script_sources) == 1
-    assert script.status_code == 200
-    assert script.headers["content-type"].startswith(("text/javascript", "application/javascript"))
+    assert [s.split("?")[0] for s in page.script_sources] == [
+        "/static/call-devices.js",
+        "/static/call-connection.js",
+        "/static/call-media.js",
+        "/static/call-page.js",
+    ]
+    for script in scripts:
+        assert script.status_code == 200
+        assert script.headers["content-type"].startswith(
+            ("text/javascript", "application/javascript")
+        )
 
 
 async def test_no_link_to_another_way_in_while_the_setting_is_hidden(

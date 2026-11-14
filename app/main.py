@@ -53,6 +53,7 @@ from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail, fallback_sender
 from app.adapters.signing_keys import EcSigningKeys
 from app.adapters.staff_addresses import StoredAddresses
+from app.adapters.vendored_files import STATIC_VENDOR, VendoredFile
 from app.admin.display_routes import router as display_router
 from app.admin.reviewed_documents import ReviewedDocuments
 from app.admin.routes import register_admin
@@ -940,6 +941,9 @@ def create_app(
     app.state.settings = settings
     app.state.clock = clock
     app.state.limiter = limiter
+    # ADR 0123 point 3: the call page offers its vendored SDK only while the file is the one the
+    # manifest names; the verdict is cached until the file or the manifest changes.
+    app.state.call_sdk = VendoredFile(STATIC_VENDOR / "webex")
     # ADR 0053: security events name callers by pseudonym, never by address.
     app.state.client_pseudonyms = ClientPseudonyms(client_pseudonym_key(settings))
     app.state.identity_provider = identity_provider or oidc_provider(

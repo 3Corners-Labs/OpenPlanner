@@ -12,7 +12,8 @@ import os
 import subprocess
 from pathlib import Path
 
-from scripts.vendor import Manifest, file_matches, load, manifests
+from app.adapters.vendored_files import Manifest, file_matches, load
+from scripts.vendor import manifests
 
 WEBEX = Path("app/web/static/vendor/webex")
 MAX_GZIP_BYTES = 1_200 * 1024

@@ -13992,7 +13992,7 @@ msgid "callpage.check.body"
 msgstr "Ziet u uzelf en beweegt de balk als u praat? Dan kunt u deelnemen."
 
 msgid "callpage.check.preview"
-msgstr "Uw eigen beeld"
+msgstr "Voorbeeld van uw camera"
 
 msgid "callpage.check.camera_off"
 msgstr "Uw camera staat uit"
@@ -14125,3 +14125,101 @@ msgstr "Microfoon aan."
 
 msgid "callpage.say.microphone_off"
 msgstr "Microfoon uit."
+
+#. The participant's call page from the click that joins (ADR 0123 step 4c). No text names the video platform.
+
+msgid "callpage.connecting.heading"
+msgstr "Wij verbinden u"
+
+msgid "callpage.connecting.body"
+msgstr "Een ogenblik. Uw gesprek wordt klaargezet. U hoeft niets te doen."
+
+msgid "callpage.connecting.retry"
+msgstr "De vorige poging is niet gelukt. Wij proberen het opnieuw. Dat gaat vanzelf."
+
+msgid "callpage.connecting.attempt"
+msgstr "Poging {n} van {total}"
+
+msgid "callpage.lobby.heading"
+msgstr "U bent er. Uw {agent} laat u zo binnen"
+
+msgid "callpage.lobby.body"
+msgstr "U hoeft niets te doen. Het gesprek begint vanzelf."
+
+msgid "callpage.call.heading"
+msgstr "U bent in gesprek"
+
+msgid "callpage.call.remote"
+msgstr "Beeld van uw {agent}"
+
+msgid "callpage.call.remote_off"
+msgstr "Uw {agent} heeft de camera uit"
+
+msgid "callpage.control.leave"
+msgstr "Gesprek verlaten"
+
+msgid "callpage.left.heading"
+msgstr "U hebt het gesprek verlaten"
+
+msgid "callpage.left.body"
+msgstr "U kunt dit venster sluiten of teruggaan naar uw afspraak."
+
+msgid "callpage.ended.heading"
+msgstr "Het gesprek is beëindigd"
+
+msgid "callpage.ended.body"
+msgstr "Het gesprek is afgelopen. U kunt dit venster sluiten of teruggaan naar uw afspraak."
+
+msgid "callpage.failed.heading"
+msgstr "Het lukt niet om te verbinden"
+
+msgid "callpage.failed.attempts"
+msgstr "Het beeldgesprek kon niet worden klaargezet. Wij hebben het {total} keer geprobeerd. U kunt het opnieuw proberen."
+
+msgid "callpage.failed.generic"
+msgstr "Het beeldgesprek kon niet worden klaargezet. U kunt het opnieuw proberen."
+
+msgid "callpage.failed.not_open"
+msgstr "Het gesprek is nog niet geopend, of het is niet meer geopend. Controleer de tijd van uw afspraak en probeer het dan opnieuw."
+
+msgid "callpage.failed.rate_limited"
+msgstr "U hebt in korte tijd te vaak geprobeerd. Wacht enkele minuten en probeer het opnieuw."
+
+msgid "callpage.failed.unavailable"
+msgstr "Het gesprek is nu niet beschikbaar. Probeer het over enkele ogenblikken opnieuw."
+
+msgid "callpage.failed.retry"
+msgstr "Opnieuw proberen"
+
+msgid "callpage.say.connecting"
+msgstr "Uw gesprek wordt klaargezet."
+
+msgid "callpage.say.waiting"
+msgstr "Wachten tot uw {agent} u binnenlaat."
+
+msgid "callpage.say.admitted"
+msgstr "Uw {agent} heeft u binnengelaten. Het gesprek is begonnen."
+
+msgid "callpage.say.device_failed"
+msgstr "Dat is niet gelukt. Controleer uw camera of microfoon en probeer het opnieuw."
+
+msgid "callpage.self.picture"
+msgstr "Uw beeld"
+
+msgid "callpage.contact.none"
+msgstr "Neem contact op met de organisatie."
+
+msgid "callpage.hear.button"
+msgstr "Tik om de andere persoon te horen"
+
+msgid "callpage.say.remote_on"
+msgstr "Uw {agent} heeft de camera aangezet."
+
+msgid "callpage.say.remote_off"
+msgstr "Uw {agent} heeft de camera uitgezet."
+
+msgid "callpage.say.sound_blocked"
+msgstr "Uw browser heeft het geluid geblokkeerd. Gebruik de knop om de andere persoon te horen."
+
+msgid "callpage.say.device_kept"
+msgstr "Het staat uit voor de ander, maar uw browser kan het apparaat nog als in gebruik tonen."
