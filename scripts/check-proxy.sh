@@ -346,7 +346,8 @@ import asyncio
 from app.adapters.keycloak_directory import directory_from_settings
 from app.config import Settings
 directory = directory_from_settings(Settings())
-print("reachable" if directory and asyncio.run(directory.reachable()) else "unreachable")
+assert directory is not None, "keycloak-app.env holds no directory settings"
+print("reachable" if asyncio.run(directory.reachable()) else "unreachable")
 '
 
 # The headers the route drops, read from where they are written (deploy/proxy/idp.caddy).

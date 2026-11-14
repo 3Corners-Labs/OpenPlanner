@@ -119,16 +119,20 @@ def test_pass_three_puts_a_hostile_provider_behind_the_route() -> None:
     probe = _program("idp_probe_code")
     body = _body("idp_route_checks")
 
-    # Every header the route drops or replaces, the probe sends: checked here in the pull
-    # request's lane, and again at run time, where the probe is asked directly first.
+    # Every header the route drops, rewrites or sets, the probe sends, and a header the route
+    # sets comes from the probe with another value, or its value on the wire would prove nothing.
+    # At run time the probe is asked directly for the dropped ones before the proxy is judged.
     route = (REPO / "deploy/proxy/idp.caddy").read_text()
-    changed = set(re.findall(r"^\s*header_down [-+]?([A-Za-z-]+)\b", route, re.MULTILINE))
-    for name in changed - {"Set-Cookie"}:
+    for name in set(re.findall(r"^\s*header_down [-+]?([A-Za-z-]+)\b", route, re.MULTILINE)):
         assert f'("{name}", ' in probe, f"the probe does not send {name}"
+    set_by_route = re.findall(
+        r'^\s*header_down \+?([A-Za-z-]+) (?:"([^"]*)"|([^\s"`]+))$', route, re.MULTILINE
+    )
+    assert len(set_by_route) == 4  # HSTS, Permissions-Policy, the opener policy, the added CSP
+    for name, quoted, bare in set_by_route:
+        assert f'("{name}", "{quoted or bare}")' not in probe, f"the probe sends the route's {name}"
     assert body.index("so its absence would prove nothing") < body.index("the proxy passes $header")
     assert '"__Host-op_admin=forged; Path=/;' in probe  # would replace the portal's session
-    assert '"Strict-Transport-Security", "max-age=0"' in probe
-    assert '"Cross-Origin-Opener-Policy", "same-origin"' in probe
     # HSTS and the permissions on /idp must equal what the same proxy returns for the portal.
     assert body.index('"$base/healthz"') < body.index("portal_hsts=")
     assert body.index('"$base/healthz"') < body.index("portal_permissions=")

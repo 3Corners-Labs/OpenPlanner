@@ -117,8 +117,9 @@ None, after checking. Every value below is a fixed security rule or follows from
   `Permissions-Policy` values, the `Cross-Origin-Opener-Policy` value and the added policy:
   security rules; tests tie the HSTS and `Permissions-Policy` values and the cookie names to the
   application's own.
-- The console's loopback address: the port the compose service `idp` publishes on
-  `127.0.0.1`, read by the installer from `docker port`.
+- The console's loopback address: the port the compose service `idp` publishes on the loopback
+  (`127.0.0.1`, else `[::1]`), read by the installer from `docker port`; any binding beyond the
+  loopback refuses it.
 
 ## Build status
 

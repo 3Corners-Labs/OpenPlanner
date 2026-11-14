@@ -1011,13 +1011,20 @@ def test_the_admin_console_is_put_on_the_loopback_after_the_start_adr_0126(host:
     assert "admin console: http://127.0.0.1:8080/idp/admin/ on this host only" in output
 
 
-def test_a_provider_also_published_beyond_the_loopback_gets_no_console_address(
-    host: Host,
+@pytest.mark.parametrize(
+    "run",
+    [
+        pytest.param(("--mode", "test", "--non-interactive"), id="behind the proxy"),
+        pytest.param(("--mode", "lab", "--version", "1.4.0", "--non-interactive"), id="no proxy"),
+    ],
+)
+def test_a_provider_published_beyond_the_loopback_is_refused_with_or_without_the_proxy(
+    host: Host, run: tuple[str, ...]
 ) -> None:
     """One more port on every interface (an override's 8780) puts realm master on the network."""
     host.given("idp-ports", "8080/tcp -> 127.0.0.1:8080\n8080/tcp -> 0.0.0.0:8780\n")
 
-    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
+    result = host.run(*run, **(WITHOUT_MAIL if "test" in run else {}))
 
     assert result.returncode == 0, result.stderr
     assert host.ran("port idp-container-id")
@@ -1025,33 +1032,22 @@ def test_a_provider_also_published_beyond_the_loopback_gets_no_console_address(
     assert "published beyond the loopback (8080/tcp -> 0.0.0.0:8780)" in result.stderr
 
 
-def test_a_provider_on_both_loopbacks_gets_the_ipv4_one(host: Host) -> None:
-    host.given("idp-ports", "8080/tcp -> 127.0.0.1:8080\n8080/tcp -> [::1]:8080\n")
+@pytest.mark.parametrize(
+    ("ports", "console"),
+    [
+        ("8080/tcp -> 127.0.0.1:8080\n8080/tcp -> [::1]:8080\n", "http://127.0.0.1:8080/idp"),
+        ("8080/tcp -> [::1]:8080\n", "http://[::1]:8080/idp"),
+    ],
+)
+def test_the_console_address_is_the_loopback_the_provider_is_published_on(
+    host: Host, ports: str, console: str
+) -> None:
+    host.given("idp-ports", ports)
 
     result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
 
     assert result.returncode == 0, result.stderr
-    assert host.ran("realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp")
-
-
-def test_a_provider_on_the_ipv6_loopback_only_gets_that_address(host: Host) -> None:
-    host.given("idp-ports", "8080/tcp -> [::1]:8080\n")
-
-    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
-
-    assert result.returncode == 0, result.stderr
-    assert host.ran("realms/master -s attributes.frontendUrl=http://[::1]:8080/idp")
-
-
-def test_a_provider_without_the_proxy_is_also_held_to_the_loopback(host: Host) -> None:
-    """Without the proxy Keycloak and realm master answer on the port itself: never the network."""
-    host.given("idp-ports", "8080/tcp -> 127.0.0.1:8080\n8080/tcp -> 0.0.0.0:8780\n")
-
-    result = host.run("--mode", "lab", "--version", "1.4.0", "--non-interactive")
-
-    assert result.returncode == 0, result.stderr
-    assert "published beyond the loopback (8080/tcp -> 0.0.0.0:8780)" in result.stderr
-    assert not host.ran("frontendUrl")
+    assert host.ran(f"realms/master -s attributes.frontendUrl={console}")
 
 
 def test_a_provider_that_is_not_running_is_named_as_such(host: Host) -> None:

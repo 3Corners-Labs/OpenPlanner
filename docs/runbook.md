@@ -534,11 +534,9 @@ Moving docker01 from plain http to this took these steps, all without root, beca
    *Opening the admin console*, which logs in on `http://localhost:8080/idp` itself).
 7. `docker compose --env-file .env.update up -d --force-recreate web worker proxy`.
 8. Verify with `oidc-check`, `tls-check` and `address-check` from `web`.
-9. Since ADR 0126 (with the release that brings it): update the checkout and recreate `idp`
-   (`docker compose --env-file .env.update up -d idp`, for the helper's mount), run the command of
-   *Opening the admin console*, check that `docker port $(docker compose --env-file .env.update ps -q idp)` lists
-   `127.0.0.1` (or `[::1]`) only, nothing on 8780 or `0.0.0.0`, and that
-   `https://<host>/idp/admin/` answers 404 from another machine.
+9. Since ADR 0126 (with the release that brings it): follow *Opening the admin console* (under
+   *Bundled identity provider*), then check that `https://<host>/idp/admin/` answers 404 from
+   another machine.
 
 #### The bundled identity provider behind the proxy
 
@@ -964,11 +962,14 @@ the proxy) and log in as `admin` with `KC_BOOTSTRAP_ADMIN_PASSWORD` from
 address, or its login form sends the browser to the public address, where the proxy refuses
 it. The installer sets it after every start (run it again after updating the checkout, as for
 every release that changes the host side); it sets nothing while any port of `idp` is published
-beyond the loopback, and says so. On a host set up by hand, check that
-`docker port $(docker compose --env-file .env.update ps -q idp)` lists `127.0.0.1` only, recreate
-`idp` once after updating the checkout (`docker compose --env-file .env.update up -d idp`: the
-container must have the helper's mount), and run once, with the port listed for `8080/tcp`
-(`127.0.0.1:8080` by default):
+beyond the loopback, and says so. On a host set up by hand:
+
+1. Check that `docker port $(docker compose --env-file .env.update ps -q idp)` lists the loopback
+   only (`127.0.0.1` or `[::1]`): nothing on `0.0.0.0`, `[::]` or another address, such as the
+   8780 of an older override. Remove any other published port from `docker-compose.override.yml`.
+2. Recreate `idp` once after updating the checkout, so the container has the helper's mount:
+   `docker compose --env-file .env.update up -d idp`.
+3. Run, with the address listed for `8080/tcp` (`127.0.0.1:8080` by default):
 
 ```bash
 docker compose --env-file .env.update exec -T idp sh /opt/openplanner/kcadm-as-admin.sh update realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp
