@@ -43,9 +43,12 @@ put in a URL, an event or a job. Answers:
 
 
 The staff endpoint (step 5c) answers ``{"name": "..."}`` or ``{}`` and nothing else, under the same
-session and the same ``no-store``, and under a limit of its own keyed on the booking's reference and
-not on the address (``call_staff_limit``: three times the page's own poll rate, so participants
-behind one address do not share it); it is the one place the page learns the name
+session and the same ``no-store``, and under two limits of its own, both derived from the page's
+poll rate: a bound per address before any session is checked (``call_staff_address_limit``, ten
+times the per-booking rate, so people behind one address do not starve each other) and a bound per
+booking that counts only a request holding the participant's session (``within_call_staff_limit``,
+three times the poll rate; knowing the reference is not enough to use it up). It is the one place
+the page learns the name
 of the staff member, from our own record of who accepted the booking and never from the video
 platform. What the name is follows the organisation's ``embedded_call_staff_name`` (the screen name
 by default, ``app.domain.screen_name``). It answers ``{}`` while nobody has accepted the booking,
@@ -84,11 +87,11 @@ from app.web.error_pages import refuse_rate_limited
 from app.web.locale import resolve_locale
 from app.web.organisation_settings import follow
 from app.web.protection import (
-    booking_of,
-    call_staff_limit,
+    call_staff_address_limit,
     limiter,
     read_limit,
     require_same_origin,
+    within_call_staff_limit,
     within_call_token_limit,
 )
 from app.web.static_assets import ASSETS
@@ -193,8 +196,8 @@ async def call_token(request: Request, public_ref: str, _: SameOrigin) -> Respon
 
 
 @router.get("/b/m/{public_ref}/call/staff")
-@limiter.limit(call_staff_limit, key_func=booking_of)
-async def call_staff(request: Request, public_ref: str) -> JSONResponse:
+@limiter.limit(call_staff_address_limit)
+async def call_staff(request: Request, public_ref: str) -> Response:
     """Tell the call page who the participant talks to: ``{"name": ...}`` or ``{}``.
 
     Only the participant's session for this booking may ask; the answer is a name or nothing
@@ -207,6 +210,8 @@ async def call_staff(request: Request, public_ref: str) -> JSONResponse:
     if not request.app.state.settings.embedded_call_enabled:
         raise HTTPException(status_code=404)
     ref = await authorise(request, public_ref)
+    if not within_call_staff_limit(public_ref):  # only a request with the session is counted
+        return await refuse_rate_limited(request)
     bookings: BookingService = request.app.state.booking_service
     details = await bookings.find(ref)
     current = follow(request, details.group.organisation_id)

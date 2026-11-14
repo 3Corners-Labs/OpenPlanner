@@ -447,6 +447,29 @@ test('a name longer than the server would send is cut, and the label stays insid
   expect(box && stage && box.x >= stage.x - 1 && box.x + box.width <= stage.x + stage.width + 1).toBe(true);
 });
 
+test('a 40-character name beside the staff member\'s small tile (their screen shared, captions on) overlaps nothing and stays in the stage', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 650 });
+  const name = 'Ab '.repeat(13) + 'A'; // 40 characters, with spaces to wrap at
+  expect(name).toHaveLength(40);
+  await inCall(page, { name });
+  await expect(label(page)).toContainText('Ab Ab', NEXT);
+  await page.getByRole('button', { name: /^Captions/ }).click();
+  await said(page, 'Captions are on.');
+  await caption(page, [{ id: '1', text: 'Hello', own: false }]);
+  await remoteShare(page, true);
+  await expect(page.locator('[data-call-notice="theirs"]')).toBeVisible();
+
+  const stage = await page.locator('[data-call-stage]').boundingBox();
+  const text = await label(page).boundingBox();
+  const tile = await remote(page).boundingBox();
+  const boxes = JSON.stringify({ stage, label: text, tile });
+  expect(stage && text && tile, `a box is missing: ${boxes}`).toBeTruthy();
+  const inside = text!.x >= stage!.x - 1 && text!.y >= stage!.y - 1 && text!.x + text!.width <= stage!.x + stage!.width + 1 && text!.y + text!.height <= stage!.y + stage!.height + 1;
+  expect(inside, `the label is outside the stage: ${boxes}`).toBe(true);
+  const apart = text!.x + text!.width <= tile!.x || tile!.x + tile!.width <= text!.x || text!.y + text!.height <= tile!.y || tile!.y + tile!.height <= text!.y;
+  expect(apart, `the label and the staff member's tile overlap: ${boxes}`).toBe(true);
+});
+
 test('axe finds nothing in the call with a name, and the label takes no part in the tab order', async ({ page }) => {
   await inCall(page, { name: 'Sanne' });
   await expect(label(page)).toContainText('Sanne', NEXT);

@@ -157,7 +157,8 @@ alone. While the screen name is chosen, the staff list marks everyone who has no
 
 A screen name needs at least one letter or digit, and an accent only after a letter. The portal
 stores it in the normal form of Unicode and counts the characters after that. Zero-width and direction
-characters are refused, which also refuses names that need a joiner to be spelled.
+characters are refused, which also refuses, for now, a name that can only be spelled with a
+zero-width non-joiner or joiner (some Persian names); at most four accents in a row are accepted.
 
 There is one screen name per person, whichever organisation's participants see it: a manager of
 one organisation sets what the participants of every organisation of that person see. The list

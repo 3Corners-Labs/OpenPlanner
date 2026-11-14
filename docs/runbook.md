@@ -2897,6 +2897,13 @@ staff list marks who has none); it is no loss while the call page is dark behind
 `embedded_call_enabled`. To keep showing the account name, set the setting to `name` under
 *Organisation settings*.
 
+*Rate limit of the poll.* The call page asks who the participant talks to at the interval of
+`embedded_call_chat_poll_seconds` (class C, platform: an organisation cannot change it). The route's
+limits follow it and are no setting of their own: a bound per booking of three times the poll rate
+(18 a minute at 10 seconds, 60 at the default 3, 90 at 2) and a bound per address of ten times that
+(180, 600, 900). From step 7c the chat is asked for in the same poll and counts against the same
+per-booking bound.
+
 ## The call page's SDK does not work (ADR 0123 step 4c)
 
 The call page (`/b/m/{ref}/call`, only while `embedded_call_enabled` is on) joins a call with the

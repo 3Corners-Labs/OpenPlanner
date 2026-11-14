@@ -5980,7 +5980,7 @@ msgid "admin.staff.screen_name.error.no_letter"
 msgstr "Een schermnaam heeft minstens één letter of cijfer."
 
 msgid "admin.staff.screen_name.error.bad_marks"
-msgstr "Een schermnaam gebruikt accenten alleen op een letter, en hoogstens twee achter elkaar."
+msgstr "Een schermnaam gebruikt accenten alleen op een letter, en hoogstens {marks} achter elkaar."
 
 msgid "admin.staff.screen_name.error.bad_character"
 msgstr "Een schermnaam bevat alleen letters, cijfers, spaties, een koppelteken, een apostrof en een punt."

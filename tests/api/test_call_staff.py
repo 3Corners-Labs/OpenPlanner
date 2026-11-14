@@ -292,26 +292,65 @@ async def test_it_answers_a_get_only(site: Site) -> None:
 # ---- the limit -----------------------------------------------------------------------------------
 
 
-async def test_one_booking_is_held_by_a_limit_of_the_page_s_own_poll_rate_not_by_the_address(
-    demo_settings: Settings,
-) -> None:
-    # The poll runs every 10 seconds: six asks a minute, so three times that is 18. The common read
-    # limit of the address (3 a minute here) does not apply to this route: participants behind one
-    # address do not share a bucket.
-    settings = _on(
+def _limited(demo_settings: Settings, seconds: int = 10, **more: object) -> Settings:
+    """Rate limits on, the poll every ``seconds``: 18 asks a minute a booking and 180 an address."""
+    return _on(
         demo_settings,
         rate_limit_enabled=True,
-        rate_limit_reads="3/minute",
-        embedded_call_chat_poll_seconds=10,
+        rate_limit_reads="3/minute",  # the common read limit is not what holds this route
+        embedded_call_chat_poll_seconds=seconds,
+        **more,
     )
-    async for running in _site(settings):
-        answers = [(await running.ask()).status_code for _ in range(19)]
 
-        assert answers == [200] * 18 + [429]
-        limited = await running.ask()
-        assert limited.json() == {"error": "rate_limited"}  # a script's route answers JSON
-        assert limited.headers["cache-control"] == "no-store"
-        assert limited.headers["retry-after"] == "60"
+
+def _from(site: Site, address: str) -> httpx.AsyncClient:
+    """A browser at another address, without the participant's cookie."""
+    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    return httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app, client=(address, 4321)),
+        base_url="http://testserver",
+    )
+
+
+async def test_a_flood_without_a_session_stops_at_the_address_bound_and_spares_the_participant(
+    demo_settings: Settings,
+) -> None:
+    # The bound on links that match no booking (20 an hour) would stop the flood first: raised, so
+    # that it is the per-address bound of the route that is seen.
+    settings = _limited(demo_settings, rate_limit_unknown_links="1000/hour")
+    async for running in _site(settings):
+        await running.staff(screen_name="Sanne")
+        await running.claim()
+        async with _from(running, "203.0.113.9") as attacker:
+            answers = [(await attacker.get(running.path)).status_code for _ in range(185)]
+
+            # The first 180 reach the session check and are refused there; then the address bound.
+            assert answers[:180] == [403] * 180
+            assert answers[180:] == [429] * 5
+            limited = await attacker.get(running.path)
+            assert limited.json() == {"error": "rate_limited"}
+            assert limited.headers["retry-after"] == "60"
+        # The participant, at another address with the session, has the whole bucket of the booking.
+        answers = [(await running.ask()).status_code for _ in range(18)]
+        assert answers == [200] * 18
+
+
+async def test_with_the_session_the_per_booking_bound_refuses_and_names_nothing(
+    demo_settings: Settings,
+) -> None:
+    # The poll runs every 10 seconds: six asks a minute, three times that is 18 a booking. The
+    # common read limit of the address (3 a minute here) does not hold this route.
+    async for running in _site(_limited(demo_settings)):
+        await running.staff(screen_name="Sanne")
+        await running.claim()
+
+        answers = [await running.ask() for _ in range(19)]
+
+        assert [a.status_code for a in answers] == [200] * 18 + [429]
+        assert answers[-1].json() == {"error": "rate_limited"}
+        assert answers[-1].headers["cache-control"] == "no-store"
+        assert answers[-1].headers["retry-after"] == "60"
+        assert "Sanne" not in answers[-1].text
         # Another participant at the same address has a bucket of their own.
         async with running.stranger() as other:
             now = running.clock.now()
@@ -320,6 +359,45 @@ async def test_one_booking_is_held_by_a_limit_of_the_page_s_own_poll_rate_not_by
             theirs = await open_link(other, await confirm_newest(other))
             running.clock.advance(now - running.clock.now())
             assert (await other.get(f"{theirs}/call/staff")).status_code == 200
+
+
+async def test_another_bookings_session_cannot_spend_this_bookings_bucket(
+    demo_settings: Settings,
+) -> None:
+    async for running in _site(_limited(demo_settings)):
+        async with running.stranger() as other:
+            now = running.clock.now()
+            running.clock.advance(NOW + timedelta(hours=12) - now)
+            assert (await book(other, FRIDAY_0930)).status_code == 303
+            await open_link(other, await confirm_newest(other))  # their cookie, their booking
+            running.clock.advance(now - running.clock.now())
+
+            spent = [(await other.get(running.path)).status_code for _ in range(30)]
+
+        # Refused at the session check (and then by the bound on unknown links): never counted.
+        assert set(spent) <= {403, 429}
+        assert 200 not in spent
+        assert [(await running.ask()).status_code for _ in range(18)] == [200] * 18
+
+
+@pytest.mark.parametrize(
+    ("seconds", "per_booking", "per_address"),
+    [
+        (2, "90/minute", "900/minute"),
+        (3, "60/minute", "600/minute"),
+        (10, "18/minute", "180/minute"),
+    ],
+)
+def test_the_limits_follow_the_poll_interval_at_the_settings_bounds(
+    seconds: int, per_booking: str, per_address: str
+) -> None:
+    from app.web.protection import RateLimits
+
+    limits = RateLimits.from_settings(
+        Settings(environment="dev", embedded_call_chat_poll_seconds=seconds)
+    )
+
+    assert (limits.call_staff, limits.call_staff_addresses) == (per_booking, per_address)
 
 
 # ---- what the answer holds -----------------------------------------------------------------------

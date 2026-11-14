@@ -207,3 +207,32 @@ def test_the_longest_name_is_the_same_number_in_the_rule_the_column_and_the_scri
     assert in_column
     assert in_migration
     assert {int(in_script[1]), int(in_column[1]), int(in_migration[1])} == {MAX_LENGTH}
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "\u0915\u093c\u093e\u0901\u0924",  # Devanagari: nukta, aa sign, candrabindu
+        "\u0e01\u0e31\u0e49\u0e07",  # Thai: ko kai, mai han-akat, mai tho (two marks) and a letter
+        "\u05e9\u05b4\u05bc\u05c1\u05dc",  # pointed Hebrew: hiriq, dagesh, shin dot
+        "\u0646\u064e\u0651\u0670\u0627",  # Arabic: noon, fatha, shadda, dagger alef (three marks)
+        "\u1000\u103b\u103d\u103e\u103a",  # Burmese: ka with three medials and asat (four marks)
+    ],
+)
+def test_names_with_up_to_four_marks_in_a_row_pass_in_the_scripts_that_have_them(name: str) -> None:
+    assert parse_screen_name(name) == unicodedata.normalize("NFC", name)
+
+
+def test_five_marks_in_a_row_are_refused() -> None:
+    with pytest.raises(ScreenNameError) as refused:
+        parse_screen_name("\u1000\u103b\u103d\u103e\u103a\u1037")  # Burmese, plus a dot below
+
+    assert refused.value.reason is ScreenNameRefusal.BAD_MARKS
+    assert MAX_MARKS == 4
+
+
+def test_a_name_that_needs_the_zero_width_non_joiner_is_still_refused() -> None:
+    with pytest.raises(ScreenNameError) as refused:
+        parse_screen_name("\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645")  # Persian "mi-khaham"
+
+    assert refused.value.reason is ScreenNameRefusal.BAD_CHARACTER

@@ -163,8 +163,9 @@ schermnaam met **Geen schermnaam**, zodat u ziet wie nog alleen met het woord ge
 
 Een schermnaam heeft minstens één letter of cijfer, en een accent alleen op een letter. De
 portal bewaart hem in de normaalvorm van Unicode en telt de tekens daarna. Tekens van nulbreedte
-en tekens die de schrijfrichting veranderen worden geweigerd, en daarmee ook namen die een
-verbindingsteken nodig hebben om geschreven te worden.
+en tekens die de schrijfrichting veranderen worden geweigerd, en daarmee voorlopig ook een naam die alleen met een
+nulbreedte-verbindings- of -scheidingsteken te schrijven is (sommige Perzische namen); hoogstens vier
+accenten achter elkaar worden geaccepteerd.
 
 Er is één schermnaam per persoon, ongeacht van welke organisatie de deelnemers hem zien: een
 beheerder van één organisatie stelt in wat de deelnemers van elke organisatie van die persoon

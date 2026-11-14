@@ -150,10 +150,12 @@ class RateLimits:
     webhooks: str = "600/minute"
     call_tokens: str = "10/hour"
     call_staff: str = "60/minute"
+    call_staff_addresses: str = "600/minute"
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "RateLimits":
         """Return the limits the settings ask for; the one place that reads them."""
+        polls = CALL_POLL_HEADROOM * _polls_a_minute(settings)  # one booking's asks a minute
         return cls(
             bookings=settings.rate_limit_bookings,
             reads=settings.rate_limit_reads,
@@ -164,14 +166,27 @@ class RateLimits:
             change_requests=f"{settings.agent_change_requests_per_hour}/hour",
             webhooks=f"{settings.rate_limit_webhook_per_minute}/minute",
             call_tokens=f"{settings.embedded_call_token_per_booking_per_hour}/hour",
-            call_staff=f"{CALL_POLL_HEADROOM * _polls_a_minute(settings)}/minute",
+            call_staff=f"{polls}/minute",
+            call_staff_addresses=f"{CALL_POLL_ADDRESS_HEADROOM * polls}/minute",
         )
 
 
 CALL_POLL_HEADROOM = 3
 """How many times the call page's own poll rate (``embedded_call_chat_poll_seconds``) one booking
 may ask for who the participant talks to: room for reloads and a second browser, not for a flood.
-Derived from that setting, so it is no setting of its own (ADR 0042)."""
+Derived from that setting, so it is no setting of its own (ADR 0042). It counts only a request that
+holds the booking's session (``within_call_staff_limit``), so knowing the reference is not enough to
+use it up."""
+
+CALL_POLL_ADDRESS_HEADROOM = 10
+"""How many bookings' worth of that bound one address may ask for, before any session is checked:
+ten times the per-booking rate: 600 a minute at the default interval of 3 seconds, 900 at the
+setting's lowest (2 seconds) and 180 at its highest (10 seconds). It is a
+bound on floods without a session and on the limiter's memory (the key is the address, never the
+path), sized so that people behind one office or carrier address do not starve each other. Derived
+from ``embedded_call_chat_poll_seconds``, so it is no setting of its own: it follows the
+interval the
+page asks at, and a value of its own could only be set wrong against it (ADR 0042)."""
 
 LIMITS = RateLimits()
 limiter = Limiter(key_func=caller_of)
@@ -208,19 +223,9 @@ def read_limit() -> str:
     return LIMITS.reads
 
 
-def call_staff_limit() -> str:
-    """Limit for the call page's poll of who the participant talks to, per booking (ADR 0123)."""
-    return LIMITS.call_staff
-
-
-def booking_of(request: Request) -> str:
-    """Key a limit by the booking's public reference in the route's path, not by the caller.
-
-    The call page's poll is one participant's own, so participants behind one address (an
-    office, a mobile carrier) do not share it; a route without a reference falls back to the
-    caller's address. Used with ``limiter.limit(..., key_func=booking_of)``.
-    """
-    return f"ref:{request.path_params.get('public_ref') or caller_of(request)}"
+def call_staff_address_limit() -> str:
+    """Limit per address for the call page's poll, counted before the session is checked."""
+    return LIMITS.call_staff_addresses
 
 
 def unknown_link_limit() -> str:
@@ -354,6 +359,24 @@ def within_unknown_address_limit(source: str) -> bool:
         ``False`` when the caller is over the bucket; always ``True`` while rate limits are off.
     """
     return _within(webhook_limit(), "webhook-unknown", source)
+
+
+def within_call_staff_limit(public_ref: str) -> bool:
+    """Count one poll for who the participant talks to against its booking's own bucket.
+
+    As the guest token's (``within_call_token_limit``): the key is the booking's public reference,
+    so a participant's reloads and several browsers share one budget whatever the address, and only
+    a request that holds the participant's session is counted, so a caller who knows the (not
+    secret) reference but has no session can never use the budget up; the bound on callers without
+    a session is the per-address limit of the route (``call_staff_address_limit``).
+
+    Args:
+        public_ref: The booking's public reference, after the session check.
+
+    Returns:
+        ``False`` when the booking is over its limit; always ``True`` while rate limits are off.
+    """
+    return _within(LIMITS.call_staff, "call-staff", public_ref)
 
 
 def within_call_token_limit(public_ref: str) -> bool:

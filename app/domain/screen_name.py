@@ -13,8 +13,10 @@ staff next to it ("Sanne · medewerker"). Two pure rules live here:
                            code for every refusal
 
 Zero-width and bidirectional control characters are refused, and so is every other format
-character, which also refuses the names that need a joiner to be spelled (some Persian and Indic
-names): the label sits on a picture and in the captions, where such a character could hide or
+character. That refuses, in this step, a name that needs the zero-width non-joiner or joiner to be
+spelled (U+200C, U+200D: some Persian names, and Indic conjuncts written with a visible joiner); the
+same name without the joiner is accepted. The label sits on a picture and in the captions, where
+such a character could hide or
 reorder text. The manual says so.
     ``staff_label``        what the participant is told, given the organisation's setting and the
                            record of who accepted the work: a name or nothing, and the word
@@ -39,9 +41,10 @@ the length of one word of the staff term (ADR 0077), like ``agent_term.MAX_TERM_
 column (``staff.screen_name``, migration 0118) and ``MAX_NAME`` of ``call-poll.js`` repeat the
 upper bound; a test reads the three."""
 
-MAX_MARKS = 2
-"""Most combining marks in a row (an accent and one more: "ế"); a longer run is a stack that
-draws over the lines around it."""
+MAX_MARKS = 4
+"""Most combining marks in a row. Real names reach four (Burmese medials with a tone mark,
+Devanagari with a nukta, a vowel sign and a candrabindu, pointed Hebrew, Arabic with a shadda and
+vowels); a longer run is a stack that draws over the lines around it."""
 
 _PUNCTUATION = frozenset(" -'.’")
 """Besides letters, marks and digits, a screen name may hold a space, a hyphen, an apostrophe (also

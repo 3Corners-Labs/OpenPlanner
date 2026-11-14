@@ -28,7 +28,13 @@ from app.admin.pages import Locale, SameOrigin
 from app.admin.staff_routes import member_page
 from app.domain.authorization import Permission, scope_for
 from app.domain.errors import DomainError
-from app.domain.screen_name import MAX_LENGTH, MIN_LENGTH, ScreenNameError, ScreenNameRefusal
+from app.domain.screen_name import (
+    MAX_LENGTH,
+    MAX_MARKS,
+    MIN_LENGTH,
+    ScreenNameError,
+    ScreenNameRefusal,
+)
 from app.domain.staff_screen_names import ScreenNameResult, StaffScreenNames
 from app.web.errors import FormError
 from app.web.protection import RejectedRequest
@@ -67,7 +73,9 @@ async def save_screen_name(
         form.errors.append(
             FormError(
                 "screen_name",
-                locale.gettext(REFUSAL_TEXTS[error.reason], min=MIN_LENGTH, max=MAX_LENGTH),
+                locale.gettext(
+                    REFUSAL_TEXTS[error.reason], min=MIN_LENGTH, max=MAX_LENGTH, marks=MAX_MARKS
+                ),
             )
         )
         return await member_page(request, locale, context, member_id, form=form, status=422)
