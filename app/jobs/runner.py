@@ -44,6 +44,7 @@ from app.domain.diagnostics import DiagnosticLog
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.event_context import bind_booking, current, trace_scope
 from app.domain.fallback import FallbackService
+from app.domain.guest_access import GuestKeys
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import (
     BACKOFF,
@@ -64,6 +65,7 @@ from app.domain.ports import (
     UnitOfWork,
     VideoProvider,
 )
+from app.domain.purge import purge_booking
 from app.domain.request_dispatch import RequestDispatch
 from app.domain.request_work import RequestWork
 from app.domain.system_log import EventRetention, SystemLog
@@ -156,6 +158,8 @@ class JobRunner:
         reconcile_minutes: ``contact_center_reconcile_minutes`` (class C), read when called.
         conversation_enabled: ``embedded_call_enabled`` (class C), read when called: a routing's
             conversation task is made only while it is on (ADR 0123 step 7a).
+        guest_keys: The keys of the guest subjects now in force, the current one first (ADR 0123
+            point 7); with them a ``rename_guest`` job can run.
         after_purge: Called once after a round that ran ``purge_pii`` jobs (the worker passes
             the WAL checkpoint, WP-A3); a failure is logged and never fails the round.
     """
@@ -181,6 +185,7 @@ class JobRunner:
         request_work: RequestWork | None = None,
         reconcile_minutes: Callable[[], int] | None = None,
         conversation_enabled: Callable[[], bool] | None = None,
+        guest_keys: GuestKeys | None = None,
     ) -> None:
         """Store the collaborators and decide which job types this worker can handle."""
         self._queue = queue
@@ -210,6 +215,7 @@ class JobRunner:
                 organisations,
                 partial(conversation_opening, composer.translator),
                 conversation_enabled,
+                guest_keys,
             )
             if integration is not None
             else None
@@ -315,7 +321,7 @@ class JobRunner:
             return await self._calls.run(job)
         if job.type is JobType.PURGE_PII:
             async with self._uow.locked() as tx:
-                await tx.purge_personal_data(job.booking_id, now)
+                await purge_booking(tx, job.booking_id, now)
             log.info("job.purged", job_id=job.id, booking_id=job.booking_id)
             return None
         if job.type in LAPSES:  # ADR 0044 / 0056: no new time chosen, or not confirmed

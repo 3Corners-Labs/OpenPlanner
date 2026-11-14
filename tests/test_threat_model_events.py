@@ -208,6 +208,7 @@ FLOWS: dict[str, Flow] = {
         "flow that serves it, and nothing is refused by the scripts themselves"
     ),
     "## Flow: the call page as a third kind of page (ADR 0123 step 2)": Flow((PUBLIC,)),
+    "## Flow: the guest token of the call page (ADR 0123 step 4a)": Flow((PUBLIC, JOB)),
     "## Flow: allowed origins for embedding (ADR 0035, EM-1)": Flow(ADMIN),
     "## Flow: video meetings, work items and direct calls (WP5/WP6)": Flow(
         (PUBLIC, WEBHOOK, JOB, DENIED, CHANGE)

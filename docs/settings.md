@@ -219,6 +219,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `EMBEDDED_CALL_ENABLED` | bool | `false` | — | `settings.platform.manage` | Whether groups on this installation may let participants join the call in the organisation's own page instead of the Webex app; off until the conditions of ADR 0123 point 18 are met. |
 | `EMBEDDED_CALL_CONNECT_SECONDS` | int | `30` | 10–90 | `settings.platform.manage` | Seconds the call page waits for one attempt at registering or joining before it tries again (ADR 0123). |
 | `EMBEDDED_CALL_CONNECT_ATTEMPTS` | int | `3` | 1–5 | `settings.platform.manage` | Attempts the call page makes before it says it cannot connect (ADR 0123). |
+| `EMBEDDED_CALL_TOKEN_PER_BOOKING_PER_HOUR` | int | `10` | 5–30 | `settings.platform.manage` | Guest tokens one booking may ask for in an hour on the call page; per address the common read limit applies (ADR 0123 point 6). |
 
 ## D. Organisation (portal, organisation settings; lockable by env)
 

@@ -106,7 +106,14 @@ Deliberately not on it: ``contact_center_task_kind`` and ``contact_center_attemp
 was tried as) and ``contact_center_kind`` (the platform). Each is a word of a closed list
 that finds nothing at the provider and says nothing about the participant, and the kind of a
 task is kept so that a later step knows a conversation without asking the platform. The task's
-*id* is what finds the record again, and that is purged."""
+*id* is what finds the record again, and that is purged.
+
+Also not on it: ``guest_minted_at`` (ADR 0123 point 7), the moment a guest was first minted for
+the booking at the video platform. It is a timestamp that says nothing about the participant and
+finds nothing at the platform (the guest's subject is worked out from the booking's id and a key,
+never stored), and the purge needs it afterwards: a booking that has it gets one ``rename_guest``
+job, which mints the guest again under the neutral term so the platform no longer holds the first
+name. A test pins that it is on no list of this module."""
 
 USAGE_FIELDS: tuple[str, ...] = (
     "kind",

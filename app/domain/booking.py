@@ -293,6 +293,10 @@ class Booking:
     """The flow and revision it was made under (ADR 0121); ``None`` is the service's default for
     its entry path (a booking from before flows, or a service without flow rows). A move keeps
     it."""
+    guest_minted_at: datetime | None = None
+    """When a guest was first minted for the booking at the video platform (ADR 0123 point 7);
+    set by the call page's token endpoint. A moment, no personal data, never purged: the purge
+    reads it to rename the guest at the platform."""
 
     @property
     def subject(self) -> str | None:

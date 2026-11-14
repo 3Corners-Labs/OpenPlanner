@@ -88,6 +88,7 @@ from app.domain.api_access import ApiAccessService
 from app.domain.branding_service import BrandingService
 from app.domain.call_retry import CallRetryService
 from app.domain.call_service import CallService
+from app.domain.call_token_service import CallTokenService
 from app.domain.capacity_service import CapacityService
 from app.domain.change_request_service import ChangePolicy, ChangeRequestService
 from app.domain.channel_service import ChannelSettingsService
@@ -166,6 +167,7 @@ from app.keys import (
     agent_pseudonym_key,
     agent_pseudonym_key_previous,
     client_pseudonym_key,
+    guest_pseudonym_keys,
     management_token_key,
     management_token_key_previous,
     session_secret,
@@ -370,6 +372,14 @@ def create_app(
             )
             app.state.trial_call_service = TrialCallService(
                 uow, wired.video, app.state.integration_service, clock
+            )
+            # ADR 0123 point 6: the call page's guest token; rebuilt with the video provider.
+            app.state.call_token_service = CallTokenService(
+                uow,
+                wired.video,
+                app.state.integration_service,
+                clock,
+                lambda: guest_pseudonym_keys(settings),
             )
             app.state.integration_check_service = IntegrationCheckService(
                 uow,

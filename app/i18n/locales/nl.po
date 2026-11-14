@@ -1681,6 +1681,9 @@ msgstr "Uw videogesprek"
 msgid "call.unavailable"
 msgstr "Het gesprek in deze pagina is nog niet beschikbaar. Ga met de link hieronder terug naar uw afspraak."
 
+msgid "call.guest.term"
+msgstr "Deelnemer"
+
 msgid "error.direct_call_unavailable"
 msgstr "Nu een gesprek starten kan op dit moment niet. Maak een afspraak."
 
@@ -7079,6 +7082,9 @@ msgstr "Onbevestigde afspraak laten vervallen"
 
 msgid "audit.job.send_unconfirmed_lapsed"
 msgstr "Melding vervallen afspraak sturen"
+
+msgid "audit.job.rename_guest"
+msgstr "Gastnaam in het gesprek vervangen door een neutraal woord"
 
 msgid "audit.job.send_refusal"
 msgstr "Melding geweigerde afspraak sturen"
@@ -13706,6 +13712,9 @@ msgstr "Wachttijd per poging om het gesprek te verbinden (seconden)"
 
 msgid "settings.field.embedded_call_connect_attempts.label"
 msgstr "Aantal pogingen om het gesprek te verbinden"
+
+msgid "settings.field.embedded_call_token_per_booking_per_hour.label"
+msgstr "Aantal keer per uur dat één afspraak toegang tot het gesprek mag vragen"
 
 msgid "settings.field.embedded_call_display_name.label"
 msgstr "Naam van de deelnemer voor de medewerker in het gesprek (voornaam of eigen woord)"

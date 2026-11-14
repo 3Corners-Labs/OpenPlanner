@@ -441,6 +441,8 @@ class Settings(BaseSettings):
     embedded_call_enabled: bool = False
     embedded_call_connect_seconds: int = Field(default=30, ge=10, le=90)
     embedded_call_connect_attempts: int = Field(default=3, ge=1, le=5)
+    # ADR 0123 point 6: guest tokens one booking may ask for in an hour (step 4a). Class C.
+    embedded_call_token_per_booking_per_hour: int = Field(default=10, ge=5, le=30)
     # ADR 0046, staff directory. An admin's "last seen" is written at most once per this many
     # seconds (class C, platform; ADR 0042 registry).
     staff_last_seen_interval_seconds: int = Field(default=300, ge=60, le=3600)

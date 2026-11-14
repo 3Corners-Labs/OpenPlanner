@@ -10,6 +10,7 @@ skipped with a reason, ADR 0068) and logging. Failures are classified by the run
                           DISPATCH_CONTACT_CENTER_TASK, ADR 0032)
     delete_video_room  ─► CallService.delete_meeting
     delete_trial_call  ─► CallService.delete_trial_call   (ADR 0071)
+    rename_guest       ─► CallService.rename_guest        (ADR 0123 point 7; added by the purge)
     end_wxcc_task      ─► CallService.end_task      (cancelled bookings, ADR 0021)
 
 A dispatch job of request work (a new flow on a counted pool, ADR 0121 step 6b) goes to
@@ -44,6 +45,8 @@ OWN_QUEUE = "own_queue"
 """Skip reason: the group's agents pick bookings up in OpenPlanner (ADR 0043): no work item."""
 NO_DISPATCH = "no_dispatch"
 """Skip reason: the group's contact-center routing is missing or incomplete: no task."""
+NO_GUEST_KEY = "no_guest_key"
+"""Skip reason: this worker has no video provider or no key to work out the guest's subject."""
 
 FAILURE_EVENTS = {
     JobType.CREATE_VIDEO_ROOM: EventKind.MEETING_FAILED,
@@ -58,6 +61,7 @@ CALL_JOBS = frozenset(
         JobType.DELETE_TRIAL_CALL,
         JobType.DISPATCH_CONTACT_CENTER_TASK,
         JobType.END_WXCC_TASK,
+        JobType.RENAME_GUEST,
     }
 )
 
@@ -105,6 +109,7 @@ class CallJobs:
                 JobType.CREATE_VIDEO_ROOM,
                 JobType.DELETE_VIDEO_ROOM,
                 JobType.DELETE_TRIAL_CALL,
+                JobType.RENAME_GUEST,
             }
         if self._calls.dispatch_available:
             types.add(JobType.DISPATCH_CONTACT_CENTER_TASK)
@@ -132,6 +137,12 @@ class CallJobs:
             await self._calls.delete_trial_call(booking, group)
         elif job.type is JobType.END_WXCC_TASK:
             await self._calls.end_task(booking, group)
+        elif job.type is JobType.RENAME_GUEST:
+            # ADR 0123 point 7: after the purge, so the booking has no contact and nothing to
+            # compare; the subject comes from its id and the keys.
+            if not await self._calls.rename_guest(booking):
+                log.info("job.skipped", job_id=job.id, reason=NO_GUEST_KEY)
+                return NO_GUEST_KEY
         elif is_stale(job.pinned_start, booking):
             log.info("job.skipped", job_id=job.id, reason=STALE)
             return STALE
