@@ -209,8 +209,8 @@ to another at run time goes through `app` and may reach a file loaded later.
   share is decided in `render` out of what had focus when it began (the notice's stop button): no field in the state.
   The picture gives way to what is shown above and below it by layout alone (`call-page.css`): while the call shows,
   the body, main, the call and its section are grids with a `1fr` row under a `min-height` of the window, so the
-  picture's row is what the notices, the heading and the captions leave and the page scrolls only when the minimums
-  do not fit; no script measures anything for it.
+  picture grows into what is left, from 8 rem up to 16 by 9 of the column's width (`cqw`), and the page scrolls only when
+  the minimums do not fit; no script measures anything for it.
 - **`call-status.js` owns** the queue behind the one polite status element: one sentence at a time, each
   kept on screen for a minimum time, none dropped, none repeated.
 - **`call-sound.js` owns** the level meter (a bar and a text that says whether the participant is heard) and

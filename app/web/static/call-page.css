@@ -331,11 +331,15 @@ html:has([data-call-controls]:not([hidden])) body {
    the call is `auto 1fr` (the notices, then the call's section), the section is `auto 1fr` (its
    heading, then the media). A `1fr` row of a grid with a `min-height` is exactly what is left, and
    the column grows by itself when the minimums do not fit, so the page then scrolls and the bar
-   holds, as before. The media is a column of its own, the picture and under it the captions: the
-   picture is 16 by 9 and shrinks, down to a small picture, only when the row is lower than both.
-   No gap opens between them on a high window, because the captions follow the picture and the row's
-   rest is empty below them. A browser without `:has()` keeps the picture at 16 by 9 and the page
-   scrolls. */
+   holds, as before. The media is a column of its own, the picture and under it the captions.
+   The picture GROWS into the room that is left: a small base (8 rem) with `flex-grow`, capped at the
+   16 by 9 height of the column's width, which the container unit `cqw` of the media gives without any
+   estimate. It cannot be done the other way round, as a 16 by 9 box that shrinks: a grid under a
+   `min-height` only hands out room that is left over and never makes an item smaller than its content
+   size, and the content size of a 16 by 9 box is its 16 by 9 height, so the `1fr` rows would have
+   nothing to give and the page would just grow. Where the room is more than the cap, the captions
+   follow the picture and the rest is empty below them, so no gap opens. A browser without `:has()` or
+   container units keeps the 16 by 9 box of the rule below and a page that scrolls. */
 body:has([data-call-state="call"]:not([hidden])) {
   display: grid;
   grid-template-rows: auto 1fr auto;
@@ -383,6 +387,16 @@ body:has([data-call-state="call"]:not([hidden])) .call {
   --call-media-min: calc(8rem + var(--call-captions-max) + var(--booking-space-s));
 }
 
+body:has([data-call-state="call"]:not([hidden])) .call-media {
+  container-type: inline-size;
+}
+
+body:has([data-call-state="call"]:not([hidden])) .call-stage {
+  flex: 1 1 8rem;
+  aspect-ratio: auto;
+  max-height: calc(100cqw * 9 / 16);
+}
+
 .call-stage {
   position: relative;
   flex: 0 1 auto;
@@ -417,8 +431,9 @@ body:has([data-call-state="call"]:not([hidden])) .call {
   bottom: var(--booking-space-s);
   left: var(--booking-space-s);
   z-index: 1;
-  width: min(30%, 12rem);
-  height: auto;
+  width: auto;
+  height: var(--call-tile);
+  max-width: 30%;
   aspect-ratio: 16 / 9;
   border: 2px solid var(--call-on-stage);
   border-radius: var(--booking-radius);
@@ -429,7 +444,9 @@ body:has([data-call-state="call"]:not([hidden])) .call {
 .call-stage[data-call-share="theirs"] .call-remote__off {
   inset: auto auto var(--booking-space-s) var(--booking-space-s);
   z-index: 1;
-  width: min(30%, 12rem);
+  width: auto;
+  height: var(--call-tile);
+  max-width: 30%;
   aspect-ratio: 16 / 9;
   padding: var(--booking-space-xs);
   font-size: 0.875rem;
@@ -475,11 +492,20 @@ body:has([data-call-state="call"]:not([hidden])) .call {
   text-align: center;
 }
 
+/* The small tiles in the stage (the participant's own, and the staff member's camera while their screen
+   is shared) are as high as the stage allows, 55 % of it and 6.75 rem at most, 16 by 9, and no wider
+   than 30 % of it: a low picture still shows them whole and side by side. */
+.call-stage {
+  --call-tile: min(55%, 6.75rem);
+}
+
 .call-self {
   position: absolute;
   right: var(--booking-space-s);
   bottom: var(--booking-space-s);
-  width: min(30%, 12rem);
+  width: auto;
+  height: var(--call-tile);
+  max-width: 30%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
   border: 2px solid var(--call-on-stage);

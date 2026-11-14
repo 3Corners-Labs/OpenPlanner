@@ -834,9 +834,45 @@ for (const size of SIZES) {
 }
 
 // ---- the picture gives way to what is really shown above and below it -----------------------------------
-// While the participant shares and the captions are on, with and without the recording notice: at
-// scroll 0 the whole captions box is above the bar, the picture is never lower than its minimum, and
-// the captions follow the picture. The numbers are in the message of each assertion.
+// The picture grows into what is left, up to 16 by 9 of the column's width, never below 8 rem. In three
+// states (captions only; the participant's own share; the own share and the recording notice): at scroll 0
+// the whole captions box is above the bar, the picture is at least 8 rem high and the captions follow it.
+// The numbers are in the message of each assertion.
+
+/** The boxes of the call at scroll 0, rounded; the tiles are those inside the stage. */
+async function layoutOf(page: Page) {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  return page.evaluate(() => {
+    const box = (selector: string) => (document.querySelector(selector) as HTMLElement).getBoundingClientRect();
+    const stage = box('[data-call-stage]');
+    const captions = box('[data-call-captions]');
+    const bar = box('[data-call-controls]');
+    const minimum = Number.parseFloat(getComputedStyle(document.querySelector('[data-call-stage]') as HTMLElement).minHeight);
+    const rect = (r: DOMRect) => ({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
+    return {
+      scrollY: window.scrollY,
+      stage: rect(stage),
+      stageMinimum: Math.round(minimum),
+      captionsTop: Math.round(captions.top),
+      captionsFoot: Math.round(captions.bottom),
+      barTop: Math.round(bar.top),
+      gap: Math.round(captions.top - stage.bottom),
+      self: rect(box('.call-self')),
+      remote: rect(box('[data-call-remote]')),
+      share: rect(box('[data-call-share-view]')),
+    };
+  });
+}
+type Layout = Awaited<ReturnType<typeof layoutOf>>;
+
+function expectAboveTheBar(m: Layout, label: string): void {
+  const said_ = `${label}: ${JSON.stringify(m)}`;
+  expect(m.scrollY, said_).toBe(0);
+  expect(m.captionsFoot, `captions foot below the bar's top, ${said_}`).toBeLessThanOrEqual(m.barTop);
+  expect(m.stage.h, `picture lower than its minimum, ${said_}`).toBeGreaterThanOrEqual(m.stageMinimum);
+  expect(m.gap, `picture and captions not adjacent, ${said_}`).toBeGreaterThanOrEqual(0);
+  expect(m.gap, `picture and captions not adjacent, ${said_}`).toBeLessThanOrEqual(16);
+}
 
 for (const size of [
   { width: 1280, height: 800 },
@@ -845,46 +881,51 @@ for (const size of [
   { width: 1024, height: 700 },
   { width: 1920, height: 950 },
 ]) {
-  for (const withRecording of [false, true]) {
-    test(`the captions stay above the bar and next to the picture while sharing${withRecording ? ' with the recording notice' : ''}, ${size.width} by ${size.height}`, async ({ page }) => {
+  for (const state_ of ['captions only', 'own share', 'own share and recording'] as const) {
+    test(`the captions stay above the bar and next to the picture, ${state_}, ${size.width} by ${size.height}`, async ({ page }) => {
       await page.setViewportSize(size);
       await inCall(page);
       await captionsToggle(page).click();
       await pressed(captionsToggle(page), true);
       await caption(page, [{ id: '1', text: 'A first line of the captions', own: false }, { id: '2', text: 'A second line', own: true }]);
-      await shareNow(page);
-      if (withRecording) {
+      if (state_ !== 'captions only') await shareNow(page);
+      if (state_ === 'own share and recording') {
         await recording(page, true);
         await expect(notice(page, 'recording')).toBeVisible();
       }
       await expect(rowsOf(page)).toHaveCount(2);
-      await page.evaluate(() => window.scrollTo(0, 0));
-      const m = await page.evaluate(() => {
-        const box = (selector: string) => (document.querySelector(selector) as HTMLElement).getBoundingClientRect();
-        const stage = box('[data-call-stage]');
-        const captions = box('[data-call-captions]');
-        const bar = box('[data-call-controls]');
-        const minimum = Number.parseFloat(getComputedStyle(document.querySelector('[data-call-stage]') as HTMLElement).minHeight);
-        return {
-          scrollY: window.scrollY,
-          stageTop: Math.round(stage.top),
-          stageHeight: Math.round(stage.height),
-          stageMinimum: Math.round(minimum),
-          captionsTop: Math.round(captions.top),
-          captionsFoot: Math.round(captions.bottom),
-          barTop: Math.round(bar.top),
-          gap: Math.round(captions.top - stage.bottom),
-        };
-      });
-      const said_ = `${size.width}x${size.height}${withRecording ? ' +recording' : ''}: ${JSON.stringify(m)}`;
-      expect(m.scrollY, said_).toBe(0);
-      expect(m.captionsFoot, `captions foot below the bar's top, ${said_}`).toBeLessThanOrEqual(m.barTop);
-      expect(m.stageHeight, `picture lower than its minimum, ${said_}`).toBeGreaterThanOrEqual(m.stageMinimum);
-      expect(m.gap, `picture and captions not adjacent, ${said_}`).toBeGreaterThanOrEqual(0);
-      expect(m.gap, `picture and captions not adjacent, ${said_}`).toBeLessThanOrEqual(16);
+      const m = await layoutOf(page);
+      expectAboveTheBar(m, `${size.width}x${size.height} ${state_}`);
+      // The own tile lies whole inside a stage that may be low.
+      expect(m.self.h, JSON.stringify(m)).toBeLessThanOrEqual(m.stage.h);
+      expect(m.self.y, JSON.stringify(m)).toBeGreaterThanOrEqual(m.stage.y);
+      if (size.width === 1920 && state_ === 'captions only') {
+        // The cap holds: 16 by 9 of the column's width, within a pixel.
+        expect(Math.abs(m.stage.h - (m.stage.w * 9) / 16), JSON.stringify(m)).toBeLessThanOrEqual(1);
+      }
     });
   }
 }
+
+test('the staff member\'s screen and both tiles lie inside the stage, with the captions above the bar, 1366 by 650', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 650 });
+  await inCall(page);
+  await captionsToggle(page).click();
+  await pressed(captionsToggle(page), true);
+  await caption(page, [{ id: '1', text: 'A first line of the captions', own: false }, { id: '2', text: 'A second line', own: true }]);
+  await remoteShare(page, true);
+  await expect(notice(page, 'theirs')).toBeVisible();
+  await expect(rowsOf(page)).toHaveCount(2);
+  const m = await layoutOf(page);
+  const label = JSON.stringify(m);
+  expectAboveTheBar(m, '1366x650 their screen');
+  const inside = (r: { x: number; y: number; w: number; h: number }) =>
+    r.x >= m.stage.x - 1 && r.y >= m.stage.y - 1 && r.x + r.w <= m.stage.x + m.stage.w + 1 && r.y + r.h <= m.stage.y + m.stage.h + 1;
+  expect(inside(m.share), `the shared screen is not inside the stage: ${label}`).toBe(true);
+  expect(inside(m.remote), `the staff member's tile is not inside the stage: ${label}`).toBe(true);
+  expect(inside(m.self), `the own tile is not inside the stage: ${label}`).toBe(true);
+  expect(m.remote.x + m.remote.w <= m.self.x, `the tiles overlap: ${label}`).toBe(true);
+});
 
 test('the sharing notice is one row on a wide window: the words on the left and the stop button on their right', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
