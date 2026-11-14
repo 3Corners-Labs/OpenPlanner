@@ -62,10 +62,28 @@ http://{$TLS_DOMAIN}:8080 {
 	}
 	# Caddy sets X-Forwarded-For to the visitor's address and drops any value the client sent
 	# (no trusted_proxies), so rate limits in the app see the real IP.
-	# The bundled identity provider (ADR 0112) is served under /idp when IDP_UPSTREAM is set;
-	# entrypoint.sh renders IDP_DIRECTIVE, empty otherwise.
+	# The bundled identity provider (ADR 0112) is served under /idp when IDP_UPSTREAM is set:
+	# entrypoint.sh renders IDP_DIRECTIVE as `import /etc/caddy/idp.caddy` (ADR 0126: only the
+	# login, none of the portal's cookies, nothing that acts on the whole origin), empty otherwise.
 	{$IDP_DIRECTIVE}
 	handle {
 		reverse_proxy web:8000
+	}
+	# Every answer the proxy makes itself (a refusal under /idp, a body over its limit, a 502
+	# while web restarts) is a page of the portal's own origin. It gets the portal's deny-by-
+	# default headers (app/api/security_headers.py, tied by a test), so no script can frame or open
+	# it and act from there with the portal's cookies (ADR 0126 point 4). The body stays empty.
+	handle_errors {
+		header {
+			Content-Security-Policy "default-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+			Strict-Transport-Security "max-age=63072000; includeSubDomains"
+			X-Content-Type-Options nosniff
+			X-Frame-Options DENY
+			Referrer-Policy same-origin
+			Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=(), interest-cohort=()"
+			Cross-Origin-Opener-Policy same-origin
+			Cross-Origin-Embedder-Policy require-corp
+			Cross-Origin-Resource-Policy same-origin
+		}
 	}
 }

@@ -30,8 +30,10 @@
 #                      without a public name; ADR 0112)
 #      the identity provider (ADR 0106 step 5): by default the bundled Keycloak in every
 #                      mode (--idp bundled): the realm is rendered with generated secrets
-#                      (scripts/render-keycloak-realm.sh), the proxy serves it under /idp, and its
-#                      mail server is set at the first start. --idp own asks for the login of
+#                      (scripts/render-keycloak-realm.sh), the proxy serves its login under /idp
+#                      (ADR 0126), and after every start its mail server and its admin console's
+#                      loopback address are set (realm master's frontend URL; every published port
+#                      on the loopback, or nothing is set). --idp own asks for the login of
 #                      your own provider, as before, and on a host that ran the bundled one removes
 #                      its login (secrets/keycloak-app.env), its /idp route and its containers
 #                      (ADR 0125; volumes stay). Production runs Keycloak in production
@@ -745,7 +747,7 @@ render_idp() {
   [[ -f $DIR/scripts/render-keycloak-realm.sh ]] || die "scripts/render-keycloak-realm.sh is missing from $DIR"
   log "rendering the bundled identity provider's realm"
   "$BASH" "$DIR/scripts/render-keycloak-realm.sh" --dir "$DIR" --database "$database" || die "the realm could not be rendered"
-  ((TLS)) || warn "the bundled identity provider without the HTTPS proxy answers on this host only (127.0.0.1:8080); logging in from another machine needs --tls-domain"
+  ((TLS)) || warn "the bundled identity provider without the HTTPS proxy is for this host only (published on the loopback, checked after the start); logging in from another machine needs --tls-domain"
   log "first password of the portal user 'super': KC_SUPER_PASSWORD in $kept (changed at the first login)"
 }
 
@@ -958,8 +960,33 @@ start() {
   compose up -d
   healthy || die "not healthy within ${HEALTH_TIMEOUT}s; see: docker compose --env-file .env.update logs web worker"
   log "web and worker are healthy"
-  retire_bundled_provider
+  idp_after_start
+}
+
+# The identity provider once web and worker run: with --idp own the bundled one is retired (ADR
+# 0125); with the bundled one its mail server and its admin console's loopback address are set
+# (ADR 0106 step 5, ADR 0126), sharing one wait (IDP_DEADLINE, which idp_kcadm reads).
+idp_after_start() {
+  if [[ $IDP != bundled ]]; then
+    retire_bundled_provider
+    return 0
+  fi
+  local IDP_DEADLINE=$((SECONDS + HEALTH_TIMEOUT))
   idp_mail
+  idp_console
+}
+
+# idp_kcadm INPUT ARGS...: kcadm.sh ARGS as realm master's admin in the idp container, through
+# deploy/keycloak/kcadm-as-admin.sh (ADR 0126), retried until Keycloak answers or IDP_DEADLINE
+# passes (status 1); the steps share that one wait. INPUT goes to it on stdin, for a body read with
+# `-f -`, so a secret in it is never an argument.
+idp_kcadm() {
+  local input=$1
+  shift
+  until printf '%s' "$input" | compose exec -T idp sh /opt/openplanner/kcadm-as-admin.sh "$@" >/dev/null 2>&1; do
+    ((SECONDS < IDP_DEADLINE)) || return 1
+    sleep 5
+  done
 }
 
 # ADR 0125 point 6: a host that left the bundled provider stops it, after `up -d` has replaced
@@ -967,7 +994,7 @@ start() {
 # the host's resolver while they run. Its volumes and secrets/keycloak.env stay for the way back
 # (--idp bundled; `compose rm` never removes a named volume).
 retire_bundled_provider() {
-  [[ $IDP != bundled && -f $DIR/secrets/keycloak.env ]] || return 0
+  [[ -f $DIR/secrets/keycloak.env ]] || return 0
   if compose --profile idp --profile idp-db rm --stop --force idp idp-db >/dev/null 2>&1; then
     log "the bundled identity provider's containers (idp, idp-db) are removed; its volumes and secrets/keycloak.env stay"
   else
@@ -980,8 +1007,7 @@ retire_bundled_provider() {
 # itself sends. The lab's Mailpit, else the installation's own SMTP settings; the password goes to
 # the container through stdin, never through an argument.
 idp_mail() {
-  [[ $IDP == bundled ]] || return 0
-  local host port from user password starttls path json deadline=$((SECONDS + HEALTH_TIMEOUT))
+  local host port from user password starttls json
   host=$(value "$ENV_FILE" SMTP_HOST)
   if [[ -z $host ]]; then
     warn "no SMTP_HOST in $ENV_FILE: Keycloak cannot mail invitations until the realm has a mail server (docs/runbook.md, Bundled identity provider)"
@@ -992,21 +1018,47 @@ idp_mail() {
   from=$(value "$ENV_FILE" MAIL_FROM)
   from=${from##*<} from=${from%%>*} # "Name <address>" → address
   from=${from:-noreply@openplanner.invalid}
-  path=$(value "$DIR/secrets/keycloak.env" KC_HTTP_RELATIVE_PATH)
   json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
   json=$(printf '{"smtpServer":{"host":"%s","port":"%s","from":"%s","fromDisplayName":"OpenPlanner","starttls":"%s","ssl":"false","auth":"%s"%s}}' \
     "$(json_escape "$host")" "${port:-587}" "$(json_escape "$from")" "${starttls:-true}" \
     "$([[ -n $user ]] && echo true || echo false)" \
     "$([[ -n $user ]] && printf ',"user":"%s","password":"%s"' "$(json_escape "$user")" "$(json_escape "$password")")")
-  until printf '%s' "$json" | compose exec -T idp sh -c "
-      /opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080${path} --realm master \
-        --user admin --password \"\$KC_BOOTSTRAP_ADMIN_PASSWORD\" >/dev/null 2>&1 \
-      && cat >/tmp/op-smtp.json && /opt/keycloak/bin/kcadm.sh update realms/openplanner -f /tmp/op-smtp.json >/dev/null 2>&1
-      rc=\$?; rm -f /tmp/op-smtp.json; exit \$rc" >/dev/null 2>&1; do
-    ((SECONDS < deadline)) || { warn "the bundled identity provider did not take its mail server within ${HEALTH_TIMEOUT}s; set it in its console (docs/runbook.md)"; return 0; }
-    sleep 5
-  done
+  if ! idp_kcadm "$json" update realms/openplanner -f -; then
+    warn "the bundled identity provider did not take its mail server within ${HEALTH_TIMEOUT}s; set it in its console (docs/runbook.md)"
+    return 0
+  fi
   log "the bundled identity provider's mail server: $host (Keycloak mails invitations and resets itself)"
+}
+
+# ADR 0126: Keycloak's own port is for this host alone: every port Docker publishes for the
+# container must be on the loopback, with or without the proxy, or Keycloak, realm master and its
+# admin console are on the network over plain http (an override's 8780, say). Behind the proxy only
+# the login is public and the console is opened on the loopback: realm master then gets that
+# address as its frontend URL, or its login form would send the browser to the public address,
+# where the proxy refuses it.
+idp_console() {
+  local container bindings outside published path console
+  container=$(compose ps -q idp 2>/dev/null) || container=
+  bindings=$([[ -z $container ]] || docker port "$container" 2>/dev/null) || bindings=
+  outside=$(printf '%s\n' "$bindings" | grep -E -v -e '-> (127\.0\.0\.1|\[::1\]):[0-9]+$' -e '^$' || true)
+  if [[ -n $outside ]]; then
+    warn "the bundled identity provider is published beyond the loopback (${outside//$'\n'/, }): Keycloak, realm master and its admin console are on the network; publish 127.0.0.1 only (docs/runbook.md, Opening the admin console)"
+    return 0
+  fi
+  path=$(value "$DIR/secrets/keycloak.env" KC_HTTP_RELATIVE_PATH)
+  [[ -n $path ]] || return 0 # without the proxy Keycloak's own address is the loopback already
+  published=$(printf '%s\n' "$bindings" | sed -n -E 's/^8080\/tcp -> (127\.0\.0\.1:[0-9]+)$/\1/p' | head -n 1)
+  [[ -n $published ]] || published=$(printf '%s\n' "$bindings" | sed -n -E 's/^8080\/tcp -> (\[::1\]:[0-9]+)$/\1/p' | head -n 1)
+  if [[ -z $published ]]; then
+    warn "the bundled identity provider publishes no port on the loopback, or is not running: its admin console is not set up for the loopback (docs/runbook.md, Opening the admin console)"
+    return 0
+  fi
+  console=http://$published$path
+  if ! idp_kcadm '' update realms/master -s "attributes.frontendUrl=$console"; then
+    warn "the bundled identity provider did not take the loopback address of its admin console within ${HEALTH_TIMEOUT}s (docs/runbook.md, Opening the admin console)"
+    return 0
+  fi
+  log "the bundled identity provider's admin console: $console/admin/ on this host only (ADR 0126)"
 }
 
 # 6. Host updater -------------------------------------------------------------------------------

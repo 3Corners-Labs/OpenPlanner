@@ -17,6 +17,11 @@ Behaviour is set through files in ``FAKE_HOST_DIR``:
 - ``edge-ipv6``: whether the project's ``edge`` network has IPv6, as ``docker network inspect``
   says (default ``true``).
 - ``latest``: the tag of the latest GitHub release (default none: the API call fails).
+- ``idp-container``: what ``docker compose ps -q idp`` prints (default ``IDP``); an empty line
+  is a provider that is not running (ADR 0126).
+- ``idp-ports``: what ``docker port`` prints for that container, one binding per line (default
+  ``IDP_PORT``, the loopback of docker-compose.yml); ``fail`` may list ``idp-exec``, which makes
+  every ``docker compose exec -T idp`` (kcadm.sh in the provider) exit 1.
 - ``min-upgrade-from``: the ``MIN_UPGRADE_FROM`` every image's configuration carries (ADR
   0116; default none); ``fail`` may list ``upgrade-path-check`` (a database too old).
 - ``images``: the images on the host, one ``repository:tag`` per line, or ``repository@digest``
@@ -57,6 +62,9 @@ CONFIG_ENV = (
 CONFIG_SUMMARY = "configuration imported\norganisations       2\ngroups              3\n"
 PLAN_HASH = "ab" * 32
 PROXY = "proxy-container-id"
+IDP = "idp-container-id"
+IDP_PORT = "8080/tcp -> 127.0.0.1:8080"
+"""What `docker port` prints for the bundled provider of docker-compose.yml (ADR 0126)."""
 COSIGN = "3.1.4"
 # The releases the fake registry knows, so an image's digest can be mapped back to the version
 # baked into it (``APP_VERSION``, read by the installer; ADR 0064 step 2).
@@ -164,6 +172,10 @@ def _compose(args: list[str]) -> int:
         print(WEB)
     elif command == ["ps", "-q", "proxy"]:
         print(PROXY)
+    elif command == ["ps", "-q", "idp"]:
+        print(next(iter(_lines("idp-container")), IDP))
+    elif command[:3] == ["exec", "-T", "idp"]:  # kcadm.sh inside the bundled provider
+        return _failing("idp-exec")
     elif command[:2] == ["alembic", "current"]:
         print(f"{(_host() / 'revision').read_text().strip()} (head)")
     elif command[:2] == ["alembic", "downgrade"]:
@@ -202,6 +214,9 @@ def _docker(args: list[str]) -> int:
         return _compose(args)
     elif args[0] == "info":
         return _failing("docker-info")
+    elif args[:2] == ["port", IDP]:  # every address the bundled provider is published on
+        for line in _lines("idp-ports") if (_host() / "idp-ports").exists() else [IDP_PORT]:
+            print(line)
     elif args[0] == "version":
         print(next(iter(_lines("engine-version")), "29.1.3"))
     elif args[:2] == ["network", "inspect"] and args[-1] == f"{PROJECT}_edge":

@@ -113,6 +113,14 @@ class Host:
     def ran(self, fragment: str) -> bool:
         return any(fragment in command for command in self.commands())
 
+    def after_start(self, fragment: str) -> bool:
+        """Whether the first call holding ``fragment`` came after `up -d` and the ready check."""
+        commands = self.commands()
+        started = max(i for i, c in enumerate(commands) if c.endswith(" up -d"))
+        ready = max(i for i, c in enumerate(commands) if "/readyz" in c)
+        called = min(i for i, c in enumerate(commands) if fragment in c)
+        return started < ready < called
+
     def settings(self, name: str) -> dict[str, str]:
         """Read an env file as Compose does: the last occurrence wins, quotes removed."""
         values = {}
@@ -825,6 +833,8 @@ def _with_package(host: Host, *args: str, **settings: str) -> subprocess.Complet
 
 
 HOST_SETTINGS = {k: v for k, v in PRODUCTION.items() if not k.startswith("OIDC_")}
+WITHOUT_MAIL = {k: v for k, v in HOST_SETTINGS.items() if not k.startswith("SMTP_")}
+"""A host with the bundled provider and no SMTP server of its own."""
 
 
 def test_the_configuration_and_passphrase_options_go_together(host: Host) -> None:
@@ -876,9 +886,7 @@ def test_the_package_answers_the_login_questions_and_is_imported_once_healthy(
     assert "a passphrase of sixteen chars" not in " ".join(commands)
     assert not list(host.checkout.glob(".package.*"))
     # The import waits for health and uses a copy inside the container.
-    started = commands.index(next(c for c in commands if c.endswith(" up -d")))
-    imported = commands.index(next(c for c in commands if "app.cli config import" in c))
-    assert started < imported
+    assert host.after_start("app.cli config import")
     assert any(c.endswith("web:/srv/data/configuration-package.sqlite") for c in commands)
     assert host.ran("exec -T web rm -f /srv/data/configuration-package.sqlite")
     assert "organisations       2" in result.stdout
@@ -977,26 +985,116 @@ def test_a_test_install_renders_the_bundled_realm_and_hands_over_the_login(host:
     assert "until ADR 0125 step 2" not in result.stderr  # the warning is production's (point 7)
 
 
+KCADM = "exec -T idp sh /opt/openplanner/kcadm-as-admin.sh"
+"""How the installer runs kcadm.sh as realm master's admin (deploy/keycloak/kcadm-as-admin.sh)."""
+
+
 def test_the_realms_mail_server_is_set_after_the_start_without_a_password_in_an_argument(
     host: Host,
 ) -> None:
-    settings = {k: v for k, v in PRODUCTION.items() if not k.startswith("OIDC_")}
-
-    result = host.run("--mode", "test", "--non-interactive", **settings)
+    result = host.run("--mode", "test", "--non-interactive", **HOST_SETTINGS)
 
     assert result.returncode == 0, result.stderr
-    assert host.ran("exec -T idp sh -c")
-    assert not host.ran("pass word #1")  # the password goes through stdin
+    assert host.ran(f"{KCADM} update realms/openplanner -f -")  # the body comes on stdin
+    assert host.after_start("update realms/openplanner")
+    assert not host.ran("pass word #1")
     assert "mail server: smtp.example.nl" in result.stderr + result.stdout
 
 
 def test_without_an_smtp_host_the_install_says_keycloak_cannot_mail(host: Host) -> None:
-    settings = {k: v for k, v in PRODUCTION.items() if not k.startswith(("OIDC_", "SMTP_"))}
-
-    result = host.run("--mode", "test", "--non-interactive", **settings)
+    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
 
     assert result.returncode == 0, result.stderr
     assert "Keycloak cannot mail invitations" in result.stderr
+    assert not host.ran("realms/openplanner")
+
+
+def test_the_admin_console_is_put_on_the_loopback_after_the_start_adr_0126(host: Host) -> None:
+    """Behind the proxy realm master's login must stay on the loopback, where the console is."""
+    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
+
+    assert result.returncode == 0, result.stderr
+    assert host.ran("port idp-container-id")
+    # The published loopback port, with the proxy's path, as one argument of kcadm.sh's own,
+    # read from the container the start made.
+    assert host.ran(
+        f"{KCADM} update realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp"
+    )
+    assert host.after_start("port idp-container-id")
+    assert host.after_start("update realms/master")
+    assert not host.ran("rm --stop --force idp idp-db")  # a bundled install keeps its provider
+    output = result.stderr + result.stdout
+    assert "admin console: http://127.0.0.1:8080/idp/admin/ on this host only" in output
+
+
+@pytest.mark.parametrize(
+    "run",
+    [
+        pytest.param(("--mode", "test", "--non-interactive"), id="behind the proxy"),
+        pytest.param(("--mode", "lab", "--version", "1.4.0", "--non-interactive"), id="no proxy"),
+    ],
+)
+def test_a_provider_published_beyond_the_loopback_gets_a_warning_with_or_without_the_proxy(
+    host: Host, run: tuple[str, ...]
+) -> None:
+    """One more port on every interface (an override's 8780) puts realm master on the network."""
+    host.given("idp-ports", "8080/tcp -> 127.0.0.1:8080\n8080/tcp -> 0.0.0.0:8780\n")
+
+    result = host.run(*run, **(WITHOUT_MAIL if "test" in run else {}))
+
+    assert result.returncode == 0, result.stderr
+    assert host.ran("port idp-container-id")
+    assert not host.ran("frontendUrl")
+    assert "published beyond the loopback (8080/tcp -> 0.0.0.0:8780)" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("ports", "console"),
+    [
+        ("8080/tcp -> 127.0.0.1:8080\n8080/tcp -> [::1]:8080\n", "http://127.0.0.1:8080/idp"),
+        ("8080/tcp -> [::1]:8080\n", "http://[::1]:8080/idp"),
+    ],
+)
+def test_the_console_address_is_the_loopback_the_provider_is_published_on(
+    host: Host, ports: str, console: str
+) -> None:
+    host.given("idp-ports", ports)
+
+    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
+
+    assert result.returncode == 0, result.stderr
+    assert host.ran(f"realms/master -s attributes.frontendUrl={console}")
+
+
+def test_a_provider_that_is_not_running_is_named_as_such(host: Host) -> None:
+    """No container, so nothing published: say so, not that a port is wrong."""
+    host.given("idp-container", "\n")
+
+    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
+
+    assert result.returncode == 0, result.stderr
+    assert not host.ran("frontendUrl")
+    assert "publishes no port on the loopback, or is not running" in result.stderr
+
+
+def test_a_provider_that_never_answers_is_waited_for_once(host: Host) -> None:
+    """The steps on the provider share one wait: after the mail server's, the console tries once."""
+    host.given("fail", "idp-exec\n")
+
+    result = host.run("--mode", "test", "--non-interactive", HEALTH_TIMEOUT="5", **HOST_SETTINGS)
+
+    assert result.returncode == 0, result.stderr
+    assert host.ran(f"{KCADM} update realms/openplanner")
+    assert sum("realms/master" in command for command in host.commands()) == 1
+    assert "did not take its mail server" in result.stderr
+    assert "did not take the loopback address of its admin console" in result.stderr
+
+
+def test_an_own_provider_gets_no_console_step(host: Host) -> None:
+    result = host.run("--mode", "test", "--idp", "own", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode == 0, result.stderr
+    assert not host.ran("ps -q idp")
     assert not host.ran("exec -T idp")
 
 
@@ -1138,11 +1236,7 @@ def test_a_host_that_leaves_the_bundled_keycloak_logs_in_with_its_own_provider(
     # Only once the new proxy, web and worker run without it (`up -d`, then ready): stopped
     # earlier, the name idp would reach the host's resolver while they still use it. `compose rm`
     # never removes the named volumes idp-data and idp-db-data, which the fake docker cannot show.
-    commands = host.commands()
-    retired = max(i for i, c in enumerate(commands) if "rm --stop --force idp idp-db" in c)
-    started = max(i for i, c in enumerate(commands) if c.endswith(" up -d"))
-    ready = max(i for i, c in enumerate(commands) if "/readyz" in c)
-    assert started < ready < retired
+    assert host.after_start("rm --stop --force idp idp-db")
     assert "containers (idp, idp-db) are removed" in result.stderr + result.stdout
     assert "until ADR 0125 step 2" not in result.stderr
     settings = _container_settings(host)

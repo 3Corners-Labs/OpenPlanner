@@ -137,7 +137,7 @@ flowchart TB
     web -- "OIDC and directory API (ADR 0095), http, one host (recorded exception, ADR 0125)" --> keycloak
     worker -- "directory API, http, one host (ADR 0125)" --> keycloak
     keycloak <--> idpdata
-    proxy -- "/idp route (ADR 0112), http, one host (ADR 0125)" --> keycloak
+    proxy -- "/idp route: the login only (ADR 0112, 0126), http, one host (ADR 0125)" --> keycloak
     web -- https --> cisco
     worker -- https --> cisco
     web -- "syslog+tls or https" --> logs
@@ -175,7 +175,10 @@ flowchart TB
   Keycloak runs next to `web`; staff are managed in it from the portal (ADR 0095). In a lab
   without a public name the proxy can issue its certificates from its own certificate authority
   (`TLS_INTERNAL=true`, ADR 0112), publish the root for download on *System status*, and serve
-  Keycloak under `/idp` on the same https address.
+  Keycloak under `/idp` on the same https address; the installer writes `IDP_UPSTREAM` (ADR
+  0112 step 6). The route passes only the login of realm `openplanner` and its assets, keeps the
+  portal's cookies from Keycloak and drops what an answer could do to the whole origin; the
+  admin console is on the host's loopback (ADR 0126).
 - **Every hop with personal data is encrypted, or a recorded exception (ADR 0091).** The
   exceptions are all on one host: the bundled proxy to `web` on the `edge` network (ADR 0091),
   and the hops to the bundled Keycloak as `idp:8080`, from `web` and `worker` and from the proxy,

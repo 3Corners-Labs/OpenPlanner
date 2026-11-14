@@ -16,7 +16,8 @@
 # The Caddyfile cannot branch, so the `tls` line of the https site comes from TLS_DIRECTIVE,
 # which this script sets for `caddy run` and again for every `caddy reload`. Without a domain
 # Caddy would serve plain HTTP on 8443, so a missing or incomplete setting stops the container.
-# IDP_UPSTREAM (host:port) adds the route /idp/* to the bundled identity provider (ADR 0112).
+# IDP_UPSTREAM (host:port) adds the route /idp to the bundled identity provider (ADR 0112),
+# with what it lets through and keeps out in idp.caddy (ADR 0126).
 set -eu
 
 PORTAL_DIR=${TLS_PORTAL_DIR:-/portal-certs} # the volume's mount point (tests point it elsewhere)
@@ -24,6 +25,7 @@ INTERNAL_CA_DIR=${TLS_INTERNAL_CA_DIR:-/internal-ca}
 CA_ROOT=${TLS_CA_ROOT:-/data/caddy/pki/authorities/local/root.crt}
 POLL=${TLS_PORTAL_POLL_SECONDS:-10}
 CADDYFILE=/etc/caddy/Caddyfile
+IDP_CADDYFILE=/etc/caddy/idp.caddy
 
 fail() { echo "$1" >&2; exit 1; }
 
@@ -91,9 +93,8 @@ if [ -n "${IDP_UPSTREAM:-}" ]; then
   case $IDP_UPSTREAM in
     *[!A-Za-z0-9.:_-]*) fail "IDP_UPSTREAM must be host:port" ;;
   esac
-  IDP_DIRECTIVE="handle /idp/* {
-		reverse_proxy $IDP_UPSTREAM
-	}"
+  # The route and what it lets through live in idp.caddy (ADR 0126), which reads IDP_UPSTREAM.
+  IDP_DIRECTIVE="import $IDP_CADDYFILE"
 else
   IDP_DIRECTIVE=""
 fi

@@ -281,6 +281,13 @@ def test_the_compose_profile_idp_mounts_the_rendered_realm() -> None:
     )
     assert mounts["idp-data"] == "/opt/keycloak/data"
     assert "idp-data" in compose["volumes"]
+    # The one place that logs kcadm.sh in as realm master's admin (ADR 0126).
+    assert mounts[str(REPO / "deploy/keycloak/kcadm-as-admin.sh")] == (
+        "/opt/openplanner/kcadm-as-admin.sh"
+    )
+    assert next(v for v in service["volumes"] if v["target"].startswith("/opt/openplanner"))[
+        "read_only"
+    ]
 
 
 def test_the_dev_and_idp_services_pin_the_same_image() -> None:

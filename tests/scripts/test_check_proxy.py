@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 
 from app.api.security_headers import SECURITY_HEADERS
+from tests.support.idp_route import dropped_headers, set_headers
 
 REPO = Path(__file__).parents[2]
 SCRIPT = (REPO / "scripts/check-proxy.sh").read_text()
@@ -22,6 +23,14 @@ def _body(name: str) -> str:
     match = re.search(rf"^{name}\(\) \{{.*?^\}}$", SCRIPT, re.MULTILINE | re.DOTALL)
     assert match, f"{name} is not defined in check-proxy.sh"
     return match.group(0)
+
+
+def _program(name: str) -> str:
+    """Return the Python program the script keeps in the shell variable ``name``."""
+    match = re.search(rf"^{name}='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
+    assert match, f"{name} is not in the script"
+    compile(match.group(1), name, "exec")
+    return match.group(1)
 
 
 def test_every_pass_runs_the_standards_through_edge_checks() -> None:
@@ -82,11 +91,8 @@ def test_every_pass_sends_a_forged_forwarded_header_and_looks_at_the_wire() -> N
 
 def test_the_sniffer_prints_only_the_forwarded_headers() -> None:
     """The wire is read for ``X-Forwarded-*`` lines and nothing else (no paths, no tokens)."""
-    match = re.search(r"^sniffer_code='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
-    assert match, "the sniffer program is not in the script"
-    code = match.group(1)
+    code = _program("sniffer_code")
 
-    compile(code, "sniffer", "exec")
     assert 'startswith(b"x-forwarded-")' in code
     assert "print(line" in code
 
@@ -106,6 +112,76 @@ def test_a_visitor_over_ipv6_must_reach_web_with_their_own_address() -> None:
     assert "enable_ip_masquerade=false" in SCRIPT
     overlay = (REPO / "deploy/proxy/compose.pebble.yml").read_text()
     assert '"[${PROBE6_ADDRESS:?set by scripts/check-proxy.sh}]:18444:8443"' in overlay
-    match = re.search(r"^ipv6_client_code='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
-    assert match, "the IPv6 client program is not in the script"
-    compile(match.group(1), "ipv6 client", "exec")
+    _program("ipv6_client_code")
+
+
+def test_pass_three_puts_a_hostile_provider_behind_the_route() -> None:
+    """ADR 0126: a probe sends what the route must drop; first asked directly, as the control."""
+    probe = _program("idp_probe_code")
+    body = _body("idp_route_checks")
+
+    # Every header the route drops or sets, the probe sends, and a header the route sets comes
+    # from the probe with another value, or its value on the wire would prove nothing. At run time
+    # the probe is asked directly for the dropped ones before the proxy is judged.
+    for name in dropped_headers():
+        assert f'("{name}", ' in probe, f"the probe does not send {name}"
+    for name, value in set_headers().items():
+        assert f'("{name}", ' in probe, f"the probe does not send {name}"
+        assert f'("{name}", "{value}")' not in probe, f"the probe sends the route's own {name}"
+    assert body.index("so its absence would prove nothing") < body.index("the proxy passes $header")
+    assert '"__Host-op_admin=forged; Path=/;' in probe  # would replace the portal's session
+    # HSTS and the permissions on /idp, and every header of the proxy's own refusals there, must
+    # equal what the same proxy returns for the portal itself.
+    assert body.index('"$base/healthz"') < body.index("portal_hsts=")
+    assert body.index('"$base/healthz"') < body.index("portal_permissions=")
+    assert body.index('"$base/healthz"') < body.index("portal_security=")
+    names = re.search(r"^security_names='([^']*)'$", SCRIPT, re.MULTILINE)
+    assert names, "the script names no security headers"
+    assert names.group(1).split() == [name.decode() for name in SECURITY_HEADERS]
+    assert "the proxy passes the detour" in body
+    assert body.index("the proxy passes the detour") < body.index("a detour reached the provider")
+    assert re.search(
+        r"^start_idp_probe\nexport PROXY_INTERNAL=true PROXY_IDP_UPSTREAM=idp-probe:8080$",
+        SCRIPT,
+        re.M,
+    )
+    assert re.search(r"^idp_route_checks$", SCRIPT, re.MULTILINE)
+
+
+def test_pass_four_runs_the_pinned_keycloak_as_compose_defines_it() -> None:
+    """The overlay changes the realm, the data and the port; image and command stay compose's."""
+    overlay = (REPO / "deploy/proxy/compose.pebble.yml").read_text()
+    idp = overlay[overlay.index("\n  idp:\n") :]
+
+    assert "image:" not in idp
+    assert "command:" not in idp
+    assert "${KEYCLOAK_CHECK_DIR:?set by scripts/check-proxy.sh}/secrets/keycloak-realm.json" in idp
+    assert '"127.0.0.1:18090:8080"' in idp
+    assert re.search(r"^keycloak_up\nexport PROXY_IDP_UPSTREAM=idp:8080$", SCRIPT, re.MULTILINE)
+    assert re.search(r"^keycloak_checks$", SCRIPT, re.MULTILINE)
+    assert "--profile idp" in _body("compose")
+
+
+def test_pass_four_proves_each_refusal_against_the_loopback_and_the_console_after_the_change() -> (
+    None
+):
+    body = _body("keycloak_checks")
+
+    # A 404 through the route counts only when the loopback serves the same path.
+    assert "so its 404 proves nothing" in body
+    # Before the change the console's login is the public address's: the control for the change,
+    # which runs the installer's and the runbook's own helper.
+    change = "compose exec -T idp sh /opt/openplanner/kcadm-as-admin.sh update realms/master"
+    assert body.index("did not name the public address before the change") < body.index(change)
+    assert body.index(change) < body.index("does not stay on the loopback")
+    # The helper itself still logs in once realm master's frontend URL is the loopback.
+    assert body.index("does not stay on the loopback") < body.index(
+        "kcadm.sh no longer works once realm master's frontend URL is the loopback"
+    )
+    assert 'assets_load "$page" "the login page"' in body
+    assert "the account console" in body
+    # The staff directory as web builds it, from the values the render script wrote for web.
+    directory = _program("directory_code")
+    assert "directory_from_settings(Settings())" in directory
+    assert ".reachable()" in directory
+    assert "secrets/keycloak-app.env" in body
