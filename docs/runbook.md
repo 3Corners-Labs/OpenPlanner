@@ -517,7 +517,8 @@ Moving docker01 from plain http to this took these steps, all without root, beca
 
 1. `git fetch --tags && git merge --ff-only v<rc>` in the checkout, so compose has the volume
    `internal-ca` and the `idp` service on the `edge` network.
-2. `proxy.env` with `TLS_DOMAIN`, `TLS_INTERNAL=true` and `IDP_UPSTREAM=idp:8080`.
+2. `proxy.env` with `TLS_DOMAIN`, `TLS_INTERNAL=true` and `IDP_UPSTREAM`: then `idp:8080`, since
+   ADR 0125 step 2 the provider's fixed address `172.31.240.4:8080`, which the installer writes.
 3. `docker-compose.override.yml`: `proxy` and `idp` under the profile the installer set
    (`profiles: !override [dev]`), the proxy image pinned by hand
    (`ghcr.io/3corners-labs/openplanner-proxy:<rc>`; the updater pins it only when
@@ -537,8 +538,9 @@ Moving docker01 from plain http to this took these steps, all without root, beca
 
 #### The bundled identity provider behind the proxy
 
-With `IDP_UPSTREAM=idp:8080` in `proxy.env` the proxy serves the bundled Keycloak under `/idp` on
-the same host name and certificate. Run `scripts/render-keycloak-realm.sh` after `PUBLIC_BASE_URL`
+With `IDP_UPSTREAM=172.31.240.4:8080` in `proxy.env`, the provider's fixed address on `edge` (ADR
+0125 step 2), the proxy serves the bundled Keycloak under `/idp` on the same host name and
+certificate. Run `scripts/render-keycloak-realm.sh` after `PUBLIC_BASE_URL`
 is `https://<host>`: it writes `KC_HOSTNAME=https://<host>/idp`, `KC_HTTP_RELATIVE_PATH=/idp` and
 `KC_PROXY_HEADERS=xforwarded` for Keycloak, and the whole login (`OIDC_DISCOVERY_URL`,
 `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, the admin URL) into
@@ -641,11 +643,12 @@ Without `OIDC_DISCOVERY_URL` the admin portal is disabled; participants' pages w
 In production also set `SESSION_SECRET` (at least 32 random bytes); the image refuses to start
 without it, and with an `http` discovery URL or without `OIDC_CLIENT_SECRET` (ADR 0013). The one
 http discovery URL production accepts is the bundled identity provider's internal address,
-`http://idp:8080/idp/realms/openplanner/...` with an https `OIDC_ISSUER`, as
-`scripts/render-keycloak-realm.sh` writes it (a recorded exception, ADR 0125). Until ADR 0125
-step 2 that address is the name `idp`, which this host's DNS may answer while the container is
-down: read the ADR before a production host goes live on the bundled provider (the installer
-warns), and see *After an unexplained outage of the bundled provider* below. A host that
+`http://172.31.240.4:8080/idp/realms/openplanner/...` with an https `OIDC_ISSUER`, as
+`scripts/render-keycloak-realm.sh` writes it (a recorded exception, ADR 0125): the provider's
+fixed address on the `edge` network, never the name `idp`, which this host's DNS could answer
+while the container is down (ADR 0125 step 2). A host whose login still names `idp` (installed
+before that step) is refused at start in production; the installer of this release moves it (see
+*Fixed addresses on the host* below). A host that
 leaves the bundled provider runs the installer with `--idp own`, which deletes
 `secrets/keycloak-app.env` (Compose reads that file after `.env`, so its login would otherwise
 win over yours), removes the `/idp` route from `proxy.env` and stops the `idp` and `idp-db`
@@ -920,15 +923,16 @@ from `PUBLIC_BASE_URL` in `.env` (the redirect URIs, and the https hostname of K
 prints no value. The login (`OIDC_DISCOVERY_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`,
 `OIDC_CLIENT_SECRET`) is written to `secrets/keycloak-app.env`, so nothing is copied into
 `.env`. `OIDC_ISSUER` is `<KC_HOSTNAME>/realms/openplanner`: Keycloak announces its public
-address, not the `idp:8080` it is fetched on, and the login is refused on any other issuer (ADR 0097).
+address, not the internal address it is fetched on, and the login is refused on any other issuer
+(ADR 0097).
 `python -m app.cli oidc-check` compares the two and names the issuer to set when they differ.
 When Keycloak itself sits behind a TLS proxy and OpenPlanner fetches its discovery document over
 https, set `KC_PROXY_HEADERS=xforwarded` (and let the proxy send `X-Forwarded-Proto`): otherwise
 Keycloak announces its token endpoint and key set as `http://`, and `oidc-check` fails on
 *provider endpoints* in production. With the bundled provider behind the bundled proxy
-(`render-keycloak-realm.sh` sets the header), web fetches the document on the internal network as
-`http://idp:8080/idp/...` (ADR 0112), the endpoints follow that address, and `oidc-check` reports
-them as expected. Keycloak's own address
+(`render-keycloak-realm.sh` sets the header), web fetches the document on the internal network at
+the provider's fixed address, `http://172.31.240.4:8080/idp/...` (ADR 0112, ADR 0125), the
+endpoints follow that address, and `oidc-check` reports them as expected. Keycloak's own address
 for browsers is `KC_HOSTNAME` in the same file (default `http://127.0.0.1:8080`): a lab on the
 host itself needs nothing more; reaching the login from another machine goes through the proxy
 and is step 2. The admin console is bound to the host's loopback and is never published.
@@ -953,7 +957,9 @@ docker01 on 2026-11-02, without root:
 4. In `docker-compose.override.yml`, switch the old service off and run `idp` under the
    profile the installer set: `keycloak: profiles: !override [lab-old-keycloak]` and
    `idp: profiles: !override [dev]` with its published port.
-5. In `.env`, point `OIDC_DISCOVERY_URL` at `http://idp:8080/realms/openplanner/...`, set
+5. In `.env`, point `OIDC_DISCOVERY_URL` at `http://idp:8080/realms/openplanner/...` (today the
+   render script writes the login, at the provider's fixed address, into
+   `secrets/keycloak-app.env`, and `.env` holds none of it; ADR 0106 step 5, ADR 0125), set
    `OIDC_CLIENT_SECRET` to `KC_OPENPLANNER_CLIENT_SECRET`, and drop any `KEYCLOAK_*` lines
    (`secrets/keycloak-app.env` holds them).
 6. `docker compose --env-file .env.update up -d idp web worker`, then `python -m app.cli
@@ -1015,15 +1021,52 @@ Deleting it and starting again re-imports the rendered realm, so `super` gets th
 password of `secrets/keycloak.env` back; a changed `KC_OPENPLANNER_CLIENT_SECRET` needs a new
 render and a restart of `idp` and `web`.
 
-**After an unexplained outage of the bundled provider (ADR 0125 point 8).** Until ADR 0125
-step 2, web, worker and the proxy reach Keycloak by the name `idp`. While its container is
-down, this host's DNS may answer that name, and whoever answered may hold staff passwords and
-one-time codes, the portal's session cookie, Keycloak's own session cookies (of the console too)
-and both client secrets, all of which work after the outage; it also served pages and script on
-the portal's own address. Nothing logs whether Keycloak's console was used in that time (the
-proxy keeps no access log, Keycloak no event log here), so assume it was. When the `idp`
-container was down and the reason is not known (an update or a restart you did yourself is
-known), work through these steps in this order:
+**Fixed addresses on the host (ADR 0125 step 2).** Every hop between the containers of one
+host goes to a fixed address, never to a name: the proxy reaches web at `172.31.240.3:8000`
+(`WEB_UPSTREAM`, set in `docker-compose.yml`) and the bundled provider at `172.31.240.4:8080`
+(`IDP_UPSTREAM` in `proxy.env`); web and worker reach the provider's login and staff directory at
+that address (`secrets/keycloak-app.env`); Keycloak reaches its database at `172.31.240.18:5432`
+(`KC_DB_URL_HOST` in `secrets/keycloak.env`) on the internal network `idp-store`, which only
+`idp` and `idp-db` join. The addresses are in `scripts/fixed-addresses.sh`, which the installer,
+the render script and `scripts/check-proxy.sh` read, and in `docker-compose.yml`; a test keeps
+them equal. They lie outside the range Docker hands out, so while a
+container is down its address stays free and its hop fails: logging in fails, `/idp` answers
+502, and so does the portal while web restarts. (Mailpit, a lab's mail catcher, keeps its name;
+it is never in production, ADR 0125 point 5.) Before this step the hops used the names `idp`,
+`idp-db` and `web`, which Docker passes to the host's resolver while the container is down.
+`scripts/check-proxy.sh` (pass 4) shows it on a real Docker host.
+
+*Moving a host.* After a portal update, bring the checkout to the same release and run the
+installer (`docs/install.md`, *Upgrading*); until then the proxy finds web by its name as before
+and says so in its log. The installer writes `IDP_UPSTREAM` with the address, renders the
+login, the directory and the database host again and replaces both client secrets
+(`KC_OPENPLANNER_CLIENT_SECRET`, `KC_DIRECTORY_CLIENT_SECRET`) unless the render script made them
+since this step (`KC_CLIENT_SECRETS_PINNED=true` in `secrets/keycloak.env`): whatever answered the
+name `idp` may hold the old ones. Running the render script by hand first does not change that. They change in `secrets/keycloak.env`,
+`secrets/keycloak-app.env` and the realm file and, once Keycloak runs, in Keycloak itself
+(`kcadm.sh`, logged in as `admin` with `KC_BOOTSTRAP_ADMIN_PASSWORD`, the values on standard
+input). Staff cannot log in between the start of web and that moment. When the installer stops
+with *did not take its new client secrets*, `KC_BOOTSTRAP_ADMIN_PASSWORD` is not the password
+of `admin` in realm `master` (the recovery below changes it): write the current one there with an
+editor and run the installer again, which sets the same new pair (it waits in
+`secrets/keycloak-secrets.pending` until Keycloak has it). A production host whose login still
+names `idp` runs the installer of the new release before its portal update instead: the new
+image refuses that address at start, and the updater would roll the update back.
+
+**After an unexplained outage of the bundled provider on a host that ran on the name (ADR 0125
+point 8).** Before ADR 0125 step 2, web, worker and the proxy reached Keycloak by the name `idp`,
+and the installer of that step moves a host to the fixed addresses above. This recovery is for an
+outage of the `idp` container from before the move: while it was down, this host's DNS may have
+answered that name, and whoever answered may hold staff passwords and one-time codes, the
+portal's session cookie, Keycloak's own session cookies (of the console too) and both client
+secrets, all of which work after the outage; it also served pages and script on the portal's own
+address. The new client secrets of the move do not replace step 2 below: an administrator planted
+in realm `master` during the outage can read them. Nothing logs whether Keycloak's console was
+used in that time (the proxy keeps no access log, Keycloak no event log here), so assume it was.
+Since the move an outage stops the login, the staff directory and `/idp`, and reaches nothing
+else. When the `idp` container was down before the
+move and the reason is not known (an update or a restart you did yourself is known), work through
+these steps in this order:
 
 1. **Realm `master` first, always**, before any new secret exists (a `master` administrator can
    read every client's secret):

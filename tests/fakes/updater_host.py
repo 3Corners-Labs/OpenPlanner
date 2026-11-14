@@ -33,6 +33,9 @@ Behaviour is set through files in ``FAKE_HOST_DIR``:
   CLI's ``Refused (...)`` or ``REFUSED ...`` lines.
   ``config plan`` prints one change and the plan hash ``PLAN_HASH``; ``config apply`` refuses
   any other ``--plan-hash`` with ``configuration_plan_stale``.
+- ``idp-stdin.jsonl`` (written, not read): every ``compose exec -T idp sh -c SCRIPT`` with what
+  reached it on stdin, where the installer hands Keycloak's admin CLI its values (ADR 0125
+  step 2); ``fail`` may list ``idp-secrets`` (Keycloak refuses the new client secrets).
 
 ``apt-get``, ``usermod`` and ``systemctl`` only record their call; ``curl -o`` writes a small
 stand-in for the downloaded file, with a matching checksum unless ``fail`` lists ``checksum``.
@@ -151,9 +154,18 @@ def _document(args: list[str]) -> int:
     return 0
 
 
+def _idp(script: str) -> int:
+    """Handle ``compose exec -T idp sh -c SCRIPT``: record the script and its stdin."""
+    with (_host() / "idp-stdin.jsonl").open("a") as log:
+        log.write(json.dumps({"script": script, "stdin": sys.stdin.read()}) + "\n")
+    return _failing("idp-secrets") if "get clients" in script else 0
+
+
 def _compose(args: list[str]) -> int:
     """Handle ``docker compose --project-directory D --env-file F <command>``."""
     command = args[5:]
+    if command[:3] == ["exec", "-T", "idp"]:
+        return _idp(command[-1])
     if command[:3] == ["exec", "-T", "web"]:
         command = command[3:]
     elif command[:1] == ["run"] and "web" in command:
