@@ -24,7 +24,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.domain.admin import AdminService, record_change
-from app.domain.authorization import Permission, Principal
+from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.contact_center import (
     CONNECTION_FIELD,
     ConnectionChange,
@@ -131,6 +131,26 @@ class ContactCenterConnectionService:
         if self._connections is None:
             return None
         return await self._connections.get(organisation_id)
+
+    async def paused_organisations(self, principal: Principal) -> list[str]:
+        """Return the slugs of the organisations whose webhook address is paused.
+
+        For the status screens (ADR 0124 point 9), so that a pause reads as paused and not as a
+        healthy or a silent connection. Only organisations the reader may manage integrations
+        for; empty without a settings key.
+        """
+        if self._connections is None:
+            return []
+        async with self._uow.read() as tx:
+            organisations = await tx.list_organisations(
+                scope_for(principal, Permission.INTEGRATIONS_MANAGE)
+            )
+        paused: list[str] = []
+        for organisation in organisations:
+            stored = await self._connections.get(organisation.id)
+            if stored is not None and not stored.inbound_enabled:
+                paused.append(organisation.slug)
+        return paused
 
     async def webhook_target(self, slug: str, kind: ContactCenterKind) -> WebhookTarget:
         """Return whether an organisation's own webhook address exists (ADR 0032 point 10).

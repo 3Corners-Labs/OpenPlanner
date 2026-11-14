@@ -109,8 +109,10 @@ controleert elke aanroep nog net als voorheen (netwerk, handtekening, tijd): een
 geweigerd zou worden, wordt geweigerd. Een aanroep die klopt krijgt het gebruikelijke `204`, zodat
 het platform zijn aanmelding houdt en die niet uitzet, maar de gebeurtenis wordt weggegooid: er
 wordt niets bij de boeking vastgelegd en niets onthouden, dus de herbezorging door het platform
-nadat u hervat is, wordt wel verwerkt. De kaart toont een melding *Gepauzeerd* zolang het duurt, en
-de *laatste gebeurtenis* op de statusschermen staat stil. Pauzeren of hervatten verandert het
+nadat u hervat is, wordt wel verwerkt. De kaart toont een melding *Gepauzeerd* zolang het duurt en
+telt de gebeurtenissen die zijn weggegooid, en de statusschermen (*Koppelingen* en de statuskaart
+op het overzicht) tonen het adres als gepauzeerd: de *laatste gebeurtenis* daar staat stil, en dat
+is geen gezonde en ook geen rustige koppeling. Pauzeren of hervatten verandert het
 webhookgeheim en de aanmelding bij het platform niet.
 
 Hervatten speelt wat is weggegooid niet opnieuw af. De toestanden van de open taken worden
@@ -152,9 +154,32 @@ Een netwerk dat een hele adresfamilie dekt (`0.0.0.0/0` of `::/0`, of een IPv6-n
 dat ook elk als IPv6 geschreven IPv4-adres bevat) wordt geweigerd: dat is geen lijst. Is de opgeslagen lijst niet te lezen, dan zegt de kaart dat en accepteert het adres geen
 enkele aanroep tot u de lijst opnieuw opslaat.
 
-**Stuur nadat u een lijst hebt ingesteld een testbezorging** en controleer dat die wordt
-geaccepteerd. De kaart toont nog geen geweigerde aanroepen, dus een lijst die de leverancier buiten
-sluit ziet u hier niet.
+**Stuur nadat u een lijst hebt ingesteld een testbezorging** en controleer op de kaart, onder
+*Geziene bezorgingen*, dat die wordt geaccepteerd. Een lijst die de leverancier buiten sluit, ziet u
+daar als een weigering vanwege het netwerk.
+
+### Geziene bezorgingen
+
+Onder de pauze toont de kaart wat OpenPlanner op dit adres zag: *Laatst geaccepteerd*, *Laatst
+geweigerd* met de reden in woorden, het aantal aanroepen in het huidige venster per uitkomst
+(geaccepteerd, geaccepteerd maar al eerder gezien, gecontroleerd en weggegooid tijdens de pauze,
+gecontroleerd maar over werk dat deze koppeling niet heeft aangemaakt, en elke reden van een
+weigering), de fouten bij afzonderlijke aanroepen waarvan het bronadres niet te vertrouwen was, per
+soort, en hoeveel weigeringen van binnen uw eigen netwerklijst kwamen. Zo ziet u of de leverancier
+doorkomt en waarom een aanroep werd geweigerd.
+
+Deze aantallen zijn van het draaiende webproces sinds het venster begon (het venster voor
+beveiligingsgebeurtenissen, een instelling van de platformbeheerder). Een herstart maakt ze leeg en
+elk proces telt voor zichzelf, dus een rustige kaart na een herstart zegt niets. De laatste tijden
+blijven staan zolang het proces draait.
+
+Gebeurt het volgende op dit adres binnen het venster vaker dan het *waarschuwingsaantal voor
+weigeringen* van het platform (standaard 20), dan meldt één systeemgebeurtenis het: een
+bezorging die wel getekend was maar te oud is, een weigering van een aanroep van binnen uw eigen
+netwerklijst, een weigering vanwege het netwerk nadat een bezorging was geaccepteerd (uw lijst kan
+verouderd zijn), of een gebeurtenis over werk dat deze koppeling niet heeft aangemaakt (de
+aanmelding wijst mogelijk naar het verkeerde adres). Aanroepen van vreemden die mislukken, staan
+op de kaart en geven geen melding.
 
 ## Wat wordt vastgelegd
 

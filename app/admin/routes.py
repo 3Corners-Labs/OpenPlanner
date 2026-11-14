@@ -815,6 +815,7 @@ async def integrations(
         locale.gettext,
         lambda at: admin_moment(request, locale, at),
         lambda organisation: reach.contains(organisation, None),
+        await contact_center_routes.paused_addresses(request, context.principal),
     )
     return _page(
         request,

@@ -6363,6 +6363,9 @@ msgstr "Machine API token requests per client"
 msgid "settings.field.rate_limit_webhook_per_minute.label"
 msgstr "Inbound webhooks per minute, per platform, organisation and source address"
 
+msgid "settings.field.webhook_refusal_alert_count.label"
+msgstr "Refused or unmatched webhook deliveries at one address, inside the event window, above which a system event warns"
+
 msgid "settings.field.rate_limit_agent_calls.label"
 msgstr "Machine API calls per client"
 
@@ -13815,7 +13818,121 @@ msgid "admin.source.paused_chip"
 msgstr "Paused"
 
 msgid "admin.source.paused_text"
-msgstr "This address is paused: deliveries are accepted and dropped, and the platform keeps its subscription. The last event on the status screens stands still while it lasts. Resume to handle events again; the periodic check of the tasks then catches up on missed states."
+msgstr "This address is paused: deliveries are accepted and dropped, and the platform keeps its subscription. The last event on the status screens stands still while it lasts, and they show the address as paused. Resume to handle events again; the periodic check of the tasks then catches up on missed states."
+
+msgid "admin.delivery.title"
+msgstr "Deliveries seen"
+
+msgid "admin.delivery.process_note"
+msgstr "These numbers are of the running web process since the window began. A restart empties them, and each process counts for itself."
+
+msgid "admin.delivery.last_accepted"
+msgstr "Last accepted"
+
+msgid "admin.delivery.last_refused"
+msgstr "Last refused"
+
+msgid "admin.delivery.window"
+msgstr "Counting window"
+
+msgid "admin.delivery.window_since"
+msgstr "Since {time}"
+
+msgid "admin.delivery.paused_dropped"
+msgstr "Events dropped while paused"
+
+msgid "admin.delivery.none_seen"
+msgstr "None seen since this process started"
+
+msgid "admin.delivery.last_refused_at"
+msgstr "{time}: {reason}"
+
+msgid "admin.delivery.counts"
+msgstr "Calls in this window by outcome"
+
+msgid "admin.delivery.col.what"
+msgstr "Outcome"
+
+msgid "admin.delivery.col.calls"
+msgstr "Calls"
+
+msgid "admin.delivery.col.fault"
+msgstr "Fault of the call"
+
+msgid "admin.delivery.no_calls"
+msgstr "No calls in this window."
+
+msgid "admin.delivery.inside_list"
+msgstr "{count} of the refused calls came from inside this connection's own list of networks."
+
+msgid "admin.delivery.faults"
+msgstr "Calls whose source address could not be trusted, by fault"
+
+msgid "admin.delivery.outcome.accepted"
+msgstr "Accepted and handled"
+
+msgid "admin.delivery.outcome.duplicate"
+msgstr "Accepted, already seen (delivered again)"
+
+msgid "admin.delivery.outcome.paused"
+msgstr "Verified, dropped while paused"
+
+msgid "admin.delivery.outcome.unknown_work"
+msgstr "Verified, about work this connection did not create"
+
+msgid "admin.delivery.reason.unknown_address"
+msgstr "Refused: no such address"
+
+msgid "admin.delivery.reason.network"
+msgstr "Refused: caller outside the allowed networks"
+
+msgid "admin.delivery.reason.source_unknown"
+msgstr "Refused: the caller's address could not be trusted"
+
+msgid "admin.delivery.reason.rate"
+msgstr "Refused: too many calls"
+
+msgid "admin.delivery.reason.content_type"
+msgstr "Refused: not a JSON call"
+
+msgid "admin.delivery.reason.too_large"
+msgstr "Refused: body too large"
+
+msgid "admin.delivery.reason.invalid_signature"
+msgstr "Refused: signature does not match"
+
+msgid "admin.delivery.reason.stale"
+msgstr "Refused: signed time too far from now"
+
+msgid "admin.delivery.reason.malformed"
+msgstr "Refused: body not of the expected shape"
+
+msgid "admin.delivery.fault.wide_trust"
+msgstr "The proxy trust is wider than single hosts"
+
+msgid "admin.delivery.fault.unreadable_trust"
+msgstr "An entry of the proxy trust cannot be read"
+
+msgid "admin.delivery.fault.untrusted_hop"
+msgstr "The call carried forwarded headers from a sender that is not trusted"
+
+msgid "admin.delivery.fault.caller_is_proxy"
+msgstr "The caller was the proxy itself, which did not hand the caller on"
+
+msgid "admin.delivery.fault.hop_not_handed_on"
+msgstr "A hop on the way did not hand the caller's address on"
+
+msgid "admin.delivery.fault.no_address"
+msgstr "The call had no address"
+
+msgid "admin.overview.widget.status.paused"
+msgstr "{count} address(es) paused"
+
+msgid "admin.integrations.paused"
+msgstr "Paused addresses"
+
+msgid "admin.integrations.paused_lead"
+msgstr "These organisations paused their contact-center address. The platform still gets its 204 and keeps its subscription, but verified events are dropped, so the last event above stands still. This is not a healthy connection and not a quiet one."
 
 msgid "admin.channels.cc_pause_title"
 msgstr "Deliveries"

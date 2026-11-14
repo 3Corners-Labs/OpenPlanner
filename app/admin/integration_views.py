@@ -7,7 +7,7 @@ command line (runbook, section 6): the page offers no destructive action. The he
 shows the connection health and each platform's last verified webhook (ADR 0082).
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -202,6 +202,20 @@ class HealthRow:
     since: str
     requests: int
     failures: int
+    paused: bool = False
+
+
+@dataclass(frozen=True)
+class PausedRow:
+    """An organisation whose contact-center address is paused (ADR 0124 point 9).
+
+    Attributes:
+        organisation: Its slug.
+        dropped: Verified events this web process dropped while it was paused, in the window.
+    """
+
+    organisation: str
+    dropped: int
 
 
 @dataclass(frozen=True)
@@ -220,6 +234,7 @@ class HealthView:
 
     rows: list[HealthRow]
     inbound: list[InboundRow]
+    paused: list[PausedRow] = field(default_factory=list)
 
 
 def health_view(
@@ -228,8 +243,21 @@ def health_view(
     gettext: Callable[..., str],
     moment: Callable[[datetime], str],
     organisations: Callable[[str | None], bool],
+    paused: Mapping[str, int] | None = None,
 ) -> HealthView:
-    """Return the health rows the reader may see (``organisations``) and the last webhooks."""
+    """Return the health rows the reader may see (``organisations``) and the last webhooks.
+
+    Args:
+        entries: The stored health of every connection.
+        inbound: Each platform's last verified webhook.
+        gettext: The request's translator.
+        moment: Writes a time in the reader's zone.
+        organisations: Whether the reader may see an organisation's rows.
+        paused: The organisations whose contact-center address is paused, with the events the
+            gate dropped for each (ADR 0124 point 9). A paused address is shown as paused: its
+            platform's last event stands still while it lasts, which is not health.
+    """
+    paused = paused or {}
     rows = [
         HealthRow(
             entry.organisation or gettext("admin.integrations.health.platform_wide"),
@@ -239,6 +267,7 @@ def health_view(
             moment(entry.since),
             entry.requests,
             entry.failures,
+            entry.platform is Platform.WXCC and entry.organisation in paused,
         )
         for entry in entries
         if organisations(entry.organisation)
@@ -249,6 +278,7 @@ def health_view(
             InboundRow(gettext(PLATFORM_LABELS[e.platform]), moment(e.at), e.kind, e.outcome)
             for e in inbound
         ],
+        [PausedRow(slug, dropped) for slug, dropped in sorted(paused.items())],
     )
 
 

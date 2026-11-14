@@ -1,13 +1,8 @@
 """The organisation's own contact-center connection on its *Kanalen* page (ADR 0032 points 9–10)."""
 
-import json
-from dataclasses import replace
-
-import httpx
 import pytest
 import structlog.testing
 
-from app.adapters.contact_center_connections import SealedConnections
 from app.adapters.db.credentials import CredentialStore
 from app.adapters.db.record_names import contact_center_credential_name
 from app.adapters.integrations import sealed_store
@@ -17,17 +12,22 @@ from app.domain.integration import EventOutcome
 from app.domain.networks import NetworkList
 from app.web.protection import RateLimits, configure_rate_limits
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
-from tests.fakes.integrations import FakeOrganisationDispatchers
 from tests.support.admin_site import site_app
-
-PAGE = "/admin/organisations/demo/channels"
-FORM = {
-    "cc_kind": "webex_cc",
-    "cc_api_base_url": "https://api.wxcc-eu1.cisco.com",
-    "cc_client_id": "C0ffee-client",
-    "cc_client_secret": "client-secret-value",
-    "cc_refresh_token": "refresh-token-value",
-}
+from tests.support.contact_center_site import (
+    FORM,
+    PAGE,
+    STRANGER,
+    SUPPLIER,
+    SUPPLIER_RANGE,
+    _call_from,
+    _connect,
+    _connections,
+    _event,
+    _pause,
+    _registrar,
+    _save_networks,
+    _set_settings,
+)
 
 
 def _credentials(site: Site) -> CredentialStore:
@@ -36,29 +36,6 @@ def _credentials(site: Site) -> CredentialStore:
     store = sealed_store(state.engine, state.settings)
     assert store is not None
     return store
-
-
-def _connections(site: Site) -> SealedConnections:
-    connections: SealedConnections = site_app(site).state.contact_center_connections
-    return connections
-
-
-def _registrar(
-    site: Site, outcome: Registration = Registration.REGISTERED
-) -> FakeOrganisationDispatchers:
-    """Put a fake in place of the platform: no test talks to a real contact center."""
-    registrar = FakeOrganisationDispatchers(outcome=outcome)
-    state = site_app(site).state
-    state.integrations = replace(state.integrations, organisations=registrar)
-    return registrar
-
-
-async def _connect(site: Site) -> None:
-    _registrar(site)
-    await site.login_as(SUPER)
-    saved = await site.client.post(f"{PAGE}/contact-center", data=FORM, headers=SAME_ORIGIN)
-    assert saved.status_code == 303
-    assert "done=contact_center_registered" in saved.headers["location"]
 
 
 async def test_the_superuser_connects_an_organisation_and_never_sees_the_secrets(
@@ -124,18 +101,6 @@ async def test_an_organisation_admin_may_not_set_the_connection(site: Site) -> N
     refused = await site.client.post(f"{PAGE}/contact-center", data=FORM, headers=SAME_ORIGIN)
 
     assert refused.status_code == 403
-
-
-def _event(stamp_ms: int) -> bytes:
-    return json.dumps(
-        {
-            "id": "evt-1",
-            "type": "task:ended",
-            "comciscotimestamp": stamp_ms,
-            "data": {"taskId": "unknown-task"},
-        },
-        separators=(",", ":"),
-    ).encode()
 
 
 async def test_the_organisations_address_verifies_with_its_own_secret(site: Site) -> None:
@@ -239,36 +204,6 @@ async def test_forged_calls_to_an_organisation_never_lock_its_signed_calls_out(s
 
 
 # --- Allowed source networks (ADR 0124 point 3, step 2b) --------------------------------------
-
-SUPPLIER = "8.8.8.8"
-SUPPLIER_RANGE = "8.8.8.0/24"
-STRANGER = "8.8.4.4"
-ADDRESS = "/webhooks/contact-center/webex_cc/demo"
-
-
-async def _save_networks(site: Site, text: str, **form: str) -> httpx.Response:
-    """Save the card with only the allowed networks changed (secrets left blank: they are kept)."""
-    data = FORM | {"cc_client_secret": "", "cc_refresh_token": ""} | {"cc_allowed_networks": text}
-    return await site.client.post(f"{PAGE}/contact-center", data=data | form, headers=SAME_ORIGIN)
-
-
-async def _call_from(site: Site, address: str, secret: str | None = None) -> httpx.Response:
-    """Send a task event to the organisation's address from ``address``.
-
-    It is signed correctly unless a ``secret`` (a wrong one) is given.
-    """
-    secret = secret or await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC)
-    assert secret is not None
-    stamp = int(site.clock.now().timestamp() * 1000)
-    body = _event(stamp)
-    transport = httpx.ASGITransport(app=site_app(site), client=(address, 4711))
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
-        return await c.post(ADDRESS, content=body, headers=sign_wxcc(body, secret, stamp))
-
-
-def _set_settings(site: Site, **update: object) -> None:
-    state = site_app(site).state
-    state.settings = state.settings.model_copy(update=update)
 
 
 async def _webhook_refusals(site: Site) -> list[tuple[str, str]]:
@@ -524,15 +459,6 @@ def _handler(site: Site) -> _Handler:
     handler = _Handler()
     site_app(site).state.integration_service = handler
     return handler
-
-
-async def _pause(site: Site, state: str, org: str = "demo") -> httpx.Response:
-    """Press the card's button: ``off`` pauses the deliveries, ``on`` resumes them."""
-    return await site.client.post(
-        f"/admin/organisations/{org}/channels/contact-center/inbound",
-        data={"inbound": state},
-        headers=SAME_ORIGIN,
-    )
 
 
 async def test_the_card_offers_a_button_that_pauses_and_one_that_resumes(site: Site) -> None:

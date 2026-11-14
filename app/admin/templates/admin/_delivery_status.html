@@ -1,0 +1,35 @@
+{#- What the gate has seen at one webhook address (ADR 0124 point 10): last accepted, last refused with its reason, the window's calls per outcome and the faults of single calls. Set `delivery` (a DeliveryView), `delivery_id` (the heading's id) and optionally `delivery_tag` (default h3) before including. Server-rendered, no script; the counts are this process's, since the window began. -#}
+{% set tag = delivery_tag|default("h3") %}
+<{{ tag }} id="{{ delivery_id }}">{{ _("admin.delivery.title") }}</{{ tag }}>
+<p class="hint">{{ _("admin.delivery.process_note") }}</p>
+<dl class="facts" aria-labelledby="{{ delivery_id }}">
+  <div><dt>{{ _("admin.delivery.last_accepted") }}</dt><dd>{{ delivery.last_accepted }}</dd></div>
+  <div><dt>{{ _("admin.delivery.last_refused") }}</dt><dd>{{ delivery.last_refused }}</dd></div>
+  {% if delivery.window %}<div><dt>{{ _("admin.delivery.window") }}</dt><dd>{{ delivery.window }}</dd></div>{% endif %}
+  <div><dt>{{ _("admin.delivery.paused_dropped") }}</dt><dd>{{ delivery.paused_dropped }}</dd></div>
+</dl>
+{% if delivery.outcomes %}
+<div class="table-scroll">
+<table class="data-table">
+  <caption class="visually-hidden">{{ _("admin.delivery.counts") }}</caption>
+  <thead><tr><th scope="col">{{ _("admin.delivery.col.what") }}</th><th scope="col">{{ _("admin.delivery.col.calls") }}</th></tr></thead>
+  <tbody>
+    {% for row in delivery.outcomes %}<tr><th scope="row">{{ row.label }}</th><td>{{ row.count }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% if delivery.inside_list %}<p>{{ _("admin.delivery.inside_list", count=delivery.inside_list) }}</p>{% endif %}
+{% else %}
+<p class="empty-state">{{ _("admin.delivery.no_calls") }}</p>
+{% endif %}
+{% if delivery.faults %}
+<div class="table-scroll">
+<table class="data-table">
+  <caption class="visually-hidden">{{ _("admin.delivery.faults") }}</caption>
+  <thead><tr><th scope="col">{{ _("admin.delivery.col.fault") }}</th><th scope="col">{{ _("admin.delivery.col.calls") }}</th></tr></thead>
+  <tbody>
+    {% for row in delivery.faults %}<tr><th scope="row">{{ row.label }}</th><td>{{ row.count }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}

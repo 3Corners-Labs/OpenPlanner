@@ -1293,6 +1293,26 @@ _OPERATIONS = (
         "A verified webhook of a contact-center platform was processed (ADR 0032).",
     ),
     _e(
+        "webhook.alert_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The warning about refused webhook deliveries could not be written: {error}.",
+        "The system event `webhook.refusal_alert` (ADR 0124 point 10) was not saved; the "
+        "webhook was answered as usual and the ledger will not raise it again in this window.",
+        _CHECK_HOST,
+    ),
+    _e(
+        "webhook.ledger_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The delivery ledger could not note a webhook call: {error}.",
+        "The in-memory ledger behind the connection card (ADR 0124 point 10) failed on a call; "
+        "the webhook was answered as usual.",
+        _CHECK_HOST,
+    ),
+    _e(
         "webhook.paused",
         _OPS,
         "info",
@@ -1651,6 +1671,22 @@ _AUDIT = (
         "the actor and the count; nothing was refused.",
         "Ask the person whether the requests were theirs; if not, use *End all sessions* on their "
         "page under Staff, which also lists what they did.",
+    ),
+    _e(
+        "webhook.refusal_alert",
+        _SYS,
+        "outcome",
+        "",
+        "Many refused or unmatched webhook deliveries at one address.",
+        "More than `webhook_refusal_alert_count` deliveries at one organisation's webhook address "
+        "within the event window (ADR 0124 points 10 and 12) were of a kind a passer-by cannot "
+        "cause alone: signed but stale, refused from inside the connection's own list of "
+        "networks, refused for the network after a delivery was accepted, or about work the "
+        "connection did not create. The detail names the platform, the count and the reasons' "
+        "codes; nothing was changed. Written once per window and address.",
+        "`stale`: check the clocks of the platform and of this server. `network`: the platform's "
+        "source networks may have changed, so check the connection's list. `unknown_work`: the "
+        "subscription may point at the wrong address. Others: check the webhook secret.",
     ),
     _e(
         "booking_rows.rollup",

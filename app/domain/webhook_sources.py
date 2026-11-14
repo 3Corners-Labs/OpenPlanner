@@ -175,6 +175,33 @@ class ProxyChain:
         return None
 
 
+def judge_source(
+    caller: str | None, sources: NetworkList, *, required: bool, chain: ProxyChain
+) -> tuple[Refusal | None, ChainFault | None]:
+    """Decide whether the source of a call is acceptable, and say why when it cannot be trusted.
+
+    The one judgement of ADR 0124 points 3 and 4; ``check_source`` returns its first part.
+
+    Args:
+        caller: The caller's address as the server derived it.
+        sources: The list that applies (``source_list_that_applies``); empty: none.
+        required: ``WEBHOOK_SOURCE_NETWORKS_REQUIRED``: an address without a list does not accept.
+        chain: What is known about the proxy chain.
+
+    Returns:
+        The refusal (``None`` to go on) and, for ``Refusal.SOURCE_UNKNOWN`` only, the fault of
+        this call's proxy chain that made the address untrustworthy: what the card counts by kind.
+    """
+    if sources.unreadable:
+        return Refusal.NETWORK, None
+    if not sources.networks:
+        return (Refusal.NETWORK if required else None), None
+    fault = chain.fault_for(caller)
+    if fault is not None:
+        return Refusal.SOURCE_UNKNOWN, fault
+    return (None if in_any(caller, sources.networks) else Refusal.NETWORK), None
+
+
 def check_source(
     caller: str | None, sources: NetworkList, *, required: bool, chain: ProxyChain
 ) -> Refusal | None:
@@ -192,13 +219,7 @@ def check_source(
         ``Refusal.SOURCE_UNKNOWN`` when a list applies and the caller's address cannot be
         trusted. A call without a list is not asked about the chain.
     """
-    if sources.unreadable:
-        return Refusal.NETWORK
-    if not sources.networks:
-        return Refusal.NETWORK if required else None
-    if chain.fault_for(caller) is not None:
-        return Refusal.SOURCE_UNKNOWN
-    return None if in_any(caller, sources.networks) else Refusal.NETWORK
+    return judge_source(caller, sources, required=required, chain=chain)[0]
 
 
 class SourceState(StrEnum):

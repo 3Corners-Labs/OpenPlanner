@@ -12,6 +12,7 @@ from app.domain.webhook_sources import (
     ProxyChain,
     SourceState,
     check_source,
+    judge_source,
     source_list_that_applies,
     source_state,
 )
@@ -206,3 +207,31 @@ def test_the_state_of_an_address_is_never_silent(
     sources: NetworkList, required: bool, state: SourceState
 ) -> None:
     assert source_state(sources, required=required) is state
+
+
+@pytest.mark.parametrize(
+    ("caller", "trusted", "fault"),
+    [
+        ("172.31.240.2", "172.31.240.2", ChainFault.CALLER_IS_PROXY),
+        ("10.1.2.3", "172.31.240.2", ChainFault.HOP_NOT_HANDED_ON),
+        (None, "172.31.240.2", ChainFault.NO_ADDRESS),
+        (SUPPLIER, "*", ChainFault.WIDE_TRUST),
+    ],
+)
+def test_the_judgement_names_the_fault_of_this_call_behind_a_source_unknown(
+    caller: str | None, trusted: str, fault: ChainFault
+) -> None:
+    """The card counts the per-call faults by kind; only ``source_unknown`` has one."""
+    judged = judge_source(caller, LISTED, required=False, chain=chain(trusted))
+
+    assert judged == (Refusal.SOURCE_UNKNOWN, fault)
+
+
+def test_the_judgement_names_no_fault_for_the_other_answers() -> None:
+    assert judge_source("8.8.4.4", LISTED, required=False, chain=SOUND) == (Refusal.NETWORK, None)
+    assert judge_source(SUPPLIER, LISTED, required=False, chain=SOUND) == (None, None)
+    assert judge_source(SUPPLIER, NONE, required=True, chain=SOUND) == (Refusal.NETWORK, None)
+    assert judge_source(SUPPLIER, UNREADABLE, required=False, chain=SOUND) == (
+        Refusal.NETWORK,
+        None,
+    )
