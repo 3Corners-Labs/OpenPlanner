@@ -161,6 +161,8 @@ async def _bookings_in_every_status(tx: Transaction, now: datetime, token_key: b
     _, purged = await store_example_booking(
         tx, group, start, now, token_key, status=BookingStatus.COMPLETED
     )
+    # Storage only, on purpose: the fixture is a database as a pre-upgrade image holds it, with
+    # no minted guest, so the domain's rule (``purge_booking``) would plan nothing here.
     await tx.purge_personal_data(purged.id or 0, start + timedelta(hours=24))
 
 

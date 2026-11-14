@@ -125,10 +125,10 @@ class CallTokenService:
         link = join_link(booking.meeting.link if booking.meeting else None, JoinClient.CHOICE)
         if join_state(booking, self._clock.now()) is not JoinState.OPEN or link is None:
             return TokenRefusal.NOT_OPEN
-        if not admit():
-            return TokenRefusal.RATE_LIMITED
         if self._video is None:
             return TokenRefusal.UNAVAILABLE
+        if not admit():
+            return TokenRefusal.RATE_LIMITED
         async with self._uow.locked() as tx:
             await tx.mark_guest_minted(booking.id, self._clock.now())
         try:

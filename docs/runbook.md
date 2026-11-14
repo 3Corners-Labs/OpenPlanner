@@ -1742,7 +1742,7 @@ current and, while it is set, the previous key. Keep `MANAGEMENT_TOKEN_KEY_PREVI
 for at least the longest span from a booking to its purge (the booking's time, plus the 24 hours
 of retention, plus any closure hold up to `closure_max_retention_days`); a guest minted under a
 key that is no longer configured keeps the participant's first name at the video platform. A
-worker that cannot rename (no video provider or no key) skips the job and writes one system
+worker that cannot rename (it has no video provider configured) skips the job and writes one system
 event `job.rename_guest` with the outcome `skipped` and the reason `no_guest_key`, with no name
 and no token; the audit log shows it.
 

@@ -1596,9 +1596,8 @@ class Transaction(Protocol):
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
         """Set every PII column of the booking to NULL and record ``pii_purged_at``.
 
-        When a guest was minted for the booking (``guest_minted_at``) and it was not purged
-        before, the same transaction adds one ``rename_guest`` job (ADR 0123 point 7), so the
-        purge itself never waits for the video platform and a second purge adds none.
+        Storage only: which jobs follow a purge (the rename of a minted guest, ADR 0123 point
+        7) is the domain's rule, ``app.domain.purge.purge_booking``, which callers use.
         """
         ...
 

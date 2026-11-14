@@ -142,7 +142,7 @@ class RateLimits:
     reports: str = "30/minute"
     change_requests: str = "20/hour"
     webhooks: str = "600/minute"
-    call_tokens: str = "20/hour"
+    call_tokens: str = "10/hour"
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "RateLimits":
