@@ -1,8 +1,8 @@
 /**
  * Shared steps of the call page's browser specs (ADR 0123 steps 4b and 4c): opening the page
  * through its emailed link, and the made-up devices. `spy` stands in for getUserMedia and
- * enumerateDevices before the page's own script runs, in every browser, with two cameras and two
- * microphones, a canvas picture and an oscillator sound; it also records every request for a
+ * enumerateDevices before the page's own script runs, in every browser, with two cameras, two
+ * microphones and two speakers, a canvas picture and an oscillator sound; it also records every request for a
  * device, every stream handed out and every sentence the page's live region gets, and plays a
  * refusal of one kind or of both while the other stays healthy.
  */
@@ -34,6 +34,7 @@ export async function spy(page: Page, plan: Plan = { devices: 'real' }): Promise
       { deviceId: 'mic-1', label: 'Microphone one', kind: 'audioinput', groupId: 'g' },
       { deviceId: 'mic-2', label: 'Microphone two', kind: 'audioinput', groupId: 'g' },
       { deviceId: 'spk-1', label: 'Speaker one', kind: 'audiooutput', groupId: 'g' },
+      { deviceId: 'spk-2', label: 'Speaker two', kind: 'audiooutput', groupId: 'g' },
     ];
     if (what.devices === 'made-up') {
       navigator.mediaDevices.enumerateDevices = async () => listed as unknown as MediaDeviceInfo[];
@@ -117,3 +118,7 @@ export const said = (page: Page, text: string): Promise<void> =>
 export const begin = (page: Page) => page.getByRole('button', { name: 'Test camera and microphone' });
 export const checkHeading = (page: Page) => page.getByRole('heading', { level: 1, name: 'Check picture and sound' });
 export const READY = 'Your camera and microphone are ready.';
+
+/** The list of cameras or microphones of the device check (the call's panel has lists of its own). */
+export const checkList = (page: Page, label: 'Camera' | 'Microphone') =>
+  page.locator('[data-call-state="check"]').getByLabel(label, { exact: true });

@@ -88,8 +88,8 @@ async def test_a_whole_sdk_file_is_named_in_an_attribute_and_never_as_a_tag(
     digest = base64.b64encode(hashlib.sha256(CONTENT).digest()).decode()
     assert str(root["data-call-sdk"]).startswith("/static/vendor/webex/meetings.min.js?v=")
     assert root["data-call-sdk-integrity"] == f"sha256-{digest}"
-    # Nothing the browser would fetch or run before the click: our four scripts, no SDK.
-    assert len(page.script_sources) == 4  # our own, never the SDK
+    # Nothing the browser would fetch or run before the click: our seven scripts, no SDK.
+    assert len(page.script_sources) == 7  # our own, never the SDK
     assert not any("vendor" in url for url in page.references)
 
 
@@ -126,8 +126,16 @@ async def test_every_failure_has_its_own_sentence_and_the_failed_state_its_ways_
     failed = page.state("failed")
     reasons = re.findall(r'data-call-failure="(\w+)"', failed.raw)
     sentences = re.findall(r'data-call-failure="\w+" data-text="\w+" hidden>([^<]+)<', failed.raw)
-    assert reasons == ["attempts", "generic", "not_open", "rate_limited", "unavailable"]
-    assert len(set(sentences)) == 5
+    assert reasons == [
+        "attempts",
+        "generic",
+        "media",
+        "lost",
+        "not_open",
+        "rate_limited",
+        "unavailable",
+    ]
+    assert len(set(sentences)) == 7
     assert [b.text for b in failed.buttons()] == ["Try again"]
     # The link out is offered by `on_failure` in the failed state, with the contact details kept
     # for the script to show instead of it when the call is simply not open (a link out would
@@ -205,7 +213,13 @@ async def test_each_own_picture_has_a_name_of_its_own_and_each_sentence_is_in_th
     assert len(set(labels)) == 2
     # The check's, the lobby's and the call's picture are told apart by the state they are in.
     assert page.state("check").raw.count("Preview of your camera") == 1
-    for sentence in ("We tried 3 times", "The call is over.", "The last attempt did not work."):
+    for sentence in (
+        "We tried 3 times",
+        "Thank you for the call.",
+        "The last attempt did not work.",
+        "This call is being recorded. The picture",
+        "The connection was interrupted. It is being",
+    ):
         assert page.raw.count(sentence) == 1, sentence
 
 

@@ -1,5 +1,5 @@
 /*
- * The call of the participant's call page (ADR 0123 steps 4c and 5).
+ * The call of the participant's call page (ADR 0123 steps 4c and 5a).
  *
  * Owns: everything that follows the click that joins, except the participant's own devices
  * (call-media.js). It loads the video SDK file (with its checksum as integrity), asks our server
@@ -41,8 +41,6 @@
 
   var tokenUrl = "", sdkSource = "", sdkIntegrity = ""; // read out of the markup in `init`
   var attemptsMax = 0, attemptMs = 0;
-  var choice = { cameraId: "", microphoneId: "" };
-  app.choice = choice; // the devices the participant chose in the check, for call-media.js
 
   // `epoch` moves whenever a connection starts, ends or is taken over; every step and every
   // event of the SDK checks it, so nothing of an old attempt reaches the page. The token is kept
@@ -87,6 +85,8 @@
       );
     });
   }
+
+  app.within = within; // for call-media.js: the same time limit for taking a stream out or sending it
 
   function giveUp(promise) {
     var limit = new Promise(function (resolve) {
@@ -213,27 +213,6 @@
     return adding;
   }
 
-  // What the meeting tells the page, for this connection only.
-  function follow(epoch) {
-    var client = call.client;
-    var meeting = call.meeting;
-    meeting.on("meeting:self:guestAdmitted", function () {
-      if (epoch !== call.epoch) return;
-      enter(epoch).then(null, function () {
-        if (epoch === call.epoch) fail("generic");
-      });
-    });
-    meeting.on("media:ready", function (media) {
-      if (epoch !== call.epoch) return;
-      if (media.type === "remoteVideo") app.setRemote("remote", media.stream);
-      if (media.type === "remoteAudio") app.setRemote("audio", media.stream);
-    });
-    client.meetings.on("meeting:removed", function () {
-      var screen = app.state.screen;
-      if (epoch === call.epoch && (screen === "lobby" || screen === "call")) finish("ended");
-    });
-  }
-
   // A step that answers after its attempt was given up is undone when it arrives: a late
   // registration is unregistered, a late join leaves the meeting.
   function undoLate(promise, epoch, undo) {
@@ -279,7 +258,7 @@
       .then(function (meeting) {
         check(epoch);
         call.meeting = meeting;
-        follow(epoch);
+        app.events.follow(client, meeting, epoch);
         var joining = undoLate(meeting.join(), epoch, function () {
           meeting.leave().then(noop, noop);
         });
@@ -307,6 +286,7 @@
     call.meeting = null;
     call.joined = false;
     call.capturing = null;
+    call.making = { camera: null, microphone: null }; // a device being made or taken out is given up with the call
     call.sent = null;
     call.epoch += 1;
     if (call.abort) {
@@ -379,10 +359,6 @@
 
   // ---- what the page asks of the call ---------------------------------------------------------
   function start(picked) {
-    if (picked) {
-      choice.cameraId = picked.cameraId;
-      choice.microphoneId = picked.microphoneId;
-    }
     var moved = app.go("connecting", {
       attempt: 1,
       failure: "",
@@ -401,6 +377,24 @@
 
   function leave() {
     finish("left");
+  }
+
+  // What the meeting tells the page (call-events.js, which checks the epoch first): the staff
+  // member let the participant in (the media goes in; if it cannot, the call fails), the meeting
+  // was removed (the staff member ended it), or the connection is lost for good.
+  function admitted(epoch) {
+    enter(epoch).then(null, function () {
+      if (epoch === call.epoch) fail("media");
+    });
+  }
+
+  function ended() {
+    var screen = app.state.screen;
+    if (screen === "lobby" || screen === "call") finish("ended");
+  }
+
+  function lost() {
+    fail("lost");
   }
 
   // The page goes away or comes back out of the browser's memory: nothing of a call stays.
@@ -426,6 +420,9 @@
     start: start,
     again: again,
     leave: leave,
+    admitted: admitted,
+    ended: ended,
+    lost: lost,
     hangUp: hangUp,
     setLive: function (kind, on) {
       return app.callMedia.setLive(kind, on);

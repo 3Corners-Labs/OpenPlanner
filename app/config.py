@@ -36,6 +36,7 @@ from app.domain.system_log import EventRetention
 from app.domain.update_policy import valid_line, valid_window
 from app.domain.updates import valid_release
 from app.domain.user_names import DEFAULT_SUFFIX, valid_suffix
+from app.domain.web_transport import bundled_idp_hop
 from app.i18n.dates import ClockStyle
 
 LogLevel = Literal["TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -850,12 +851,17 @@ class Settings(BaseSettings):
         check(
             self.oidc_discovery_url is not None
             and (
-                not self.oidc_discovery_url.startswith("https://")
+                not (
+                    self.oidc_discovery_url.startswith("https://")
+                    # ADR 0125: the bundled provider's internal hop, a recorded exception.
+                    or bundled_idp_hop(self.oidc_discovery_url, self.oidc_issuer)
+                )
                 or self.oidc_client_secret is None
             ),
             "oidc_incomplete",
             "OIDC_DISCOVERY_URL",
-            "OIDC needs an https discovery URL and a client secret",
+            "OIDC needs an https discovery URL, or the bundled provider's internal one with an "
+            "https OIDC_ISSUER, and a client secret",
         )
         return found
 

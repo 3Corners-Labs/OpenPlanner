@@ -1,5 +1,6 @@
 """The call page (ADR 0123 steps 2 and 4b): route, switch, policy, start state, references."""
 
+import re
 from typing import Any
 
 import httpx
@@ -159,7 +160,15 @@ async def test_the_page_refers_only_to_files_of_its_own_and_has_no_inline_code(
     for url in page.references:
         assert url.startswith(("/", "?")), url
         assert not url.startswith("//"), url
-    for name in ("call-devices.js", "call-connection.js", "call-media.js", "call-page.js"):
+    for name in (
+        "call-status.js",
+        "call-sound.js",
+        "call-devices.js",
+        "call-connection.js",
+        "call-media.js",
+        "call-events.js",
+        "call-page.js",
+    ):
         assert any(url.startswith(f"/static/{name}?v=") for url in page.references)
     assert any(url.startswith("/static/call-page.css?v=") for url in page.references)
     assert page.inline_code == []
@@ -178,9 +187,12 @@ async def test_the_script_is_served_with_the_page_and_nothing_else_is_loaded(
         scripts = [await client.get(source) for source in page.script_sources]
 
     assert [s.split("?")[0] for s in page.script_sources] == [
+        "/static/call-status.js",
+        "/static/call-sound.js",
         "/static/call-devices.js",
         "/static/call-connection.js",
         "/static/call-media.js",
+        "/static/call-events.js",
         "/static/call-page.js",
     ]
     for script in scripts:
@@ -320,3 +332,41 @@ async def test_the_page_follows_the_switch_at_runtime(demo_settings: Settings) -
 
         await _switch(client, on=False)
         assert (await client.get(f"{base}/call")).status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("lang", "deleted", "thanks"),
+    [
+        ("en", "deleted 24 hours after the end of your appointment", "Thank you for the call"),
+        ("nl", "24 uur na het einde van uw afspraak verwijderd", "Bedankt voor het gesprek"),
+    ],
+)
+async def test_the_ended_state_says_what_is_deleted_and_when_in_both_languages(
+    call_settings: Settings, lang: str, deleted: str, thanks: str
+) -> None:
+    async with app_client(call_settings, FixedClock(NOW)) as client:
+        base = await open_link(client, await booked(client))
+        page = Page((await client.get(f"{base}/call?lang={lang}")).text)
+
+    ended = page.state("ended").text()
+    assert deleted in ended
+    assert thanks in ended
+    # Deleted, never "anonymised" (ADR 0102); no chat exists on this page yet.
+    assert "anonym" not in ended.lower()
+    assert "chat" not in ended.lower()
+
+
+async def test_the_failure_state_has_a_sentence_for_a_call_that_was_lost_and_for_the_media(
+    call_settings: Settings,
+) -> None:
+    async with app_client(call_settings, FixedClock(NOW)) as client:
+        base = await open_link(client, await booked(client))
+        failed = Page((await client.get(f"{base}/call?lang=en")).text).state("failed")
+
+    sentences = {
+        "media": "The picture or sound of the call could not be set up. You can try again.",
+        "lost": "The connection was lost and could not be restored. You can try again.",
+    }
+    for kind, sentence in sentences.items():
+        assert re.search(rf'data-call-failure="{kind}"[^>]*>{re.escape(sentence)}<', failed.raw)
+    assert [b.text for b in failed.buttons()] == ["Try again"]
