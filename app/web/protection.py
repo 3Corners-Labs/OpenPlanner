@@ -178,14 +178,15 @@ Derived from that setting, so it is no setting of its own (ADR 0042). It counts 
 holds the booking's session (``within_call_staff_limit``), so knowing the reference is not enough to
 use it up."""
 
-CALL_POLL_ADDRESS_HEADROOM = 10
-"""How many bookings' worth of that bound one address may ask for, before any session is checked:
-ten times the per-booking rate: 600 a minute at the default interval of 3 seconds, 900 at the
-setting's lowest (2 seconds) and 180 at its highest (10 seconds). It is a
-bound on floods without a session and on the limiter's memory (the key is the address, never the
-path), sized so that people behind one office or carrier address do not starve each other. Derived
-from ``embedded_call_chat_poll_seconds``, so it is no setting of its own: it follows the
-interval the
+CALL_POLL_ADDRESS_HEADROOM = 50
+"""How many bookings' worth of that bound one address may ask for: fifty times the per-booking rate,
+3000 a minute at the default interval of 3 seconds, 4500 at the setting's lowest (2 seconds) and 900
+at its highest (10 seconds). That is fifty calls at three times their normal rate, or 150 at their
+normal rate, so thirty participants behind one office, carrier or IPv6 /64 address do not
+starve each other. A flood without a session is already refused by the bound on links that match no
+booking (``count_unknown_link``); this is the last bound for an address that holds sessions, and it
+bounds the limiter's memory, because its key is the address and never the path. Derived from
+``embedded_call_chat_poll_seconds``, so it is no setting of its own: it follows the interval the
 page asks at, and a value of its own could only be set wrong against it (ADR 0042)."""
 
 LIMITS = RateLimits()

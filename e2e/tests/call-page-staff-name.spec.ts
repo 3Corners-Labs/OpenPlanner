@@ -274,6 +274,30 @@ test('the same answer asked many times is said once, a change once more, and a c
   expect(await told(page)).toBe(2); // nothing was said for the cleared name
 });
 
+test('a name that changes while its sentence still waits is heard once, the newest, and a sentence queued between the two names is still said', async ({ page }) => {
+  await inCall(page, { name: 'Sanne' });
+  await said(page, 'You are talking to Sanne.');
+  await freeze(page);
+  const texts = await page.evaluate(() => {
+    const t = (window as unknown as { openplannerCall: { texts: Record<string, string> } }).openplannerCall.texts;
+    return { on: t.say_recording_on, off: t.say_recording_off };
+  });
+  const before = (await statuses(page)).length;
+
+  // All four in one turn of the page: the first is on the line, the others wait; the second name
+  // replaces the first and goes to the end, behind the sentence that was queued between them.
+  await page.evaluate(() => {
+    const say = (window as unknown as { openplannerCall: { say: (key: string, values?: { name: string }) => void } }).openplannerCall.say;
+    say('say_recording_on');
+    say('say_staff_name', { name: 'Alpha' });
+    say('say_recording_off');
+    say('say_staff_name', { name: 'Beta' });
+  });
+  await pass(page, 20_000);
+
+  expect((await statuses(page)).slice(before)).toEqual([texts.on, texts.off, 'You are talking to Beta.']);
+});
+
 test('an answer that says the feature is off (404) brings the label back to the team\'s word', async ({ page }) => {
   const stub = (await inCall(page, { name: 'Sanne' })) as Stub;
   const word = await term(page);

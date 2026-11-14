@@ -293,7 +293,7 @@ async def test_it_answers_a_get_only(site: Site) -> None:
 
 
 def _limited(demo_settings: Settings, seconds: int = 10, **more: object) -> Settings:
-    """Rate limits on, the poll every ``seconds``: 18 asks a minute a booking and 180 an address."""
+    """Rate limits on, the poll every ``seconds``: 18 asks a minute a booking and 900 an address."""
     return _on(
         demo_settings,
         rate_limit_enabled=True,
@@ -317,16 +317,16 @@ async def test_a_flood_without_a_session_stops_at_the_address_bound_and_spares_t
 ) -> None:
     # The bound on links that match no booking (20 an hour) would stop the flood first: raised, so
     # that it is the per-address bound of the route that is seen.
-    settings = _limited(demo_settings, rate_limit_unknown_links="1000/hour")
+    settings = _limited(demo_settings, rate_limit_unknown_links="5000/hour")
     async for running in _site(settings):
         await running.staff(screen_name="Sanne")
         await running.claim()
         async with _from(running, "203.0.113.9") as attacker:
-            answers = [(await attacker.get(running.path)).status_code for _ in range(185)]
+            answers = [(await attacker.get(running.path)).status_code for _ in range(905)]
 
-            # The first 180 reach the session check and are refused there; then the address bound.
-            assert answers[:180] == [403] * 180
-            assert answers[180:] == [429] * 5
+            # The first 900 reach the session check and are refused there; then the address bound.
+            assert answers[:900] == [403] * 900
+            assert answers[900:] == [429] * 5
             limited = await attacker.get(running.path)
             assert limited.json() == {"error": "rate_limited"}
             assert limited.headers["retry-after"] == "60"
@@ -383,9 +383,9 @@ async def test_another_bookings_session_cannot_spend_this_bookings_bucket(
 @pytest.mark.parametrize(
     ("seconds", "per_booking", "per_address"),
     [
-        (2, "90/minute", "900/minute"),
-        (3, "60/minute", "600/minute"),
-        (10, "18/minute", "180/minute"),
+        (2, "90/minute", "4500/minute"),
+        (3, "60/minute", "3000/minute"),
+        (10, "18/minute", "900/minute"),
     ],
 )
 def test_the_limits_follow_the_poll_interval_at_the_settings_bounds(
