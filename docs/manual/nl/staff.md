@@ -148,7 +148,9 @@ Op de pagina van een medewerker stelt u onder **Schermnaam** de naam in die de d
 een gesprek op de eigen gesprekspagina van de organisatie: bij het beeld van de medewerker, met het
 eigen woord van de organisatie voor medewerkers erbij ("Sanne · medewerker"), en in de
 ondertitels. Wie `staff.manage` heeft (organisatiebeheerders en de superuser) vult het in voor de
-mensen die zij zien; een leeg veld haalt de naam weg.
+mensen die zij zien; een leeg veld haalt de naam weg. Een medewerker kan zijn eigen schermnaam ook instellen, op **Mijn profiel** (het
+onderwerp [Mijn profiel](my-profile.md)); een wijziging van een beheerder en van de persoon zelf
+gaan over dezelfde naam.
 
 De medewerker mag niet te vinden zijn op de accountnaam, dus de deelnemer ziet standaard een
 schermnaam en nooit de accountnaam. Kies een **voornaam of een verzonnen naam**, niet de volledige

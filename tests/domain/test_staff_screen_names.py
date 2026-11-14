@@ -89,7 +89,7 @@ async def test_an_empty_text_clears_the_name_and_says_so_in_the_event(
 
     result = await service.set_screen_name(ORG_ADMIN, person.id or 0, "")
 
-    assert result is ScreenNameResult.DONE
+    assert result is ScreenNameResult.CLEARED
     assert uow.state.staff["p-1"].screen_name is None
     assert [row[3] for row in _audit(uow)] == [CLEARED]
 
@@ -342,3 +342,66 @@ async def test_the_pseudonym_map_is_the_one_function_both_homes_use() -> None:
         agent_pseudonym(KEY, "c"): 3,
         agent_pseudonym(PREVIOUS, "c"): 3,
     }
+
+
+# ---- the person's own name (step 5d) -------------------------------------------------------------
+
+
+async def test_the_person_sets_their_own_name_found_by_their_subject_in_every_organisation(
+    uow: InMemoryUnitOfWork, service: StaffScreenNames
+) -> None:
+    both = (Membership("org_admin", "demo", None), Membership("org_admin", "andere", None))
+    _person(uow, "p-1", memberships=frozenset(both))
+    _person(uow, "p-2")
+
+    result = await service.set_own_screen_name(replace(AUDITOR, subject="p-1"), "  Sanne ")
+
+    assert result is ScreenNameResult.DONE
+    assert uow.state.staff["p-1"].screen_name == "Sanne"
+    assert uow.state.staff["p-2"].screen_name is None
+    rows = _audit(uow)
+    assert sorted(str(row[4]) for row in rows) == ["andere", "demo"]
+    assert {(row[0], row[3], row[5]) for row in rows} == {("p-1", SET, "subject:p-1")}
+    assert all("Sanne" not in repr(row) for row in rows)
+
+
+async def test_the_own_write_clears_keeps_and_refuses_like_the_managers(
+    uow: InMemoryUnitOfWork, service: StaffScreenNames
+) -> None:
+    _person(uow, "p-1", screen_name="Sanne")
+    me = replace(AUDITOR, subject="p-1")
+
+    assert await service.set_own_screen_name(me, "Sanne") is ScreenNameResult.UNCHANGED
+    assert await service.set_own_screen_name(me, "") is ScreenNameResult.CLEARED
+    assert [row[3] for row in _audit(uow)] == [CLEARED]
+    with pytest.raises(ScreenNameError):
+        await service.set_own_screen_name(me, "G")
+
+
+async def test_the_own_write_needs_a_role_a_record_and_a_record_that_is_not_erased(
+    uow: InMemoryUnitOfWork, service: StaffScreenNames
+) -> None:
+    me = replace(AUDITOR, subject="p-1")
+    with pytest.raises(DomainError) as error:
+        await service.set_own_screen_name(replace(AUDITOR, grants=frozenset()), "Sanne")
+    assert error.value.code is ErrorCode.NOT_PERMITTED
+
+    assert await service.set_own_screen_name(me, "Sanne") is ScreenNameResult.NO_RECORD
+    assert await service.own("p-1") is None
+    _person(uow, "p-1", status=StaffStatus.ERASED)
+    assert await service.set_own_screen_name(me, "Sanne") is ScreenNameResult.ERASED
+    assert uow.state.audit == []
+
+
+async def test_the_page_may_offer_the_form_only_where_the_write_would_accept_it(
+    uow: InMemoryUnitOfWork, service: StaffScreenNames
+) -> None:
+    person = _person(uow)
+    erased = _person(uow, "p-2", status=StaffStatus.ERASED)
+
+    assert await service.may_set(ORG_ADMIN, person.id or 0)
+    assert await service.may_set(SUPER, person.id or 0)
+    assert not await service.may_set(OUTSIDER, person.id or 0)  # another organisation
+    assert not await service.may_set(AUDITOR, person.id or 0)  # may see, may not manage
+    assert not await service.may_set(ORG_ADMIN, erased.id or 0)
+    assert not await service.may_set(ORG_ADMIN, 9999)

@@ -354,6 +354,15 @@
       ]
     },
     {
+      "name": "my profile as agent",
+      "path": "/admin/rights/profile",
+      "user": "agent",
+      "locales": [
+        "nl",
+        "en"
+      ]
+    },
+    {
       "name": "identity provider mapping",
       "path": "/admin/idp-mapping",
       "user": "super",

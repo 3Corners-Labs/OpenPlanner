@@ -43,6 +43,7 @@ did not recognise, with the reason (ADR 0049 point 8), within the viewer's scope
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import StrEnum
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
@@ -50,11 +51,19 @@ from starlette.responses import HTMLResponse, Response
 
 from app.adapters.live_settings import LiveSettings
 from app.admin.audit_routes import audit_views
-from app.admin.authz import AdminContext, RequirePermission, admin_service, skill_service
-from app.admin.forms import Field, FormData, Option, done_message, read_form, redirect_done
+from app.admin.authz import (
+    AdminContext,
+    RequirePermission,
+    admin_service,
+    screen_names,
+    skill_service,
+)
+from app.admin.forms import FormData, Option, done_message, read_form, redirect_done
 from app.admin.idp_mapping_routes import reason_label
-from app.admin.pages import Locale, SameOrigin, admin_moment, with_manual
+from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
+from app.admin.screen_name_form import DONE as SCREEN_NAME_DONE
+from app.admin.screen_name_form import screen_name_field
 from app.admin.skill_inputs import (
     SkillChoice,
     choices,
@@ -74,7 +83,6 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.guest_access import StaffNameMode
 from app.domain.identity import PLATFORM
 from app.domain.scheduling import GroupSummary
-from app.domain.screen_name import MAX_LENGTH as SCREEN_NAME_MAX
 from app.domain.staff import StaffFilter, StaffMember, StaffStatus
 from app.web.authz_labels import ROLE_LABELS
 from app.web.locale import RequestLocale
@@ -424,6 +432,17 @@ async def skill_sections(
     return sections
 
 
+class Refused(StrEnum):
+    """The section of a person's page whose form was refused (the page answers 422).
+
+    Each section shows a refused form only when it is its own, so one section's refusal never
+    empties or marks another's input.
+    """
+
+    SKILLS = "skills"
+    SCREEN_NAME = "screen_name"
+
+
 async def member_page(
     request: Request,
     locale: RequestLocale,
@@ -431,13 +450,18 @@ async def member_page(
     member_id: int,
     *,
     form: FormData | None = None,
+    refused: Refused | None = None,
     error_org: str | None = None,
     status: int = 200,
 ) -> HTMLResponse:
     """Render one person's page; outside the viewer's scope it does not exist (404).
 
-    ``form`` and ``error_org`` re-show a refused save of the skills of that organisation.
+    ``form`` is the refused form and ``refused`` says which section it belongs to; with
+    ``Refused.SKILLS``, ``error_org`` names the organisation. Any other section shows its stored
+    values.
     """
+    skills_form = form if refused is Refused.SKILLS else None
+    name_form = form if refused is Refused.SCREEN_NAME else None
     service = admin_service(request)
     member = await service.staff_member(context.principal, member_id)
     if member is None:
@@ -456,7 +480,9 @@ async def member_page(
     sections = (
         []
         if member.status is StaffStatus.ERASED
-        else await skill_sections(request, locale, context.principal, member_id, form, error_org)
+        else await skill_sections(
+            request, locale, context.principal, member_id, skills_form, error_org
+        )
     )
     response = _page(
         request,
@@ -467,7 +493,11 @@ async def member_page(
             "person": _view(
                 request, locale, member, names, now, _screen_name_organisations(request, [member])
             ),
-            "screen_name_field": _screen_name_field(request, locale, context, member, form),
+            "screen_name_field": (
+                screen_name_field(request, locale, member.screen_name, name_form)
+                if await screen_names(request).may_set(context.principal, member_id)
+                else None
+            ),
             "screen_name_done": done_message(request, locale.gettext, only=SCREEN_NAME_DONE),
             "events": activity,
             "manage": manage,
@@ -482,38 +512,6 @@ async def member_page(
     )
     response.status_code = status
     return response
-
-
-SCREEN_NAME_DONE = ("staff_screen_name_saved", "staff_screen_name_unchanged")
-"""The confirmations of a save of the screen name, shown in that section of the page."""
-
-
-def _screen_name_field(
-    request: Request,
-    locale: RequestLocale,
-    context: AdminContext,
-    member: StaffMember,
-    form: FormData | None,
-) -> Field | None:
-    """Return the input of the screen name for a viewer who may manage staff, else ``None``.
-
-    ``form`` re-shows the text of a refused save. An erased person has no screen name to set.
-    """
-    if member.status is StaffStatus.ERASED:
-        return None
-    if scope_for(context.principal, Permission.STAFF_MANAGE).is_empty:
-        return None
-    _ = locale.gettext
-    field = Field(
-        "screen_name",
-        _("admin.staff.screen_name.label"),
-        value=form.text("screen_name") if form is not None else member.screen_name or "",
-        hint=_("admin.staff.screen_name.hint"),
-        error=form.error_for("screen_name") if form is not None else None,
-        required=False,
-        attributes={"maxlength": str(SCREEN_NAME_MAX), "autocomplete": "off"},
-    )
-    return with_manual(request, locale, [field])[0]
 
 
 @router.get("/staff/{member_id}", response_class=HTMLResponse)
@@ -546,7 +544,14 @@ async def save_staff_skills(
     except DomainError as error:
         refuse(form, error, locale, f"skills-{org}")
         return await member_page(
-            request, locale, context, member_id, form=form, error_org=org, status=422
+            request,
+            locale,
+            context,
+            member_id,
+            form=form,
+            refused=Refused.SKILLS,
+            error_org=org,
+            status=422,
         )
     return redirect_done(
         f"/admin/staff/{member_id}",
