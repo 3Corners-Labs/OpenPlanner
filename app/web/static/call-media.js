@@ -237,7 +237,9 @@
   // The capture is stopped first, so the browser's own sign that the screen is shared goes out at
   // once; taking the stream out of the meeting follows within the time of an attempt, and a refusal
   // changes nothing: it is stopped either way, also when it was only half sent. Only the stream
-  // that is the current share ends it, so a second call does nothing.
+  // that is the current share ends it, so a second call does nothing. A share that ends while it is
+  // still being sent was never said as on: no "stopped" is said for it (`share()` takes the stream
+  // out of the meeting again if its sending lands after).
   function endShare(display, patch) {
     if (!display || call.screen !== display) return;
     call.screen = null;
@@ -245,7 +247,9 @@
     if (patch && app.state.media === "added" && call.meeting) {
       app.within(call.meeting.unpublishStreams([display])).then(null, function () {});
     }
-    if (patch) app.go(app.state.screen, Object.assign({ share: "off" }, patch));
+    if (!patch) return;
+    var starting = app.state.share === "asking" && patch.say === "say_share_off";
+    app.go(app.state.screen, Object.assign({ share: "off" }, patch, starting ? { say: undefined } : {}));
   }
 
   // The browser's own control, or the meeting, ends the share without our button. The track's
@@ -297,8 +301,12 @@
         call.screen = display;
         watch(display, epoch);
         return send("screen", display, epoch).then(function () {
-          if (epoch === call.epoch && call.screen === display) {
+          if (epoch !== call.epoch) return;
+          if (call.screen === display) {
             app.go("call", { share: "mine", say: "say_share_mine" });
+          } else if (app.state.media === "added" && call.meeting) {
+            // The share ended while it was being sent: the stream that landed is taken out again.
+            app.within(call.meeting.unpublishStreams([display])).then(null, function () {});
           }
         });
       })

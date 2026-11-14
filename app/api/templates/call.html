@@ -211,6 +211,7 @@
 
   <section class="call-state" aria-labelledby="call-call-heading" data-call-state="call" hidden>
     <h1 class="call-quiet" id="call-call-heading" tabindex="-1">{{ _("callpage.call.heading") }}</h1>
+    <div class="call-media">
     <div class="call-stage" data-call-stage>
       <video class="call-remote-share" playsinline autoplay muted hidden aria-label="{{ _("callpage.share.view") }}" data-call-share-view></video>
       <video class="call-remote" playsinline autoplay muted aria-label="{{ _("callpage.staff.term") }}" data-call-remote></video>
@@ -225,6 +226,7 @@
     </div>
     {#- The captions: ordinary text under the picture, never a live region (a screen reader user hears the speaker). -#}
     <div class="call-captions" role="group" aria-label="{{ _("callpage.control.captions") }}" data-call-captions hidden></div>
+    </div>
   </section>
 
   <section class="call-state" aria-labelledby="call-failed-heading" data-call-state="failed" hidden>

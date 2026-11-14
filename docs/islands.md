@@ -208,6 +208,10 @@ to another at run time goes through `app` and may reach a file loaded later.
   asks `call-render.js` (pure drawing of the call's parts out of the state) to draw the pictures, the notices,
   the sharing switches and the captions' lines. Where focus goes for the stop button that went away with a
   share is decided in `render` out of what had focus when it began (the notice's stop button): no field in the state.
+  The picture gives way to what is shown above and below it by layout alone (`call-page.css`): while the call shows,
+  the body, main, the call and its section are grids with a `1fr` row under a `min-height` of the window, so the
+  picture grows into what is left, from 8 rem up to 16 by 9 of the column's width (`cqw`), and the page scrolls only when
+  the minimums do not fit; no script measures anything for it.
 - **`call-status.js` owns** the queue behind the one polite status element: one sentence at a time, each
   kept on screen for a minimum time, none dropped, none repeated.
 - **`call-sound.js` owns** the level meter (a bar and a text that says whether the participant is heard) and
@@ -283,7 +287,7 @@ to another at run time goes through `app` and may reach a file loaded later.
   the foot of the window (a sticky bar leaves the foot at the page's end), and the page keeps room for it at its end; its row of buttons is at most half the window
   (on a window under 32 rem high the buttons are 2 rem high, under 20 rem the toggles' words "on" and "off" are
   for assistive technology only; up to 40 rem wide "Share screen" shows as "Share" and keeps its full name for assistive technology), the panel of devices overlays the page above the row (out of flow, at most half the window less 1.5 rem),
-  and scrolls inside itself. `scroll-padding-bottom` and the page's bottom padding exist only while the bar shows and are 4.5 rem (under 72 rem wide, where the longer row of step 5b wraps to two rows: `min(50vh, 7.5rem)`; under 46 rem, three rows: 11.5 rem; under 40 rem, up to five: 17.5 rem; estimates from the buttons' widths, to be measured), the bar's height at most. The panel
+  and scrolls inside itself. `scroll-padding-bottom` and the page's bottom padding exist only while the bar shows and are 4.5 rem (under 72 rem wide, where the longer row of step 5b wraps to two rows: `min(50vh, 8.5rem)`; under 46 rem, three rows: 11.5 rem; under 40 rem, up to five: 17.5 rem; estimates from the buttons' widths, to be measured), the bar's height at most. The panel
   is a disclosure wired in `call-page.js` with the page's other controls.
 
 - **Keyboard:** every control is a native button, link or select in reading order; nothing is a pointer
@@ -308,9 +312,9 @@ to another at run time goes through `app` and may reach a file loaded later.
   when it has none) and, where the organisation allows it, the link to join another way.
 - **Used by:** the call page only (`call.html`, with `call-page.css`).
 - **Size** (lines): `call-status.js` 56, `call-sound.js` 130, `call-devices.js` 389, `call-connection.js` 439,
-  `call-media.js` 334, `call-captions.js` 187, `call-remote.js` 142, `call-render.js` 148, `call-events.js` 110,
-  `call-poll.js` 140, `call-page.js` 378; about 0.9, 1.8, 4.1, 5.3, 4.2, 2.6, 2.1, 2.5, 1.7, 2.3 and 5.3 KB gzipped (in
-  the order of the loading), about 4.6 KB gzipped (styles). `call-connection.js` and `call-devices.js` are the files to watch.
+  `call-media.js` 342, `call-captions.js` 194, `call-remote.js` 142, `call-render.js` 148, `call-events.js` 110,
+  `call-poll.js` 140, `call-page.js` 385; about 0.9, 1.8, 4.0, 5.2, 4.3, 2.8, 2.1, 2.5, 1.7, 2.3 and 5.4 KB gzipped (in
+  the order of the loading), about 5.6 KB gzipped (styles). `call-connection.js` and `call-devices.js` are the files to watch.
 
 ### `call-status.js`
 

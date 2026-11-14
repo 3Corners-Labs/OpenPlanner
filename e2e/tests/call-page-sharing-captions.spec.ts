@@ -30,6 +30,7 @@ import {
   open,
   reconnection,
   recording,
+  releasePublish,
   remoteShare,
   rights,
   sdk,
@@ -262,6 +263,46 @@ test('two presses in a row give one picker, one share and a stop that works', as
   await expect.poll(async () => callsOf(page, 'unpublishStreams')).toBe(1);
 });
 
+test('a press while the screen is being sent ends nothing: one stream in the meeting, none taken out, and a stop that works after', async ({ page }) => {
+  await inCall(page, { holdPublish: true });
+  await shareToggle(page).click();
+  await expect.poll(async () => callsOf(page, 'publishStreams')).toBe(1); // the screen is on its way
+  await shareToggle(page).click(); // presses while it is being sent
+  await shareToggle(page).click();
+  await frames(page);
+  expect(await callsOf(page, 'unpublishStreams')).toBe(0);
+  expect((await displayLog(page)).stops).toBe(0); // the capture is still there
+  expect((await displayLog(page)).requests).toBe(1);
+  await releasePublish(page);
+  await pressed(shareToggle(page), true);
+  await expect(notice(page, 'sharing')).toBeVisible();
+  expect((await sdk(page)).published.filter((kind) => kind === 'screenShare')).toHaveLength(1);
+  expect(await callsOf(page, 'unpublishStreams')).toBe(0);
+  await shareToggle(page).click(); // and the stop works
+  await said(page, STOPPED);
+  await pressed(shareToggle(page), false);
+  expect((await displayLog(page)).stops).toBeGreaterThan(0);
+  await expect.poll(async () => callsOf(page, 'unpublishStreams')).toBe(1);
+});
+
+test('a share that ends while it is being sent is not said as on or off, and the stream that lands is taken out again', async ({ page }) => {
+  await inCall(page, { holdPublish: true });
+  await shareToggle(page).click();
+  await expect.poll(async () => callsOf(page, 'publishStreams')).toBe(1);
+  await endDisplay(page); // the browser's own control, before the screen has landed
+  await pressed(shareToggle(page), false);
+  await expect(notice(page, 'sharing')).toBeHidden();
+  expect((await displayLog(page)).stops).toBeGreaterThan(0);
+  const before = await callsOf(page, 'unpublishStreams');
+  await releasePublish(page);
+  await expect.poll(async () => callsOf(page, 'unpublishStreams')).toBe(before + 1); // out again after it landed
+  await captionsToggle(page).click(); // a later sentence: what the region said before it is in order
+  await said(page, CAPTIONS_ON);
+  const spoken = await statuses(page);
+  expect(spoken).not.toContain(SHARING);
+  expect(spoken).not.toContain(STOPPED);
+});
+
 test('a meeting that stops allowing sharing while the picker is open gets no share when the picker answers', async ({ page }) => {
   await inCall(page, {}, 'held');
   await shareToggle(page).click();
@@ -365,8 +406,9 @@ test('the notice says that the button in the bar stops the share too, and a stop
   await endDisplay(page);
   await pressed(shareToggle(page), false);
   await expect(shareToggle(page)).toBeFocused();
-  // Ended while focus was elsewhere: focus stays where it was.
+  // The stop button had focus, then focus went elsewhere: the share ends and focus stays where it is.
   await shareNow(page);
+  await stopButton(page).focus();
   await page.getByRole('button', { name: /^Microphone/ }).focus();
   await stopLocalShare(page);
   await pressed(shareToggle(page), false);
@@ -539,7 +581,7 @@ test('a long caption can be read to its start and to its end with the keyboard, 
   await page.keyboard.press('End');
   await expect.poll(() => visible('last')).toBe(true); // the keyboard reaches its end
   await page.keyboard.press('Home');
-  expect(await box.evaluate((el) => el.scrollTop)).toBe(0);
+  await expect.poll(() => box.evaluate((el) => el.scrollTop)).toBe(0); // a key scrolls over a few frames
   for (let i = 0; i < 30 && !(await visible('first')); i++) await page.keyboard.press('PageDown'); // and back to its start
   expect(await visible('first')).toBe(true);
 
@@ -554,24 +596,68 @@ test('a long caption can be read to its start and to its end with the keyboard, 
   expect(await box.getAttribute('tabindex')).toBeNull();
 });
 
-test('a reader who scrolled back is not moved by a change that brings no new line, and is by a new one', async ({ page }) => {
+const LONG = (word: string): string => Array.from({ length: 40 }, (_, n) => `${word}${n}`).join(' ');
+
+test('a reader who scrolled back is not moved by a change that brings no line, nor by an interim line that grows, and is by a new line', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 640 });
   await inCall(page);
   await page.evaluate(() => (document.documentElement.style.fontSize = '200%'));
   await captionsToggle(page).click();
   await pressed(captionsToggle(page), true);
-  await caption(page, [{ id: '1', text: Array.from({ length: 40 }, (_, n) => `word${n}`).join(' ') }]);
+  const first = { id: '1', text: LONG('one') };
+  const second = { id: '2', text: LONG('two') };
+  await caption(page, [first, second], [{ text: 'a' }]); // two long lines and an interim one
   const box = captionBox(page);
   const top = () => box.evaluate((el) => el.scrollTop);
-  await box.evaluate((el) => (el.scrollTop = 0)); // the reader scrolled away from the newest line's start
-  const kept = await top();
+  const middle = await box.evaluate((el) => {
+    el.scrollTop = Math.floor((el.scrollHeight - el.clientHeight) / 2); // the reader is in the middle
+    return el.scrollTop;
+  });
+  expect(middle).toBeGreaterThan(0);
+  expect(middle).toBeLessThan(await box.evaluate((el) => el.scrollHeight - el.clientHeight));
+
   await page.getByRole('button', { name: /^Microphone/ }).click(); // a change that brings no line
   await pressed(page.getByRole('button', { name: /^Microphone/ }), false);
-  await recording(page, true);
-  await expect(notice(page, 'sharing')).toBeHidden();
-  expect(await top()).toBe(kept);
-  await caption(page, [{ id: '1', text: Array.from({ length: 40 }, (_, n) => `word${n}`).join(' ') }, { id: '2', text: Array.from({ length: 40 }, (_, n) => `next${n}`).join(' ') }]);
-  await expect.poll(top).toBeGreaterThan(kept); // a new line moves it to that line
+  await recording(page, true); // and another
+  await expect(notice(page, 'recording')).toBeVisible();
+  expect(await top()).toBe(middle);
+  for (const growing of ['a b', 'a b c', 'a b c d']) {
+    await caption(page, [first, second], [{ text: growing }]); // the interim line grows
+    await expect(rowsOf(page).last().locator('.call-caption__text')).toHaveText(growing);
+    expect(await top(), growing).toBe(middle);
+  }
+  expect(await box.evaluate((el) => (el as HTMLElement).dataset.newest ?? '')).not.toContain('a b'); // no caption text in an attribute
+
+  await caption(page, [first, second, { id: '3', text: LONG('three') }]); // a new final line
+  await expect.poll(top).toBeGreaterThan(middle); // moves the reader to the start of that line
+  const place = await box.evaluate((el) => {
+    const last = el.lastElementChild as HTMLElement;
+    return { top: el.scrollTop, start: last.offsetTop, end: el.scrollHeight - el.clientHeight };
+  });
+  expect(Math.abs(place.top - Math.min(place.end, place.start)), JSON.stringify(place)).toBeLessThanOrEqual(1);
+});
+
+test('the box stays a tab stop while it has focus, and is none once it has not and cannot scroll', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await inCall(page);
+  await page.evaluate(() => (document.documentElement.style.fontSize = '200%'));
+  await captionsToggle(page).click();
+  await pressed(captionsToggle(page), true);
+  await caption(page, [{ id: '1', text: LONG('one') }]);
+  const box = captionBox(page);
+  expect(await box.getAttribute('tabindex')).toBe('0');
+  await box.focus();
+  // Three short lines push the long one out: the box can no longer scroll, but it has focus.
+  await caption(page, [{ id: '1', text: LONG('one') }, { id: '2', text: 'Two' }, { id: '3', text: 'Three' }, { id: '4', text: 'Four' }]);
+  await expect(rowsOf(page)).toHaveCount(3);
+  expect(await box.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(false);
+  expect(await box.getAttribute('tabindex')).toBe('0');
+  await expect(box).toBeFocused();
+  // Focus has left: the next caption takes the tab stop away.
+  await page.getByRole('button', { name: /^Microphone/ }).focus();
+  await caption(page, [{ id: '5', text: 'Five' }]);
+  await expect(rowsOf(page).last().locator('.call-caption__text')).toHaveText('Five');
+  expect(await box.getAttribute('tabindex')).toBeNull();
 });
 
 test('captions that cannot be started leave the toggle off and say so in one sentence', async ({ page }) => {
@@ -745,6 +831,113 @@ for (const size of SIZES) {
     });
   }
 }
+
+// ---- the picture gives way to what is really shown above and below it -----------------------------------
+// The picture grows into what is left, up to 16 by 9 of the column's width, never below 8 rem. In three
+// states (captions only; the participant's own share; the own share and the recording notice): at scroll 0
+// the whole captions box is above the bar, the picture is at least 8 rem high and the captions follow it.
+// The numbers are in the message of each assertion.
+
+/** The boxes of the call at scroll 0, rounded; the tiles are those inside the stage. */
+async function layoutOf(page: Page) {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  return page.evaluate(() => {
+    const box = (selector: string) => (document.querySelector(selector) as HTMLElement).getBoundingClientRect();
+    const stage = box('[data-call-stage]');
+    const captions = box('[data-call-captions]');
+    const bar = box('[data-call-controls]');
+    const minimum = Number.parseFloat(getComputedStyle(document.querySelector('[data-call-stage]') as HTMLElement).minHeight);
+    const rect = (r: DOMRect) => ({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
+    return {
+      scrollY: window.scrollY,
+      stage: rect(stage),
+      stageMinimum: Math.round(minimum),
+      captionsTop: Math.round(captions.top),
+      captionsFoot: Math.round(captions.bottom),
+      barTop: Math.round(bar.top),
+      gap: Math.round(captions.top - stage.bottom),
+      self: rect(box('.call-self')),
+      remote: rect(box('[data-call-remote]')),
+      share: rect(box('[data-call-share-view]')),
+    };
+  });
+}
+type Layout = Awaited<ReturnType<typeof layoutOf>>;
+
+function expectAboveTheBar(m: Layout, label: string): void {
+  const said_ = `${label}: ${JSON.stringify(m)}`;
+  expect(m.scrollY, said_).toBe(0);
+  expect(m.captionsFoot, `captions foot below the bar's top, ${said_}`).toBeLessThanOrEqual(m.barTop);
+  expect(m.stage.h, `picture lower than its minimum, ${said_}`).toBeGreaterThanOrEqual(m.stageMinimum);
+  expect(m.gap, `picture and captions not adjacent, ${said_}`).toBeGreaterThanOrEqual(0);
+  expect(m.gap, `picture and captions not adjacent, ${said_}`).toBeLessThanOrEqual(16);
+}
+
+for (const size of [
+  { width: 1280, height: 800 },
+  { width: 1366, height: 650 },
+  { width: 1280, height: 720 },
+  { width: 1024, height: 700 },
+  { width: 1920, height: 950 },
+]) {
+  for (const state_ of ['captions only', 'own share', 'own share and recording'] as const) {
+    test(`the captions stay above the bar and next to the picture, ${state_}, ${size.width} by ${size.height}`, async ({ page }) => {
+      await page.setViewportSize(size);
+      await inCall(page);
+      await captionsToggle(page).click();
+      await pressed(captionsToggle(page), true);
+      await caption(page, [{ id: '1', text: 'A first line of the captions', own: false }, { id: '2', text: 'A second line', own: true }]);
+      if (state_ !== 'captions only') await shareNow(page);
+      if (state_ === 'own share and recording') {
+        await recording(page, true);
+        await expect(notice(page, 'recording')).toBeVisible();
+      }
+      await expect(rowsOf(page)).toHaveCount(2);
+      const m = await layoutOf(page);
+      expectAboveTheBar(m, `${size.width}x${size.height} ${state_}`);
+      // The own tile lies whole inside a stage that may be low.
+      expect(m.self.h, JSON.stringify(m)).toBeLessThanOrEqual(m.stage.h);
+      expect(m.self.y, JSON.stringify(m)).toBeGreaterThanOrEqual(m.stage.y);
+      if (size.width === 1920 && state_ === 'captions only') {
+        // The cap holds: 16 by 9 of the column's width, within a pixel.
+        expect(Math.abs(m.stage.h - (m.stage.w * 9) / 16), JSON.stringify(m)).toBeLessThanOrEqual(1);
+      }
+    });
+  }
+}
+
+test('the staff member\'s screen and both tiles lie inside the stage, with the captions above the bar, 1366 by 650', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 650 });
+  await inCall(page);
+  await captionsToggle(page).click();
+  await pressed(captionsToggle(page), true);
+  await caption(page, [{ id: '1', text: 'A first line of the captions', own: false }, { id: '2', text: 'A second line', own: true }]);
+  await remoteShare(page, true);
+  await expect(notice(page, 'theirs')).toBeVisible();
+  await expect(rowsOf(page)).toHaveCount(2);
+  const m = await layoutOf(page);
+  const label = JSON.stringify(m);
+  expectAboveTheBar(m, '1366x650 their screen');
+  const inside = (r: { x: number; y: number; w: number; h: number }) =>
+    r.x >= m.stage.x - 1 && r.y >= m.stage.y - 1 && r.x + r.w <= m.stage.x + m.stage.w + 1 && r.y + r.h <= m.stage.y + m.stage.h + 1;
+  expect(inside(m.share), `the shared screen is not inside the stage: ${label}`).toBe(true);
+  expect(inside(m.remote), `the staff member's tile is not inside the stage: ${label}`).toBe(true);
+  expect(inside(m.self), `the own tile is not inside the stage: ${label}`).toBe(true);
+  expect(m.remote.x + m.remote.w <= m.self.x, `the tiles overlap: ${label}`).toBe(true);
+});
+
+test('the sharing notice is one row on a wide window: the words on the left and the stop button on their right', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await inCall(page);
+  await shareNow(page);
+  const words = await notice(page, 'sharing').locator('span').first().boundingBox();
+  const button = await stopButton(page).boundingBox();
+  const whole = await notice(page, 'sharing').boundingBox();
+  const m = JSON.stringify({ words, button, whole });
+  expect(words && button && button.y < words.y + words.height, `the button is below the words: ${m}`).toBe(true);
+  expect(words && button && button.x >= words.x + words.width - 1, `the button is not on the right of the words: ${m}`).toBe(true);
+  expect(whole?.height ?? 999, m).toBeLessThan(100);
+});
 
 test('the buttons keep their full names for assistive technology when the window is low', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 256 });

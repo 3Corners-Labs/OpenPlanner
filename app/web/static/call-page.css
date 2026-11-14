@@ -8,7 +8,7 @@
 /* The bar is fixed at the foot of the window, so a page needs room at its end for it, and a focused
    control is scrolled to rest above it (WCAG 2.4.11); both exist only while the bar shows. From 48 rem
    wide the row of buttons is one line, about 4.5 rem with its frame; the captions and sharing buttons of
-   step 5b make the row longer, so below 72 rem it wraps to two rows (7.5 rem), below 46 rem to three
+   step 5b make the row longer, so below 72 rem it wraps to two rows (8.5 rem; 127 px measured at 1024 wide), below 46 rem to three
    (11.5 rem) and below 40 rem to as many as five (17.5 rem), each the lesser of that and half the window;
    the three are estimates from the buttons' widths, to be measured. `body` is a plain block, so a
    bottom padding is the room after the footer. A browser without `:has()` only loses the room at the end. */
@@ -22,11 +22,11 @@ html:has([data-call-controls]:not([hidden])) body {
 
 @media (max-width: 72rem) {
   html:has([data-call-controls]:not([hidden])) {
-    scroll-padding-bottom: min(50vh, 7.5rem);
+    scroll-padding-bottom: min(50vh, 8.5rem);
   }
 
   html:has([data-call-controls]:not([hidden])) body {
-    padding-bottom: min(50vh, 7.5rem);
+    padding-bottom: min(50vh, 8.5rem);
   }
 }
 
@@ -324,15 +324,85 @@ html:has([data-call-controls]:not([hidden])) body {
   font-weight: 400;
 }
 
-/* The picture gives way, never the bar: on a low window the stage is as high as what is left
-   under the heading and the notices (and the captions, when they show), and no lower than a small
-   picture. */
+/* The picture gives way, never the bar, and it gives way to what is really shown above and below it,
+   with no estimate per notice. While the call shows, the page is a column of grids as high as the
+   window at least (the well-known sticky-footer pattern): the body is `auto 1fr auto` (header, main,
+   footer; the bar's room is its own bottom padding, inside the window's height), main holds the call,
+   the call is `auto 1fr` (the notices, then the call's section), the section is `auto 1fr` (its
+   heading, then the media). A `1fr` row of a grid with a `min-height` is exactly what is left, and
+   the column grows by itself when the minimums do not fit, so the page then scrolls and the bar
+   holds, as before. The media is a column of its own, the picture and under it the captions.
+   The picture GROWS into the room that is left: a small base (8 rem) with `flex-grow`, capped at the
+   16 by 9 height of the column's width, which the container unit `cqw` of the media gives without any
+   estimate. It cannot be done the other way round, as a 16 by 9 box that shrinks: a grid under a
+   `min-height` only hands out room that is left over and never makes an item smaller than its content
+   size, and the content size of a 16 by 9 box is its 16 by 9 height, so the `1fr` rows would have
+   nothing to give and the page would just grow. Where the room is more than the cap, the captions
+   follow the picture and the rest is empty below them, so no gap opens. A browser without `:has()` or
+   container units keeps the 16 by 9 box of the rule below and a page that scrolls. */
+body:has([data-call-state="call"]:not([hidden])) {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  grid-template-columns: minmax(0, 1fr);
+  box-sizing: border-box;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* A grid item with automatic side margins would be as wide as its content: the width is asked for. */
+body:has([data-call-state="call"]:not([hidden])) main,
+body:has([data-call-state="call"]:not([hidden])) .site-footer {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+body:has([data-call-state="call"]:not([hidden])) main {
+  display: grid;
+  grid-template-rows: 1fr;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body:has([data-call-state="call"]:not([hidden])) .call {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.call-state[data-call-state="call"]:not([hidden]) {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.call-media {
+  --call-captions-max: 6.5rem;
+  --call-media-min: 8rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: var(--call-media-min);
+}
+
+.call-media:has([data-call-captions]:not([hidden])) {
+  --call-media-min: calc(8rem + var(--call-captions-max) + var(--booking-space-s));
+}
+
+body:has([data-call-state="call"]:not([hidden])) .call-media {
+  container-type: inline-size;
+}
+
+body:has([data-call-state="call"]:not([hidden])) .call-stage {
+  flex: 1 1 8rem;
+  aspect-ratio: auto;
+  max-height: calc(100cqw * 9 / 16);
+}
+
 .call-stage {
   position: relative;
+  flex: 0 1 auto;
+  width: 100%;
   aspect-ratio: 16 / 9;
   min-height: 8rem;
-  max-height: calc(100vh - 16rem);
-  max-height: calc(100dvh - 16rem);
   overflow: hidden;
   border-radius: var(--booking-radius);
   background: var(--call-stage);
@@ -344,11 +414,6 @@ html:has([data-call-controls]:not([hidden])) body {
   width: 100%;
   height: 100%;
   object-fit: contain;
-}
-
-.call:has([data-call-captions]:not([hidden])) .call-stage {
-  max-height: calc(100vh - 22rem);
-  max-height: calc(100dvh - 22rem);
 }
 
 /* The staff member's screen takes the place of their picture, which moves to a small tile at the
@@ -366,8 +431,9 @@ html:has([data-call-controls]:not([hidden])) body {
   bottom: var(--booking-space-s);
   left: var(--booking-space-s);
   z-index: 1;
-  width: min(30%, 12rem);
-  height: auto;
+  width: auto;
+  height: var(--call-tile);
+  max-width: 30%;
   aspect-ratio: 16 / 9;
   border: 2px solid var(--call-on-stage);
   border-radius: var(--booking-radius);
@@ -378,7 +444,9 @@ html:has([data-call-controls]:not([hidden])) body {
 .call-stage[data-call-share="theirs"] .call-remote__off {
   inset: auto auto var(--booking-space-s) var(--booking-space-s);
   z-index: 1;
-  width: min(30%, 12rem);
+  width: auto;
+  height: var(--call-tile);
+  max-width: 30%;
   aspect-ratio: 16 / 9;
   padding: var(--booking-space-xs);
   font-size: 0.875rem;
@@ -390,7 +458,8 @@ html:has([data-call-controls]:not([hidden])) body {
    never take the picture's place. */
 .call-captions {
   position: relative;
-  max-height: 6.5rem;
+  flex: none;
+  max-height: var(--call-captions-max);
   margin: var(--booking-space-s) 0 0;
   padding: var(--booking-space-xs) var(--booking-space-m);
   overflow-y: auto;
@@ -441,11 +510,20 @@ html:has([data-call-controls]:not([hidden])) body {
   overflow-wrap: anywhere;
 }
 
+/* The small tiles in the stage (the participant's own, and the staff member's camera while their screen
+   is shared) are as high as the stage allows, 55 % of it and 6.75 rem at most, 16 by 9, and no wider
+   than 30 % of it: a low picture still shows them whole and side by side. */
+.call-stage {
+  --call-tile: min(55%, 6.75rem);
+}
+
 .call-self {
   position: absolute;
   right: var(--booking-space-s);
   bottom: var(--booking-space-s);
-  width: min(30%, 12rem);
+  width: auto;
+  height: var(--call-tile);
+  max-width: 30%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
   border: 2px solid var(--call-on-stage);
@@ -482,6 +560,13 @@ html:has([data-call-controls]:not([hidden])) body {
   width: 1.25rem;
   height: 1.25rem;
   fill: currentcolor;
+}
+
+/* The words take the row's room and the stop button stays on their right (as in the mock-up); on a
+   narrow window the button goes to a row of its own. */
+.call-notice > span {
+  flex: 1 1 20rem;
+  min-width: 0;
 }
 
 .call-notice__stop {
@@ -649,8 +734,11 @@ html:has([data-call-controls]:not([hidden])) body {
     gap: 4px;
   }
 
+  .call-media {
+    --call-captions-max: 3.5rem;
+  }
+
   .call-captions {
-    max-height: 3.5rem;
     font-size: 1rem;
   }
 

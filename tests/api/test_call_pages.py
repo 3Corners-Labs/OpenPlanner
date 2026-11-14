@@ -170,6 +170,7 @@ async def test_the_page_refers_only_to_files_of_its_own_and_has_no_inline_code(
         "call-remote.js",
         "call-render.js",
         "call-events.js",
+        "call-poll.js",
         "call-page.js",
     ):
         assert any(url.startswith(f"/static/{name}?v=") for url in page.references)
@@ -199,6 +200,7 @@ async def test_the_script_is_served_with_the_page_and_nothing_else_is_loaded(
         "/static/call-remote.js",
         "/static/call-render.js",
         "/static/call-events.js",
+        "/static/call-poll.js",
         "/static/call-page.js",
     ]
     for script in scripts:
