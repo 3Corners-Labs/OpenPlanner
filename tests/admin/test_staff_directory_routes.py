@@ -228,7 +228,7 @@ async def test_a_cross_site_post_is_refused(managed: Site) -> None:
     assert managed.directory.users["kc-mine"].enabled
 
 
-BUNDLED_ADMIN_URL = "http://idp:8080/admin/realms/openplanner"
+BUNDLED_ADMIN_URL = "http://172.31.240.4:8080/admin/realms/openplanner"
 
 
 @pytest.fixture

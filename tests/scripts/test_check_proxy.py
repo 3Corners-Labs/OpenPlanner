@@ -3,13 +3,18 @@
 The script needs Docker and runs in CI (step *proxy check*). This test keeps its shape honest
 without Docker: the TLS-version and HSTS checks belong to ``edge_checks``, which every pass
 calls, every pass also runs the round trip, the wrong proxy address is tried once, and the first
-pass checks that a visitor over IPv6 keeps their address.
+pass checks that a visitor over IPv6 keeps their address. Pass 4 (ADR 0125 step 2) stops each
+container another one reaches and lets an impostor answer its name: these tests hold that it
+uses the addresses a host gets and that each refusal follows a control.
 """
 
 import re
 from pathlib import Path
 
+import pytest
+
 from app.api.security_headers import SECURITY_HEADERS
+from tests.support.compose import compose_file
 
 REPO = Path(__file__).parents[2]
 SCRIPT = (REPO / "scripts/check-proxy.sh").read_text()
@@ -109,3 +114,66 @@ def test_a_visitor_over_ipv6_must_reach_web_with_their_own_address() -> None:
     match = re.search(r"^ipv6_client_code='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
     assert match, "the IPv6 client program is not in the script"
     compile(match.group(1), "ipv6 client", "exec")
+
+
+def _pass_4() -> str:
+    """Return pass 4 of the script, from its heading to its closing line (ADR 0125 step 2)."""
+    start = SCRIPT.index("# Pass 4:")
+    return SCRIPT[start : SCRIPT.index('echo "pass 4 ok', start)]
+
+
+def test_pass_4_proves_the_addresses_a_host_gets_not_addresses_of_its_own() -> None:
+    """The login, directory and database host from the render script, the route from install.sh."""
+    text = _pass_4()
+
+    assert "bash scripts/render-keycloak-realm.sh" in text
+    assert "--database postgres" in text
+    for key in ("OIDC_DISCOVERY_URL", "KEYCLOAK_ADMIN_URL", "KC_DB_URL_HOST"):
+        assert f"s/^{key}=//p" in text
+    assert "s/^BUNDLED_IDP_UPSTREAM=//p' scripts/install.sh" in text
+    assert "172.31.240." not in text
+    # Every hop answers while its container runs: a refusal later is then the container's absence.
+    for hop in ('fetch web "$login"', 'fetch worker "$directory"', 'fetch idp "$database"'):
+        assert text.index(hop) < text.index("impostor idp-db idp-store 5432")
+
+
+@pytest.mark.parametrize(
+    ("name", "control", "refusal"),
+    [
+        ("idp-db", "answers idp http://idp-db:5432/", '[ "$(fetch idp "$database")" = "refused" ]'),
+        ("idp", "answers web http://idp:8080/", '[ "$(fetch web "$login")" = "refused" ]'),
+        ("idp", "wget -q -O - -T 5 http://idp:8080/", '[ "$(proxied "$idp_path")" = " 502" ]'),
+        ("web", "wget -q -O - -T 5 http://web:8000/", '[ "$(proxied /healthz)" = " 502" ]'),
+    ],
+)
+def test_a_hop_fails_closed_only_after_an_impostor_answers_its_name(
+    name: str, control: str, refusal: str
+) -> None:
+    """A control first: with nobody answering the name, a refusal would prove nothing."""
+    text = _pass_4()
+    started = text.index(f"impostor {name} ")
+    counted = text.index(f'[ "$(requests {name})" = "$seen" ]', started)
+
+    assert started < text.index(control, started) < text.index(refusal, started) < counted
+
+
+def test_the_stand_ins_keep_where_docker_compose_puts_them() -> None:
+    """The overlay swaps the image, never the networks or fixed addresses, and publishes nothing."""
+    check = compose_file("deploy/proxy/compose.pebble.yml")["services"]
+    base = compose_file()["services"]
+
+    for name in ("idp", "idp-db"):
+        assert "networks" not in check[name]
+        assert check[name].get("ports", []) == []
+        assert base[name]["networks"]
+    assert "/pebble/responder.py" in check["idp"]["command"]
+    match = re.search(r"^responder_code='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
+    assert match, "the responder is not in the script"
+    compile(match.group(1), "responder", "exec")
+    assert 'print("request"' in match.group(1)  # one line per request, never what it carried
+
+
+def test_the_impostors_are_removed_before_the_networks_they_hold() -> None:
+    cleanup = _body("cleanup")
+
+    assert cleanup.index("impostor") < cleanup.index("compose down -v")

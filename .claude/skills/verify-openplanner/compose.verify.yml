@@ -11,8 +11,9 @@
 #   retags a developer's openplanner:local, nor the image of a stack running in another worktree;
 # - env_file is .env.example only: the documented development settings, and never a real Webex
 #   or SMTP credential from a local .env;
-# - web leaves the edge network: its fixed subnet is taken by any other stack of this repository,
-#   and the verification stack runs without the TLS proxy;
+# - web and worker leave the edge network: its fixed subnet is taken by any other stack of this
+#   repository, and the verification stack runs without the TLS proxy and the bundled identity
+#   provider that the worker reaches there (ADR 0125);
 # - web drops the ./web-tls bind mount, so nothing is created in the checkout;
 # - Keycloak imports realms rendered by stack.sh, which name this stack's web port as the
 #   redirect address, and announces itself on this stack's Keycloak port.
@@ -46,6 +47,8 @@ services:
       PUBLIC_BASE_URL: http://127.0.0.1:${VERIFY_WEB_PORT:?set by stack.sh}
       OIDC_ISSUER: http://127.0.0.1:${VERIFY_KC_PORT:?set by stack.sh}/realms/openplanner
       INSTALLATION_NAME: verify
+    networks: !override
+      - default
 
   mailpit:
     ports: !override

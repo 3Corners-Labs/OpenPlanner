@@ -29,8 +29,9 @@
 #
 # With --database postgres (production, ADR 0106 point 4) Keycloak runs on its own PostgreSQL
 # container `idp-db`: the script also generates KC_DB_PASSWORD and writes the connection to
-# secrets/keycloak.env (KC_DB*, KC_HTTP_ENABLED: TLS ends at the proxy) and the container's own
-# secrets/idp-db.env. The choice is remembered in keycloak.env (KC_DB).
+# secrets/keycloak.env (KC_DB*, the database at its fixed address, ADR 0125 step 2;
+# KC_HTTP_ENABLED: TLS ends at the proxy) and the container's own secrets/idp-db.env. The
+# choice is remembered in keycloak.env (KC_DB).
 #
 # A shell script, not a `python -m app.cli` command: it runs on the host before any container
 # exists, like scripts/install.sh, and the host has no Python of its own.
@@ -44,7 +45,7 @@ while (($#)); do
   case $1 in
     --dir) DIR=$2; shift 2 ;;
     --database) DATABASE=${2:-}; shift 2 ;;
-    -h|--help) sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,39p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -56,8 +57,14 @@ SECRETS_DIR=$DIR/secrets
 ENV_FILE=$SECRETS_DIR/keycloak.env
 REALM_FILE=$SECRETS_DIR/keycloak-realm.json
 APP_ENV_FILE=$SECRETS_DIR/keycloak-app.env
-# How web and worker reach the realm's admin API: the compose service `idp` on its own network.
-ADMIN_URL=http://idp:8080/admin/realms/openplanner
+# ADR 0125 step 2: web and worker reach Keycloak, and Keycloak its database, at the fixed
+# addresses docker-compose.yml gives them on its internal networks, never by a name this host's
+# DNS could answer while the container is down. scripts/install.sh (IDP_UPSTREAM) and
+# app/domain/web_transport.py hold the same address; a test keeps them equal.
+IDP_ADDRESS=172.31.240.4
+IDP_DB_ADDRESS=172.31.240.18
+# How web and worker reach the realm's admin API.
+ADMIN_URL=http://$IDP_ADDRESS:8080/admin/realms/openplanner
 GENERATED=(KC_BOOTSTRAP_ADMIN_PASSWORD KC_OPENPLANNER_CLIENT_SECRET KC_DIRECTORY_CLIENT_SECRET KC_SUPER_PASSWORD)
 KEYS=("${GENERATED[@]}" KC_OPENPLANNER_BASE_URL KC_HOSTNAME)
 DB_FILE=$SECRETS_DIR/idp-db.env
@@ -104,15 +111,16 @@ KC_OPENPLANNER_BASE_URL=${KC_OPENPLANNER_BASE_URL%/}
 
 # ADR 0112: with an https public address Keycloak is served by the proxy under /idp, on the same
 # host name and certificate. The browser address, the relative path and the proxy header mode
-# follow from it; web and worker talk to Keycloak on the internal network, with the path.
+# follow from it; web and worker talk to Keycloak at its address on the internal network, with
+# the path.
 if [[ $KC_OPENPLANNER_BASE_URL == https://* ]]; then
   HTTPS=1
   KC_HOSTNAME=$KC_OPENPLANNER_BASE_URL/idp
-  ADMIN_URL=http://idp:8080/idp/admin/realms/openplanner
-  DISCOVERY_URL=http://idp:8080/idp/realms/openplanner/.well-known/openid-configuration
+  ADMIN_URL=http://$IDP_ADDRESS:8080/idp/admin/realms/openplanner
+  DISCOVERY_URL=http://$IDP_ADDRESS:8080/idp/realms/openplanner/.well-known/openid-configuration
 else
   HTTPS=0
-  DISCOVERY_URL=http://idp:8080/realms/openplanner/.well-known/openid-configuration
+  DISCOVERY_URL=http://$IDP_ADDRESS:8080/realms/openplanner/.well-known/openid-configuration
 fi
 
 # A value goes into a JSON string through sed: only characters that need no escaping in either.
@@ -129,7 +137,7 @@ tmp=$(mktemp "$SECRETS_DIR/.keycloak.env.XXXXXX")
   printf '# never copied off this host. Re-run the script after a change to render the realm.\n'
   for key in "${KEYS[@]}"; do printf '%s=%s\n' "$key" "${!key}"; done
   if [[ $DATABASE == postgres ]]; then
-    printf 'KC_DB=postgres\nKC_DB_URL_HOST=idp-db\nKC_DB_URL_DATABASE=keycloak\n'
+    printf 'KC_DB=postgres\nKC_DB_URL_HOST=%s\nKC_DB_URL_DATABASE=keycloak\n' "$IDP_DB_ADDRESS"
     printf 'KC_DB_USERNAME=keycloak\nKC_DB_PASSWORD=%s\n' "$KC_DB_PASSWORD"
     # `start` refuses plain http unless told; TLS ends at the proxy, which sets the headers.
     printf 'KC_HTTP_ENABLED=true\n'
@@ -166,7 +174,7 @@ tmp=$(mktemp "$SECRETS_DIR/.keycloak-app.env.XXXXXX")
   printf 'KEYCLOAK_DIRECTORY_CLIENT_ID=openplanner-directory\n'
   printf 'KEYCLOAK_DIRECTORY_CLIENT_SECRET=%s\n' "$KC_DIRECTORY_CLIENT_SECRET"
   # The login itself, so nothing has to be copied into .env by hand (ADR 0112, ADR 0106 step 5).
-  # Keycloak announces KC_HOSTNAME, not the idp:8080 it is fetched on (ADR 0097).
+  # Keycloak announces KC_HOSTNAME, not the internal address it is fetched on (ADR 0097).
   printf 'OIDC_DISCOVERY_URL=%s\n' "$DISCOVERY_URL"
   printf 'OIDC_ISSUER=%s/realms/openplanner\n' "$KC_HOSTNAME"
   printf 'OIDC_CLIENT_ID=openplanner-admin\n'

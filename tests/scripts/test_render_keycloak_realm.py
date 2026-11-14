@@ -14,14 +14,17 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
-from app.domain.web_transport import BUNDLED_IDP_DISCOVERY_URL
+from app.domain.web_transport import BUNDLED_IDP_ADDRESS, BUNDLED_IDP_DISCOVERY_URL
 
 REPO = Path(__file__).parents[2]
 SCRIPT = REPO / "scripts/render-keycloak-realm.sh"
 TEMPLATE = REPO / "deploy/keycloak/realm.template.json"
 DEV_REALM = REPO / "dev/keycloak/openplanner-realm.json"
 BASH = shutil.which("bash") or "/bin/bash"
+INTERNAL = f"http://{BUNDLED_IDP_ADDRESS}:8080"
+"""Where web and worker reach the provider: its fixed address, never a name (ADR 0125)."""
 FIXED = {
     "KC_BOOTSTRAP_ADMIN_PASSWORD": "fixed-admin-password-0123456789",
     "KC_OPENPLANNER_CLIENT_SECRET": "fixed-client-secret-0123456789",
@@ -187,7 +190,7 @@ def test_the_application_half_carries_the_realm_s_directory_secret(tmp_path: Pat
     realm = json.loads((tmp_path / "secrets/keycloak-realm.json").read_text())
     client = next(c for c in realm["clients"] if c["clientId"] == "openplanner-directory")
     assert {k: v for k, v in app.items() if k.startswith("KEYCLOAK_")} == {
-        "KEYCLOAK_ADMIN_URL": "http://idp:8080/admin/realms/openplanner",
+        "KEYCLOAK_ADMIN_URL": f"{INTERNAL}/admin/realms/openplanner",
         "KEYCLOAK_DIRECTORY_CLIENT_ID": "openplanner-directory",
         "KEYCLOAK_DIRECTORY_CLIENT_SECRET": FIXED["KC_DIRECTORY_CLIENT_SECRET"],
     }
@@ -351,7 +354,7 @@ def test_an_https_address_puts_keycloak_under_idp_and_writes_the_login(tmp_path:
     assert keycloak["KC_HOSTNAME"] == "https://docker01.example.nl/idp"
     assert keycloak["KC_HTTP_RELATIVE_PATH"] == "/idp"
     assert keycloak["KC_PROXY_HEADERS"] == "xforwarded"
-    assert app["KEYCLOAK_ADMIN_URL"] == "http://idp:8080/idp/admin/realms/openplanner"
+    assert app["KEYCLOAK_ADMIN_URL"] == f"{INTERNAL}/idp/admin/realms/openplanner"
     # The one internal address production accepts over http (ADR 0125), with an https issuer.
     assert app["OIDC_DISCOVERY_URL"] == BUNDLED_IDP_DISCOVERY_URL
     assert app["OIDC_ISSUER"] == "https://docker01.example.nl/idp/realms/openplanner"
@@ -383,7 +386,7 @@ def test_an_http_address_keeps_the_loopback_shape(tmp_path: Path) -> None:
     app = read_env(tmp_path / "secrets/keycloak-app.env")
     assert "KC_HTTP_RELATIVE_PATH" not in keycloak
     assert app["OIDC_DISCOVERY_URL"] == (
-        "http://idp:8080/realms/openplanner/.well-known/openid-configuration"
+        f"{INTERNAL}/realms/openplanner/.well-known/openid-configuration"
     )
     assert app["OIDC_ISSUER"] == "http://127.0.0.1:8080/realms/openplanner"
     assert app["OIDC_CLIENT_ID"] == "openplanner-admin"
@@ -409,7 +412,10 @@ def test_postgres_gives_keycloak_its_own_database_and_a_private_password(tmp_pat
     keycloak = read_env(tmp_path / "secrets/keycloak.env")
     database = read_env(tmp_path / "secrets/idp-db.env")
     assert keycloak["KC_DB"] == "postgres"
-    assert keycloak["KC_DB_URL_HOST"] == "idp-db"
+    # The database's fixed address on its internal network, never the name idp-db (ADR 0125).
+    compose = yaml.safe_load((REPO / "docker-compose.yml").read_text())
+    pinned = compose["services"]["idp-db"]["networks"]["idp-store"]["ipv4_address"]
+    assert keycloak["KC_DB_URL_HOST"] == pinned
     assert keycloak["KC_HTTP_ENABLED"] == "true"
     assert keycloak["KC_PROXY_HEADERS"] == "xforwarded"
     assert database["POSTGRES_PASSWORD"] == keycloak["KC_DB_PASSWORD"] != ""

@@ -13,8 +13,10 @@
 # applies again when it is withdrawn; then the same proxy serves an own certificate from files and
 # one issued by its internal authority (ADR 0112; the root is published, trusted by `tls-check`,
 # and /idp/ is routed),
-# and `tls-check` from the web container reads either certificate and judges it. Used by CI
-# and by `make proxy-check`. Needs docker with compose v2, curl and openssl.
+# and `tls-check` from the web container reads either certificate and judges it. Pass 4 shows
+# that every hop on the host goes to a fixed address and fails closed while its container is down,
+# even when an impostor answers the container's name as the host's DNS could (ADR 0125 step 2).
+# Used by CI and by `make proxy-check`. Needs docker with compose v2, bash, curl and openssl.
 set -eu
 
 project=openplanner-proxy-check
@@ -29,6 +31,8 @@ compose() {
     -f docker-compose.yml -f deploy/proxy/compose.pebble.yml --profile tls "$@"
 }
 cleanup() {
+  # The impostors of pass 4 first: a network with a container attached cannot be removed.
+  for name in idp idp-db web; do docker rm -f "$project-impostor-$name" >/dev/null 2>&1 || true; done
   compose down -v >/dev/null 2>&1 || true
   docker network rm "$probe6_network" >/dev/null 2>&1 || true
   rm -rf "$certs"
@@ -292,6 +296,74 @@ tls_check() { # tls_check EXPECTED_FINDING EXPECTED_ISSUER_FRAGMENT: run the CLI
   echo "$report" | grep -Eq '^valid until .*\([0-9]+ days\)' || fail "tls-check did not report the days left"
 }
 
+# A stand-in or an impostor of pass 4: answers every request with its name and prints one line
+# per request, never a path, a header or a body, so the script can count what reached it.
+responder_code='
+import http.server
+import sys
+
+name, port = sys.argv[1], int(sys.argv[2])
+
+
+class Answer(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = name.encode()
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+        print("request", flush=True)
+
+    do_POST = do_GET
+
+    def log_message(self, *args):
+        pass
+
+
+http.server.ThreadingHTTPServer(("0.0.0.0", port), Answer).serve_forever()
+'
+
+# What a container gets from a URL: the body, or `refused` (and why, on stderr) when nothing
+# answers within ten seconds.
+fetch_code='
+import sys
+import urllib.request
+
+try:
+    print(urllib.request.urlopen(sys.argv[1], timeout=10).read().decode())
+except OSError as error:
+    print("refused")
+    print(f"  {sys.argv[1]}: {error}", file=sys.stderr)
+'
+
+fetch() { # fetch SERVICE URL: what SERVICE gets from URL, `refused` when nothing answers
+  compose exec -T "$1" python -I -c "$fetch_code" "$2"
+}
+
+proxied() { # proxied PATH: the body of a request through the proxy, a space, its status
+  # shellcheck disable=SC2086
+  curl -sk $resolve -w ' %{http_code}' "https://booking.test:18443$1"
+}
+
+impostor() { # impostor NAME NETWORK PORT: stop container NAME; another answers NAME on NETWORK
+  docker stop "$(compose ps -q "$1")" >/dev/null
+  docker run -d --rm --name "$project-impostor-$1" --network "${project}_$2" --network-alias "$1" \
+    -v "$certs:/pebble:ro" --entrypoint python "$image" -I /pebble/responder.py "impostor $1" "$3" \
+    >/dev/null
+}
+
+answers() { # answers SERVICE URL BODY: wait until SERVICE gets BODY from URL, the impostor's name
+  for _ in $(seq 1 15); do
+    [ "$(fetch "$1" "$2" 2>/dev/null)" = "$3" ] && return 0
+    sleep 1
+  done
+  fail "the impostor does not answer $2 for $1, so a refusal would prove nothing"
+}
+
+requests() { # requests NAME: how many requests the impostor for NAME has answered
+  docker logs "$project-impostor-$1" 2>/dev/null | grep -c '^request$' || true
+}
+
 # Pass 1: ACME against Pebble.
 compose up -d --build --wait proxy
 wait_for_proxy
@@ -384,6 +456,72 @@ echo "$report" | grep -q "^finding  *ok" || fail "tls-check did not find 'ok' fo
   || fail "the app is not served next to /idp/"
 edge_checks
 echo "pass 3 ok: internal authority, root published without a key, tls-check ok, /idp routed, redirect, body limit, non-root, TLS versions, HSTS"
+
+# Pass 4: every hop on the host goes to a fixed address, never to a name (ADR 0125 step 2).
+# Stand-ins answer at the addresses docker-compose.yml gives the bundled identity provider and its
+# database (compose.pebble.yml). The login, the staff directory and the database host are what
+# the render script writes, the /idp route what the installer writes (IDP_UPSTREAM), the route to
+# web what docker-compose.yml hands the proxy (WEB_UPSTREAM). Then each container is stopped and
+# an impostor answers its name on that network, as the host's DNS could: the name reaches the
+# impostor (the control, so a refusal means something), the hop fails, and the impostor sees none
+# of it.
+printf '%s' "$responder_code" >"$certs/responder.py"
+chmod 644 "$certs/responder.py"
+render="$certs/render"
+mkdir -p "$render/deploy/keycloak"
+cp deploy/keycloak/realm.template.json "$render/deploy/keycloak/"
+printf 'PUBLIC_BASE_URL=https://booking.test\n' >"$render/.env"
+bash scripts/render-keycloak-realm.sh --dir "$render" --database postgres >/dev/null 2>&1 \
+  || fail "the realm could not be rendered"
+login="$(sed -n 's/^OIDC_DISCOVERY_URL=//p' "$render/secrets/keycloak-app.env")"
+directory="$(sed -n 's/^KEYCLOAK_ADMIN_URL=//p' "$render/secrets/keycloak-app.env")"
+database="http://$(sed -n 's/^KC_DB_URL_HOST=//p' "$render/secrets/keycloak.env"):5432/"
+PROXY_IDP_UPSTREAM="$(sed -n 's/^BUNDLED_IDP_UPSTREAM=//p' scripts/install.sh)"
+export PROXY_IDP_UPSTREAM
+[ -n "$login" ] && [ -n "$directory" ] && [ -n "$PROXY_IDP_UPSTREAM" ] \
+  || fail "the render script or the installer named no address"
+# The worker too: no other pass starts it, and it reads the staff directory.
+compose up -d --wait idp-db idp worker
+compose up -d --force-recreate --wait proxy
+wait_for_proxy
+image="$(docker inspect -f '{{.Config.Image}}' "$(compose ps -q web)")"
+idp_path=/idp/realms/openplanner/.well-known/openid-configuration
+
+[ "$(fetch web "$login")" = "stand-in idp" ] || fail "web does not reach the login at its address ($login)"
+[ "$(fetch worker "$directory")" = "stand-in idp" ] \
+  || fail "the worker does not reach the staff directory at its address ($directory)"
+[ "$(fetch idp "$database")" = "stand-in idp-db" ] \
+  || fail "the identity provider does not reach its database at its address ($database)"
+[ "$(proxied "$idp_path")" = "stand-in idp 200" ] || fail "/idp does not reach $PROXY_IDP_UPSTREAM"
+[ "$(status_of https://booking.test:18443/healthz)" = "200" ] || fail "the proxy does not reach web"
+
+impostor idp-db idp-store 5432
+answers idp http://idp-db:5432/ "impostor idp-db"
+seen="$(requests idp-db)"
+[ "$(fetch idp "$database")" = "refused" ] || fail "Keycloak's database hop reached something while idp-db was down"
+[ "$(requests idp-db)" = "$seen" ] || fail "the impostor for idp-db received Keycloak's database hop"
+
+impostor idp edge 8080
+answers web http://idp:8080/ "impostor idp"
+[ "$(compose exec -T proxy wget -q -O - -T 5 http://idp:8080/ 2>/dev/null || true)" = "impostor idp" ] \
+  || fail "the impostor does not answer the name idp for the proxy, so its refusal would prove nothing"
+seen="$(requests idp)"
+[ "$(fetch web "$login")" = "refused" ] || fail "web's login reached something while idp was down"
+[ "$(fetch web "$directory")" = "refused" ] || fail "web's staff directory reached something while idp was down"
+[ "$(fetch worker "$directory")" = "refused" ] || fail "the worker's staff directory reached something while idp was down"
+[ "$(proxied "$idp_path")" = " 502" ] || fail "/idp answered while idp was down"
+[ "$(requests idp)" = "$seen" ] || fail "the impostor for idp received a hop meant for the identity provider"
+
+impostor web edge 8000
+[ "$(compose exec -T proxy wget -q -O - -T 5 http://web:8000/ 2>/dev/null || true)" = "impostor web" ] \
+  || fail "the impostor does not answer the name web for the proxy, so its refusal would prove nothing"
+seen="$(requests web)"
+[ "$(proxied /healthz)" = " 502" ] || fail "the proxy reached something while web was down"
+[ "$(requests web)" = "$seen" ] || fail "the impostor for web received the proxy's route"
+
+for name in idp idp-db web; do docker rm -f "$project-impostor-$name" >/dev/null; done
+compose up -d --wait web idp-db idp
+echo "pass 4 ok: login, staff directory, database, /idp and web at fixed addresses; each fails closed while its container is down, and an impostor answering its name gets nothing"
 unset PROXY_INTERNAL PROXY_IDP_UPSTREAM
 
 # A half-configured own certificate must stop the container, never serve plain HTTP.

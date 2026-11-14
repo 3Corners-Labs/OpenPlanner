@@ -16,7 +16,10 @@
 # The Caddyfile cannot branch, so the `tls` line of the https site comes from TLS_DIRECTIVE,
 # which this script sets for `caddy run` and again for every `caddy reload`. Without a domain
 # Caddy would serve plain HTTP on 8443, so a missing or incomplete setting stops the container.
-# IDP_UPSTREAM (host:port) adds the route /idp/* to the bundled identity provider (ADR 0112).
+# WEB_UPSTREAM (address:port) is where everything else goes: web's fixed address on edge, set in
+# docker-compose.yml. IDP_UPSTREAM (address:port) adds the route /idp/* to the bundled identity
+# provider (ADR 0112) at its fixed address, written by the installer. A name works but is
+# named in the log: this host's DNS may answer it while its container is down (ADR 0125).
 set -eu
 
 PORTAL_DIR=${TLS_PORTAL_DIR:-/portal-certs} # the volume's mount point (tests point it elsewhere)
@@ -87,10 +90,25 @@ publish_root() {
   done
 }
 
-if [ -n "${IDP_UPSTREAM:-}" ]; then
-  case $IDP_UPSTREAM in
-    *[!A-Za-z0-9.:_-]*) fail "IDP_UPSTREAM must be host:port" ;;
+# upstream NAME VALUE: refuse anything but host:port, since the value goes into the Caddyfile,
+# and say so when it is a name rather than an address (ADR 0125 step 2).
+upstream() {
+  case $2 in
+    '' | *[!A-Za-z0-9.:_-]*) fail "$1 must be host:port" ;;
+    *[!0-9.:]*) echo "warning: $1=$2 is a name, which this host's DNS may answer while its container is down; docker-compose.yml and scripts/install.sh give its fixed address (ADR 0125)" >&2 ;;
   esac
+}
+
+# A docker-compose.yml from before ADR 0125 step 2 sets no WEB_UPSTREAM: this image then finds
+# web by its name as the earlier one did, until the checkout of this release is in place (a
+# portal update replaces the image before the operator updates the checkout; docs/install.md,
+# Upgrading). The fallback goes a minor later (ADR 0116: expand, then contract).
+WEB_UPSTREAM=${WEB_UPSTREAM:-web:8000}
+upstream WEB_UPSTREAM "$WEB_UPSTREAM"
+export WEB_UPSTREAM
+
+if [ -n "${IDP_UPSTREAM:-}" ]; then
+  upstream IDP_UPSTREAM "$IDP_UPSTREAM"
   IDP_DIRECTIVE="handle /idp/* {
 		reverse_proxy $IDP_UPSTREAM
 	}"

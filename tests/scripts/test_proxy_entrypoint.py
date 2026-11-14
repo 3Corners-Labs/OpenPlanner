@@ -21,6 +21,7 @@ FAKE_CADDY = """#!/bin/sh
 # Fake caddy: records the command and the TLS_DIRECTIVE it was started or reloaded with.
 echo "$1:${TLS_DIRECTIVE-unset}" >> "$CADDY_LOG"
 echo "$1:${IDP_DIRECTIVE-unset}" >> "$CADDY_LOG.idp"
+echo "$1:${WEB_UPSTREAM-unset}" >> "$CADDY_LOG.web"
 if [ "$1" = run ]; then sleep "${CADDY_RUN_SECONDS:-0}"; fi
 """
 
@@ -48,6 +49,7 @@ class Outcome:
     stderr: str
     logged: list[str]
     idp: list[str]
+    web: list[str]
 
 
 def run(bin_dir: Path, tmp_path: Path, run_seconds: int = 0, **env: str) -> Outcome:
@@ -76,9 +78,12 @@ def run(bin_dir: Path, tmp_path: Path, run_seconds: int = 0, **env: str) -> Outc
         returncode = process.wait(timeout=30)
     time.sleep(1.5)  # let the watcher notice that caddy is gone and write its last line
     lines = log.read_text().splitlines() if log.exists() else []
-    idp_log = Path(f"{log}.idp")
+    idp_log, web_log = Path(f"{log}.idp"), Path(f"{log}.web")
     idp = idp_log.read_text().splitlines() if idp_log.exists() else []
-    return Outcome(returncode, out.read_text(), err.read_text(), lines, idp)
+    web = web_log.read_text().splitlines() if web_log.exists() else []
+    for used in (idp_log, web_log):
+        used.unlink(missing_ok=True)  # the next run in the same test starts its own
+    return Outcome(returncode, out.read_text(), err.read_text(), lines, idp, web)
 
 
 def write_pair(portal: Path, serial: str) -> None:
@@ -256,33 +261,63 @@ def test_operator_files_win_over_the_internal_authority(bin_dir: Path, tmp_path:
     assert outcome.logged == [f"run:tls {cert} {key}"]
 
 
+IDP_ADDRESS = "172.31.240.4:8080"
+"""The bundled identity provider's fixed address and port (ADR 0125 step 2)."""
+WEB_ADDRESS = "172.31.240.3:8000"
+"""Web's fixed address and port on edge, as ``docker-compose.yml`` hands it to the proxy."""
+ACME = {"TLS_DOMAIN": "a.example.nl", "ACME_EMAIL": "ops@example.nl"}
+COMPOSE = {**ACME, "WEB_UPSTREAM": WEB_ADDRESS}
+"""What the proxy gets from ``docker-compose.yml`` and an ACME ``proxy.env``."""
+
+
 def test_the_identity_provider_is_routed_only_when_an_upstream_is_named(
     bin_dir: Path, tmp_path: Path
 ) -> None:
-    plain = run(bin_dir, tmp_path, TLS_DOMAIN="a.example.nl", ACME_EMAIL="ops@example.nl")
-    (tmp_path / "caddy.log.idp").unlink()
-    routed = run(
-        bin_dir,
-        tmp_path,
-        TLS_DOMAIN="a.example.nl",
-        ACME_EMAIL="ops@example.nl",
-        IDP_UPSTREAM="idp:8080",
-    )
+    plain = run(bin_dir, tmp_path, **COMPOSE)
+    routed = run(bin_dir, tmp_path, **COMPOSE, IDP_UPSTREAM=IDP_ADDRESS)
 
     assert plain.idp == ["run:"]
     directive = "\n".join(routed.idp)  # a multi-line directive: one log line per line of it
     assert directive.startswith("run:handle /idp/* {")
-    assert "reverse_proxy idp:8080" in directive
+    assert f"reverse_proxy {IDP_ADDRESS}" in directive
+    assert "warning" not in routed.stderr
 
 
-def test_an_upstream_with_an_odd_character_is_refused(bin_dir: Path, tmp_path: Path) -> None:
-    outcome = run(
-        bin_dir,
-        tmp_path,
-        TLS_DOMAIN="a.example.nl",
-        ACME_EMAIL="ops@example.nl",
-        IDP_UPSTREAM="idp:8080; respond 200",
-    )
+def test_everything_else_goes_to_web_at_the_address_compose_names(
+    bin_dir: Path, tmp_path: Path
+) -> None:
+    """ADR 0125 step 2: never the name web, which the host's DNS may answer while it is down."""
+    outcome = run(bin_dir, tmp_path, **COMPOSE)
+
+    assert outcome.web == [f"run:{WEB_ADDRESS}"]
+    assert "warning" not in outcome.stderr
+
+
+def test_an_older_compose_file_falls_back_to_the_name_web_and_says_so(
+    bin_dir: Path, tmp_path: Path
+) -> None:
+    """A portal update replaces the image before the checkout: the route must keep working."""
+    outcome = run(bin_dir, tmp_path, **ACME)
+
+    assert outcome.returncode == 0
+    assert outcome.web == ["run:web:8000"]
+    assert "WEB_UPSTREAM=web:8000 is a name" in outcome.stderr
+
+
+def test_a_name_in_idp_upstream_works_and_is_named(bin_dir: Path, tmp_path: Path) -> None:
+    """A proxy.env from before ADR 0125 step 2, until the installer writes the address."""
+    outcome = run(bin_dir, tmp_path, **COMPOSE, IDP_UPSTREAM="idp:8080")
+
+    assert "reverse_proxy idp:8080" in "\n".join(outcome.idp)
+    assert "IDP_UPSTREAM=idp:8080 is a name" in outcome.stderr
+
+
+@pytest.mark.parametrize("name", ["IDP_UPSTREAM", "WEB_UPSTREAM"])
+def test_an_upstream_with_an_odd_character_is_refused(
+    bin_dir: Path, tmp_path: Path, name: str
+) -> None:
+    outcome = run(bin_dir, tmp_path, **{**COMPOSE, name: f"{IDP_ADDRESS}; respond 200"})
 
     assert outcome.returncode == 1
-    assert "IDP_UPSTREAM must be host:port" in outcome.stderr
+    assert f"{name} must be host:port" in outcome.stderr
+    assert outcome.logged == []

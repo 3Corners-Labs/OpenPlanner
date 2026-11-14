@@ -4,12 +4,13 @@ These hops are meant never to leave the host, so they run without TLS, as record
 
 * the bundled proxy to web, over the ``edge`` network (ADR 0091 point 2). An own proxy on
   another machine crosses a real network, so web should serve TLS there (point 3);
-* to the bundled identity provider (ADR 0125): web and worker over the compose network (the
-  back channel: discovery, token, keys, the staff directory), and the proxy over ``edge`` (the
-  browser's ``/idp`` route, whose leg from the browser is https); and the provider to its
-  database. Until ADR 0125 step 2 pins their addresses, they find each other by name
-  (``idp``, ``idp-db``, and ``web`` for the proxy), which the host's resolver may answer while
-  a container is not running.
+* to the bundled identity provider (ADR 0125): web and worker over ``edge`` (the back channel:
+  discovery, token, keys, the staff directory), and the proxy over ``edge`` too (the browser's
+  ``/idp`` route, whose leg from the browser is https); and the provider to its database, over
+  the internal network ``idp-store``.
+
+Every one of these hops goes to a fixed address on its network (ADR 0125 step 2), never to a
+name, which the host's resolver may answer while a container is not running.
 
 Pure Python: the settings arrive as plain values.
 """
@@ -19,14 +20,25 @@ from app.domain.identity_providers import DISCOVERY_SUFFIX
 BUNDLED_PROXY_ADDRESS = "172.31.240.2"
 """The fixed address of the bundled proxy on the ``edge`` network (``docker-compose.yml``)."""
 
+BUNDLED_IDP_ADDRESS = "172.31.240.4"
+"""The fixed address of the bundled identity provider on the ``edge`` network (ADR 0125 step 2).
+
+``docker-compose.yml`` gives it to the service ``idp`` outside the network's range of dynamic
+addresses, so no other container is handed it while the provider is down. The proxy's route
+(``IDP_UPSTREAM``, written by ``scripts/install.sh``) and the login and staff directory that
+``scripts/render-keycloak-realm.sh`` writes all use it; a test keeps them equal.
+"""
+
 BUNDLED_REALM_PATH = "/realms/openplanner/"
 """Where the bundled provider's realm sits in its addresses (ADR 0090, the realm template)."""
 
-BUNDLED_IDP_DISCOVERY_URL = f"http://idp:8080/idp{BUNDLED_REALM_PATH.rstrip('/')}{DISCOVERY_SUFFIX}"
-"""Where web reads the bundled provider's login on the compose network (ADR 0112 point 4).
+BUNDLED_IDP_DISCOVERY_URL = (
+    f"http://{BUNDLED_IDP_ADDRESS}:8080/idp{BUNDLED_REALM_PATH.rstrip('/')}{DISCOVERY_SUFFIX}"
+)
+"""Where web reads the bundled provider's login on the internal network (ADR 0112 point 4).
 
-The compose service ``idp`` on its fixed port, under the proxy's ``/idp`` path, in the bundled
-realm: what ``scripts/render-keycloak-realm.sh`` writes for an https public address.
+The provider's fixed address and port, under the proxy's ``/idp`` path, in the bundled realm:
+what ``scripts/render-keycloak-realm.sh`` writes for an https public address.
 """
 
 
