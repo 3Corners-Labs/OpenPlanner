@@ -89,6 +89,11 @@ status_of() { # status_of CURL_ARGS...: the HTTP status code of a request throug
   curl -sk $resolve -o /dev/null -w '%{http_code}' "$@"
 }
 
+head_of() { # head_of CURL_ARGS...: the response headers of a request through the proxy, without CR
+  # shellcheck disable=SC2086
+  curl -sk $resolve -D - -o /dev/null "$@" | tr -d '\r'
+}
+
 machine_paths_check() { # port 80 refuses machine paths without a Location header (ASVS V4.1.2)
   for path in /api/agent/v1/oauth/token /api/v1/widget/x /webhooks/x; do
     for method in GET POST; do
@@ -406,23 +411,19 @@ idp_route_checks() { # pass 3: the route of ADR 0126 in front of a provider that
   done
   ! echo "$given" | grep -q -e '__Host-' -e 'lang=' || fail "a cookie of the portal reaches the provider ($given)"
   direct="$(compose exec -T web python -I -c "$probe_direct_code" | tr -d '\r')"
-  # shellcheck disable=SC2086
-  head="$(curl -sk $resolve -D - -o /dev/null "$base/healthz" | tr -d '\r')"
+  head="$(head_of "$base/healthz")"
   portal_hsts="$(values_of strict-transport-security)"
   portal_permissions="$(values_of permissions-policy)"
   portal_security="$(security_of)"
+  ! echo "$portal_security" | grep -q ': $' \
+    || fail "the portal lacks one of its own security headers, so nothing on /idp has a value to equal: $portal_security"
   # The proxy's own answers are pages of the portal's origin: the portal's headers, so a script
   # on a provider page can neither frame nor open one and act from there.
-  for refusal in "$base/idp/admin/" "-H Service-Worker:script $base/idp/resources/sw.js"; do
-    # shellcheck disable=SC2086
-    head="$(curl -sk $resolve -D - -o /dev/null $refusal | tr -d '\r')"
-    [ "$(security_of)" = "$portal_security" ] \
-      || fail "the proxy's own answer to $refusal lacks the portal's headers: $(security_of)"
-  done
-  [ -n "$portal_hsts" ] && [ -n "$portal_permissions" ] \
-    || fail "the portal sends no HSTS or Permissions-Policy, so the ones on /idp have nothing to equal"
-  # shellcheck disable=SC2086
-  head="$(curl -sk $resolve -D - -o /dev/null "$base/idp/realms/openplanner/x" | tr -d '\r')"
+  head="$(head_of "$base/idp/admin/")"
+  [ "$(security_of)" = "$portal_security" ] || fail "the proxy's own 404 under /idp lacks the portal's headers: $(security_of)"
+  head="$(head_of -H 'Service-Worker: script' "$base/idp/resources/sw.js")"
+  [ "$(security_of)" = "$portal_security" ] || fail "the proxy's own 403 under /idp lacks the portal's headers: $(security_of)"
+  head="$(head_of "$base/idp/realms/openplanner/x")"
   [ -n "$dropped_headers" ] || fail "no dropped header found in deploy/proxy/idp.caddy"
   for header in $dropped_headers; do
     echo "$direct" | grep -qi "^$header:" || fail "the probe sends no $header, so its absence would prove nothing"

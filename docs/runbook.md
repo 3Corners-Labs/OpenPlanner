@@ -571,7 +571,7 @@ rewrite a `Set-Cookie` path outside `/idp/` to `/idp/` and drop its `Domain`, dr
 `Cross-Origin-Opener-Policy: same-origin-allow-popups` and the added `Content-Security-Policy`,
 and refuse a request with a `Service-Worker` header. Every answer it makes itself (a refusal, an
 error page, a body over its limit) must carry the portal's own security headers, as
-`handle_errors` in `deploy/proxy/Caddyfile` does. `deploy/proxy/idp.caddy` is the reference.
+`handle_errors` in `deploy/proxy/Caddyfile` does for Caddy's handlers. `deploy/proxy/idp.caddy` is the reference.
 
 ### Test the certificate flow end to end (ADR 0064)
 

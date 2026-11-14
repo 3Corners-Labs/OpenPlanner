@@ -113,6 +113,14 @@ class Host:
     def ran(self, fragment: str) -> bool:
         return any(fragment in command for command in self.commands())
 
+    def after_start(self, fragment: str) -> bool:
+        """Whether the first call holding ``fragment`` came after `up -d` and the ready check."""
+        commands = self.commands()
+        started = max(i for i, c in enumerate(commands) if c.endswith(" up -d"))
+        ready = max(i for i, c in enumerate(commands) if "/readyz" in c)
+        called = min(i for i, c in enumerate(commands) if fragment in c)
+        return started < ready < called
+
     def settings(self, name: str) -> dict[str, str]:
         """Read an env file as Compose does: the last occurrence wins, quotes removed."""
         values = {}
@@ -878,9 +886,7 @@ def test_the_package_answers_the_login_questions_and_is_imported_once_healthy(
     assert "a passphrase of sixteen chars" not in " ".join(commands)
     assert not list(host.checkout.glob(".package.*"))
     # The import waits for health and uses a copy inside the container.
-    started = commands.index(next(c for c in commands if c.endswith(" up -d")))
-    imported = commands.index(next(c for c in commands if "app.cli config import" in c))
-    assert started < imported
+    assert host.after_start("app.cli config import")
     assert any(c.endswith("web:/srv/data/configuration-package.sqlite") for c in commands)
     assert host.ran("exec -T web rm -f /srv/data/configuration-package.sqlite")
     assert "organisations       2" in result.stdout
@@ -983,15 +989,6 @@ KCADM = "exec -T idp sh /opt/openplanner/kcadm-as-admin.sh"
 """How the installer runs kcadm.sh as realm master's admin (deploy/keycloak/kcadm-as-admin.sh)."""
 
 
-def _after_start(host: Host, fragment: str) -> bool:
-    """Whether the call holding ``fragment`` came after `up -d` and the ready check."""
-    commands = host.commands()
-    started = max(i for i, c in enumerate(commands) if c.endswith(" up -d"))
-    ready = max(i for i, c in enumerate(commands) if "/readyz" in c)
-    called = min(i for i, c in enumerate(commands) if fragment in c)
-    return started < ready < called
-
-
 def test_the_realms_mail_server_is_set_after_the_start_without_a_password_in_an_argument(
     host: Host,
 ) -> None:
@@ -999,7 +996,7 @@ def test_the_realms_mail_server_is_set_after_the_start_without_a_password_in_an_
 
     assert result.returncode == 0, result.stderr
     assert host.ran(f"{KCADM} update realms/openplanner -f -")  # the body comes on stdin
-    assert _after_start(host, "update realms/openplanner")
+    assert host.after_start("update realms/openplanner")
     assert not host.ran("pass word #1")
     assert "mail server: smtp.example.nl" in result.stderr + result.stdout
 
@@ -1023,8 +1020,9 @@ def test_the_admin_console_is_put_on_the_loopback_after_the_start_adr_0126(host:
     assert host.ran(
         f"{KCADM} update realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp"
     )
-    assert _after_start(host, "port idp-container-id")
-    assert _after_start(host, "update realms/master")
+    assert host.after_start("port idp-container-id")
+    assert host.after_start("update realms/master")
+    assert not host.ran("rm --stop --force idp idp-db")  # a bundled install keeps its provider
     output = result.stderr + result.stdout
     assert "admin console: http://127.0.0.1:8080/idp/admin/ on this host only" in output
 
@@ -1238,11 +1236,7 @@ def test_a_host_that_leaves_the_bundled_keycloak_logs_in_with_its_own_provider(
     # Only once the new proxy, web and worker run without it (`up -d`, then ready): stopped
     # earlier, the name idp would reach the host's resolver while they still use it. `compose rm`
     # never removes the named volumes idp-data and idp-db-data, which the fake docker cannot show.
-    commands = host.commands()
-    retired = max(i for i, c in enumerate(commands) if "rm --stop --force idp idp-db" in c)
-    started = max(i for i, c in enumerate(commands) if c.endswith(" up -d"))
-    ready = max(i for i, c in enumerate(commands) if "/readyz" in c)
-    assert started < ready < retired
+    assert host.after_start("rm --stop --force idp idp-db")
     assert "containers (idp, idp-db) are removed" in result.stderr + result.stdout
     assert "until ADR 0125 step 2" not in result.stderr
     settings = _container_settings(host)

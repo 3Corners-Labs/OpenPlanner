@@ -94,10 +94,10 @@ in both directions. Measured on Keycloak 26.8.1 behind the bundled proxy (2026-1
      stays allowed;
    - refuses with 403, before the provider sees it, a request that fetches a service worker
      script (`Service-Worker` request header);
-   - gives every answer it makes itself (its refusals under `/idp`, a body over its limit, a 502
-     while a container restarts) the portal's own deny-by-default headers (`handle_errors` in
-     `deploy/proxy/Caddyfile`): such an empty page is a page of the portal's origin without the
-     added policy, which a script could otherwise frame or open and act from.
+   - gives every answer its own handlers make (its refusals under `/idp`, a body over its limit,
+     a 502 while a container restarts) the portal's own deny-by-default headers (`handle_errors`
+     in `deploy/proxy/Caddyfile`): such an empty page is a page of the portal's origin without
+     the added policy, which a script could otherwise frame or open and act from.
 5. **One origin stays (ADR 0112).** A host name of its own for the provider would give it its
    own origin, and the portal's Fetch Metadata check would then refuse its requests without
    any of point 4. Not chosen now: it needs a second name and certificate on every
@@ -120,6 +120,8 @@ None, after checking. Every value below is a fixed security rule or follows from
 
 - The public paths (`/idp/realms/openplanner/*`, `/idp/resources/*`): the realm name is fixed
   by the template (ADR 0090), and a setting would let a host publish the console again.
+- The refused detours (an encoded slash, dot or backslash, a dot segment, a `;` in the path) and
+  the headers of the proxy's own answers (the portal's `SECURITY_HEADERS`, tied by a test).
 - The removed cookies (`__Host-*`, `lang`), the dropped headers, the HSTS and
   `Permissions-Policy` values, the `Cross-Origin-Opener-Policy` value and the added policy:
   security rules; tests tie the HSTS and `Permissions-Policy` values and the cookie names to the
@@ -161,7 +163,12 @@ None, after checking. Every value below is a fixed security rule or follows from
     show any page under `/idp`;
   - in Firefox and Safari, which ignore `Permissions-Policy`, and in a window such a script
     opens, it can still use the camera or microphone grant the origin holds from the call page
-    (ADR 0123), or ask for one under the portal's name.
+    (ADR 0123), or ask for one under the portal's name;
+  - two kinds of same-origin page still lack the deny-by-default headers, so such a script could
+    frame one and act from it: what Go's HTTP server answers before Caddy's handlers run (a 431
+    for a header block over 1 MB, a 400 for a request it cannot parse), and the portal's own 500
+    for an exception nothing handles (`SecurityHeadersMiddleware` sits inside Starlette's error
+    middleware; a follow-up outside this decision).
 
   A host name of its own (point 5) removes all of them. The product owner accepts them with this
   decision, or decides on that host name instead.
