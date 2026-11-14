@@ -1002,7 +1002,7 @@ def test_the_admin_console_is_put_on_the_loopback_after_the_start_adr_0126(host:
     result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
 
     assert result.returncode == 0, result.stderr
-    assert host.ran("port idp 8080")
+    assert host.ran("port idp-container-id")
     # The published loopback port, with the proxy's path, as one argument of kcadm.sh's own.
     assert host.ran(
         f"{KCADM} update realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp"
@@ -1011,26 +1011,38 @@ def test_the_admin_console_is_put_on_the_loopback_after_the_start_adr_0126(host:
     assert "admin console: http://127.0.0.1:8080/idp/admin/ on this host only" in output
 
 
-def test_a_provider_published_beyond_the_loopback_gets_no_console_address(host: Host) -> None:
-    """A port on every interface would put the console on the network: say so, set nothing."""
-    host.given("idp-port", "0.0.0.0:8780\n")
+def test_a_provider_also_published_beyond_the_loopback_gets_no_console_address(
+    host: Host,
+) -> None:
+    """One more port on every interface (an override's 8780) puts realm master on the network."""
+    host.given("idp-ports", "8080/tcp -> 127.0.0.1:8080\n8080/tcp -> 0.0.0.0:8780\n")
+
+    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
+
+    assert result.returncode == 0, result.stderr
+    assert host.ran("port idp-container-id")
+    assert not host.ran("frontendUrl")
+    assert "published beyond the loopback (8080/tcp -> 0.0.0.0:8780)" in result.stderr
+
+
+def test_a_provider_on_both_loopbacks_gets_the_ipv4_one(host: Host) -> None:
+    host.given("idp-ports", "8080/tcp -> 127.0.0.1:8080\n8080/tcp -> [::1]:8080\n")
+
+    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
+
+    assert result.returncode == 0, result.stderr
+    assert host.ran("realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp")
+
+
+def test_a_provider_that_is_not_running_is_named_as_such(host: Host) -> None:
+    """No container, so nothing published: say so, not that a port is wrong."""
+    host.given("idp-container", "\n")
 
     result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
 
     assert result.returncode == 0, result.stderr
     assert not host.ran("frontendUrl")
-    assert "published as '0.0.0.0:8780', not on 127.0.0.1 only" in result.stderr + result.stdout
-
-
-def test_a_provider_that_publishes_nothing_is_named_as_such(host: Host) -> None:
-    """`docker compose port` prints nothing while idp is not running: not a port problem."""
-    host.given("idp-port", "\n")
-
-    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
-
-    assert result.returncode == 0, result.stderr
-    assert not host.ran("frontendUrl")
-    assert "publishes no port, or is not running" in result.stderr
+    assert "publishes no port on 127.0.0.1, or is not running" in result.stderr
 
 
 def test_a_provider_that_never_answers_is_waited_for_once(host: Host) -> None:
@@ -1050,7 +1062,7 @@ def test_an_own_provider_gets_no_console_step(host: Host) -> None:
     result = host.run("--mode", "test", "--idp", "own", "--non-interactive", **PRODUCTION)
 
     assert result.returncode == 0, result.stderr
-    assert not host.ran("port idp")
+    assert not host.ran("ps -q idp")
     assert not host.ran("exec -T idp")
 
 

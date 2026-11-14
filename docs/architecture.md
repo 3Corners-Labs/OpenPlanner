@@ -136,7 +136,7 @@ flowchart TB
     web -- "OIDC, https" --> idp
     web -- "OIDC and directory API (ADR 0095)" --> keycloak
     keycloak <--> idpdata
-    proxy -- "/idp route (ADR 0112)" --> keycloak
+    proxy -- "/idp route: the login only (ADR 0112, 0126)" --> keycloak
     web -- https --> cisco
     worker -- https --> cisco
     web -- "syslog+tls or https" --> logs
@@ -174,8 +174,10 @@ flowchart TB
   Keycloak runs next to `web`; staff are managed in it from the portal (ADR 0095). In a lab
   without a public name the proxy can issue its certificates from its own certificate authority
   (`TLS_INTERNAL=true`, ADR 0112), publish the root for download on *System status*, and serve
-  Keycloak under `/idp` on the same https address. Step 6 of ADR 0112 (the installer writes
-  `IDP_UPSTREAM`) is not built.
+  Keycloak under `/idp` on the same https address; the installer writes `IDP_UPSTREAM` (ADR
+  0112 step 6). The route passes only the login of realm `openplanner` and its assets, keeps the
+  portal's cookies from Keycloak and drops what an answer could do to the whole origin; the
+  admin console is on the host's loopback (ADR 0126).
 - **Every hop with personal data is encrypted, or a recorded exception (ADR 0091).** The one
   exception is the bundled proxy to `web` on the `edge` network of one host. An own reverse proxy
   on another machine gets HTTPS from uvicorn (`WEB_TLS_CERT_FILE`, `WEB_TLS_KEY_FILE`, class B;

@@ -291,8 +291,8 @@ edge_checks() { # redirect, machine paths, body limit, non-root, standards: the 
 idp_probe_code='
 import http.server, json
 FORGED = [
-    ("Set-Cookie", "__Host-op_admin=forged; Path=/; Secure; HttpOnly"),
-    ("Set-Cookie", "tossed=1; Path=/admin; Domain=booking.test"),
+    ("Set-Cookie", "__Host-op_admin=forged; Path=/; Path=/; Secure; HttpOnly"),
+    ("Set-Cookie", "tossed=1; Path =/admin; Domain = booking.test"),
     ("Set-Cookie", "KC_PROBE=1; Path=/idp/realms/openplanner/; Secure"),
     ("Strict-Transport-Security", "max-age=0"),
     ("Cross-Origin-Opener-Policy", "same-origin"),
@@ -402,8 +402,11 @@ idp_route_checks() { # pass 3: the route of ADR 0126 in front of a provider that
   done
   cookies="$(values_of set-cookie)"
   [ "$(echo "$cookies" | grep -c .)" = "3" ] || fail "the provider's three cookies do not all arrive ($cookies)"
-  ! echo "$cookies" | grep -iv '; path=/idp/' | grep -q . || fail "a cookie of the provider leaves /idp/ ($cookies)"
-  ! echo "$cookies" | grep -qi 'domain=' || fail "a cookie of the provider keeps its Domain ($cookies)"
+  # Every Path attribute as a browser reads it (it uses the last), not only the first.
+  outside="$(echo "$cookies" | tr ';' '\n' | sed -n 's/^[[:space:]]*[Pp][Aa][Tt][Hh][[:space:]]*=[[:space:]]*//p' \
+    | grep -v '^/idp/' || true)"
+  [ -z "$outside" ] || fail "a cookie of the provider keeps a path outside /idp/ ($cookies)"
+  ! echo "$cookies" | grep -qi 'domain *=' || fail "a cookie of the provider keeps its Domain ($cookies)"
   [ "$(values_of strict-transport-security)" = "$portal_hsts" ] || fail "HSTS on /idp is not the portal's own"
   [ "$(values_of cross-origin-opener-policy)" = "same-origin-allow-popups" ] \
     || fail "the opener policy on /idp is not same-origin-allow-popups alone"
@@ -457,9 +460,14 @@ keycloak_checks() { # pass 4: what a browser needs passes the route, the admin c
       || fail "$path is not served on the loopback either, so its 404 proves nothing"
   done
   [ "$(status_of "$base/idp/admin/realms/openplanner/users")" = "404" ] || fail "the admin REST API passes the route"
+  # Detours through a public path. The console would answer 200 and the REST API 401 (asking for
+  # a token): either means the detour reached them.
   for path in '/idp/realms/openplanner/..;/..;/admin/master/console/' '/idp/resources/..;/admin/master/console/' \
-    '/idp/realms/openplanner/%2e%2e/%2e%2e/admin/master/console/'; do
-    [ "$(status_of --path-as-is "$base$path")" != "200" ] || fail "$path reaches the admin console through the route"
+    '/idp/realms/openplanner/%2e%2e/%2e%2e/admin/master/console/' \
+    '/idp/realms/openplanner/..;/..;/admin/realms/openplanner/users' '/idp/resources/..;/admin/realms/openplanner/users' \
+    '/idp/realms/openplanner/%2e%2e/%2e%2e/admin/realms/openplanner/users'; do
+    status="$(status_of --path-as-is "$base$path")"
+    case $status in 200 | 401 | 403) fail "$path reaches the admin console or its API through the route ($status)" ;; esac
   done
   # The console on the loopback (ADR 0126 point 2). Until realm master's frontend URL is the
   # loopback, Keycloak serves the console's login for the public address, where the route refuses

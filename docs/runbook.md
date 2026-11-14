@@ -535,9 +535,9 @@ Moving docker01 from plain http to this took these steps, all without root, beca
 7. `docker compose --env-file .env.update up -d --force-recreate web worker proxy`.
 8. Verify with `oidc-check`, `tls-check` and `address-check` from `web`.
 9. Since ADR 0126 (with the release that brings it): run the command of *Opening the admin
-   console*, check that `docker compose --env-file .env.update port idp 8080` prints
-   `127.0.0.1:8080` and nothing on 8780, and that `https://<host>/idp/admin/` answers 404 from
-   another machine.
+   console*, check that `docker port $(docker compose --env-file .env.update ps -q idp)` lists
+   `127.0.0.1` (or `[::1]`) only, nothing on 8780 or `0.0.0.0`, and that
+   `https://<host>/idp/admin/` answers 404 from another machine.
 
 #### The bundled identity provider behind the proxy
 
@@ -547,9 +547,10 @@ is `https://<host>`: it writes `KC_HOSTNAME=https://<host>/idp`, `KC_HTTP_RELATI
 `KC_PROXY_HEADERS=xforwarded` for Keycloak, and the whole login (`OIDC_DISCOVERY_URL`,
 `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, the admin URL) into
 `secrets/keycloak-app.env`, which web and worker read after `.env`. Remove the same names from
-`.env` so one place holds them, recreate `idp`, `web` and `worker`, and log in at
-`https://<host>/idp/realms/openplanner`. Port 8780 is no longer needed: remove any published
-port of `idp` other than `127.0.0.1:8080` from `docker-compose.override.yml`.
+`.env` so one place holds them, recreate `idp`, `web` and `worker`, and log in to the portal,
+which sends you to Keycloak's login under `https://<host>/idp/realms/openplanner/`. Port 8780 is
+no longer needed: remove any published port of `idp` other than `127.0.0.1:8080` from
+`docker-compose.override.yml`.
 
 Only the login is public (ADR 0126, `deploy/proxy/idp.caddy`): the proxy passes
 `/idp/realms/openplanner/*` (the login, its OIDC endpoints and the account console) and
@@ -960,8 +961,10 @@ the proxy) and log in as `admin` with `KC_BOOTSTRAP_ADMIN_PASSWORD` from
 `secrets/keycloak.env`. With the proxy, realm `master` must have the loopback as its frontend
 address, or its login form sends the browser to the public address, where the proxy refuses
 it. The installer sets it after every start (run it again after updating the checkout, as for
-every release that changes the host side). On a host set up by hand, run once, with the address
-`docker compose --env-file .env.update port idp 8080` prints (`127.0.0.1:8080` by default):
+every release that changes the host side); it sets nothing while any port of `idp` is published
+beyond the loopback, and says so. On a host set up by hand, check that
+`docker port $(docker compose --env-file .env.update ps -q idp)` lists `127.0.0.1` only, and run
+once, with the port it lists for `8080/tcp` (`127.0.0.1:8080` by default):
 
 ```bash
 docker compose --env-file .env.update exec -T idp sh /opt/openplanner/kcadm-as-admin.sh update realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp

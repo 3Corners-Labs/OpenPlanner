@@ -134,6 +134,15 @@ def test_only_the_portal_sets_cookies_outside_the_proxys_rule() -> None:
             "KEYCLOAK_LOCALE=nl; Path=/idp/realms/openplanner/; domain=AFSPRAAK.example.nl",
             "KEYCLOAK_LOCALE=nl; Path=/idp/realms/openplanner/",
         ),
+        # A browser uses the last Path: every one is confined, however many there are.
+        (
+            "__Host-op_admin=x; Path=/; Path=/; Secure",
+            "__Host-op_admin=x; Path=/idp/; Path=/idp/; Secure",
+        ),
+        ("t=1; Path=/; path=/admin; PATH=/", "t=1; Path=/idp/; path=/idp/; PATH=/idp/"),
+        # Browsers trim the white space around the name and the value.
+        ("t=1; Path =/admin; Domain = afspraak.example.nl", "t=1; Path =/idp/"),
+        ("t=1; Path= /; Secure", "t=1; Path= /idp/; Secure"),
     ],
 )
 def test_a_cookie_the_provider_sets_stays_under_idp_on_this_host(
@@ -141,6 +150,27 @@ def test_a_cookie_the_provider_sets_stays_under_idp_on_this_host(
 ) -> None:
     """Point 4: a ``__Host-`` name with a path other than / is refused by the browser."""
     assert _apply("header_down", "Set-Cookie", set_cookie) == (expected or set_cookie)
+
+
+def _paths_a_browser_sees(set_cookie: str) -> list[str]:
+    """Return the value of every Path attribute as RFC 6265 reads it (trimmed, case-blind)."""
+    attributes = [part.split("=", 1) for part in set_cookie.split(";")[1:] if "=" in part]
+    return [value.strip() for name, value in attributes if name.strip().lower() == "path"]
+
+
+def test_no_mix_of_path_attributes_leaves_the_cookie_outside_idp() -> None:
+    """Point 4, exhaustively over short mixes: whatever an answer sends, every Path is confined."""
+    values = ["/", "/admin", "/i", "/id", "/idp", "/idpx/", "/idp/", "/idp/realms/openplanner/"]
+    spellings = ["; Path={}", ";path={}", "; PATH = {}", ";  Path= {} "]
+    for first in values:
+        for second in values:
+            for spelling in spellings:
+                header = "__Host-op_admin=x" + spelling.format(first) + spelling.format(second)
+
+                paths = _paths_a_browser_sees(_apply("header_down", "Set-Cookie", header))
+
+                for path in paths:
+                    assert path == "/idp" or path.startswith("/idp/"), (header, paths)
 
 
 def test_the_headers_that_act_on_the_whole_origin_are_dropped() -> None:

@@ -985,20 +985,24 @@ idp_mail() {
 # ADR 0126: behind the proxy only the login of the bundled identity provider is public, and its
 # admin console is opened on the host's loopback. Realm master gets that loopback address as its
 # frontend URL, or its login form would send the browser to the public address, where the proxy
-# refuses it. Only a port Docker publishes on 127.0.0.1 qualifies; without the proxy Keycloak's own
-# address is the loopback already.
+# refuses it. Every port Docker publishes for the container must be on the loopback: one more on
+# the network (an override's 8780, say) would leave realm master and the console there over plain
+# http. Without the proxy Keycloak's own address is the loopback already.
 idp_console() {
   [[ $IDP == bundled ]] || return 0
-  local path published console
+  local path container bindings outside published console
   path=$(value "$DIR/secrets/keycloak.env" KC_HTTP_RELATIVE_PATH)
   [[ -n $path ]] || return 0
-  if ! published=$(compose port idp 8080 2>/dev/null) || [[ -z $published ]]; then
-    warn "the bundled identity provider publishes no port, or is not running: its admin console is not set up for the loopback (docs/runbook.md, Opening the admin console)"
+  container=$(compose ps -q idp 2>/dev/null) || container=
+  bindings=$([[ -z $container ]] || docker port "$container" 2>/dev/null) || bindings=
+  outside=$(printf '%s\n' "$bindings" | grep -E -v -e '-> (127\.0\.0\.1|\[::1\]):[0-9]+$' -e '^$' || true)
+  if [[ -n $outside ]]; then
+    warn "the bundled identity provider is published beyond the loopback (${outside//$'\n'/, }): its admin console and realm master are on the network; publish 127.0.0.1 only (docs/runbook.md, Opening the admin console)"
     return 0
   fi
-  published=${published%%$'\n'*}
-  if [[ ! $published =~ ^127\.0\.0\.1:[0-9]+$ ]]; then
-    warn "the bundled identity provider's port is published as '$published', not on 127.0.0.1 only: its admin console is not set up for the loopback (docs/runbook.md, Opening the admin console)"
+  published=$(printf '%s\n' "$bindings" | sed -n 's/^8080\/tcp -> \(127\.0\.0\.1:[0-9][0-9]*\)$/\1/p' | head -n 1)
+  if [[ -z $published ]]; then
+    warn "the bundled identity provider publishes no port on 127.0.0.1, or is not running: its admin console is not set up for the loopback (docs/runbook.md, Opening the admin console)"
     return 0
   fi
   console=http://$published$path

@@ -14,8 +14,9 @@ REPO = Path(__file__).parents[2]
 SCRIPT = REPO / "deploy/keycloak/kcadm-as-admin.sh"
 SH = shutil.which("sh") or "/bin/sh"
 RECORDING = """#!/bin/sh
-# Stand-in kcadm.sh: one line with its arguments, then whatever came on stdin, then a blank line.
-printf '%s\\n' "$*" >> "$LOG"
+# Stand-in kcadm.sh: its arguments and the password it sees in its environment on one line, then
+# whatever came on stdin, then a blank line.
+printf '%s [KC_CLI_PASSWORD=%s]\\n' "$*" "${KC_CLI_PASSWORD-unset}" >> "$LOG"
 cat >> "$LOG"
 printf '\\n\\n' >> "$LOG"
 """
@@ -61,10 +62,15 @@ def test_it_logs_in_on_keycloaks_own_address_then_runs_the_command(tmp_path: Pat
     assert done.returncode == 0, done.stderr
     login, command = calls
     assert login.startswith("config credentials --config ")
-    assert "--server http://localhost:8080/idp --realm master --user admin" in login
-    assert login.endswith("--password pw-from-the-container")
+    assert "--server http://localhost:8080/idp --realm master --user admin " in login
+    # The password only in kcadm.sh's environment, never an argument any process list shows.
+    assert "--password" not in login
+    assert login.endswith("[KC_CLI_PASSWORD=pw-from-the-container]")
     config = login.split()[3]
-    assert command == f"update realms/master -s attributes.frontendUrl=http://x --config {config}"
+    assert command == (
+        f"update realms/master -s attributes.frontendUrl=http://x --config {config} "
+        "[KC_CLI_PASSWORD=unset]"
+    )
     assert not Path(config).exists(), "the login is removed when the command ends"
 
 
@@ -78,6 +84,7 @@ def test_a_body_comes_on_stdin_to_the_command_and_never_as_an_argument(tmp_path:
     assert body not in login  # the login reads nothing from stdin
     arguments, given = command.split("\n", 1)
     assert arguments.startswith("update realms/openplanner -f - --config ")
+    assert "pw-from-the-container" not in arguments
     assert body not in arguments
     assert given == body
 

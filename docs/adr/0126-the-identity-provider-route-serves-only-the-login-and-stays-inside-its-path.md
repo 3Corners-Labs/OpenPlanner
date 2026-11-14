@@ -59,8 +59,8 @@ in both directions. Measured on Keycloak 26.8.1 behind the bundled proxy (2026-1
 2. **The admin console is on the host's loopback.** Realm `master`'s frontend URL is the
    loopback address the compose service publishes, `http://127.0.0.1:8080/idp`. The installer
    sets it after the start, with the realm's mail server (ADR 0112 point 6), when the provider
-   is behind the proxy; it refuses to point it at a port published beyond the loopback and
-   says so. On a host set up by hand one command in the runbook sets it. Both go through
+   is behind the proxy; it sets nothing while any port of the container is published beyond the
+   loopback (realm `master` would be on the network there over plain http), and says so. On a host set up by hand one command in the runbook sets it. Both go through
    `deploy/keycloak/kcadm-as-admin.sh`, mounted read-only into the container: the one place that
    logs `kcadm.sh` in as `admin`, with the container's own password, so no secret is an
    argument on the host. The console is opened on the host, or from elsewhere through an SSH
@@ -71,8 +71,8 @@ in both directions. Measured on Keycloak 26.8.1 behind the bundled proxy (2026-1
    one of the provider's, whose path is under `/idp/`) and `lang`.
 4. **An answer from the provider acts on `/idp` only.** On the route the proxy:
    - confines every cookie the provider sets to `/idp/` and this host: a `Path` outside
-     `/idp/` becomes `/idp/` (the browser then refuses a `__Host-` name, so the portal's
-     session cannot be replaced) and `Domain` is dropped;
+     `/idp/` becomes `/idp/` (the browser then refuses a `__Host-` name, so no answer can
+     replace the portal's session) and `Domain` is dropped;
    - drops `Service-Worker-Allowed`, `Clear-Site-Data`, `Alt-Svc`, `NEL`, `Report-To`,
      `Reporting-Endpoints`, `Accept-CH` and `Critical-CH`, and sets HSTS to the portal's own
      value (`app/api/security_headers.py`);
@@ -111,7 +111,7 @@ None, after checking. Every value below is a fixed security rule or follows from
   `Cross-Origin-Opener-Policy` value and the added policy: security rules; a test ties the
   HSTS value and the cookie names to the application's own.
 - The console's loopback address: the port the compose service `idp` publishes on
-  `127.0.0.1`, read by the installer with `docker compose port`.
+  `127.0.0.1`, read by the installer from `docker port`.
 
 ## Build status
 
@@ -130,11 +130,20 @@ None, after checking. Every value below is a fixed security rule or follows from
   or starts a worker would be blocked there; pass 4 shows a broken login page at the Renovate
   pull request, and the experiment of 2026-11-14 (login with a second factor and the account
   console in three engines, no violation) is the record for 26.8.1.
-- What remains with one origin: a script on a provider page can still make the browser load a
-  portal address by navigation or as an image, so a `GET` that has an effect (an audited
-  download) runs in the admin's name, without the script reading the result; the
-  provider's own scripts are not restricted (its themes use inline scripts); the provider can
-  show any page under `/idp`. A host name of its own (point 5) removes all three.
+- What remains with one origin:
+  - a script on a provider page can still make the browser load a portal address by navigation
+    or as an image, so a `GET` that has an effect (an audited download) runs in the admin's
+    name, without the script reading the result;
+  - it can write a cookie for the whole origin with `document.cookie`, which point 4 cannot
+    reach: a `__Host-op_admin` too, while the browser holds none (after a logout, or once a full
+    cookie jar dropped it). The portal reads only values it signed, so a planted one is at most a
+    session of the attacker's own (a login CSRF);
+  - the portal's `script-src 'self'` admits every script under `/idp/resources/`, a gadget for an
+    injection in a portal page;
+  - the provider's own scripts are not restricted (its themes use inline scripts), and it can
+    show any page under `/idp`.
+
+  A host name of its own (point 5) removes all of them.
 - A reverse proxy of the operator's own in front of the bundled provider must do the same; the
   runbook lists what.
 - Updated with this decision: `docs/runbook.md`, `docs/threat-model.md`, `docs/dataflow.md`,

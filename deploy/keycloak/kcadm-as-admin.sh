@@ -7,14 +7,15 @@
 #   docker compose exec -T idp sh /opt/openplanner/kcadm-as-admin.sh ARGS...
 # where ARGS are kcadm.sh's own, for example `update realms/master -s attributes.frontendUrl=...`.
 # It logs in on Keycloak's own address in the container (KC_HTTP_RELATIVE_PATH, /idp behind the
-# proxy) with the container's KC_BOOTSTRAP_ADMIN_PASSWORD, from secrets/keycloak.env, so no
-# secret is ever an argument on the host. A body for `-f -` comes on stdin and is passed through.
-# The login is kept in a temporary file that is removed when the command ends.
+# proxy) with the container's KC_BOOTSTRAP_ADMIN_PASSWORD, from secrets/keycloak.env. The password
+# reaches kcadm.sh through its environment (KC_CLI_PASSWORD), never as an argument, so it is not in
+# any process list, on the host or in the container. A body for `-f -` comes on stdin and is passed
+# through. The login is kept in a temporary file that is removed when the command ends.
 set -eu
 
 KCADM=${KCADM:-/opt/keycloak/bin/kcadm.sh} # tests point it at a stand-in
 config=$(mktemp)
 trap 'rm -f "$config"' EXIT
-"$KCADM" config credentials --config "$config" --server "http://localhost:8080${KC_HTTP_RELATIVE_PATH:-}" \
-  --realm master --user admin --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" </dev/null >/dev/null
+KC_CLI_PASSWORD=$KC_BOOTSTRAP_ADMIN_PASSWORD "$KCADM" config credentials --config "$config" \
+  --server "http://localhost:8080${KC_HTTP_RELATIVE_PATH:-}" --realm master --user admin </dev/null >/dev/null
 "$KCADM" "$@" --config "$config"

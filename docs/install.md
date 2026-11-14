@@ -69,6 +69,9 @@ need neither.
 in a `lab`, the installation's `SMTP_*` otherwise. Staff are then managed in the portal
 (*Manage › Staff*). The first password of the user `super` is `KC_SUPER_PASSWORD` in
 `secrets/keycloak.env`; Keycloak asks for a new one and an authenticator at the first login.
+Only the login is public under `/idp`; Keycloak's own admin console is on the host's loopback,
+reached through an SSH tunnel (ADR 0126, `docs/runbook.md`, *Opening the admin console*), and the
+installer points realm `master` there after the start.
 **`own`** asks for the login of your provider (PingFederate, Entra, ...), as before.
 
 In `production` Keycloak runs in production mode (`start`, not `start-dev`) on its own
