@@ -5,9 +5,17 @@ not be findable by their account name. So the page shows, by default, a *screen 
 with the staff member's record for the participant's side, with the organisation's own word for
 staff next to it ("Sanne · medewerker"). Two pure rules live here:
 
-    ``parse_screen_name``  what a screen name may be (trimmed; ``MIN_LENGTH`` to ``MAX_LENGTH``
-                           characters; letters of any script, digits, spaces, hyphen, apostrophe
-                           and full stop; empty clears it), with a code for every refusal
+    ``parse_screen_name``  what a screen name may be (normalised to NFC and trimmed;
+                           ``MIN_LENGTH`` to ``MAX_LENGTH`` characters, counted after the
+                           normalisation; letters of any script, digits, spaces, hyphen, apostrophe
+                           and full stop, at least one letter or digit; a combining mark only after
+                           a letter and at most ``MAX_MARKS`` in a row; empty clears it), with a
+                           code for every refusal
+
+Zero-width and bidirectional control characters are refused, and so is every other format
+character, which also refuses the names that need a joiner to be spelled (some Persian and Indic
+names): the label sits on a picture and in the captions, where such a character could hide or
+reorder text. The manual says so.
     ``staff_label``        what the participant is told, given the organisation's setting and the
                            record of who accepted the work: a name or nothing, and the word
 
@@ -27,7 +35,13 @@ from app.domain.guest_access import StaffNameMode
 MIN_LENGTH = 2
 MAX_LENGTH = 40
 """Bounds of a screen name in characters. Fixed: they follow from the label on the picture and
-the length of one word of the staff term (ADR 0077), like ``agent_term.MAX_TERM_LENGTH``."""
+the length of one word of the staff term (ADR 0077), like ``agent_term.MAX_TERM_LENGTH``. The
+column (``staff.screen_name``, migration 0118) and ``MAX_NAME`` of ``call-poll.js`` repeat the
+upper bound; a test reads the three."""
+
+MAX_MARKS = 2
+"""Most combining marks in a row (an accent and one more: "ế"); a longer run is a stack that
+draws over the lines around it."""
 
 _PUNCTUATION = frozenset(" -'.’")
 """Besides letters, marks and digits, a screen name may hold a space, a hyphen, an apostrophe (also
@@ -40,6 +54,8 @@ class ScreenNameRefusal(StrEnum):
     TOO_SHORT = "too_short"
     TOO_LONG = "too_long"
     BAD_CHARACTER = "bad_character"
+    NO_LETTER = "no_letter"
+    BAD_MARKS = "bad_marks"
 
 
 class ScreenNameError(DomainError):
@@ -66,21 +82,44 @@ def _allowed(character: str) -> bool:
     return category[0] in ("L", "M") or category == "Nd"
 
 
+def _marks_follow_letters(text: str) -> bool:
+    """Return whether every combining mark follows a letter and no run is over ``MAX_MARKS``."""
+    run = 0
+    previous = ""
+    for character in text:
+        if unicodedata.category(character)[0] != "M":
+            run, previous = 0, unicodedata.category(character)
+            continue
+        run += 1
+        if run > MAX_MARKS or not (previous[:1] == "L" or previous[:1] == "M"):
+            return False
+        previous = unicodedata.category(character)
+    return True
+
+
 def parse_screen_name(text: str) -> str | None:
     """Return the screen name ``text`` stands for, or ``None`` when it clears the name.
 
-    The text is trimmed and its inner runs of white space become one space. An empty text is the
-    request to have no screen name. Any other text is checked in this order: characters first
-    (no control character, no markup), then length.
+    The text is normalised to NFC (so a decomposed and a composed spelling are one name and one
+    length), trimmed, and its inner runs of white space become one space. An empty text is the
+    request to have no screen name. Any other text is checked in this order: characters (no
+    control, format or markup character), combining marks, a letter or digit somewhere, then
+    length.
 
     Raises:
         ScreenNameError: With the code of the first rule the text breaks.
     """
-    cleaned = " ".join(text.split())
+    cleaned = " ".join(unicodedata.normalize("NFC", text).split())
     if not cleaned:
         return None
     if any(not _allowed(character) for character in cleaned):
         raise ScreenNameError(ScreenNameRefusal.BAD_CHARACTER)
+    if not _marks_follow_letters(cleaned):
+        raise ScreenNameError(ScreenNameRefusal.BAD_MARKS)
+    if not any(
+        unicodedata.category(c)[0] == "L" or unicodedata.category(c) == "Nd" for c in cleaned
+    ):
+        raise ScreenNameError(ScreenNameRefusal.NO_LETTER)
     if len(cleaned) < MIN_LENGTH:
         raise ScreenNameError(ScreenNameRefusal.TOO_SHORT)
     if len(cleaned) > MAX_LENGTH:

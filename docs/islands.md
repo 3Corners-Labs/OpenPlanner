@@ -246,8 +246,9 @@ to another at run time goes through `app` and may reach a file loaded later.
 - **`call-captions.js` owns** the captions: whether the meeting offers them, the toggle's press (the meeting is
   asked for its real-time link and then to start, in the page's language where the meeting offers that; a start
   that was given up and completes later is stopped again), each caption into the state (the last three lines, an
-  interim line until its final text; "You" for the participant's own member and, for the rest, the name our server gave
-  (step 5c) or else the team's term, never the name the platform reports) and which lines are shown (`shown`; `call-render.js` draws them as text
+  interim line until its final text; "You" for the participant's own member and, for the rest, the label of the other side's picture
+  (step 5c: "name · term", or the term alone while no name is known, as in the approved mock-up; never the name the
+  platform reports) and which lines are shown (`shown`; `call-render.js` draws them as text
   nodes in a box that scrolls inside itself and takes focus only when it can). Captions are in memory only,
   are never put in a live region, and are stopped when switched off and when the call ends.
 - **`call-remote.js` owns** the other side's picture, sound and screen: whether their picture moves (said once
@@ -256,10 +257,15 @@ to another at run time goes through `app` and may reach a file loaded later.
   `app.callMedia.endShare`, and one sentence says both. A screen that arrives while their share is off waits only as pending (dropped at the end of the call or when it is no longer running) and is not kept as theirs.
 - **`call-poll.js` owns** the page's one poll of our own server (step 5c): while the page is in the lobby or the call it asks
   `GET /b/m/{ref}/call/staff` on entering the lobby, on entering the call and then every `data-call-poll-seconds`, with one
-  timer and one request in flight. The answer is a name or nothing and is put into `state.staffName`; a name that arrives or
-  changes in the call is said once through the polite region. The poll stops on leaving, ending and failing and a page
-  restored from the browser's memory, and an answer on its way is dropped when the call's epoch has moved. It asks nobody
-  but that address, never the video platform, and stores nothing. The chat of step 7c is asked for in the same turns.
+  timer and one request in flight. The answer is a name or nothing and is put into `state.staffName`; what the polite
+  region last said is kept apart (`state.staffSaid`), so a name learned in the lobby is said once on entering the call,
+  the same answer again is not said again, a change is said once more, and a cleared name is not announced (the label is
+  the term again). An answer of 404 clears the name; any other refusal or a network error keeps it and doubles the wait to
+  the next turn (up to 30 seconds), a success brings the interval back, and nothing is announced for a failure. The poll
+  stops on leaving, ending and failing and a page restored from the browser's memory, and an answer on its way is dropped
+  when the call's epoch has moved. It asks nobody but that address, never the video platform, and stores nothing. The
+  chat of step 7c is asked for in the same turns. The visible label on the picture is `aria-hidden`: the picture carries
+  the same words as its accessible name, so they are read once.
 - **`call-render.js` owns** the drawing of the call's parts out of the state, as pure functions: the pictures with the
   label on the other side's (the name and the team's word, or the word alone; also the picture's accessible name),
   the notices, the sharing switches and the staff member's screen, the captions' lines and the bar with its
@@ -302,8 +308,8 @@ to another at run time goes through `app` and may reach a file loaded later.
   when it has none) and, where the organisation allows it, the link to join another way.
 - **Used by:** the call page only (`call.html`, with `call-page.css`).
 - **Size** (lines): `call-status.js` 56, `call-sound.js` 130, `call-devices.js` 389, `call-connection.js` 439,
-  `call-media.js` 334, `call-captions.js` 187, `call-remote.js` 142, `call-render.js` 147, `call-events.js` 110,
-  `call-poll.js` 115, `call-page.js` 377; about 0.9, 1.8, 4.1, 5.3, 4.2, 2.6, 2.1, 2.5, 1.7, 1.7 and 5.3 KB gzipped (in
+  `call-media.js` 334, `call-captions.js` 187, `call-remote.js` 142, `call-render.js` 148, `call-events.js` 110,
+  `call-poll.js` 140, `call-page.js` 378; about 0.9, 1.8, 4.1, 5.3, 4.2, 2.6, 2.1, 2.5, 1.7, 2.3 and 5.3 KB gzipped (in
   the order of the loading), about 4.6 KB gzipped (styles). `call-connection.js` and `call-devices.js` are the files to watch.
 
 ### `call-status.js`

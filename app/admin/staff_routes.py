@@ -48,6 +48,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
+from app.adapters.live_settings import LiveSettings
 from app.admin.audit_routes import audit_views
 from app.admin.authz import AdminContext, RequirePermission, admin_service, skill_service
 from app.admin.forms import Field, FormData, Option, done_message, read_form, redirect_done
@@ -154,18 +155,30 @@ def _dormant_after(request: Request) -> timedelta:
     return timedelta(days=settings_for(request).staff_dormant_after_days)
 
 
-def _lacks_screen_name(request: Request, member: StaffMember) -> bool:
-    """Whether ``member`` has no screen name though an organisation of theirs shows it."""
+def _screen_name_organisations(request: Request, members: list[StaffMember]) -> frozenset[str]:
+    """Return the slugs, among the organisations of ``members``, that show the screen name.
+
+    Each organisation's setting is read once for the page, not once per person.
+    """
+    live: LiveSettings = request.app.state.live_settings
+    slugs = {slug for member in members for slug in member.organisations}
+    return frozenset(
+        slug
+        for slug in slugs
+        if live.for_organisation(live.organisation_id(slug)).embedded_call_staff_name
+        == StaffNameMode.SCREEN_NAME.value
+    )
+
+
+def _lacks_screen_name(member: StaffMember, showing: frozenset[str]) -> bool:
+    """Whether ``member`` has no screen name though an organisation of theirs shows it.
+
+    One screen name belongs to the person, whichever organisation's participants see it, so the
+    mark is on when any of the person's organisations (those the viewer sees) shows the screen name.
+    """
     if member.screen_name or member.status is StaffStatus.ERASED:
         return False
-    live = getattr(request.app.state, "live_settings", None)
-    if live is None:
-        return False
-    return any(
-        live.for_organisation(live.organisation_id(slug)).embedded_call_staff_name
-        == StaffNameMode.SCREEN_NAME
-        for slug in member.organisations
-    )
+    return any(slug in showing for slug in member.organisations)
 
 
 def _names(in_scope: list[GroupSummary]) -> tuple[dict[str, str], dict[str, str]]:
@@ -181,6 +194,7 @@ def _view(
     member: StaffMember,
     names: tuple[dict[str, str], dict[str, str]],
     now: datetime,
+    showing: frozenset[str],
 ) -> StaffView:
     """Translate a person for the templates; unknown slugs are shown as the slug."""
     _ = locale.gettext
@@ -207,7 +221,7 @@ def _view(
         provider=member.provider or _("admin.staff.platform_provider"),
         email="" if erased else member.email or "",
         dormant=not erased and member.is_dormant(now, _dormant_after(request)),
-        no_screen_name=_lacks_screen_name(request, member),
+        no_screen_name=_lacks_screen_name(member, showing),
         suspended=member.status is StaffStatus.SUSPENDED,
         erased=erased,
         refused=tuple(
@@ -296,6 +310,7 @@ async def staff_list(
     )
     members = await service.staff(context.principal, narrow)
     names = _names(in_scope)
+    showing = _screen_name_organisations(request, members)
     filters = StaffFilterView(
         organisations=tuple(Option(slug, name) for slug, name in sorted(names[0].items())),
         organisation=narrow.organisation or "",
@@ -327,7 +342,7 @@ async def staff_list(
         "admin/staff.html",
         context.principal,
         {
-            "people": [_view(request, locale, m, names, now) for m in members],
+            "people": [_view(request, locale, m, names, now, showing) for m in members],
             "can_invite": directory.available and manager and not unreachable,
             "directory_notice": _directory_notice(locale, directory.missing, unreachable)
             if manager
@@ -449,7 +464,9 @@ async def member_page(
         "admin/staff_member.html",
         context.principal,
         {
-            "person": _view(request, locale, member, names, now),
+            "person": _view(
+                request, locale, member, names, now, _screen_name_organisations(request, [member])
+            ),
             "screen_name_field": _screen_name_field(request, locale, context, member, form),
             "screen_name_done": done_message(request, locale.gettext, only=SCREEN_NAME_DONE),
             "events": activity,

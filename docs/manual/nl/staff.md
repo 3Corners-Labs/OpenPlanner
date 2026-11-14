@@ -161,6 +161,16 @@ instelling *embedded_call_staff_name*): de schermnaam (de standaard), de naam va
 alleen het woord. Zolang de schermnaam gekozen is, markeert de medewerkerslijst iedereen zonder
 schermnaam met **Geen schermnaam**, zodat u ziet wie nog alleen met het woord getoond wordt.
 
+Een schermnaam heeft minstens één letter of cijfer, en een accent alleen op een letter. De
+portal bewaart hem in de normaalvorm van Unicode en telt de tekens daarna. Tekens van nulbreedte
+en tekens die de schrijfrichting veranderen worden geweigerd, en daarmee ook namen die een
+verbindingsteken nodig hebben om geschreven te worden.
+
+Er is één schermnaam per persoon, ongeacht van welke organisatie de deelnemers hem zien: een
+beheerder van één organisatie stelt in wat de deelnemers van elke organisatie van die persoon
+zien. De lijst markeert iemand met **Geen schermnaam** zodra een van zijn organisaties (die u
+ziet) de schermnaam toont.
+
 De schermnaam is persoonsgegeven van de medewerker. Wordt het medewerkersrecord gewist, dan gaat de
 schermnaam mee, en de auditlog zegt dat hij is ingesteld of gewist, nooit welke het is.
 

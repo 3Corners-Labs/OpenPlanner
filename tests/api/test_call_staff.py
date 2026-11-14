@@ -292,16 +292,34 @@ async def test_it_answers_a_get_only(site: Site) -> None:
 # ---- the limit -----------------------------------------------------------------------------------
 
 
-async def test_one_address_is_held_by_the_common_read_limit(demo_settings: Settings) -> None:
-    settings = _on(demo_settings, rate_limit_enabled=True, rate_limit_reads="3/minute")
+async def test_one_booking_is_held_by_a_limit_of_the_page_s_own_poll_rate_not_by_the_address(
+    demo_settings: Settings,
+) -> None:
+    # The poll runs every 10 seconds: six asks a minute, so three times that is 18. The common read
+    # limit of the address (3 a minute here) does not apply to this route: participants behind one
+    # address do not share a bucket.
+    settings = _on(
+        demo_settings,
+        rate_limit_enabled=True,
+        rate_limit_reads="3/minute",
+        embedded_call_chat_poll_seconds=10,
+    )
     async for running in _site(settings):
-        answers = [(await running.ask()).status_code for _ in range(5)]
+        answers = [(await running.ask()).status_code for _ in range(19)]
 
-        assert answers[3:] == [429, 429]
+        assert answers == [200] * 18 + [429]
         limited = await running.ask()
         assert limited.json() == {"error": "rate_limited"}  # a script's route answers JSON
         assert limited.headers["cache-control"] == "no-store"
         assert limited.headers["retry-after"] == "60"
+        # Another participant at the same address has a bucket of their own.
+        async with running.stranger() as other:
+            now = running.clock.now()
+            running.clock.advance(NOW + timedelta(hours=12) - now)
+            assert (await book(other, FRIDAY_0930)).status_code == 303
+            theirs = await open_link(other, await confirm_newest(other))
+            running.clock.advance(now - running.clock.now())
+            assert (await other.get(f"{theirs}/call/staff")).status_code == 200
 
 
 # ---- what the answer holds -----------------------------------------------------------------------

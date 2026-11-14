@@ -4,9 +4,14 @@
  * Owns: asking our own server, while the page waits in the lobby or is in the call, for the staff
  * member's name (`GET` on the address the server put in the markup) once on entering the lobby,
  * once on entering the call and then again every `data-call-poll-seconds` (a platform setting),
- * with one timer and at most one request in flight. The answer is a name or nothing; a name that
- * arrives or changes is put into the state (`state.staffName`) and, when it happens in the call,
- * said once through the polite region. This is the page's one poll: the chat of step 7c is asked
+ * with one timer and at most one request in flight. The answer is a name or nothing; the name is
+ * put into the state (`state.staffName`) and said once through the polite region when the page is
+ * in the call: what was last said is kept apart (`state.staffSaid`), so a name learned in the lobby
+ * is said on entering the call, the same name asked ten times is said once, and a change is said
+ * once more. A name that is cleared is not announced and the label is the team's word again. An
+ * answer of 404 (the switch went off) clears the name; any other refusal or a network error keeps
+ * the name and makes the next turn wait twice as long, up to `BACKOFF_MAX_MS`, and a success brings
+ * back the setting's interval. Nothing is announced for a failure. This is the page's one poll: the chat of step 7c is asked
  * for in the same turns, not by a timer of its own.
  *
  * Never: it asks nobody but our own server, at the address the markup names, never the video platform,
@@ -23,9 +28,15 @@
 
   var app = (window.openplannerCall = window.openplannerCall || {});
 
-  var MAX_NAME = 40; // a name longer than the server allows is cut: the label is one short line
+  // The most characters of a name (mirrors MAX_LENGTH of app/domain/screen_name.py; a test reads
+  // both): a longer one is cut, the label is one short line.
+  var MAX_NAME = 40;
+  // The longest wait between two turns after failures; the setting's interval is the shortest.
+  var BACKOFF_MAX_MS = 30000;
 
-  var url = "", turnMs = 0;
+  var url = "";
+  var turnMs = 0; // the setting's interval
+  var waitMs = 0; // the wait to the next turn: turnMs, or more after failures
   var timer = 0; // the one timer: the wait to the next turn
   var request = null; // the AbortController of the request in flight
   var watching = ""; // the screen (lobby or call) the poll has asked for, "" when it is stopped
@@ -48,14 +59,25 @@
     return name.slice(0, MAX_NAME);
   }
 
-  // A name arrived or changed. In the call it is said once; in the lobby the picture is not shown
-  // yet, so it waits for the call (the sentence of the participant being let in comes first).
+  // The answer's name is known now. It is said once, in the call, when it is not the one last said:
+  // a name learned in the lobby waits for the call (the sentence of being let in comes first, the
+  // answer of the call's own first turn follows it). A cleared name is forgotten, not announced.
   function receive(name) {
     var state = app.state;
-    if (name === state.staffName) return;
-    var said = state.screen === "call" && name !== "";
-    app.go(state.screen, { staffName: name });
-    if (said) app.say("say_staff_name", { name: name });
+    var patch = {};
+    if (name !== state.staffName) patch.staffName = name;
+    var say = state.screen === "call" && name !== "" && name !== state.staffSaid;
+    if (say) patch.staffSaid = name;
+    else if (name === "" && state.staffSaid !== "") patch.staffSaid = "";
+    if (Object.keys(patch).length) app.go(state.screen, patch);
+    if (say) app.say("say_staff_name", { name: name });
+  }
+
+  // A turn went well: the next one is at the setting's interval. A turn went wrong: it waits twice
+  // as long as the last one, up to BACKOFF_MAX_MS.
+  function settle(epoch, ok) {
+    waitMs = ok ? turnMs : Math.min(waitMs * 2, BACKOFF_MAX_MS);
+    later(epoch);
   }
 
   function later(epoch) {
@@ -63,7 +85,7 @@
     timer = window.setTimeout(function () {
       timer = 0;
       if (watching) ask();
-    }, turnMs);
+    }, waitMs);
   }
 
   function ask() {
@@ -73,6 +95,7 @@
     window
       .fetch(url, { method: "GET", credentials: "same-origin", cache: "no-store", signal: controller.signal })
       .then(function (response) {
+        if (response.status === 404) return { gone: true };
         if (!response.ok) throw new Error("refused");
         return response.json();
       })
@@ -82,12 +105,13 @@
           request = null;
           if (epoch !== app.call.epoch || !watches(app.state.screen)) return;
           receive(nameOf(body));
-          later(epoch);
+          settle(epoch, !(body && body.gone));
         },
         function () {
           if (request !== controller) return;
           request = null;
-          later(epoch);
+          if (epoch !== app.call.epoch || !watches(app.state.screen)) return;
+          settle(epoch, false);
         },
       );
   }
@@ -103,6 +127,7 @@
     if (watching === state.screen) return;
     stop();
     watching = state.screen;
+    waitMs = turnMs;
     ask();
   }
 

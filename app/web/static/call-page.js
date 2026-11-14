@@ -98,6 +98,7 @@
       interim: null, // the caption being spoken, until its final text arrives
       can: { share: false, captions: false }, // what the meeting offers this participant
       staffName: "", // who the participant talks to, as our server says (call-poll.js); "" for no name
+      staffSaid: "", // the name the polite region last said, "" for none: a name is said once
     };
   }
   var state = fresh();

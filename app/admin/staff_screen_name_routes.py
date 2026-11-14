@@ -28,7 +28,7 @@ from app.admin.pages import Locale, SameOrigin
 from app.admin.staff_routes import member_page
 from app.domain.authorization import Permission, scope_for
 from app.domain.errors import DomainError
-from app.domain.screen_name import ScreenNameError, ScreenNameRefusal
+from app.domain.screen_name import MAX_LENGTH, MIN_LENGTH, ScreenNameError, ScreenNameRefusal
 from app.domain.staff_screen_names import ScreenNameResult, StaffScreenNames
 from app.web.errors import FormError
 from app.web.protection import RejectedRequest
@@ -41,6 +41,8 @@ REFUSAL_TEXTS: dict[ScreenNameRefusal, str] = {
     ScreenNameRefusal.TOO_SHORT: "admin.staff.screen_name.error.too_short",
     ScreenNameRefusal.TOO_LONG: "admin.staff.screen_name.error.too_long",
     ScreenNameRefusal.BAD_CHARACTER: "admin.staff.screen_name.error.bad_character",
+    ScreenNameRefusal.NO_LETTER: "admin.staff.screen_name.error.no_letter",
+    ScreenNameRefusal.BAD_MARKS: "admin.staff.screen_name.error.bad_marks",
 }
 """The catalogue key of each refusal of the rule for a screen name."""
 
@@ -62,7 +64,12 @@ async def save_screen_name(
             context.principal, member_id, form.text("screen_name")
         )
     except ScreenNameError as error:
-        form.errors.append(FormError("screen_name", locale.gettext(REFUSAL_TEXTS[error.reason])))
+        form.errors.append(
+            FormError(
+                "screen_name",
+                locale.gettext(REFUSAL_TEXTS[error.reason], min=MIN_LENGTH, max=MAX_LENGTH),
+            )
+        )
         return await member_page(request, locale, context, member_id, form=form, status=422)
     except DomainError as error:
         raise_refusal(error)

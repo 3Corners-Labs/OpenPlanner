@@ -18,7 +18,7 @@ from app.domain.calls import EventKind
 from app.domain.ports import Transaction
 from app.domain.scheduling import Group
 from app.domain.staff import StaffFilter
-from app.domain.tokens import agent_pseudonyms
+from app.domain.tokens import staff_ids_by_pseudonym
 from app.domain.usage import FactKind, StaffFact, UsageFact, hour_of
 
 _CALL_EVENTS: dict[EventKind, FactKind] = {
@@ -97,7 +97,6 @@ class StaffUsage:
 
     async def _staff_of(self, tx: Transaction, pseudonym: str) -> int | None:
         """Return the id of the staff entry whose pseudonym is ``pseudonym``, if there is one."""
-        for member in await tx.list_staff(Scope(everything=True), StaffFilter()):
-            if member.id is not None and pseudonym in agent_pseudonyms(self._keys, member.subject):
-                return member.id
-        return None
+        members = await tx.list_staff(Scope(everything=True), StaffFilter())
+        found = staff_ids_by_pseudonym(self._keys, ((m.id, m.subject) for m in members))
+        return found.get(pseudonym)

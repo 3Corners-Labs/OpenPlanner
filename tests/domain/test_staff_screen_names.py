@@ -310,3 +310,35 @@ async def test_a_suspended_person_is_still_named_the_call_is_not_theirs_to_lose(
     label = await service.label_of(agent_pseudonym(KEY, "p-1"), StaffNameMode.SCREEN_NAME)
 
     assert label.name == "Sanne"
+
+
+# ---- a review of step 5c: several organisations, the one map ------------------------------
+
+
+async def test_the_audit_event_is_written_for_each_organisation_of_the_person_in_the_scope(
+    uow: InMemoryUnitOfWork, service: StaffScreenNames
+) -> None:
+    both = frozenset({DEMO, Membership("org_admin", "andere")})
+    person = _person(uow, memberships=both)
+
+    await service.set_screen_name(ORG_ADMIN, person.id or 0, "Sanne")  # manages demo only
+    assert [row[4] for row in _audit(uow)] == ["demo"]
+
+    uow.state.audit.clear()
+    await service.set_screen_name(SUPER, person.id or 0, "Sam")  # manages both
+    assert sorted(row[4] or "" for row in _audit(uow)) == ["andere", "demo"]
+    # One person, one name: it is the name every organisation's participants see.
+    assert uow.state.staff["p-1"].screen_name == "Sam"
+
+
+async def test_the_pseudonym_map_is_the_one_function_both_homes_use() -> None:
+    from app.domain.tokens import staff_ids_by_pseudonym
+
+    found = staff_ids_by_pseudonym([KEY, PREVIOUS], [(1, "a"), (None, "b"), (3, "c")])
+
+    assert found == {
+        agent_pseudonym(KEY, "a"): 1,
+        agent_pseudonym(PREVIOUS, "a"): 1,
+        agent_pseudonym(KEY, "c"): 3,
+        agent_pseudonym(PREVIOUS, "c"): 3,
+    }

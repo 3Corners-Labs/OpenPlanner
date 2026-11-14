@@ -13,6 +13,7 @@ buckets per request path, so links that match no booking get a bound of their ow
 per address whatever the path (``count_unknown_link``).
 """
 
+import math
 from dataclasses import dataclass, fields
 from urllib.parse import urlsplit
 
@@ -125,6 +126,11 @@ def is_action(request: Request) -> bool:
     return require_same_origin in dependency_calls(request.scope.get("route"))
 
 
+def _polls_a_minute(settings: Settings) -> int:
+    """How many times a minute the call page asks for who the participant talks to."""
+    return math.ceil(60 / settings.embedded_call_chat_poll_seconds)
+
+
 @dataclass
 class RateLimits:
     """Current limit strings; set once per application in ``configure_rate_limits``.
@@ -143,6 +149,7 @@ class RateLimits:
     change_requests: str = "20/hour"
     webhooks: str = "600/minute"
     call_tokens: str = "10/hour"
+    call_staff: str = "60/minute"
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "RateLimits":
@@ -157,8 +164,14 @@ class RateLimits:
             change_requests=f"{settings.agent_change_requests_per_hour}/hour",
             webhooks=f"{settings.rate_limit_webhook_per_minute}/minute",
             call_tokens=f"{settings.embedded_call_token_per_booking_per_hour}/hour",
+            call_staff=f"{CALL_POLL_HEADROOM * _polls_a_minute(settings)}/minute",
         )
 
+
+CALL_POLL_HEADROOM = 3
+"""How many times the call page's own poll rate (``embedded_call_chat_poll_seconds``) one booking
+may ask for who the participant talks to: room for reloads and a second browser, not for a flood.
+Derived from that setting, so it is no setting of its own (ADR 0042)."""
 
 LIMITS = RateLimits()
 limiter = Limiter(key_func=caller_of)
@@ -193,6 +206,21 @@ def booking_limit() -> str:
 def read_limit() -> str:
     """Limit for availability pages."""
     return LIMITS.reads
+
+
+def call_staff_limit() -> str:
+    """Limit for the call page's poll of who the participant talks to, per booking (ADR 0123)."""
+    return LIMITS.call_staff
+
+
+def booking_of(request: Request) -> str:
+    """Key a limit by the booking's public reference in the route's path, not by the caller.
+
+    The call page's poll is one participant's own, so participants behind one address (an
+    office, a mobile carrier) do not share it; a route without a reference falls back to the
+    caller's address. Used with ``limiter.limit(..., key_func=booking_of)``.
+    """
+    return f"ref:{request.path_params.get('public_ref') or caller_of(request)}"
 
 
 def unknown_link_limit() -> str:

@@ -27,9 +27,10 @@
     return state.staffName ? app.texts.staff_named.replace("{name}", state.staffName) : app.texts.staff_term;
   }
 
-  // The other side in the captions: the name when one is known, else the team's word.
+  // The other side in the captions: the same label as on the picture (the approved design shows
+  // "name · term"; the term alone while no name is known).
   function speaker(state) {
-    return state.staffName || app.texts.captions_other;
+    return staffLabel(state);
   }
 
   function show(video, stream) {

@@ -155,6 +155,15 @@ The organisation chooses what the participant is told in *Organisation settings*
 alone. While the screen name is chosen, the staff list marks everyone who has none with
 **No screen name**, so you see who is still shown by the word alone.
 
+A screen name needs at least one letter or digit, and an accent only after a letter. The portal
+stores it in the normal form of Unicode and counts the characters after that. Zero-width and direction
+characters are refused, which also refuses names that need a joiner to be spelled.
+
+There is one screen name per person, whichever organisation's participants see it: a manager of
+one organisation sets what the participants of every organisation of that person see. The list
+marks a person as having **No screen name** when any of their organisations (those you see) shows
+the screen name.
+
 The screen name is personal data of the staff member. Erasing the staff record deletes it, and the
 audit log says that it was set or cleared, never what it is.
 

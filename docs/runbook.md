@@ -2886,6 +2886,17 @@ Refused origins are logged as `widget.origin_refused` with the origin and the gr
 personal data). Many refusals from one unknown origin mean a copied tag: nothing to do, it
 cannot book.
 
+## Upgrading: who the participant is told they talk to (ADR 0123 step 5c)
+
+The default of `embedded_call_staff_name` (class D, per organisation) changed on 2026-11-14 from
+`name` (the staff member's account name) to `screen_name`: the participant sees the screen name kept
+with the staff record, or the organisation's word for staff alone when there is none, and never the
+account name. An organisation that stored `name` or `term` keeps it. An organisation that stored
+nothing now shows the word alone until a manager fills in the screen names on the staff page (the
+staff list marks who has none); it is no loss while the call page is dark behind
+`embedded_call_enabled`. To keep showing the account name, set the setting to `name` under
+*Organisation settings*.
+
 ## The call page's SDK does not work (ADR 0123 step 4c)
 
 The call page (`/b/m/{ref}/call`, only while `embedded_call_enabled` is on) joins a call with the

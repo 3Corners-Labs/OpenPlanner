@@ -214,8 +214,8 @@
     <div class="call-stage" data-call-stage>
       <video class="call-remote-share" playsinline autoplay muted hidden aria-label="{{ _("callpage.share.view") }}" data-call-share-view></video>
       <video class="call-remote" playsinline autoplay muted aria-label="{{ _("callpage.staff.term") }}" data-call-remote></video>
-      {#- Who the participant talks to: a name and the team's word for staff, or the word alone. The script sets the text; it is also the accessible name of the picture. -#}
-      <p class="call-remote__label" data-call-remote-label>{{ _("callpage.staff.term") }}</p>
+      {#- Who the participant talks to: a name and the team's word for staff, or the word alone. The script sets the text; the picture carries the same words as its accessible name, so the label is hidden from assistive technology (it would be read twice). -#}
+      <p class="call-remote__label" aria-hidden="true" data-call-remote-label>{{ _("callpage.staff.term") }}</p>
       <p class="call-remote__off" data-call-remote-off hidden>{{ _("callpage.call.remote_off") }}</p>
       <audio autoplay data-call-remote-audio></audio>
       <button type="button" class="button call-hear" data-call-hear hidden>{{ _("callpage.hear.button") }}</button>
@@ -340,7 +340,6 @@
     <span data-text="say_captions_off">{{ _("callpage.say.captions_off") }}</span>
     <span data-text="say_captions_failed">{{ _("callpage.say.captions_failed") }}</span>
     <span data-text="captions_you">{{ _("callpage.captions.you") }}</span>
-    <span data-text="captions_other">{{ _("callpage.captions.other") }}</span>
     <span data-text="staff_term">{{ _("callpage.staff.term") }}</span>
     <span data-text="staff_named">{{ _("callpage.staff.named", name="{name}") }}</span>
     <span data-text="say_staff_name">{{ _("callpage.say.staff_name", name="{name}") }}</span>

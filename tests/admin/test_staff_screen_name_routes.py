@@ -129,12 +129,24 @@ async def test_a_refused_text_shows_the_page_again_with_the_reason_and_the_text_
     assert "&lt;script&gt;" in response.text
     assert "alleen letters, cijfers" in response.text
     assert 'id="screen_name-error"' in response.text
+    # The refusal is tied to the input through the shared field macro: described by hint and error.
+    assert 'aria-describedby="screen_name-hint screen_name-error"' in response.text
+    assert 'aria-invalid="true"' in response.text
     assert await _stored(site, GROUP_ADMIN.subject) is None
     short = await site.client.post(
         f"/admin/staff/{gina}/screen-name", data={"screen_name": "G"}, headers=SAME_ORIGIN
     )
     assert short.status_code == 422
     assert "minstens 2 tekens" in short.text
+    for typed, words in (
+        ("..", "minstens één letter of cijfer"),
+        ("\u0301\u0302Sam", "accenten alleen op een letter"),
+    ):
+        refused = await site.client.post(
+            f"/admin/staff/{gina}/screen-name", data={"screen_name": typed}, headers=SAME_ORIGIN
+        )
+        assert refused.status_code == 422
+        assert words in refused.text
 
 
 async def test_nobody_without_staff_manage_gets_the_form_or_may_post(site: Site) -> None:

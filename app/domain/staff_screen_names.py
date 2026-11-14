@@ -33,13 +33,15 @@ from app.domain.guest_access import StaffNameMode
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.screen_name import NO_LABEL, StaffLabel, parse_screen_name, staff_label
 from app.domain.staff import SCREEN_NAME_EVENT, StaffFilter, StaffMember, StaffStatus
-from app.domain.tokens import agent_pseudonyms
+from app.domain.tokens import staff_ids_by_pseudonym
 
 REBUILD_FLOOR = timedelta(seconds=60)
-"""The least time between two rebuilds of the pseudonym map. Fixed: it only bounds how often a
-claim that matches nobody (a booking dispatched to the contact center, a pseudonym of a key that
-is gone) may make the directory be scanned; it changes what is shown for no one, because a name is
-read from the record each time (see the module's text)."""
+"""The least time between two rebuilds of the pseudonym map. It is no setting (ADR 0042): it is a
+bound on our own table scans that changes no outcome an administrator chooses, because a name is
+read from the record at every ask (see the module's text) and a member who is new since the last
+rebuild is found at the first miss once the last rebuild is older than the floor. A claim that
+matches nobody (a booking dispatched to the contact center, a pseudonym of a key that is gone)
+may thus make the directory be scanned once a minute at most."""
 
 SET = "set"
 CLEARED = "cleared"
@@ -148,17 +150,9 @@ class StaffScreenNames:
             return None
         async with self._uow.read() as tx:
             members = await tx.list_staff(Scope(everything=True), StaffFilter())
-        self._index = _Index(self._pseudonyms(members), now)
+        found = staff_ids_by_pseudonym(self._keys, ((m.id, m.subject) for m in members))
+        self._index = _Index(found, now)
         return self._index.ids.get(pseudonym)
-
-    def _pseudonyms(self, members: Sequence[StaffMember]) -> dict[str, int]:
-        """Return the id of every member of the directory under each of its pseudonyms."""
-        return {
-            pseudonym: member.id
-            for member in members
-            if member.id is not None
-            for pseudonym in agent_pseudonyms(self._keys, member.subject)
-        }
 
 
 async def _audit(

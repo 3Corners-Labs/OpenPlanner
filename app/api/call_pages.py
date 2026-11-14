@@ -43,7 +43,9 @@ put in a URL, an event or a job. Answers:
 
 
 The staff endpoint (step 5c) answers ``{"name": "..."}`` or ``{}`` and nothing else, under the same
-session, the same read limit and the same ``no-store``; it is the one place the page learns the name
+session and the same ``no-store``, and under a limit of its own keyed on the booking's reference and
+not on the address (``call_staff_limit``: three times the page's own poll rate, so participants
+behind one address do not share it); it is the one place the page learns the name
 of the staff member, from our own record of who accepted the booking and never from the video
 platform. What the name is follows the organisation's ``embedded_call_staff_name`` (the screen name
 by default, ``app.domain.screen_name``). It answers ``{}`` while nobody has accepted the booking,
@@ -82,6 +84,8 @@ from app.web.error_pages import refuse_rate_limited
 from app.web.locale import resolve_locale
 from app.web.organisation_settings import follow
 from app.web.protection import (
+    booking_of,
+    call_staff_limit,
     limiter,
     read_limit,
     require_same_origin,
@@ -189,7 +193,7 @@ async def call_token(request: Request, public_ref: str, _: SameOrigin) -> Respon
 
 
 @router.get("/b/m/{public_ref}/call/staff")
-@limiter.limit(read_limit)
+@limiter.limit(call_staff_limit, key_func=booking_of)
 async def call_staff(request: Request, public_ref: str) -> JSONResponse:
     """Tell the call page who the participant talks to: ``{"name": ...}`` or ``{}``.
 

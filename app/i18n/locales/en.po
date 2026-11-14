@@ -5971,10 +5971,16 @@ msgid "admin.staff.screen_name.none"
 msgstr "No screen name"
 
 msgid "admin.staff.screen_name.error.too_short"
-msgstr "A screen name has at least 2 characters."
+msgstr "A screen name has at least {min} characters."
 
 msgid "admin.staff.screen_name.error.too_long"
-msgstr "A screen name has at most 40 characters."
+msgstr "A screen name has at most {max} characters."
+
+msgid "admin.staff.screen_name.error.no_letter"
+msgstr "A screen name has at least one letter or digit."
+
+msgid "admin.staff.screen_name.error.bad_marks"
+msgstr "A screen name uses accents only on a letter, and at most two in a row."
 
 msgid "admin.staff.screen_name.error.bad_character"
 msgstr "A screen name holds only letters, digits, spaces, a hyphen, an apostrophe and a full stop."
@@ -14342,9 +14348,6 @@ msgstr "Screen shared by the {agent}"
 
 msgid "callpage.captions.you"
 msgstr "You"
-
-msgid "callpage.captions.other"
-msgstr "{Agent}"
 
 msgid "callpage.say.share_mine"
 msgstr "You are sharing your screen."

@@ -5971,10 +5971,16 @@ msgid "admin.staff.screen_name.none"
 msgstr "Geen schermnaam"
 
 msgid "admin.staff.screen_name.error.too_short"
-msgstr "Een schermnaam heeft minstens 2 tekens."
+msgstr "Een schermnaam heeft minstens {min} tekens."
 
 msgid "admin.staff.screen_name.error.too_long"
-msgstr "Een schermnaam heeft hoogstens 40 tekens."
+msgstr "Een schermnaam heeft hoogstens {max} tekens."
+
+msgid "admin.staff.screen_name.error.no_letter"
+msgstr "Een schermnaam heeft minstens één letter of cijfer."
+
+msgid "admin.staff.screen_name.error.bad_marks"
+msgstr "Een schermnaam gebruikt accenten alleen op een letter, en hoogstens twee achter elkaar."
 
 msgid "admin.staff.screen_name.error.bad_character"
 msgstr "Een schermnaam bevat alleen letters, cijfers, spaties, een koppelteken, een apostrof en een punt."
@@ -14355,9 +14361,6 @@ msgstr "Scherm gedeeld door uw {agent}"
 
 msgid "callpage.captions.you"
 msgstr "U"
-
-msgid "callpage.captions.other"
-msgstr "{Agent}"
 
 msgid "callpage.say.share_mine"
 msgstr "U deelt uw scherm."

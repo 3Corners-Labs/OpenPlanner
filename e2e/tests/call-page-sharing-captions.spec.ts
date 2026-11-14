@@ -398,7 +398,7 @@ test('captions are offered only when the meeting has them, and the real-time lin
 
 test('captions show who speaks in the page\'s own words, never the platform\'s name, newest lines last, an interim line until its final text', async ({ page }) => {
   await inCall(page);
-  const who = (await term(page)).replace(/^./, (c) => c.toUpperCase());
+  const who = await term(page); // the label of the picture: no name is known here, so the team's word alone
   await captionsToggle(page).click();
   await said(page, CAPTIONS_ON);
 

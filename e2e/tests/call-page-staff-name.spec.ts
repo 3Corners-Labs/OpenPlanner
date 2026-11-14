@@ -9,12 +9,12 @@
  * token; the first uses the real endpoint on the seeded booking, which nobody has accepted, so
  * the label is the term alone. The poll's interval is the stack's setting (`embedded_call_chat_poll_seconds`,
  * 3 seconds by default): a test that waits for the next turn waits for a state, within the expect
- * timeout; a test that proves a timer is stopped waits one interval and a margin, read from the
- * page, and says so.
+ * timeout; a test that proves a timer is stopped, or measures the wait between two turns, moves the
+ * page's own clock (`page.clock`, installed before the page loads) and waits for nothing.
  */
 import { expect, test, type Page, type Request } from '@playwright/test';
 
-import { said } from '../call-page';
+import { said, statuses } from '../call-page';
 import {
   caption,
   control,
@@ -67,6 +67,7 @@ async function stubStaff(page: Page, body: unknown = {}): Promise<Stub> {
 
 /** Into the call with the endpoint stubbed (or not, with `stub` false). */
 async function inCall(page: Page, stub: false | unknown = {}, plan: Plan = {}): Promise<Stub | null> {
+  await page.clock.install(); // before the page loads: its timers are the test's to move
   const staff = stub === false ? null : await stubStaff(page, stub);
   await stubToken(page, granted());
   await open(page, { captions: true, ...plan });
@@ -78,11 +79,28 @@ async function inCall(page: Page, stub: false | unknown = {}, plan: Plan = {}): 
 /** How many times the endpoint was asked, as the page's own network log has it. */
 const asked = (stub: Stub): number => stub.seen.length;
 
-/** One interval of the poll and a margin, read from the page: the wait of a test that proves a timer is stopped. */
-const oneTurn = async (page: Page): Promise<void> => {
-  const seconds = Number((await page.locator('[data-call]').getAttribute('data-call-poll-seconds')) ?? '3');
-  await page.waitForTimeout(seconds * 1000 + 500);
+/** Let `ms` of the page's own time pass at once: a timer that is still running asks in it. */
+const pass = async (page: Page, ms: number): Promise<void> => {
+  await page.clock.runFor(ms);
+  await page.evaluate(() => 0); // a round trip, so that a request the timers made has reached the stub
 };
+
+/** How much of the page's time goes by, in steps of 100 ms, until the endpoint is asked once more. */
+async function gap(page: Page, stub: Stub, limit = 60_000): Promise<number> {
+  const before = asked(stub);
+  for (let elapsed = 100; elapsed <= limit; elapsed += 100) {
+    await pass(page, 100);
+    if (asked(stub) > before) return elapsed;
+  }
+  throw new Error(`the endpoint was not asked again within ${limit} ms of the page's time`);
+}
+
+/** Stop the page's time where it is: from now on only `pass` moves it. */
+const freeze = (page: Page): Promise<void> => page.clock.pauseAt(new Date(Date.now() + 2_000));
+
+/** The sentence of the polite region that names the staff member, as often as it was said. */
+const told = async (page: Page, name?: string): Promise<number> =>
+  (await statuses(page)).filter((s) => (name ? s === `You are talking to ${name}.` : /^You are talking to /.test(s))).length;
 
 // ---- the label ----------------------------------------------------------------------------------
 
@@ -105,9 +123,12 @@ test('with a name the label reads "name · term", as text in the page and as the
   // Text in the page, not a picture or a pseudo-element, and not a control.
   expect(await label(page).evaluate((el) => el.tagName)).toBe('P');
   expect(await label(page).getAttribute('tabindex')).toBeNull();
+  // The picture carries the words as its name: the visible label is hidden from assistive technology.
+  expect(await label(page).getAttribute('aria-hidden')).toBe('true');
 });
 
 test('the label is not shown in the lobby, where the staff member\'s picture is not either', async ({ page }) => {
+  await page.clock.install();
   await stubStaff(page, { name: 'Sanne' });
   await stubToken(page, granted());
   await open(page, { lobby: true });
@@ -131,13 +152,14 @@ test('the name is also the other side in the captions; the participant\'s own li
 
   const rows = page.locator('[data-call-captions] .call-caption');
   await expect(rows).toHaveCount(2);
-  await expect(rows.nth(0).locator('.call-caption__who')).toHaveText('Sanne');
+  // The approved design (mock-up 04): the other side is named as on the picture, "name · term".
+  await expect(rows.nth(0).locator('.call-caption__who')).toHaveText(`Sanne · ${await term(page)}`);
   await expect(rows.nth(1).locator('.call-caption__who')).toHaveText('You');
 });
 
 test('without a name the captions name the other side with the team\'s word', async ({ page }) => {
   await inCall(page, {});
-  const word = (await term(page)).replace(/^./, (c) => c.toUpperCase());
+  const word = await term(page);
   await page.getByRole('button', { name: /^Captions/ }).click();
   await said(page, 'Captions are on.');
 
@@ -209,6 +231,115 @@ test('a failed or unreadable answer changes nothing and the next turn asks again
   await expect(label(page)).toHaveText(word); // an answer without a name is "no name"
 });
 
+test('a name known in the lobby is said once on entering the call', async ({ page }) => {
+  await page.clock.install();
+  const stub = await stubStaff(page, { name: 'Sanne' });
+  await stubToken(page, granted());
+  await open(page, { lobby: true });
+  await join(page);
+  await expect(heading(page, WAITING)).toBeFocused();
+  await expect.poll(() => asked(stub), NEXT).toBeGreaterThanOrEqual(1);
+  expect(await told(page)).toBe(0); // the lobby shows no picture: nothing is said yet
+
+  await control(page, 'admit');
+  await expect(heading(page, IN_CALL)).toBeFocused();
+
+  await said(page, 'You are talking to Sanne.');
+  await expect(label(page)).toContainText('Sanne');
+  await pass(page, 30_000); // more turns, the same answer
+  expect(await told(page, 'Sanne')).toBe(1);
+});
+
+test('the same answer asked many times is said once, a change once more, and a cleared name not at all', async ({ page }) => {
+  const stub = (await inCall(page, { name: 'Sanne' })) as Stub;
+  const word = await term(page);
+  await said(page, 'You are talking to Sanne.');
+  await freeze(page);
+
+  const before = asked(stub);
+  await pass(page, 60_000);
+  expect(asked(stub)).toBeGreaterThanOrEqual(before + 10);
+  expect(await told(page, 'Sanne')).toBe(1);
+
+  stub.answer = { status: 200, body: { name: 'Tom' } };
+  await pass(page, 10_000);
+  await said(page, 'You are talking to Tom.');
+  await pass(page, 30_000);
+  expect(await told(page, 'Tom')).toBe(1);
+
+  stub.answer = { status: 200, body: {} };
+  await pass(page, 10_000);
+  await expect(label(page)).toHaveText(word);
+  await pass(page, 30_000);
+  expect(await told(page)).toBe(2); // nothing was said for the cleared name
+});
+
+test('an answer that says the feature is off (404) brings the label back to the team\'s word', async ({ page }) => {
+  const stub = (await inCall(page, { name: 'Sanne' })) as Stub;
+  const word = await term(page);
+  await expect(label(page)).toHaveText(`Sanne · ${word}`, NEXT);
+  await said(page, 'You are talking to Sanne.');
+
+  stub.answer = { status: 404, body: { error: 'gone' } };
+
+  await expect(label(page)).toHaveText(word, NEXT);
+  expect(await told(page)).toBe(1);
+});
+
+test('refusals and failures keep the name and make the turns wait longer, a success brings the interval back', async ({ page }) => {
+  const stub = (await inCall(page, { name: 'Sanne' })) as Stub;
+  const word = await term(page);
+  await expect(label(page)).toHaveText(`Sanne · ${word}`, NEXT);
+  const seconds = Number(await page.locator('[data-call]').getAttribute('data-call-poll-seconds'));
+  const turn = seconds * 1000;
+  await said(page, 'You are talking to Sanne.');
+  await freeze(page);
+
+  stub.answer = { status: 429, body: { error: 'rate_limited' } };
+  await gap(page, stub); // the first refusal: it starts the backing off
+  const gaps: number[] = [];
+  for (let i = 0; i < 5; i += 1) gaps.push(await gap(page, stub));
+
+  // Twice as long after each refusal, up to 30 seconds (resolution: one step of 100 ms).
+  const expected = [2, 4, 8, 16, 16].map((n) => Math.min(turn * n, 30_000));
+  gaps.forEach((got, i) => expect(Math.abs(got - expected[i]), `gap ${i}: ${got} against ${expected[i]}`).toBeLessThanOrEqual(300));
+  // Nothing is announced and the name stays.
+  await expect(label(page)).toHaveText(`Sanne · ${word}`);
+  expect(await told(page)).toBe(1);
+
+  stub.answer = { status: 200, body: { name: 'Sanne' } };
+  await gap(page, stub); // the request that is answered well
+  const back = await gap(page, stub);
+  expect(Math.abs(back - turn)).toBeLessThanOrEqual(300);
+});
+
+test('a network error is a failure like a refusal: the name stays and the next turn waits longer', async ({ page }) => {
+  await page.clock.install();
+  let failing = false;
+  const seen: Request[] = [];
+  await page.route('**/call/staff', (route) => {
+    seen.push(route.request());
+    return failing
+      ? route.abort('connectionreset')
+      : route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ name: 'Sanne' }) });
+  });
+  await stubToken(page, granted());
+  await open(page, { captions: true });
+  await join(page);
+  await expect(heading(page, IN_CALL)).toBeFocused();
+  const word = await term(page);
+  await expect(label(page)).toHaveText(`Sanne · ${word}`, NEXT);
+  const stub: Stub = { answer: { status: 200, body: {} }, seen };
+  await freeze(page);
+
+  failing = true;
+  await gap(page, stub);
+  const second = await gap(page, stub);
+
+  expect(second).toBeGreaterThan(Number(await page.locator('[data-call]').getAttribute('data-call-poll-seconds')) * 1000);
+  await expect(label(page)).toHaveText(`Sanne · ${word}`);
+});
+
 // ---- the one poll -------------------------------------------------------------------------------
 
 test('the page asks on entering the lobby and again on entering the call, then at each turn', async ({ page }) => {
@@ -259,9 +390,9 @@ for (const [name, stop] of [
     await expect(page.locator('[data-call-state="call"]')).toBeHidden();
     // A timer that was left running would ask at the next turn: wait one turn and a margin (a state
     // cannot be waited for when the thing to prove is that nothing happens any more).
-    await oneTurn(page);
+    await pass(page, 5_000);
     const stopped = asked(stub);
-    await oneTurn(page);
+    await pass(page, 120_000); // many turns of the poll, were it still running
 
     expect(asked(stub)).toBe(stopped);
   });
@@ -278,7 +409,7 @@ test('an answer that comes after the call ended changes nothing', async ({ page 
   await control(page, 'end');
   await expect(page.locator('[data-call-state="ended"]')).toBeVisible();
   release();
-  await oneTurn(page);
+  await pass(page, 60_000);
 
   expect(await timesSaid(page, 'You are talking to Late.')).toBe(0);
   await expect(label(page)).toBeHidden();
