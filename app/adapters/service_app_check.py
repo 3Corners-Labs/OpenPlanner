@@ -16,9 +16,8 @@ from app.adapters.diagnostics import CheckResult, passed, probes, run_checks
 from app.adapters.vendored_files import STATIC_VENDOR, FileTrust, VendoredFile
 from app.adapters.webex_auth import WebexTokens
 from app.adapters.wxcc_config import region_check
+from app.domain.integration_check import SERVICE_APP_REPORT
 from app.domain.ports import Clock
-
-SERVICE_APP_REPORT = "service_app_check"
 
 NOT_CONFIGURED = CheckResult(
     "token refresh",

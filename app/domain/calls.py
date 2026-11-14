@@ -95,7 +95,8 @@ def join_link(link: str | None, client: JoinClient) -> str | None:
 
     The stored link comes from Webex and is personal data, so it is never altered in storage;
     this builds the redirect target. A link that is not ``https`` is refused, so a poisoned
-    value can never become a redirect. ``JoinClient.BROWSER`` sets the parameters of
+    value can never become a redirect. ``JoinClient.BROWSER`` (and ``EMBEDDED``, see
+    ``app.domain.call_client.redirect_client``) sets the parameters of
     ``BROWSER_LINK_PARAMS`` (replacing a value that says the opposite) and keeps every other
     part of the link; applying it twice gives the same link.
     """
@@ -103,6 +104,8 @@ def join_link(link: str | None, client: JoinClient) -> str | None:
         return None
     if client is JoinClient.CHOICE:
         return link
+    # BROWSER and EMBEDDED alike: a redirect of an embedded service (its way around our page,
+    # ADR 0123 point 11) opens the web app straight away, like the default.
     parts = urlsplit(link)
     names = {name for name, _ in BROWSER_LINK_PARAMS}
     query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k not in names]

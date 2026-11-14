@@ -73,6 +73,8 @@ def webex_fingerprint(settings: Settings) -> str:
         settings.webex_refresh_token.get_secret_value() if settings.webex_refresh_token else "",
         settings.wxcc_api_base_url or "",
         settings.webex_api_base_url,
+        # The group check's guest finding follows the platform switch (ADR 0123 point 17).
+        str(settings.embedded_call_enabled),
     )
     return hashlib.sha256("\x00".join(parts).encode()).hexdigest()
 
@@ -173,6 +175,7 @@ def build_integrations(
             webhook_base=settings.webhook_base,
             webex_secret=webex_secret.get_secret_value() if webex_secret else None,
             wxcc_secret=wxcc_secret.get_secret_value() if wxcc_secret else None,
+            call_page_enabled=settings.embedded_call_enabled,
         ),
         clock,
         request_log,

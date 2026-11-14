@@ -314,6 +314,15 @@ REASON_KEYS: dict[ChangeReason, str] = {
 }
 """The text block of each planner's reason (ADR 0044), written out for the catalogue test."""
 
+_JOIN_TEXT_KEYS: dict[JoinClient, str] = {
+    JoinClient.BROWSER: "message.join",
+    JoinClient.CHOICE: "message.join_choice",
+    # Neutral on purpose: true whether the call opens in our page or, while the platform switch is
+    # off, in the video platform's web app, and it names no supplier (ADR 0123 point 14).
+    JoinClient.EMBEDDED: "message.join_embedded",
+}
+"""The text about how the call opens, per join client; every client has one (a test checks)."""
+
 
 def _deadline(
     kind: MessageKind,
@@ -514,9 +523,7 @@ class MessageComposer:
             "book_text": _("message.book_again"),
             "book_link": _("message.book_again_link"),
             "join_url": join_url,
-            "join_text": _(
-                "message.join_choice" if group.join_client is JoinClient.CHOICE else "message.join"
-            ),
+            "join_text": _(_JOIN_TEXT_KEYS[group.join_client]),
             "join_link": _("message.join_link"),
             "trial_url": f"{manage_url}/test" if join_url and group.trial_call_enabled else None,
             "trial_text": _("message.trial"),

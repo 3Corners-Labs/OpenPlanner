@@ -10,6 +10,10 @@ For one group it walks the chain a call depends on and turns every link into a `
               Then a second probe with the trial call's options (entry before the host, ADR
               0071): a warning when the site refuses it, and one when it accepts the request
               but stores other values, since the participant would then wait in the lobby for nobody
+    guest     only for a group that uses the call page of its own (``join_client = embedded``
+              while ``embedded_call_enabled`` is on, ADR 0123 point 17): the one fixed guest of
+              the checks is minted, which proves the Service App's guest scopes. A group that
+              does not use the page, and every group while the switch is off, creates no guest
     wxcc      region ─► channel ─► asset ─► schema ─► entry point ─► flow ─► queue ─► Screen Pop
               (``wxcc_config``, the same rules as ``wxcc-config-check``); then a probe work
               item (ADR 0082): created on the group's channel and business address with kind
@@ -46,6 +50,7 @@ from app.adapters.webhook_selftest import self_test
 from app.adapters.webhooks import WXCC_INBOUND
 from app.adapters.wxcc import channel_and_address
 from app.adapters.wxcc_config import GroupRouting, check_group, fetch_config, region_check
+from app.domain.call_client import uses_call_page
 from app.domain.calls import (
     BROWSER_LINK_PARAMS,
     EventKind,
@@ -54,6 +59,7 @@ from app.domain.calls import (
     probe_task,
 )
 from app.domain.checks import CheckArea, CheckStatus, Finding
+from app.domain.guest_access import CHECK_SUBJECT, NEUTRAL_TERM
 from app.domain.ports import (
     Clock,
     ContactCenterDispatcher,
@@ -92,6 +98,9 @@ class CheckerConfig:
     webhook_base: str
     webex_secret: str | None
     wxcc_secret: str | None
+    call_page_enabled: bool = False
+    """Whether ``embedded_call_enabled`` is on (ADR 0123 point 17): only then does a group that
+    uses the call page get the guest finding."""
 
 
 def _status(result: CheckResult) -> CheckStatus:
@@ -163,6 +172,7 @@ class PlatformChecker:
         webex, link = await self._webex(group)
         return [
             *webex,
+            *await self._guest(group),
             *await self._wxcc(group, peers, link),
             *await self._webhooks(group),
         ]
@@ -197,6 +207,29 @@ class PlatformChecker:
         if group.trial_call_enabled:
             findings += await self._trial_probe(meetings, group, host, start)
         return findings, probe.link
+
+    async def _guest(self, group: Group) -> list[Finding]:
+        """Mint the one fixed guest of the checks for a group that uses the call page (point 17).
+
+        A guest at the video platform is made only for such a group and only while the platform
+        switch is on; the subject is fixed, so repeating the check makes no further guest. No
+        participant data is sent, and no token is kept or shown.
+        """
+        if not uses_call_page(group, platform_enabled=self._config.call_page_enabled):
+            return []
+        meetings = WebexMeetings(self._client, self._config.webex_base_url, self._clock)
+        try:
+            await meetings.guest_access(CHECK_SUBJECT, NEUTRAL_TERM)
+        except IntegrationError as error:
+            return [
+                Finding(
+                    CheckArea.WEBEX,
+                    "webex.guest_refused",
+                    CheckStatus.FAIL,
+                    (("error", error.code),),
+                )
+            ]
+        return [Finding(CheckArea.WEBEX, "webex.guest_ok", CheckStatus.OK)]
 
     async def _trial_probe(
         self, meetings: WebexMeetings, group: Group, host: str, start: datetime
@@ -235,7 +268,7 @@ class PlatformChecker:
         a failure: without the parameter the participant gets Webex's own choice page.
         """
         if group.join_client is not JoinClient.BROWSER:
-            return []
+            return []  # choice has no parameter to lose; embedded has no link of this kind
         url = join_link(link, JoinClient.BROWSER)
         if url is None:  # not an https link: never visited
             return [_browser_finding("webex.browser_link_lost", (("status", "-"),))]

@@ -150,6 +150,57 @@ def group_change(result: Plan) -> Change:
     return next(change for change in result.changes if change.kind == "group")
 
 
+# --- the call page chosen by a service (ADR 0123 step 6a) --------------------------------------
+
+READY = RuleContext(
+    now=NOW,
+    settings={"booking_form_max_custom_fields": 2, "embedded_call_enabled": True},
+    contact_centers={WEBEX_CC.kind.value: WEBEX_CC},
+    guest_check_passed=True,
+)
+EMBEDDED_TEAM = {**NEW_TEAM, "join_client": "embedded", "embedded_call_webex_option": "always"}
+
+
+def test_a_new_embedded_group_is_accepted_where_the_form_would_accept_it() -> None:
+    result = planned(doc(EMBEDDED_TEAM), context=READY)
+
+    assert result.ok
+    values = group_change(result).values
+    assert (values["join_client"], values["embedded_call_webex_option"]) == ("embedded", "always")
+
+
+@pytest.mark.parametrize(
+    "context",
+    [
+        CONTEXT,  # the switch is off here
+        RuleContext(now=NOW, settings={"embedded_call_enabled": True}),  # no guest minted yet
+        RuleContext(now=NOW, settings={"embedded_call_enabled": False}, guest_check_passed=True),
+    ],
+)
+def test_embedded_is_refused_where_the_form_refuses_it_with_its_field(context: RuleContext) -> None:
+    result = planned(doc(EMBEDDED_TEAM), context=context)
+
+    assert refusals(result) == [
+        ("organisations[acme].groups[team]", ErrorCode.INVALID_CONFIGURATION, "join_client")
+    ]
+
+
+def test_a_group_that_already_holds_embedded_is_not_asked_again_for_the_switch_or_the_check() -> (
+    None
+):
+    held = team(join_client="embedded")
+
+    result = planned(doc({**EMBEDDED_TEAM, "name": "Other"}), world(org("acme", held)))
+
+    assert result.ok  # CONTEXT: switch off and no check; keeping it is no new choice
+
+
+def test_the_option_may_be_empty_and_must_otherwise_be_one_of_three() -> None:
+    assert planned(doc({**NEW_TEAM, "embedded_call_webex_option": None})).ok
+    with pytest.raises(DomainError, match="embedded_call_webex_option"):
+        planned(doc({**NEW_TEAM, "embedded_call_webex_option": "sometimes"}))
+
+
 # --- settings ---------------------------------------------------------------------------
 
 

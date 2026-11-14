@@ -102,6 +102,8 @@ class RuleContext:
             (ADR 0042), or ``None``; supplied by the layer that can read the environment.
         contact_centers: The descriptor of every contact-center platform the installation has
             an adapter for, by the value of its kind (ADR 0032).
+        guest_check_passed: Whether the latest service-app check minted a guest token (ADR 0123
+            point 17); the planner fills it from the installation's state.
     """
 
     locales: frozenset[str] = frozenset({"nl", "en"})
@@ -112,6 +114,7 @@ class RuleContext:
     smtp_plaintext_relay_allowed: bool = False
     combination_problem: Callable[[Mapping[str, object]], str | None] | None = None
     contact_centers: Mapping[str, ProviderDescriptor] = field(default_factory=dict)
+    guest_check_passed: bool = False
 
 
 @dataclass(frozen=True)
@@ -153,6 +156,8 @@ class Usage:
         hidden_pool_names: The names of those pools that are not archived, by organisation slug.
             They are absent from the tree, so a plan checks the name of a pool it creates against
             them too (pool names are unique within an organisation).
+        guest_check_passed: Whether the latest service-app check minted a guest token (ADR 0123
+            point 17), which a group needs before it may be set to ``embedded``.
     """
 
     in_use: Mapping[str, frozenset[Address]] = field(default_factory=dict)
@@ -162,6 +167,7 @@ class Usage:
     locked_settings: frozenset[str] = frozenset()
     unaddressable: frozenset[str] = frozenset()
     hidden_pool_names: Mapping[str, frozenset[str]] = field(default_factory=dict)
+    guest_check_passed: bool = False
 
     def unaddressable_in(self, organisation: str | None) -> frozenset[str]:
         """Return the unaddressable objects of one organisation, or of all for ``None``.

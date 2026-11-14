@@ -44,16 +44,32 @@ PRE_TRAIN = "0108"
 """The revision before ADR 0121's first migration (0109): the schema of a pre-train image."""
 TRAIN_TOUCHED = {"bookings", "slots"}
 """The only pre-train tables the train adds columns to; every other one is left as it was."""
-AFTER_TRAIN_TOUCHED = {"group_contact_center", "staff"}
+AFTER_TRAIN_TOUCHED = {"group_contact_center", "groups", "staff"}
 """Pre-train tables that a migration after the train adds a column to, by the same additive rule:
-0116 (ADR 0123 step 7a) gives the group's contact-center routing its task kind, and 0118
-(ADR 0123 step 5c) gives the staff record its screen name."""
+0116 (ADR 0123 step 7a) gives the group's contact-center routing its task kind, 0118
+(ADR 0123 step 5c) gives the staff record its screen name, and 0119 (ADR 0123 step 6a) gives the
+group the service's option next to the call page and widens one check (``AFTER_TRAIN_WIDENED``)."""
+AFTER_TRAIN_WIDENED = {
+    "groups": (
+        "join_client IN ('browser', 'choice')",
+        "join_client IN ('browser', 'choice', 'embedded')",
+    )
+}
+"""The one check each of those tables has widened (never narrowed): ``groups.join_client`` may
+now be ``embedded`` (0119). Every value the previous image writes still meets it."""
 AFTER_TRAIN_COLUMNS = {
     "group_contact_center": "task_kind VARCHAR(16) DEFAULT 'form' NOT NULL",
     "staff": "screen_name VARCHAR(40)",
+    "groups": (
+        "embedded_call_webex_option VARCHAR(16)"
+        " | CONSTRAINT ck_groups_embedded_call_webex_option CHECK"
+        " (embedded_call_webex_option IS NULL"
+        " OR embedded_call_webex_option IN ('hidden', 'on_failure', 'always'))"
+    ),
 }
-"""The one part each of those tables' definitions gains. The table is rebuilt to add it, which
-may reorder its keys and checks, so the definitions are compared part by part."""
+"""The parts each of those tables' definitions gains (``|`` separates two parts). The table is
+rebuilt to add it, which may reorder its keys and checks, so the definitions are compared part
+by part."""
 LATER = NOW + timedelta(days=3650)
 """A moment after every pending job's ``run_at``, as the upgrade check claims."""
 Rows = dict[str, list[tuple[object, ...]]]
@@ -305,8 +321,13 @@ def test_no_index_or_constraint_of_a_pre_train_table_becomes_stricter(
     for table in tables - {"bookings", "slots"} - AFTER_TRAIN_TOUCHED:
         assert now[table] == definitions[table], table  # checks and keys untouched
     for table, added in AFTER_TRAIN_COLUMNS.items():
-        # every column, key and check as it was, plus the one defaulted column
-        assert _parts(now[table]) == sorted([*_parts(definitions[table]), added]), table
+        text = definitions[table]
+        if table in AFTER_TRAIN_WIDENED:
+            narrow, wide = AFTER_TRAIN_WIDENED[table]
+            assert narrow in text, table
+            text = text.replace(narrow, wide)
+        # every column, key and check as it was (a widened one as widened), plus what was added
+        assert _parts(now[table]) == sorted([*_parts(text), *_parts(added.replace(" | ", ", "))])
 
 
 def test_the_previous_image_writes_and_the_current_code_reads_and_claims_it(

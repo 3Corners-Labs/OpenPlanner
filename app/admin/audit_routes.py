@@ -261,6 +261,7 @@ DETAIL_LABELS: dict[str, str] = {
     "embedding_enabled": "admin.field.embedding_enabled",
     "trial_call_enabled": "admin.field.trial_call_enabled",
     "join_client": "admin.field.join_client",
+    "embedded_call_webex_option": "admin.field.embedded_call_webex_option",
     "trial_call_minutes": "admin.field.trial_call_minutes",
     "trial_calls_per_booking": "admin.field.trial_calls_per_booking",
     "not_picked_up_minutes": "admin.field.not_picked_up_minutes",

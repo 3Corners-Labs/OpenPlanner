@@ -44,6 +44,12 @@ from starlette.responses import HTMLResponse, RedirectResponse, Response
 from app.adapters.contact_centers import routing
 from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.block_subjects import block_subject_values, read_block_subjects, subject_choices
+from app.admin.call_client_input import (
+    embedded_offer,
+    organisation_option,
+    read_call_client,
+    with_call_client_fields,
+)
 from app.admin.check_routes import check_service, check_view
 from app.admin.form_summary import form_summary
 from app.admin.forms import (
@@ -134,11 +140,6 @@ from app.web.security_policy import PageKind
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 log = structlog.get_logger()
-
-JOIN_CLIENT_LABELS: dict[JoinClient, str] = {
-    JoinClient.BROWSER: "admin.group.join_client_browser",
-    JoinClient.CHOICE: "admin.group.join_client_choice",
-}
 
 DISPATCH_LABELS: dict[DispatchKind, str] = {
     DispatchKind.CONTACT_CENTER: "admin.group.dispatch_contact_center",
@@ -504,9 +505,6 @@ def _settings_fields(
     phone_options = tuple(Option(mode.value, _(PHONE_LABELS[mode])) for mode in PhoneMode)
     yes_no = (Option("yes", _("admin.yes")), Option("no", _("admin.no")))
     dispatch_options = tuple(Option(kind.value, _(DISPATCH_LABELS[kind])) for kind in DispatchKind)
-    join_client_options = tuple(
-        Option(client.value, _(JOIN_CLIENT_LABELS[client])) for client in JoinClient
-    )
     planning = [
         Field(
             "name",
@@ -641,15 +639,6 @@ def _settings_fields(
             current.trial_calls_per_booking,
             {"min": "1", "max": str(MAX_TRIAL_CALLS_PER_BOOKING)},
         ),
-        Field(
-            "join_client",
-            _("admin.field.join_client"),
-            "select",
-            value("join_client", current.join_client.value),
-            hint=_("admin.field.join_client_hint"),
-            error=form.error_for("join_client"),
-            options=join_client_options,
-        ),
         number("not_picked_up_minutes", current.not_picked_up_minutes, {"min": "1", "max": "120"}),
         number(
             "direct_call_max_concurrent",
@@ -683,6 +672,14 @@ async def _settings_response(
     """
     current = settings_of(context.group.group)
     planning, integrations = _settings_fields(form, current, locale.gettext)
+    integrations = with_call_client_fields(
+        integrations,
+        form,
+        current,
+        await embedded_offer(request),
+        organisation_option(request, context.group.group.organisation_id),
+        locale.gettext,
+    )
     integrations = with_task_kind_field(
         integrations,
         form,
@@ -775,11 +772,13 @@ async def save_settings(
     dispatch = form.choice("dispatch_kind", {kind.value for kind in DispatchKind})
     embedding = form.choice("embedding_enabled", {"yes", "no"})
     trial = form.choice("trial_call_enabled", {"yes", "no"})
-    join_client = form.choice("join_client", {client.value for client in JoinClient})
+    client, webex_option = read_call_client(
+        form, settings_of(context.group.group), await embedded_offer(request)
+    )
     free_pick = form.choice("queue_free_pick_allowed", {"yes", "no"})
     auto_send = form.choice("reschedule_auto_send", {"yes", "no"})
     fallback = form.choice("dispatch_fallback", {f.value for f in DispatchFallback})
-    chosen = (phone, dispatch, embedding, free_pick, trial, join_client, fallback, auto_send)
+    chosen = (phone, dispatch, embedding, free_pick, trial, client, fallback, auto_send)
     try:
         center = routing_with_task_kind(
             _form_routing(form),
@@ -805,7 +804,8 @@ async def save_settings(
             direct_call_max_concurrent=cap,
             embedding_enabled=embedding == "yes",
             trial_call_enabled=trial == "yes",
-            join_client=JoinClient(str(join_client)),
+            join_client=JoinClient(str(client)),
+            embedded_call_webex_option=webex_option,
             **{name: value for name, value in numbers.items() if value is not None},
         )
         try:

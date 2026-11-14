@@ -7,6 +7,11 @@ shows the time and a button to check again. It never reloads by itself (WCAG 2.2
 
     GET /b/m/{ref}/join      status page (too early / open / ended / not active)
     GET /b/m/{ref}/join/go   record the click, 303 to the meeting's Webex link
+
+For a booking of a service that uses the call page of its own (ADR 0123, ``call_client``) the
+join page's button leads to ``/b/m/{ref}/call``, and ``/join/go`` leads the participant there
+too, unless the service's ``embedded_call_webex_option`` allows another way: only then is the
+address that sends the participant to the video platform open for such a booking.
 """
 
 from fastapi import APIRouter, Request
@@ -15,6 +20,12 @@ from starlette.responses import HTMLResponse, RedirectResponse, Response
 from app.api.labels import slot_label
 from app.api.link_session import authorise
 from app.api.participant import participant_page
+from app.domain.call_client import (
+    allows_other_way,
+    other_way_offer,
+    redirect_client,
+    uses_call_page,
+)
 from app.domain.calls import JOIN_OPENS_BEFORE, EventKind, JoinState, join_link, join_state
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock
@@ -46,12 +57,14 @@ async def join_page(request: Request, public_ref: str) -> HTMLResponse:
     follow(request, details.group.organisation_id)
     booking, group = details.booking, details.group
     state = join_state(booking, clock.now())
+    enabled = request.app.state.settings.embedded_call_enabled
     if state is JoinState.OPEN and booking.id is not None:
         await integration.record(booking.id, EventKind.JOIN_PAGE_OPENED)
     context = {
         "group": group,
         "ref": public_ref,
         "state": state.value,
+        "call_page": uses_call_page(group, platform_enabled=enabled),
         "refresh": state in REFRESHING,
         "trial_offered": group.trial_call_enabled and group.video_enabled,
         "slot_label": slot_label(booking.start, booking.end, group, locale),
@@ -66,14 +79,21 @@ async def join_go(request: Request, public_ref: str) -> Response:
     """Send the participant to the meeting, or back to the status page when it is not open."""
     bookings, integration, clock = _services(request)
     details = await bookings.find(await authorise(request, public_ref))
-    follow(request, details.group.organisation_id)
-    booking = details.booking
+    current = follow(request, details.group.organisation_id)
+    booking, group = details.booking, details.group
     # The link comes from Webex: ``join_link`` refuses anything but https and sets the group's
     # client (ADR 0075), so nothing else can ever become a redirect.
-    link = join_link(booking.meeting.link if booking.meeting else None, details.group.join_client)
+    link = join_link(
+        booking.meeting.link if booking.meeting else None, redirect_client(group.join_client)
+    )
     if join_state(booking, clock.now()) is not JoinState.OPEN or not link or booking.id is None:
         return RedirectResponse(f"/b/m/{public_ref}/join", status_code=303)
+    enabled = request.app.state.settings.embedded_call_enabled
+    offer = other_way_offer(group, current.embedded_call_webex_option)
+    if uses_call_page(group, platform_enabled=enabled) and not allows_other_way(offer):
+        # The call is in our page; the platform's address stays closed around it (point 11).
+        return RedirectResponse(f"/b/m/{public_ref}/call", status_code=303)
     await integration.record(
-        booking.id, EventKind.JOIN_CLICKED, detail=details.group.join_client.value
+        booking.id, EventKind.JOIN_CLICKED, detail=redirect_client(group.join_client).value
     )
     return RedirectResponse(link, status_code=303)

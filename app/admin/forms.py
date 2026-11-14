@@ -240,6 +240,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "embedding_enabled": "admin.form.error.choice",
     "trial_call_enabled": "admin.form.error.choice",
     "join_client": "admin.form.error.choice",
+    "embedded_call_webex_option": "admin.form.error.choice",
     "trial_call_minutes": "admin.form.error.trial_call_minutes",
     "trial_calls_per_booking": "admin.form.error.trial_calls_per_booking",
     "not_picked_up_minutes": "admin.form.error.not_picked_up_minutes",
@@ -623,6 +624,10 @@ class FormData:
             target = "organisation"
         message = CODE_MESSAGES.get(error.code, "error.invalid_request")
         self.errors.append(FormError(target, self._(message)))
+
+    def reject(self, name: str, key: str) -> None:
+        """Link the sentence of catalogue key ``key`` to the field ``name`` (a rule of its own)."""
+        self._fail(name, key)
 
     def error_for(self, name: str) -> str | None:
         """Return the first message linked to ``name``."""

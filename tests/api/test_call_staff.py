@@ -23,8 +23,8 @@ from app.domain.booking import MeetingRef
 from app.domain.staff import Membership, StaffMember
 from app.domain.tokens import agent_pseudonym
 from app.keys import agent_pseudonym_key
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.call_page import embedded_app_client
 from tests.support.domain import NOW
 from tests.support.participant import (
     FRIDAY_0900,
@@ -115,7 +115,7 @@ async def _site(settings: Settings) -> AsyncIterator[Site]:
         await tx.save_group(replace(group, video_host_email="host@example.nl"))
     await engine.dispose()
     clock = FixedClock(NOW)
-    async with app_client(settings, clock) as client:
+    async with embedded_app_client(settings, clock) as client:
         assert (await book(client)).status_code == 303
         token = await confirm_newest(client)
         app = client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001

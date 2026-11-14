@@ -90,6 +90,7 @@ COLUMNS = (
     "trial_call_minutes",
     "trial_calls_per_booking",
     "join_client",
+    "embedded_call_webex_option",
     "embedding_enabled",
     "queue_visible_from_minutes",
     "queue_free_pick_allowed",

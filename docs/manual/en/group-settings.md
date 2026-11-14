@@ -406,17 +406,40 @@ How often one appointment may open a trial call, from 1 to 5. Default 3. Each tr
 meeting in Webex; this number stops one appointment from creating them without end.
 
 <!-- field: join_client -->
-### Webex page for the participant
+### How the participant gets into the call
 
-Decides which Webex page the participant gets when they go from our page to the call, for the
-appointment and for the trial call. **Straight into the browser** (the default) opens the Webex
-web app at once: on a computer the participant has nothing to install and does not see the "app or
-browser" question. **Webex lets the participant choose** gives Webex's own page, with the choice
-between the app and the browser; pick it if your participants use the Webex app or your organisation
-prefers it. On a phone or tablet Webex asks for the Webex app in both cases: there is no web
-version there. The texts in the confirmation, on the call page and on the trial call page follow
-this choice. Webex can change this behaviour itself; if the participant does see the choice between
-app and browser anyway, set it to **Webex lets the participant choose**.
+Decides how the participant of this team gets into the call: through a page of Webex or in a page
+of your organisation's own. **Straight into the browser** (the default) opens the Webex web app at
+once: on a computer the participant has nothing to install and does not see the "app or browser"
+question. **Webex lets the participant choose** gives Webex's own page, with the choice between the
+app and the browser; pick it if your participants use the Webex app or your organisation prefers it.
+On a phone or tablet Webex asks for the Webex app in both cases: there is no web version there.
+**In the organisation's own page** has the participant hold the call in our call page, in your
+organisation's branding; the participant does not leave that page for Webex, unless you allow
+another way below. The staff side does not change: your staff open the meeting from the task, as
+always.
+
+The third choice can be made only when the installation's administrator has switched on the call
+page (the platform setting *embedded_call_enabled*), and only after the Service App check on
+**Integrations** has been able to create a guest at the video platform (the Service App's guest
+scopes). That is needed for the whole team: without those scopes no participant can join. If the
+platform setting is switched off later, your choice stays, but the participants of this team are
+sent to Webex in the meantime, straight into the browser. The trial call still opens in Webex for
+now. The texts in the confirmation, on the call page and on the trial call page follow this choice.
+Webex can change the behaviour of the direct browser link itself; if the participant does see the
+choice between app and browser anyway, set it to **Webex lets the participant choose**.
+
+<!-- field: embedded_call_webex_option -->
+### Way into Webex next to our page
+
+Only for a team that uses the organisation's own page. Decides whether the participant is ever shown
+a way into the Webex app next to our call page. **Never** (the default): the participant sees no way
+into Webex; if the call does not work they can try again or call you. **Only when our page cannot
+give the call**: after a failed connection, or in a browser that cannot run the page, the link "join
+another way" appears. **Always, also before joining**: that link is there before the participant
+starts too. The link leads to the Webex web app and does not name Webex. It is a setting of this
+team; a team that never chose one follows the organisation's value until the next minor version. The
+field appears after you have saved the choice of the organisation's own page.
 
 <!-- field: offer -->
 ### Offer per block

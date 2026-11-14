@@ -19,7 +19,7 @@ it out of its ``repr``.
 import hashlib
 import hmac
 import unicodedata
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -39,6 +39,27 @@ is ``SUBJECT_PREFIX`` and a digest, and it names no one."""
 
 NEUTRAL_TERM = "Participant"
 """The word the checks send as the guest's name: no participant, so no personal data."""
+
+GUEST_PROBE = "POST /guests/token"
+"""The name of the service-app check's line that mints the checks' guest; the stored report
+carries it, and ``guest_check_passed`` reads it back."""
+
+
+def guest_check_passed(report: Mapping[str, object] | None) -> bool:
+    """Return whether the latest stored service-app check minted a guest token (ADR 0123 point 17).
+
+    A group may be saved as ``embedded`` only after that: it proves the Service App has the guest
+    scopes. ``report`` is the body of the stored report (``None`` before any check ran); a check
+    that ran while the platform switch was off holds no such line and so does not count, and a
+    line that failed does not either.
+    """
+    results = report.get("results") if report else None
+    if not isinstance(results, list):
+        return False
+    return any(
+        isinstance(line, dict) and line.get("name") == GUEST_PROBE and line.get("ok") is True
+        for line in results
+    )
 
 
 GuestKeys = Callable[[], Sequence[bytes]]

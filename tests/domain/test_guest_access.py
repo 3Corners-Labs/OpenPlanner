@@ -6,12 +6,14 @@ import pytest
 
 from app.domain.guest_access import (
     CHECK_SUBJECT,
+    GUEST_PROBE,
     GUEST_TERM_KEY,
     MAX_DISPLAY_NAME,
     NEUTRAL_TERM,
     SUBJECT_PREFIX,
     DisplayNameMode,
     GuestAccess,
+    guest_check_passed,
     guest_display_name,
     guest_subject,
 )
@@ -81,3 +83,26 @@ def test_the_registry_choices_come_from_the_enums() -> None:
 def test_the_neutral_word_and_the_catalogues_default_for_a_participant_are_the_same_word() -> None:
     """The rename at the purge sends the constant; the guest is minted under the catalogue word."""
     assert Translator(load_catalogues()).gettext("en", GUEST_TERM_KEY) == NEUTRAL_TERM
+
+
+def _report(*lines: dict[str, object]) -> dict[str, object]:
+    return {"passed": True, "results": list(lines)}
+
+
+@pytest.mark.parametrize(
+    ("report", "expected"),
+    [
+        (None, False),  # no check has run
+        ({}, False),
+        ({"results": "garbage"}, False),
+        (_report({"name": "GET /meetings", "ok": True}), False),  # ran with the switch off
+        (_report({"name": GUEST_PROBE, "ok": False}), False),  # the platform refused the guest
+        (_report({"name": GUEST_PROBE, "ok": "yes"}), False),  # only a real true counts
+        (_report({"name": GUEST_PROBE}, "not a line"), False),  # type: ignore[arg-type]
+        (_report({"name": "GET /meetings", "ok": True}, {"name": GUEST_PROBE, "ok": True}), True),
+    ],
+)
+def test_only_a_stored_check_that_minted_a_guest_lets_a_service_choose_the_call_page(
+    report: dict[str, object] | None, expected: bool
+) -> None:
+    assert guest_check_passed(report) is expected

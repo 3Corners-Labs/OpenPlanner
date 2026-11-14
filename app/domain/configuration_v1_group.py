@@ -22,6 +22,8 @@ from typing import Any, cast
 from app.domain.agenda import agents_for
 from app.domain.agent_term import TERM_KEYS, clean_term
 from app.domain.authorization import Permission
+from app.domain.call_client import embedded_blocker
+from app.domain.call_page import OtherWayOffer
 from app.domain.channel_settings import CONFIGURABLE_CHANNELS
 from app.domain.channels import (
     MAX_REMINDER_MINUTES,
@@ -125,12 +127,18 @@ _DEFAULTS = Group(0, 0, "default", "default", "UTC", 30)
 """A group with every default of the dataclass, the one source of a new group's defaults."""
 
 _ENUMS: dict[
-    str, type[PhoneMode] | type[DispatchKind] | type[DispatchFallback] | type[JoinClient]
+    str,
+    type[PhoneMode]
+    | type[DispatchKind]
+    | type[DispatchFallback]
+    | type[JoinClient]
+    | type[OtherWayOffer],
 ] = {
     "phone_mode": PhoneMode,
     "dispatch_kind": DispatchKind,
     "dispatch_fallback": DispatchFallback,
     "join_client": JoinClient,
+    "embedded_call_webex_option": OtherWayOffer,
 }
 _SCHEDULE_FIELDS = (
     "schedule_rules",
@@ -179,6 +187,11 @@ _SETTINGS: tuple[FieldSpec, ...] = (
     _setting("trial_call_minutes", MIN_TRIAL_CALL_MINUTES, MAX_TRIAL_CALL_MINUTES),
     _setting("trial_calls_per_booking", 1, MAX_TRIAL_CALLS_PER_BOOKING),
     _choice("join_client", (client.value for client in JoinClient)),
+    text(
+        "embedded_call_webex_option",
+        nullable=True,
+        choices=tuple(offer.value for offer in OtherWayOffer),
+    ),
     boolean("embedding_enabled", default=_default("embedding_enabled")),
     _setting("queue_visible_from_minutes", 0, MAX_QUEUE_VISIBLE_FROM_MINUTES),
     boolean("queue_free_pick_allowed", default=_default("queue_free_pick_allowed")),
@@ -278,7 +291,7 @@ def _build_group(view: Mapping[str, Value], ctx: RuleContext) -> Group:
     """Build the group the fields describe, which validates every bound of the portal."""
     values: dict[str, Any] = {name: view[name] for name in _GROUP_ARGUMENTS if name in view}
     for name, enum in _ENUMS.items():
-        if name in values:
+        if values.get(name) is not None:
             values[name] = enum(values[name])
     routing = view.get("routing")
     if routing is not None:
@@ -320,6 +333,25 @@ def _check_schedule(
     }
 
 
+def _check_embedded(group: Group, current: Mapping[str, Value] | None, ctx: RuleContext) -> None:
+    """Refuse a group that would newly use the call page where the settings form would refuse it.
+
+    Choosing ``embedded`` needs the platform switch on and a guest token minted by the service-app
+    check (ADR 0123 point 17); keeping it does not, so a document that repeats a group's stored
+    value is accepted as it is. A document may not turn the switch on and choose ``embedded`` in
+    one go: the switch is audited and the check runs after it, so each is its own step.
+
+    Raises:
+        DomainError: ``invalid_configuration`` naming ``join_client``.
+    """
+    already = current is not None and current.get("join_client") == JoinClient.EMBEDDED.value
+    if group.join_client is not JoinClient.EMBEDDED or already:
+        return
+    enabled = ctx.settings.get("embedded_call_enabled") is True
+    if embedded_blocker(platform_enabled=enabled, guest_check_passed=ctx.guest_check_passed):
+        raise invalid("join_client")
+
+
 def _check_group(
     view: Mapping[str, Value], current: Mapping[str, Value] | None, ctx: RuleContext
 ) -> Mapping[str, Value]:
@@ -327,6 +359,7 @@ def _check_group(
     if current is None and str(view["slug"]) in RESERVED_SLUGS:
         raise invalid("slug", ErrorCode.SLUG_TAKEN)
     group = _build_group(view, ctx)
+    _check_embedded(group, current, ctx)
     idp_key = view.get("idp_key")
     if idp_key is not None and not is_idp_key(str(idp_key)):
         raise invalid("idp_key")

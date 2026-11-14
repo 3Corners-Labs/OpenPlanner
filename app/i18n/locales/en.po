@@ -1199,16 +1199,46 @@ msgid "admin.field.trial_call_enabled_hint"
 msgstr "Yes: the participant can try beforehand, in a real Webex meeting, whether camera, microphone and speakers work. The meeting belongs to this service's Webex host; nobody from the team joins. Only with a Webex host."
 
 msgid "admin.field.join_client"
-msgstr "Webex page for the participant"
+msgstr "How the participant gets into the call"
 
 msgid "admin.field.join_client_hint"
-msgstr "Which Webex page the participant sees for the appointment and the trial call."
+msgstr "How the participant gets into the call. Straight into the browser and Webex lets the participant choose send them to Webex; the organisation's own page gives the call in our page (the trial call still opens in Webex)."
 
 msgid "admin.group.join_client_browser"
 msgstr "Straight into the browser"
 
 msgid "admin.group.join_client_choice"
 msgstr "Webex lets the participant choose"
+
+msgid "admin.group.join_client_embedded"
+msgstr "In the organisation's own page"
+
+msgid "admin.field.join_client_embedded_off"
+msgstr "The call page is switched off for this installation (platform setting), so participants of this group get the redirect to Webex for now."
+
+msgid "admin.field.join_client_embedded_unchecked"
+msgstr "The organisation's own page can be chosen once the Service App check on Integrations has succeeded with the guest scopes."
+
+msgid "admin.field.embedded_call_webex_option"
+msgstr "Way into Webex next to our page"
+
+msgid "admin.field.embedded_call_webex_option_hint"
+msgstr "Whether the participant is ever shown a way into the Webex app next to our call page. It leads to Webex's web app and never names Webex to the participant."
+
+msgid "admin.group.webex_option_hidden"
+msgstr "Never"
+
+msgid "admin.group.webex_option_on_failure"
+msgstr "Only when our page cannot give the call"
+
+msgid "admin.group.webex_option_always"
+msgstr "Always, also before joining"
+
+msgid "admin.form.error.embedded_platform_switch"
+msgstr "The call in the organisation's own page is switched off for this installation."
+
+msgid "admin.form.error.embedded_guest_check"
+msgstr "Not yet: run the Service App check on Integrations first; it must have created a guest at the video platform."
 
 msgid "admin.field.trial_call_minutes"
 msgstr "Trial call stays open (minutes)"
@@ -1636,6 +1666,9 @@ msgstr "The call opens in your browser; on a computer there is nothing to instal
 msgid "message.join_choice"
 msgstr "On a computer there is nothing to install: if Webex asks to open the app, choose 'Join from this browser'. On a phone or tablet Webex asks for the Webex app. The link works from 15 minutes before the start."
 
+msgid "message.join_embedded"
+msgstr "The call opens in your browser; on a computer there is nothing to install. The link works from 15 minutes before the start."
+
 msgid "message.join_link"
 msgstr "Join the video call"
 
@@ -1656,6 +1689,9 @@ msgstr "The call opens in your browser; on a computer there is nothing to instal
 
 msgid "join.tips.choice"
 msgstr "If Webex asks whether to open the app, choose 'Join from this browser'; on a computer there is nothing to install. On a phone or tablet Webex asks for the Webex app."
+
+msgid "join.tips.embedded"
+msgstr "The call opens in this browser; there is nothing to install."
 
 msgid "join.tips.devices"
 msgstr "Allow your browser to use the camera and microphone when it asks."
@@ -4783,7 +4819,7 @@ msgid "admin.check.webex.browser_link_ok"
 msgstr "The direct browser link works: Webex carries the browser option through, so on a computer the participant gets the web version at once, without the question about the app."
 
 msgid "admin.check.webex.browser_link_lost"
-msgstr "Webex no longer carries the browser option through in the link (answer {status}). The participant then gets the choice between app and browser after all. Nothing breaks; if you like, set the Webex page for the participant to 'Webex lets the participant choose'."
+msgstr "Webex no longer carries the browser option through in the link (answer {status}). The participant then gets the choice between app and browser after all. Nothing breaks; if you like, set 'How the participant gets into the call' to 'Webex lets the participant choose'."
 
 msgid "admin.check.webex.browser_link_unreachable"
 msgstr "The direct browser link could not be checked: the Webex site could not be reached ({error})."
@@ -4811,6 +4847,12 @@ msgstr "Webex refused a trial-call meeting for host {host} ({error}): {reason}. 
 
 msgid "admin.check.webex.trial_lobby"
 msgstr "Webex accepted a trial call meeting for host {host} but did not keep its settings ({stored}). The participant would then wait in the lobby and nobody lets them in. Ask the administrator of the Webex site to allow participants to join before the host and without a lobby; until then the trial call does not work."
+
+msgid "admin.check.webex.guest_ok"
+msgstr "The call page can create a guest at the video platform (the Service App has the guest scopes)."
+
+msgid "admin.check.webex.guest_refused"
+msgstr "The video platform refused to create a guest ({error}): the Service App needs the guest scopes, so participants cannot join in our page."
 
 msgid "admin.check.webex.trial_left"
 msgstr "The trial-call meeting {meeting} for host {host} was scheduled but could not be deleted ({error}); delete it in Webex."
@@ -14006,7 +14048,7 @@ msgstr "Deliveries are resumed."
 #. The participant's call page before the click that joins (ADR 0123 step 4b). No text names the video platform.
 
 msgid "settings.field.embedded_call_webex_option.label"
-msgstr "Way into the video platform's own app next to the call (never, only when the page cannot give the call, or always)"
+msgstr "Default way into the video platform's own app next to the call, for a service that has not chosen its own (each service chooses it under Group, Settings, Video; this value is read for one more minor version)"
 
 msgid "callpage.start.body"
 msgstr "You have the call here, in this page. There is nothing to install."
