@@ -44,16 +44,29 @@ PRE_TRAIN = "0108"
 """The revision before ADR 0121's first migration (0109): the schema of a pre-train image."""
 TRAIN_TOUCHED = {"bookings", "slots"}
 """The only pre-train tables the train adds columns to; every other one is left as it was."""
-AFTER_TRAIN_TOUCHED = {"group_contact_center", "staff"}
+AFTER_TRAIN_TOUCHED = {"group_contact_center", "groups", "staff"}
 """Pre-train tables that a migration after the train adds a column to, by the same additive rule:
-0116 (ADR 0123 step 7a) gives the group's contact-center routing its task kind, and 0118
-(ADR 0123 step 5c) gives the staff record its screen name."""
+0116 (ADR 0123 step 7a) gives the group's contact-center routing its task kind, 0118
+(ADR 0123 step 5c) gives the staff record its screen name, and 0119 (ADR 0123 step 6a) gives the
+group the service's option next to the call page and widens one check (``AFTER_TRAIN_WIDENED``)."""
+AFTER_TRAIN_WIDENED = {"groups": ("join_client", ("browser", "choice"), "embedded")}
+"""The one check each of those tables has widened (never narrowed), as ``(column, the values it
+allowed, the one value added)``: ``groups.join_client`` may now be ``embedded`` (0119). Every value
+the previous image writes still meets it. The test builds both forms of the check from this, so
+the exemption is exactly "the same constraint with one more allowed value" and nothing else."""
 AFTER_TRAIN_COLUMNS = {
     "group_contact_center": "task_kind VARCHAR(16) DEFAULT 'form' NOT NULL",
     "staff": "screen_name VARCHAR(40)",
+    "groups": (
+        "embedded_call_webex_option VARCHAR(16)"
+        " | CONSTRAINT ck_groups_embedded_call_webex_option CHECK"
+        " (embedded_call_webex_option IS NULL"
+        " OR embedded_call_webex_option IN ('hidden', 'on_failure', 'always'))"
+    ),
 }
-"""The one part each of those tables' definitions gains. The table is rebuilt to add it, which
-may reorder its keys and checks, so the definitions are compared part by part."""
+"""The parts each of those tables' definitions gains (``|`` separates two parts). The table is
+rebuilt to add it, which may reorder its keys and checks, so the definitions are compared part
+by part."""
 LATER = NOW + timedelta(days=3650)
 """A moment after every pending job's ``run_at``, as the upgrade check claims."""
 Rows = dict[str, list[tuple[object, ...]]]
@@ -249,18 +262,35 @@ def test_the_train_changes_only_bookings_and_slots_of_the_pre_train_tables_and_o
             assert not notnull or default is not None, f"{table}.{name} needs a value"
 
 
+def _split(line: str) -> list[str]:
+    """Split ``line`` at the ``", "`` outside brackets, so an ``IN (...)`` list stays whole."""
+    parts, depth, start = [], 0, 0
+    for at, char in enumerate(line):
+        depth += (char == "(") - (char == ")")
+        if depth == 0 and line.startswith(", ", at):
+            parts.append(line[start:at])
+            start = at + 2
+    return [*parts, line[start:]]
+
+
 def _parts(definition: str) -> list[str]:
     """Return the parts of a table's definition (columns, keys, checks), sorted, without commas.
 
     A column that SQLite appends in place (``ALTER TABLE ... ADD COLUMN``) lands on the line of the
-    column before it, so a line is split at ``", "`` too; both sides are split the same way.
+    column before it, so a line is split at ``", "`` too, outside brackets; both sides are split
+    the same way.
     """
     return sorted(
         part.strip().rstrip(",").strip()
         for line in definition.splitlines()
-        for part in line.split(", ")
+        for part in _split(line)
         if part.strip().rstrip(",").strip()
     )
+
+
+def _in_check(column: str, values: tuple[str, ...]) -> str:
+    """Return the text of the check ``column IN (...)`` for ``values``."""
+    return f"{column} IN ({', '.join(repr(value) for value in values)})"
 
 
 def _indexes(path: Path, tables: set[str]) -> dict[str, str]:
@@ -305,8 +335,14 @@ def test_no_index_or_constraint_of_a_pre_train_table_becomes_stricter(
     for table in tables - {"bookings", "slots"} - AFTER_TRAIN_TOUCHED:
         assert now[table] == definitions[table], table  # checks and keys untouched
     for table, added in AFTER_TRAIN_COLUMNS.items():
-        # every column, key and check as it was, plus the one defaulted column
-        assert _parts(now[table]) == sorted([*_parts(definitions[table]), added]), table
+        text = definitions[table]
+        if table in AFTER_TRAIN_WIDENED:
+            column, allowed, added_value = AFTER_TRAIN_WIDENED[table]
+            narrow = _in_check(column, allowed)
+            assert narrow in text, table
+            text = text.replace(narrow, _in_check(column, (*allowed, added_value)))
+        # every column, key and check as it was (a widened one as widened), plus what was added
+        assert _parts(now[table]) == sorted([*_parts(text), *_parts(added.replace(" | ", ", "))])
 
 
 def test_the_previous_image_writes_and_the_current_code_reads_and_claims_it(

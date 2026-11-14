@@ -318,8 +318,16 @@ worker/web ──HTTPS──> WxCC Task Messages v2 (mediaType customMessaging),
 
 For a participant who joins in the organisation's own call page, our server asks the video
 platform for a guest token on the click that joins. Nothing is sent before the click, and the
-endpoint exists only while the platform switch `embedded_call_enabled` is on (until step 6 it is
-dark behind that switch alone).
+endpoint exists only while the platform switch `embedded_call_enabled` is on and only for a
+booking of a service that chose the page (`join_client = embedded`, step 6a). For every other
+service the participant's way to the video platform is the redirect `/join/go` of ADR 0075, and
+for an embedded service that redirect stays closed (it leads back to the call page) unless the
+service's `embedded_call_webex_option` is `on_failure` or `always` (its own value, else the
+organisation's); the choice itself is a setting of the group and holds no personal data. "Closed"
+hides the offer and the address; it is no barrier: the token's answer still carries the meeting's
+guest address, because the page needs it to join. The group check mints the one fixed guest of the
+checks (a constant subject, no participant) for a group that uses the page and only while the
+switch is on.
 
 ```
 participant ──POST /b/m/{public_ref}/call/token (cookie, same-origin)──> OpenPlanner

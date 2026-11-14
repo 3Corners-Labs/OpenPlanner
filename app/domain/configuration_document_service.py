@@ -415,7 +415,10 @@ class ConfigurationDocumentService:
             usage=snapshot.usage,
             may_change=actor.may_change,
             context=replace(
-                context, now=self._clock.now(), settings={**context.settings, **portal}
+                context,
+                now=self._clock.now(),
+                settings={**context.settings, **portal},
+                guest_check_passed=snapshot.usage.guest_check_passed,
             ),
             settings_version=snapshot.version,
             max_changes=self._max_changes(),

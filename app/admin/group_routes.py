@@ -42,8 +42,10 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.adapters.contact_centers import routing
+from app.adapters.db.reports import ReportStore
 from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.block_subjects import block_subject_values, read_block_subjects, subject_choices
+from app.admin.call_client_input import EmbeddedOffer, read_call_client, with_call_client_fields
 from app.admin.check_routes import check_service, check_view
 from app.admin.form_summary import form_summary
 from app.admin.forms import (
@@ -92,6 +94,7 @@ from app.admin.staffing_views import (
 from app.admin.task_kind_input import routing_with_task_kind, with_task_kind_field
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
+from app.domain.call_page import OtherWayOffer
 from app.domain.contact_center import ContactCenterRouting
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.planning import (
@@ -115,6 +118,7 @@ from app.domain.scheduling import (
     MIN_TRIAL_CALL_MINUTES,
     DispatchFallback,
     DispatchKind,
+    Group,
     GroupSummary,
     JoinClient,
     PhoneMode,
@@ -130,15 +134,11 @@ from app.i18n.dates import (
 from app.web.authz_labels import PERMISSION_LABELS
 from app.web.locale import RequestLocale
 from app.web.navigation import object_page
+from app.web.organisation_settings import follow
 from app.web.security_policy import PageKind
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 log = structlog.get_logger()
-
-JOIN_CLIENT_LABELS: dict[JoinClient, str] = {
-    JoinClient.BROWSER: "admin.group.join_client_browser",
-    JoinClient.CHOICE: "admin.group.join_client_choice",
-}
 
 DISPATCH_LABELS: dict[DispatchKind, str] = {
     DispatchKind.CONTACT_CENTER: "admin.group.dispatch_contact_center",
@@ -238,6 +238,22 @@ def planning_service(request: Request) -> PlanningService:
     """Return the application's planning service."""
     service: PlanningService = request.app.state.planning_service
     return service
+
+
+async def _call_client_inputs(
+    request: Request, group: Group
+) -> tuple[EmbeddedOffer, OtherWayOffer]:
+    """Return what the settings form needs to offer ``embedded`` and its option, resolved here.
+
+    The platform switch and the stored finding of the guest check, and the value of the option that
+    holds for the group's organisation (what a service without its own value gets).
+    """
+    offer = EmbeddedOffer(
+        request.app.state.settings.embedded_call_enabled,
+        await ReportStore(request.app.state.engine).guest_check_passed(),
+    )
+    organisation = follow(request, group.organisation_id).embedded_call_webex_option
+    return offer, OtherWayOffer.of(organisation)
 
 
 def group_page(
@@ -504,9 +520,6 @@ def _settings_fields(
     phone_options = tuple(Option(mode.value, _(PHONE_LABELS[mode])) for mode in PhoneMode)
     yes_no = (Option("yes", _("admin.yes")), Option("no", _("admin.no")))
     dispatch_options = tuple(Option(kind.value, _(DISPATCH_LABELS[kind])) for kind in DispatchKind)
-    join_client_options = tuple(
-        Option(client.value, _(JOIN_CLIENT_LABELS[client])) for client in JoinClient
-    )
     planning = [
         Field(
             "name",
@@ -641,15 +654,6 @@ def _settings_fields(
             current.trial_calls_per_booking,
             {"min": "1", "max": str(MAX_TRIAL_CALLS_PER_BOOKING)},
         ),
-        Field(
-            "join_client",
-            _("admin.field.join_client"),
-            "select",
-            value("join_client", current.join_client.value),
-            hint=_("admin.field.join_client_hint"),
-            error=form.error_for("join_client"),
-            options=join_client_options,
-        ),
         number("not_picked_up_minutes", current.not_picked_up_minutes, {"min": "1", "max": "120"}),
         number(
             "direct_call_max_concurrent",
@@ -683,6 +687,10 @@ async def _settings_response(
     """
     current = settings_of(context.group.group)
     planning, integrations = _settings_fields(form, current, locale.gettext)
+    offer, organisation_option = await _call_client_inputs(request, context.group.group)
+    integrations = with_call_client_fields(
+        integrations, form, current, offer, organisation_option, locale.gettext
+    )
     integrations = with_task_kind_field(
         integrations,
         form,
@@ -775,11 +783,12 @@ async def save_settings(
     dispatch = form.choice("dispatch_kind", {kind.value for kind in DispatchKind})
     embedding = form.choice("embedding_enabled", {"yes", "no"})
     trial = form.choice("trial_call_enabled", {"yes", "no"})
-    join_client = form.choice("join_client", {client.value for client in JoinClient})
+    offer, _option = await _call_client_inputs(request, context.group.group)
+    client, webex_option = read_call_client(form, settings_of(context.group.group), offer)
     free_pick = form.choice("queue_free_pick_allowed", {"yes", "no"})
     auto_send = form.choice("reschedule_auto_send", {"yes", "no"})
     fallback = form.choice("dispatch_fallback", {f.value for f in DispatchFallback})
-    chosen = (phone, dispatch, embedding, free_pick, trial, join_client, fallback, auto_send)
+    chosen = (phone, dispatch, embedding, free_pick, trial, client, fallback, auto_send)
     try:
         center = routing_with_task_kind(
             _form_routing(form),
@@ -805,7 +814,8 @@ async def save_settings(
             direct_call_max_concurrent=cap,
             embedding_enabled=embedding == "yes",
             trial_call_enabled=trial == "yes",
-            join_client=JoinClient(str(join_client)),
+            join_client=JoinClient(str(client)),
+            embedded_call_webex_option=webex_option,
             **{name: value for name, value in numbers.items() if value is not None},
         )
         try:

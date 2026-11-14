@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from app.domain.booking import Booking
-from app.domain.calls import EventKind, JoinState, join_link, join_state
+from app.domain.calls import EventKind, JoinState, RedirectClient, join_link, join_state
 from app.domain.guest_access import (
     DisplayNameMode,
     GuestAccess,
@@ -33,7 +33,6 @@ from app.domain.guest_access import (
 )
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock, IntegrationError, UnitOfWork, VideoProvider
-from app.domain.scheduling import JoinClient
 
 
 class TokenRefusal(StrEnum):
@@ -122,7 +121,7 @@ class CallTokenService:
         # The one rule of the join page (``join_state``). The link is not shaped by the group's
         # join client as ``/join/go`` does (``launchApp`` sends the browser to the Webex app):
         # the SDK takes the stored guest link as it is, so the unaltered form is asked for here.
-        link = join_link(booking.meeting.link if booking.meeting else None, JoinClient.CHOICE)
+        link = join_link(booking.meeting.link if booking.meeting else None, RedirectClient.CHOICE)
         if join_state(booking, self._clock.now()) is not JoinState.OPEN or link is None:
             return TokenRefusal.NOT_OPEN
         if self._video is None:

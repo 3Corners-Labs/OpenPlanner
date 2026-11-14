@@ -10,7 +10,7 @@ from collections.abc import Callable
 
 import pytest
 
-from app.domain.calls import JoinClient, join_link
+from app.domain.calls import RedirectClient, join_link
 from app.domain.contacts import ContactKind, ContactOption
 from app.domain.embedding import normalise_origin
 from app.domain.errors import DomainError
@@ -70,9 +70,9 @@ def test_an_identity_provider_address_with_a_script_or_data_scheme_is_refused(va
     assert not is_discovery_url(value + DISCOVERY)
 
 
-@pytest.mark.parametrize("client", list(JoinClient))
+@pytest.mark.parametrize("client", list(RedirectClient))
 @pytest.mark.parametrize("value", UNSAFE)
 def test_a_join_link_with_a_script_or_data_scheme_is_never_handed_out(
-    client: JoinClient, value: str
+    client: RedirectClient, value: str
 ) -> None:
     assert join_link(value, client) is None

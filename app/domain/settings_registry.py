@@ -2450,8 +2450,9 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "hidden",
         _D,
         T.DISPLAY,
-        "Whether the call page shows the participant a way into the video platform's own app: "
-        "never, only when the page cannot give the call, or always (ADR 0123 point 11).",
+        "Whether the call page shows the participant a way into the video platform's own app "
+        "(never, only when the page cannot give the call, or always). It holds for every service "
+        "that has not chosen its own; a service may (Group > Settings > Video, ADR 0123 step 6a).",
         choices=tuple(m.value for m in OtherWayOffer),
     ),
 )

@@ -23,6 +23,7 @@ from app.adapters.db.models import (
     ShortfallAcceptanceRow,
     SlotRow,
 )
+from app.adapters.db.report_findings import guest_token_minted
 from app.domain.booking import HOLDS_PLACE
 from app.domain.configuration_changes import SlotLoad, Usage
 from app.domain.configuration_v1_names import GROUP_KIND
@@ -106,4 +107,5 @@ async def read_usage(
         future_bookings=frozenset(future),
         slot_loads={address: tuple(found) for address, found in loads.items()},
         locked_settings=locked_settings,
+        guest_check_passed=await guest_token_minted(session),
     )

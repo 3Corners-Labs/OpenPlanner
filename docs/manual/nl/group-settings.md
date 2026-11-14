@@ -417,17 +417,50 @@ Hoe vaak één afspraak een proefgesprek mag openen, van 1 tot 5. Standaard 3. E
 een meeting in Webex; met dit getal kan één afspraak er niet onbeperkt aanmaken.
 
 <!-- field: join_client -->
-### Webex-pagina voor de deelnemer
+### Hoe de deelnemer in het gesprek komt
 
-Bepaalt welke pagina van Webex de deelnemer krijgt wanneer die vanaf onze pagina naar het gesprek gaat,
-bij de afspraak en bij het proefgesprek. **Direct in de browser** (standaard) opent meteen de
-webversie van Webex: op een computer hoeft de deelnemer niets te installeren en ziet de vraag
-"app of browser" niet. **Webex laat de deelnemer kiezen** geeft Webex' eigen pagina, met de keuze
-tussen de app en de browser; kies dit als uw deelnemers de Webex-app gebruiken of als uw organisatie
-dat zo wil. Op een telefoon of tablet vraagt Webex in beide gevallen om de Webex-app: een
-webversie is daar niet beschikbaar. De teksten in de bevestiging, op de pagina voor het gesprek
-en op de proefgesprekpagina volgen deze keuze. Webex kan dit gedrag zelf wijzigen; ziet de
-deelnemer toch de keuze tussen app en browser, zet het dan op **Webex laat de deelnemer kiezen**.
+Bepaalt hoe de deelnemer van dit team in het gesprek komt: via een pagina van Webex of in een
+pagina van uw organisatie zelf. **Direct in de browser** (standaard) opent meteen de webversie van
+Webex: op een computer hoeft de deelnemer niets te installeren en ziet de vraag "app of browser"
+niet. **Webex laat de deelnemer kiezen** geeft Webex' eigen pagina, met de keuze tussen de app en de
+browser; kies dit als uw deelnemers de Webex-app gebruiken of als uw organisatie dat zo wil. Op een
+telefoon of tablet vraagt Webex in beide gevallen om de Webex-app: een webversie is daar niet
+beschikbaar. **In de eigen pagina van de organisatie** laat de deelnemer het gesprek voeren in onze
+gesprekspagina, in de huisstijl van uw organisatie; de deelnemer verlaat die pagina niet voor Webex,
+tenzij u hieronder een andere weg toestaat. Het medewerkersdeel verandert niet: uw medewerkers
+openen de vergadering vanuit de taak, zoals altijd.
+
+De derde keuze is alleen te kiezen als de beheerder van de installatie de gesprekspagina heeft
+aangezet (de platforminstelling *embedded_call_enabled*), en pas nadat de controle van de Service
+App op **Koppelingen** een gast bij het videoplatform heeft kunnen aanmaken (de gastrechten van de
+Service App). Dat is nodig voor het hele team: zonder die rechten kan geen deelnemer meedoen. Staat
+de platforminstelling later uit, dan blijft uw keuze staan, maar de deelnemers van dit team worden
+dan voorlopig doorgestuurd naar Webex, direct in de browser. Het proefgesprek opent voorlopig nog in
+Webex. De teksten in de bevestiging, op de pagina voor het gesprek en op de proefgesprekpagina
+volgen deze keuze. Webex kan het gedrag van de directe browserlink zelf wijzigen; ziet de deelnemer
+toch de keuze tussen app en browser, zet het dan op **Webex laat de deelnemer kiezen**.
+
+<!-- field: embedded_call_webex_option -->
+### Weg naar Webex naast onze pagina
+
+Alleen voor een team dat de eigen pagina van de organisatie gebruikt. Bepaalt of de deelnemer ooit
+een weg naar de Webex-app krijgt naast onze gesprekspagina. **Nooit** (standaard): de deelnemer ziet
+geen weg naar Webex; lukt het gesprek niet, dan kan de deelnemer het opnieuw proberen of u bellen.
+**Alleen als onze pagina het gesprek niet kan geven**: na een mislukte verbinding, of in een browser
+die de pagina niet kan draaien, verschijnt de link "op een andere manier deelnemen". **Altijd, ook
+voor het deelnemen**: die link staat er ook voordat de deelnemer begint. De link leidt naar de
+webversie van Webex en noemt Webex niet bij naam.
+
+De eerste keuze, **Zoals de organisatie**, is de standaard: de waarde die uw organisatie heeft
+ingesteld geldt voor dit team, en de keuze toont wat die waarde nu is. Kies een andere waarde om er
+een voor dit team alleen in te stellen; een latere wijziging van de waarde van de organisatie bereikt
+het team dan niet meer. Het veld staat er zodra de eigen pagina van de organisatie te kiezen is, dus
+u stelt beide in één keer in. Het werkt alleen voor een team dat de eigen pagina van de organisatie
+gebruikt.
+
+'Nooit' verbergt het aanbod en sluit de link, maar het is geen slot: de pagina heeft het adres van
+de vergadering nodig om deel te nemen, dus een deelnemer die weet waar te kijken kan toch een weg
+naar de Webex-app vinden.
 
 <!-- field: offer -->
 ### Aanbod per tijdblok

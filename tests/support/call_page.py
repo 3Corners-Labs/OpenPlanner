@@ -6,8 +6,20 @@ one part, what the page refers to and whether it holds inline code. It is a read
 browser: ``hidden`` means the attribute, as the page's script sees it.
 """
 
-from dataclasses import dataclass, field
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field, replace
 from html.parser import HTMLParser
+from typing import Any
+
+import httpx
+
+from app.adapters.db.uow import SqlUnitOfWork
+from app.adapters.integrations import Integrations
+from app.config import Settings
+from app.domain.ports import Clock
+from app.domain.scheduling import JoinClient
+from tests.conftest import app_client
 
 VOID = frozenset({"meta", "link", "input", "br", "img", "source", "hr", "wbr"})
 HEADINGS = frozenset({"h1", "h2", "h3"})
@@ -183,3 +195,31 @@ class StateView:
         for button in found:
             button.own_text = button.text_content()
         return found
+
+
+async def set_group(client: httpx.AsyncClient, slug: str, **changes: object) -> None:
+    """Change fields of the group ``slug`` of the app behind ``client`` (a seeded group)."""
+    app: Any = client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+        group = await tx.get_group(slug)
+        assert group is not None
+        await tx.save_group(replace(group, **changes))  # type: ignore[arg-type]
+
+
+@asynccontextmanager
+async def embedded_app_client(
+    settings: Settings,
+    clock: Clock | None = None,
+    integrations: Integrations | None = None,
+    *,
+    slug: str = "demo",
+    **changes: object,
+) -> AsyncIterator[httpx.AsyncClient]:
+    """Run the app with the group ``slug`` set to use the call page (ADR 0123 step 6a).
+
+    The call page's routes answer only for a service that chose it, so a test of the page itself
+    starts from a group that did; ``changes`` set further fields of the group.
+    """
+    async with app_client(settings, clock, integrations) as client:
+        await set_group(client, slug, join_client=JoinClient.EMBEDDED, **changes)
+        yield client

@@ -219,6 +219,7 @@ FLOWS: dict[str, Flow] = {
         "so an attack on it (a device, a notice, an event of a call that is over) reaches no "
         "server, and there is nothing to attribute"
     ),
+    "## Flow: the call page chosen by a service (ADR 0123 step 6a)": Flow((PUBLIC, DENIED, CHANGE)),
     "## Flow: the staff member's name on the participant's call page (ADR 0123 step 5c)": Flow(
         (PUBLIC, DENIED, CHANGE)
     ),

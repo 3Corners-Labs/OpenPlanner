@@ -98,6 +98,7 @@ class Platforms:
         self.trial_status = 200
         self.trial_stored: dict[str, Any] = {}
         """Options Webex's answer to the trial probe carries (an empty answer says nothing)."""
+        self.guest_status = 200
         self.web_link = "https://w.example/j"
         self.browser_status = 302
         self.browser_keeps_parameter = True
@@ -113,6 +114,10 @@ class Platforms:
         url = str(request.url)
         if request.url.path.endswith("/access_token"):
             return httpx.Response(200, json={"access_token": "a", "expires_in": 3600})
+        if url == f"{WEBEX}/guests/token":
+            if self.guest_status != 200:
+                return httpx.Response(self.guest_status, json={"message": "Refused."})
+            return httpx.Response(200, json={"accessToken": "guest-token", "expiresIn": 3600})
         if url == f"{WEBEX}/meetings" and request.method == "POST":
             trial = json.loads(request.content).get("enabledJoinBeforeHost") is True
             status = self.trial_status if trial else self.host_status
@@ -729,3 +734,73 @@ async def test_a_probe_without_a_probe_meeting_carries_a_placeholder_link() -> N
     await checker.check_group(GROUP, [GROUP])
 
     assert dispatcher.items[0].meeting_link == "https://openplanner.invalid/probe"
+
+
+# --- the guest finding for a group that uses the call page (ADR 0123 point 17) ------------------
+
+EMBEDDED = replace(GROUP, join_client=JoinClient.EMBEDDED)
+ON = replace(CONFIG, call_page_enabled=True)
+
+
+def _guest_requests(platforms: Platforms) -> list[httpx.Request]:
+    return [r for r in platforms.requests if r.url.path.endswith("/guests/token")]
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_group_that_uses_the_call_page_mints_the_one_fixed_guest() -> None:
+    platforms = Platforms()
+
+    findings = await _checker(platforms, ON).check_group(EMBEDDED, [EMBEDDED])
+
+    assert _codes(findings)["webex.guest_ok"] is CheckStatus.OK
+    (request,) = _guest_requests(platforms)
+    body = json.loads(request.content)
+    assert body["subject"] == "openplanner-check"  # one guest in all, whatever the group
+    assert "Ada" not in request.content.decode()
+    assert "webex.browser_link_ok" not in _codes(findings)  # nothing of the redirect to prove
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_held_embedded_group_acts_as_browser_while_the_switch_is_off() -> None:
+    """Its participants get the redirect then, so the browser link is checked like a browser's."""
+    platforms = Platforms()
+
+    findings = await _checker(platforms, CONFIG).check_group(EMBEDDED, [EMBEDDED])
+
+    (get,) = _gets(platforms)
+    assert str(get.url) == "https://w.example/j?launchApp=true"
+    assert _codes(findings)["webex.browser_link_ok"] is CheckStatus.OK
+    assert _guest_requests(platforms) == []  # and no guest is made while the switch is off
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_refusal_fails_with_the_code_and_no_token_is_in_a_finding() -> None:
+    platforms = Platforms()
+    platforms.guest_status = 403
+
+    findings = await _checker(platforms, ON).check_group(EMBEDDED, [EMBEDDED])
+
+    refused = next(f for f in findings if f.code == "webex.guest_refused")
+    assert refused.status is CheckStatus.FAIL
+    assert refused.params == (("error", "rejected_403"),)
+    assert "guest-token" not in repr(findings)
+
+
+@pytest.mark.parametrize(
+    ("group", "config"),
+    [
+        (EMBEDDED, CONFIG),  # the switch is off: no guest is made at the supplier
+        (GROUP, ON),  # the switch is on, but this service did not choose the page
+        (replace(GROUP, join_client=JoinClient.CHOICE), ON),
+    ],
+)
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_any_other_group_creates_no_guest_and_sees_no_finding(
+    group: Any, config: CheckerConfig
+) -> None:
+    platforms = Platforms()
+
+    findings = await _checker(platforms, config).check_group(group, [group])
+
+    assert _guest_requests(platforms) == []
+    assert not [f for f in findings if f.code.startswith("webex.guest")]

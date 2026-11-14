@@ -21,6 +21,7 @@ from datetime import date, time, timedelta
 from app.domain.admin import AdminService, Authorization, record_change, require
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.availability import SlotTime, slots_on
+from app.domain.call_page import OtherWayOffer
 from app.domain.contact_center import ContactCenterRouting
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.holiday_service import effective_schedule
@@ -78,6 +79,7 @@ class GroupSettings:
     trial_call_minutes: int
     trial_calls_per_booking: int
     join_client: JoinClient
+    embedded_call_webex_option: OtherWayOffer | None
     queue_visible_from_minutes: int
     queue_free_pick_allowed: bool
     max_bookings_per_email: int

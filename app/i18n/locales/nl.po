@@ -1199,16 +1199,52 @@ msgid "admin.field.trial_call_enabled_hint"
 msgstr "Ja: de deelnemer kan vooraf in een echte Webex-meeting uitproberen of camera, microfoon en luidsprekers werken. De meeting is van de Webex-host van deze dienst; er komt niemand van het team in. Alleen met een Webex-host."
 
 msgid "admin.field.join_client"
-msgstr "Webex-pagina voor de deelnemer"
+msgstr "Hoe de deelnemer in het gesprek komt"
 
 msgid "admin.field.join_client_hint"
-msgstr "Welke pagina van Webex de deelnemer bij de afspraak en het proefgesprek te zien krijgt."
+msgstr "Hoe de deelnemer in het gesprek komt. 'Direct in de browser': de deelnemer gaat naar Webex en het gesprek opent in de webversie. 'Webex laat de deelnemer kiezen': de deelnemer gaat naar Webex en kiest daar zelf tussen de app en de browser. 'In de eigen pagina van de organisatie': het gesprek loopt in onze eigen pagina. Het proefgesprek opent altijd in Webex."
 
 msgid "admin.group.join_client_browser"
 msgstr "Direct in de browser"
 
 msgid "admin.group.join_client_choice"
 msgstr "Webex laat de deelnemer kiezen"
+
+msgid "admin.group.join_client_embedded"
+msgstr "In de eigen pagina van de organisatie"
+
+msgid "admin.field.join_client_embedded_off"
+msgstr "De gesprekspagina staat voor deze installatie uit (platforminstelling). Deelnemers van deze groep gaan voorlopig naar Webex."
+
+msgid "admin.field.join_client_embedded_unchecked"
+msgstr "De eigen pagina van de organisatie is te kiezen zodra de controle van de Service App op Koppelingen is geslaagd met de gastrechten."
+
+msgid "admin.field.join_client_embedded_held_unchecked"
+msgstr "De laatste controle van de Service App kon geen gast aanmaken. Deelnemers van deze groep krijgen onze pagina nog, maar komen er mogelijk niet in het gesprek. Herstel de gastrechten van de Service App en voer de controle op Koppelingen opnieuw uit; zet de groep anders voorlopig op 'Direct in de browser'."
+
+msgid "admin.field.embedded_call_webex_option"
+msgstr "Weg naar Webex naast onze pagina"
+
+msgid "admin.field.embedded_call_webex_option_hint"
+msgstr "Geldt alleen als hierboven 'In de eigen pagina van de organisatie' is gekozen. De deelnemer krijgt naast onze gesprekspagina een weg naar de webversie van Webex te zien: nooit, alleen als de pagina het gesprek niet kan geven, of altijd. De tekst van die link op de pagina van de deelnemer noemt Webex niet bij naam. 'Zoals de organisatie' volgt de instelling van de organisatie."
+
+msgid "admin.group.webex_option_hidden"
+msgstr "Nooit"
+
+msgid "admin.group.webex_option_on_failure"
+msgstr "Alleen als onze pagina het gesprek niet kan geven"
+
+msgid "admin.group.webex_option_always"
+msgstr "Altijd, ook voor het deelnemen"
+
+msgid "admin.group.webex_option_follow"
+msgstr "Zoals de organisatie (nu: {value})"
+
+msgid "admin.form.error.embedded_platform_switch"
+msgstr "Het gesprek in de eigen pagina van de organisatie staat voor deze installatie uit."
+
+msgid "admin.form.error.embedded_guest_check"
+msgstr "Nog niet: voer eerst de controle van de Service App op Koppelingen uit; die moet een gast bij het videoplatform hebben aangemaakt."
 
 msgid "admin.field.trial_call_minutes"
 msgstr "Proefgesprek blijft open (minuten)"
@@ -1636,6 +1672,9 @@ msgstr "Het gesprek opent in uw browser; op een computer hoeft u niets te instal
 msgid "message.join_choice"
 msgstr "Op een computer hoeft u niets te installeren: vraagt Webex om de app te openen, kies dan 'Deelnemen via deze browser'. Op een telefoon of tablet vraagt Webex om de Webex-app. De link werkt vanaf 15 minuten voor de start."
 
+msgid "message.join_embedded"
+msgstr "Het gesprek opent in uw browser; op een computer hoeft u niets te installeren. De link werkt vanaf 15 minuten voor de start."
+
 msgid "message.join_link"
 msgstr "Deelnemen aan het videogesprek"
 
@@ -1656,6 +1695,9 @@ msgstr "Het gesprek opent in uw browser; op een computer hoeft u niets te instal
 
 msgid "join.tips.choice"
 msgstr "Vraagt Webex of u de app wilt openen? Kies dan 'Deelnemen via deze browser'; op een computer hoeft u niets te installeren. Op een telefoon of tablet vraagt Webex om de Webex-app."
+
+msgid "join.tips.embedded"
+msgstr "Het gesprek opent in deze browser; u hoeft niets te installeren."
 
 msgid "join.tips.devices"
 msgstr "Geef uw browser toestemming voor camera en microfoon als daarom wordt gevraagd."
@@ -4783,7 +4825,7 @@ msgid "admin.check.webex.browser_link_ok"
 msgstr "De directe browserlink werkt: Webex houdt de browseroptie vast, dus de deelnemer krijgt op een computer meteen de webversie, zonder de vraag naar de app."
 
 msgid "admin.check.webex.browser_link_lost"
-msgstr "Webex neemt de browseroptie niet meer mee in de link (antwoord {status}). De deelnemer krijgt dan toch de keuze tussen app en browser. Er breekt niets; zet de Webex-pagina voor de deelnemer desnoods op 'Webex laat de deelnemer kiezen'."
+msgstr "Webex neemt de browseroptie niet meer mee in de link (antwoord {status}). De deelnemer krijgt dan toch de keuze tussen app en browser. Er breekt niets; zet 'Hoe de deelnemer in het gesprek komt' desnoods op 'Webex laat de deelnemer kiezen'."
 
 msgid "admin.check.webex.browser_link_unreachable"
 msgstr "De directe browserlink kon niet worden gecontroleerd: de Webex-site was niet bereikbaar ({error})."
@@ -4811,6 +4853,12 @@ msgstr "Webex weigerde een proefgesprek-meeting voor host {host} ({error}): {rea
 
 msgid "admin.check.webex.trial_lobby"
 msgstr "Webex nam een proefgesprek-meeting voor host {host} aan, maar bewaarde de instellingen niet ({stored}). De deelnemer komt dan in de wachtruimte terecht en niemand laat de deelnemer binnen. Laat de beheerder van de Webex-site toestaan dat deelnemers vóór de host binnenkomen en zonder wachtruimte; tot dan werkt het proefgesprek niet."
+
+msgid "admin.check.webex.guest_ok"
+msgstr "De gesprekspagina kan een gast aanmaken bij het videoplatform (de Service App heeft de gastrechten)."
+
+msgid "admin.check.webex.guest_refused"
+msgstr "Het videoplatform weigerde een gast aan te maken ({error}): de Service App heeft de gastrechten nodig, dus deelnemers kunnen niet in onze pagina meedoen."
 
 msgid "admin.check.webex.trial_left"
 msgstr "De proefgesprek-meeting {meeting} voor host {host} is gepland maar kon niet worden verwijderd ({error}); verwijder hem in Webex."
@@ -14019,7 +14067,7 @@ msgstr "De bezorgingen zijn hervat."
 #. The participant's call page before the click that joins (ADR 0123 step 4b). No text names the video platform.
 
 msgid "settings.field.embedded_call_webex_option.label"
-msgstr "Weg naar de eigen app van het videoplatform naast het gesprek (nooit, alleen als de pagina het gesprek niet kan geven, of altijd)"
+msgstr "Weg naar de eigen app van het videoplatform naast het gesprek (nooit, alleen als de pagina het gesprek niet kan geven, of altijd). Geldt voor elk team dat er zelf geen koos; een team kiest het onder Groep, Instellingen, Video"
 
 msgid "callpage.start.body"
 msgstr "U voert het gesprek hier, in deze pagina. U hoeft niets te installeren."

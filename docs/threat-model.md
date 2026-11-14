@@ -923,7 +923,8 @@ nothing of it reaches the server, so there is no request to attribute and no eve
 participant's click that joins, and `rename_guest` jobs rename the guest after the purge. Inputs
 from outside: the reference in the path, the participant's session cookie, the form-protection
 headers, the platform's answer. The answer carries `token`, `expires_at` and the meeting's guest
-`link`. Until step 6 the endpoint is dark behind the platform switch alone.
+`link`. It answers only while the platform switch is on and only for a booking of a service that
+chose the call page (step 6a, flow below).
 
 | Abuse case | Control | Test |
 |---|---|---|
@@ -1130,6 +1131,50 @@ flow, "embedded booking".
 | Tampering (CSRF) | A third-party site changes the list in an admin's browser | Fetch Metadata check; a recent login (ADR 0015) | `tests/admin/test_embedding_routes.py::test_cross_site_posts_are_refused` |
 | Repudiation | Who added a website | Audited in the same transaction with the numbers added, removed and remaining | `tests/domain/test_embedding_service.py::test_organisation_admin_saves_origins_and_it_is_audited_with_counts` |
 | Denial of service | A huge list slows every widget request | At most `EMBEDDING_MAX_ORIGINS` (20, bounded 1–100) of at most 200 characters | `tests/domain/test_embedding.py::test_more_origins_than_the_limit_are_refused` |
+
+## Flow: the call page chosen by a service (ADR 0123 step 6a)
+
+A service (the group) chooses how its participants join: the platform's page (`browser`, `choice`)
+or our call page (`embedded`, a third value of `join_client`), and, for an embedded service,
+whether the participant is ever shown a way into the video platform's own app
+(`embedded_call_webex_option`, now the service's setting under `group.edit`). One reader decides
+for a booking, `call_client` / `uses_call_page` in `app/domain/call_client.py`, from the platform
+switch and the service's value; no route, job or template decides it for itself. Inputs from
+outside: the participant's session and the reference on the three call routes, the settings form's
+`join_client` and option, and a configuration document's two group fields.
+
+| Abuse case | Control | Test |
+|---|---|---|
+| The call page, its token endpoint or its staff poll are reached, or a guest token is minted, for a booking of a service that did not choose the page | The three routes ask the one question after the participant's session: another service's booking answers `404` as an address that does not exist, nothing is sent to the platform and no mark is written | `tests/api/test_call_page_per_service.py::test_a_service_that_did_not_choose_it_answers_as_an_address_that_does_not_exist` |
+| An outsider learns which service uses the page (a reference is no secret) | The order is the switch, then the session, then the service: without the session the answer is the same `403` and the same body for every service, and one `token.rejected` event | `tests/api/test_call_page_per_service.py::test_an_outsider_learns_nothing_about_the_service`, `tests/api/test_security_events.py::test_a_visit_to_the_call_page_without_a_session_is_a_security_event` |
+| Another booking's session reaches the call page of an embedded service | The session holds a set of bookings; one that does not hold this booking is answered as no session | `tests/api/test_call_page_per_service.py::test_another_bookings_session_reaches_nothing_of_an_embedded_service` |
+| A service says `embedded` while the platform switch is off, so participants are sent to a page that does not exist | The switch is the kill switch: off means nobody, whatever a service says. A stored `embedded` then acts as the default client (the redirect the participant had before), the form says so, and the platform switch's audited change is the only way the page opens | `tests/api/test_call_page_per_service.py::test_the_switch_is_the_kill_switch_whatever_the_service_says`, `::test_a_held_embedded_choice_acts_as_the_default_while_the_switch_is_off`, `tests/domain/test_call_client.py` |
+| The video platform's address is reached around the page when the service did not allow it | `/join/go` leads an embedded service's participant to the call page unless `embedded_call_webex_option` is `on_failure` or `always`; the join page's button leads to the page; the service's own value wins and a service without one follows its organisation's | `tests/api/test_call_page_per_service.py::test_the_platforms_address_is_closed_around_the_page_unless_the_option_allows_it`, `::test_a_service_without_an_option_follows_its_organisations_value`, `::test_the_join_page_leads_to_the_call_page_for_an_embedded_service` |
+| A group is saved as `embedded` while the service-app check has not minted a guest token, so the page would fail for every participant, or with the platform switch off | The form (and a configuration document) refuse choosing `embedded` until the switch is on and the latest stored check carries the typed fact `guest_minted`, which the check writes next to its lines and one reader (`guest_token_minted`, `app/adapters/db/report_findings.py`) serves to the form and to the package alike; keeping an existing choice is no new choice; the form asks the stored report and calls nobody. Each stored check replaces the last, so a later check that failed to mint a guest (a revoked scope), or ran with the switch off, takes the fact away and stops new choices; the group check (every `integration_check_interval_hours`, 24 h by default) mints the checks' guest for each group that holds `embedded` and reports `webex.guest_refused` for it | `tests/admin/test_group_call_client.py::test_embedded_is_refused_with_a_plain_sentence_until_the_guest_check_passed`, `::test_embedded_submitted_while_the_switch_is_off_is_refused`, `tests/domain/test_configuration_v1_group.py::test_embedded_is_refused_where_the_form_refuses_it_with_its_field`, `tests/domain/test_guest_access.py::test_only_a_stored_check_that_minted_a_guest_lets_a_service_choose_the_call_page`, `tests/adapters/db/test_reports.py::test_the_guest_fact_is_written_by_the_check_and_a_later_check_takes_it_away` |
+| The group check creates guests at the platform for a group that does not use the page, or while the switch is off | The guest finding exists only for a group that uses the page and only while the switch is on; the subject is the checks' one fixed subject, so repeating the check makes no further guest | `tests/adapters/test_group_check.py::test_a_group_that_uses_the_call_page_mints_the_one_fixed_guest`, `::test_any_other_group_creates_no_guest_and_sees_no_finding` |
+| A manager of another group changes the choice or the option, or a manager of the group changes more than before | Both are fields of the group's settings form under `group.edit` for that group (SQL-scoped); another group's manager gets a denial; the audit event lists the field names and never a value; the organisation's own value cannot reach a service that has its own | `tests/admin/test_group_call_client.py::test_a_manager_of_another_group_cannot_change_it`, `::test_the_organisations_admin_may_change_the_choice_and_the_option`, `::test_embedded_is_saved_and_audited_once_the_check_minted_a_guest` |
+| A crafted post sets a value the form does not offer | The select accepts the three clients (`embedded` only as above) and the three options; anything else is a field error and nothing is saved | `tests/admin/test_group_call_client.py::test_a_nonsense_client_is_refused`, `::test_a_value_that_is_no_option_is_refused` |
+| An email or a page names the supplier to a participant of an embedded service | The join page's tips and the email's sentence for `embedded` are neutral texts, true whether the call opens in our page or, while the switch is off, in the platform's web app | `tests/api/test_call_page_per_service.py::test_the_join_page_leads_to_the_call_page_for_an_embedded_service`, `tests/jobs/test_message_join_text.py` |
+
+What an attack on this flow leaves in the log: a request without a session is the one
+`token.rejected` security event of the link; a successful change of the choice is the group's audit
+event with field names only, a denial for another group's manager is the authorisation event, and a
+refused form (a value that is not offered, `embedded` before the check passed) is a field error on
+the form as elsewhere in the portal, with no audit event. A request for a
+service that did not choose the page, or while the switch is off, leaves no event: it is an unknown
+address for the one participant who holds the session, and for nobody else.
+
+What the controls do not cover, said plainly: a group saved as `embedded` makes the previous image
+fail to read that group (migration 0119), so a rollback after a service chose it needs that
+service set back to `browser` first (`docs/runbook.md`); and `on_failure` cannot be told apart from
+`always` by the server (it cannot know that the page failed), so with either the address `/join/go`
+works for a participant who knows it. `hidden` hides the offer and closes `/join/go`; it is not a
+barrier: the token's answer still carries the meeting's guest address, because the page needs it
+to join, so a participant with a session can find a way into the video platform's own app. The age
+of the guest check is not limited: the service-app check runs only when someone presses *Check* on
+Integrations (nothing schedules it), so a stored "passed" is as old as the last press. A revoked
+scope shows at the next check (the button, or the group check within a day for a group that holds
+`embedded`), and until then new choices of `embedded` are still accepted. No age limit is built.
 
 ## Flow: the staff member's name on the participant's call page (ADR 0123 step 5c)
 

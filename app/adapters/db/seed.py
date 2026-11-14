@@ -88,6 +88,9 @@ DEMO_WIDGET_HOST = "http://localhost:8001"
 CLOSED_GROUP_SLUG = "demo-gesloten"
 PLANNED_GROUP_SLUG = "demo-gepland"
 JOURNEY_GROUP_SLUG = "demo-reis"
+CALL_GROUP_SLUG = "demo-gesprek"
+"""The team that chose the call page of its own (``join_client = embedded``, ADR 0123 step 6a): the
+call page's browser specs open its booking, while the journey team keeps the redirect."""
 JOURNEY_HOST = "proefhost@example.org"
 """Video host of the journey team: a made-up address, so the team offers video and the trial
 call without a Webex Service App; the simulator stands in for Webex."""
@@ -182,7 +185,8 @@ class ClosureExamples:
         proposal_page: The page where a participant takes a proposed new time (ADR 0057), of
             a booking awaiting a new time with an open proposal; never confirmed by the checks.
         call_page: The call page of a confirmed booking that starts in two hours (ADR 0123
-            step 4b), reached through its emailed link; the checks never join it.
+            step 4b), reached through its emailed link; the checks never join it. Its team
+            chose the call page of its own (step 6a), as the page answers only for such a team.
         trial_page: The trial call page of that booking. It shows the page's "not available
             for this appointment" state; its other states are covered by the API tests.
         journeys: The participant's journey per e2e browser (``BROWSERS``), new each run.
@@ -318,6 +322,15 @@ async def seed_closure_examples(
         "Demo: reis van de deelnemer",
         video_host=JOURNEY_HOST,
     )
+    await _seed_group(
+        engine,
+        DEMO_SLUG,
+        "Demo-acme",
+        CALL_GROUP_SLUG,
+        "Demo: gesprek in de eigen pagina",
+        video_host=JOURNEY_HOST,
+        join_client="embedded",
+    )
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:
         closed_group = await seeded_group(tx, CLOSED_GROUP_SLUG)
@@ -352,9 +365,10 @@ async def seed_closure_examples(
         journeys = {
             browser: await _journey(tx, journey_group, now, token_key) for browser in BROWSERS
         }
+        call_group = await seeded_group(tx, CALL_GROUP_SLUG)
         call_token, _ = await store_example_booking(
             tx,
-            journey_group,
+            call_group,
             # Its own start, so no count of the journey's bookings at their time changes.
             now + JOURNEY_CALL_IN + timedelta(hours=2),
             now,
@@ -751,12 +765,13 @@ async def _seed_group(
     *,
     embed: bool = False,
     video_host: str | None = None,
+    join_client: str = "browser",
 ) -> bool:
     """Create a group open on weekdays, and its organisation if needed; skip if the group exists.
 
     With ``embed`` the group is switched on for the widget and the organisation allows
     ``DEMO_WIDGET_HOST`` (ADR 0035). With ``video_host`` the group offers video and the trial
-    call on that host's behalf (ADR 0017, 0071).
+    call on that host's behalf (ADR 0017, 0071). ``join_client`` is the group's way into the call.
     """
     async with AsyncSession(engine) as session, session.begin():
         existing = await session.scalar(select(GroupRow.id).where(GroupRow.slug == slug))
@@ -782,6 +797,7 @@ async def _seed_group(
             dispatch_lead_minutes=5,
             embedding_enabled=embed,
             video_host_email=video_host,
+            join_client=join_client,
         )
         session.add(group)
         if embed:

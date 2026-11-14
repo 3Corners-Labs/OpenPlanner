@@ -16,9 +16,8 @@ from app.web.security_policy import (
     HTML_CSP,
     SCRIPT_CSP,
 )
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
-from tests.support.call_page import Page
+from tests.support.call_page import Page, embedded_app_client
 from tests.support.domain import NOW
 from tests.support.participant import booked, open_link
 
@@ -48,7 +47,7 @@ def call_settings(demo_settings: Settings) -> Settings:
 async def test_the_call_page_carries_its_own_policy_and_nothing_else_changes(
     call_settings: Settings,
 ) -> None:
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         page = await client.get(f"{base}/call")
 
@@ -67,7 +66,7 @@ async def test_the_call_page_carries_its_own_policy_and_nothing_else_changes(
 async def test_the_start_state_shows_the_appointment_and_one_button_to_begin(
     call_settings: Settings,
 ) -> None:
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         english = Page((await client.get(f"{base}/call?lang=en")).text)
         dutch = Page((await client.get(f"{base}/call?lang=nl")).text)
@@ -92,7 +91,7 @@ async def test_the_start_state_shows_the_appointment_and_one_button_to_begin(
 async def test_without_javascript_the_page_says_what_the_call_needs(
     call_settings: Settings,
 ) -> None:
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         english = Page((await client.get(f"{base}/call?lang=en")).text)
         dutch = Page((await client.get(f"{base}/call?lang=nl")).text)
@@ -111,7 +110,7 @@ async def test_without_javascript_the_page_says_what_the_call_needs(
 async def test_the_start_state_offers_the_contact_details_of_the_organisation(
     call_settings: Settings,
 ) -> None:
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         app: Any = client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
         async with SqlUnitOfWork(app.state.engine).locked() as tx:
             demo = await tx.get_organisation("demo")
@@ -130,7 +129,7 @@ async def test_the_page_has_no_supplier_name_in_any_locale_and_any_state(
     call_settings: Settings,
 ) -> None:
     settings = call_settings.model_copy(update=_ALWAYS)
-    async with app_client(settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(settings, FixedClock(NOW)) as client:
         app: Any = client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
         async with SqlUnitOfWork(app.state.engine).locked() as tx:
             demo = await tx.get_organisation("demo")
@@ -152,7 +151,9 @@ async def test_the_page_has_no_supplier_name_in_any_locale_and_any_state(
 async def test_the_page_refers_only_to_files_of_its_own_and_has_no_inline_code(
     call_settings: Settings,
 ) -> None:
-    async with app_client(call_settings.model_copy(update=_ALWAYS), FixedClock(NOW)) as client:
+    async with embedded_app_client(
+        call_settings.model_copy(update=_ALWAYS), FixedClock(NOW)
+    ) as client:
         base = await open_link(client, await booked(client))
         page = Page((await client.get(f"{base}/call")).text)
 
@@ -185,7 +186,7 @@ async def test_the_page_refers_only_to_files_of_its_own_and_has_no_inline_code(
 async def test_the_script_is_served_with_the_page_and_nothing_else_is_loaded(
     call_settings: Settings,
 ) -> None:
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         page = Page((await client.get(f"{base}/call")).text)
         scripts = [await client.get(source) for source in page.script_sources]
@@ -214,7 +215,7 @@ async def test_no_link_to_another_way_in_while_the_setting_is_hidden(
     call_settings: Settings,
 ) -> None:
     assert call_settings.embedded_call_webex_option == "hidden"
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         page = (await client.get(f"{base}/call?lang=en")).text
 
@@ -226,7 +227,7 @@ async def test_on_failure_shows_the_link_only_where_the_page_cannot_give_the_cal
     call_settings: Settings,
 ) -> None:
     settings = call_settings.model_copy(update={"embedded_call_webex_option": "on_failure"})
-    async with app_client(settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         page = Page((await client.get(f"{base}/call?lang=en")).text)
 
@@ -239,7 +240,9 @@ async def test_on_failure_shows_the_link_only_where_the_page_cannot_give_the_cal
 
 
 async def test_always_shows_the_link_before_joining_too(call_settings: Settings) -> None:
-    async with app_client(call_settings.model_copy(update=_ALWAYS), FixedClock(NOW)) as client:
+    async with embedded_app_client(
+        call_settings.model_copy(update=_ALWAYS), FixedClock(NOW)
+    ) as client:
         base = await open_link(client, await booked(client))
         page = Page((await client.get(f"{base}/call?lang=nl")).text)
 
@@ -254,7 +257,7 @@ async def test_always_shows_the_link_before_joining_too(call_settings: Settings)
 async def test_the_other_way_follows_the_organisations_own_choice(
     call_settings: Settings,
 ) -> None:
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         app: Any = client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
         base = await open_link(client, await booked(client))
         assert "/join/go" not in (await client.get(f"{base}/call")).text
@@ -270,7 +273,7 @@ async def test_the_other_way_follows_the_organisations_own_choice(
 
 
 async def test_the_page_needs_the_participants_session(call_settings: Settings) -> None:
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         async with httpx.AsyncClient(
             transport=client._transport,  # type: ignore[attr-defined]  # noqa: SLF001
@@ -290,7 +293,7 @@ async def test_the_page_needs_the_participants_session(call_settings: Settings) 
 
 async def test_the_page_does_not_exist_while_the_feature_is_off(demo_settings: Settings) -> None:
     assert demo_settings.embedded_call_enabled is False
-    async with app_client(demo_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(demo_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         off = await client.get(f"{base}/call")
         nothing = await client.get(f"{base}/no-such-page")
@@ -301,7 +304,7 @@ async def test_the_page_does_not_exist_while_the_feature_is_off(demo_settings: S
 
 
 async def test_no_other_page_carries_the_call_policy(call_settings: Settings) -> None:
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         others = [
             await client.get("/"),
@@ -331,7 +334,7 @@ async def _switch(client: httpx.AsyncClient, on: bool) -> None:
 
 
 async def test_the_page_follows_the_switch_at_runtime(demo_settings: Settings) -> None:
-    async with app_client(demo_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(demo_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         assert (await client.get(f"{base}/call")).status_code == 404
 
@@ -352,7 +355,7 @@ async def test_the_page_follows_the_switch_at_runtime(demo_settings: Settings) -
 async def test_the_ended_state_says_what_is_deleted_and_when_in_both_languages(
     call_settings: Settings, lang: str, deleted: str, thanks: str
 ) -> None:
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         page = Page((await client.get(f"{base}/call?lang={lang}")).text)
 
@@ -367,7 +370,7 @@ async def test_the_ended_state_says_what_is_deleted_and_when_in_both_languages(
 async def test_the_failure_state_has_a_sentence_for_a_call_that_was_lost_and_for_the_media(
     call_settings: Settings,
 ) -> None:
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         failed = Page((await client.get(f"{base}/call?lang=en")).text).state("failed")
 

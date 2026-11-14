@@ -323,8 +323,9 @@ class Settings(BaseSettings):
     embedded_call_display_name: Literal["first_name", "term"] = "first_name"
     embedded_call_staff_name: Literal["screen_name", "name", "term"] = "screen_name"
     # ADR 0123 point 11 and the *Settings* table: whether the participant of an embedded call is
-    # ever shown a way into the video platform's own app. Class D organisation (per service from
-    # step 6, which puts it on the service's form).
+    # ever shown a way into the video platform's own app. Class D organisation. Since step 6a a
+    # service may set its own (``groups.embedded_call_webex_option``); this value is the default
+    # of every service that has not (empty there means "as the organisation").
     embedded_call_webex_option: Literal["hidden", "on_failure", "always"] = "hidden"
     # ADR 0121 step 5: the watchdog: hours after the appointment's end before unstarted work
     # expires and started work is marked for recovery. Class D organisation.

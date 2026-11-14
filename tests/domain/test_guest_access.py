@@ -6,12 +6,15 @@ import pytest
 
 from app.domain.guest_access import (
     CHECK_SUBJECT,
+    GUEST_FACT,
+    GUEST_PROBE,
     GUEST_TERM_KEY,
     MAX_DISPLAY_NAME,
     NEUTRAL_TERM,
     SUBJECT_PREFIX,
     DisplayNameMode,
     GuestAccess,
+    guest_check_passed,
     guest_display_name,
     guest_subject,
 )
@@ -81,3 +84,21 @@ def test_the_registry_choices_come_from_the_enums() -> None:
 def test_the_neutral_word_and_the_catalogues_default_for_a_participant_are_the_same_word() -> None:
     """The rename at the purge sends the constant; the guest is minted under the catalogue word."""
     assert Translator(load_catalogues()).gettext("en", GUEST_TERM_KEY) == NEUTRAL_TERM
+
+
+@pytest.mark.parametrize(
+    ("report", "expected"),
+    [
+        (None, False),  # no check has run
+        ({}, False),  # a report written before the fact existed
+        ({"results": [{"name": GUEST_PROBE, "ok": True}]}, False),  # a line is not the fact
+        ({GUEST_FACT: False}, False),  # the platform refused the guest, or the switch was off
+        ({GUEST_FACT: "yes"}, False),  # only a real true counts
+        ({GUEST_FACT: 1}, False),
+        ({GUEST_FACT: True}, True),
+    ],
+)
+def test_only_a_stored_check_that_minted_a_guest_lets_a_service_choose_the_call_page(
+    report: dict[str, object] | None, expected: bool
+) -> None:
+    assert guest_check_passed(report) is expected
