@@ -17,6 +17,7 @@ ledger takes its mark back (``retract``), so the next counted outcome raises it 
 from the request is passed on.
 """
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 
@@ -146,6 +147,9 @@ async def _tell(request: Request, told: Callable[[WebhookLedger], Alert | None])
         return
     try:
         await writer(alert)
+    except asyncio.CancelledError:
+        ledger.retract(alert)  # a cancelled request must not leave the mark set
+        raise
     except Exception as exc:  # the webhook's answer does not depend on its alert
         ledger.retract(alert)
         log.warning("webhook.alert_failed", error=type(exc).__name__)

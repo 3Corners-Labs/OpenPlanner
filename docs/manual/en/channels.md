@@ -173,7 +173,7 @@ the platform's *refusal alert* number (20 by default) of the following happen at
 inside the window, one system event tells you. Group *signed*: a delivery that was signed but is
 too old, a refusal for a call from inside your own list of networks, or an event about work this
 connection did not create (the subscription may point at the wrong address); a stranger cannot
-cause these alone. Group *list*: refusals for the network after a delivery was accepted, which
+cause these alone (when your list is a range the supplier shares with others, a caller inside it who is not the supplier can also raise this alert; the signature still refuses them). Group *list*: refusals for the network after a delivery was accepted, which
 means your list may be out of date. A stranger who knows the address can also cause the *list*
 alert while real deliveries arrive: it costs one event per window and hides nothing. Other calls
 from strangers that fail are counted on the card and raise nothing.

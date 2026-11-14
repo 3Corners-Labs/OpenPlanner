@@ -6,6 +6,7 @@ import pytest
 
 from app.domain.inbound_gate import Refusal
 from app.domain.webhook_ledger import (
+    RETRACT_PAUSE,
     AddressKey,
     AlertGroup,
     Delivered,
@@ -263,17 +264,52 @@ def test_each_group_alerts_at_most_once_per_window() -> None:
 
 
 def test_an_alert_that_could_not_be_written_is_raised_again_by_the_next_counted_outcome() -> None:
-    ledger, _ = _ledger(threshold=1)
+    ledger, clock = _ledger(threshold=1)
     ledger.refused(ACME, Refusal.STALE)
     alert = ledger.refused(ACME, Refusal.STALE)
     assert alert is not None
     assert ledger.refused(ACME, Refusal.STALE) is None  # marked
 
     ledger.retract(alert)
+    clock.advance(RETRACT_PAUSE)
 
     again = ledger.refused(ACME, Refusal.STALE)
     assert again is not None
     assert (again.group, again.count) == (AlertGroup.SIGNED, 4)
+
+
+def test_a_retracted_group_is_not_raised_again_before_the_pause_has_passed() -> None:
+    """While the database stays locked, a counted outcome must not retry the write each time."""
+    ledger, clock = _ledger(threshold=1)
+    ledger.refused(ACME, Refusal.STALE)
+    alert = ledger.refused(ACME, Refusal.STALE)
+    assert alert is not None
+    ledger.retract(alert)
+
+    within = [ledger.refused(ACME, Refusal.STALE) for _ in range(20)]
+    clock.advance(RETRACT_PAUSE - timedelta(seconds=1))
+    just_before = ledger.refused(ACME, Refusal.STALE)
+    clock.advance(timedelta(seconds=1))
+    after = ledger.refused(ACME, Refusal.STALE)
+
+    assert not any(within)
+    assert just_before is None
+    assert after is not None
+    assert after.count == 24  # nothing counted was lost while it waited
+
+
+def test_the_pause_never_outlives_the_window() -> None:
+    ledger, clock = _ledger(threshold=1)
+    ledger.refused(ACME, Refusal.STALE)
+    alert = ledger.refused(ACME, Refusal.STALE)
+    assert alert is not None
+    ledger.retract(alert)
+
+    clock.advance(WINDOW)  # a new window: its own counts, its own alert
+    results = [ledger.refused(ACME, Refusal.STALE) for _ in range(2)]
+
+    assert results[0] is None
+    assert results[1] is not None
 
 
 def test_taking_a_mark_back_touches_neither_the_other_group_nor_a_later_window() -> None:
@@ -287,6 +323,7 @@ def test_taking_a_mark_back_touches_neither_the_other_group_nor_a_later_window()
     assert signed is not None
 
     ledger.retract(listed)
+    clock.advance(RETRACT_PAUSE)
     assert ledger.refused(ACME, Refusal.STALE) is None  # the signed mark stays
 
     clock.advance(WINDOW)
@@ -359,9 +396,31 @@ def test_when_every_entry_is_live_and_alerted_the_new_address_is_not_recorded() 
     assert result is None
     assert dropped == ["webex_cc"]  # the platform's code, never the slug
     assert ledger.size == 2
-    assert ledger.view(_key("c")) is None
+    assert ledger.view(_key("c")) is None  # not recorded: it has no view, not an empty one
     assert ledger.view(_key("a")) is not None
     assert ledger.view(_key("b")) is not None
+
+
+def test_a_full_ledger_reports_a_platform_once_per_window_not_once_per_call() -> None:
+    dropped: list[str] = []
+    ledger, clock = _ledger(threshold=1, max_entries=1, dropped=dropped)
+    for _ in range(3):
+        ledger.refused(_key("a"), Refusal.STALE)  # fills it, alerted
+
+    for index in range(50):
+        ledger.refused(_key(f"guess{index}"), Refusal.STALE)
+    ledger.refused(AddressKey("webex", "other"), Refusal.STALE)  # another platform
+    assert dropped == ["webex_cc", "webex"]
+
+    clock.advance(WINDOW - timedelta(seconds=1))
+    ledger.refused(_key("guess"), Refusal.STALE)
+    assert dropped == ["webex_cc", "webex"]  # still the same window
+    clock.advance(timedelta(seconds=1))  # "a" has ended, so a new address finds room ...
+    for _ in range(3):
+        ledger.refused(_key("again"), Refusal.STALE)  # ... and alerts, filling it again
+    ledger.refused(_key("guess-again"), Refusal.STALE)
+    ledger.refused(_key("guess-more"), Refusal.STALE)
+    assert dropped == ["webex_cc", "webex", "webex_cc"]  # a new window: one more line
 
 
 def test_a_flood_over_many_addresses_stays_within_the_cap() -> None:

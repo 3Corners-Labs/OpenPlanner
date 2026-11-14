@@ -179,7 +179,7 @@ voor weigeringen* van het platform (standaard 20), dan meldt één systeemgebeur
 *signed*: een bezorging die wel getekend was maar te oud is, een weigering van een aanroep van
 binnen uw eigen netwerklijst, of een gebeurtenis over werk dat deze koppeling niet heeft
 aangemaakt (de aanmelding wijst mogelijk naar het verkeerde adres); een vreemde kan dit niet
-alleen veroorzaken. Groep *list*: weigeringen vanwege het netwerk nadat een bezorging was
+alleen veroorzaken (is uw lijst een bereik dat de leverancier met anderen deelt, dan kan ook een aanroeper binnen dat bereik die niet de leverancier is deze melding veroorzaken; de handtekening weigert hem nog steeds). Groep *list*: weigeringen vanwege het netwerk nadat een bezorging was
 geaccepteerd, wat betekent dat uw lijst verouderd kan zijn. Een vreemde die het adres kent kan
 de *list*-melding ook veroorzaken terwijl echte bezorgingen binnenkomen: het kost één
 gebeurtenis per venster en verbergt niets. Andere mislukte aanroepen van vreemden staan op de

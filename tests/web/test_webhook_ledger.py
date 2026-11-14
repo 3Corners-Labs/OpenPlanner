@@ -1,11 +1,23 @@
 """The web side of the delivery ledger: the alert's event (ADR 0124 point 10)."""
 
+import asyncio
 from datetime import timedelta
+from types import SimpleNamespace
+from typing import cast
+
+import pytest
+from fastapi import Request
 
 from app.domain.audit import Category, Outcome, Source
 from app.domain.inbound_gate import Refusal
-from app.domain.webhook_ledger import AddressKey, Alert, Delivered, WebhookLedger
-from app.web.webhook_ledger import ALERT_ACTION, write_alert
+from app.domain.webhook_ledger import (
+    RETRACT_PAUSE,
+    AddressKey,
+    Alert,
+    Delivered,
+    WebhookLedger,
+)
+from app.web.webhook_ledger import ALERT_ACTION, note_refused, write_alert
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import NOW
@@ -58,3 +70,28 @@ async def test_an_alert_for_an_installation_address_names_no_organisation() -> N
     (event,) = uow.state.audit
     assert event.organisation is None
     assert event.detail.startswith("platform:webex,group:signed,")
+
+
+async def test_a_cancelled_request_takes_the_alerts_mark_back_and_is_cancelled_still() -> None:
+    clock = FixedClock(NOW)
+    written: list[Alert] = []
+
+    async def cancelled(alert: Alert) -> None:
+        written.append(alert)
+        raise asyncio.CancelledError
+
+    state = SimpleNamespace(
+        webhook_ledger=WebhookLedger(clock, timedelta(minutes=15), 1),
+        webhook_alert_writer=cancelled,
+    )
+    request = cast(Request, SimpleNamespace(app=SimpleNamespace(state=state)))
+    key = AddressKey("webex_cc", "acme")
+    await note_refused(request, key, Refusal.STALE)
+
+    with pytest.raises(asyncio.CancelledError):
+        await note_refused(request, key, Refusal.STALE)  # the one that raises the alert
+    clock.advance(RETRACT_PAUSE)
+    with pytest.raises(asyncio.CancelledError):
+        await note_refused(request, key, Refusal.STALE)  # the mark was taken back: again
+
+    assert len(written) == 2

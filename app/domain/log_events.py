@@ -1299,7 +1299,7 @@ _OPERATIONS = (
         "error",
         "The warning about refused webhook deliveries could not be written: {error}.",
         "The system event `webhook.refusal_alert` (ADR 0124 point 10) was not saved; the "
-        "webhook was answered as usual and the ledger will not raise it again in this window.",
+        "webhook was answered as usual and a later counted outcome raises it again, after 60 s.",
         _CHECK_HOST,
     ),
     _e(
@@ -1697,7 +1697,8 @@ _AUDIT = (
         "source",
         "The webhook delivery ledger is full: an address of {source} was not recorded.",
         "Every entry of the in-memory delivery ledger is inside its window and has alerted, so a "
-        "new address was not recorded (ADR 0124 point 10); its calls were answered as usual.",
+        "new address was not recorded (ADR 0124 point 10); its calls were answered as usual. "
+        "Logged once per platform and window.",
         "Raise `security_event_max_sources`, or wait for a window to end.",
     ),
     _e(

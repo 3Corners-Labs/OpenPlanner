@@ -39,8 +39,9 @@ next window; the last accepted and last refused times stay.
   connection did not create (point 12, an organisation's own address only).
 
 When a group passes the threshold the ledger returns one ``Alert`` for that group and window. If
-the event could not be written, ``retract`` takes the mark back and the next counted outcome
-raises it again.
+the event could not be written, ``retract`` takes the mark back: the next counted outcome after
+``RETRACT_PAUSE``, still inside the window, raises it again. While the ledger is full, the
+platform of a dropped address is reported once per platform and window, not once per call.
 """
 
 from collections.abc import Callable
@@ -52,6 +53,11 @@ from app.domain.inbound_gate import Refusal
 from app.domain.ports import Clock
 from app.domain.tunable import value_of
 from app.domain.webhook_sources import ChainFault
+
+RETRACT_PAUSE = timedelta(seconds=60)
+"""How long a group whose alert could not be written is not raised again. While the database
+stays locked, every counted outcome would otherwise try the write and wait out the lock; this is
+a protection of our own write path, so it is a constant and not a setting (ADR 0042)."""
 
 
 class Delivered(StrEnum):
@@ -182,6 +188,7 @@ class _Entry:
     inside_list: int = 0
     verified: bool = False
     alerted: set[AlertGroup] = field(default_factory=set)
+    retracted: dict[AlertGroup, datetime] = field(default_factory=dict)
     last_accepted: datetime | None = None
     last_refused: tuple[datetime, str] | None = None
 
@@ -192,6 +199,7 @@ class _Entry:
         self.inside_list = 0
         self.verified = False
         self.alerted = set()
+        self.retracted = {}
 
 
 class WebhookLedger:
@@ -223,6 +231,7 @@ class WebhookLedger:
         self._max_entries = max_entries
         self._on_dropped = on_dropped
         self._entries: dict[AddressKey, _Entry] = {}
+        self._dropped_at: dict[str, datetime] = {}
 
     @property
     def size(self) -> int:
@@ -285,6 +294,7 @@ class WebhookLedger:
         entry = self._entries.get(alert.key)
         if entry is not None and entry.started == alert.started:
             entry.alerted.discard(alert.group)
+            entry.retracted[alert.group] = self._clock.now()
 
     def view(self, key: AddressKey) -> LedgerView | None:
         """Return what the ledger knows of an address, or ``None`` when it never saw it.
@@ -317,12 +327,19 @@ class WebhookLedger:
         entry = self._entries.get(key)
         if entry is None:
             if not self._make_room(now):
-                self._on_dropped(key.platform)
+                self._report_dropped(key.platform, now)
                 return None
             entry = self._entries[key] = _Entry(now)
         elif now - entry.started >= value_of(self._window):
             entry.start_window(now)
         return entry
+
+    def _report_dropped(self, platform: str, now: datetime) -> None:
+        """Tell ``on_dropped`` once per platform and window, however many calls were dropped."""
+        last = self._dropped_at.get(platform)
+        if last is None or now - last >= value_of(self._window):
+            self._dropped_at[platform] = now
+            self._on_dropped(platform)
 
     def _make_room(self, now: datetime) -> bool:
         """Keep the ledger within its bound without erasing a live alert state.
@@ -358,6 +375,9 @@ class WebhookLedger:
         codes[code] = codes.get(code, 0) + 1
         total = sum(codes.values())
         if group in entry.alerted or total <= value_of(self._alert_count):
+            return None
+        paused_since = entry.retracted.get(group)
+        if paused_since is not None and self._clock.now() - paused_since < RETRACT_PAUSE:
             return None
         entry.alerted.add(group)
         return Alert(key, group, total, tuple(sorted(codes)), entry.started)

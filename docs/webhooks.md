@@ -526,7 +526,7 @@ in two groups, each with the threshold `webhook_refusal_alert_count` (class C, d
 written for the organisation (reason `too_many_refusals`, detail
 `platform:<code>,group:<list|signed>,count:<n>,reasons:<codes>`, nothing else). So noise cannot
 hide a signal: one group spending its alert leaves the other its own. A failure to write an event
-changes no answer, and the event is tried again by the next counted outcome of its group.
+changes no answer, and the event is tried again by a counted outcome of its group, not before 60 seconds have passed (a constant, so a locked database is not asked to write on every counted call).
 
 | Group | Counted | Why |
 |---|---|---|
@@ -535,7 +535,7 @@ changes no answer, and the event is tried again by the next counted outcome of i
 | `signed` | a verified event about work this connection did not create (organisation addresses only) | Usually a subscription that points at the wrong address (point 12) |
 | `list` | `network` while a delivery was verified earlier in the same window | The supplier's ranges may have changed and the list gone stale (point 3) |
 
-A passer-by cannot cause the `signed` group alone. **The `list` alert can be raised by a stranger**
+A passer-by cannot cause the `signed` group alone. It counts refusals from inside the connection's own list, so when the list is a range the supplier shares with others, a caller inside that range who is not the supplier can also raise it; the signature still refuses them. **The `list` alert can be raised by a stranger**
 who knows the address while real deliveries arrive: it costs one event per window and cannot hide
 the `signed` alert. It says only that the list should be looked at, and changes nothing. Not
 counted at all, however many: refusals from strangers (`invalid_signature`, `content_type`,
@@ -545,7 +545,7 @@ not ours is routine there and never counts; its alert, if it comes, names no org
 only the superuser sees it.
 
 If the ledger is full (every entry inside its window and alerted) a new address is not recorded and
-the log line `webhook.ledger_full` names the platform; making room otherwise drops entries whose
+the log line `webhook.ledger_full` names the platform, once per platform and window; making room otherwise drops entries whose
 window ended, then the oldest that has not alerted, so a live alert state is never erased.
 
 ## Inbound: Webex webhooks (`POST /webhooks/webex`)

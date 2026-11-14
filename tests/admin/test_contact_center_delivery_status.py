@@ -8,7 +8,7 @@ import httpx
 from app.domain.audit import Category
 from app.domain.inbound_gate import Refusal
 from app.domain.integration import EventOutcome
-from app.domain.webhook_ledger import AddressKey, WebhookLedger
+from app.domain.webhook_ledger import RETRACT_PAUSE, AddressKey, WebhookLedger
 from app.web.webhook_ledger import ALERT_ACTION
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.support.admin_site import site_app
@@ -435,6 +435,10 @@ async def test_an_alert_that_could_not_be_written_is_raised_by_the_next_counted_
     assert await _alerts(site) == []
 
     state.webhook_alert_writer = working
+    await _send(site, SUPPLIER, 1, secret=FORGED)
+    assert await _alerts(site) == []  # inside the pause: no retry yet
+
+    site.clock.advance(RETRACT_PAUSE)
     await _send(site, SUPPLIER, 1, secret=FORGED)
 
     assert len(await _alerts(site)) == 1
