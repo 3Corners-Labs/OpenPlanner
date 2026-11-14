@@ -2564,6 +2564,13 @@ environment, which the application cannot write:
 If the database cannot be read when the application first sees a secret, the previous value is not
 used until it can: an overlap that cannot be measured is never granted.
 
+**After a restore of the database, or on another host** (a new installation from a backup, a
+standby taking over): the first sightings are in the database table `webhook_secret_sightings`. A
+restore from before the rotation, or a host with an empty database, has no sighting of the current
+secret, so a `_PREVIOUS` value that is still in the environment gets a new overlap, counted from
+the first call at the new place. Remove the `_PREVIOUS` variables before such a move once their
+overlap has ended; a configuration package neither carries the table nor a previous secret.
+
 **Rotating `MANAGEMENT_TOKEN_KEY`** keeps every link working while the previous key is set
 (ADR 0094 point 4):
 

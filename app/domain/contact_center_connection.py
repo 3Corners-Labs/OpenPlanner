@@ -317,6 +317,14 @@ class ContactCenterConnectionService:
 
         A registration that succeeded clears the state. A gap (``REPLACED``) or no subscription
         (``GONE``) is also a system event for the organisation, with a code and no platform text.
+
+        The state and the event cannot be one transaction: the sealed record is written through the
+        credential store and the event through the unit of work, two writers of two tables. So the
+        order is fixed: the state first (the card tells the truth even if the event is lost), the
+        event second. The fact is never lost: the administrator's own audit row
+        (``contact_center_connection.register,outcome:...``) was written before both, and a
+        failure to write the event propagates to the request, whose error log names it (the domain
+        has no logger of its own).
         """
         if self._connections is None:
             return

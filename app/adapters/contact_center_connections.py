@@ -22,7 +22,7 @@ knows the live overlap.
 """
 
 import secrets as random
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -171,86 +171,123 @@ class SealedConnections:
             if record.get("inbound_enabled") is False
         }
 
+    async def _change(
+        self,
+        organisation_id: int,
+        change: Callable[[dict[str, object] | None], dict[str, object] | None],
+        now: datetime,
+    ) -> bool:
+        """Change the organisation's record where it is read: one locked transaction.
+
+        Every writer of the record goes through here, so a write of one field (the pause, the
+        registration, a rotation) is never overwritten by another that read the record earlier.
+        """
+        name = contact_center_credential_name(organisation_id)
+        return await self._store.update(name, change, now)
+
     async def save(self, organisation_id: int, change: ConnectionChange, now: datetime) -> None:
         """Store the connection; a ``None`` secret keeps the stored one.
 
         A new connection gets its webhook secret at once, so its address works from the start;
         a changed API host or client id gets a new one, so a subscription the previous tenant
-        still holds no longer verifies (CC-4d). Changing the allowed networks alone touches
-        neither the secret nor anything else of the record.
+        still holds no longer verifies (CC-4d), and with it go the previous secret and the stored
+        registration outcome, in the same write: an overlap is for a rotation, not for a move, and
+        what a registration left at the old tenant says nothing about the new one. Changing the
+        allowed networks alone touches neither the secret nor anything else of the record.
         """
-        record = _tidied(dict(await self._record(organisation_id) or {}), now)
-        moved = (record.get("api_base_url"), record.get("client_id")) != (
-            change.api_base_url,
-            change.client_id,
-        )
-        record |= {
-            "kind": change.kind.value,
-            "api_base_url": change.api_base_url,
-            "client_id": change.client_id,
-        }
-        if change.allowed_networks is not None:
-            record["allowed_networks"] = list(change.allowed_networks)
-        if change.client_secret is not None:
-            record["client_secret"] = change.client_secret
-        if change.refresh_token is not None:
-            record["refresh_token"] = change.refresh_token
-        if moved or not record.get("webhook_secret"):
-            # Another tenant (host or client): the old tenant's subscription must stop verifying,
-            # so nothing is kept as a previous secret (an overlap is for a rotation, not a move).
-            record |= {"webhook_secret": new_webhook_secret(), "webhook_secret_at": now.isoformat()}
-            record.pop(PREVIOUS_KEY, None)
-        await self._store.put(contact_center_credential_name(organisation_id), record, now)
+
+        def apply(stored: dict[str, object] | None) -> dict[str, object]:
+            record = _tidied(dict(stored or {}), now)
+            moved = (record.get("api_base_url"), record.get("client_id")) != (
+                change.api_base_url,
+                change.client_id,
+            )
+            record |= {
+                "kind": change.kind.value,
+                "api_base_url": change.api_base_url,
+                "client_id": change.client_id,
+            }
+            if change.allowed_networks is not None:
+                record["allowed_networks"] = list(change.allowed_networks)
+            if change.client_secret is not None:
+                record["client_secret"] = change.client_secret
+            if change.refresh_token is not None:
+                record["refresh_token"] = change.refresh_token
+            if moved:
+                record.pop("registration", None)
+            if moved or not record.get("webhook_secret"):
+                made = {
+                    "webhook_secret": new_webhook_secret(),
+                    "webhook_secret_at": now.isoformat(),
+                }
+                record |= made
+                record.pop(PREVIOUS_KEY, None)
+            return record
+
+        await self._change(organisation_id, apply, now)
 
     async def set_inbound_enabled(self, organisation_id: int, enabled: bool, now: datetime) -> None:
         """Pause or resume the address (ADR 0124 point 9): that one field, nothing else.
 
-        Nothing happens for an organisation whose record went away in the meantime, as for
-        ``rotate_webhook_secret``.
+        Read and written in one locked transaction (``_change``). Nothing happens for an
+        organisation whose record went away in the meantime, as for ``rotate_webhook_secret``.
         """
-        record = await self._record(organisation_id)
-        if record is None:
-            return
-        _tidied(record, now)
-        record["inbound_enabled"] = enabled
-        await self._store.put(contact_center_credential_name(organisation_id), record, now)
+
+        def apply(record: dict[str, object] | None) -> dict[str, object] | None:
+            if record is None:
+                return None
+            _tidied(record, now)
+            record["inbound_enabled"] = enabled
+            return record
+
+        await self._change(organisation_id, apply, now)
 
     async def set_registration(
         self, organisation_id: int, state: Registration | None, now: datetime
     ) -> None:
         """Remember what the last registration came to; ``None`` forgets it (ADR 0124 point 8).
 
-        Only that field changes. Nothing happens for an organisation whose record went away.
+        Only that field changes, read and written in one locked transaction (``_change``), so a
+        rotation that happened in between is never overwritten. Nothing happens for an
+        organisation whose record went away.
         """
-        record = await self._record(organisation_id)
-        if record is None:
-            return
-        _tidied(record, now)
-        if state is None:
-            record.pop("registration", None)
-        else:
-            record["registration"] = state.value
-        await self._store.put(contact_center_credential_name(organisation_id), record, now)
+
+        def apply(record: dict[str, object] | None) -> dict[str, object] | None:
+            if record is None:
+                return None
+            _tidied(record, now)
+            if state is None:
+                record.pop("registration", None)
+            else:
+                record["registration"] = state.value
+            return record
+
+        await self._change(organisation_id, apply, now)
 
     async def rotate_webhook_secret(self, organisation_id: int, now: datetime) -> None:
         """Replace the webhook secret of an existing connection; nothing without one.
 
         The secret that was current is kept, sealed, as the previous one (ADR 0124 point 8); the
-        previous one from before it is gone, whatever was left of its overlap.
+        previous one from before it is gone, whatever was left of its overlap. Read and written in
+        one locked transaction (``_change``).
         """
-        record = await self._record(organisation_id)
-        if record is None:
-            return
-        _write_secrets(record, rotated(secrets_of(record), new_webhook_secret(), now))
-        await self._store.put(contact_center_credential_name(organisation_id), record, now)
+
+        def apply(record: dict[str, object] | None) -> dict[str, object] | None:
+            if record is None:
+                return None
+            _write_secrets(record, rotated(secrets_of(record), new_webhook_secret(), now))
+            return record
+
+        await self._change(organisation_id, apply, now)
 
     async def drop_expired_previous(
         self, organisation_ids: Sequence[int], now: datetime, overlap: timedelta
     ) -> int:
         """Remove the previous secrets whose overlap has ended at ``now``; return how many.
 
-        For the periodic sweep, which knows the live overlap. One read for all the records, one
-        write per record that changes.
+        For the periodic sweep, which knows the live overlap. One read to find the records that
+        hold a previous secret, then each one is changed where it is read (``_change``), so a
+        rotation that happens meanwhile is not overwritten.
         """
         names = {contact_center_credential_name(i): i for i in organisation_ids}
         removed = 0
@@ -260,9 +297,21 @@ class SealedConnections:
                 continue
             if settled(held, now, overlap).previous is not None:
                 continue
-            record.pop(PREVIOUS_KEY, None)
-            await self._store.put(name, record, now)
-            removed += 1
+            dropped = False
+
+            def apply(current: dict[str, object] | None) -> dict[str, object] | None:
+                nonlocal dropped
+                found = secrets_of(current) if current else None
+                if current is None or found is None or found.previous is None:
+                    return None
+                if settled(found, now, overlap).previous is not None:
+                    return None  # rotated again in the meantime: its overlap is running
+                current.pop(PREVIOUS_KEY, None)
+                dropped = True
+                return current
+
+            await self._store.update(name, apply, now)
+            removed += dropped
         return removed
 
     async def delete(self, organisation_id: int) -> None:

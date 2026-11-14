@@ -4,7 +4,7 @@ The Webex and WxCC adapters (video, dispatch, probes, checks) and the request lo
 adapters report every call to (ADR 0068).
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
@@ -255,6 +255,18 @@ class FakeSecrets:
 
     async def delete(self, name: str) -> None:
         self.values.pop(name, None)
+
+    async def update(
+        self,
+        name: str,
+        change: Callable[[dict[str, object] | None], dict[str, object] | None],
+        now: datetime,
+    ) -> bool:
+        value = change(self.values.get(name))
+        if value is None:
+            return False
+        self.values[name] = value
+        return True
 
 
 class FakeContactCenterConnections:

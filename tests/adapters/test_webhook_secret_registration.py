@@ -104,8 +104,8 @@ async def test_a_duplicate_refusal_falls_back_to_removing_the_old_one_and_says_s
     assert [r.method for r in seen] == ["GET", "POST", "GET", "DELETE", "POST"]
 
 
-@pytest.mark.parametrize("status", [400, 401, 403, 422])
-async def test_a_refusal_of_rights_or_validation_deletes_nothing(status: int) -> None:
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 405, 415, 422])
+async def test_any_refusal_that_is_no_duplicate_deletes_nothing(status: int) -> None:
     old = {"id": "old-1", "destinationUrl": WXCC_TARGET}
     client, seen = _client(_wxcc_platform([old], create=lambda old_exists: status))
 
@@ -269,3 +269,67 @@ def test_the_command_lines_report_says_what_came_of_a_renewal_and_holds_no_secre
     assert "there is none now" in lines[Registration.GONE]
     assert lines[Registration.REFUSED] == "wxcc subscription: refused (see the request log)"
     assert all(line.startswith("wxcc subscription: ") for line in lines.values())
+
+
+# --- once anything was deleted, the outcome says so ----------------------------------------------
+
+
+async def test_a_retryable_error_on_the_create_after_the_delete_is_gone_not_failed() -> None:
+    old = {"id": "old-1", "destinationUrl": WXCC_TARGET}
+    client, seen = _client(
+        _wxcc_platform([old], create=lambda old_exists: 409 if old_exists else 503)
+    )
+
+    outcome = await renew_wxcc(client, WXCC_BASE, WXCC_TARGET, "new-secret")
+
+    assert outcome is Registration.GONE  # no IntegrationError: the old one is gone
+    assert [r.method for r in seen] == ["GET", "POST", "GET", "DELETE", "POST"]
+
+
+async def test_a_delete_that_fails_after_one_succeeded_is_gone() -> None:
+    held = [
+        {"id": "old-1", "destinationUrl": WXCC_TARGET},
+        {"id": "old-2", "destinationUrl": WXCC_TARGET},
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(200, json={"data": list(held), "meta": {}})
+        if request.method == "DELETE":
+            return httpx.Response(204 if request.url.path.endswith("old-1") else 503)
+        return httpx.Response(409, json={})
+
+    client, seen = _client(handler)
+
+    outcome = await renew_wxcc(client, WXCC_BASE, WXCC_TARGET, "new-secret")
+
+    assert outcome is Registration.GONE
+    assert [r.method for r in seen] == ["GET", "POST", "GET", "DELETE", "DELETE"]  # no create
+
+
+async def test_a_delete_that_fails_before_anything_was_removed_is_the_callers_failure() -> None:
+    """Nothing changed: the old subscription still works, so it is a plain failure."""
+    held = [{"id": "old-1", "destinationUrl": WXCC_TARGET}]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(200, json={"data": held, "meta": {}})
+        return httpx.Response(503 if request.method == "DELETE" else 409, json={})
+
+    client, _ = _client(handler)
+
+    with pytest.raises(IntegrationError):
+        await renew_wxcc(client, WXCC_BASE, WXCC_TARGET, "new-secret")
+
+
+async def test_a_cleanup_that_fails_after_the_new_subscription_exists_is_still_registered() -> None:
+    held = [{"id": "old-1", "destinationUrl": WXCC_TARGET}]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(200, json={"data": held, "meta": {}})
+        return httpx.Response(503 if request.method == "DELETE" else 201, json={})
+
+    client, _ = _client(handler)
+
+    assert await renew_wxcc(client, WXCC_BASE, WXCC_TARGET, "s") is Registration.REGISTERED

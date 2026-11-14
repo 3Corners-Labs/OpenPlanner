@@ -582,6 +582,14 @@ verifying for `webhook_secret_overlap_minutes`** (class C, default 60, 0 to 1440
   findings on System status and the removal of a stored secret (`settled`) all go through it. A
   rotation whose time is in the future (the clock was set back) does not count: a secret that cannot
   be shown to be inside its overlap is not accepted.
+- **A configuration package never holds what a rotation left.** The application no longer exports a
+  package (ADR 0099 step 4) and only reads one; the place where a package's copy of a sealed record
+  is made, for the helper that writes one in the tests and for the reading alike
+  (`_reseal_or_refuse`, with `without_rotation_state` in `app/adapters/db/sealed.py`), leaves out of an
+  organisation's contact-center record the previous webhook secret, the registration outcome and,
+  when there was a previous secret, the time of the rotation (the overlap was counted from it). The
+  live database keeps them, `rekey` never scrubs, and the table of first sightings is emptied by a
+  package like every host-bound table.
 
 **An organisation's secret.** The previous secret is sealed in the connection's record next to the
 current one (`previous_webhook_secret`; the time of the rotation is `webhook_secret_at`) and removed
@@ -610,7 +618,7 @@ from the platform.
 | Platform | The secret of its subscription | Done |
 |---|---|---|
 | Video platform (`/webhooks/webex`) | Changed in place: `PUT /webhooks/{id}` with the new secret (`update_webex_secrets`) | `register-webhooks --update-secret` |
-| Webex Contact Center, an organisation's connection | Kept by the subscription, so renewed: the new subscription is made **before** the old one is removed, then the old ones at the address (and only those, ids checked) are deleted. For a moment an event is delivered twice, once under each secret, and the replay memory recognises the second. A refusal of the new subscription leaves the old one alone, except when it can mean that WxCC allows one subscription per address (the shape of that answer is not recorded): the address is listed again, and only when the old subscription still holds it and the refusal is not one of rights or validation (401, 403, 400, 422) are the old ones removed and the new one made; that opens a gap (`replaced`), and if the new one is refused then there is none (`gone`). An outage removes nothing | The card's button |
+| Webex Contact Center, an organisation's connection | Kept by the subscription, so renewed: the new subscription is made **before** the old one is removed, then the old ones at the address (and only those, ids checked) are deleted. For a moment an event is delivered twice, once under each secret, and the replay memory recognises the second. A refusal of the new subscription leaves the old one alone and is `refused`, except a 409 (Conflict), which can mean that WxCC allows one subscription per address (no recorded answer exists, so nothing else is read as a duplicate; a 404, 405, 415 or a refusal of rights or validation deletes nothing): the address is listed again, and only when the old subscription still holds it are the old ones removed and the new one made; that opens a gap (`replaced`). **Once anything has been deleted on that path the outcome is `gone` unless the new subscription exists**: a failed later delete, or a refused or failed create (a 429, a 5xx), is `gone`, with its system event and card line, and the platform's status is only a code in the log line `webhook.renewal_interrupted`. An outage before anything was changed removes nothing | The card's button |
 | Webex Contact Center, the installation's own subscription | As above | `register-webhooks --update-secret` |
 
 **The installation's own secrets** (`WEBEX_WEBHOOK_SECRET`, `WXCC_WEBHOOK_SECRET`) come from the

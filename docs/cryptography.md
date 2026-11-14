@@ -156,11 +156,15 @@ the code changes, this document changes in the same pull request. `docs/threat-m
   is a random secret of at least 32 characters, constant-time comparison, and replay protection by
   `event_key` (Webex sends no signed event time). When Webex offers SHA-256 the adapter switches
   (ADR 0094 point 5).
-- **Lives in.** `WEBEX_WEBHOOK_SECRET` and `WXCC_WEBHOOK_SECRET`, environment or `X_FILE`; the
-  provider holds the same value in its subscription. Neither is typed into the portal.
+- **Lives in.** `WEBEX_WEBHOOK_SECRET` and `WXCC_WEBHOOK_SECRET`, the environment only: they are class C,
+  which takes no `X_FILE` (that is for classes A and B), and so do their previous values
+  (`..._PREVIOUS`, ADR 0124 point 8); the provider holds the same value in its subscription. None is
+  typed into the portal.
 - **Who can read it.** The host operator and the `web` process.
-- **Rotation.** Replace the value in the secret store, restart `web`, run `python -m app.cli
-  register-webhooks` so the subscriptions carry the new secret. Until then events are refused
+- **Rotation.** Replace the value in the secret store and put the old one in `..._PREVIOUS`, restart
+  `web`, run `python -m app.cli register-webhooks --update-secret` so the subscriptions carry the new
+  secret; the old value verifies for `webhook_secret_overlap_minutes` (ADR 0124 point 8, runbook
+  *Rotating secrets*). Without a previous value events signed with the old secret are refused at once
   (`webhook.rejected`).
 - **Destruction.** Remove the old value from the secret store.
 

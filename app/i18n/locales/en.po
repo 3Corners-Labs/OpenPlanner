@@ -13803,7 +13803,7 @@ msgid "admin.settings.address.secrets.title"
 msgstr "Previous webhook secrets in the environment"
 
 msgid "admin.settings.address.secrets.ended"
-msgstr "A previous webhook secret is still set in the environment, and its overlap has ended: it no longer verifies anything. Remove WEBEX_WEBHOOK_SECRET_PREVIOUS or WXCC_WEBHOOK_SECRET_PREVIOUS (or the _FILE variable) from the environment."
+msgstr "A previous webhook secret is still set in the environment, and its overlap has ended: it no longer verifies anything. Remove WEBEX_WEBHOOK_SECRET_PREVIOUS or WXCC_WEBHOOK_SECRET_PREVIOUS from the environment."
 
 msgid "admin.settings.address.secrets.same"
 msgstr "A previous webhook secret is set and equals the current one: it does nothing. Remove it from the environment."

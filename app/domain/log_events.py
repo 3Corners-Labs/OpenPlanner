@@ -1328,6 +1328,20 @@ _OPERATIONS = (
         "register. `replaced`: the periodic check of open tasks catches up on states.",
     ),
     _e(
+        "webhook.renewal_interrupted",
+        _OPS,
+        "warning",
+        "stage error",
+        "Renewing the contact-center subscription was interrupted at {stage}: {error}.",
+        "While a new webhook secret was being given to the contact center (ADR 0124 point 8) the "
+        "platform failed after an old subscription had been removed (stage `delete` or `create`), "
+        "or while the old ones were being cleaned up after the new one was made (stage "
+        "`cleanup`). The first two leave the connection card on `gone`, with its system event; "
+        "the third leaves a duplicate subscription. Only the platform's status code is logged.",
+        "`create` or `delete`: save the connection's card again to register. `cleanup`: remove "
+        "the old subscription at the platform.",
+    ),
+    _e(
         "webhook.sighting_failed",
         _OPS,
         "warning",

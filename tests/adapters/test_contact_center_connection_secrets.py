@@ -153,3 +153,21 @@ async def test_the_registration_state_is_kept_until_a_registration_succeeds() ->
     assert odd is not None
     assert odd.registration is None  # a value that does not parse is read as none
     assert await connections.get(2) is None
+
+
+async def test_a_move_to_another_tenant_clears_the_registration_outcome_in_the_same_write() -> None:
+    connections, store = await _connected()
+    await connections.set_registration(1, Registration.GONE, NOW)
+
+    await connections.save(1, ConnectionChange(WXCC, OWN.api_base_url, "another-client"), NOW)
+
+    assert "registration" not in store.values[NAME]
+
+
+async def test_a_save_that_keeps_the_tenant_keeps_the_registration_outcome() -> None:
+    connections, store = await _connected()
+    await connections.set_registration(1, Registration.FAILED, NOW)
+
+    await connections.save(1, ConnectionChange(WXCC, OWN.api_base_url, "client"), NOW)
+
+    assert store.values[NAME]["registration"] == "failed"

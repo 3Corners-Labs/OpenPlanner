@@ -281,3 +281,11 @@ def test_a_rotation_in_the_future_does_not_keep_the_previous_secret() -> None:
     assert previous_finding("new", "old", NOW + timedelta(hours=2), NOW, OVERLAP) is (
         SecretFinding.ENDED
     )
+
+
+def test_a_removal_waits_for_the_overlap_even_when_the_rotation_is_ahead_of_the_clock() -> None:
+    """A writer with a clock a moment behind must not delete a secret that is inside its overlap."""
+    secrets = WebhookSecrets("new", "old", NOW + timedelta(seconds=2))
+
+    assert settled(secrets, NOW, OVERLAP).previous == "old"
+    assert settled(secrets, NOW + timedelta(seconds=2) + OVERLAP, OVERLAP).previous is None

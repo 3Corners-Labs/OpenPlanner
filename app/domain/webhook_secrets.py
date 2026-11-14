@@ -100,13 +100,18 @@ def rotated(secrets: WebhookSecrets | None, new: str, now: datetime) -> WebhookS
 
 
 def settled(secrets: WebhookSecrets, now: datetime, overlap: timedelta) -> WebhookSecrets:
-    """Return ``secrets`` without a previous secret that does not count at ``now``.
+    """Return ``secrets`` without a previous secret whose overlap has ended at ``now``.
+
+    A rotation in the future (a writer whose clock is a moment behind, or one set back) does not
+    count (``previous_counts``) but is not removed either: removal waits until the overlap has
+    ended, so a skewed clock never deletes a secret that is still inside its overlap.
 
     The one way a previous secret is removed: the sweep calls it with the live overlap, and a write
     of the sealed record with ``OVERLAP_MAX``, the longest the setting allows (no setting could
     keep it past that). Callers compare ``previous`` of the result with what they held.
     """
-    if secrets.previous is None or secrets.previous_counts(now, overlap):
+    ends = secrets.previous_ends(overlap)
+    if secrets.previous is None or (ends is not None and now < ends):
         return secrets
     return WebhookSecrets(secrets.current, None, secrets.rotated_at)
 

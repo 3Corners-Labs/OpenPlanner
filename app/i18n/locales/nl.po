@@ -13816,7 +13816,7 @@ msgid "admin.settings.address.secrets.title"
 msgstr "Vorige webhookgeheimen in de omgeving"
 
 msgid "admin.settings.address.secrets.ended"
-msgstr "Er staat nog een vorig webhookgeheim in de omgeving, en de overlap is voorbij: het controleert niets meer. Haal WEBEX_WEBHOOK_SECRET_PREVIOUS of WXCC_WEBHOOK_SECRET_PREVIOUS (of de _FILE-variabele) uit de omgeving."
+msgstr "Er staat nog een vorig webhookgeheim in de omgeving, en de overlap is voorbij: het controleert niets meer. Haal WEBEX_WEBHOOK_SECRET_PREVIOUS of WXCC_WEBHOOK_SECRET_PREVIOUS uit de omgeving."
 
 msgid "admin.settings.address.secrets.same"
 msgstr "Er staat een vorig webhookgeheim dat gelijk is aan het huidige: het doet niets. Haal het uit de omgeving."

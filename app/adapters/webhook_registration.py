@@ -26,9 +26,13 @@ import re
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 
+import structlog
+
 from app.adapters.webex_auth import AuthorizedClient
 from app.domain.contact_center import Registration, WebhookSecretUpdate
 from app.domain.ports import IntegrationError
+
+log = structlog.get_logger()
 
 WEBEX_EVENTS = (
     ("meetings", "started"),
@@ -268,12 +272,11 @@ async def _create_wxcc(
     return None
 
 
-NOT_A_DUPLICATE = frozenset(
-    {"unauthorized", "rejected_400", "rejected_401", "rejected_403", "rejected_422"}
-)
-"""Refusals of a create that cannot mean "a second subscription at this address": missing rights
-or a request WxCC finds invalid. The shape of WxCC's answer for a duplicate is not recorded, so
-a duplicate is any other refusal while the old subscription still holds the address."""
+DUPLICATE_REFUSALS = frozenset({"rejected_409"})
+"""The refusals of a create that mean "a second subscription at this address": 409, Conflict. No
+recorded answer of WxCC for a duplicate exists yet, so nothing else is read as one: any other
+refusal (rights, validation, a wrong host or path, a media type) leaves the old subscription in
+place and is ``REFUSED``."""
 
 
 async def _held_ids(client: AuthorizedClient, base: str, target_url: str) -> list[str] | None:
@@ -311,22 +314,28 @@ async def renew_wxcc(
     made *before* the old ones are removed, so the platform never has none: until the old ones are
     gone an event is delivered twice, once signed with each secret, and the replay memory
     recognises the second (its key does not depend on the secret). Only subscriptions at
-    ``target_url`` are removed, their ids checked.
+    ``target_url`` are removed, their ids checked. Once the new one exists the registration is
+    ``REGISTERED`` even when removing an old one fails (a duplicate stays until it is removed).
 
-    A refusal of the first create leaves the old subscription alone, unless it can mean that WxCC
-    allows one subscription per address (the answer for that is not recorded): the address is
-    listed again, and only when the old subscription still holds it and the refusal is not one of
-    rights or validation (``NOT_A_DUPLICATE``) are the old ones removed and the new one made
-    then. That fall-back opens a gap in which events are lost, so its outcome says so.
+    A refusal of the first create leaves the old subscription alone, except a 409
+    (``DUPLICATE_REFUSALS``), which can mean that WxCC allows one subscription per address: the
+    address is listed again, and only when the old subscription still holds it are the old ones
+    removed and the new one made then. That fall-back opens a gap in which events are lost, so its
+    outcome says so. **Once anything has been deleted on that path the outcome is ``GONE`` unless
+    the new subscription exists**: an error after the first delete, of the later deletes or of the
+    create (a 429, a 5xx), is caught here and never reaches the caller as a plain failure, because
+    a subscription that vanished must not be reported as "could not be reached". The platform's
+    status is kept as a code in the log line ``webhook.renewal_interrupted`` and nowhere else.
 
     Returns:
         ``REGISTERED`` (made, old removed); ``REPLACED`` (the fall-back worked, events in the gap
-        may have been missed); ``GONE`` (the fall-back removed the old subscription and the new
-        one was refused: there is none now); ``REFUSED`` (nothing changed, or an odd listing).
+        may have been missed); ``GONE`` (the fall-back removed an old subscription and the new
+        one does not exist: there may be none now); ``REFUSED`` (nothing changed, or an odd
+        listing, or a refusal that is no duplicate).
 
     Raises:
-        IntegrationError: Retryable failures (``FAILED`` for the caller); nothing is removed after
-            one, so the old subscription keeps working under the previous secret.
+        IntegrationError: A retryable failure *before anything was changed* (``FAILED`` for the
+            caller), so the old subscription keeps working under the previous secret.
     """
     base = base_url.rstrip("/")
     ours = await _held_ids(client, base, target_url)
@@ -334,17 +343,43 @@ async def renew_wxcc(
         return Registration.REFUSED
     refusal = await _create_wxcc(client, base, target_url, secret)
     if refusal is None:
-        await _delete_subscriptions(client, base, ours)
+        try:
+            await _delete_subscriptions(client, base, ours)
+        except IntegrationError as error:
+            log.warning("webhook.renewal_interrupted", stage="cleanup", error=error.code)
         return Registration.REGISTERED
-    if not ours or refusal.code in NOT_A_DUPLICATE:
+    if not ours or refusal.code not in DUPLICATE_REFUSALS:
         return Registration.REFUSED
     still_held = await _held_ids(client, base, target_url)
     if not still_held:
         return Registration.REFUSED
-    await _delete_subscriptions(client, base, still_held)
-    if await _create_wxcc(client, base, target_url, secret) is None:
-        return Registration.REPLACED
-    return Registration.GONE
+    return await _replace_wxcc(client, base, target_url, secret, still_held)
+
+
+async def _replace_wxcc(
+    client: AuthorizedClient, base: str, target_url: str, secret: str, held: list[str]
+) -> Registration:
+    """The fall-back of ``renew_wxcc``: remove the old subscriptions, then make the new one.
+
+    Nothing deleted yet: an error is the caller's, as for any call that changed nothing. After the
+    first delete every error is ``GONE``, and a create that is refused or fails is ``GONE`` too.
+    """
+    removed = False
+    try:
+        for item_id in held:
+            await client.request("DELETE", f"{base}/v2/subscriptions/{item_id}")
+            removed = True
+    except IntegrationError as error:
+        if not removed:
+            raise
+        log.warning("webhook.renewal_interrupted", stage="delete", error=error.code)
+        return Registration.GONE
+    try:
+        refusal = await _create_wxcc(client, base, target_url, secret)
+    except IntegrationError as error:
+        log.warning("webhook.renewal_interrupted", stage="create", error=error.code)
+        return Registration.GONE
+    return Registration.REPLACED if refusal is None else Registration.GONE
 
 
 SecretUpdate = Callable[[AuthorizedClient, str, str, str], Awaitable[Registration]]
