@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Betreft | OpenPlanner 0.6.0, releasekandidaat `v0.6.0-rc.117` (commit `a9406441` op `main`, 13 november 2026). De laatst uitgebrachte release is `v0.5.1` van 7 november 2026. Wat deze kandidaat meer heeft, komt in productie met `v0.6.0`: een productie-installatie weigert een kandidaat (7.3) |
-| Stand | Concept 2a van 14 november 2026, beschreven tegen de code van `v0.6.0-rc.117` en `docs/adr-status.md` (bijgewerkt op 8 november 2026 onder ADR 0119), aangevuld met ADR 0125 (#834), die na deze kandidaat op `main` kwam. Concept 1 beschreef `v0.4.0` |
+| Stand | Concept 2a van 14 november 2026, beschreven tegen de code van `v0.6.0-rc.117` en `docs/adr-status.md` (bijgewerkt op 8 november 2026 onder ADR 0119), aangevuld met ADR 0125 (#834), die na deze kandidaat op `main` kwam, en met de belpagina als bouwblok (8.2). Concept 1 beschreef `v0.4.0` |
 | Taal | Nederlands, als stakeholderdocument naast `docs/HANDOVER.md`. Code, ADR's en de overige documentatie zijn Engels |
 | Lezers | Architecten en ontwikkelaars van een organisatie die OpenPlanner in haar landschap inpast; het team dat de applicatie host op een container- of cloudplatform; identity-, netwerk-, security- en privacybeheer; het productteam |
 | Bron van waarheid | De code op `main`, de ADR's en `docs/adr-status.md`. Dit document beschrijft en verwijst; het beslist niets |
@@ -1287,7 +1287,7 @@ toetsbare kenmerk van een goede uitbreiding, en de reviewvraag bij elke PR.
 | Een sms-gateway | `SmsProvider` + `SMS_GATEWAYS` | Webex Connect; gevraagd: gateways via de open standaard SMPP (O18) | ja | ADR 0028 |
 | Een logbestemming | `DestinationKind` + `build_sender` | syslog, Splunk HEC, Elastic, HTTP NDJSON | ja | ADR 0085 |
 | Een contactcenterplatform | `ContactCenterKind` + `ContactCenterDispatcher` + descriptor | Webex Contact Center; poort, taak, routering, webhookroute en verbinding per organisatie zijn neutraal; gevraagd: Genesys Engage via GMS nu en Genesys Cloud CX later (O15) | grotendeels: CC-1 tot en met CC-5 zijn gebouwd; de WxCC-kolommen zijn nog de bron tot een volgende expand- en contractstap | ADR 0032 |
-| Een videoplatform | `VideoProvider` | Webex Meetings | beperkt: poort bestaat, contract volgt Webex; tweede platform vraagt een ADR naar het model van 0032 | ADR 0017 |
+| Een videoplatform | `VideoProvider` + de belpagina | Webex Meetings; de belpagina op de Webex Meetings SDK. Verkend: een on-premises platform zoals Cisco Meeting Server (hieronder) | beperkt: poort bestaat, contract volgt Webex; tweede platform vraagt een ADR naar het model van 0032 | ADR 0017, 0123 |
 | Een wachtrijgedrag | `DispatchKind` | contactcenter, eigen wachtrij | een derde soort raakt het domein (regels voor zicht en claim) | ADR 0043 |
 | Een identity provider | registratie in het portaal, geen code | elke OIDC-provider met asymmetrische handtekening; keuze op e-maildomein met DNS-bewijs | ja | ADR 0083 |
 | Een medewerkersdirectory | `StaffDirectory` | Keycloak; SCIM 2.0 ontworpen, niet gebouwd | beperkt | ADR 0046, 0095 |
@@ -1298,6 +1298,23 @@ toetsbare kenmerk van een goede uitbreiding, en de reviewvraag bij elke PR.
 | Een beheerscherm of instelling | navigatieregister + permissie in de matrix + registeringang + handleidingonderwerp | scope, object, tabblad | ja, binnen de bestaande objecten; een nieuwe sectie of zevende tab vraagt een ADR | ADR 0042, 0047 |
 | Een rapport of export | gebruiksfeiten en uurtellingen, de rapportage-API | rapportscherm, CSV, API, samenvatting, wallboard, auditexport, bewijsrapport | ja, binnen het schema zonder persoonsgegevens | ADR 0040, 0102, 0117 |
 | Een releasebron | `ReleaseSource` | GitHub releases | beperkt: updater verwacht GHCR en cosign | ADR 0029 |
+
+**De belpagina als bouwblok.** De belpagina van ADR 0123 heeft twee doelen. De deelnemer ziet het
+platform van de leverancier niet, en de pagina draagt de huisstijl en de teksten van de organisatie.
+Die doelen hangen niet aan Webex. De pagina, de toegang per afspraak met een pseudoniem, het
+proefgesprek en de status blijven van OpenPlanner. Per platform verschilt alleen hoe het gesprek in
+de pagina komt. Op 14 november 2026 is verkend hoe dat gaat met een on-premises platform:
+
+| Hoe het gesprek in de pagina komt | Voorbeeld | Afscherming en eigen huisstijl | Wat de leverancier krijgt | Stand |
+|---|---|---|---|---|
+| Eigen bediening op de SDK van het platform | Webex Meetings SDK | Volledig: eigen bediening, teksten, ondertiteling en toegankelijkheid | Een gastidentiteit per afspraak in de cloud van de leverancier | besloten, als huls gebouwd (ADR 0123) |
+| De web-app van het platform, ingebed in de pagina | Cisco Meeting Server: geen client-SDK ([Cisco](https://developer.cisco.com/cisco-meeting-server/)); de web-app mag vanaf versie 3.2 in een iframe ([Cisco](https://www.cisco.com/c/en/us/support/docs/conferencing/meeting-server-1000/217201-how-to-customize-content-security-policy.html)) | Deels: logo, achtergrond, teksten per taal en links; het belscherm zelf blijft van Cisco ([Cisco](https://www.cisco.com/c/dam/en/us/td/docs/conferencing/ciscoMeetingServer/Customisation/Version-4-0/Cisco-Meeting-Server-4-0-Customization-Guidelines.pdf)) | Niets buiten de eigen servers; beeld en geluid blijven on-premises | verkend, niet besloten |
+| Doorverwijzing naar de app of webclient van het platform | De link van Webex | Geen | Als bij de SDK, plus wat de app van de leverancier verzamelt | gebouwd |
+
+Een tweede platform vraagt een adapter achter `VideoProvider`. Die maakt een ruimte per afspraak,
+geeft een gastlink in plaats van een gasttoken, en leest de status uit de events van het platform in
+plaats van uit webhooks. Een on-premises platform vraagt bovendien dat deelnemers van internet de
+webserver en een TURN-server van dat platform bereiken. Dat besluit volgt in een eigen ADR (R-3).
 
 ### 8.3 Recepten
 
@@ -1822,7 +1839,7 @@ en O15 (Genesys) tellen zwaar.
 |---|---|---|---|---|
 | R-1 | Eén host of pod, één SQLite-bestand: geen horizontale schaal en geen hoge beschikbaarheid | Een uitval is uitval tot herstel; de eis "RTO onder 15 minuten" is niet haalbaar in deze vorm | ADR 0036 noemt de triggers en het pad (Postgres, meer `web`-replica's); de naden (rate-limitopslag, contracttest schrijfslot, back-upinterface) en de metingen zijn niet gebouwd | productowner |
 | R-2 | Het contactcenterkoppelvlak is neutraal gemaakt, maar de WxCC-kolommen zijn nog de bron | Genesys Engage via GMS en later Genesys Cloud CX zijn gevraagd (V-3); elk vraagt een adapter | ADR 0032 grotendeels gebouwd (CC-1 tot en met CC-5); de contractstap en per Genesys-variant een adapter met een eigen ADR (CC-6, O15) volgen | productowner |
-| R-3 | Het videokoppelvlak is niet leveranciersneutraal | Een tweede videoplatform vraagt een ADR en een aanpassing van het contract van `VideoProvider` | Hetzelfde patroon als ADR 0032; nog geen besluit | productowner |
+| R-3 | Het videokoppelvlak is niet leveranciersneutraal | Een tweede videoplatform vraagt een ADR en een aanpassing van het contract van `VideoProvider` | Hetzelfde patroon als ADR 0032. De belpagina is als bouwblok neutraal opgezet; een on-premises platform zoals Cisco Meeting Server is verkend (8.2). Nog geen besluit | productowner |
 | R-4 | Kubernetes alleen door rendering getest | De eerste echte run kan verrassingen geven; updates uit het portaal werken daar niet; egress per CIDR is bewerkelijk voor clouddiensten | ADR 0114 stappen 3 tot en met 5 | hostingpartij |
 | R-5 | Hosting, back-up, herstelproef en verwerkingsverantwoordelijke zijn niet overal belegd (O7); de database van de meegeleverde Keycloak zit nog niet in de terugdraaikopie | Zonder eigenaar geen aantoonbaar herstel en geen DPIA | Checklists in `docs/assurance/`; 7.10; ADR 0106 stap 5c | opdrachtgever |
 | R-6 | Pentest, toegankelijkheidsonderzoek met schermlezers en menselijke reviewer niet belegd (O10) | Geen livegang zonder | HANDOVER §12 | opdrachtgever |
@@ -1851,6 +1868,8 @@ Wat na `v0.6.0-rc.117` nog openstaat, zoals `docs/adr-status.md` en de ADR's het
   productie aan zodra terugdraaien bewezen is (ADR 0121, 0122).
 - Het gesprek in een eigen pagina: de SDK na de licentie, het gastentoken, chat via het
   contactcenter (ADR 0123).
+- Verkend, niet gepland: een on-premises videoplatform zoals Cisco Meeting Server achter
+  `VideoProvider`, met de web-app van dat platform in de belpagina (8.2, R-3).
 - De webhookpoort: melding bij weigeringen, rotatie van secrets met overlap, een regel voor de
   proxy en een ondertekende proeflevering (ADR 0124).
 - Vaste adressen voor de meegeleverde Keycloak, haar database en de route van de proxy naar
@@ -2049,4 +2068,4 @@ document. Zo'n ontwerp vult ten minste dit in:
 | 5 november 2026 | Concept 1c: de platen zijn bijgewerkt (#547); risico R-11, paragraaf 5.1 en bijlage A volgen |
 | 5 november 2026 | Concept 1d: elke fake staat in `tests/fakes/` (#549); paragraaf 5.4 en 11.3 volgen |
 | 14 november 2026 | Concept 2: bijgewerkt naar releasekandidaat `v0.6.0-rc.117` (ADR 0117 tot en met 0124, 37 poorten, 54 permissies, 29 taaksoorten, 224 instellingen) en de term *dienst*. Voor het hostingteam: elke datastroom met nummer, poort en richting (3.3), de ingangen met hun blootstelling (5.6), netwerk en zones zonder websockets (7.7), Docker, Kubernetes en OpenStack (7.8), de impactanalyse van hosten in de eigen infrastructuur of bij een hoster (7.9), wat het platformteam levert (7.10), OIDC met de claims en JIT (8.5), en elke bewaartermijn met haar instelling (8.6). Aannames A-6 en A-7, risico's R-14 tot en met R-16, vragen V-16 tot en met V-22 en het kader voor een ontwerp per organisatie (13.5) zijn nieuw |
-| 14 november 2026 | Concept 2a: ADR 0125 (#834) verwerkt. De hops naar de meegeleverde Keycloak en haar database zijn vastgelegde uitzonderingen (3.3, 9.1). Tot stap 2 van die ADR vinden de containers elkaar op naam (7.2, 7.7). Productie start met de meegeleverde provider, en de installer waarschuwt (7.3, 8.5). Risico R-17, vraag V-23, de roadmap en een voorbehoud bij A-3, V-2 en 13.5 zijn nieuw |
+| 14 november 2026 | Concept 2a: ADR 0125 (#834) verwerkt. De hops naar de meegeleverde Keycloak en haar database zijn vastgelegde uitzonderingen (3.3, 9.1). Tot stap 2 van die ADR vinden de containers elkaar op naam (7.2, 7.7). Productie start met de meegeleverde provider, en de installer waarschuwt (7.3, 8.5). Risico R-17, vraag V-23, de roadmap en een voorbehoud bij A-3, V-2 en 13.5 zijn nieuw. Verder is de belpagina beschreven als bouwblok dat niet aan Webex hangt, met een verkenning van Cisco Meeting Server (8.2, R-3, 13.1) |
