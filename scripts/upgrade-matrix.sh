@@ -10,6 +10,18 @@
 #       bookings) that IMAGE writes, against UPGRADE_BUDGET_SECONDS
 #   scripts/upgrade-matrix.sh fixture IMAGE VERSION  write upgrade-fixture-VERSION.sqlite and its
 #       .sha256 into the current directory with the released IMAGE (main.yml, every release)
+#   scripts/upgrade-matrix.sh rollback IMAGE [FIXTURE]  the rollback proof of ADR 0121 (A30, gate
+#       item G07): this checkout migrates FIXTURE (a release's upgrade fixture; a fresh database
+#       without it), seeds demo and the demonstration and writes one record of each kind the
+#       rollback gate holds back (seed-gated-records); the previous IMAGE then starts on it
+#       without a downgrade and books on /g/demo on the day the pool bookings hold; this checkout
+#       compares the database per table again
+#   scripts/upgrade-matrix.sh rollback-release IMAGE_REPO  the same against the newest release
+#       that carries an upgrade fixture (ROLLBACK_VERSION=X.Y.Z picks another one): downloads
+#       and checks its fixture, runs `rollback IMAGE_REPO:X.Y.Z FIXTURE`; skips with a notice
+#       while no release carries a fixture (the first is v0.6.0)
+#
+# UPGRADE_PLATFORM (e.g. linux/amd64) runs a released image on a host of another architecture.
 #
 # Per fixture: read its state, `alembic upgrade head`, compare (rows per table, personal data
 # on live and not on purged bookings, pending jobs claimable, settings within bounds), start
@@ -22,6 +34,7 @@ set -euo pipefail
 UPGRADE_BUDGET_SECONDS="${UPGRADE_BUDGET_SECONDS:-300}"
 LARGE_BOOKINGS="${LARGE_BOOKINGS:-100000}"
 PORT="${UPGRADE_PORT:-8011}"
+PLATFORM="${UPGRADE_PLATFORM:-}"
 read -r -a PY <<<"${PYTHON:-uv run python}"
 # Development mode for this checkout's alembic, cli and app: a throwaway database, generated keys.
 export ENVIRONMENT=dev
@@ -61,7 +74,7 @@ start_checkout() {
 
 start_released() {
   local image="$1" name="$2"
-  docker run -d --name upgrade-app "${AS_ME[@]}" --read-only --tmpfs /tmp --cap-drop ALL \
+  docker run -d --name upgrade-app ${PLATFORM:+--platform "$PLATFORM"} "${AS_ME[@]}" --read-only --tmpfs /tmp --cap-drop ALL \
     --security-opt no-new-privileges -e ENVIRONMENT=dev \
     -e "DATABASE_URL=sqlite+aiosqlite:////srv/data/$name" -v "$work:/srv/data" \
     -p "127.0.0.1:$PORT:8000" "$image" >/dev/null
@@ -136,6 +149,130 @@ fixture() {
   cat "$name.sha256"
 }
 
+# Book the first free time of /g/demo on DAY through the participant pages at $PORT, as a
+# browser does: the day's times, then the form's post. Prints the answer's HTTP status.
+book_on_demo() {
+  local day="$1" start
+  start="$(curl -fsS "http://127.0.0.1:$PORT/g/demo?day=$day" \
+    | grep -o 'class="time-button" name="start" value="[^"]*"' | head -n 1 \
+    | sed 's/.*value="//; s/"$//')"
+  if [ -z "$start" ]; then
+    echo "::error::/g/demo offers no time on $day next to the gated records" >&2
+    return 1
+  fi
+  curl -sS -o /dev/null -w '%{http_code}' -X POST "http://127.0.0.1:$PORT/g/demo/book" \
+    -H "Origin: http://127.0.0.1:$PORT" \
+    --data-urlencode "start=$start" --data-urlencode "first_name=Voorbeeld" \
+    --data-urlencode "last_name=Deelnemer" --data-urlencode "email=matrix@example.org" \
+    --data-urlencode "phone=" --data-urlencode "website="
+}
+
+# Make sure IMAGE is here: pulled when it is not. Fails with what to do when it cannot be had.
+require_image() {
+  local image="$1"
+  docker image inspect "$image" >/dev/null 2>&1 && return 0
+  if ! docker pull -q ${PLATFORM:+--platform "$PLATFORM"} "$image" >/dev/null; then
+    echo "::error::image $image is not available. The previous supported release is meant" \
+      "(v0.6.0 for the train of ADR 0121); patch images are private (ADR 0108): log in to" \
+      "ghcr.io first, and set UPGRADE_PLATFORM=linux/amd64 on a host of another architecture" >&2
+    return 1
+  fi
+}
+
+rollback() {
+  local image="${1:-}" fixture="${2:-}" name=rollback.sqlite day status
+  if [ -z "$image" ]; then
+    echo "::error::usage: $0 rollback IMAGE [FIXTURE]: IMAGE is the previous supported release" >&2
+    return 2
+  fi
+  if [ -n "$fixture" ] && [ ! -f "$fixture" ]; then
+    echo "::error::fixture $fixture not found (a release's upgrade-fixture-X.Y.Z.sqlite)" >&2
+    return 2
+  fi
+  require_image "$image"
+  if [ -n "$fixture" ]; then
+    # Start from what the released image wrote itself (ADR 0116 point 7), not a fresh database.
+    cp "$fixture" "$work/$name"
+  else
+    : >"$work/$name"
+  fi
+  export DATABASE_URL="sqlite+aiosqlite:///$work/$name"
+  echo "== rollback: the gated records written by this checkout${fixture:+ on $(basename "$fixture")}, then $image on them"
+  alembic upgrade head
+  cli seed-demo >/dev/null
+  cli seed-gated-records >"$work/gated.json"
+  day="$("${PY[@]}" -c 'import json,sys; print(json.load(open(sys.argv[1]))["day"])' "$work/gated.json")"
+  cli upgrade-check --save "$work/before.json" >/dev/null
+  # One file: fold the write-ahead log in before the image's account opens it.
+  "${PY[@]}" -c "import sqlite3,sys; sqlite3.connect(sys.argv[1]).execute('PRAGMA wal_checkpoint(TRUNCATE)')" "$work/$name"
+  unset DATABASE_URL
+  # No downgrade: the previous image runs on the expanded schema this checkout wrote.
+  docker run -d --name upgrade-app ${PLATFORM:+--platform "$PLATFORM"} "${AS_ME[@]}" --read-only --tmpfs /tmp --cap-drop ALL \
+    --security-opt no-new-privileges -e ENVIRONMENT=dev \
+    -e "DATABASE_URL=sqlite+aiosqlite:////srv/data/$name" -v "$work:/srv/data" \
+    -p "127.0.0.1:$PORT:8000" "$image" >/dev/null
+  if ! wait_ready "$image"; then
+    docker logs upgrade-app >&2
+    return 1
+  fi
+  if ! status="$(book_on_demo "$day")"; then
+    docker logs upgrade-app >&2
+    return 1
+  fi
+  docker rm -f upgrade-app >/dev/null
+  if [ "$status" != 303 ]; then
+    echo "::error::$image did not book on /g/demo next to the gated records (HTTP $status)" >&2
+    return 1
+  fi
+  echo "$image booked on /g/demo on $day next to the gated records"
+  # No table lost a row (the gated records survived the previous image) and every invariant
+  # holds; the one finding expected is the live booking the previous image just made.
+  export DATABASE_URL="sqlite+aiosqlite:///$work/$name"
+  local live expected report
+  live="$("${PY[@]}" -c 'import json,sys; print(json.load(open(sys.argv[1]))["live_with_data"])' "$work/before.json")"
+  expected="FAIL live bookings with personal data: $live before, $((live + 1)) after"
+  report="$(cli upgrade-check --compare "$work/before.json" || true)"
+  unset DATABASE_URL
+  echo "$report"
+  if grep '^FAIL' <<<"$report" | grep -qvxF "$expected"; then
+    echo "::error::the database broke an invariant after $image ran on the gated records" >&2
+    return 1
+  fi
+  if ! grep -qxF "$expected" <<<"$report"; then
+    echo "::error::the booking $image made is not in the database" >&2
+    return 1
+  fi
+}
+
+# The rollback proof against a released image and the fixture it wrote (G07). The newest
+# release with a fixture is the previous supported minor once the next one is built on main.
+rollback_release() {
+  local repo="$1" tag version fixture
+  if [ -z "$repo" ]; then
+    echo "::error::usage: $0 rollback-release IMAGE_REPO (e.g. ghcr.io/owner/repo)" >&2
+    return 2
+  fi
+  if [ -n "${ROLLBACK_VERSION:-}" ]; then
+    tag="v${ROLLBACK_VERSION#v}"
+  else
+    gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" | jq -s 'add' >"$work/releases.json"
+    tag="$("${PY[@]}" -m scripts.upgrade_window <"$work/releases.json" | head -n 1)"
+  fi
+  if [ -z "$tag" ]; then
+    echo "::notice::no release carries an upgrade fixture yet (the first is v0.6.0); the rollback proof waits for it"
+    return 0
+  fi
+  version="${tag#v}"
+  fixture="upgrade-fixture-$version.sqlite"
+  if ! gh release download "$tag" --dir "$work/download" --pattern "$fixture" \
+    --pattern "$fixture.sha256" --clobber; then
+    echo "::error::release $tag has no $fixture: the rollback proof needs the fixture the release wrote" >&2
+    return 1
+  fi
+  (cd "$work/download" && sha256sum -c "$fixture.sha256")
+  rollback "$repo:$version" "$work/download/$fixture"
+}
+
 budget() {
   local image="$1" name=large.sqlite seconds
   if ! seed_with "$image" "$name" "$LARGE_BOOKINGS"; then
@@ -159,5 +296,7 @@ case "${1:-}" in
   one) one "$2" "${3:-}" ;;
   budget) budget "$2" ;;
   fixture) fixture "$2" "$3" ;;
-  *) sed -n '2,19p' "$0" >&2; exit 2 ;;
+  rollback) rollback "${2:-}" "${3:-}" ;;
+  rollback-release) rollback_release "${2:-}" ;;
+  *) sed -n '2,31p' "$0" >&2; exit 2 ;;
 esac

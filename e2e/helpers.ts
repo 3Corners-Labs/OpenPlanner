@@ -7,6 +7,20 @@ import { expect, type Locator, type Page, type TestInfo } from '@playwright/test
 /** The axe rule tags that together make up WCAG 2.2 AA. */
 export const WCAG_22_AA = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
+/**
+ * Give the browser the cookie a page of pages.json needs before it opens (`cookie`: the request
+ * page of ADR 0121, which opens only for the browser that holds its request's cookie).
+ */
+export async function holdCookie(
+  page: Page,
+  variant: { cookie?: { name: string; value: string } },
+  baseURL?: string,
+): Promise<void> {
+  const cookie = variant.cookie;
+  if (cookie === undefined) return;
+  await page.context().addCookies([{ ...cookie, url: baseURL ?? 'http://127.0.0.1:8000' }]);
+}
+
 /** Fail the test if axe finds any WCAG 2.2 AA violation on the current page. */
 export async function expectNoAxeViolations(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page }).withTags(WCAG_22_AA).analyze();

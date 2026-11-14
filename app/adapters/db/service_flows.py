@@ -538,7 +538,7 @@ class ServiceFlowQueries:
         return (await self._flows([row]))[0]
 
     async def publish_draft(
-        self, scope: Scope, flow_id: int, *, by: int, at: datetime
+        self, scope: Scope, flow_id: int, *, by: int | None, at: datetime
     ) -> ServiceFlow:
         """Publish the flow's draft: it becomes the current revision and is immutable from now on.
 

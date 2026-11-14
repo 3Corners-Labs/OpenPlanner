@@ -28,6 +28,7 @@ from tests.support.flow_documents import (
     revision,
     skill,
 )
+from tests.support.pool_flows import shut_gate
 
 FLOW = "organisations[acme].groups[balie].flows[advies]"
 APPOINTMENT = "organisations[acme].groups[balie].flows[appointment]"
@@ -398,7 +399,10 @@ def test_a_time_without_an_offset_is_not_a_publication_time() -> None:
     )
 
 
-def test_a_document_cannot_bring_a_flow_live_that_the_readiness_checklist_refuses() -> None:
+def test_a_document_cannot_bring_a_flow_live_that_the_readiness_checklist_refuses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     data = document_json()
     advies(data)["state"] = "active"  # a telephone flow on the own queue is built, the gate is shut
 

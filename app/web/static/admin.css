@@ -1511,6 +1511,14 @@ fieldset.card {
   gap: 0.25rem 0.75rem;
 }
 
+/* A widget table in its scroll region (the queue widget): the widget is the card already. */
+.admin .table-scroll.widget-scroll {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .widget-table {
   width: 100%;
   border-collapse: collapse;
@@ -1539,6 +1547,16 @@ fieldset.card {
 }
 
 .widget-table td.widget-table__number {
+  white-space: nowrap;
+}
+
+/* The queue widget's five columns fit a widget beside another at 1280 px only when a state
+   under a number may wrap; the number itself stays on one line. */
+.widget-table--wrap td.widget-table__number {
+  white-space: normal;
+}
+
+.widget-table__value {
   white-space: nowrap;
 }
 

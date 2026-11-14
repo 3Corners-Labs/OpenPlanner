@@ -4,11 +4,12 @@
  */
 import { expect, test } from '@playwright/test';
 
-import { expectNoAxeViolations } from '../helpers';
+import { expectNoAxeViolations, holdCookie } from '../helpers';
 import { pageVariants } from '../pages';
 
 for (const variant of pageVariants()) {
-  test(`axe: ${variant.title}`, async ({ page }) => {
+  test(`axe: ${variant.title}`, async ({ page, baseURL }) => {
+    await holdCookie(page, variant, baseURL);
     // networkidle: the widget pages render after their API calls (ADR 0035).
     await page.goto(variant.path, { waitUntil: 'networkidle' });
     // ADR 0093: the link from an email trades its token for a cookie and ends on a page whose

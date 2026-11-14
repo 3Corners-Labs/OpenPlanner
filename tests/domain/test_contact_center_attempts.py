@@ -30,6 +30,7 @@ from app.domain.service_requests import (
 )
 from tests.support.contact_center_requests import CC_FLOW
 from tests.support.domain import NOW, webex_routing
+from tests.support.pool_flows import shut_gate
 from tests.support.service_flows import pool, revision
 
 LATER = NOW + timedelta(minutes=10)
@@ -165,7 +166,10 @@ def test_each_dispatch_has_its_own_completion() -> None:
     assert _completion(own, event) is ReadinessReason.COMPLETION_NOT_FOR_DISPATCH
 
 
-def test_a_contact_center_flow_without_a_meeting_waits_only_for_the_rollback_gate() -> None:
+def test_a_contact_center_flow_without_a_meeting_waits_only_for_the_rollback_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     made = revision(
         dispatch=DispatchKind.CONTACT_CENTER,
         completion=CompletionPolicy.PROVIDER_EVENT,

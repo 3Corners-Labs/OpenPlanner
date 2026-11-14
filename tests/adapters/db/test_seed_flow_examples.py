@@ -26,6 +26,8 @@ from app.domain.service_flows import FlowState, InteractionKind
 from tests.support.domain import NOW
 
 PAGES = json.loads(Path("e2e/pages.json").read_text())
+PAGES_TS = Path("e2e/pages.ts").read_text()
+SETUP_KEYS = re.compile(r"const SETUP_KEYS[^=]*= new Set\(\[([^\]]*)\]\)")
 
 
 async def test_the_seed_adds_the_skills_pool_and_draft_flows_once(engine: AsyncEngine) -> None:
@@ -64,10 +66,12 @@ async def test_the_seed_adds_the_skills_pool_and_draft_flows_once(engine: AsyncE
 async def test_every_placeholder_of_the_pages_list_is_a_path_the_seed_command_writes(
     engine: AsyncEngine,
 ) -> None:
-    """The resolver (``variants`` in ``e2e/pages.ts``) takes the keys of one fixture file.
+    """The resolver (``variants`` in ``e2e/pages.ts``) takes the keys of two files.
 
-    ``seed-closures`` merges the closure and the flow examples into it; a placeholder that
-    names none of them would fail the page checks only when they run, so it fails here first.
+    ``seed-closures`` merges the closure and the flow examples and the immediate form into
+    ``fixtures.json``; the global set-up ``e2e/requests.ts`` writes ``requests.json`` (its keys
+    are ``SETUP_KEYS`` in ``e2e/pages.ts``). A placeholder that names none of them would fail
+    the page checks only when they run, so it fails here first.
     """
     await seed_demo(engine)
     written = dataclasses.asdict(
@@ -81,7 +85,11 @@ async def test_every_placeholder_of_the_pages_list_is_a_path_the_seed_command_wr
     }
 
     assert placeholders
-    assert placeholders <= set(written)
+    keys = SETUP_KEYS.search(PAGES_TS)
+    assert keys is not None
+    set_up = set(re.findall(r"'(\w+)'", keys.group(1)))
+    assert "immediate_request" in set_up
+    assert placeholders <= set(written) | {"immediate_form"} | set_up
     assert all(
         re.fullmatch(r"\{\w+\}", p["path"])
         for p in [*pages["pages"], *pages["admin"]]

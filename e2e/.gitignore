@@ -3,3 +3,4 @@ test-results/
 playwright-report/
 fixtures.json
 tour-output/
+requests.json
