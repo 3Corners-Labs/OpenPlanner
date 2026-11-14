@@ -16,7 +16,7 @@
     "lighthouse": "13.6.0"
   },
   "overrides": {
-    "glob": "14.0.3",
+    "glob": "14.0.5",
     "minimatch": "11.0.3"
   }
 }
