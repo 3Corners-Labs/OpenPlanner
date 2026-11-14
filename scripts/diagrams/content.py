@@ -8,7 +8,7 @@ the HTML that draw.io renders (``<b>``, ``<br>``, ``&amp;``); the document build
 from dataclasses import dataclass
 from enum import StrEnum
 
-AS_OF = "5 november 2026"
+AS_OF = "5 november 2026, aangevuld op 14 november 2026"
 TITLE = "Bouwblokken van OpenPlanner"
 SUBTITLE = (
     "Architectuur van de groepsafsprakenservice voor het contactcenter, zoals gebouwd. "
@@ -22,7 +22,7 @@ INTRO = (
 )
 LEGEND_TEXT = (
     "Kleuren: groen = deelnemerskanaal, blauw = kern (domein), oranje = beheer, paars = platform, "
-    "grijs = extern. Gestippeld = ontworpen, nog niet gebouwd."
+    "grijs = extern. Gestippeld = ontworpen of verkend, nog niet gebouwd."
 )
 
 
@@ -161,13 +161,16 @@ BLOCKS = (
         "B7",
         Family.CORE,
         "Gespreksregie",
-        "meeting, work item, tijdlijn, controle",
+        "meeting, belpagina, work item, tijdlijn, controle",
         "Meeting aanmaken namens de host van de groep, work item naar WxCC op T-dispatch, "
         "ondertekende webhooks terug, tijdlijn en gespreksstatus per boeking met de reden van de "
-        "provider; groepscontrole met een proef-work item.",
-        "domain/calls · call_service · integration · jobs/calls · adapters/webex_meetings · "
-        "wxcc · webhooks · group_check",
-        "0017 · 0018 · 0021 · 0065 · 0068 · 0082",
+        "provider; groepscontrole met een proef-work item. De belpagina laat de deelnemer in een "
+        "eigen pagina bellen: het videoplatform blijft afgeschermd en de huisstijl blijft die van "
+        "de organisatie. Als huls gebouwd op de Webex Meetings SDK; een on-premises platform zoals "
+        "Cisco Meeting Server is verkend.",
+        "domain/calls · call_service · call_page · guest_access · integration · jobs/calls · "
+        "api/call_pages · adapters/webex_meetings · wxcc · webhooks · group_check",
+        "0017 · 0018 · 0021 · 0065 · 0068 · 0082 · 0123",
     ),
     Block(
         "B8",
@@ -297,16 +300,27 @@ ACTORS = (
     ("Agent", "krijgt work item via WxCC, host in Webex", False),
 )
 
+
+@dataclass(frozen=True)
+class External:
+    """An external system on plate 1; an explored one is drawn dashed, as not built."""
+
+    name: str
+    note: str
+    explored: bool = False
+
+
 EXTERNALS = (
-    ("Mailprovider", "SMTP per organisatie · B6"),
-    ("SMS-gateway", "vandaag Webex Connect · B6"),
-    ("DNS", "TXT-controle afzenderdomein · B6"),
-    ("Webex Meetings", "meeting + webhooks · B7"),
-    ("Webex Contact Center", "work item, taakevents · B7"),
-    ("Identity provider", "per organisatie of meegeleverde Keycloak · B17"),
-    ("Logplatform", "syslog, Splunk, Elastic of HTTP"),
-    ("Let's Encrypt", "ACME-certificaten · B15"),
-    ("GitHub / GHCR", "releases, ondertekende images · B16"),
+    External("Mailprovider", "SMTP per organisatie · B6"),
+    External("SMS-gateway", "vandaag Webex Connect · B6"),
+    External("DNS", "TXT-controle afzenderdomein · B6"),
+    External("Webex Meetings", "meeting, belpagina, webhooks · B7"),
+    External("Cisco Meeting Server", "verkend: on-premises, web-app in de belpagina · B7", True),
+    External("Webex Contact Center", "work item, taakevents · B7"),
+    External("Identity provider", "per organisatie of meegeleverde Keycloak · B17"),
+    External("Logplatform", "syslog, Splunk, Elastic of HTTP"),
+    External("Let's Encrypt", "ACME-certificaten · B15"),
+    External("GitHub / GHCR", "releases, ondertekende images · B16"),
 )
 
 PLATE1_FOOTNOTE = (
@@ -521,7 +535,11 @@ OUTSIDE_NOTE = (
 
 @dataclass(frozen=True)
 class Lane:
-    """One integration on plate 3: port, adapter, wire, external system and the data."""
+    """One integration on plate 3: port, adapter, wire, external system and the data.
+
+    A ``planned`` lane is explored or designed but not built; its adapter, wire and system are
+    drawn dashed.
+    """
 
     ports: tuple[str, ...]
     family: Family
@@ -535,6 +553,7 @@ class Lane:
     inbound: str
     port_note: str = ""
     incoming: bool = False
+    planned: bool = False
 
 
 LANES = (
@@ -586,6 +605,19 @@ LANES = (
         "groepsnaam en tijden, ook proefgesprekken; verwijderen bij annuleren",
         "meeting-id, join-link · webhooks gestart, host/gast binnen, beëindigd "
         "(HMAC-SHA1, replay-sleutel)",
+    ),
+    Lane(
+        ("VideoProvider",),
+        Family.CORE,
+        "B7",
+        "Cisco Meeting Server",
+        "verkend, nog geen adapter",
+        "HTTPS REST, Call Bridge API<br>events via WebSocket of CDR",
+        "Cisco Meeting Server",
+        "on-premises; web-app ingebed in de belpagina",
+        "ruimte per afspraak met secret en pincode",
+        "gastlink · binnenkomst en vertrek uit de events",
+        planned=True,
     ),
     Lane(
         ("ContactCenterDispatcher", "IntegrationChecker"),

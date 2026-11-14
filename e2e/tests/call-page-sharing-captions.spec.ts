@@ -582,7 +582,23 @@ test('a long caption can be read to its start and to its end with the keyboard, 
   await expect.poll(() => visible('last')).toBe(true); // the keyboard reaches its end
   await page.keyboard.press('Home');
   await expect.poll(() => box.evaluate((el) => el.scrollTop)).toBe(0); // a key scrolls over a few frames
-  for (let i = 0; i < 30 && !(await visible('first')); i++) await page.keyboard.press('PageDown'); // and back to its start
+  // A key's scroll takes a few frames: look only once the box has come to rest, or the next key is
+  // pressed while the newest line's start is still on its way in, and carries it past the box.
+  const atRest = async (): Promise<void> => {
+    let before = -1;
+    await expect
+      .poll(async () => {
+        const now = await box.evaluate((el) => el.scrollTop);
+        const same = now === before;
+        before = now;
+        return same;
+      })
+      .toBe(true);
+  };
+  for (let i = 0; i < 30 && !(await visible('first')); i++) {
+    await page.keyboard.press('PageDown'); // and back to its start
+    await atRest();
+  }
   expect(await visible('first')).toBe(true);
 
   // A box with nothing higher than itself is no tab stop.

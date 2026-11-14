@@ -8,7 +8,9 @@ gate judges the merge group too). Built; step 5 was the release `v0.4.0` with it
 audit runs as a job of the `release` workflow; the release tag is set by the workflow
 dispatch). Step 3 done on 2026-11-02: `decision gate` is a required check in the ruleset of
 `main`, which has no bypass. Point 3 amended by ADR 0104 (only a label set by an administrator
-counts; a push by anyone else takes it off).
+counts; a push by anyone else takes it off). Point 4 superseded in part by ADR 0128
+(2026-11-14): the audit by a second model is optional, no release waits for it and no tag check
+reads a verdict; the audit scripts left the decision paths of point 1.
 
 ## Context
 
