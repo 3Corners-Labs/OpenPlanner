@@ -1002,7 +1002,7 @@ flowchart LR
     gate --> main([main])
     main --> zap["ZAP-baseline,<br/>mutatietest ≥ 80 %"]
     main --> rc["releasekandidaat vX.Y.Z-rc.N<br/>ondertekend image, SBOM,<br/>pre-release"]
-    rel["release-PR, audit door een<br/>tweede model, tag door de release-app"] --> tag([tag vX.Y.Z])
+    rel["release-PR, tag door de release-app"] --> tag([tag vX.Y.Z])
     tag --> img["images: applicatie en proxy<br/>GHCR, cosign, attestatie,<br/>publiek pakket"]
     img --> check["worker: releasecheck<br/>op het kanaal van de installatie"]
     check --> portal["superuser kiest versie<br/>in het portaal"]
@@ -1708,8 +1708,8 @@ overzicht en wordt tegen de code gecontroleerd (een test faalt als de statusrege
 overzicht verschillen). Een PR die een besluit wijzigt, is een *beslissing* en wacht op de
 beslispoort. Die opent alleen met het label `po:approved` van een beheerder van de repository
 (ADR 0078, 0088, 0104). Sinds ADR 0119 merget een besluit samen met zijn eerste bouwstap. Bouwwerk
-merget zodra alle controles groen zijn. Vóór elke release `vX.Y.0` beoordeelt een tweede model
-alles sinds de vorige release (ADR 0078, 0079).
+merget zodra alle controles groen zijn. Een audit door een tweede model van alles sinds de vorige
+release is sinds ADR 0128 optioneel en af en toe; geen release wacht erop.
 
 ### 10.2 Besluiten per thema en hun bouwstand
 
@@ -1766,7 +1766,6 @@ en O15 (Genesys) tellen zwaar.
 | Merge queue (volledige baan) | Alles hierboven plus de autorisatiematrix over elke rol en elk eindpunt, `hadolint`, `trivy`, `schemathesis`, SBOM met `grype`, Playwright (toetsenbord, axe, Lighthouse) voor elke pagina in elke taal | axe 0, Lighthouse ≥ 95 |
 | Beslis-PR | Beslispoort | label `po:approved` van een beheerder |
 | Merge naar `main` | OWASP ZAP-baseline tegen de gestarte container, `mutmut` op domein en i18n, kandidaat-image bouwen, ondertekenen, SBOM attesteren | mutatiescore ≥ 80 % |
-| Release `vX.Y.0` | Release-audit door een tweede model in de release-PR | `Verdict: pass`, anders geen tag |
 | Elk uur, wekelijks | Guardrail-audit tegen de baseline; Renovate; `freshness` (geen update-PR ouder dan 14 dagen); ADR-drift | afwijking is een issue |
 
 ### 11.3 Testarchitectuur

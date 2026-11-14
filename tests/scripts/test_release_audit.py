@@ -1,4 +1,4 @@
-"""The release audit runs Codex against the last release, and a minor tag without one is refused."""
+"""The optional release audit runs Codex against the last release, and nothing waits for it (ADR 0128)."""
 
 import os
 import subprocess
@@ -10,7 +10,7 @@ from tests.scripts.conftest import Git, commit_all, fake_program, script_path
 
 ROOT = Path(__file__).resolve().parents[2]
 AUDIT = ROOT / "scripts" / "release-audit.sh"
-CHECK = ROOT / "scripts" / "check-release-audit.sh"
+WORKFLOWS = ROOT / ".github" / "workflows"
 
 
 def run(script: Path, fakes: Path, **env: str) -> subprocess.CompletedProcess[str]:
@@ -59,38 +59,10 @@ def test_the_audit_says_when_codex_is_missing(released: Path) -> None:
     assert "Codex CLI is not installed" in result.stderr
 
 
-AUDITED = "## What\n\nv0.4.0\n\n## Release audit\n\nNo P1 findings.\n\nVerdict: pass\n"
-
-
-@pytest.mark.parametrize(
-    ("tag", "body", "code", "message"),
-    [
-        ("v0.4.1", "", 0, "patch release"),
-        ("v0.4.0", AUDITED, 0, "release audit found in PR #12"),
-        ("v0.4.0", "## What\n\nv0.4.0\n", 1, "no '## Release audit' section"),
-        ("v0.4.0", AUDITED.replace("Verdict: pass", "Verdict: open"), 1, "Verdict: pass"),
-        ("v1.0.0", AUDITED, 0, "release audit found"),
-    ],
-)
-def test_a_minor_or_major_tag_needs_the_audit_in_its_release_pr(
-    released: Path, tag: str, body: str, code: int, message: str
-) -> None:
-    released.mkdir()
-    fake_program(released, "gh", 'printf "%s" "$FAKE_BODY"')
-
-    result = run(CHECK, released, GITHUB_REF_NAME=tag, FAKE_BODY=body)
-
-    assert result.returncode == code, result.stdout + result.stderr
-    assert message in result.stdout
-
-
-def test_a_tag_on_a_commit_that_is_no_release_pr_is_refused(git: Git, tmp_path: Path) -> None:
-    (tmp_path / "a.txt").write_text("a\n")
-    commit_all(git, "feat: not a release PR")
-    fakes = tmp_path / "fakes"
-    fakes.mkdir()
-
-    result = run(CHECK, fakes, GITHUB_REF_NAME="v0.4.0")
-
-    assert result.returncode == 1
-    assert "not a squash-merged release PR" in result.stdout
+def test_no_workflow_runs_the_audit_or_waits_for_it() -> None:
+    """ADR 0128: no job needs a second model's account, and no tag waits for a verdict."""
+    for workflow in sorted(WORKFLOWS.glob("*.yml")):
+        text = workflow.read_text()
+        for word in ("release-audit", "codex", "OPENAI_API_KEY", "Verdict"):
+            assert word not in text, f"{workflow.name} still refers to {word}"
+    assert not (ROOT / "scripts" / "check-release-audit.sh").exists()

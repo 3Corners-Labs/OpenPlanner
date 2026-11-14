@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Print the part of the release notes that tells an outsider how to verify the public images
-# of a release (ADR 0108 point 4; every release since ADR 0116 point 10). Only a minor or major
-# release (vX.Y.0) carries the independent audit of ADR 0078, so only its notes point to it.
+# of a release (ADR 0108 point 4; every release since ADR 0116 point 10). The notes claim no
+# audit: an audit by a second model is optional (ADR 0128), so a release may have none.
 #
 #   scripts/public-release-notes.sh OWNER/REPO TAG APP_REFERENCE PROXY_REFERENCE
 #
@@ -37,6 +37,3 @@ done
 \`\`\`
 
 TXT
-if [[ $tag =~ ^v[0-9]+\.[0-9]+\.0$ ]]; then
-  printf '%s\n\n' "The independent audit of this release is in its release pull request, under *Release audit*."
-fi
