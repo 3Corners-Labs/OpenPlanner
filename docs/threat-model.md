@@ -897,6 +897,10 @@ are added there).
 | The page is reachable, or shows that the feature exists, while it is switched off | While `embedded_call_enabled` is off the route answers `404` exactly as an unknown address, before the booking is looked at | `tests/api/test_call_pages.py::test_the_page_does_not_exist_while_the_feature_is_off` |
 | A browser without the participant's session opens the page | The same session check as the join page: a `403` that is the same for a booking that does not exist, one `token.rejected` security event (reason `link_required`, no reference in it) and a draw on the budget for links that match nothing | `tests/api/test_call_pages.py::test_the_page_needs_the_participants_session`, `tests/api/test_security_events.py::test_a_visit_to_the_call_page_without_a_session_is_a_security_event` |
 | A public page contacts another origin before the participant clicks | `no-third-parties.spec.ts` keeps failing on every page, and on the call page before the click; the call hosts are allowed after the join click only (a recorded allowance nothing uses yet; not run here) | `e2e/tests/no-third-parties.spec.ts` |
+| The page asks for the camera or the microphone when it loads, or on another page (step 4b) | The script asks only inside the handler of the start button; the device calls are in one place; the permission policy of the camera and the microphone is the call page's alone (the row above) | `tests/api/test_call_pages.py::test_the_script_comes_with_the_page_and_asks_for_the_devices_only_at_the_click`, `tests/web/test_call_page_assets.py::test_the_script_asks_the_browser_for_devices_in_one_place` |
+| The picture or the sound of the device check leaves the browser (step 4b) | The script has no request, socket, storage, cookie, worker or address of any origin; the page refers only to files of its own and the policy adds no host before the click | `tests/web/test_call_page_assets.py::test_the_script_reaches_nothing_outside_the_browser`, `tests/api/test_call_pages.py::test_the_page_refers_only_to_files_of_its_own_and_has_no_inline_code` |
+| Script or markup is injected through a text of the page (step 4b) | Every text is rendered by the server (autoescaped) and set with `textContent`; the script has no text of its own and no markup sink; no inline script or style | `tests/web/test_static.py::test_a_script_never_turns_text_into_markup_or_code`, `tests/web/test_call_page_assets.py::test_the_script_has_no_text_of_its_own` |
+| The page shows a way into the video platform's own app that the organisation did not allow (step 4b) | The server renders the link only when `embedded_call_webex_option` says so (`hidden` renders none, `on_failure` only where the page cannot give the call, `always` before joining too); the link is the redirect `/join/go`, which keeps its own checks; no text names the supplier | `tests/api/test_call_pages.py::test_no_link_to_another_way_in_while_the_setting_is_hidden`, `::test_on_failure_shows_the_link_only_where_the_page_cannot_give_the_call`, `::test_always_shows_the_link_before_joining_too`, `tests/web/test_call_page_assets.py::test_no_text_of_the_page_names_the_supplier_in_any_locale` |
 
 What an attack on this flow leaves in the log: a visit without the participant's session is the
 one `token.rejected` security event above. The other cases leave no event, each for its own
@@ -906,7 +910,8 @@ found by the tests and gates named in the table before anything is released; the
 to attribute at run time. A visit while the feature is off is an unknown address like any other
 (a `404`, the same page and the same headers), so it leaves what an unknown address leaves,
 which is nothing. A page that contacts another origin is caught by the end-to-end test, not
-by a runtime event.
+by a runtime event. The same holds for step 4b: the device check runs in the browser alone and
+nothing of it reaches the server, so there is no request to attribute and no event.
 
 ## Flow: the guest token of the call page (ADR 0123 step 4a)
 

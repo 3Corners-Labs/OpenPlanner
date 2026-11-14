@@ -196,6 +196,7 @@ SETTING_LABELS: dict[str, str] = {
     ),
     "embedded_call_display_name": "settings.field.embedded_call_display_name.label",
     "embedded_call_staff_name": "settings.field.embedded_call_staff_name.label",
+    "embedded_call_webex_option": "settings.field.embedded_call_webex_option.label",
 }
 """The label of every class C and D setting, by key."""
 

@@ -13828,3 +13828,164 @@ msgstr "Deliveries are paused."
 
 msgid "admin.done.contact_center_resumed"
 msgstr "Deliveries are resumed."
+
+#. The participant's call page before the click that joins (ADR 0123 step 4b). No text names the video platform.
+
+msgid "settings.field.embedded_call_webex_option.label"
+msgstr "Way into the video platform's own app next to the call (never, only when the page cannot give the call, or always)"
+
+msgid "callpage.start.body"
+msgstr "You have the call here, in this page. There is nothing to install."
+
+msgid "callpage.start.button"
+msgstr "Test camera and microphone"
+
+msgid "callpage.needs"
+msgstr "The call needs a browser with JavaScript, a camera and a microphone. Turn JavaScript on, or open this page in another browser."
+
+msgid "callpage.other_way"
+msgstr "Join another way"
+
+msgid "callpage.unavailable.heading"
+msgstr "The call is not available in this page yet"
+
+msgid "callpage.check.heading"
+msgstr "Check picture and sound"
+
+msgid "callpage.check.body"
+msgstr "Can you see yourself, and does the bar move when you talk? Then you can join."
+
+msgid "callpage.check.preview"
+msgstr "Your own picture"
+
+msgid "callpage.check.camera_off"
+msgstr "Your camera is off"
+
+msgid "callpage.check.toggles"
+msgstr "Microphone and camera"
+
+msgid "callpage.check.level"
+msgstr "Sound from your microphone"
+
+msgid "callpage.check.level_heard"
+msgstr "We hear you."
+
+msgid "callpage.check.level_silent"
+msgstr "We do not hear you yet. Say something."
+
+msgid "callpage.check.level_off"
+msgstr "Your microphone is off, so we do not hear you."
+
+msgid "callpage.check.camera"
+msgstr "Camera"
+
+msgid "callpage.check.microphone"
+msgstr "Microphone"
+
+msgid "callpage.check.speaker"
+msgstr "Speaker"
+
+msgid "callpage.check.test_sound"
+msgstr "Play a test sound"
+
+msgid "callpage.check.test_sound_playing"
+msgstr "You now hear two tones. Do you hear nothing? Choose another speaker or turn the volume up."
+
+msgid "callpage.check.no_camera"
+msgstr "No camera found. You can join without a picture."
+
+msgid "callpage.check.no_microphone"
+msgstr "No microphone found. You can join without sound."
+
+msgid "callpage.check.external"
+msgstr "An external video service carries this video call."
+
+msgid "callpage.check.join"
+msgstr "Join"
+
+msgid "callpage.check.join_camera"
+msgstr "Join without camera"
+
+msgid "callpage.check.join_microphone"
+msgstr "Join without microphone"
+
+msgid "callpage.check.join_both"
+msgstr "Join without camera and microphone"
+
+msgid "callpage.control.microphone"
+msgstr "Microphone"
+
+msgid "callpage.control.camera"
+msgstr "Camera"
+
+msgid "callpage.control.on"
+msgstr "on"
+
+msgid "callpage.control.off"
+msgstr "off"
+
+msgid "callpage.denied.here"
+msgstr "Click here"
+
+msgid "callpage.denied.step_address_bar"
+msgstr "In the address bar, click the icon left of the web address."
+
+msgid "callpage.denied.step_safari"
+msgstr "In the Safari menu, choose Settings for This Website."
+
+msgid "callpage.denied.step_retry"
+msgstr "Then click Try again below."
+
+msgid "callpage.denied.retry"
+msgstr "Try again"
+
+msgid "callpage.denied.camera.heading"
+msgstr "Your browser does not allow the camera"
+
+msgid "callpage.denied.camera.step"
+msgstr "Set the camera to Allow."
+
+msgid "callpage.denied.camera.without"
+msgstr "You can also join without a camera."
+
+msgid "callpage.denied.microphone.heading"
+msgstr "Your browser does not allow the microphone"
+
+msgid "callpage.denied.microphone.step"
+msgstr "Set the microphone to Allow."
+
+msgid "callpage.denied.microphone.without"
+msgstr "You can also join without a microphone. You then hear the other side, but they do not hear you."
+
+msgid "callpage.denied.both.heading"
+msgstr "Your browser does not allow the camera and the microphone"
+
+msgid "callpage.denied.both.step"
+msgstr "Set the camera and the microphone to Allow."
+
+msgid "callpage.denied.both.without"
+msgstr "You can also join without a camera and microphone. You then see and hear the other side, but they do not see or hear you."
+
+msgid "callpage.say.checking"
+msgstr "Checking your camera and microphone."
+
+msgid "callpage.say.ready"
+msgstr "Your camera and microphone are ready."
+
+msgid "callpage.say.no_devices"
+msgstr "No camera or microphone found. Connect one and try again."
+
+msgid "callpage.say.sound"
+msgstr "Playing the test sound."
+
+msgid "callpage.say.camera_on"
+msgstr "Camera on."
+
+msgid "callpage.say.camera_off"
+msgstr "Camera off."
+
+msgid "callpage.say.microphone_on"
+msgstr "Microphone on."
+
+msgid "callpage.say.microphone_off"
+msgstr "Microphone off."

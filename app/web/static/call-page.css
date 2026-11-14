@@ -1,0 +1,236 @@
+/*
+ * The participant's call page before the click that joins (ADR 0123 step 4b). It builds on
+ * site.css: colours, radius, spacing, font and the 44 px target all come from the --booking-*
+ * tokens of the organisation's theme (ADR 0020, ADR 0041). Only the picture's own dark ground
+ * is a constant of this page. No inline styles and no forced declarations; the page works from 320 px.
+ */
+.call {
+  --call-stage: #101214;
+  --call-on-stage: #ffffff;
+}
+
+/* A rule above .button and friends, which set their own display. */
+.call [hidden] {
+  display: none;
+}
+
+.call-state > :last-child {
+  margin-bottom: 0;
+}
+
+.call-other-way {
+  display: inline-block;
+  min-height: 24px;
+}
+
+/* --- The device check ------------------------------------------------------------------- */
+.call-check {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--booking-space-l);
+  margin-bottom: var(--booking-space-l);
+}
+
+@media (min-width: 48rem) {
+  .call-check {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.call-check__side {
+  min-width: 0;
+}
+
+.call-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--booking-color-border-strong);
+  border-radius: var(--booking-radius);
+  background: var(--call-stage);
+  color: var(--call-on-stage);
+}
+
+.call-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* One's own picture, as in a mirror. */
+  transform: scaleX(-1);
+}
+
+.call-preview__off {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: var(--booking-space-m);
+  text-align: center;
+}
+
+/* The note shows only while there is no picture. */
+.call-preview video:not([hidden]) ~ .call-preview__off {
+  display: none;
+}
+
+.call-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--booking-space-s);
+  margin-bottom: var(--booking-space-m);
+}
+
+/* On is a filled, solid button; off is plain with a dashed edge: the word says it too. */
+.call-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--booking-space-s);
+  min-height: var(--booking-target);
+  padding: var(--booking-space-s) var(--booking-space-m);
+  border: 2px solid var(--booking-color-accent);
+  border-radius: 999px;
+  background: var(--booking-color-accent-subtle);
+  color: var(--booking-color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.call-toggle[aria-pressed="false"] {
+  border-style: dashed;
+  border-color: var(--booking-color-border-strong);
+  background: var(--booking-color-background);
+}
+
+.call-toggle:hover {
+  border-color: var(--booking-color-text);
+}
+
+.call-toggle:focus-visible {
+  background: var(--booking-color-focus-background);
+  color: var(--booking-color-text);
+}
+
+.call-toggle svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: currentcolor;
+}
+
+.call-toggle__state {
+  font-weight: 700;
+}
+
+.call-level meter {
+  display: block;
+  width: 100%;
+  max-width: 30rem;
+  height: 0.875rem;
+  border-radius: 999px;
+  background: var(--booking-color-border);
+}
+
+.call-level meter::-webkit-meter-bar {
+  height: 0.875rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--booking-color-border);
+}
+
+.call-level meter::-webkit-meter-optimum-value,
+.call-level meter::-webkit-meter-suboptimum-value,
+.call-level meter::-webkit-meter-even-less-good-value {
+  border-radius: 999px;
+  background: var(--booking-color-accent);
+}
+
+.call-level meter::-moz-meter-bar {
+  border-radius: 999px;
+  background: var(--booking-color-accent);
+}
+
+.call-level .hint {
+  margin-top: var(--booking-space-xs);
+}
+
+.call .field select {
+  max-width: 100%;
+}
+
+/* --- A refused permission --------------------------------------------------------------- */
+.call-denied h2 {
+  margin-top: 0;
+}
+
+.call-denied ol {
+  padding-left: var(--booking-space-l);
+}
+
+.call-addressbar {
+  display: flex;
+  align-items: center;
+  gap: var(--booking-space-s);
+  max-width: 30rem;
+  margin: 0 0 var(--booking-space-m);
+  padding: var(--booking-space-xs) var(--booking-space-m) var(--booking-space-xs) var(--booking-space-xs);
+  border: 1px solid var(--booking-color-border-strong);
+  border-radius: 999px;
+  background: var(--booking-color-background);
+}
+
+.call-addressbar__icon {
+  flex: none;
+  box-sizing: content-box;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: var(--booking-space-xs);
+  border: 2px solid var(--booking-color-error);
+  border-radius: 50%;
+  fill: var(--booking-color-text);
+}
+
+.call-addressbar__host {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--booking-color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.call-addressbar__here {
+  margin-left: auto;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* --- Preferences ------------------------------------------------------------------------ */
+@media (forced-colors: active) {
+  .call-preview {
+    border-color: CanvasText;
+  }
+
+  .call-toggle {
+    border-color: ButtonText;
+  }
+
+  .call-toggle[aria-pressed="true"] {
+    border-color: Highlight;
+    border-width: 3px;
+  }
+
+  .call-addressbar__icon {
+    border-color: Highlight;
+    fill: CanvasText;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .call-toggle,
+  .call-toggle[aria-pressed="false"] {
+    border-color: var(--booking-color-text);
+  }
+}
