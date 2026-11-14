@@ -8,9 +8,10 @@
  * buttons. Every word is the server's own markup (the sections of the page and [data-text]); the
  * script only shows and hides it and sets text with textContent.
  *
- * Split in three files that share the one object `window.openplannerCall` (no build step):
+ * Split in four files that share the one object `window.openplannerCall` (no build step):
  * call-devices.js is the device check, call-connection.js is the call (token, SDK, attempts,
- * lobby, leaving). They only define; this file, loaded last, starts them.
+ * lobby, leaving), call-media.js is the participant's camera and microphone in the call. They
+ * only define; this file, loaded last, starts them.
  *
  * Never: it makes no request, loads no file, stores nothing, sets no inline style and builds no
  * markup out of text. Without the script, or in a browser without the needed features, the page
@@ -273,6 +274,7 @@
   // answered with a button and one message; the button calls this again.
   var playing = false; // one try at a time; a stream that comes meanwhile is tried after it
   var again = false;
+  var pressed = false; // the participant pressed the button: focus has to land somewhere
   function playRemote() {
     if (state.screen !== "call") return Promise.resolve();
     if (playing) {
@@ -294,11 +296,20 @@
     return Promise.all(plays).then(function (played) {
       playing = false;
       var blocked = played.indexOf(false) !== -1;
-      // Said once per blocked start; when the button goes, focus goes to the heading, not nowhere.
+      // Said once per blocked start. When the participant's press makes the button go, focus goes
+      // to the heading, not nowhere; when the sound starts on its own, focus stays put.
       if (state.screen === "call" && blocked !== state.soundBlocked) {
-        go("call", blocked ? { soundBlocked: true, say: "say_sound_blocked" } : { soundBlocked: false, focus: "state" });
+        go(
+          "call",
+          blocked
+            ? { soundBlocked: true, say: "say_sound_blocked" }
+            : { soundBlocked: false, focus: pressed ? "state" : undefined },
+        );
       }
-      if (!again) return;
+      if (!again) {
+        pressed = false;
+        return;
+      }
       again = false;
       return playRemote();
     });
@@ -393,7 +404,10 @@
     button.addEventListener("click", app.connection.leave);
   });
   $("[data-call-again]").addEventListener("click", app.connection.again);
-  $("[data-call-hear]").addEventListener("click", playRemote);
+  $("[data-call-hear]").addEventListener("click", function () {
+    pressed = true;
+    playRemote();
+  });
   remoteVideo.addEventListener("playing", function () {
     if (state.screen === "call") syncRemote(true);
   });

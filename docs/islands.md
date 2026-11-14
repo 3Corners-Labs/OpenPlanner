@@ -196,17 +196,24 @@ in this order: `call-devices.js`, `call-connection.js` and `call-media.js` only 
   says whether they are heard, a test sound, native selects for camera, microphone and (where the browser
   allows it) speaker, and toggles to join with either off. A refused permission is told apart from a
   missing device and explained in the panel of that kind.
-- **`call-connection.js` owns** the click that joins: it loads the SDK file with its checksum as
-  `integrity`, then asks `POST …/call/token` (the one request the scripts make), initialises the SDK with
-  the token (logs never uploaded, registration temporary, no real-time data link until captions exist),
-  creates the meeting from the guest link and joins with the devices the participant left on. An attempt
+- **`call-connection.js` owns** the call from the click that joins on, except the participant's own devices:
+  it loads the SDK file with its checksum as `integrity`, then asks `POST …/call/token` (the one request
+  the scripts make), initialises the SDK with the token (logs never uploaded, registration temporary, no
+  real-time data link until captions exist), creates the meeting from the guest link and joins. An attempt
   that fails or takes longer than `data-call-seconds` leaves the meeting and unregisters, and the next
-  starts by itself, up to `data-call-attempts`; a token the platform did not take is forgotten. Then the
-  lobby, the first moment of the call (the other side's picture and sound, the own picture, microphone and
-  camera toggles that give the device back when off, leave), the meeting's end and the failure state with a
-  sentence per refusal of the endpoint. The token lives in memory only: never in storage, an address, the
-  page or a log. Before the click nothing is requested and no file is loaded; nothing is stored.
+  starts by itself, up to `data-call-attempts`; one token serves the attempts of a click and is forgotten
+  when the joining ends or the platform refuses it (at registration, creating the meeting or joining). A
+  file the browser refuses, or that fails to load, ends the joining at once as "not available in this
+  page"; a file that never answers is only a failed attempt like any other and, after the last, "we tried
+  N times". Then the lobby, the meeting's end, leaving, and the failure state with a sentence per refusal
+  of the endpoint. The token lives in memory only: never in storage, an address, the page or a log. Before
+  the click nothing is requested and no file is loaded; nothing is stored.
   `tests/web/test_call_page_assets.py` fails on any other network, storage, style, markup or console call.
+- **`call-media.js` owns** the participant's camera and microphone in the lobby and the call: taking the
+  streams, sending a new one when it arrives and the media is in, giving a device back when it is off (taken
+  out of the meeting and stopped; if that is refused it is muted and the page says so), and stopping one
+  that cannot be sent. A press while the media is being added waits, and is dropped if the call ended.
+
 - **Keyboard:** every control is a native button, link or select in reading order; nothing is a pointer
   gesture. Focus moves to the heading of each state (`h1`, or `h2` of a refused-permission panel) and, after
   a successful try again, back to the heading of the check.

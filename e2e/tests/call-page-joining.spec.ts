@@ -44,6 +44,9 @@ type Plan = {
   authFailures?: number;
   slowLeave?: number;
   unpublishFails?: boolean;
+  slowUnpublish?: number;
+  publishFails?: boolean;
+  authFailAt?: 'create' | 'join';
   mediaFailures?: number;
   lobby?: boolean;
   remote?: boolean;
@@ -83,10 +86,11 @@ async function stubToken(page: Page, ...answers: Answer[]): Promise<Request[]> {
   return seen;
 }
 
-/** The stand-in's own log: what the page asked of the SDK, in order. */
+/** The stand-in's own log: what the page asked of the SDK, in order. Empty while the SDK file has not loaded. */
 const sdk = (page: Page): Promise<Log> =>
   page.evaluate(() => {
-    const s = (window as unknown as { __sdk: Log }).__sdk;
+    const s = (window as unknown as { __sdk?: Log }).__sdk;
+    if (!s) return { calls: [], inits: [], devices: [], published: [], unpublished: [], left: false };
     return {
       calls: s.calls,
       inits: s.inits,
@@ -98,7 +102,7 @@ const sdk = (page: Page): Promise<Log> =>
       left: s.left,
     };
   });
-const control = (page: Page, action: 'admit' | 'end'): Promise<void> =>
+const control = (page: Page, action: 'admit' | 'end' | 'remoteAgain'): Promise<void> =>
   page.evaluate((what) => (window as unknown as { __sdk: Record<string, () => void> }).__sdk[what](), action);
 const remoteCamera = (page: Page, on: boolean): Promise<void> =>
   page.evaluate((value) => (window as unknown as { __sdk: { remoteCamera: (v: boolean) => void } }).__sdk.remoteCamera(value), on);
@@ -547,6 +551,77 @@ test('a browser that blocks the sound gets a button and one message, and the but
   expect(await timesSaid(page, 'Your browser blocked the sound. Use the button to hear the other person.')).toBe(1);
   await expectNoAxeViolations(page);
 });
+
+test('when the sound starts on its own, the button goes and focus stays where it was', async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __blockPlay: boolean };
+    w.__blockPlay = true;
+    const original = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      if (w.__blockPlay && this.hasAttribute('data-call-remote-audio')) {
+        return Promise.reject(new DOMException('blocked', 'NotAllowedError'));
+      }
+      return original.call(this);
+    };
+  });
+  await stubToken(page, granted());
+  await open(page);
+  await join(page);
+  const hear = page.getByRole('button', { name: 'Tap to hear the other person' });
+  await expect(hear).toBeVisible();
+  const microphone = page.getByRole('button', { name: /^Microphone/ });
+  await microphone.focus();
+  await page.evaluate(() => ((window as unknown as { __blockPlay: boolean }).__blockPlay = false));
+  await control(page, 'remoteAgain'); // a new try is made, and the browser lets it play
+  await expect(hear).toBeHidden();
+  await expect(microphone).toBeFocused();
+});
+
+test('a new stream that cannot be sent is stopped again, and the toggle and the page say it did not work', async ({ page }) => {
+  await stubToken(page, granted());
+  await open(page, { publishFails: true });
+  await join(page);
+  await expect(heading(page, IN_CALL)).toBeFocused();
+  const microphone = page.getByRole('button', { name: /^Microphone/ });
+  await microphone.click();
+  await expect(microphone).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(() => live(page)).toEqual([1, 0]);
+  await microphone.click();
+  await saidLike(page, /^That did not work\./);
+  // Not sent, so not on: the device is closed again and the toggle still reads off.
+  await expect(microphone).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(() => live(page)).toEqual([1, 0]);
+  // The next press tries again instead of showing "on" for a stream nobody receives.
+  await microphone.click();
+  await expect.poll(async () => (await sdk(page)).calls.filter((c) => c === 'publishStreams').length).toBe(2);
+  await expect(microphone).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('leaving while a device is being taken out of the meeting announces nothing and moves nothing', async ({ page }) => {
+  await stubToken(page, granted());
+  await open(page, { slowUnpublish: 2000 });
+  await join(page);
+  await expect(heading(page, IN_CALL)).toBeFocused();
+  await page.getByRole('button', { name: /^Microphone/ }).click();
+  await page.getByRole('button', { name: 'Leave the call' }).click();
+  await expect(heading(page, 'You left the call')).toBeFocused();
+  // The unpublishing finishes after the call ended; it must not draw or say anything any more.
+  await expect.poll(async () => (await sdk(page)).unpublished).toEqual([1]);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  expect(await timesSaid(page, 'Microphone off.')).toBe(0);
+  await expect(heading(page, 'You left the call')).toBeFocused();
+  await expect(state(page, 'left')).toBeVisible();
+});
+
+for (const step of ['create', 'join'] as const) {
+  test(`a token refused when ${step === 'create' ? 'creating the meeting' : 'joining'} is forgotten like one refused at registration`, async ({ page }) => {
+    const tokens = await stubToken(page, granted());
+    await open(page, { authFailAt: step });
+    await join(page);
+    await expect(heading(page, IN_CALL)).toBeFocused();
+    expect(tokens).toHaveLength(2);
+  });
+}
 
 test('a device that cannot be taken out of the meeting is only muted, and the page says so', async ({ page }) => {
   await stubToken(page, granted());

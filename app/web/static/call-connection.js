@@ -1,12 +1,14 @@
 /*
  * The call of the participant's call page (ADR 0123 steps 4c and 5).
  *
- * Owns: everything that follows the click that joins. It loads the video SDK file (with its checksum as
- * integrity), asks our server for a guest token, initialises the SDK, creates the meeting out of the
- * guest link and joins, in attempts that are given up when they take too long and retried by
- * themselves; a failed attempt leaves the meeting and the registration first. It waits in the
- * lobby, adds the participant's picture and sound when they are let in, switches their camera and
- * microphone on and off, and leaves.
+ * Owns: everything that follows the click that joins, except the participant's own devices
+ * (call-media.js). It loads the video SDK file (with its checksum as integrity), asks our server
+ * for a guest token, initialises the SDK, creates the meeting out of the guest link and joins, in
+ * attempts that are given up when they take too long and retried by themselves; a failed attempt
+ * leaves the meeting and the registration first. It waits in the lobby, adds the participant's
+ * picture and sound when they are let in, follows the meeting's end, and leaves. A file the
+ * browser refuses or that fails to load ends the joining as "not available in this page"; a file
+ * that never answers is a failed attempt like any other and, after the last, "we tried N times".
  *
  * Never: it makes one request, the guest token of this booking, to the address the server put in
  * the markup, and loads one file, the SDK. The token and the link live in the `call` object in
@@ -52,7 +54,8 @@
   var call = { epoch: 0, token: "", link: "", expires: 0, loading: null, abort: null };
   call.client = call.meeting = call.camera = call.microphone = call.capturing = null;
   call.joined = false;
-  call.making = { camera: false, microphone: false };
+  call.making = { camera: null, microphone: null }; // the device being made, as a promise
+  call.sent = null; // the streams that addMedia took along
   call.adding = null; // the media is being added: a device press waits for it
   app.call = call; // shared with call-media.js, which takes and releases the streams
 
@@ -109,7 +112,8 @@
       call.loading = new Promise(function (resolve, reject) {
         var script = document.createElement("script");
         // The browser refuses a file that is not the one its checksum names, and it does not say why
-        // a file did not load: trying again will not make it better, so this ends the joining.
+        // a file did not load: trying again will not make it better, so this ends the joining. A
+        // file that never answers is not this: it times out (`within`) and is a failed attempt.
         var failed = function () {
           script.remove();
           call.loading = null;
@@ -192,6 +196,7 @@
         var local = {};
         if (call.microphone) local.microphone = call.microphone;
         if (call.camera) local.camera = call.camera;
+        call.sent = local;
         return within(call.meeting.addMedia({ localStreams: local }));
       })
       .then(function () {
@@ -302,6 +307,7 @@
     call.meeting = null;
     call.joined = false;
     call.capturing = null;
+    call.sent = null;
     call.epoch += 1;
     if (call.abort) {
       call.abort.abort();
@@ -319,7 +325,9 @@
     });
   }
 
-  // The platform refused the token itself (an authorisation error at registration).
+  // The platform refused the token itself: an authorisation error at any step of the chain
+  // (registration, creating the meeting, joining). The shape of the real SDK's error (a
+  // `statusCode` or a `code`) is a guess until a real meeting shows it; the stand-in uses the same.
   function tokenRefused(error) {
     var code = error && (error.statusCode || error.code);
     return code === 401 || code === 403;

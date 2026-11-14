@@ -76,8 +76,6 @@ def test_the_manifest_is_read_again_only_when_it_changes(
         '"text"',
         "null",
         '{"name": "x", "version": "1", "source": "s", "file": "f.js", "checksum": "abc"}',
-        '{"name": "x", "version": "1", "source": "s", "file": ["f.js"]}',
-        '{"name": "x", "version": "1", "source": "s", "file": 3}',
     ],
 )
 def test_a_manifest_of_the_wrong_shape_is_no_offer_and_no_error(

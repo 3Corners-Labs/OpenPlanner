@@ -80,34 +80,36 @@
   // switching on takes a new one and sends it. If the SDK refuses to take it out, it is only
   // muted and kept, and the page says so (it is off for the other side, but the browser may still
   // show the device as in use). Before the media is in (the lobby) the device is simply stopped or
-  // taken. A press while the devices are being taken or the media is being added waits for that,
-  // so no stream is stopped under `addMedia` and none is made that is never sent.
+  // taken. One rule for sending: a new stream is sent when it arrives and the media is in (after
+  // an adding that is under way, unless that adding took it along); never earlier, never twice.
+  // A press while the devices are being taken, the media is being added or this device is being
+  // made waits for that, and is dropped if the call ended meanwhile. A stream that cannot be sent
+  // is stopped again and the page says that it did not work.
   function setLive(kind, on) {
-    var busy = call.adding || call.capturing;
-    if (busy) {
-      return busy.then(
-        function () {
-          return setLive(kind, on);
-        },
-        function () {},
-      );
-    }
     var epoch = call.epoch;
+    var busy = call.adding || call.capturing || call.making[kind];
+    if (busy) {
+      var replay = function () {
+        return epoch === call.epoch ? setLive(kind, on) : undefined;
+      };
+      return busy.then(replay, replay);
+    }
     var stream = call[kind];
-    var sent = app.state.media === "added";
     var drop = function () {
+      if (epoch !== call.epoch) return;
       stream.stop();
       call[kind] = null;
       showSelf();
       switched(kind, false);
     };
     var mute = function () {
+      if (epoch !== call.epoch) return;
       stream.setUserMuted(true);
       switched(kind, false, "say_device_kept");
     };
     if (!on) {
       if (!stream) switched(kind, false);
-      else if (sent) return call.meeting.unpublishStreams([stream]).then(drop, mute);
+      else if (app.state.media === "added") return call.meeting.unpublishStreams([stream]).then(drop, mute);
       else drop();
       return Promise.resolve();
     }
@@ -116,27 +118,40 @@
       switched(kind, true);
       return Promise.resolve();
     }
-    if (call.making[kind]) return Promise.resolve();
-    call.making[kind] = true;
-    return createStream(kind)
-      .then(function (created) {
-        call.making[kind] = false;
-        if (epoch !== call.epoch) return created.stop();
-        call[kind] = created;
-        showSelf();
-        var published = {};
-        published[kind] = created;
-        return sent ? call.meeting.publishStreams(published) : null;
-      })
-      .then(
-        function () {
-          if (epoch === call.epoch && call[kind]) switched(kind, true);
-        },
-        function () {
-          call.making[kind] = false;
-          app.go(app.state.screen, { say: "say_device_failed" });
-        },
-      );
+    var said = function () {
+      if (epoch === call.epoch) app.go(app.state.screen, { say: "say_device_failed" });
+    };
+    var making = createStream(kind).then(function (created) {
+      if (epoch !== call.epoch) return created.stop();
+      call[kind] = created;
+      showSelf();
+      var settled = function () {};
+      return (call.adding || Promise.resolve())
+        .then(settled, settled)
+        .then(function () {
+          if (epoch !== call.epoch) return null;
+          var taken = call.sent && call.sent[kind] === created;
+          var published = {};
+          published[kind] = created;
+          return app.state.media === "added" && !taken ? call.meeting.publishStreams(published) : null;
+        })
+        .then(function () {
+          if (epoch === call.epoch && call[kind] === created) switched(kind, true);
+        })
+        .then(null, function () {
+          if (epoch !== call.epoch) return;
+          created.stop();
+          if (call[kind] === created) call[kind] = null;
+          showSelf();
+          said();
+        });
+    }, said);
+    var done = function () {
+      if (call.making[kind] === making) call.making[kind] = null;
+    };
+    call.making[kind] = making;
+    making.then(done, done);
+    return making;
   }
 
   app.callMedia = { capture: capture, setLive: setLive };
