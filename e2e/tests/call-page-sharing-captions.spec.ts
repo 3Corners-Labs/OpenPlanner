@@ -540,7 +540,7 @@ test('a long caption can be read to its start and to its end with the keyboard, 
   await page.keyboard.press('End');
   await expect.poll(() => visible('last')).toBe(true); // the keyboard reaches its end
   await page.keyboard.press('Home');
-  expect(await box.evaluate((el) => el.scrollTop)).toBe(0);
+  await expect.poll(() => box.evaluate((el) => el.scrollTop)).toBe(0); // a key scrolls over a few frames
   for (let i = 0; i < 30 && !(await visible('first')); i++) await page.keyboard.press('PageDown'); // and back to its start
   expect(await visible('first')).toBe(true);
 
