@@ -8,7 +8,7 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 
-import { expectNoAxeViolations } from '../helpers';
+import { expectNoAxeViolations, holdCookie } from '../helpers';
 import { loginAs, requireKeycloak } from '../keycloak';
 import { islandVariants } from '../pages';
 
@@ -16,6 +16,7 @@ const variants = islandVariants();
 if (variants.some((v) => v.user)) requireKeycloak();
 
 async function open(page: Page, variant: (typeof variants)[number]): Promise<void> {
+  await holdCookie(page, variant, test.info().project.use.baseURL);
   if (variant.user) await loginAs(page, variant.user, variant.path);
   else await page.goto(variant.path, { waitUntil: 'networkidle' });
 }

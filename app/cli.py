@@ -3,6 +3,10 @@
 Usage:
     ``python -m app.cli seed-demo``     create the demo organisations and groups
     ``python -m app.cli seed-closures``  add the closure examples (e2e pages); not in production
+    ``python -m app.cli seed-demonstration``  add the demonstration fixture of ADR 0121 to the
+        service ``demo`` (the immediate pages of the e2e stack); not in production
+    ``python -m app.cli seed-gated-records``  write one record of each kind the rollback gate
+        holds back (the upgrade matrix's ``rollback`` mode, ADR 0121 A30); not in production
     ``python -m app.cli seed --upgrade-fixture [--bookings N]``  fill a migrated, empty database
         with the generated data of the upgrade fixture (ADR 0116 point 7); not in production
     ``python -m app.cli upgrade-check [--save STATE] [--compare STATE]``  read the state of the
@@ -107,7 +111,9 @@ from app.adapters.db.backup import (
 from app.adapters.db.configuration_package import (
     environment_values,
 )
+from app.adapters.db.demonstration_stack import IMMEDIATE_FORM, seed_demonstration_stack
 from app.adapters.db.engine import create_engine
+from app.adapters.db.gated_records import write_gated_records
 from app.adapters.db.maintenance import checkpoint_wal
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
 from app.adapters.db.rotation import rotation_status
@@ -249,21 +255,62 @@ async def _seed_demo(settings: Settings) -> str:
 async def _seed_closures(settings: Settings) -> tuple[str, bool]:
     """Seed the demo and its closure examples; report their paths as JSON (ADR 0037).
 
-    Refused in production: the examples include a booking of a made-up participant.
+    It also writes the demonstration of ADR 0121 on ``demo`` (``seed-demonstration``), so the
+    e2e stack, which runs this command, carries it (gate item G06). Refused in production: the
+    examples include a booking of a made-up participant.
     """
     if settings.environment == "prod":
         return "seed-closures adds a made-up booking; it runs only outside production\n", False
     engine = create_engine(settings.database_url)
     try:
         await seed_demo(engine)
-        examples = await seed_closure_examples(
-            engine, SystemClock().now(), management_token_key(settings)
-        )
+        now = SystemClock().now()
+        examples = await seed_closure_examples(engine, now, management_token_key(settings))
         flows = await seed_flow_examples(engine)
+        await seed_demonstration_stack(engine, now)
     finally:
         await engine.dispose()
     paths = dataclasses.asdict(examples) | dataclasses.asdict(flows)
+    paths["immediate_form"] = IMMEDIATE_FORM  # e2e/requests.ts (G06)
     return json.dumps(paths, indent=2) + "\n", True
+
+
+async def _seed_demonstration(settings: Settings) -> tuple[str, bool]:
+    """Seed the demo and the demonstration fixture on it; report the immediate form (G06).
+
+    Refused in production: the fixture activates flows past the readiness checklist.
+    """
+    if settings.environment == "prod":
+        return "seed-demonstration writes example flows; it runs only outside production\n", False
+    engine = create_engine(settings.database_url)
+    try:
+        await seed_demo(engine)
+        await seed_demonstration_stack(engine, SystemClock().now())
+    finally:
+        await engine.dispose()
+    base = settings.public_base_url.rstrip("/")
+    return f"Demonstration on {DEMO_SLUG}: {base}{IMMEDIATE_FORM}\n", True
+
+
+async def _seed_gated_records(settings: Settings) -> tuple[str, bool]:
+    """Write one record of each kind only the gated paths write (G07); report their ids.
+
+    Refused in production: the records bypass the rollback gate on purpose, for the upgrade
+    matrix's ``rollback`` mode on a throwaway database.
+    """
+    if settings.environment == "prod":
+        return "seed-gated-records bypasses the rollback gate; it runs only outside production\n", (
+            False
+        )
+    engine = create_engine(settings.database_url)
+    try:
+        await seed_demo(engine)
+        records = await write_gated_records(
+            engine, SystemClock().now(), management_token_key(settings)
+        )
+    finally:
+        await engine.dispose()
+    return json.dumps(dataclasses.asdict(records)) + "\n", True
 
 
 async def _seed_upgrade_fixture(settings: Settings, bookings: int) -> tuple[str, bool]:
@@ -1680,6 +1727,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("seed-demo", help="create the demo organisations and groups")
     commands.add_parser("seed-closures", help="add the closure examples (not in production)")
+    commands.add_parser(
+        "seed-demonstration", help="add the demonstration flows to demo (not in production)"
+    )
+    commands.add_parser(
+        "seed-gated-records", help="write the records the rollback gate holds back (not in prod)"
+    )
     path_cmd = commands.add_parser(
         "upgrade-path-check", help="refuse a database older than MIN_UPGRADE_FROM (ADR 0116)"
     )
@@ -1926,6 +1979,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _write(asyncio.run(_webhooks_health(Settings())))
     if args.command == "seed-closures":
         return _write(asyncio.run(_seed_closures(Settings())))
+    if args.command == "seed-demonstration":
+        return _write(asyncio.run(_seed_demonstration(Settings())))
+    if args.command == "seed-gated-records":
+        return _write(asyncio.run(_seed_gated_records(Settings())))
     if args.command == "upgrade-path-check":
         return _write(asyncio.run(_upgrade_path_check(Settings(), args.image_version, args.stop)))
     if args.command == "seed":

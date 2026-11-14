@@ -9,6 +9,7 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 
+import { holdCookie } from '../helpers';
 import { pageVariants } from '../pages';
 
 const APP = new URL(process.env.BASE_URL ?? 'http://127.0.0.1:8000').origin;
@@ -69,7 +70,8 @@ async function visit(page: Page, path: string): Promise<{ origins: Set<string>; 
 }
 
 for (const variant of pageVariants()) {
-  test(`no third-party request: ${variant.title}`, async ({ page }) => {
+  test(`no third-party request: ${variant.title}`, async ({ page, baseURL }) => {
+    await holdCookie(page, variant, baseURL);
     const { origins, csp, own } = await visit(page, variant.path);
     const allowed = new Set([APP, own]);
     expect([...origins].filter((origin) => !allowed.has(origin))).toEqual([]);

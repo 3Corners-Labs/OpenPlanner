@@ -49,7 +49,7 @@ from tests.support.domain import (
     book_another,
     book_confirmed,
 )
-from tests.support.pool_flows import open_gate, seed_pool_flow
+from tests.support.pool_flows import open_gate, seed_pool_flow, shut_gate
 
 PHONE = "06 1234 5678"
 OTHER_KEY = b"o" * 32
@@ -572,8 +572,12 @@ async def test_a_time_off_the_matched_bookings_own_times_reaches_nobody_with_the
 
 
 async def test_with_the_gate_shut_a_time_of_a_pool_only_is_refused_as_before(
-    changes: ChangeRequestService, bookings: BookingService, uow: InMemoryUnitOfWork
+    changes: ChangeRequestService,
+    bookings: BookingService,
+    uow: InMemoryUnitOfWork,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     await seed_pool_flow(uow, 1, 1)
     _id, _token, code = await _booked(bookings)
 

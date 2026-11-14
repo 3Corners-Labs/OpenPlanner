@@ -25,11 +25,14 @@ const chrome = await chromeLauncher.launch({
 let failed = false;
 try {
   for (const variant of variants) {
+    // A page that opens only for the browser holding a cookie (pages.json `cookie`) gets it as a header.
+    const cookie = variant.cookie;
     const result = await lighthouse(new URL(variant.path, baseUrl).href, {
       port: chrome.port,
       onlyCategories: ['accessibility'],
       output: 'json',
       logLevel: 'error',
+      ...(cookie ? { extraHeaders: { Cookie: `${cookie.name}=${cookie.value}` } } : {}),
     });
     const score = Math.round((result?.lhr.categories.accessibility.score ?? 0) * 100);
     const ok = score >= MIN_SCORE;

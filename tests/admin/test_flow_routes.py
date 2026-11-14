@@ -7,6 +7,7 @@ import pytest
 from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, Site
 from tests.support.admin_site import audit_log
 from tests.support.flow_pages import BASE, act, create, form_data, save
+from tests.support.pool_flows import shut_gate
 from tests.support.skill_seed import add_pool
 
 
@@ -25,7 +26,10 @@ async def test_the_flows_sub_tab_lists_the_existing_flow_read_only(site: Site) -
     assert f'href="{BASE}"' in (await site.client.get("/admin/groups/demo/settings")).text
 
 
-async def test_a_flow_is_created_edited_published_and_audited_with_codes_only(site: Site) -> None:
+async def test_a_flow_is_created_edited_published_and_audited_with_codes_only(
+    site: Site, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     await site.login_as(ORG_ADMIN)
     pool = await add_pool(site, "Advies")
 

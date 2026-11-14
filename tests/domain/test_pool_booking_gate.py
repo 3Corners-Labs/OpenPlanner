@@ -42,7 +42,7 @@ from tests.support.domain import (
     participant,
     window,
 )
-from tests.support.pool_flows import add_counted_pool, add_pool_flow, block, open_gate
+from tests.support.pool_flows import add_counted_pool, add_pool_flow, block, open_gate, shut_gate
 from tests.support.service_flows import flow, legacy, pool, revision
 
 GATES = [pytest.param(False, id="gate-shut"), pytest.param(True, id="gate-open")]
@@ -133,7 +133,10 @@ async def test_every_path_of_the_service_is_the_same_with_a_pool_flow_beside_it(
     assert not [s for s in pooled.state.slots.values() if s.capacity_pool_id is not None]
 
 
-async def test_with_the_gate_shut_the_pool_flow_cannot_be_named_and_nothing_is_stored() -> None:
+async def test_with_the_gate_shut_the_pool_flow_cannot_be_named_and_nothing_is_stored(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     uow = await _uow(True)
     service = _service(uow)
     assert pool_flows_bookable(IntakeMode.APPOINTMENT) is False
@@ -154,6 +157,7 @@ async def test_with_the_gate_shut_the_pool_flow_cannot_be_named_and_nothing_is_s
 async def test_with_the_gate_shut_availability_reads_no_flow(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     uow = await _uow(True)
     plain = await _service(await _uow(False)).availability("balie", MONDAY, MONDAY)
 
@@ -167,9 +171,12 @@ async def test_with_the_gate_shut_availability_reads_no_flow(
         assert found == plain
 
 
-async def test_a_pool_flow_made_the_default_is_ignored_while_the_gate_is_shut() -> None:
+async def test_a_pool_flow_made_the_default_is_ignored_while_the_gate_is_shut(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """ADR 0121 point 8: without an active default the booking is made on the service's own
     staffing and records no flow; the pool is never reached."""
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     uow = await _uow(False)
     for flow_id, stored in list(uow.state.flows.items()):
         if stored.code == "appointment":
@@ -213,8 +220,7 @@ def test_the_gate_lets_a_pool_flow_through_on_both_paths(
     gate_open: bool, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Appointments since ADR 0122 step 5, immediate intake since ADR 0121 step 7."""
-    if gate_open:
-        open_gate(monkeypatch)
+    (open_gate if gate_open else shut_gate)(monkeypatch)
     both = frozenset({IntakeMode.APPOINTMENT, IntakeMode.ON_DEMAND})
     on_pool = flow("advies", current=revision(intake_modes=both, published_at=NOW), flow_id=1)
     wrapper = flow("appointment", current=legacy(published_at=NOW), flow_id=2)
@@ -228,7 +234,8 @@ def test_the_gate_lets_a_pool_flow_through_on_both_paths(
 # --- the readiness checklist reads the gate ---------------------------------------------------
 
 
-def test_a_new_flow_waits_for_the_gate_on_its_own_point() -> None:
+def test_a_new_flow_waits_for_the_gate_on_its_own_point(monkeypatch: pytest.MonkeyPatch) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     items = readiness(revision(), pool(), offered_subjects=())
 
     retention = next(i for i in items if i.code is ReadinessCheck.RETENTION)
