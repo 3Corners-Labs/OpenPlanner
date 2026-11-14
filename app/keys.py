@@ -21,6 +21,10 @@ AGENT_PSEUDONYM_INFO = b"openplanner/agent-pseudonym/v1"
 GUEST_PSEUDONYM_INFO = b"openplanner/guest-pseudonym/v1"
 """HKDF label of the key behind the guest subjects at the video provider (ADR 0123 point 7)."""
 
+WEBHOOK_FINGERPRINT_INFO = b"openplanner/webhook-secret-fingerprint/v1"
+"""HKDF label of the key behind the fingerprints of the installation's webhook secrets (ADR 0124
+point 8); a new label makes every secret look new, which restarts an overlap."""
+
 
 def _bootstrap_key(settings: Settings, value: SecretStr | None, name: str, dev_path: Path) -> bytes:
     """Return a bootstrap key: from the environment, or a shared development key file.
@@ -137,6 +141,22 @@ def guest_pseudonym_keys(settings: Settings) -> list[bytes]:
     previous = guest_pseudonym_key_previous(settings)
     current = guest_pseudonym_key(settings)
     return [current] if previous is None else [current, previous]
+
+
+def webhook_fingerprint_keys(settings: Settings) -> list[bytes]:
+    """Return the keys a webhook secret's fingerprint may be made under, the current one first.
+
+    The fingerprint (ADR 0124 point 8) tells that the secret in the environment is the one seen
+    before without keeping it. During a rotation of ``MANAGEMENT_TOKEN_KEY`` the stored one is
+    still under the previous key, so both are returned and the match is made under either.
+    """
+    previous = management_token_key_previous(settings)
+    current = _derived(settings, WEBHOOK_FINGERPRINT_INFO)
+    return (
+        [current]
+        if previous is None
+        else [current, _derive_from(previous, WEBHOOK_FINGERPRINT_INFO)]
+    )
 
 
 def session_secret(settings: Settings) -> str:

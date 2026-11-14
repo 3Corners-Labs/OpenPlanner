@@ -2523,6 +2523,42 @@ again. Each sealed value carries the id of the key that sealed it. In this order
 A configuration package (ADR 0089) can be exported and imported during a rotation: the
 installation opens its secrets under either key.
 
+**Rotating a webhook secret (ADR 0124 point 8)** keeps the old secret verifying for
+`webhook_secret_overlap_minutes` (class C, default 60, 0 to 1440, *Advanced settings*), so no event
+is refused while the platform takes up the new one.
+
+*An organisation's secret*: on the organisation's *Kanalen* page press *Make a new webhook secret*.
+The server makes the secret and tells the platform (the card says what came of it). The card then
+says until when the previous secret still works. A rotation inside that time stops the previous
+secret at once, together with the one before it. In the *Deliveries seen* table the count *Of
+which verified under the previous secret* goes to zero once the platform has taken the new one up; if
+it does not, press the button again only after reading the refusals there. **If the old secret
+leaked**, set the overlap to 0 first (superuser, *Advanced settings*), then rotate: the old secret is
+refused from the next call, and events already on their way may be refused too. Removal of the
+sealed previous secret is housekeeping (an hourly sweep, and any write of the record after 24 hours);
+what counts is the clock at each delivery.
+
+*The installation's own secrets* (`WEBEX_WEBHOOK_SECRET`, `WXCC_WEBHOOK_SECRET`) come from the
+environment, which the application cannot write:
+
+1. Make the new value (at least 32 random characters; WxCC wants 32 to 256).
+2. Set the **new** value as `WEBEX_WEBHOOK_SECRET` (or `WXCC_WEBHOOK_SECRET`) and the **old** value
+   as `WEBEX_WEBHOOK_SECRET_PREVIOUS` (or `WXCC_WEBHOOK_SECRET_PREVIOUS`); `X_FILE` works for both.
+3. Restart `web` and `worker`. The previous value verifies for the overlap counted from the moment
+   the application first saw the new secret (it is kept in the database as a fingerprint, so a later
+   restart does not start it again).
+4. Tell the platform the new secret straight away, inside the overlap:
+   `docker compose exec web python -m app.cli register-webhooks --update-secret`. The video
+   platform's webhooks are updated in place; the WxCC subscription is made again before the old one is
+   removed. The report never holds a secret.
+5. After the overlap, **remove the `_PREVIOUS` variable** and restart. System status (*Address and
+   proxy*) shows a finding for a previous value that is still set after its overlap, and for one that
+   equals the current secret. A restart with only the new secret set and no previous value refuses the old
+   secret at once.
+
+If the database cannot be read when the application first sees a secret, the previous value is not
+used until it can: an overlap that cannot be measured is never granted.
+
 **Rotating `MANAGEMENT_TOKEN_KEY`** keeps every link working while the previous key is set
 (ADR 0094 point 4):
 

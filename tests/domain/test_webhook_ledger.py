@@ -102,6 +102,7 @@ def test_every_outcome_is_counted_per_address_and_the_times_are_kept() -> None:
         "duplicate": 1,
         "paused": 1,
         "unknown_work": 1,
+        "previous_secret": 1,
         "invalid_signature": 2,
         "malformed": 1,
     }
@@ -442,3 +443,30 @@ def test_a_view_holds_codes_counts_and_times_only() -> None:
     assert view is not None
     assert view.outcomes == {"accepted": 1, "source_unknown": 1}
     assert view.faults == {ChainFault.NO_ADDRESS: 1}
+
+
+def test_a_delivery_under_the_previous_secret_is_a_count_beside_its_outcome() -> None:
+    """ADR 0124 point 8: accepted like any other; the one more count is for the card only."""
+    ledger, clock = _ledger(threshold=1)
+
+    assert ledger.delivered(ACME, Delivered.ACCEPTED) is None
+    ledger.verified_by_previous(ACME)
+    ledger.verified_by_previous(ACME)
+
+    view = ledger.view(ACME)
+    assert view is not None
+    assert view.outcomes == {"accepted": 1, "previous_secret": 2}
+    assert view.by_previous_secret == 2
+    assert view.last_accepted == clock.now()  # from the accepted outcome, not from the count
+    assert view.counted == 0  # it never counts towards an alert
+
+
+def test_a_count_under_the_previous_secret_alone_is_no_delivery() -> None:
+    ledger, _ = _ledger()
+
+    ledger.verified_by_previous(ACME)
+
+    view = ledger.view(ACME)
+    assert view is not None
+    assert view.last_accepted is None
+    assert view.by_previous_secret == 1

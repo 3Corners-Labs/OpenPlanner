@@ -523,9 +523,16 @@ class Settings(BaseSettings):
     webex_refresh_token: SecretStr | None = None
     webex_api_base_url: str = "https://webexapis.com/v1"
     webex_webhook_secret: SecretStr | None = None
+    # ADR 0124 point 8: the webhook secret before a rotation of the installation's own secret,
+    # set only during one. It verifies for ``webhook_secret_overlap_minutes`` counted from the
+    # moment the application first saw the current secret; remove it afterwards (System status
+    # says when). Class B: the application cannot write the environment, and which secrets a
+    # host holds is the host's; ``X_FILE`` works for it.
+    webex_webhook_secret_previous: SecretStr | None = None
     # WxCC API host of the organisation's region, e.g. https://api.wxcc-eu1.cisco.com.
     wxcc_api_base_url: str | None = None
     wxcc_webhook_secret: SecretStr | None = None
+    wxcc_webhook_secret_previous: SecretStr | None = None
 
     # Rate limits on public endpoints (CLAUDE.md security baseline).
     rate_limit_enabled: bool = True
@@ -556,6 +563,9 @@ class Settings(BaseSettings):
     # the network after a delivery, unknown work) one address may have inside the event window
     # before one system event says so. Class C platform.
     webhook_refusal_alert_count: int = Field(default=20, ge=5, le=1000)
+    # ADR 0124 point 8: how long the previous webhook secret keeps verifying after a rotation, for
+    # an organisation's secret and for the installation's own; 0 is at once. Class C platform.
+    webhook_secret_overlap_minutes: int = Field(default=60, ge=0, le=1440)
 
     # ADR 0035: how many host websites one organisation may allow for the widget. Class C.
     embedding_max_origins: int = Field(default=20, ge=1, le=100)

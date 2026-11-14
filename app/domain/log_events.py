@@ -1313,6 +1313,38 @@ _OPERATIONS = (
         _CHECK_HOST,
     ),
     _e(
+        "webhook.sighting_failed",
+        _OPS,
+        "warning",
+        "source error",
+        "The first sighting of the {source} webhook secret could not be read or kept: {error}.",
+        "The moment the application first saw the installation's webhook secret is kept in the "
+        "database (ADR 0124 point 8) and could not be read or written. A previous value of the "
+        "secret in the environment is not used while that is so: an overlap that cannot be "
+        "measured is never granted. The current secret is unaffected.",
+        _CHECK_HOST,
+    ),
+    _e(
+        "webhook.previous_secrets_removed",
+        _SYS,
+        "info",
+        "connections",
+        "The previous webhook secret of {connections} connections was removed.",
+        "Housekeeping removed sealed previous webhook secrets whose overlap had ended (ADR 0124 "
+        "point 8). They no longer verified anything: the clock decides that at each delivery.",
+    ),
+    _e(
+        "webhook.previous_secrets_failed",
+        _SYS,
+        "warning",
+        "error",
+        "Removing previous webhook secrets failed: {error}.",
+        "The hourly sweep of previous webhook secrets whose overlap had ended did not finish "
+        "(ADR 0124 point 8). Nothing is refused or accepted differently: the clock decides, and "
+        "the next round tries again.",
+        _CHECK_HOST,
+    ),
+    _e(
         "webhook.paused",
         _OPS,
         "info",

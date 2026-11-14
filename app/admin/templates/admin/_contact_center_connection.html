@@ -32,8 +32,10 @@
   <p>{{ _("admin.channels.cc_webhook_lead") }}</p>
   <p><code>{{ cc.webhook }}</code></p>
   <p class="hint">{{ _("admin.channels.cc_secret_made", at=cc.secret_made) }}</p>
+  {% if cc.previous_until %}<p class="hint" role="status">{{ _("admin.channels.cc_previous_until", at=cc.previous_until) }}</p>{% endif %}
   <form method="post" action="/admin/organisations/{{ organisation.slug }}/channels/contact-center/webhook-secret">
-    <p>{{ _("admin.channels.cc_rotate_lead") }}</p>
+    <p>{% if cc.overlap_minutes %}{{ _("admin.channels.cc_rotate_lead", minutes=cc.overlap_minutes) }}{% else %}{{ _("admin.channels.cc_rotate_lead_now") }}{% endif %}</p>
+    {% if cc.previous_until %}<p>{{ _("admin.channels.cc_rotate_again") }}</p>{% endif %}
     <button type="submit" class="button button--secondary">{{ _("admin.channels.cc_rotate") }}</button>
   </form>
   <form method="post" action="/admin/organisations/{{ organisation.slug }}/channels/contact-center/delete">

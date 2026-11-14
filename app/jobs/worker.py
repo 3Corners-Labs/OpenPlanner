@@ -88,6 +88,7 @@ from app.domain.update_service import UpdateService
 from app.domain.usage_backfill_service import UsageBackfill
 from app.domain.usage_report_service import UsageReportService
 from app.domain.usage_rollup_service import UsageRollup
+from app.domain.webhook_secret_sweep import PreviousSecretSweep
 from app.domain.worker_check import WorkerHeartbeat, heartbeat_due
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
@@ -351,6 +352,12 @@ async def run_worker(
         prune_requests,
         planner.run_automatic,
         watch_requests,
+        PreviousSecretSweep(
+            uow,
+            clock,
+            sealed_connections(engine, settings),
+            lambda: timedelta(minutes=live.settings.webhook_secret_overlap_minutes),
+        ).run,
     )
     # ADR 0117: usage facts into the hourly table, and the retention of both.
     usage = UsageRollup(

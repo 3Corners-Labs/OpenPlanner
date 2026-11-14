@@ -6366,6 +6366,9 @@ msgstr "Binnenkomende webhooks per minuut, per koppeling en bronadres"
 msgid "settings.field.webhook_refusal_alert_count.label"
 msgstr "Geweigerde of onbekende webhookmeldingen op één adres, binnen het gebeurtenisvenster, waarboven een systeemgebeurtenis waarschuwt"
 
+msgid "settings.field.webhook_secret_overlap_minutes.label"
+msgstr "Hoe lang het vorige webhookgeheim blijft gelden na een vernieuwing (minuten, 0 is direct)"
+
 msgid "settings.field.rate_limit_agent_calls.label"
 msgstr "Aanroepen machine-API per client"
 
@@ -10967,7 +10970,16 @@ msgid "admin.channels.cc_secret_made"
 msgstr "Geheim gemaakt op {at}."
 
 msgid "admin.channels.cc_rotate_lead"
-msgstr "Maak een nieuw geheim als u vermoedt dat het oude is uitgelekt. Het oude geheim werkt daarna niet meer."
+msgstr "Maak een nieuw geheim als u vermoedt dat het oude is uitgelekt, of als vast onderdeel van uw eigen routine. Het contactcenter krijgt het nieuwe geheim direct te horen. Het oude geheim blijft nog {minutes} minuten werken, zodat er geen melding verloren gaat terwijl het contactcenter het nieuwe overneemt; is het oude geheim uitgelekt, vraag dan eerst de platformbeheerder die tijd op 0 te zetten."
+
+msgid "admin.channels.cc_rotate_lead_now"
+msgstr "Maak een nieuw geheim als u vermoedt dat het oude is uitgelekt, of als vast onderdeel van uw eigen routine. Het contactcenter krijgt het nieuwe geheim direct te horen en het oude geheim werkt direct niet meer: meldingen die al onderweg zijn kunnen worden geweigerd."
+
+msgid "admin.channels.cc_rotate_again"
+msgstr "Maakt u nu nog een nieuw geheim, dan werkt het vorige geheim direct niet meer, samen met het geheim daarvoor."
+
+msgid "admin.channels.cc_previous_until"
+msgstr "Het vorige geheim werkt nog tot {at}."
 
 msgid "admin.channels.cc_rotate"
 msgstr "Nieuw webhookgeheim maken"
@@ -13773,6 +13785,12 @@ msgstr "Bronnetwerken van webhooks"
 msgid "admin.settings.address.sources.intro"
 msgstr "Waarvandaan de webhookadressen van de hele installatie aanroepen accepteren. De eigen lijst van een organisatie staat op de kaart van haar koppeling. Een lijst is een extra laag; de handtekening houdt een vreemde buiten. Een adres met een lijst weigert ook een aanroep waarvan het adres niet te vertrouwen is: een aanroep met doorgestuurde headers die zijn peer niet mocht sturen, de proxy zelf, of een loopback- of privéadres terwijl het publieke adres publiek is. Dat wordt per aanroep beslist en staat als weigering in de gebeurtenissen, niet hier."
 
+msgid "admin.settings.address.secrets.ended"
+msgstr "Er staat nog een vorig webhookgeheim in de omgeving, en de overlap is voorbij: het controleert niets meer. Haal WEBEX_WEBHOOK_SECRET_PREVIOUS of WXCC_WEBHOOK_SECRET_PREVIOUS (of de _FILE-variabele) uit de omgeving."
+
+msgid "admin.settings.address.secrets.same"
+msgstr "Er staat een vorig webhookgeheim dat gelijk is aan het huidige: het doet niets. Haal het uit de omgeving."
+
 msgid "admin.settings.address.sources.video"
 msgstr "Videoplatform"
 
@@ -13886,6 +13904,9 @@ msgstr "Geaccepteerd en verwerkt"
 
 msgid "admin.delivery.outcome.duplicate"
 msgstr "Geaccepteerd, al eerder gezien (opnieuw bezorgd)"
+
+msgid "admin.delivery.outcome.previous_secret"
+msgstr "Waarvan gecontroleerd met het vorige geheim"
 
 msgid "admin.delivery.outcome.paused"
 msgstr "Gecontroleerd, weggegooid tijdens de pauze"

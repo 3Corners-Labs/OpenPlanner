@@ -174,6 +174,16 @@ async def note_delivered(request: Request, key: AddressKey, outcome: Delivered) 
     await _tell(request, lambda ledger: ledger.delivered(key, outcome))
 
 
+async def note_previous_secret(request: Request, key: AddressKey) -> None:
+    """Tell the ledger a call verified under the previous secret (ADR 0124 point 8): a count."""
+
+    def count(ledger: WebhookLedger) -> Alert | None:
+        ledger.verified_by_previous(key)
+        return None
+
+    await _tell(request, count)
+
+
 async def note_outcome(request: Request, key: AddressKey, outcome: EventOutcome) -> None:
     """Tell the ledger what a verified event came to: accepted, a duplicate or unknown work."""
     await note_delivered(request, key, _DELIVERED.get(outcome, Delivered.ACCEPTED))

@@ -69,7 +69,11 @@ the code changes, this document changes in the same pull request. `docs/threat-m
   (`app/domain/tokens.py`). The salt is 32 random bytes per booking; the database keeps the salt and
   `sha256(token)`, compared with `hmac.compare_digest`. Derived keys (`app/keys.py`), each with its
   own HKDF-SHA256 label: the client pseudonym key (ADR 0053, security events) and the agent
-  pseudonym key (ADR 0043, who claimed a booking); the pseudonyms themselves are HMAC-SHA256.
+  pseudonym key (ADR 0043, who claimed a booking); the pseudonyms themselves are HMAC-SHA256. A
+  third label makes the fingerprint of the installation's webhook secrets (ADR 0124 point 8): an
+  HMAC-SHA256 of the secret that tells the application the secret in the environment is the one it
+  saw before, without keeping it; during a rotation of this key the fingerprint under the previous
+  key still matches and is made again.
 - **Lives in.** `MANAGEMENT_TOKEN_KEY` (at least 32 bytes), environment or `X_FILE`. The token is
   never stored, never in a job payload or a log.
 - **Who can read it.** The host operator and the `web` and `worker` processes. A copy of the

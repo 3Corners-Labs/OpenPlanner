@@ -6366,6 +6366,9 @@ msgstr "Inbound webhooks per minute, per platform, organisation and source addre
 msgid "settings.field.webhook_refusal_alert_count.label"
 msgstr "Refused or unmatched webhook deliveries at one address, inside the event window, above which a system event warns"
 
+msgid "settings.field.webhook_secret_overlap_minutes.label"
+msgstr "How long the previous webhook secret keeps verifying after a rotation (minutes, 0 is at once)"
+
 msgid "settings.field.rate_limit_agent_calls.label"
 msgstr "Machine API calls per client"
 
@@ -10954,7 +10957,16 @@ msgid "admin.channels.cc_secret_made"
 msgstr "Secret made on {at}."
 
 msgid "admin.channels.cc_rotate_lead"
-msgstr "Make a new secret if you suspect the old one leaked. The old secret stops working at once."
+msgstr "Make a new secret if you suspect the old one leaked, or as part of your own routine. The contact center is told the new secret at once. The old secret keeps working for {minutes} minutes so that no event is lost while the contact center takes the new one up; if the old one leaked, ask the platform administrator to set that time to 0 first."
+
+msgid "admin.channels.cc_rotate_lead_now"
+msgstr "Make a new secret if you suspect the old one leaked, or as part of your own routine. The contact center is told the new secret at once, and the old secret stops working at once: events that are already on their way may be refused."
+
+msgid "admin.channels.cc_rotate_again"
+msgstr "Making another new secret now stops the previous secret at once, together with the one before it."
+
+msgid "admin.channels.cc_previous_until"
+msgstr "The previous secret still works until {at}."
 
 msgid "admin.channels.cc_rotate"
 msgstr "Make a new webhook secret"
@@ -13760,6 +13772,12 @@ msgstr "Source networks of webhooks"
 msgid "admin.settings.address.sources.intro"
 msgstr "Where the installation-wide webhook addresses accept calls from. An organisation's own list is on its connection card. A list is defence in depth; the signature stops a stranger. An address with a list also refuses a call whose address cannot be trusted: one that arrived with forwarded headers its peer was not trusted to send, the proxy itself, or a loopback or private address while the public address is public. Those are decided per call and show as refusals in the events, not here."
 
+msgid "admin.settings.address.secrets.ended"
+msgstr "A previous webhook secret is still set in the environment, and its overlap has ended: it no longer verifies anything. Remove WEBEX_WEBHOOK_SECRET_PREVIOUS or WXCC_WEBHOOK_SECRET_PREVIOUS (or the _FILE variable) from the environment."
+
+msgid "admin.settings.address.secrets.same"
+msgstr "A previous webhook secret is set and equals the current one: it does nothing. Remove it from the environment."
+
 msgid "admin.settings.address.sources.video"
 msgstr "Video platform"
 
@@ -13873,6 +13891,9 @@ msgstr "Accepted and handled"
 
 msgid "admin.delivery.outcome.duplicate"
 msgstr "Accepted, already seen (delivered again)"
+
+msgid "admin.delivery.outcome.previous_secret"
+msgstr "Of which verified under the previous secret"
 
 msgid "admin.delivery.outcome.paused"
 msgstr "Verified, dropped while paused"

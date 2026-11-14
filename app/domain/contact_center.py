@@ -118,6 +118,20 @@ class AttributeSpec:
             raise ValueError("invalid attribute spec")
 
 
+class WebhookSecretUpdate(StrEnum):
+    """How a platform lets the secret of an organisation's webhook subscription change.
+
+    A property of the platform's API, declared by its adapter (ADR 0124 point 8); general code
+    never asks which platform it is, only which of these the adapter declared.
+    """
+
+    IN_PLACE = "in_place"
+    """The platform changes the secret of an existing subscription; nothing is made anew."""
+    RENEW = "renew"
+    """The platform keeps a subscription's secret: a new subscription is made inside the overlap
+    and the old one removed after it, so no event is refused on the way."""
+
+
 @dataclass(frozen=True)
 class ContactCenterCapabilities:
     """What one contact-center platform's adapter can carry (ADR 0121 step 6).
@@ -131,11 +145,15 @@ class ContactCenterCapabilities:
         skills: Whether the platform can route on the mapped skill codes (ADR 0121 step 4b).
         task_kinds: The kinds of task the platform can create (ADR 0123 step 7a): the form (a
             work item), the conversation, or both.
+        webhook_secret_update: How the secret of an organisation's webhook subscription is
+            changed at the platform (ADR 0124 point 8); renewing is the default because it works
+            on every platform.
     """
 
     interaction_kinds: frozenset[InteractionKind] = frozenset()
     skills: bool = False
     task_kinds: frozenset[TaskKind] = frozenset()
+    webhook_secret_update: WebhookSecretUpdate = WebhookSecretUpdate.RENEW
 
     def carries(self, interaction: InteractionKind) -> bool:
         """Return whether the platform can hand work of ``interaction`` to an agent."""
@@ -343,6 +361,9 @@ class OrganisationConnection:
         has_client_secret: Whether a client secret is stored.
         has_refresh_token: Whether a refresh token is stored.
         webhook_secret_at: When the webhook secret was generated; ``None`` before the first.
+        has_previous_webhook_secret: Whether the secret before the last rotation is still kept
+            (ADR 0124 point 8); the card says until when it verifies, from ``webhook_secret_at``
+            and the live overlap. Never the secret.
         allowed_networks: The networks the platform's webhooks may come from (ADR 0124 point 3),
             canonical CIDR; empty: the installation's default applies; or unreadable (a stored
             list that cannot be read, never taken for an empty one). Not secret.
@@ -359,6 +380,7 @@ class OrganisationConnection:
     webhook_secret_at: datetime | None
     allowed_networks: NetworkList = NetworkList()
     inbound_enabled: bool = True
+    has_previous_webhook_secret: bool = False
 
 
 @dataclass(frozen=True)

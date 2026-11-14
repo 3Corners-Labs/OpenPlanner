@@ -33,6 +33,7 @@ OUTCOME_LABELS: dict[str, str] = {
     Delivered.DUPLICATE.value: "admin.delivery.outcome.duplicate",
     Delivered.PAUSED.value: "admin.delivery.outcome.paused",
     Delivered.UNKNOWN_WORK.value: "admin.delivery.outcome.unknown_work",
+    Delivered.PREVIOUS_SECRET.value: "admin.delivery.outcome.previous_secret",
     Refusal.UNKNOWN_ADDRESS.value: "admin.delivery.reason.unknown_address",
     Refusal.NETWORK.value: "admin.delivery.reason.network",
     Refusal.SOURCE_UNKNOWN.value: "admin.delivery.reason.source_unknown",

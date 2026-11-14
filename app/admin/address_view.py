@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from fastapi import Request
 
 from app.adapters.contact_centers import INBOUND
-from app.adapters.webhooks import WEBEX_INBOUND
+from app.adapters.webhooks import WEBEX_INBOUND, InboundWebhook
 from app.admin.delivery_status import DeliveryView, delivery_view
 from app.admin.pages import admin_moment
 from app.admin.source_findings import FAULT_TEXTS, SourceFinding, source_finding
@@ -35,8 +35,10 @@ from app.domain.public_address import (
 )
 from app.domain.web_transport import proxy_hop_unencrypted
 from app.domain.webhook_ledger import AddressKey
+from app.domain.webhook_secrets import SecretFinding
 from app.web.locale import RequestLocale
 from app.web.webhook_ledger import ledger_view
+from app.web.webhook_secrets import installation_status
 from app.web.webhook_sources import contact_center_networks, proxy_chain, video_networks
 from app.web.widget_bundle import SCRIPT_URL_PATH
 
@@ -98,6 +100,26 @@ class SourceRow:
 
 
 @dataclass(frozen=True)
+class SecretRow:
+    """A finding about the previous value of an installation-wide webhook secret (ADR 0124 point 8).
+
+    Attributes:
+        label: Which platform's secret.
+        text: What is wrong and what to do, in words; never a secret or a fingerprint.
+    """
+
+    label: str
+    text: str
+
+
+SECRET_FINDINGS = {
+    SecretFinding.ENDED: "admin.settings.address.secrets.ended",
+    SecretFinding.SAME: "admin.settings.address.secrets.same",
+}
+"""The words of each finding about a previous value that is still set in the environment."""
+
+
+@dataclass(frozen=True)
 class AddressView:
     """The *Address and proxy* part of System status."""
 
@@ -112,6 +134,7 @@ class AddressView:
     hop_warning: str
     untrusted: str
     sources: list[SourceRow]
+    secrets: list[SecretRow]
 
 
 async def address_view(request: Request, locale: RequestLocale, settings: Settings) -> AddressView:
@@ -138,6 +161,7 @@ async def address_view(request: Request, locale: RequestLocale, settings: Settin
         _(HOP_TEXT) if _hop(settings) else "",
         _untrusted_text(request, locale),
         _source_rows(request, locale, settings),
+        await _secret_rows(request, locale),
     )
 
 
@@ -178,6 +202,26 @@ def _source_rows(request: Request, locale: RequestLocale, settings: Settings) ->
         )
         for label, found, platform in findings
     ]
+
+
+async def _secret_rows(request: Request, locale: RequestLocale) -> list[SecretRow]:
+    """Return the findings on the previous values of the installation's webhook secrets.
+
+    A previous value (``WEBEX_WEBHOOK_SECRET_PREVIOUS``, ``WXCC_WEBHOOK_SECRET_PREVIOUS``) that is
+    still set after its overlap ended, or that equals the current secret, is a finding: the
+    environment is the one place it can be removed from, and the page says to remove it.
+    """
+    _ = locale.gettext
+    inbound: tuple[tuple[str, InboundWebhook], ...] = (
+        ("admin.settings.address.sources.video", WEBEX_INBOUND),
+        ("admin.settings.address.sources.contact_center", next(iter(INBOUND.values()))),
+    )
+    rows = []
+    for label, handling in inbound:
+        status = await installation_status(request, handling)
+        if status is not None and status.finding is not None:
+            rows.append(SecretRow(_(label), _(SECRET_FINDINGS[status.finding])))
+    return rows
 
 
 async def _current(request: Request, settings: Settings) -> dict[AddressKind, AddressCheck]:

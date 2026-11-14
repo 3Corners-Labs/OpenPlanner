@@ -7,6 +7,7 @@ re-renders the whole page with its errors, so that route lives with the page in
 ADR 0039 keeps for the superuser; the secrets are write-only and never rendered.
 """
 
+from datetime import timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Request
@@ -26,6 +27,7 @@ from app.domain.errors import DomainError
 from app.domain.networks import NetworkList
 from app.domain.source_networks import MAX_WEBHOOK_NETWORKS
 from app.domain.webhook_ledger import AddressKey
+from app.domain.webhook_secrets import previous_until
 from app.domain.webhook_sources import source_list_that_applies
 from app.i18n import BoundGettext
 from app.web.locale import RequestLocale
@@ -146,7 +148,8 @@ async def connection_view(
 ) -> dict[str, object]:
     """Return the contact-center card (ADR 0032, ADR 0124 point 13).
 
-    It holds the form, the webhook address, when its secret was made, where its webhooks may
+    It holds the form, the webhook address, when its secret was made and until when the previous
+    one still verifies (ADR 0124 point 8; in the organisation's timezone), where its webhooks may
     come from, whether the address is paused (the chip and the sentence, ADR 0124 point 9) and
     what the gate has seen at the address (``delivery``: this web process's ledger, point 10).
     """
@@ -156,6 +159,14 @@ async def connection_view(
     settings = request.app.state.settings
     base = settings.webhook_base
     made = stored.webhook_secret_at if stored else None
+    overlap = timedelta(minutes=settings.webhook_secret_overlap_minutes)
+    until = (
+        previous_until(
+            stored.has_previous_webhook_secret, made, request.app.state.clock.now(), overlap
+        )
+        if stored
+        else None
+    )
     own = stored.allowed_networks if stored else NetworkList()
     sources = card_finding(
         _,
@@ -170,6 +181,8 @@ async def connection_view(
         "fields": _connection_fields(form, stored, _),
         "webhook": INBOUND[stored.kind].organisation_url(base, org) if stored else "",
         "secret_made": moment_label(made, tz, locale.code) if made else "",
+        "previous_until": moment_label(until, tz, locale.code) if until else "",
+        "overlap_minutes": settings.webhook_secret_overlap_minutes,
         "sources": sources,
         "paused": stored is not None and not stored.inbound_enabled,
         "delivery": delivery_view(

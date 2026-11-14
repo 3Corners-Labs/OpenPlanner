@@ -1546,6 +1546,19 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=1000,
     ),
     S(
+        "webhook_secret_overlap_minutes",
+        K.INT,
+        60,
+        _C,
+        T.RATE_LIMITS,
+        "How long the previous webhook secret keeps verifying after a rotation, for an "
+        "organisation's secret and for the installation's own; 0 means at once. A secret that "
+        "was rotated away because it leaked still verifies for this long, so set it to 0 first "
+        "(ADR 0124 point 8).",
+        minimum=0,
+        maximum=1440,
+    ),
+    S(
         "rate_limit_agent_tokens",
         K.RATE,
         "10/minute",
@@ -1878,6 +1891,30 @@ REGISTRY: tuple[SettingSpec, ...] = (
         _C,
         T.WEBEX,
         "Webex webhook secret; to be generated and rotated by the server.",
+        optional=True,
+    ),
+    S(
+        "webex_webhook_secret_previous",
+        K.SECRET,
+        None,
+        _B,
+        T.WEBEX,
+        "The video platform's webhook secret before a rotation; set only during one, then removed. "
+        "It verifies for `webhook_secret_overlap_minutes` from the moment the application first "
+        "saw the current secret. Class B, not C: the installation's own secrets come from the "
+        "environment, which the application cannot write, so the portal cannot rotate them and a "
+        "portal value would be a second home for the same secret; `X_FILE` works (ADR 0124 "
+        "point 8).",
+        optional=True,
+    ),
+    S(
+        "wxcc_webhook_secret_previous",
+        K.SECRET,
+        None,
+        _B,
+        T.WEBEX,
+        "The installation-wide contact-center webhook secret before a rotation; as "
+        "`webex_webhook_secret_previous`, set only during one (ADR 0124 point 8).",
         optional=True,
     ),
     S(

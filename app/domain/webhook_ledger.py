@@ -71,6 +71,10 @@ class Delivered(StrEnum):
     """Verified at a paused address and dropped (point 9)."""
     UNKNOWN_WORK = "unknown_work"
     """Verified, about work this connection did not create (point 12); answered 204."""
+    PREVIOUS_SECRET = "previous_secret"  # noqa: S105 - an outcome code, not a secret
+    """Verified under the previous secret, inside its overlap (point 8). Not an outcome of its own:
+    the call is accepted like any other and counted under that too; this is the one more count
+    that tells the card whether the platform has taken up the new secret yet."""
 
 
 class AlertGroup(StrEnum):
@@ -172,6 +176,11 @@ class LedgerView:
     last_refused_reason: str | None
 
     @property
+    def by_previous_secret(self) -> int:
+        """How many deliveries the previous secret verified in the window (ADR 0124 point 8)."""
+        return self.outcomes.get(Delivered.PREVIOUS_SECRET.value, 0)
+
+    @property
     def paused_dropped(self) -> int:
         """How many verified events were dropped while the address was paused, in the window."""
         return self.outcomes.get(Delivered.PAUSED.value, 0)
@@ -245,6 +254,9 @@ class WebhookLedger:
             key: The address.
             outcome: What came of the call.
         """
+        if outcome is Delivered.PREVIOUS_SECRET:
+            self.verified_by_previous(key)  # a count beside an outcome, not an outcome
+            return None
         now = self._clock.now()
         entry = self._entry(key, now)
         if entry is None:
@@ -255,6 +267,16 @@ class WebhookLedger:
             entry.last_accepted = now
         group = alert_group(outcome, organisational=key.organisation is not None)
         return self._maybe_alert(key, entry, group, outcome.value)
+
+    def verified_by_previous(self, key: AddressKey) -> None:
+        """Count a call that verified under the previous secret (point 8), and nothing else.
+
+        It counts beside the call's outcome (``delivered`` is told that too), never instead of it:
+        no alert, no last-accepted time, no effect on the window.
+        """
+        entry = self._entry(key, self._clock.now())
+        if entry is not None:
+            self._count(entry, Delivered.PREVIOUS_SECRET.value)
 
     def refused(
         self,

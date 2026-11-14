@@ -106,6 +106,7 @@ SETTING_LABELS: dict[str, str] = {
         "settings.field.webhook_source_networks_contact_center.label"
     ),
     "webhook_refusal_alert_count": "settings.field.webhook_refusal_alert_count.label",
+    "webhook_secret_overlap_minutes": "settings.field.webhook_secret_overlap_minutes.label",
     "rate_limit_agent_calls": "settings.field.rate_limit_agent_calls.label",
     "admin_session_hours": "settings.field.admin_session_hours.label",
     "admin_reauth_minutes": "settings.field.admin_reauth_minutes.label",

@@ -10,7 +10,10 @@ one minor (point 11, ADR 0116).
     view(org)   ─► OrganisationConnection | None
     save(org)   ─► audit ─► sealed record ─► register the address  (a blank secret keeps one;
                                               not when only the allowed networks changed)
-    rotate(org) ─► audit ─► new webhook secret ─► register again     (CC-4d)
+    rotate(org) ─► audit ─► new webhook secret, the one before kept as the previous one
+                            ─► register again (CC-4d; ADR 0124 point 8: the platform is told
+                            the new secret without losing an event, and the previous secret
+                            keeps verifying for ``webhook_secret_overlap_minutes``)
     set_inbound ─► audit ─► the one field of the sealed record  (the pause, ADR 0124 point 9;
                             no secret, no registration)
     remove(org) ─► audit ─► record deleted
@@ -36,6 +39,7 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.networks import NetworkList
 from app.domain.ports import Clock, ConnectionRegistrar, ContactCenterConnections, UnitOfWork
 from app.domain.scheduling import is_slug
+from app.domain.webhook_secrets import WebhookSecrets
 
 PERMISSION = Permission.INTEGRATIONS_MANAGE
 AUDIT_KEY = "contact_center_connection"
@@ -66,7 +70,9 @@ class WebhookTarget:
 
     Attributes:
         organisation_id: The organisation's id; ``None`` when the address does not exist.
-        secret: The webhook secret its events are signed with; ``None`` when missing.
+        secrets: The webhook secrets its events are signed with: the current one, the previous
+            one inside its overlap and the time of the rotation (ADR 0124 point 8); ``None``
+            when missing.
         organisation: The organisation's slug, set only when that organisation exists (and has
             no connection); ``None`` when it does not, so a slug a caller made up is never
             handed on.
@@ -77,15 +83,20 @@ class WebhookTarget:
     """
 
     organisation_id: int | None = None
-    secret: str | None = None
+    secrets: WebhookSecrets | None = None
     organisation: str | None = None
     allowed_networks: NetworkList = NetworkList()
     inbound_enabled: bool = True
 
     @property
+    def secret(self) -> str | None:
+        """The current webhook secret; ``None`` when missing."""
+        return self.secrets.current if self.secrets else None
+
+    @property
     def found(self) -> bool:
         """Whether the address exists: an organisation connected to the platform, with a secret."""
-        return self.organisation_id is not None and self.secret is not None
+        return self.organisation_id is not None and self.secrets is not None
 
 
 class ContactCenterConnectionService:
@@ -168,13 +179,13 @@ class ContactCenterConnectionService:
         organisation_id = await self._admin.organisation_id(slug)
         if organisation_id is None:
             return WebhookTarget()
-        secret = await self._connections.webhook_secret(organisation_id, kind)
-        if secret is None:
+        secrets = await self._connections.webhook_secrets(organisation_id, kind)
+        if secrets is None:
             return WebhookTarget(organisation=slug)
         shown = await self._connections.get(organisation_id)
         return WebhookTarget(
             organisation_id,
-            secret,
+            secrets,
             slug,
             shown.allowed_networks if shown else NetworkList(),
             shown.inbound_enabled if shown else True,
@@ -247,7 +258,14 @@ class ContactCenterConnectionService:
         return True
 
     async def rotate_webhook_secret(self, principal: Principal, organisation: str) -> Registration:
-        """Generate a new webhook secret; the old one stops verifying at once.
+        """Generate a new webhook secret; the old one keeps verifying for the overlap.
+
+        The secret that was current is kept, sealed, as the previous one for
+        ``webhook_secret_overlap_minutes`` (ADR 0124 point 8; whether it still counts is decided
+        by the clock at each delivery). A second rotation inside the overlap replaces the previous
+        secret: the one from before it stops at once. The platform is told the new secret in place
+        where its API allows, otherwise by a new subscription made before the old one is removed,
+        so no event is refused on the way (the adapter's capability).
 
         Raises:
             DomainError: as ``save``, and ``invalid_configuration`` naming ``connection`` when

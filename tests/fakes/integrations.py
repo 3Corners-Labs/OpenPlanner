@@ -6,7 +6,7 @@ adapters report every call to (ADR 0068).
 
 from collections.abc import Sequence
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from app.domain.alert_model import AlertChannelKind, AlertTarget, RenderedAlert
 from app.domain.booking import MeetingRef
@@ -38,6 +38,7 @@ from app.domain.ports import (
     RequestRecord,
 )
 from app.domain.scheduling import Group
+from app.domain.webhook_secrets import WebhookSecrets, lapsed, rotated, settled
 
 GUEST_EXPIRES = datetime(2026, 1, 1, 18, tzinfo=UTC)
 """When the fake's guest tokens expire."""
@@ -266,11 +267,16 @@ class FakeContactCenterConnections:
         """Organisations whose record has no webhook secret."""
         self.unreadable: set[int] = set()
         """Organisations whose stored list cannot be read (until a save replaces it)."""
+        self.secrets: dict[int, WebhookSecrets] = {}
+        """The webhook secrets per organisation once rotated (``secret-of-{id}`` before that)."""
 
     async def get(self, organisation_id: int) -> OrganisationConnection | None:
         shown = self.connections.get(organisation_id)
         if shown is not None and organisation_id in self.unreadable:
-            return replace(shown, allowed_networks=NetworkList(unreadable=True))
+            shown = replace(shown, allowed_networks=NetworkList(unreadable=True))
+        held = self.secrets.get(organisation_id)
+        if shown is not None and held is not None:
+            shown = replace(shown, has_previous_webhook_secret=held.previous is not None)
         return shown
 
     async def save(self, organisation_id: int, change: ConnectionChange, now: datetime) -> None:
@@ -300,8 +306,27 @@ class FakeContactCenterConnections:
     async def rotate_webhook_secret(self, organisation_id: int, now: datetime) -> None:
         old = self.connections.get(organisation_id)
         if old is not None:
-            self.connections[organisation_id] = replace(old, webhook_secret_at=now)
+            held = self.secrets.get(organisation_id) or WebhookSecrets(
+                f"secret-of-{organisation_id}", None, old.webhook_secret_at
+            )
             self.rotations += 1
+            self.secrets[organisation_id] = rotated(
+                held, f"secret-of-{organisation_id}-r{self.rotations}", now
+            )
+            self.connections[organisation_id] = replace(old, webhook_secret_at=now)
+
+    async def drop_expired_previous(
+        self, organisation_ids: Sequence[int], now: datetime, overlap: timedelta
+    ) -> int:
+        removed = 0
+        for organisation_id in organisation_ids:
+            held = self.secrets.get(organisation_id)
+            if held is not None and held.previous is not None:
+                after = settled(held, now, overlap)
+                if after is not held:
+                    self.secrets[organisation_id] = after
+                    removed += 1
+        return removed
 
     async def delete(self, organisation_id: int) -> None:
         self.connections.pop(organisation_id, None)
@@ -317,7 +342,20 @@ class FakeContactCenterConnections:
         shown = self.connections.get(organisation_id)
         if organisation_id in self.secretless or shown is None or shown.kind is not kind:
             return None
-        return f"secret-of-{organisation_id}"
+        held = self.secrets.get(organisation_id)
+        return held.current if held is not None else f"secret-of-{organisation_id}"
+
+    async def webhook_secrets(
+        self, organisation_id: int, kind: ContactCenterKind
+    ) -> WebhookSecrets | None:
+        current = await self.webhook_secret(organisation_id, kind)
+        if current is None:
+            return None
+        held = self.secrets.get(organisation_id)
+        if held is not None:
+            return held if not lapsed(held, datetime.now(UTC)) else WebhookSecrets(current)
+        shown = self.connections[organisation_id]
+        return WebhookSecrets(current, None, shown.webhook_secret_at)
 
 
 class FakeOrganisationDispatchers:

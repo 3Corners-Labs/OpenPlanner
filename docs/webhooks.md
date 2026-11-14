@@ -295,7 +295,7 @@ and the first that fails refuses:
 | 2 | The source network: when a list of allowed networks applies, the caller's address is in it (below) | `network`, `source_unknown` | 403 |
 | 3 | `Content-Type`, when the call sends one, is `application/json` or `application/cloudevents+json` (parameters such as `charset` ignored). A call **without** the header passes: the signature decides | `content_type` | 415 |
 | 4 | The body is at most 64 KiB: a declared `Content-Length` over it refuses unread, and a body without a length (chunked) is cut off as soon as more than 64 KiB has arrived | `too_large` | 413 |
-| 5 | The signature over the raw body, in constant time | `invalid_signature` | 401 |
+| 5 | The signature over the raw body, in constant time, under the current secret or the previous one inside its overlap (*Rotating a secret*, below) | `invalid_signature` | 401 |
 | 6 | The signed time, where the platform signs one (WxCC), is within 300 seconds | `stale` | 401 |
 | 7 | The body is a JSON object | `malformed` | 400 |
 | 8 | The limits (below) | `rate` | 429 with `Retry-After` |
@@ -508,7 +508,10 @@ installation-wide addresses) show **Deliveries seen**, server-rendered, without 
   trusted, the caller was the proxy itself, a hop did not hand the caller on, the call had no
   address;
 - how many of the refusals came from inside the connection's own list of networks, and how many
-  events were dropped while paused.
+  events were dropped while paused;
+- *Of which verified under the previous secret* (ADR 0124 point 8): how many of the verified
+  deliveries of the window the previous secret verified, a count beside their outcome, so that an
+  administrator sees whether the platform has taken up a new secret.
 
 **The ledger is in memory, in the web process** (`app/domain/webhook_ledger.py`), like the security
 log and the rate limiter. What the card shows is what *this* process has seen since the window began
@@ -547,6 +550,63 @@ only the superuser sees it.
 If the ledger is full (every entry inside its window and alerted) a new address is not recorded and
 the log line `webhook.ledger_full` names the platform, once per platform and window; making room otherwise drops entries whose
 window ended, then the oldest that has not alerted, so a live alert state is never erased.
+
+### Rotating a secret: the overlap (ADR 0124 point 8)
+
+When a secret is replaced the platform goes on signing with the old one until it has taken up the
+new one, so refusing the old one at once loses events. After a rotation the **previous secret keeps
+verifying for `webhook_secret_overlap_minutes`** (class C, default 60, 0 to 1440, permission
+`settings.platform.manage`, read at each call; 0 means at once). The rule is
+`app/domain/webhook_secrets.py` and `app/domain/webhook_overlap.py`:
+
+- **The clock decides, at the moment of checking.** The previous secret counts when the time of the
+  delivery is before the time of the rotation plus the overlap *as it is now*. No job has to remove
+  anything for it to stop: a sweep that does not run lets nothing through, and lowering the overlap
+  (to 0 for a secret that leaked) applies to the next call.
+- **Both secrets are always compared**, the previous one also when it no longer counts or does not
+  exist (against a stand-in, the result thrown away), and neither comparison stops the other, so the
+  time a check takes says nothing about which secret matched. Each comparison is the platform's own
+  constant-time one.
+- **A delivery verified by the previous secret is accepted exactly like one verified by the current
+  secret**: the same replay key (it does not depend on the secret), the same outcome in the ledger.
+  Only one more count, *Of which verified under the previous secret*, is shown on the card (*Deliveries
+  seen*), so an administrator sees whether the platform has taken up the new secret yet. A delivery
+  refused because its secret has ended is `invalid_signature`, never `stale`.
+- **A second rotation inside the overlap** replaces the previous secret: the secret that was current
+  becomes the previous one and the one before it stops at once. There is never more than one.
+
+**An organisation's secret.** The previous secret is sealed in the connection's record next to the
+current one (`previous_webhook_secret`; the time of the rotation is `webhook_secret_at`) and removed
+when its overlap has ended: at any write of the record once no setting could keep it (24 hours, the
+longest overlap), and by an hourly housekeeping sweep of the worker with the live overlap. A save that
+moves the connection to another host or client makes a new secret and keeps no previous one. The card
+says before the *New webhook secret* button is pressed what will happen, and after a rotation until
+when (in the organisation's timezone) the previous secret still verifies, with a warning that a second
+rotation stops it at once. The rotation is audited by name (`contact_center_connection.rotate_webhook_secret`),
+never by a value.
+
+**What happens to the subscription at the platform** (the adapter declares it,
+`ContactCenterCapabilities.webhook_secret_update`):
+
+| Platform | The secret of its subscription | Done |
+|---|---|---|
+| Video platform (`/webhooks/webex`) | Changed in place: `PUT /webhooks/{id}` with the new secret | `register-webhooks --update-secret` |
+| Webex Contact Center, an organisation's connection | Kept by the subscription, so renewed: the new subscription is made **before** the old one is removed, then the old ones at the address (and only those, ids checked) are deleted. For a moment an event is delivered twice, once under each secret, and the replay memory recognises the second. If WxCC refuses a second subscription at the same address, the old ones are removed first and the new one made then, as before this step; events in that short moment rely on the platform's own retry. A failure that can be retried (an outage) removes nothing | The card's button |
+| Webex Contact Center, the installation's own subscription | As above | `register-webhooks --update-secret` |
+
+**The installation's own secrets** (`WEBEX_WEBHOOK_SECRET`, `WXCC_WEBHOOK_SECRET`) come from the
+environment, which the application cannot write. A rotation is therefore read from the environment
+too: the optional `WEBEX_WEBHOOK_SECRET_PREVIOUS` and `WXCC_WEBHOOK_SECRET_PREVIOUS` (class B,
+`X_FILE` works like for their siblings). The previous value verifies for the overlap counted from the
+moment the application **first saw the current secret**. That moment is kept in the database next to a
+fingerprint of the secret (an HMAC under a purpose key of `MANAGEMENT_TOKEN_KEY`, so it cannot be
+turned back into the secret; one row per platform in `integration_reports`, no new table), so a
+restart does not start the overlap again and a changed secret does. A rotation of
+`MANAGEMENT_TOKEN_KEY` keeps it: the fingerprint under the previous key matches and is made again. If
+the database cannot be read, the previous value is not used: an overlap that cannot be measured
+never extends. System status (*Address and proxy*) shows a finding when a previous value is still set
+after its overlap, or equals the current secret: remove it from the environment. The procedure is in
+the runbook (*Rotating secrets*).
 
 ## Inbound: Webex webhooks (`POST /webhooks/webex`)
 
