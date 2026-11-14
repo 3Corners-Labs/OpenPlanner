@@ -1,4 +1,4 @@
-"""The call page (ADR 0123 step 2): its route, its switch, its policy and who must not get it."""
+"""The call page (ADR 0123 steps 2 and 4b): route, switch, policy, start state, references."""
 
 from typing import Any
 
@@ -8,6 +8,7 @@ import pytest
 from app.adapters.db.uow import SqlUnitOfWork
 from app.api.security_headers import SECURITY_HEADERS
 from app.config import Settings
+from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.web.security_policy import (
     CALL_CSP,
     CALL_POLICY,
@@ -16,11 +17,13 @@ from app.web.security_policy import (
 )
 from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.call_page import Page
 from tests.support.domain import NOW
 from tests.support.participant import booked, open_link
 
 DEFAULT_POLICY = SECURITY_HEADERS[b"permissions-policy"].decode()
 SUPPLIER = ("webex", "cisco")
+_ALWAYS = {"embedded_call_webex_option": "always"}
 
 
 @pytest.fixture
@@ -48,22 +51,181 @@ async def test_the_call_page_carries_its_own_policy_and_nothing_else_changes(
     assert page.headers["cache-control"] == "no-store"
 
 
-async def test_the_shell_has_one_heading_no_script_and_no_supplier(
+async def test_the_start_state_shows_the_appointment_and_one_button_to_begin(
     call_settings: Settings,
 ) -> None:
     async with app_client(call_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
-        english = await client.get(f"{base}/call?lang=en")
-        dutch = await client.get(f"{base}/call?lang=nl")
+        english = Page((await client.get(f"{base}/call?lang=en")).text)
+        dutch = Page((await client.get(f"{base}/call?lang=nl")).text)
 
-    for page in (english, dutch):
-        assert page.text.count("<h1") == 1
-        assert "<script" not in page.text
-        assert "<button" not in page.text
-        assert f'href="{base}/join"' in page.text
-        assert not any(name in page.text.lower() for name in SUPPLIER)
-    assert "not available yet" in english.text
-    assert "nog niet beschikbaar" in dutch.text
+    for page, heading, when, button in (
+        (english, "Your video call", "Friday", "Test camera and microphone"),
+        (dutch, "Uw videogesprek", "vrijdag", "Camera en microfoon testen"),
+    ):
+        start = page.state("start")
+        assert page.visible_headings() == [heading]
+        assert when in start.text()
+        assert "Demo" in start.text()
+        # The one button is there for a browser that can run the call; the script shows it.
+        assert [b.text for b in start.buttons()] == [button]
+        assert "hidden" in start.buttons()[0].attrs
+        assert f'href="{base}/join"' in page.raw
+    # Every other state is rendered, hidden, so the script only has to show it.
+    assert english.state_names() == ["start", "check", "unavailable"]
+    assert [n for n in english.state_names() if english.state(n).hidden] == ["check", "unavailable"]
+
+
+async def test_without_javascript_the_page_says_what_the_call_needs(
+    call_settings: Settings,
+) -> None:
+    async with app_client(call_settings, FixedClock(NOW)) as client:
+        base = await open_link(client, await booked(client))
+        english = Page((await client.get(f"{base}/call?lang=en")).text)
+        dutch = Page((await client.get(f"{base}/call?lang=nl")).text)
+
+    # The sentence stands in the start state, visible: nothing is broken or empty.
+    for page, sentence in (
+        (english, "a browser with JavaScript, a camera and a microphone"),
+        (dutch, "een browser nodig met JavaScript, een camera en een microfoon"),
+    ):
+        needs = page.element("data-call-needs")
+        assert sentence in needs.text()
+        assert "hidden" not in needs.attrs
+        assert not page.state("start").hidden
+
+
+async def test_the_start_state_offers_the_contact_details_of_the_organisation(
+    call_settings: Settings,
+) -> None:
+    async with app_client(call_settings, FixedClock(NOW)) as client:
+        app: Any = client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+        async with SqlUnitOfWork(app.state.engine).locked() as tx:
+            demo = await tx.get_organisation("demo")
+            assert demo is not None
+            await tx.save_contact_block(
+                demo.id, ContactBlock((ContactOption.create(ContactKind.PHONE, "012 345 6789"),))
+            )
+        base = await open_link(client, await booked(client))
+        page = Page((await client.get(f"{base}/call?lang=en")).text)
+
+    assert 'href="tel:0123456789"' in page.element("data-call-needs").raw
+    assert 'href="tel:0123456789"' in page.state("unavailable").raw
+
+
+async def test_the_page_has_no_supplier_name_in_any_locale_and_any_state(
+    call_settings: Settings,
+) -> None:
+    settings = call_settings.model_copy(update=_ALWAYS)
+    async with app_client(settings, FixedClock(NOW)) as client:
+        app: Any = client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+        async with SqlUnitOfWork(app.state.engine).locked() as tx:
+            demo = await tx.get_organisation("demo")
+            assert demo is not None
+            await tx.save_contact_block(
+                demo.id, ContactBlock((ContactOption.create(ContactKind.PHONE, "012 345 6789"),))
+            )
+        base = await open_link(client, await booked(client))
+        pages = [Page((await client.get(f"{base}/call?lang={code}")).text) for code in ("nl", "en")]
+
+    for page in pages:
+        # The hidden states are in the markup, the shared texts and the contact block with them.
+        assert page.state_names() == ["start", "check", "unavailable"]
+        for name in page.state_names():
+            assert not any(word in page.state(name).raw.lower() for word in SUPPLIER)
+        assert not any(word in page.raw.lower() for word in SUPPLIER)
+
+
+async def test_the_page_refers_only_to_files_of_its_own_and_has_no_inline_code(
+    call_settings: Settings,
+) -> None:
+    async with app_client(call_settings.model_copy(update=_ALWAYS), FixedClock(NOW)) as client:
+        base = await open_link(client, await booked(client))
+        page = Page((await client.get(f"{base}/call")).text)
+
+    assert page.references
+    for url in page.references:
+        assert url.startswith(("/", "?")), url
+        assert not url.startswith("//"), url
+    assert any(url.startswith("/static/call-page.js?v=") for url in page.references)
+    assert any(url.startswith("/static/call-page.css?v=") for url in page.references)
+    assert page.inline_code == []
+    assert "<style" not in page.raw
+    # Nothing is asked of the video platform: no address of another origin is in the page at all.
+    assert "http://" not in page.raw
+    assert "https://" not in page.raw
+
+
+async def test_the_script_is_served_with_the_page_and_nothing_else_is_loaded(
+    call_settings: Settings,
+) -> None:
+    async with app_client(call_settings, FixedClock(NOW)) as client:
+        base = await open_link(client, await booked(client))
+        page = Page((await client.get(f"{base}/call")).text)
+        script = await client.get(page.script_sources[0])
+
+    assert len(page.script_sources) == 1
+    assert script.status_code == 200
+    assert script.headers["content-type"].startswith(("text/javascript", "application/javascript"))
+
+
+async def test_no_link_to_another_way_in_while_the_setting_is_hidden(
+    call_settings: Settings,
+) -> None:
+    assert call_settings.embedded_call_webex_option == "hidden"
+    async with app_client(call_settings, FixedClock(NOW)) as client:
+        base = await open_link(client, await booked(client))
+        page = (await client.get(f"{base}/call?lang=en")).text
+
+    assert "/join/go" not in page
+    assert "Join this call another way" not in page
+
+
+async def test_on_failure_shows_the_link_only_where_the_page_cannot_give_the_call(
+    call_settings: Settings,
+) -> None:
+    settings = call_settings.model_copy(update={"embedded_call_webex_option": "on_failure"})
+    async with app_client(settings, FixedClock(NOW)) as client:
+        base = await open_link(client, await booked(client))
+        page = Page((await client.get(f"{base}/call?lang=en")).text)
+
+    link = f'href="{base}/join/go"'
+    assert link in page.element("data-call-needs").raw
+    assert link in page.state("unavailable").raw
+    assert link not in page.state("check").raw
+    assert page.state("start").raw.count(link) == 1  # the notice's, which the script hides
+    assert "Join this call another way" in page.state("unavailable").text()
+
+
+async def test_always_shows_the_link_before_joining_too(call_settings: Settings) -> None:
+    async with app_client(call_settings.model_copy(update=_ALWAYS), FixedClock(NOW)) as client:
+        base = await open_link(client, await booked(client))
+        page = Page((await client.get(f"{base}/call?lang=nl")).text)
+
+    link = f'href="{base}/join/go"'
+    assert page.state("start").raw.count(link) == 1  # once, outside the notice the script hides
+    assert link not in page.element("data-call-needs").raw
+    assert link in page.state("check").raw
+    assert link in page.state("unavailable").raw
+    assert "Op een andere manier deelnemen aan dit gesprek" in page.state("check").text()
+
+
+async def test_the_other_way_follows_the_organisations_own_choice(
+    call_settings: Settings,
+) -> None:
+    async with app_client(call_settings, FixedClock(NOW)) as client:
+        app: Any = client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+        base = await open_link(client, await booked(client))
+        assert "/join/go" not in (await client.get(f"{base}/call")).text
+        async with SqlUnitOfWork(app.state.engine).locked() as tx:
+            demo = await tx.get_organisation("demo")
+            assert demo is not None
+            await tx.save_organisation_setting(demo.id, "embedded_call_webex_option", "always", NOW)
+            await tx.bump_settings_version()
+        await app.state.live_settings.refresh()
+        page = (await client.get(f"{base}/call")).text
+
+    assert f'href="{base}/join/go"' in page
 
 
 async def test_the_page_needs_the_participants_session(call_settings: Settings) -> None:

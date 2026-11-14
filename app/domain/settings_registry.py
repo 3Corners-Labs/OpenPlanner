@@ -18,6 +18,7 @@ from enum import StrEnum
 import phonenumbers
 
 from app.domain.authorization import Permission
+from app.domain.call_page import OtherWayOffer
 from app.domain.guest_access import DisplayNameMode, StaffNameMode
 
 
@@ -2414,6 +2415,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "How the call page names the staff member to the participant: the name of their "
         "account, or the organisation's word for staff (ADR 0123).",
         choices=tuple(m.value for m in StaffNameMode),
+    ),
+    S(
+        "embedded_call_webex_option",
+        K.ENUM,
+        "hidden",
+        _D,
+        T.DISPLAY,
+        "Whether the call page shows the participant a way into the video platform's own app: "
+        "never, only when the page cannot give the call, or always (ADR 0123 point 11).",
+        choices=tuple(m.value for m in OtherWayOffer),
     ),
 )
 """Every setting of the service, in the order of ``docs/settings.md``."""

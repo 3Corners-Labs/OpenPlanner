@@ -320,6 +320,10 @@ class Settings(BaseSettings):
     # account name, or the organisation's word). Class D organisation.
     embedded_call_display_name: Literal["first_name", "term"] = "first_name"
     embedded_call_staff_name: Literal["name", "term"] = "name"
+    # ADR 0123 point 11 and the *Settings* table: whether the participant of an embedded call is
+    # ever shown a way into the video platform's own app. Class D organisation (per service from
+    # step 6, which puts it on the service's form).
+    embedded_call_webex_option: Literal["hidden", "on_failure", "always"] = "hidden"
     # ADR 0121 step 5: the watchdog: hours after the appointment's end before unstarted work
     # expires and started work is marked for recovery. Class D organisation.
     request_unresolved_hours: int = Field(default=24, ge=1, le=168)

@@ -6,8 +6,13 @@ applied by ``participant_call_page``). It exists only while ``embedded_call_enab
 while it is off the route answers as an address that does not exist, so nothing about the
 feature shows on an installation that does not use it.
 
-In this step the page is the shell: the appointment and one line saying the call in this page is
-not available yet. It loads no script and contacts nobody; the page's way in is step 4b.
+In step 4b the page is the participant's way in up to the click that joins, with the browser
+alone: the start state (the appointment and one button), the device check and what a refused
+permission needs. It loads one script and one stylesheet of ours, asks the browser for the
+camera and the microphone only after the button of the start state, and contacts nobody else:
+the join button leads to a state that says the call is not available in this page yet, with
+what ``embedded_call_webex_option`` and the organisation's contact details allow (ADR 0123
+point 11). Joining itself is step 4c.
 
     GET  /b/m/{ref}/call         the call page (404 while the feature is off)
     POST /b/m/{ref}/call/token   the guest token for the click that joins (ADR 0123 point 6)
@@ -36,6 +41,7 @@ step 6 narrows to a service that uses the call page.
 """
 
 from typing import Annotated
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Request
 from starlette.exceptions import HTTPException
@@ -44,6 +50,7 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from app.api.labels import slot_label
 from app.api.link_session import authorise
 from app.api.participant import participant_call_page
+from app.domain.call_page import OtherWayOffer, shows_other_way
 from app.domain.call_token_service import (
     REFUSAL_STATUS,
     CallToken,
@@ -52,6 +59,7 @@ from app.domain.call_token_service import (
 )
 from app.domain.guest_access import GUEST_TERM_KEY, DisplayNameMode
 from app.domain.services import BookingService
+from app.web.contact_labels import contact_service, contact_view
 from app.web.error_pages import refuse_rate_limited
 from app.web.locale import resolve_locale
 from app.web.organisation_settings import follow
@@ -84,12 +92,21 @@ async def call_page(request: Request, public_ref: str) -> HTMLResponse:
     bookings: BookingService = request.app.state.booking_service
     locale = resolve_locale(request)
     details = await bookings.find(await authorise(request, public_ref))
-    follow(request, details.group.organisation_id)
+    current = follow(request, details.group.organisation_id)
     booking, group = details.booking, details.group
+    offer = OtherWayOffer.of(current.embedded_call_webex_option)
     context = {
         "group": group,
         "ref": public_ref,
         "slot_label": slot_label(booking.start, booking.end, group, locale),
+        # The address a participant sees in their address bar is the installation's public one
+        # (ADR 0086 point 4: never an address read from the request).
+        "host": urlsplit(current.public_base_url).hostname or "",
+        "contacts": contact_view(await contact_service(request).public_for_group(group), locale),
+        # The server decides what the browser may see: no link at all unless the setting allows.
+        "other_way_href": f"/b/m/{public_ref}/join/go",
+        "other_way_before": shows_other_way(offer, failed=False),
+        "other_way_failed": shows_other_way(offer, failed=True),
     }
     return await participant_call_page(request, locale, "call.html", group, context)
 

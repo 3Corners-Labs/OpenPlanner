@@ -421,10 +421,15 @@ LEGACY_SUBPATHS = (
     "/wait/leave",
     "/join",
     "/join/go",
+    "/call",
     "/test",
     "/test/go",
 )
-"""Pages an email or a bookmark made before ADR 0093 may still link to under ``/b/{token}``."""
+"""Pages an email or a bookmark made before ADR 0093 may still link to under ``/b/{token}``.
+
+``/call`` is the one later addition (ADR 0123 step 4b): the end-to-end stack opens the call page
+through a link of this kind, as it does the join page. The exchange only sets the cookie and
+redirects; the call page itself answers ``404`` while its switch is off."""
 
 
 @limiter.limit(read_limit)

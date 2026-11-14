@@ -24,6 +24,8 @@ runs:
         # organisation's own identity provider (ADR 0083); until it does, logins are unchanged.
         # The journey spec (tests/video-journey.spec.ts) plays Webex and WxCC events with the
         # simulator (docs/runbook.md, section 10); the secrets sign them for the endpoints.
+        # EMBEDDED_CALL_ENABLED: the call page of tests/call-page-device-check.spec.ts (ADR 0123
+        # step 4b) exists only while the platform switch is on.
         scripts/run-app-container.sh openplanner:e2e -e RATE_LIMIT_BOOKINGS=100/hour \
           -e RATE_LIMIT_READS=300/minute \
           --network "$network" \
@@ -33,6 +35,7 @@ runs:
           -e OIDC_CLIENT_SECRET=dev-only-openplanner-admin-secret \
           -e ORGANISATION_IDPS_ENABLED=true \
           -e SIMULATOR_ENABLED=true \
+          -e EMBEDDED_CALL_ENABLED=true \
           -e WEBEX_WEBHOOK_SECRET=dev-only-webex-webhook-secret \
           -e WXCC_WEBHOOK_SECRET=dev-only-wxcc-webhook-secret
         docker exec app alembic upgrade head
