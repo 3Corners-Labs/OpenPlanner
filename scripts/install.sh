@@ -74,6 +74,7 @@ CONFIG_ENV=$DIR/secrets/config.env
 # edge network (docker-compose.yml), never by the name idp, which this host's DNS could answer
 # while the container is down. scripts/render-keycloak-realm.sh and app/domain/web_transport.py
 # hold the same address; a test keeps them equal.
+# not a pin: a fixed IPv4 address and port on the edge network, not a version
 BUNDLED_IDP_UPSTREAM=172.31.240.4:8080
 # Written once the bundled provider's old client secrets are dropped, removed once Keycloak has
 # the new ones (new_client_secrets, idp_client_secrets): a run that stops in between leaves it,

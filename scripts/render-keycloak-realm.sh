@@ -64,7 +64,9 @@ APP_ENV_FILE=$SECRETS_DIR/keycloak-app.env
 # addresses docker-compose.yml gives them on its internal networks, never by a name this host's
 # DNS could answer while the container is down. scripts/install.sh (IDP_UPSTREAM) and
 # app/domain/web_transport.py hold the same address; a test keeps them equal.
+# not a pin: the provider's fixed IPv4 address on edge, not a version
 IDP_ADDRESS=172.31.240.4
+# not a pin: its database's fixed IPv4 address on idp-store, not a version
 IDP_DB_ADDRESS=172.31.240.18
 # How web and worker reach the realm's admin API.
 ADMIN_URL=http://$IDP_ADDRESS:8080/admin/realms/openplanner
