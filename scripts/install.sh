@@ -31,7 +31,10 @@
 #      the identity provider (ADR 0106 step 5): by default the bundled Keycloak in every
 #                      mode (--idp bundled): the realm is rendered with generated secrets
 #                      (scripts/render-keycloak-realm.sh), the proxy serves it under /idp, and its
-#                      mail server is set at the first start. --idp own asks for the login of
+#                      mail server is set at the first start. Every hop reaches it, and it its
+#                      database, at a fixed address (ADR 0125 step 2); a host that reached it by
+#                      the name idp is moved there, and both client secrets are replaced in the
+#                      files and, after the start, in Keycloak. --idp own asks for the login of
 #                      your own provider, as before, and on a host that ran the bundled one removes
 #                      its login (secrets/keycloak-app.env), its /idp route and its containers
 #                      (ADR 0125; volumes stay). Production runs Keycloak in production
