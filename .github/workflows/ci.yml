@@ -38,7 +38,7 @@ env:
   # renovate: datasource=docker depName=publiccodeyml/libpubliccode
   PUBLICCODE_PARSER_VERSION: "v5.5.1"
   # renovate: datasource=docker depName=anchore/syft
-  SYFT_VERSION: "v1.54.0"
+  SYFT_VERSION: "v1.57.1"
   # renovate: datasource=docker depName=anchore/grype
   GRYPE_VERSION: "v0.121.2"
 
