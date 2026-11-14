@@ -24,6 +24,18 @@ from tests.support.participant import booked, open_link
 DEFAULT_POLICY = SECURITY_HEADERS[b"permissions-policy"].decode()
 SUPPLIER = ("webex", "cisco")
 _ALWAYS = {"embedded_call_webex_option": "always"}
+STATES = [
+    "start",
+    "check",
+    "connecting",
+    "lobby",
+    "call",
+    "failed",
+    "left",
+    "ended",
+    "unavailable",
+]
+"""Every state of the page, in the order of the markup; all but the first are hidden at first."""
 
 
 @pytest.fixture
@@ -72,8 +84,8 @@ async def test_the_start_state_shows_the_appointment_and_one_button_to_begin(
         assert "hidden" in start.buttons()[0].attrs
         assert f'href="{base}/join"' in page.raw
     # Every other state is rendered, hidden, so the script only has to show it.
-    assert english.state_names() == ["start", "check", "unavailable"]
-    assert [n for n in english.state_names() if english.state(n).hidden] == ["check", "unavailable"]
+    assert english.state_names() == STATES
+    assert [n for n in english.state_names() if english.state(n).hidden] == STATES[1:]
 
 
 async def test_without_javascript_the_page_says_what_the_call_needs(
@@ -130,7 +142,7 @@ async def test_the_page_has_no_supplier_name_in_any_locale_and_any_state(
 
     for page in pages:
         # The hidden states are in the markup, the shared texts and the contact block with them.
-        assert page.state_names() == ["start", "check", "unavailable"]
+        assert page.state_names() == STATES
         for name in page.state_names():
             assert not any(word in page.state(name).raw.lower() for word in SUPPLIER)
         assert not any(word in page.raw.lower() for word in SUPPLIER)

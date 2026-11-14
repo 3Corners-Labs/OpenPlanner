@@ -27,14 +27,39 @@ def _code() -> str:
     )
 
 
-def test_the_script_reaches_nothing_outside_the_browser() -> None:
+def test_the_script_reaches_nothing_outside_the_browser_but_the_token_and_the_sdk() -> None:
     forbidden = re.compile(
-        r"\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|importScripts"
+        r"XMLHttpRequest|WebSocket|EventSource|sendBeacon|importScripts"
         r"|\bimport\s*\(|\bimport\s+\w|localStorage|sessionStorage|indexedDB|document\.cookie"
-        r"|https?://|wss?://|new Worker|serviceWorker"
+        r"|https?://|wss?://|new Worker|serviceWorker|\bconsole\b"
     )
 
     assert forbidden.search(_code()) is None
+    # One request, to the address the server gave; one other file, with its checksum.
+    assert re.findall(r"\bfetch\s*\(([^,)]*)", _code()) == ["tokenUrl"]
+    assert re.findall(r'createElement\("script"\)', _code()) == ['createElement("script")']
+    assert re.findall(r"\.src\s*=\s*(\w+)", _code()) == ["sdkSource"]
+    assert re.findall(r"\.integrity\s*=\s*(\w+)", _code()) == ["sdkIntegrity"]
+
+
+def test_the_token_goes_nowhere_but_the_sdk() -> None:
+    # In memory, for the retries: read from the answer, handed to the SDK, forgotten. Never
+    # written into the page, an address, a storage or a text.
+    uses = [line.strip() for line in _code().splitlines() if re.search(r"\.(token|link)\b", line)]
+
+    assert uses == [
+        'call.token = "";',
+        'call.link = "";',
+        "if (call.token && call.expires - Date.now() > TOKEN_MARGIN_MS) return Promise.resolve();",
+        'if (!body || !body.token || !body.link || isNaN(expires)) throw turnedAway("generic");',
+        "call.token = body.token;",
+        "call.link = body.link;",
+        "credentials: { access_token: call.token },",
+        "return within(client.meetings.create(call.link));",
+    ]
+    assert not re.search(
+        r"(textContent|dataset|setAttribute|href|\.value)[^;]*call\.(token|link)", _code()
+    )
 
 
 def test_the_script_sets_no_style_and_no_class_that_the_policy_would_refuse() -> None:
@@ -49,6 +74,11 @@ def _read_by_the_script() -> set[str]:
     names |= {"on", "off"}  # texts[on ? "on" : "off"]
     names |= {f"say_{kind}_{state}" for kind in ("camera", "microphone") for state in ("on", "off")}
     names |= {f"say_without_{kind}" for kind in ("camera", "microphone", "both")}
+    names |= {"say_left", "say_ended"}  # "say_" + kind of finish()
+    names |= {  # "say_failed_" + reason of fail()
+        f"say_failed_{reason}"
+        for reason in ("attempts", "generic", "not_open", "rate_limited", "unavailable")
+    }
     return {name for name in names if not name.endswith("_")}
 
 
@@ -84,9 +114,19 @@ def test_the_styles_use_the_organisations_tokens_and_no_force() -> None:
         assert media in STYLES
 
 
-def test_neither_the_template_nor_the_script_nor_the_styles_name_the_supplier() -> None:
-    for source in (TEMPLATE, SCRIPT, STYLES):
+def test_neither_the_template_nor_the_styles_name_the_supplier() -> None:
+    for source in (TEMPLATE, STYLES):
         assert not any(name in source.lower() for name in SUPPLIER)
+
+
+def test_the_script_names_the_supplier_only_as_the_one_global_the_sdk_file_defines() -> None:
+    # Code, not a text: the SDK file puts one object on the window and the script must reach it.
+    # No comment, string or identifier besides that one line says the supplier's name.
+    found = [
+        line.strip() for line in SCRIPT.splitlines() if any(n in line.lower() for n in SUPPLIER)
+    ]
+
+    assert found == ["return window.Webex;"]
 
 
 def test_no_text_of_the_page_names_the_supplier_in_any_locale() -> None:

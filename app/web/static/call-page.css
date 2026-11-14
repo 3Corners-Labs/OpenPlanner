@@ -1,5 +1,6 @@
 /*
- * The participant's call page before the click that joins (ADR 0123 step 4b). It builds on
+ * The participant's call page: the device check (ADR 0123 step 4b), connecting, the lobby and the
+ * first moment of the call (step 4c). It builds on
  * site.css: colours, radius, spacing, font and the 44 px target all come from the --booking-*
  * tokens of the organisation's theme (ADR 0020, ADR 0041). Only the picture's own dark ground
  * is a constant of this page. No inline styles and no forced declarations; the page works from 320 px.
@@ -210,8 +211,147 @@
   white-space: nowrap;
 }
 
+/* --- Connecting and waiting ------------------------------------------------------------- */
+.call-state--centred {
+  display: flex;
+  justify-content: center;
+}
+
+.call-state--centred[hidden] {
+  display: none;
+}
+
+.call-card {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 40rem;
+  padding: var(--booking-space-l);
+  border: 1px solid var(--booking-color-border);
+  border-radius: var(--booking-radius);
+  background: var(--booking-color-surface);
+  text-align: center;
+}
+
+.call-card .call-preview {
+  max-width: 28rem;
+  margin: 0 auto var(--booking-space-m);
+}
+
+.call-card .call-toggles {
+  justify-content: center;
+}
+
+.call-spinner {
+  display: block;
+  box-sizing: border-box;
+  width: 3rem;
+  height: 3rem;
+  margin: 0 auto var(--booking-space-m);
+  border: 4px solid var(--booking-color-border);
+  border-top-color: var(--booking-color-accent);
+  border-radius: 50%;
+  animation: call-spin 1s linear infinite;
+}
+
+@keyframes call-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- The first moment in the call ------------------------------------------------------- */
+.call-quiet {
+  margin: 0 0 var(--booking-space-s);
+  color: var(--booking-color-text-muted);
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+.call-stage {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--booking-radius);
+  background: var(--call-stage);
+  color: var(--call-on-stage);
+}
+
+.call-remote {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.call-remote__off {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: var(--booking-space-m);
+  text-align: center;
+}
+
+.call-self {
+  position: absolute;
+  right: var(--booking-space-s);
+  bottom: var(--booking-space-s);
+  width: min(30%, 12rem);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 2px solid var(--call-on-stage);
+  border-radius: var(--booking-radius);
+  background: var(--call-stage);
+}
+
+.call-self video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* One's own picture, as in a mirror. */
+  transform: scaleX(-1);
+}
+
+.call-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--booking-space-m);
+  margin-top: var(--booking-space-m);
+}
+
+.call-bar .call-toggles {
+  margin-bottom: 0;
+}
+
+.call-leave {
+  min-height: var(--booking-target);
+}
+
 /* --- Preferences ------------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  /* A ring that stands still still says that something is going on: the words say it too. */
+  .call-spinner {
+    animation: none;
+  }
+}
+
 @media (forced-colors: active) {
+  .call-card,
+  .call-stage,
+  .call-self {
+    border: 1px solid CanvasText;
+  }
+
+  .call-spinner {
+    border-color: CanvasText;
+    border-top-color: Highlight;
+  }
+
   /* The bar and its fill keep system colours, so the bar does not vanish. */
   .call-level meter,
   .call-level meter::-webkit-meter-bar {

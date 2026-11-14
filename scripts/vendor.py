@@ -1,4 +1,4 @@
-"""The manifest of a vendored front-end file: its one shape and its one reader (ADR 0118 point 6).
+"""The manifests of the vendored front-end files of this repository (ADR 0118 point 6).
 
 A vendored file lives under ``app/web/static/vendor/<name>/`` next to a ``manifest.json``::
 
@@ -16,85 +16,14 @@ is false until the file and the checksum are replaced together. ``scripts.check_
 ``scripts.vendor_sbom`` and ``tests/web/test_vendor.py`` read manifests through this module only.
 """
 
-import hashlib
-import json
-from dataclasses import dataclass
 from pathlib import Path
+
+from app.adapters.vendored_files import MANIFEST, Manifest, file_matches, load
+
+__all__ = ["MANIFEST", "ROOT", "VENDOR_DIRECTORY", "Manifest", "file_matches", "load", "manifests"]
 
 ROOT = Path(__file__).resolve().parent.parent
 VENDOR_DIRECTORY = "app/web/static/vendor"
-MANIFEST = "manifest.json"
-
-
-@dataclass(frozen=True)
-class Manifest:
-    """One vendored file's manifest.
-
-    Attributes:
-        path: The manifest file.
-        name: The package's name (the npm package for a Renovate datasource).
-        version: The version pinned; the only field Renovate changes.
-        source: Where the file comes from, in words.
-        file: The vendored file's name next to the manifest.
-        checksum_version: The version the checksum was taken of; ``None`` until placed.
-        sha256: The file's SHA-256 in hex; ``None`` until placed.
-    """
-
-    path: Path
-    name: str
-    version: str
-    source: str
-    file: str
-    checksum_version: str | None
-    sha256: str | None
-
-    @property
-    def vendored(self) -> Path:
-        """The vendored file's path (it may not exist: it is placed, not committed)."""
-        return self.path.parent / self.file
-
-    @property
-    def placed(self) -> bool:
-        """Whether the vendored file is next to its manifest."""
-        return self.vendored.is_file()
-
-    @property
-    def checksum_is_current(self) -> bool:
-        """Whether the manifest carries a checksum taken of the pinned ``version``."""
-        return self.sha256 is not None and self.checksum_version == self.version
-
-
-def file_matches(manifest: Manifest) -> bool:
-    """Whether the placed file's bytes are the ones the manifest's current checksum names.
-
-    True only when the file is placed, the checksum is of the pinned version and the SHA-256 of
-    the file equals it. The one place that hashes a vendored file: the size and checksum gates
-    of ``tests/web/test_vendor.py`` and the SBOM step both use it.
-    """
-    return (
-        manifest.placed
-        and manifest.checksum_is_current
-        and hashlib.sha256(manifest.vendored.read_bytes()).hexdigest() == manifest.sha256
-    )
-
-
-def load(path: Path) -> Manifest:
-    """Read the manifest at ``path``.
-
-    Raises:
-        KeyError: A required field is missing.
-    """
-    data = json.loads(path.read_text(encoding="utf-8"))
-    checksum = data.get("checksum") or {}
-    return Manifest(
-        path=path,
-        name=data["name"],
-        version=data["version"],
-        source=data["source"],
-        file=data["file"],
-        checksum_version=checksum.get("version"),
-        sha256=checksum.get("sha256"),
-    )
 
 
 def manifests(root: Path = ROOT) -> list[Manifest]:
