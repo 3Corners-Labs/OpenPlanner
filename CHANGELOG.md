@@ -4,6 +4,94 @@ All notable changes are listed here, generated from Conventional Commits on rele
 
 ## Unreleased
 
+## 0.6.0 (2026-11-14)
+
+### Shipped dark
+
+- Services, named flows, skills and shared capacity pools (ADR 0121, ADR 0122) are in the
+  schema, the domain, the configuration package and the admin portal (a group is shown as a
+  service; Skills, Capacity pools, Flows and the staffing of a counted pool), but every new
+  path stays shut behind the rollback gate: `ROLLBACK_SAFE` is `False` in this release, so the
+  flow resolver offers only each service's legacy pool and default flows, and booking on a
+  counted pool, immediate intake and check-in, requests and work items, skill enforcement and
+  contact-center task requests do not run. Every service received its legacy pool and default
+  flows from one rule in the migration (backfilled). The gate opens in a later release after
+  the items of `docs/service-flows-gate-checklist.md`; contact-center flows additionally stay
+  inactive until G13 to G15 are done.
+- The participant's call in OpenPlanner's own page (ADR 0123 steps 1 to 4c): the guest-token
+  endpoint, the start state, the device check and joining with the Meetings SDK; in the call
+  (steps 5a to 5c): devices, recording and connection notices, the ended state, sharing a
+  screen both ways, closed captions and the staff member's screen name. Off until the platform
+  setting `embedded_call_enabled` is switched on (default off). A staff member sets their own
+  screen name on *My profile* (step 5d).
+
+### Features
+
+- Reporting on use (ADR 0117): a usage store without personal data with rollup, retention and
+  backfill; the Volume, Queue and calls, Capacity, Channels and Team reports with charts
+  (`report-charts.js`); CSV export and the `openplanner.usage/1` file; the usage API
+  `/reports/usage` (scope `reports:read`); a digest by email; the live wallboard and display
+  links; usage facts as the log line `usage.fact`.
+- Configuration as a JSON document (ADR 0099 steps 1 to 4a): domain, adapter, host commands and
+  JSON Schema; the document in the portal with a plan and per-object actions; the API and the
+  installer; the SQLite export retired; secrets in clear text only when the host switch
+  `CONFIGURATION_PLAINTEXT_EXPORT_ALLOWED` allows it.
+- Provider-neutral contact center (ADR 0032 CC-1 to CC-4d): routing, task and dispatcher per
+  platform, a webhook route per platform kind, an organisation's own contact-center connection
+  and webhook address, and the group form rendered from the platform's descriptor.
+- Contact-center health (ADR 0082 steps 2, 3 and 5): connection health, last inbound events,
+  WxCC dedupe and reconcile; alerts to email addresses and Webex spaces with a test alert.
+- One gate for inbound webhooks (ADR 0124 steps 1 to 3b): one check for every inbound webhook,
+  allowed source networks per connection, replays per organisation and by body hash, the pause
+  of an address, the refusal alert and what the gate saw on the connection card. Rate limiters
+  count an IPv6 caller by its /64.
+- Subjects and routing attributes per group (ADR 0081 steps 1 to 4).
+- The rebooking assistant (ADR 0057 steps 2 to 4): a proposed new time is held until the
+  participant answers; the planner proposes and reviews for a slot, a day or a week; the
+  assistant can propose by itself per group.
+- Confirm by email (ADR 0056 steps 3 to 4): not-confirmed bookings in the agenda, confirm,
+  move and cancel on behalf; the participant corrects name, phone and answers.
+- A refused booking is explained by email only (ADR 0066 step 8).
+- Contact details on a booking are shown on request, every request audited, with an hourly
+  alert on many requests by one person (ADR 0044 §2).
+- Machine API: change requests by phone number and appointment code, which stop with their
+  client, with a quiet period and retention (ADR 0023 step 2).
+- Own queue: lobby join time and the not-picked-up event (ADR 0043 step 4).
+- Admin structure (ADR 0047 steps 4 to 6): six group tabs with sub-tabs, a readiness checklist,
+  the closures filter and list pattern, settings screens declaring their topics in the register.
+- Overview: each admin's own layout, Add widget and Edit overview (ADR 0096 steps 2 and 3).
+- Optional motion of the product mark (ADR 0060 step 2).
+- Releases (ADR 0116 steps 3 to 6): the upgrade fixture and matrix from released data (this is
+  the first release that attaches `upgrade-fixture-0.6.0.sqlite`), maintenance lines
+  `release/X.Y`, line, window, `apply_after`, support status and upgrade stop on the updates
+  page, and every release `vX.Y.Z` in the public packages.
+- Process: a decision merges with its first build step (ADR 0119).
+- Releases: the independent audit by a second model is optional and gates nothing (ADR 0128).
+
+### Fixes
+
+- Login: a production install with the bundled identity provider starts; production accepts an
+  http discovery URL only for the exact internal address of the bundled provider with an https
+  issuer (ADR 0125). Every hop on the host to the bundled provider goes to a fixed address, and
+  a host that ran on the name gets new client secrets (ADR 0125 step 2). `--idp own` removes the
+  bundled route and stops its containers.
+- Updates: an update request whose updater went silent ends, so auto-apply goes on; design
+  and documentation lines are marked in the version picker.
+- Admin: pages fit a 1280 px screen and System status names the environment; another group's
+  booking is not found through this group's booking page; the rebook form's POST checks the
+  same rule as its GET; the audited downloads refuse cross-site requests (ASVS V3.5.3); the
+  sign-in keeps only the page's view query; agenda row actions are 24 px targets (WCAG 2.5.8);
+  top-bar counts keep the visible text as their accessible name (WCAG 2.5.3); the Team usage
+  view offers no download of its own screen.
+- Configuration: an export without secrets opens no secret.
+- Seed and demo data use neutral subjects, examples and contacts.
+
+### Security and CI
+
+- `pull_request_target` only for the decision gate, allowed by an event policy; the backport
+  starts from the merge (ADR 0120).
+- syft and grype run from their images.
+
 ## 0.5.1 (2026-11-07)
 
 ## 0.5.0 (2026-11-06)
