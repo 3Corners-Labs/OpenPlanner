@@ -185,6 +185,7 @@ from app.web.protection import RateLimits, configure_rate_limits, limiter, set_r
 from app.web.proxy_headers import ProxyHeaderMiddleware
 from app.web.public_links import PublicRedirectMiddleware
 from app.web.static_assets import ASSETS, VersionedStaticFiles
+from app.web.webhook_ledger import install_webhook_ledger
 from app.web.widgets import WIDGETS
 
 
@@ -430,6 +431,7 @@ def create_app(
             lambda: timedelta(minutes=live().security_event_window_minutes),
             max_sources=lambda: live().security_event_max_sources,
         )
+        install_webhook_ledger(app, uow, clock, live)  # ADR 0124 point 10: the gate's ledger
         app.state.booking_service = booking_service(uow, clock, settings, app.state.live_settings)
         # ADR 0023 step 2: a bot's change request, confirmed by the participant.
         previous_key = management_token_key_previous(settings)

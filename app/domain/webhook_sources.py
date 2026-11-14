@@ -5,7 +5,7 @@ host may demand a list (``WEBHOOK_SOURCE_NETWORKS_REQUIRED``). This module holds
 that make of that one answer, all pure:
 
     own list, default list ─► ``source_list_that_applies`` ─► the list that governs an address
-    caller, list, switch, chain ─► ``check_source`` ─► allow, ``network`` or ``source_unknown``
+    caller, list, switch, chain ─► ``judge_source`` ─► allow, ``network`` or ``source_unknown``
     list, switch ─► ``source_state`` ─► what the portal says about the address (a finding)
 
 What an empty list means is decided here and nowhere else: *any source*, except while the host
@@ -175,30 +175,48 @@ class ProxyChain:
         return None
 
 
-def check_source(
+@dataclass(frozen=True)
+class SourceVerdict:
+    """What the gate decided about the source of one call (ADR 0124 points 3 and 4).
+
+    Attributes:
+        refusal: ``None`` to go on; ``Refusal.NETWORK`` for a caller outside the list, for any
+            caller while the list cannot be read, and for any caller while a list is required
+            and missing; ``Refusal.SOURCE_UNKNOWN`` when a list applies and the caller's address
+            cannot be trusted.
+        fault: For ``source_unknown`` only: the fault of this call's proxy chain behind it.
+        inside_list: A list applies and the call passed it, so any later refusal of the call
+            came from inside the connection's own list of networks.
+    """
+
+    refusal: Refusal | None
+    fault: ChainFault | None = None
+    inside_list: bool = False
+
+
+def judge_source(
     caller: str | None, sources: NetworkList, *, required: bool, chain: ProxyChain
-) -> Refusal | None:
+) -> SourceVerdict:
     """Decide whether the source of a call is acceptable (ADR 0124 points 3 and 4).
+
+    The one judgement of the source: the gate derives nothing of it itself.
 
     Args:
         caller: The caller's address as the server derived it.
         sources: The list that applies (``source_list_that_applies``); empty: none.
         required: ``WEBHOOK_SOURCE_NETWORKS_REQUIRED``: an address without a list does not accept.
         chain: What is known about the proxy chain.
-
-    Returns:
-        ``None`` to go on; ``Refusal.NETWORK`` for a caller outside the list, for any caller
-        while the list cannot be read, and for any caller while a list is required and missing;
-        ``Refusal.SOURCE_UNKNOWN`` when a list applies and the caller's address cannot be
-        trusted. A call without a list is not asked about the chain.
     """
     if sources.unreadable:
-        return Refusal.NETWORK
+        return SourceVerdict(Refusal.NETWORK)
     if not sources.networks:
-        return Refusal.NETWORK if required else None
-    if chain.fault_for(caller) is not None:
-        return Refusal.SOURCE_UNKNOWN
-    return None if in_any(caller, sources.networks) else Refusal.NETWORK
+        return SourceVerdict(Refusal.NETWORK if required else None)
+    fault = chain.fault_for(caller)
+    if fault is not None:
+        return SourceVerdict(Refusal.SOURCE_UNKNOWN, fault)
+    if in_any(caller, sources.networks):
+        return SourceVerdict(None, inside_list=True)
+    return SourceVerdict(Refusal.NETWORK)
 
 
 class SourceState(StrEnum):

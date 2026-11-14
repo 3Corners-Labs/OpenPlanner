@@ -74,6 +74,18 @@ stayed from before ADR 0124, when it was the only reason) and `webex.token_refre
 per kind per window, with `suppressed:<n>` for the ones held back. Shipping is described in
 `docs/runbook.md`.
 
+ADR 0124 adds one system event about a webhook address (category `system`, outcome `failure`,
+level `error`; counted by `app/domain/webhook_ledger.py`, written by
+`app/web/webhook_ledger.py`): `webhook.refusal_alert`, reason `too_many_refusals`, detail
+`platform:<code>,group:<list|signed>,count:<n>,reasons:<codes joined by +>`, at the
+organisation of the address (none for an address of the installation, which only the superuser
+sees). It is written once per group, address and event window when more than
+`webhook_refusal_alert_count` outcomes of the group came in: `signed` (a stale delivery, a
+refusal from inside the connection's own list of networks, an event about work the connection
+did not create) or `list` (a refusal for the network after a verified delivery, which a
+stranger who knows the address can also cause); it carries no caller, address or text from any
+call. A rule on the log platform turns it into a page.
+
 `database.error` (category `security`, outcome `failure`, reason `database_error`, detail
 `surface:web`, `surface:widget` or `surface:agent`, ASVS V16.3.4) is written when a request
 fails on a database error that is not a busy lock: the transaction is rolled back, the

@@ -14,6 +14,7 @@ only a stored ``False`` pauses). Nothing of it is readable in the portal:
 """
 
 import secrets as random
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -92,6 +93,19 @@ class SealedConnections:
             allowed_networks=networks,
             inbound_enabled=record.get("inbound_enabled") is not False,
         )
+
+    async def paused(self, organisation_ids: Sequence[int]) -> dict[int, ContactCenterKind]:
+        """Return the organisations among ``organisation_ids`` whose address is paused.
+
+        One query for all their records; only a stored ``False`` pauses, as in ``get``.
+        """
+        names = {contact_center_credential_name(i): i for i in organisation_ids}
+        records = await self._store.get_many(list(names))
+        return {
+            names[name]: ContactCenterKind(str(record["kind"]))
+            for name, record in records.items()
+            if record.get("inbound_enabled") is False
+        }
 
     async def save(self, organisation_id: int, change: ConnectionChange, now: datetime) -> None:
         """Store the connection; a ``None`` secret keeps the stored one.
