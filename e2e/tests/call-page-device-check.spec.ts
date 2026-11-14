@@ -154,12 +154,15 @@ test('the keyboard alone leads from the start to the join button', async ({ page
   await tabTo(page, begin(page));
   await page.keyboard.press('Enter');
   await expect(checkHeading(page)).toBeFocused();
-  await tabTo(page, page.getByRole('button', { name: 'Play a test sound' }));
-  await page.keyboard.press('Space');
-  await expect(page.getByText('You now hear two tones.')).toBeVisible();
+  // In the page's own tab order (the toggles, the choices, the test sound, the join button): going
+  // back to an earlier control would lean on Tab wrapping from the page's end to its start, which
+  // Firefox does not do under Playwright.
   await tabTo(page, page.getByRole('button', { name: /^Microphone/ }));
   await page.keyboard.press('Space');
   await expect(page.getByRole('button', { name: /^Microphone/ })).toHaveAttribute('aria-pressed', 'false');
+  await tabTo(page, page.getByRole('button', { name: 'Play a test sound' }));
+  await page.keyboard.press('Space');
+  await expect(page.getByText('You now hear two tones.')).toBeVisible();
   // The click itself, and what follows it, is walked in call-page-joining.spec.ts.
   await tabTo(page, page.getByRole('button', { name: 'Join', exact: true }));
   await expectNoAxeViolations(page);
