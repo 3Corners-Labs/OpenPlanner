@@ -105,8 +105,10 @@ async def test_an_empty_text_clears_it_and_the_same_text_again_is_no_change(site
         f"/admin/staff/{gina}?done=staff_screen_name_unchanged"
     )
     assert cleared.headers["location"].startswith(
-        f"/admin/staff/{gina}?done=staff_screen_name_saved"
+        f"/admin/staff/{gina}?done=staff_screen_name_cleared"
     )
+    shown = (await site.client.get(cleared.headers["location"])).text
+    assert "De schermnaam is verwijderd." in shown
     assert await _stored(site, GROUP_ADMIN.subject) is None
     reasons = [e[3] for e in await _events(site) if e[1] == "staff.screen_name_changed"]
     assert reasons == ["cleared", "set"]  # newest first
@@ -276,3 +278,15 @@ async def test_the_list_mark_and_the_page_are_in_english_too(site: Site) -> None
     assert "No screen name" in listing
     assert "Screen name for the participant" in page
     assert "not the full name" in page
+
+
+async def test_the_managers_refused_form_keeps_the_staff_entry_active(site: Site) -> None:
+    await _login(site, GROUP_ADMIN, ORG_ADMIN)
+    gina = await _id_of(site, "Gina Group")
+
+    refused = await site.client.post(
+        f"/admin/staff/{gina}/screen-name", data={"screen_name": "G"}, headers=SAME_ORIGIN
+    )
+
+    assert refused.status_code == 422
+    assert 'href="/admin/staff" aria-current="page"' in refused.text

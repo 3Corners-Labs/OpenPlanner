@@ -9,6 +9,7 @@ from app.config import Settings
 from app.i18n import Translator, load_catalogues
 from app.main import create_app
 from app.web.navigation import (
+    ANSWERS_ON,
     MAX_SECTIONS,
     MAX_TABS,
     OBJECTS,
@@ -56,6 +57,12 @@ def test_the_register_names_only_existing_routes(settings: Settings) -> None:
     declared = {path for _, screen in screens() for path in screen.routes}
 
     assert declared - _page_routes(settings) == set()
+
+
+def test_a_form_that_answers_on_a_page_takes_that_pages_home() -> None:
+    for post, page in ANSWERS_ON.items():
+        assert home_of(page) is not None
+        assert home_of(post) == home_of(page)
 
 
 def test_no_route_has_two_homes() -> None:

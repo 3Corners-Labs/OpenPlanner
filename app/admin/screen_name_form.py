@@ -18,13 +18,14 @@ from app.domain.screen_name import (
     ScreenNameError,
     ScreenNameRefusal,
 )
+from app.domain.staff_screen_names import ScreenNameResult
 from app.web.errors import FormError
 from app.web.locale import RequestLocale
 
 FIELD = "screen_name"
 """The name of the input and of the form key."""
 
-DONE = ("staff_screen_name_saved", "staff_screen_name_unchanged")
+DONE = ("staff_screen_name_saved", "staff_screen_name_cleared", "staff_screen_name_unchanged")
 """The confirmations of a save of the screen name; each page shows them in its own section."""
 
 REFUSAL_TEXTS: dict[ScreenNameRefusal, str] = {
@@ -35,6 +36,15 @@ REFUSAL_TEXTS: dict[ScreenNameRefusal, str] = {
     ScreenNameRefusal.BAD_MARKS: "admin.staff.screen_name.error.bad_marks",
 }
 """The catalogue key of each refusal of the rule for a screen name."""
+
+
+def done_key(result: ScreenNameResult) -> str:
+    """Return the confirmation key of a successful write: set, cleared or unchanged."""
+    if result is ScreenNameResult.DONE:
+        return "staff_screen_name_saved"
+    if result is ScreenNameResult.CLEARED:
+        return "staff_screen_name_cleared"
+    return "staff_screen_name_unchanged"
 
 
 def screen_name_field(
@@ -51,7 +61,8 @@ def screen_name_field(
     field = Field(
         FIELD,
         locale.gettext("admin.staff.screen_name.label"),
-        value=form.text(FIELD) if form is not None else current or "",
+        # A refused text is shown again, cut to what any answer to it needs (the body may be 16 KB).
+        value=form.text(FIELD)[: 2 * MAX_LENGTH] if form is not None else current or "",
         hint=locale.gettext("admin.staff.screen_name.hint"),
         error=form.error_for(FIELD) if form is not None else None,
         required=False,

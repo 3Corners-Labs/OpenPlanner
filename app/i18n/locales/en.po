@@ -12740,6 +12740,9 @@ msgstr "The skills have been saved. They apply from the next request that is pic
 msgid "admin.done.staff_screen_name_saved"
 msgstr "The screen name has been saved."
 
+msgid "admin.done.staff_screen_name_cleared"
+msgstr "The screen name has been removed. Participants now see only the organisation's word for staff, unless the organisation chooses otherwise."
+
 msgid "admin.done.staff_screen_name_unchanged"
 msgstr "The screen name was not changed."
 
@@ -14392,10 +14395,10 @@ msgid "admin.profile.account.note"
 msgstr "This name comes from your organisation's login and is not changed here. It is not the name participants see."
 
 msgid "admin.profile.screen_name.where"
-msgstr "Participants see your screen name on the call page, next to the organisation's word for staff. A manager who may manage staff can change your screen name too."
+msgstr "Participants see your screen name in the call, next to the organisation's word for staff. Without a screen name they see that word alone. A manager who may manage staff can change your screen name too."
 
 msgid "admin.profile.screen_name.no_record"
-msgstr "You can set your screen name once your login has been recorded. Log out and in again to have that done."
+msgstr "You can set a screen name once your login has been recorded. Log out and log in again."
 
 msgid "admin.profile.screen_name.erased"
 msgstr "Your data has been deleted. You can set a screen name again after your next login."

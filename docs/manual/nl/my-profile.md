@@ -7,8 +7,8 @@ geen aparte permissie voor nodig.
 
 ## Wat u ziet
 
-- **Accountnaam**: de naam die het login van uw organisatie heeft doorgegeven. U wijzigt die
-  hier niet, en het is niet wat deelnemers zien.
+- **Accountnaam**: de naam die de login van uw organisatie heeft doorgegeven. U kunt die
+  hier niet wijzigen, en het is niet wat deelnemers zien.
 - **Schermnaam**: de naam die een deelnemer van u ziet op de eigen gesprekspagina van de
   organisatie, naast het woord van de organisatie voor medewerkers ("Sanne · medewerker"), en in
   de ondertitels. Een beheerder die medewerkers mag beheren kan uw schermnaam ook wijzigen (zie

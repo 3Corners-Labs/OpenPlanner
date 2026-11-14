@@ -60,6 +60,11 @@ async def test_every_role_sets_and_clears_the_own_name_and_it_is_audited_without
         assert same.headers["location"].startswith(f"{PAGE}?done=staff_screen_name_unchanged")
         cleared = await site.client.post(POST, data={"screen_name": ""}, headers=SAME_ORIGIN)
         assert cleared.status_code == 303
+        assert cleared.headers["location"].startswith(f"{PAGE}?done=staff_screen_name_cleared")
+        assert (
+            "De schermnaam is verwijderd."
+            in (await site.client.get(cleared.headers["location"])).text
+        )
         assert await _stored(site, person.subject) is None
 
     events = [e for e in await _events(site) if e[1] == "staff.screen_name_changed"]
@@ -252,3 +257,24 @@ async def test_a_name_that_imitates_a_colleague_is_allowed_but_never_an_address_
     for typed in ("sanne@voorbeeld.nl", "https://voorbeeld.nl", "Sanne: manager", "Sanne/Admin"):
         refused = await site.client.post(POST, data={"screen_name": typed}, headers=SAME_ORIGIN)
         assert refused.status_code == 422, typed
+
+
+async def test_the_refused_form_keeps_its_tab_row_with_the_right_tab_active(site: Site) -> None:
+    await _login(site, GROUP_ADMIN)
+
+    refused = await site.client.post(POST, data={"screen_name": "G"}, headers=SAME_ORIGIN)
+
+    assert refused.status_code == 422
+    assert 'class="tabs tabs--sub"' in refused.text
+    assert 'href="/admin/rights/profile" aria-current="page"' in refused.text
+    assert 'href="/admin/rights/sessions" aria-current' not in refused.text
+
+
+async def test_the_refused_form_echoes_at_most_twice_the_longest_name(site: Site) -> None:
+    await _login(site, GROUP_ADMIN)
+
+    refused = await site.client.post(POST, data={"screen_name": "x" * 5000}, headers=SAME_ORIGIN)
+
+    assert refused.status_code == 422
+    assert f'value="{"x" * 80}"' in refused.text
+    assert "x" * 81 not in refused.text

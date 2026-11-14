@@ -89,7 +89,7 @@ async def test_an_empty_text_clears_the_name_and_says_so_in_the_event(
 
     result = await service.set_screen_name(ORG_ADMIN, person.id or 0, "")
 
-    assert result is ScreenNameResult.DONE
+    assert result is ScreenNameResult.CLEARED
     assert uow.state.staff["p-1"].screen_name is None
     assert [row[3] for row in _audit(uow)] == [CLEARED]
 
@@ -372,7 +372,7 @@ async def test_the_own_write_clears_keeps_and_refuses_like_the_managers(
     me = replace(AUDITOR, subject="p-1")
 
     assert await service.set_own_screen_name(me, "Sanne") is ScreenNameResult.UNCHANGED
-    assert await service.set_own_screen_name(me, "") is ScreenNameResult.DONE
+    assert await service.set_own_screen_name(me, "") is ScreenNameResult.CLEARED
     assert [row[3] for row in _audit(uow)] == [CLEARED]
     with pytest.raises(ScreenNameError):
         await service.set_own_screen_name(me, "G")

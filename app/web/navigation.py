@@ -821,9 +821,23 @@ def _homes() -> dict[str, Home]:
 _HOMES = _homes()
 
 
+ANSWERS_ON: dict[str, str] = {
+    "/admin/rights/profile/screen-name": "/admin/rights/profile",
+    "/admin/staff/{member_id}/screen-name": "/admin/staff/{member_id}",
+}
+"""POST-only routes that answer a refused form with a page (422), and the page they answer on.
+
+The register declares pages (GET routes) only, so such a response has no home of its own; it
+takes the home of the page it re-shows, and so keeps its side-navigation entry and its tab row.
+"""
+
+
 def home_of(route_path: str) -> Home | None:
-    """Return where the route template ``route_path`` lives, or ``None`` if it has no home."""
-    return _HOMES.get(route_path)
+    """Return where the route template ``route_path`` lives, or ``None`` if it has no home.
+
+    A POST route listed in ``ANSWERS_ON`` lives where the page it answers on lives.
+    """
+    return _HOMES.get(ANSWERS_ON.get(route_path, route_path))
 
 
 def screen(key: str) -> Screen:

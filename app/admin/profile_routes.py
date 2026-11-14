@@ -20,12 +20,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
-from app.admin.authz import AdminContext, RequirePermission
+from app.admin.authz import AdminContext, RequirePermission, screen_names
 from app.admin.forms import FormData, done_message, raise_refusal, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin
 from app.admin.pages import page as _page
-from app.admin.screen_name_form import DONE, FIELD, refusal_error, screen_name_field
-from app.admin.staff_screen_name_routes import screen_names
+from app.admin.screen_name_form import DONE, FIELD, done_key, refusal_error, screen_name_field
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError
 from app.domain.screen_name import ScreenNameError
@@ -98,9 +97,4 @@ async def save_own_screen_name(
         raise
     if result in (ScreenNameResult.ERASED, ScreenNameResult.NO_RECORD):
         raise RejectedRequest(409)
-    done = (
-        "staff_screen_name_saved"
-        if result is ScreenNameResult.DONE
-        else "staff_screen_name_unchanged"
-    )
-    return redirect_done(PROFILE_PATH, done, anchor="screen-name")
+    return redirect_done(PROFILE_PATH, done_key(result), anchor="screen-name")

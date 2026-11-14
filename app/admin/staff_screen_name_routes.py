@@ -22,26 +22,20 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import Response
 
-from app.admin.authz import AccessDenied, AdminContext, RequirePermission
+from app.admin.authz import AccessDenied, AdminContext, RequirePermission, screen_names
 from app.admin.forms import raise_refusal, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin
-from app.admin.screen_name_form import refusal_error
+from app.admin.screen_name_form import done_key, refusal_error
 from app.admin.staff_routes import member_page
 from app.domain.authorization import Permission, scope_for
 from app.domain.errors import DomainError
 from app.domain.screen_name import ScreenNameError
-from app.domain.staff_screen_names import ScreenNameResult, StaffScreenNames
+from app.domain.staff_screen_names import ScreenNameResult
 from app.web.protection import RejectedRequest
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
 
 Manage = Annotated[AdminContext, Depends(RequirePermission(Permission.STAFF_MANAGE))]
-
-
-def screen_names(request: Request) -> StaffScreenNames:
-    """Return the application's screen-name service."""
-    service: StaffScreenNames = request.app.state.staff_names
-    return service
 
 
 @router.post("/staff/{member_id}/screen-name", response_model=None)
@@ -66,9 +60,4 @@ async def save_screen_name(
         raise AccessDenied
     if result is ScreenNameResult.ERASED:
         raise RejectedRequest(409)
-    done = (
-        "staff_screen_name_saved"
-        if result is ScreenNameResult.DONE
-        else "staff_screen_name_unchanged"
-    )
-    return redirect_done(f"/admin/staff/{member_id}", done, anchor="screen-name")
+    return redirect_done(f"/admin/staff/{member_id}", done_key(result), anchor="screen-name")
