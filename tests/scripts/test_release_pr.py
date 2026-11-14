@@ -1,4 +1,4 @@
-"""The release workflow's file edits, PR body, audit section and tag checks (ADR 0079)."""
+"""The release workflow's file edits, PR body and tag checks (ADR 0079, ADR 0128)."""
 
 import re
 from pathlib import Path
@@ -7,22 +7,18 @@ import pytest
 
 from scripts.release_plan import LineError, Target
 from scripts.release_pr import (
-    AUDIT_HEADING,
-    VERDICT_OPEN,
     adr_progress,
     bump_lock,
     bump_publiccode,
     bump_pyproject,
     main,
     merge_changelogs,
-    needs_audit,
     parse_version,
     plan,
     pr_body,
     release_changelog,
     release_commit,
     tag_message,
-    with_audit,
 )
 from tests.scripts.conftest import Git, commit_all, cut_line
 
@@ -48,12 +44,6 @@ def test_a_version_is_three_numbers() -> None:
     for wrong in ("v1.2.3", "1.2", "1.2.3-rc.1", "", "latest"):
         with pytest.raises(ValueError, match="not a version"):
             parse_version(wrong)
-
-
-def test_a_minor_or_major_release_needs_the_audit_a_patch_does_not() -> None:
-    assert needs_audit("0.4.0")
-    assert needs_audit("1.0.0")
-    assert not needs_audit("0.4.1")
 
 
 def test_the_plan_follows_the_commits_unless_a_higher_number_is_given() -> None:
@@ -125,45 +115,14 @@ def test_the_body_answers_every_section_of_the_pr_template() -> None:
     assert "po:approved" in body
 
 
-def test_a_minor_release_body_carries_an_open_audit_section_a_patch_does_not() -> None:
-    minor = pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02", "")
-    patch = pr_body("0.4.1", "v0.4.0", ["fix: a"], "po", "2026-11-02", "")
+def test_no_release_body_waits_for_an_audit() -> None:
+    """ADR 0128: the audit is optional, so neither a minor nor a patch body asks for a verdict."""
+    for version, previous in (("0.4.0", "v0.3.0"), ("1.0.0", "v0.9.0"), ("0.4.1", "v0.4.0")):
+        body = pr_body(version, previous, ["feat: a"], "po", "2026-11-02", "")
 
-    assert AUDIT_HEADING in minor
-    assert VERDICT_OPEN in minor
-    assert "Verdict: pass" not in minor
-    assert AUDIT_HEADING not in patch
-    assert "Verdict" not in patch
-
-
-def test_the_audit_section_is_added_or_replaced_and_ends_open() -> None:
-    body = pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02", "")
-
-    first = with_audit(body, "## Findings\n\nP1: a bug in x.py:3\nP2: a nit\n")
-
-    assert first.count(AUDIT_HEADING) == 1
-    assert "Pending:" not in first
-    # Headings inside the findings would split the section; they become bold lines.
-    assert "**Findings**" in first
-    assert "## Findings" not in first
-    section = first[first.index(AUDIT_HEADING) :]
-    assert section.split("## How tested")[0].rstrip().endswith(VERDICT_OPEN)
-    assert "## How tested" in first
-
-    second = with_audit(first, "No findings.\n")
-
-    assert "P1: a bug" not in second
-    assert "No findings." in second
-    assert second.count(AUDIT_HEADING) == 1
-    assert second.count(VERDICT_OPEN) == 1
-
-
-def test_the_audit_section_is_appended_when_the_body_has_none() -> None:
-    appended = with_audit("## What\n\nv0.4.0\n", "")
-
-    assert appended.endswith(
-        f"{AUDIT_HEADING}\n\nThe audit produced no output.\n\n{VERDICT_OPEN}\n\n"
-    )
+        assert not re.search(r"^## Release audit", body, re.M)
+        assert "Verdict" not in body
+        assert "optional and gates nothing (ADR 0128)" in body
 
 
 def test_the_tag_message_records_the_instruction() -> None:
@@ -256,10 +215,9 @@ def test_plan_prints_outputs_for_the_workflow(
         "base=main",
         "branch=release/v0.4.0",
         "title=chore(release): v0.4.0",
-        "audit=true",
     ]
     assert main(["plan", "--version", "0.3.1"]) == 0
-    assert "audit=false" in capsys.readouterr().out
+    assert "version=0.3.1" in capsys.readouterr().out
     assert main(["plan", "--version", "0.3.0"]) == 1
     assert "::error::0.3.0 is not above the last release v0.3.0" in capsys.readouterr().err
 
@@ -292,16 +250,6 @@ def test_prepare_edits_the_four_files_and_writes_the_body(
     assert 'releaseDate: "2026-11-02"' in publiccode
     assert "- feat: a" in body.read_text()
     assert "Commits since v0.3.0 (1)" in body.read_text()
-
-
-def test_audit_writes_the_findings_into_the_body_file(released: Path) -> None:
-    body, findings = released / "body.md", released / "findings.md"
-    body.write_text(pr_body("0.4.0", "v0.3.0", ["feat: a"], "po", "2026-11-02", ""))
-    findings.write_text("P2: a nit\n")
-
-    assert main(["audit", "--body", str(body), "--findings", str(findings)]) == 0
-
-    assert "P2: a nit\n\nVerdict: open" in body.read_text()
 
 
 def test_tag_check_finds_the_release_and_refuses_an_existing_tag(
@@ -401,7 +349,6 @@ def test_the_release_pr_and_tag_on_a_line(
     out = capsys.readouterr().out
     assert "version=0.3.1" in out
     assert "base=release/0.3" in out
-    assert "audit=false" in out
 
     _merge_release(git, released, "0.3.1", PYPROJECT.replace("0.3.0", "0.3.1"), 23)
     args = ["--ref", "release/0.3", "--actor", "po", "--date", "2026-11-09"]

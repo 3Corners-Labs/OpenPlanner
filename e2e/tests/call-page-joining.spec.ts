@@ -107,7 +107,8 @@ test('the script tag carries the manifest checksum and the SDK is started with t
   expect(await page.locator('script[src*="vendor/webex"]').count()).toBe(1);
 
   const log = await sdk(page);
-  expect(log.inits).toEqual([{ token: TOKEN, autoUploadLogs: false, ephemeral: true }]);
+  // The real-time link stays off at the join; captions ask for it at their own press.
+  expect(log.inits).toEqual([{ token: TOKEN, autoUploadLogs: false, ephemeral: true, automaticLLM: false }]);
   expect(log.link).toBe(LINK);
   expect(log.calls).toEqual(['init', 'register', 'create', 'join', 'createCameraStream', 'createMicrophoneStream', 'addMedia']);
   expect(log.added).toEqual(['microphone', 'camera']);

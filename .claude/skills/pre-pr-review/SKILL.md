@@ -39,6 +39,11 @@ In one message, start two background subagents (`Agent` with
 - **Code quality:** "Read `.claude/skills/code-quality-review/SKILL.md` and follow it for this
   scope. Reply with its Output section only."
 
+Tell both that the Graphify MCP is available: `graphify_impact` (`include_risk=true`),
+`graphify_callers` and `graphify_tests_for` give the callers and the linked tests of a changed
+symbol faster than grep. The graph describes the indexed commit, so anything changed in this
+scope is read from the file, and a graph answer is never a finding on its own.
+
 While they run, do the correctness pass in this thread with the built-in `code-review` skill at
 level `high`, so that its findings come back to you in full. Where its instructions gather the
 diff, use the scope of section 1, never `main` or `@{upstream}`. When `code-review` is not
