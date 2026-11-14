@@ -4383,6 +4383,9 @@ msgstr "Na de update draait niet de gevraagde versie."
 msgid "admin.updates.reason.updater_error"
 msgstr "Onverwachte fout in de updater. Bekijk het log van de updater op de server."
 
+msgid "admin.updates.reason.updater_stalled"
+msgstr "De updater meldde niets meer (bijvoorbeeld door een volle schijf); het verzoek is beëindigd zodat de volgende update kan starten."
+
 msgid "admin.updates.reason.other"
 msgstr "De updater meldde een onbekende reden."
 
@@ -6452,6 +6455,9 @@ msgstr "Automatisch bijwerken"
 
 msgid "settings.field.update_check_minutes.label"
 msgstr "Minuten tussen twee versiecontroles"
+
+msgid "settings.field.update_stalled_minutes.label"
+msgstr "Minuten voordat een stille update wordt beëindigd"
 
 msgid "settings.field.update_line.label"
 msgstr "Alleen één minorversie volgen (X.Y)"

@@ -98,6 +98,9 @@ screen readers. Without scripts, **Refresh status** reloads the page.
 - **Withdraw request** is offered as long as the updater has not picked the request up.
 - When no updater has picked the request up after 10 minutes, a warning says to check that the
   updater is installed on the server (see the runbook).
+- When a request that the updater picked up reports no step for 120 minutes (the setting
+  *Minutes before a silent update is ended*, for example after a full disk), the application
+  ends it as *Failed* (*the updater stopped reporting*), so the next update can start.
 
 When the request has ended, the card shows the outcome: *Succeeded*, *Rolled back*, *Failed* or
 *Withdrawn*, and for a rollback or failure the reason: the signature is not valid, the image was
