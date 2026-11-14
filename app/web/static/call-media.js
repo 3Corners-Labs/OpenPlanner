@@ -1,12 +1,15 @@
 /*
- * The camera and the microphone of the participant's call (ADR 0123 steps 4c and 5).
+ * The camera, the microphone and the screen of the participant's call (ADR 0123 steps 4c, 5a and 5b).
  *
  * Owns: taking the participant's streams out of the SDK (the devices they left on), switching
  * either on or off in the lobby and in the call, and giving a device back when it is off: in the
  * call the stream is taken out of the meeting and stopped, and switching on takes a new one and
  * sends it. Choosing another camera or microphone in the call takes the new one, sends it by the
  * same rule and only then gives the old one back. A press while the media is being added waits
- * until that is done.
+ * until that is done. The screen is a third kind of stream, taken only at a press (the browser's
+ * own picker), sent by the same rule, and given back whoever ends the share: the participant, the
+ * browser's own control, the staff member (their own share replaces it: one share in a meeting) or
+ * the end of the call, always through `endShare`. The staff member's share is handled by call-remote.js.
  *
  * Never: it makes no request, loads no file and stores nothing. It works on the `call` object of
  * call-connection.js (`app.call`, the SDK's client and meeting; that file is loaded first) and
@@ -19,9 +22,11 @@
   var call = app.call; // call-connection.js is loaded first and has made both
   var choice = app.choice; // the chosen device ids; call-devices.js is loaded first and has made it
   var PICTURE = { width: 1280, height: 720 }; // the size the picture is asked for
+  var CLOSED = ["NotAllowedError", "AbortError"]; // the picker was closed or refused: no error, only no share
 
   function createStream(kind) {
     var helpers = call.client.meetings.mediaHelpers;
+    if (kind === "screen") return helpers.createDisplayStream();
     if (kind === "microphone") {
       var sound = { echoCancellation: true, noiseSuppression: true };
       if (choice.microphone) sound.deviceId = choice.microphone;
@@ -219,9 +224,102 @@
       if (epoch !== call.epoch) return null;
       var taken = call.sent && call.sent[kind] === created;
       var published = {};
-      published[kind] = created;
+      if (kind === "screen") published.screenShare = { video: created };
+      else published[kind] = created;
       return app.state.media === "added" && !taken ? app.within(call.meeting.publishStreams(published)) : null;
     });
+  }
+
+  // ---- the participant's screen -----------------------------------------------------------------
+  // The one place a share ends, whoever ends it: our button, the browser's own control, the
+  // meeting, the staff member sharing theirs (`patch.share` is then "theirs"), a failed sending or
+  // the end of the call (`patch` null: the meeting is left anyway, only the capture is given back).
+  // The capture is stopped first, so the browser's own sign that the screen is shared goes out at
+  // once; taking the stream out of the meeting follows within the time of an attempt, and a refusal
+  // changes nothing: it is stopped either way, also when it was only half sent. Only the stream
+  // that is the current share ends it, so a second call does nothing. A share that ends while it is
+  // still being sent was never said as on: no "stopped" is said for it (`share()` takes the stream
+  // out of the meeting again if its sending lands after).
+  function endShare(display, patch) {
+    if (!display || call.screen !== display) return;
+    call.screen = null;
+    display.stop();
+    if (patch && app.state.media === "added" && call.meeting) {
+      app.within(call.meeting.unpublishStreams([display])).then(null, function () {});
+    }
+    if (!patch) return;
+    var starting = app.state.share === "asking" && patch.say === "say_share_off";
+    app.go(app.state.screen, Object.assign({ share: "off" }, patch, starting ? { say: undefined } : {}));
+  }
+
+  // The browser's own control, or the meeting, ends the share without our button. The track's
+  // `ended` is the browser's; the stream's own `stream-ended` is the prototype's way, kept next to it.
+  function watch(display, epoch) {
+    var ended = function () {
+      if (epoch === call.epoch) endShare(display, { say: "say_share_off" });
+    };
+    var track = display.outputStream && display.outputStream.getVideoTracks()[0];
+    if (track) track.addEventListener("ended", ended);
+    if (typeof display.on === "function") display.on("stream-ended", ended);
+  }
+
+  // The participant's press. Only in the call, only if the meeting allows it and never twice: a
+  // press while a share exists or the picker is open does nothing. A closed picker is no error;
+  // any failure after the picture was given (watching it, sending it) stops it and says so.
+  function share(on) {
+    var state = app.state;
+    var epoch = call.epoch;
+    if (state.screen !== "call") return Promise.resolve();
+    // A share that is starting (the picker is open or the screen is being sent) is not stopped by a
+    // second press: it ends by its own failure, by the browser's control, or once it is the
+    // participant's own, so a stream can never be taken out of the meeting while it is still being sent.
+    if (!on) {
+      if (state.share !== "asking") endShare(call.screen, { say: "say_share_off" });
+      return Promise.resolve();
+    }
+    if (state.share !== "off" || !state.can.share) return Promise.resolve();
+    var waiting = whenIdle("screen", function () {
+      return share(true);
+    });
+    if (waiting) return waiting;
+    app.go("call", { share: "asking" });
+    var picked = null;
+    var making = Promise.resolve()
+      .then(function () {
+        return createStream("screen");
+      })
+      .then(function (display) {
+        picked = display;
+        // The call ended, the staff member began to share or the meeting stopped allowing it while the
+        // picker was open: give it back.
+        if (epoch !== call.epoch) return display.stop();
+        if (state.share !== "asking" || !state.can.share) {
+          display.stop();
+          if (state.share === "asking") app.go("call", { share: "off", say: "say_share_failed" });
+          return null;
+        }
+        call.screen = display;
+        watch(display, epoch);
+        return send("screen", display, epoch).then(function () {
+          if (epoch !== call.epoch) return;
+          if (call.screen === display) {
+            app.go("call", { share: "mine", say: "say_share_mine" });
+          } else if (app.state.media === "added" && call.meeting) {
+            // The share ended while it was being sent: the stream that landed is taken out again.
+            app.within(call.meeting.unpublishStreams([display])).then(null, function () {});
+          }
+        });
+      })
+      .then(null, function (error) {
+        if (picked && epoch === call.epoch && call.screen === picked) {
+          return endShare(picked, { say: "say_share_failed" });
+        }
+        if (picked) picked.stop();
+        if (epoch !== call.epoch || state.share !== "asking") return;
+        var closed = !picked && Boolean(error) && CLOSED.indexOf(error.name) !== -1;
+        app.go("call", closed ? { share: "off" } : { share: "off", say: "say_share_failed" });
+      });
+    return track("screen", making);
   }
 
   // A device being made is a promise that a press of its toggle, or a choice, waits for.
@@ -234,5 +332,11 @@
     return making;
   }
 
-  app.callMedia = { capture: capture, setLive: setLive, change: change };
+  app.callMedia = {
+    capture: capture,
+    setLive: setLive,
+    change: change,
+    share: share,
+    endShare: endShare,
+  };
 })();

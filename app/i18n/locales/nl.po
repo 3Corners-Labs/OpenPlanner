@@ -14280,3 +14280,60 @@ msgstr "De wachtkamer verlaten"
 
 msgid "callpage.control.bar"
 msgstr "Bediening van het gesprek"
+
+msgid "callpage.control.captions"
+msgstr "Ondertitels"
+
+msgid "callpage.control.share"
+msgstr "Scherm delen"
+
+msgid "callpage.control.share_short"
+msgstr "Delen"
+
+msgid "callpage.notice.sharing.word"
+msgstr "Delen"
+
+msgid "callpage.notice.sharing.body"
+msgstr "U deelt uw scherm. Uw {agent} ziet wat u op dat scherm opent. De knop Scherm delen onderaan de pagina stopt het delen ook."
+
+msgid "callpage.notice.sharing.stop"
+msgstr "Stoppen met delen"
+
+msgid "callpage.notice.theirs.word"
+msgstr "Scherm gedeeld"
+
+msgid "callpage.notice.theirs.body"
+msgstr "Uw {agent} deelt een scherm."
+
+msgid "callpage.share.view"
+msgstr "Scherm gedeeld door uw {agent}"
+
+msgid "callpage.captions.you"
+msgstr "U"
+
+msgid "callpage.captions.other"
+msgstr "{Agent}"
+
+msgid "callpage.say.share_mine"
+msgstr "U deelt uw scherm."
+
+msgid "callpage.say.share_off"
+msgstr "U deelt uw scherm niet meer."
+
+msgid "callpage.say.share_theirs_off"
+msgstr "Uw {agent} deelt het scherm niet meer."
+
+msgid "callpage.say.share_replaced"
+msgstr "Uw {agent} is een scherm gaan delen. Uw eigen scherm wordt daarom niet meer gedeeld."
+
+msgid "callpage.say.share_failed"
+msgstr "Uw scherm kon niet worden gedeeld."
+
+msgid "callpage.say.captions_on"
+msgstr "Ondertitels staan aan."
+
+msgid "callpage.say.captions_off"
+msgstr "Ondertitels staan uit."
+
+msgid "callpage.say.captions_failed"
+msgstr "De ondertitels konden niet worden gestart. Dit gesprek biedt ze misschien niet aan."

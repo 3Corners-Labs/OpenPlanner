@@ -34,10 +34,15 @@ export type Plan = {
   lobby?: boolean;
   remote?: boolean;
   deviceFails?: string[];
+  captions?: boolean;
+  captionsFail?: boolean;
+  canShare?: boolean;
+  shareSendFails?: boolean;
+  holdPublish?: boolean;
 };
 export type Log = {
   calls: string[];
-  inits: { token: string; autoUploadLogs: boolean; ephemeral: boolean }[];
+  inits: { token: string; autoUploadLogs: boolean; ephemeral: boolean; automaticLLM: boolean }[];
   devices: { kind: string; deviceId: string }[];
   published: string[];
   unpublished: number[];
@@ -155,3 +160,29 @@ export async function stubRemoteSound(page: Page): Promise<void> {
   });
 }
 export const plays = (page: Page): Promise<number> => page.evaluate(() => (window as unknown as { __plays: number }).__plays);
+
+/** The staff member's screen starts or stops (the stand-in's meeting reports it as the SDK would). */
+export const remoteShare = (page: Page, on: boolean): Promise<void> =>
+  page.evaluate((value) => (window as unknown as { __sdk: { remoteShare: (v: boolean) => void } }).__sdk.remoteShare(value), on);
+/** The meeting ends the participant's own share (the staff member stopped it). */
+export const stopLocalShare = (page: Page): Promise<void> =>
+  page.evaluate(() => (window as unknown as { __sdk: { stopLocalShare: () => void } }).__sdk.stopLocalShare());
+/** What the meeting offers changes: sharing a screen, captions. */
+export const rights = (page: Page, share: boolean, captions: boolean): Promise<void> =>
+  page.evaluate(([a, b]) => (window as unknown as { __sdk: { rights: (a: boolean, b: boolean) => void } }).__sdk.rights(a, b), [share, captions]);
+export type Spoken = { id: string; text: string; own?: boolean };
+/** A caption event with final lines and interim lines of two speakers (the platform's own names for them are never to be shown). */
+export const caption = (page: Page, finals: Spoken[], interim: Omit<Spoken, 'id'>[] = []): Promise<void> =>
+  page.evaluate(
+    ([f, i]) => (window as unknown as { __sdk: { caption: (spec: unknown) => void } }).__sdk.caption({ finals: f, interim: i }),
+    [finals, interim] as const,
+  );
+export const captioning = (page: Page): Promise<{ on: boolean; language: string }> =>
+  page.evaluate(() => {
+    const s = (window as unknown as { __sdk: { captioning: boolean; captionLanguage: string } }).__sdk;
+    return { on: s.captioning, language: s.captionLanguage };
+  });
+export const callsOf = async (page: Page, name: string): Promise<number> => (await sdk(page)).calls.filter((c) => c === name).length;
+/** The screen that `holdPublish` keeps under way lands in the meeting now. */
+export const releasePublish = (page: Page): Promise<void> =>
+  page.evaluate(() => (window as unknown as { __sdk: { releasePublish: () => void } }).__sdk.releasePublish());
