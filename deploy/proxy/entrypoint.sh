@@ -110,12 +110,48 @@ export WEB_UPSTREAM
 if [ -n "${IDP_UPSTREAM:-}" ]; then
   upstream IDP_UPSTREAM "$IDP_UPSTREAM"
   IDP_DIRECTIVE="handle /idp/* {
-		reverse_proxy $IDP_UPSTREAM
+		reverse_proxy $IDP_UPSTREAM {
+			header_up X-Forwarded-For {client_ip}
+		}
 	}"
 else
   IDP_DIRECTIVE=""
 fi
 export IDP_DIRECTIVE
+
+# trusted_networks VALUE: the reverse proxies, WAFs and load balancers in front of this proxy
+# (PROXY_TRUSTED_NETWORKS, ADR 0129), comma or space separated, as one space-separated line.
+# Only addresses and CIDR ranges, at most 32, and never a range of length 0: trusting every
+# address would let any visitor choose theirs. Caddy itself refuses a malformed address.
+trusted_networks() {
+  ranges=$(printf '%s' "$1" | tr ',\t\n' '   ')
+  count=0
+  for range in $ranges; do
+    case $range in
+      *[!0-9A-Fa-f.:/]* | /* | */*/* | */) fail "PROXY_TRUSTED_NETWORKS: $range is not an IP address or CIDR range" ;;
+    esac
+    case $range in
+      */*)
+        prefix=${range##*/}
+        [ "$prefix" -gt 0 ] 2>/dev/null \
+          || fail "PROXY_TRUSTED_NETWORKS: $range trusts every address; name the edge's own addresses"
+        ;;
+    esac
+    count=$((count + 1))
+  done
+  [ "$count" -le 32 ] || fail "PROXY_TRUSTED_NETWORKS: at most 32 entries, $count given"
+  printf '%s' "$ranges" | tr -s ' ' | sed 's/^ //; s/ $//'
+}
+
+trusted=$(trusted_networks "${PROXY_TRUSTED_NETWORKS:-}")
+if [ -n "$trusted" ]; then
+  TRUSTED_PROXIES_DIRECTIVE="trusted_proxies static $trusted
+		trusted_proxies_strict"
+  echo "visitor's address taken from X-Forwarded-For of: $trusted (right to left, ADR 0129)"
+else
+  TRUSTED_PROXIES_DIRECTIVE=""
+fi
+export TRUSTED_PROXIES_DIRECTIVE
 
 if [ -n "${TLS_CERT_FILE:-}" ] || [ -n "${TLS_KEY_FILE:-}" ]; then
   [ -n "${TLS_CERT_FILE:-}" ] && [ -n "${TLS_KEY_FILE:-}" ] \
