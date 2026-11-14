@@ -18,7 +18,11 @@ if (variants.some((v) => v.user)) requireKeycloak();
 async function open(page: Page, variant: (typeof variants)[number]): Promise<void> {
   await holdCookie(page, variant, test.info().project.use.baseURL);
   if (variant.user) await loginAs(page, variant.user, variant.path);
-  else await page.goto(variant.path, { waitUntil: 'networkidle' });
+  else {
+    const response = await page.goto(variant.path, { waitUntil: 'networkidle' });
+    // A page behind a cookie (pages.json `cookie`) must be the page itself, not the refusal.
+    if (variant.cookie) expect(response?.status()).toBe(200);
+  }
 }
 
 for (const variant of variants) {

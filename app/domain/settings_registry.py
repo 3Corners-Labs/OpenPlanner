@@ -1532,6 +1532,20 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "off from the portal (ADR 0124 point 3).",
     ),
     S(
+        "webhook_refusal_alert_count",
+        K.INT,
+        20,
+        _C,
+        T.RATE_LIMITS,
+        "Refusals of the kinds a passer-by cannot cause alone (a stale delivery, a refusal from "
+        "inside a connection's own list of networks, a refusal for the network after a "
+        "delivery, an event about work the connection did not create) at one webhook address "
+        "inside the event window, above which one system event for the organisation says so "
+        "(ADR 0124 point 10).",
+        minimum=5,
+        maximum=1000,
+    ),
+    S(
         "rate_limit_agent_tokens",
         K.RATE,
         "10/minute",

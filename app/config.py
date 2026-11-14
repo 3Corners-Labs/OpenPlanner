@@ -551,6 +551,11 @@ class Settings(BaseSettings):
     webhook_source_networks_video: str = Field(default="", max_length=1600)
     webhook_source_networks_contact_center: str = Field(default="", max_length=1600)
     webhook_source_networks_required: bool = False
+    # Inbound webhooks (ADR 0124 point 10): how many refusals of the kinds a passer-by cannot
+    # cause alone (a stale delivery, a refusal from inside a connection's own list, a refusal for
+    # the network after a delivery, unknown work) one address may have inside the event window
+    # before one system event says so. Class C platform.
+    webhook_refusal_alert_count: int = Field(default=20, ge=5, le=1000)
 
     # ADR 0035: how many host websites one organisation may allow for the widget. Class C.
     embedding_max_origins: int = Field(default=20, ge=1, le=100)
