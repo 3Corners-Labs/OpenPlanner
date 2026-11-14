@@ -1,4 +1,4 @@
-"""The call page's own scripts and styles (ADR 0123 steps 4b and 4c).
+"""The call page's own scripts and styles (ADR 0123 steps 4b, 4c, 5a and 5b).
 
 The scripts are checked for what they must never do (reach anything but the token and the
 SDK file, set a style, build markup, log), for the texts they read (the server renders every one,
@@ -20,10 +20,13 @@ SCRIPT_FILES = (
     "call-devices.js",
     "call-connection.js",
     "call-media.js",
+    "call-captions.js",
+    "call-remote.js",
+    "call-render.js",
     "call-events.js",
     "call-page.js",
 )
-"""In the order the page loads them: the six that only define, then the page that starts them."""
+"""In the order the page loads them: the nine that only define, then the page that starts them."""
 SOURCES = {name: (STATIC / name).read_text() for name in SCRIPT_FILES}
 SCRIPT = "\n".join(SOURCES.values())
 STYLES = (STATIC / "call-page.css").read_text()
