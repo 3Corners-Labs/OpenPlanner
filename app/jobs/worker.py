@@ -96,7 +96,11 @@ from app.jobs.housekeeping import Housekeeping
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
 from app.jobs.usage import backfill_usage, close_slots, roll_up_usage
-from app.keys import management_token_key, management_token_key_previous
+from app.keys import (
+    guest_pseudonym_keys,
+    management_token_key,
+    management_token_key_previous,
+)
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
 from app.service_wiring import booking_service, planner_service, request_watch, request_work
 from app.web.alert_text import alert_composer
@@ -268,6 +272,9 @@ async def run_worker(
                 organisations=wired.organisations,
                 request_work=work,
                 reconcile_minutes=lambda: live.settings.contact_center_reconcile_minutes,
+                conversation_enabled=lambda: live.settings.embedded_call_enabled,
+                # ADR 0123 point 7: the guest renamed at the purge, under both keys in a rotation.
+                guest_keys=lambda: guest_pseudonym_keys(settings),
                 integration=integration,
                 fallback=fallback,
                 retention=lambda: live.settings.event_retention,

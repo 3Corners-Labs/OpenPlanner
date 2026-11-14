@@ -61,7 +61,12 @@ pages need `docker compose exec web python -m app.cli seed-closures > e2e/fixtur
 which writes the link of the example booking on hold and the bookings of the participant's
 journey, and the demonstration of ADR 0121 on `demo` (also on its own: `seed-demonstration`);
 that journey spec also needs `SIMULATOR_ENABLED=true` and the two webhook secrets in
+<<<<<<< HEAD
 `.env`, as CI sets them). Where the
+=======
+`.env`, as CI sets them; the call page of `e2e/pages.json` answers 404 on a stack without
+`EMBEDDED_CALL_ENABLED=true`, which CI sets). Where the
+>>>>>>> origin/main
 Playwright browser download is blocked, use an installed Chrome:
 `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome npx playwright test --project=chromium` and
 `CHROME_PATH=/path/to/chrome npm run lighthouse`. CI additionally runs gitleaks, hadolint, trivy, schemathesis, SBOM + grype, and on

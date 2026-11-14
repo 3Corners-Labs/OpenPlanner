@@ -20,7 +20,14 @@ from starlette.responses import RedirectResponse
 
 from app.admin.authz import AccessDenied
 from app.admin.connection_inputs import CONNECTION_MESSAGES, CONNECTION_TARGETS
-from app.admin.routing_inputs import ROUTING_FIELDS, ROUTING_MESSAGE, ROUTING_TARGETS
+from app.admin.routing_inputs import (
+    ROUTING_FIELDS,
+    ROUTING_MESSAGE,
+    ROUTING_TARGETS,
+    TASK_KIND_FIELD,
+    TASK_KIND_MESSAGE,
+)
+from app.domain.contact_center import TASK_KIND, routing_field
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.theme import TOKENS, TokenKind
 from app.i18n import BoundGettext
@@ -222,6 +229,9 @@ FIELD_MESSAGES: dict[str, str] = {
     **dict.fromkeys(ROUTING_FIELDS, ROUTING_MESSAGE),
     # ADR 0032: the routing's own refusals, linked to the settings form's inputs (FIELD_TARGET).
     **dict.fromkeys(ROUTING_TARGETS, ROUTING_MESSAGE),
+    # ADR 0123 step 7a: a task kind that is not offered, from the form or from the domain.
+    routing_field(TASK_KIND): TASK_KIND_MESSAGE,
+    TASK_KIND_FIELD: TASK_KIND_MESSAGE,
     **CONNECTION_MESSAGES,
     "offer": "admin.form.error.choice",
     "embedding_enabled": "admin.form.error.choice",

@@ -49,7 +49,7 @@ from app.domain.connection_health import (
     RequestSample,
     StaleTask,
 )
-from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef, TaskKind
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -65,7 +65,14 @@ from app.domain.identity_providers import (
 )
 from app.domain.images import ImageFile, ImageText
 from app.domain.integration_check import CHECK_EVENT, PROBE_REASON_PREFIX
-from app.domain.job_plan import JobCounts, JobStatus, JobSummary, JobType, PlannedJob
+from app.domain.job_plan import (
+    OUTLIVES_PURGE,
+    JobCounts,
+    JobStatus,
+    JobSummary,
+    JobType,
+    PlannedJob,
+)
 from app.domain.log_destinations import DestinationStatus, LogDestination
 from app.domain.login_domains import DomainClaim
 from app.domain.maintenance import OFF as MAINTENANCE_OFF
@@ -820,7 +827,15 @@ class InMemoryTransaction(ServiceRequestStore):
 
     async def save_task(self, booking_id: int, task: ContactCenterTaskRef) -> None:
         booking = self.state.bookings[booking_id]
-        self.state.bookings[booking_id] = replace(booking, contact_center_task=task)
+        self.state.bookings[booking_id] = replace(
+            booking, contact_center_task=task, attempted_task_kind=TaskKind.FORM
+        )
+
+    async def save_task_attempt(self, booking_id: int, task_kind: TaskKind | None) -> None:
+        booking = self.state.bookings[booking_id]
+        self.state.bookings[booking_id] = replace(
+            booking, attempted_task_kind=task_kind or TaskKind.FORM
+        )
 
     async def get_booking_by_meeting(self, meeting_id: str) -> Booking | None:
         return next(
@@ -1205,6 +1220,11 @@ class InMemoryTransaction(ServiceRequestStore):
         current = self.state.slots_closed_until
         self.state.slots_closed_until = until if current is None else max(current, until)
 
+    async def mark_guest_minted(self, booking_id: int, at: datetime) -> None:
+        booking = self.state.bookings[booking_id]
+        if booking.guest_minted_at is None:
+            self.state.bookings[booking_id] = replace(booking, guest_minted_at=at)
+
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
         self.state.bookings[booking_id] = replace(
             self.state.bookings[booking_id],
@@ -1355,7 +1375,8 @@ class InMemoryTransaction(ServiceRequestStore):
         self.state.bookings[booking_id] = replace(self.state.bookings[booking_id], contact=contact)
 
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
-        self.state.jobs[booking_id] = list(jobs)
+        kept = [j for j in self.state.jobs.get(booking_id, []) if j.type in OUTLIVES_PURGE]
+        self.state.jobs[booking_id] = [*kept, *jobs]
 
     async def add_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
         self.state.jobs.setdefault(booking_id, []).extend(jobs)

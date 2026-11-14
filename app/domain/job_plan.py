@@ -99,6 +99,10 @@ class JobType(StrEnum):
     SEND_PROPOSAL_RELEASED = "send_proposal_released"
     SEND_CHANGE_REQUEST = "send_change_request"
     SEND_REFUSAL = "send_refusal"
+    RENAME_GUEST = "rename_guest"
+    """Mint the booking's guest once more under the neutral term, after the purge (ADR 0123
+    point 7). Added by the purge itself, never planned with the booking; carries the booking's id
+    and nothing else."""
 
     @classmethod
     def _missing_(cls, value: object) -> "JobType | None":
@@ -114,6 +118,11 @@ NEXT_JOB_TYPES: Mapping[str, JobType] = {
 This minor still writes the old value, so the previous image keeps working on the new schema;
 the next minor switches to the new value, and this mapping lets this image read those jobs after
 a rollback."""
+
+
+OUTLIVES_PURGE = frozenset({JobType.RENAME_GUEST})
+"""Job types that are added by a purge or must survive one: everything else pending for a purged
+booking is deleted (``retention.purge_booking``, the sweep and ``replace_jobs`` all read this)."""
 
 
 TEAM_INVITES = frozenset({JobType.SEND_TEAM_INVITE, JobType.SEND_TEAM_CANCEL})

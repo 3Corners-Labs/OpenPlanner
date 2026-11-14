@@ -26,6 +26,13 @@ EVERYWHERE_PLACEHOLDERS = frozenset({"agent", "agents", "Agent", "Agents"})
 """Placeholders every text may use besides its own: the agent term, which the translator fills
 from the words in effect for the organisation and group (ADR 0077)."""
 
+CONVERSATION_OPENING_PLACEHOLDERS = frozenset(
+    {"reference", "first_name", "start", "group_name", "link"}
+)
+"""The names the first message of a conversation task may use (ADR 0123 step 7a): exactly the
+booking fields CLAUDE.md allows in an outbound contact-center payload. The text is fixed (not
+one of ``MESSAGE_BLOCKS``), so no stored text can ask for another value."""
+
 EMAIL_PLACEHOLDERS = frozenset({"date", "time", "group_name"})
 SMS_PLACEHOLDERS = frozenset({"first_name", "date", "time", "group_name", "manage_url"})
 CANCELLATION_SMS_PLACEHOLDERS = frozenset({"first_name", "date", "time", "group_name", "reason"})

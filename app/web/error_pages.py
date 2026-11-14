@@ -79,10 +79,25 @@ async def _too_many_unknown_links(request: Request) -> Response:
     return _rate_limited_response(request)
 
 
+JSON_ROUTES = frozenset({"/b/m/{public_ref}/call/token"})
+"""Routes a script calls: a limited call is answered as JSON like their other refusals, not as a
+page (ADR 0123 point 6). The event it leaves is the same."""
+
+RETRY_AFTER = "60"
+"""The ``Retry-After`` seconds of a rate-limit answer."""
+
+
 def _rate_limited_response(request: Request) -> Response:
-    """The rate-limit page with a ``Retry-After`` hint."""
+    """The rate-limit answer with a ``Retry-After`` hint: JSON for a script's route, else a page."""
+    route = str(getattr(request.scope.get("route"), "path", ""))
+    if route in JSON_ROUTES:
+        return JSONResponse(
+            {"error": "rate_limited"},
+            status_code=429,
+            headers={"retry-after": RETRY_AFTER, "cache-control": "no-store"},
+        )
     response = _page(request, 429, "error.title", "error.rate_limited")
-    response.headers["retry-after"] = "60"
+    response.headers["retry-after"] = RETRY_AFTER
     return response
 
 
@@ -129,10 +144,19 @@ async def validation_error_page(request: Request, exc: Exception) -> Response:
     return _page(request, 422, "error.title", "error.invalid_request")
 
 
-async def rate_limited_page(request: Request, exc: Exception) -> Response:
-    """Render the rate-limit page with a ``Retry-After`` hint."""
+async def refuse_rate_limited(request: Request) -> Response:
+    """Answer 429 as every limited participant route does, after leaving the security event.
+
+    For a route that counts a limit of its own (a bucket per booking) and so cannot let slowapi
+    raise ``RateLimitExceeded``.
+    """
     await report(request, RATE_LIMITED, TOO_MANY_REQUESTS, detail="surface:web")
     return _rate_limited_response(request)
+
+
+async def rate_limited_page(request: Request, exc: Exception) -> Response:
+    """Render the rate-limit page with a ``Retry-After`` hint."""
+    return await refuse_rate_limited(request)
 
 
 async def database_error_page(request: Request, exc: Exception) -> Response:

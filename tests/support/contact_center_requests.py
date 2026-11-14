@@ -69,11 +69,16 @@ class Desk:
 
 
 def desk(
-    uow: InMemoryUnitOfWork, clock: FixedClock, own_connections: frozenset[int] = frozenset()
+    uow: InMemoryUnitOfWork,
+    clock: FixedClock,
+    own_connections: frozenset[int] = frozenset(),
+    *,
+    conversation_enabled: bool = False,
 ) -> Desk:
     """Return the request dispatch of ``uow`` wired as the worker wires it.
 
-    ``own_connections`` are the organisations with a contact-center connection of their own.
+    ``own_connections`` are the organisations with a contact-center connection of their own;
+    ``conversation_enabled`` is the platform switch of ADR 0123 step 7a.
     """
     work = RequestWork(
         PoolBookings(clock, treatment_buffer=5), lease_minutes=5, unresolved_hours=24
@@ -92,7 +97,15 @@ def desk(
 
     integration.set_requeue_handler(note)
     dispatcher = FakeDispatcher()
-    calls = CallService(uow, integration, FakeVideo(), webex_cc(dispatcher), lambda b, g: "x")
+    calls = CallService(
+        uow,
+        integration,
+        FakeVideo(),
+        webex_cc(dispatcher),
+        lambda b, g: "x",
+        opening=lambda locale, task: f"opening {task.reference}",
+        conversation_enabled=lambda: conversation_enabled,
+    )
     dispatch = RequestDispatch(
         uow,
         work,

@@ -133,7 +133,7 @@ One row per metric a fact kind feeds. The count of a cell is always the number o
 
 A `reason_code` of a fact is always one of these; a free text never becomes one.
 
-- Failure codes (`call.failed` is `task.`, `meeting.` or `integration.` plus one of): `meeting_missing`, `other`, `rate_limited`, `rejected`, `server_error`, `unauthorized`, `unexpected_response`, `unreachable`
+- Failure codes (`call.failed` is `task.`, `meeting.` or `integration.` plus one of): `conversation_open`, `meeting_missing`, `messaging_not_configured`, `other`, `rate_limited`, `rejected`, `server_error`, `unauthorized`, `unexpected_response`, `unreachable`
 - Why a participant left a direct call: `agent`, `waiting`
 - Purpose of a message: `cancellation`, `change`, `closure`, `confirm_request`, `confirmation`, `rebook`, `reminder`
 - Shortfall of a slot: `open`, `accepted`, `resolved`

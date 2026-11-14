@@ -295,6 +295,57 @@ web ──HTTPS GET /meetings/{id}, /meetingParticipants?meetingId=──> Webex
 | Service App tokens | `integration_credentials` (AES-256-GCM) | Webex | rotated automatically | sent only to Webex |
 | Last webhook listing and delivery test (registration ids, events, host account filters, target URLs without query, statuses, outcome codes) | `integration_reports` | Webex, WxCC, the self-test | replaced by the next check | no; shown read-only on **Koppelingen** |
 
+### A conversation task instead of a work item (ADR 0123 point 8, step 7a)
+
+A group whose routing has the task kind `conversation` (default `form`, the work item above) sends a `customMessaging` task instead. Nothing sends one until the call page exists to show the chat: the choice is offered only while the platform switch `embedded_call_enabled` is on.
+
+```
+worker/web ──HTTPS──> WxCC Create Task v2 (channelType customMessaging): booking reference (the participant's identifier, one conversation per appointment), first name, the same flow variables as a work item (route, routing variables, skill codes, interaction kind), and as the first text message: the booking reference, first name, start (text), group name and, for a video task, the meeting link, composed from a fixed catalogue text in the organisation's language
+WxCC ──task id──> OpenPlanner (bookings.contact_center_task_id, with the kind the task was made with in bookings.contact_center_task_kind)
+worker/web ──HTTPS──> WxCC Task Messages v2 (mediaType customMessaging), when a later step has a participant message to append: the message identifier (aliasId) and the text the participant wrote
+```
+
+| Data item | Where | Source | Retention | Leaves the system |
+|---|---|---|---|---|
+| The routing's task kind | `group_contact_center.task_kind` | the group's settings | until changed; no personal data | no |
+| The kind a task was created with | `bookings.contact_center_task_kind` | the dispatch | with the booking row; a kind is no personal data and is not purged | no |
+| The first message | not stored: composed at dispatch from the catalogue and the allowed fields | the booking | not kept by OpenPlanner | to WxCC, as the conversation's first text (no other field of the booking: no surname, address, phone number, form answer or note) |
+| A participant's later message (from step 7b) | stored only from step 7b; nothing sends one in 7a | the participant | step 7b states it and puts it on the list of `app/domain/privacy.py` | to WxCC as the text of an appended message |
+| The conversation's transcript | **at the contact center**: it keeps the transcript and the thread per participant identifier and business address, and masks card numbers | the contact center | the contact center's own; **OpenPlanner's purge does not reach it** (the follow-up ADR of step 7b states the retention; a question to the supplier, `docs/research/call-page-on-the-meetings-sdk.md`) | no |
+
+### The guest of the call page (ADR 0123 points 6 and 7, step 4a)
+
+For a participant who joins in the organisation's own call page, our server asks the video
+platform for a guest token on the click that joins. Nothing is sent before the click, and the
+endpoint exists only while the platform switch `embedded_call_enabled` is on (until step 6 it is
+dark behind that switch alone).
+
+```
+participant ──POST /b/m/{public_ref}/call/token (cookie, same-origin)──> OpenPlanner
+OpenPlanner ──HTTPS POST /guests/token (Service App token)──> Webex: subject (a keyed digest of the booking, not the id), display name (the first name, or the organisation's word for a participant)
+Webex ──token, lifetime──> OpenPlanner ──JSON {token, expires_at, link}──> the participant's browser (Cache-Control: no-store)
+purge ──> one rename_guest job ──HTTPS POST /guests/token──> Webex: the same subject, the neutral word "Participant"; the token that comes back is dropped
+```
+
+| Data item | Where | Source | Retention | Leaves the system |
+|---|---|---|---|---|
+| The guest's subject | not stored: worked out from the booking's id and the key derived from `MANAGEMENT_TOKEN_KEY` (`app/keys.py`) | the booking | none at our side; after a key rotation the purge uses the current and the previous key | to the video platform, where it names the guest; it says nothing outside our database |
+| The guest's display name | not stored | the booking's first name, or the organisation's word (`embedded_call_display_name`, class D) | none at our side | to the video platform; staff see it in the meeting. **No other field of the booking** (no surname, address, phone number, form answer, booking reference or group) |
+| The guest token | not stored, not logged, in no event, audit row or job; returned to the browser only | the video platform | a few hours at the platform, set by it; an earlier token is not withdrawn by a new one (`docs/threat-model.md`, named risk) | to the participant's browser, then to the platform's call hosts by the SDK |
+| The meeting's guest link | `bookings.guest_join_url` (a PII field, purged with the contact) | the video platform | as the contact | to the participant's browser in the same answer; never the host's link |
+| That a guest was minted | `bookings.guest_minted_at`, a timestamp | the endpoint, once per booking | kept with the booking row; no personal data and not a purged field (`app/domain/privacy.py`) | no |
+| The rename job | `jobs`, type `rename_guest`: the booking's id and a time, nothing else | the purge, in its own transaction | until it ran or gave up | no |
+
+What the platform keeps (ADR 0123 point 7): the purge does not wait for it. After the purge the
+rename job mints once more for the same subject with the neutral word, so **the guest identity
+that the platform keeps no longer carries the first name**; the lab tenant showed that a second
+minting changes the name, also as seen with the earlier token, within seconds (research section 16).
+That is all that is removed at the supplier. The platform's own record of the meeting (its
+participant list and any recording or report) keeps the name the guest joined under, as it does
+today for a name typed into the Webex app (ADR 0102), and a name it has already shown to staff
+stays in what they saw. The rename is a job with retries and one system event when it gives up;
+until it has run, the first name is still held at the platform.
+
 ## Own queue (ADR 0043)
 
 A group with dispatch kind `openplanner_queue` sends nothing to a contact center. Its agents
@@ -472,7 +523,7 @@ and must be https (or the named secure transport) in production.
 |---|---|---|---|---|---|---|
 | Mail | worker → the organisation's SMTP server; else the `SMTP_HOST` fallback | SMTP, port 587 (STARTTLS) or 465 (implicit TLS) | Required: saving a server without TLS is refused (ADR 0091 point 4); exception `SMTP_PLAINTEXT_RELAY_ALLOWED` (B) for a relay on a trusted network | The superuser per organisation (`integrations.manage`); fallback B | no | Participant name, email address, dates, join and management links |
 | SMS | worker → the provider's API (today Webex Connect) | HTTPS | Required: https only, no credentials in the address | The superuser per organisation (`integrations.manage`; address, API key sealed, ADR 0008) | no | Phone number, first name, date, time, team, management link |
-| Webex Meetings | web, worker → `webexapis.com/v1` (OAuth token from the same host) | HTTPS | Required | B (`WEBEX_API_BASE_URL`, default Webex; changed only for test doubles); credentials A/B or sealed | no | Group name and times; host, never participants |
+| Webex Meetings | web, worker → `webexapis.com/v1` (OAuth token from the same host) | HTTPS | Required | B (`WEBEX_API_BASE_URL`, default Webex; changed only for test doubles); credentials A/B or sealed | no | Group name and times; host, never participants. For the call page's guest (ADR 0123): a pseudonymous subject and the first name or the organisation's word, nothing else |
 | Webex Messaging API | worker → `webexapis.com/v1/messages` with the bot token of the platform or the organisation (ADR 0082 points 9 and 12) | HTTPS | Required | The superuser on *Koppelingen* and per organisation on *Kanalen* (token sealed, write-only); the room id per alert target or per group (`fallback_space_room_id`, `group.edit`) | no | Alerts: codes, slugs, times, a count, the version, a portal link (no participant data). During a fallback: a booking's start time and first name and a link to the queue, never the host join link; kept in Webex after the purge |
 | Webex Contact Center | web, worker → the WxCC API of the region: the organisation's own host and Service App when it has a connection (ADR 0032 point 9), else the installation's | HTTPS | Required: https only; internal hosts refused for an organisation's connection | C (`WXCC_API_BASE_URL`, superuser) or the organisation's sealed connection (superuser); service app sealed | no | First name, host join URL, routing variables (ADR 0081), contact-center codes of the required skills (ADR 0121 step 4b; catalogue codes, no personal data) |
 | Identity provider, platform | web → `OIDC_DISCOVERY_URL`, token and key endpoints | HTTPS | Required: production refuses an http discovery URL | A (environment) | no | OIDC protocol: authorisation code, PKCE, client secret; no participant data |

@@ -320,6 +320,10 @@ class Settings(BaseSettings):
     # account name, or the organisation's word). Class D organisation.
     embedded_call_display_name: Literal["first_name", "term"] = "first_name"
     embedded_call_staff_name: Literal["name", "term"] = "name"
+    # ADR 0123 point 11 and the *Settings* table: whether the participant of an embedded call is
+    # ever shown a way into the video platform's own app. Class D organisation (per service from
+    # step 6, which puts it on the service's form).
+    embedded_call_webex_option: Literal["hidden", "on_failure", "always"] = "hidden"
     # ADR 0121 step 5: the watchdog: hours after the appointment's end before unstarted work
     # expires and started work is marked for recovery. Class D organisation.
     request_unresolved_hours: int = Field(default=24, ge=1, le=168)
@@ -441,6 +445,8 @@ class Settings(BaseSettings):
     embedded_call_enabled: bool = False
     embedded_call_connect_seconds: int = Field(default=30, ge=10, le=90)
     embedded_call_connect_attempts: int = Field(default=3, ge=1, le=5)
+    # ADR 0123 point 6: guest tokens one booking may ask for in an hour (step 4a). Class C.
+    embedded_call_token_per_booking_per_hour: int = Field(default=10, ge=5, le=30)
     # ADR 0046, staff directory. An admin's "last seen" is written at most once per this many
     # seconds (class C, platform; ADR 0042 registry).
     staff_last_seen_interval_seconds: int = Field(default=300, ge=60, le=3600)
@@ -596,6 +602,11 @@ class Settings(BaseSettings):
     # page asks for one ahead of time. GitHub allows 60 anonymous calls per hour per address,
     # so the portal floor is 5 minutes.
     update_check_minutes: int = Field(default=60, ge=1, le=1440)
+    # Class C: minutes a request the host updater claimed may stay silent (no step reported)
+    # before the application ends it as failed (`updater_stalled`). A dead updater (disk full,
+    # host restart) otherwise blocks every later request for ever. An update takes minutes;
+    # the updater's own health wait is 5 minutes.
+    update_stalled_minutes: int = Field(default=120, ge=15, le=1440)
 
     # Maintenance mode (ADR 0038). MAINTENANCE_MODE (class B, deployment: needed while the
     # database is unavailable or being restored) switches it on from the environment; the

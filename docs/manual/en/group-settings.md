@@ -351,6 +351,25 @@ The value the flow in Webex Contact Center uses to choose the queue. If you leav
 portal sends the group's web address. Only fill in something else if the flow expects another
 value.
 
+<!-- field: contact_center_task_kind -->
+### Kind of contact-center task
+
+What a booking or request becomes at the contact center. **Work item** is the default: the staff
+member sees the booking's fields and the meeting link in the agent desktop. **Conversation** makes
+a messaging task instead: the staff member answers the participant in a conversation in the agent
+desktop, and the first message names the appointment (reference, first name, time, the service's
+name and the meeting link). The choice **Conversation** appears only on an installation where the
+host has switched on the call page (the platform setting *embedded_call_enabled*), and it needs
+the messaging feature and a messaging channel in the contact center's control panel; without them
+the contact center refuses the task, the timeline says so and no work item is made in its place.
+The contact center keeps its own transcript of a conversation; the purge of OpenPlanner does not
+reach it. Changing the kind affects new tasks only; tasks that exist keep the kind they were made with.
+
+The kind **Conversation** is in force only while the call page is switched on for the installation:
+while it is off, a service that holds Conversation makes work items, and the form says so next to
+the choice. This holds for a kind that came in through a configuration import as well: the import
+keeps it, and it takes effect when the switch goes on.
+
 <!-- field: wxcc_sample_flow -->
 ### Sample flow to import
 

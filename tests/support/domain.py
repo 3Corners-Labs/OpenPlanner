@@ -15,7 +15,7 @@ from app.adapters.wxcc import BUSINESS_ADDRESS, CHANNEL
 from app.domain.authorization import Role
 from app.domain.booking import Contact
 from app.domain.channels import ChannelKind
-from app.domain.contact_center import ContactCenterKind, ContactCenterRouting
+from app.domain.contact_center import ContactCenterKind, ContactCenterRouting, TaskKind
 from app.domain.scheduling import DispatchKind, Group, Offer, PhoneMode, TimeWindow
 from app.domain.services import BookingReceipt, BookingService, ContactInput
 from tests.support.principals import principal
@@ -67,12 +67,14 @@ def webex_routing(
     business_address: str | None = "openplanner@example.biz",
     channel: str | None = "openplanner-video",
     routing_value: str | None = None,
+    task_kind: TaskKind = TaskKind.FORM,
 ) -> ContactCenterRouting:
     """Return a Webex Contact Center routing (ADR 0032), complete by default."""
     built = routing(
         ContactCenterKind.WEBEX_CC,
         routing_value,
         {BUSINESS_ADDRESS: business_address, CHANNEL: channel},
+        task_kind,
     )
     assert built is not None
     return built

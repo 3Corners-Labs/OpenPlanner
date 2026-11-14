@@ -64,6 +64,22 @@ async def test_a_booking_past_its_purge_moment_without_a_purge_is_purged(
     assert JobType.PURGE_PII not in [j.type for j in uow.state.jobs[booking_id]]  # nothing left
 
 
+async def test_the_sweep_keeps_the_rename_of_a_guest(
+    sweep: RetentionSweep, bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """ADR 0123 point 7: the sweep deletes the pending jobs, but not the one the purge adds."""
+    booking_id = await _book(bookings)
+    async with uow.locked() as tx:
+        await tx.mark_guest_minted(booking_id, NOW)
+    clock.advance(SLOT_0930 - NOW + DAY + timedelta(hours=2))
+
+    await sweep.run()
+    await sweep.run()
+
+    assert not _holds_data(uow, booking_id)
+    assert [j.type for j in uow.state.jobs[booking_id]] == [JobType.RENAME_GUEST]
+
+
 async def test_a_booking_whose_purge_job_failed_is_purged_too(
     sweep: RetentionSweep, bookings: BookingService, uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:

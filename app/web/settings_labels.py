@@ -142,6 +142,7 @@ SETTING_LABELS: dict[str, str] = {
     "update_channel": "settings.field.update_channel.label",
     "update_auto_apply": "settings.field.update_auto_apply.label",
     "update_check_minutes": "settings.field.update_check_minutes.label",
+    "update_stalled_minutes": "settings.field.update_stalled_minutes.label",
     "update_line": "settings.field.update_line.label",
     "update_window": "settings.field.update_window.label",
     "update_check_token": "settings.field.update_check_token.label",  # nosec B105 - an i18n key
@@ -191,8 +192,12 @@ SETTING_LABELS: dict[str, str] = {
     "embedded_call_enabled": "settings.field.embedded_call_enabled.label",
     "embedded_call_connect_seconds": "settings.field.embedded_call_connect_seconds.label",
     "embedded_call_connect_attempts": "settings.field.embedded_call_connect_attempts.label",
+    "embedded_call_token_per_booking_per_hour": (
+        "settings.field.embedded_call_token_per_booking_per_hour.label"
+    ),
     "embedded_call_display_name": "settings.field.embedded_call_display_name.label",
     "embedded_call_staff_name": "settings.field.embedded_call_staff_name.label",
+    "embedded_call_webex_option": "settings.field.embedded_call_webex_option.label",
 }
 """The label of every class C and D setting, by key."""
 

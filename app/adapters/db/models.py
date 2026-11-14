@@ -319,6 +319,8 @@ class GroupContactCenterRow(Base):
     kind: Mapped[str] = mapped_column(String(32))
     routing_value: Mapped[str | None] = mapped_column(String(512))
     attributes: Mapped[str] = mapped_column(Text, server_default=text("'{}'"))
+    task_kind: Mapped[str] = mapped_column(String(16), server_default=text("'form'"))
+    """The kind of task a request becomes (ADR 0123 step 7a): ``form`` or ``conversation``."""
 
     __table_args__ = (
         CheckConstraint(
@@ -631,6 +633,12 @@ class BookingRow(Base):
     # link, purged with the contact (privacy.DERIVED_FIELDS).
     contact_center_task_id: Mapped[str | None] = mapped_column(String(255))
     contact_center_kind: Mapped[str | None] = mapped_column(String(32))
+    contact_center_task_kind: Mapped[str | None] = mapped_column(String(16))
+    """The kind the task was created with (ADR 0123 step 7a); NULL is a form. Written only when a
+    task reference is stored."""
+    contact_center_attempt_kind: Mapped[str | None] = mapped_column(String(16))
+    """The kind the latest create was tried as, before the platform answers (step 7a); NULL is a
+    form. Cleared when a task is stored or an attempt fails for good."""
     # Before ADR 0032; written for a Webex Contact Center task and, for that platform, the
     # source of truth on read this minor (ADR 0116 §5, contact_center_rows.py).
     wxcc_task_id: Mapped[str | None] = mapped_column(String(255))
@@ -667,6 +675,10 @@ class BookingRow(Base):
     # table stays a plain ALTER, and the adapter writes only revisions that exist.
     flow_id: Mapped[int | None] = mapped_column(Integer)
     flow_revision: Mapped[int | None] = mapped_column(Integer)
+    # ADR 0123 point 7: when a guest was first minted for the booking at the video platform. A
+    # timestamp, no personal data and not a purged field: the purge reads it to know that the
+    # guest's name has to be replaced at the platform (``rename_guest``).
+    guest_minted_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     __table_args__ = (
         Index("ix_bookings_slot_status", "slot_id", "status"),

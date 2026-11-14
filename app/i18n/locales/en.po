@@ -63,6 +63,12 @@ msgstr "View or change appointment"
 msgid "message.signoff"
 msgstr "Kind regards, {group_name}"
 
+msgid "message.conversation.opening_video"
+msgstr "Video appointment {reference} with {first_name}, {start}, {group_name}. Start the call: {link}"
+
+msgid "message.conversation.opening"
+msgstr "Appointment {reference} with {first_name}, {start}, {group_name}."
+
 msgid "message.team_invite.subject"
 msgstr "Video appointment {date} {time}, {group_name} ({reference})"
 
@@ -1555,6 +1561,21 @@ msgstr "Routing value for the WxCC flow"
 msgid "admin.field.wxcc_routing_value_hint"
 msgstr "The flow chooses the queue with it. Empty: the service's web address."
 
+msgid "admin.field.contact_center_task_kind"
+msgstr "Kind of contact-center task"
+
+msgid "admin.field.contact_center_task_kind_hint"
+msgstr "Work item: the staff member sees the fields and the link in the agent desktop (the default). Conversation: a messaging task the staff member answers in the agent desktop. The conversation can be chosen only on an installation that has the call page switched on, and needs the messaging channel of the contact center."
+
+msgid "admin.field.contact_center_task_kind_off"
+msgstr "This service holds Conversation, but until the call page is switched on for this installation it makes work items."
+
+msgid "admin.contact_center.task_kind.form"
+msgstr "Work item"
+
+msgid "admin.contact_center.task_kind.conversation"
+msgstr "Conversation"
+
 msgid "admin.field.direct_call_enabled"
 msgstr "Start a call right away"
 
@@ -1581,6 +1602,9 @@ msgstr "Enter a valid email address."
 
 msgid "admin.form.error.integration_text"
 msgstr "Enter a value without special characters, or leave the field empty."
+
+msgid "admin.form.error.task_kind"
+msgstr "Choose a kind of task from the list. The conversation is not available on this installation or at this contact center."
 
 msgid "admin.form.error.choice"
 msgstr "Make a choice."
@@ -1656,6 +1680,9 @@ msgstr "Your video call"
 
 msgid "call.unavailable"
 msgstr "The call in this page is not available yet. Use the link below to go back to the appointment."
+
+msgid "call.guest.term"
+msgstr "Participant"
 
 msgid "error.direct_call_unavailable"
 msgstr "Starting a call is not possible right now. Please book an appointment."
@@ -1809,6 +1836,12 @@ msgstr "The task waited for the video meeting, but it never came. Fix the meetin
 
 msgid "call.hint.task.other"
 msgstr "Webex Contact Center did not accept the task. Check the service's entry point and channel under Settings and the WxCC setup under Integrations; the code is WxCC's reason."
+
+msgid "call.hint.task.messaging_not_configured"
+msgstr "The contact center refused the conversation with a 403 (the status is shown with the event). Either its messaging feature or messaging channel is not set up for this organisation, or the service app lacks the permission. Check the channel under the service's settings, the messaging channel in the contact center's control panel and the service app's permissions. No work item was made instead."
+
+msgid "call.hint.task.conversation_open"
+msgstr "The contact center already has an open conversation for this appointment. End it in the agent desktop, then try again. No work item was made instead."
 
 msgid "call.hint.integration.other"
 msgstr "Webex refused a request. Webex's answer is shown when Webex gave one; the worker log also has a trackingId at integration.refused."
@@ -4350,6 +4383,9 @@ msgstr "After the update, the requested version is not running."
 msgid "admin.updates.reason.updater_error"
 msgstr "Unexpected error in the updater. Check the updater's log on the server."
 
+msgid "admin.updates.reason.updater_stalled"
+msgstr "The updater stopped reporting (for example a full disk), so the request was ended and the next update can start."
+
 msgid "admin.updates.reason.other"
 msgstr "The updater reported an unknown reason."
 
@@ -6420,6 +6456,9 @@ msgstr "Update automatically"
 msgid "settings.field.update_check_minutes.label"
 msgstr "Minutes between two version checks"
 
+msgid "settings.field.update_stalled_minutes.label"
+msgstr "Minutes before a silent update is ended"
+
 msgid "settings.field.update_line.label"
 msgstr "Follow one minor only (X.Y)"
 
@@ -7030,6 +7069,9 @@ msgstr "Expire unconfirmed booking"
 
 msgid "audit.job.send_unconfirmed_lapsed"
 msgstr "Send notice of an expired booking"
+
+msgid "audit.job.rename_guest"
+msgstr "Replace the guest's name in the call with a neutral word"
 
 msgid "audit.job.send_refusal"
 msgstr "Send notice of a refused booking"
@@ -13658,6 +13700,9 @@ msgstr "Wait per attempt to connect the call (seconds)"
 msgid "settings.field.embedded_call_connect_attempts.label"
 msgstr "Attempts to connect the call"
 
+msgid "settings.field.embedded_call_token_per_booking_per_hour.label"
+msgstr "Times per hour one appointment may ask for access to the call"
+
 msgid "settings.field.embedded_call_display_name.label"
 msgstr "Participant's name shown to staff in the call (first name or own word)"
 
@@ -13789,3 +13834,164 @@ msgstr "Deliveries are paused."
 
 msgid "admin.done.contact_center_resumed"
 msgstr "Deliveries are resumed."
+
+#. The participant's call page before the click that joins (ADR 0123 step 4b). No text names the video platform.
+
+msgid "settings.field.embedded_call_webex_option.label"
+msgstr "Way into the video platform's own app next to the call (never, only when the page cannot give the call, or always)"
+
+msgid "callpage.start.body"
+msgstr "You have the call here, in this page. There is nothing to install."
+
+msgid "callpage.start.button"
+msgstr "Test camera and microphone"
+
+msgid "callpage.needs"
+msgstr "The call needs a browser with JavaScript, a camera and a microphone. Turn JavaScript on, or open this page in another browser."
+
+msgid "callpage.other_way"
+msgstr "Join this call another way"
+
+msgid "callpage.unavailable.heading"
+msgstr "The call is not available in this page yet"
+
+msgid "callpage.check.heading"
+msgstr "Check picture and sound"
+
+msgid "callpage.check.body"
+msgstr "Can you see yourself, and does the bar move when you talk? Then you can join."
+
+msgid "callpage.check.preview"
+msgstr "Your own picture"
+
+msgid "callpage.check.camera_off"
+msgstr "Your camera is off"
+
+msgid "callpage.check.toggles"
+msgstr "Microphone and camera"
+
+msgid "callpage.check.level"
+msgstr "Sound from your microphone"
+
+msgid "callpage.check.level_heard"
+msgstr "We hear you."
+
+msgid "callpage.check.level_silent"
+msgstr "We do not hear you yet. Say something."
+
+msgid "callpage.check.level_off"
+msgstr "Your microphone is off, so we do not hear you."
+
+msgid "callpage.check.camera"
+msgstr "Camera"
+
+msgid "callpage.check.microphone"
+msgstr "Microphone"
+
+msgid "callpage.check.speaker"
+msgstr "Speaker"
+
+msgid "callpage.check.test_sound"
+msgstr "Play a test sound"
+
+msgid "callpage.check.test_sound_playing"
+msgstr "You now hear two tones. Do you hear nothing? Choose another speaker or turn the volume up."
+
+msgid "callpage.check.no_camera"
+msgstr "No camera found. You can join without a picture."
+
+msgid "callpage.check.no_microphone"
+msgstr "No microphone found. You can join without sound."
+
+msgid "callpage.check.external"
+msgstr "An external video service carries this video call."
+
+msgid "callpage.check.join"
+msgstr "Join"
+
+msgid "callpage.check.join_camera"
+msgstr "Join without camera"
+
+msgid "callpage.check.join_microphone"
+msgstr "Join without microphone"
+
+msgid "callpage.check.join_both"
+msgstr "Join without camera and microphone"
+
+msgid "callpage.control.microphone"
+msgstr "Microphone"
+
+msgid "callpage.control.camera"
+msgstr "Camera"
+
+msgid "callpage.control.on"
+msgstr "on"
+
+msgid "callpage.control.off"
+msgstr "off"
+
+msgid "callpage.denied.here"
+msgstr "Click here"
+
+msgid "callpage.denied.step_address_bar"
+msgstr "In the address bar, click the icon left of the web address."
+
+msgid "callpage.denied.step_safari"
+msgstr "In the Safari menu, choose Settings for This Website."
+
+msgid "callpage.denied.step_retry"
+msgstr "Then click Try again below."
+
+msgid "callpage.denied.retry"
+msgstr "Try again"
+
+msgid "callpage.denied.camera.heading"
+msgstr "Your browser does not allow the camera"
+
+msgid "callpage.denied.camera.step"
+msgstr "Set the camera to Allow."
+
+msgid "callpage.denied.camera.without"
+msgstr "You can also join without a camera."
+
+msgid "callpage.denied.microphone.heading"
+msgstr "Your browser does not allow the microphone"
+
+msgid "callpage.denied.microphone.step"
+msgstr "Set the microphone to Allow."
+
+msgid "callpage.denied.microphone.without"
+msgstr "You can also join without a microphone. You then hear the other side, but they do not hear you."
+
+msgid "callpage.denied.both.heading"
+msgstr "Your browser does not allow the camera and the microphone"
+
+msgid "callpage.denied.both.step"
+msgstr "Set the camera and the microphone to Allow."
+
+msgid "callpage.denied.both.without"
+msgstr "You can also join without a camera and microphone. You then see and hear the other side, but they do not see or hear you."
+
+msgid "callpage.say.checking"
+msgstr "Checking your camera and microphone."
+
+msgid "callpage.say.ready"
+msgstr "Your camera and microphone are ready."
+
+msgid "callpage.say.no_devices"
+msgstr "No camera or microphone found. Connect one and try again."
+
+msgid "callpage.say.sound"
+msgstr "Playing the test sound."
+
+msgid "callpage.say.camera_on"
+msgstr "Camera on."
+
+msgid "callpage.say.camera_off"
+msgstr "Camera off."
+
+msgid "callpage.say.microphone_on"
+msgstr "Microphone on."
+
+msgid "callpage.say.microphone_off"
+msgstr "Microphone off."

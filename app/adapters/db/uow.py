@@ -185,7 +185,7 @@ from app.domain.channel_settings import (
 from app.domain.channels import ChannelKind, ReminderRule
 from app.domain.checks import CheckArea, CheckStatus, Finding, GroupCheck
 from app.domain.closure import Closure
-from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
+from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef, TaskKind
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
 from app.domain.direct_queue import DirectCall
@@ -195,6 +195,7 @@ from app.domain.flow_resolution import FlowRef
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
 from app.domain.images import PageImage
 from app.domain.job_plan import (
+    OUTLIVES_PURGE,
     JobCounts,
     JobStatus,
     JobSummary,
@@ -436,6 +437,7 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         else None,
         trial_count=row.trial_count,
         contact_center_task=task_of(row),
+        attempted_task_kind=TaskKind(row.contact_center_attempt_kind or TaskKind.FORM),
         kind=BookingKind(slot.kind),
         closure_id=row.closure_id,
         change_reason=ChangeReason(row.change_reason) if row.change_reason else None,
@@ -450,6 +452,7 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         flow=FlowRef(row.flow_id, row.flow_revision)
         if row.flow_id is not None and row.flow_revision is not None
         else None,
+        guest_minted_at=row.guest_minted_at,
     )
 
 
@@ -1384,6 +1387,14 @@ class SqlTransaction(
             )
         )
 
+    async def mark_guest_minted(self, booking_id: int, at: datetime) -> None:
+        """Remember when a guest was first minted for the booking; a later call changes nothing."""
+        await self._session.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id, BookingRow.guest_minted_at.is_(None))
+            .values(guest_minted_at=at)
+        )
+
     async def save_trial_call(self, booking_id: int, trial: TrialCall) -> None:
         """Store a new trial call and count it; a previous one is replaced."""
         await self._session.execute(
@@ -1409,6 +1420,17 @@ class SqlTransaction(
         """Store the booking's contact-center task (the old column too, ADR 0116)."""
         await self._session.execute(
             update(BookingRow).where(BookingRow.id == booking_id).values(**task_columns(task))
+        )
+
+    async def save_task_attempt(self, booking_id: int, task_kind: TaskKind | None) -> None:
+        """Store the kind a create is tried as, before the answer; ``None`` clears it.
+
+        Only the attempt's own column: the kind of a stored task is written with the task.
+        """
+        await self._session.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id)
+            .values(contact_center_attempt_kind=task_kind.value if task_kind else None)
         )
 
     async def get_booking_by_meeting(self, meeting_id: str) -> Booking | None:
@@ -1927,6 +1949,8 @@ class SqlTransaction(
         booking's timeline events, replaces the management token hash by a random value (the
         column is unique and not null; the old hash can no longer find the booking) and records
         ``pii_purged_at``. The salt stays: without the token it identifies nothing.
+
+        Storage only: what follows a purge is decided by ``app.domain.retention.purge_booking``.
         """
         await self._session.execute(
             update(BookingRow)
@@ -2013,9 +2037,16 @@ class SqlTransaction(
         )
 
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
-        """Delete the booking's pending jobs and insert ``jobs``."""
+        """Delete the booking's pending jobs and insert ``jobs``.
+
+        A job that outlives a purge (``OUTLIVES_PURGE``) is never deleted here.
+        """
         await self._session.execute(
-            delete(JobRow).where(JobRow.booking_id == booking_id, JobRow.status == _PENDING)
+            delete(JobRow).where(
+                JobRow.booking_id == booking_id,
+                JobRow.status == _PENDING,
+                JobRow.type.not_in(sorted(t.value for t in OUTLIVES_PURGE)),
+            )
         )
         await self.add_jobs(booking_id, jobs)
 

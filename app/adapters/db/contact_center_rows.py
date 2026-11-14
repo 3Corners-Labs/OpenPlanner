@@ -15,6 +15,13 @@ stale copy in the new places.
 
 This module is the one home of that rule; ``task_of``, ``stored_task_id`` and ``purge_columns``
 apply it to rows and to SQL.
+
+The task kind (ADR 0123 step 7a) is newer than the previous image, which never reads or writes
+it, so it has no old column to keep in step: ``group_contact_center.task_kind`` holds a routing's
+kind for every platform (the form where the group has no such row) and
+``bookings.contact_center_task_kind`` the kind a task was created with (NULL: a form, as every
+task before the step) and ``bookings.contact_center_attempt_kind`` the kind the latest create was
+tried as (NULL: a form; cleared with a stored task or a failed attempt).
 """
 
 from collections.abc import Sequence
@@ -26,7 +33,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.contact_centers import attributes_from_json, attributes_json, routing
 from app.adapters.db.models import BookingRow, GroupContactCenterRow, GroupRow
 from app.adapters.wxcc import BUSINESS_ADDRESS, CHANNEL
-from app.domain.contact_center import ContactCenterKind, ContactCenterRouting, ContactCenterTaskRef
+from app.domain.contact_center import (
+    ContactCenterKind,
+    ContactCenterRouting,
+    ContactCenterTaskRef,
+    TaskKind,
+)
 from app.domain.privacy import PURGED_FIELDS
 
 LEGACY_KIND = ContactCenterKind.WEBEX_CC
@@ -44,11 +56,13 @@ def routing_of(
             ContactCenterKind(center.kind),
             center.routing_value,
             attributes_from_json(center.attributes),
+            TaskKind(center.task_kind),
         )
     return routing(
         LEGACY_KIND,
         group.wxcc_routing_value,
         {BUSINESS_ADDRESS: group.wxcc_business_address, CHANNEL: group.wxcc_channel},
+        TaskKind(center.task_kind) if center is not None else TaskKind.FORM,
     )
 
 
@@ -77,6 +91,7 @@ async def save_routing(
             kind=center.kind.value,
             routing_value=center.routing_value,
             attributes=attributes_json(center.attributes),
+            task_kind=center.task_kind.value,
         )
     )
 
@@ -85,7 +100,10 @@ def task_of(row: BookingRow) -> ContactCenterTaskRef | None:
     """Return the booking's task: ``wxcc_task_id`` for WxCC (or no kind), the new column else."""
     kind = ContactCenterKind(row.contact_center_kind) if row.contact_center_kind else LEGACY_KIND
     task_id = row.wxcc_task_id if kind is LEGACY_KIND else row.contact_center_task_id
-    return ContactCenterTaskRef(task_id, kind) if task_id is not None else None
+    if task_id is None:
+        return None
+    task_kind = TaskKind(row.contact_center_task_kind or TaskKind.FORM)
+    return ContactCenterTaskRef(task_id, kind, task_kind)
 
 
 def task_columns(task: ContactCenterTaskRef) -> dict[str, Any]:
@@ -94,6 +112,8 @@ def task_columns(task: ContactCenterTaskRef) -> dict[str, Any]:
         "contact_center_task_id": task.id,
         "contact_center_kind": task.kind.value,
         "wxcc_task_id": task.id if task.kind is LEGACY_KIND else None,
+        "contact_center_task_kind": task.task_kind.value,
+        "contact_center_attempt_kind": None,  # the create is answered: nothing left to adopt
     }
 
 

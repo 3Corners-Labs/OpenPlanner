@@ -63,6 +63,12 @@ msgstr "Afspraak bekijken of wijzigen"
 msgid "message.signoff"
 msgstr "Met vriendelijke groet, {group_name}"
 
+msgid "message.conversation.opening_video"
+msgstr "Videoafspraak {reference} met {first_name}, {start}, {group_name}. Start het gesprek: {link}"
+
+msgid "message.conversation.opening"
+msgstr "Afspraak {reference} met {first_name}, {start}, {group_name}."
+
 msgid "message.team_invite.subject"
 msgstr "Videoafspraak {date} {time}, {group_name} ({reference})"
 
@@ -1555,6 +1561,21 @@ msgstr "Routeringswaarde voor de WxCC-flow"
 msgid "admin.field.wxcc_routing_value_hint"
 msgstr "De flow kiest hiermee de wachtrij. Leeg: het webadres van de dienst."
 
+msgid "admin.field.contact_center_task_kind"
+msgstr "Soort taak in het contactcenter"
+
+msgid "admin.field.contact_center_task_kind_hint"
+msgstr "Werkitem: de medewerker ziet de velden en de link in het agent desktop (standaard). Gesprek: een berichtentaak die de medewerker in het agent desktop beantwoordt. Het gesprek kan alleen gekozen worden op een installatie waar de gesprekspagina aanstaat, en vraagt het berichtenkanaal van het contactcenter."
+
+msgid "admin.field.contact_center_task_kind_off"
+msgstr "Deze dienst staat op Gesprek, maar zolang de gesprekspagina op deze installatie niet aanstaat maakt hij werkitems."
+
+msgid "admin.contact_center.task_kind.form"
+msgstr "Werkitem"
+
+msgid "admin.contact_center.task_kind.conversation"
+msgstr "Gesprek"
+
 msgid "admin.field.direct_call_enabled"
 msgstr "Direct gesprek starten"
 
@@ -1581,6 +1602,9 @@ msgstr "Vul een geldig e-mailadres in."
 
 msgid "admin.form.error.integration_text"
 msgstr "Vul een waarde in zonder speciale tekens, of laat het veld leeg."
+
+msgid "admin.form.error.task_kind"
+msgstr "Kies een soort taak uit de lijst. Het gesprek is op deze installatie of bij dit contactcenter niet beschikbaar."
 
 msgid "admin.form.error.choice"
 msgstr "Maak een keuze."
@@ -1656,6 +1680,9 @@ msgstr "Uw videogesprek"
 
 msgid "call.unavailable"
 msgstr "Het gesprek in deze pagina is nog niet beschikbaar. Ga met de link hieronder terug naar uw afspraak."
+
+msgid "call.guest.term"
+msgstr "Deelnemer"
 
 msgid "error.direct_call_unavailable"
 msgstr "Nu een gesprek starten kan op dit moment niet. Maak een afspraak."
@@ -1809,6 +1836,12 @@ msgstr "De taak wachtte op de videomeeting, maar die kwam er niet. Los eerst de 
 
 msgid "call.hint.task.other"
 msgstr "Webex Contact Center nam de taak niet aan. Controleer het entry point en kanaal van de dienst onder Instellingen en de WxCC-inrichting onder Koppelingen; de code is de reden van WxCC."
+
+msgid "call.hint.task.messaging_not_configured"
+msgstr "Het contactcenter weigerde het gesprek met een 403 (de status staat bij de gebeurtenis). Of de berichtenfunctie of het berichtenkanaal staat voor deze organisatie niet aan, of de service-app heeft de machtiging niet. Controleer het kanaal onder de instellingen van de dienst, het berichtenkanaal in het beheer van het contactcenter en de machtigingen van de service-app. Er is geen werkitem voor in de plaats gemaakt."
+
+msgid "call.hint.task.conversation_open"
+msgstr "Het contactcenter heeft voor deze afspraak al een open gesprek. Sluit het in het agent desktop af en probeer het opnieuw. Er is geen werkitem voor in de plaats gemaakt."
 
 msgid "call.hint.integration.other"
 msgstr "Webex weigerde een aanroep. Het antwoord van Webex staat erbij als Webex er een gaf; het worker-log heeft bij integration.refused ook een trackingId."
@@ -4350,6 +4383,9 @@ msgstr "Na de update draait niet de gevraagde versie."
 msgid "admin.updates.reason.updater_error"
 msgstr "Onverwachte fout in de updater. Bekijk het log van de updater op de server."
 
+msgid "admin.updates.reason.updater_stalled"
+msgstr "De updater meldde niets meer (bijvoorbeeld door een volle schijf); het verzoek is beëindigd zodat de volgende update kan starten."
+
 msgid "admin.updates.reason.other"
 msgstr "De updater meldde een onbekende reden."
 
@@ -6420,6 +6456,9 @@ msgstr "Automatisch bijwerken"
 msgid "settings.field.update_check_minutes.label"
 msgstr "Minuten tussen twee versiecontroles"
 
+msgid "settings.field.update_stalled_minutes.label"
+msgstr "Minuten voordat een stille update wordt beëindigd"
+
 msgid "settings.field.update_line.label"
 msgstr "Alleen één minorversie volgen (X.Y)"
 
@@ -7043,6 +7082,9 @@ msgstr "Onbevestigde afspraak laten vervallen"
 
 msgid "audit.job.send_unconfirmed_lapsed"
 msgstr "Melding vervallen afspraak sturen"
+
+msgid "audit.job.rename_guest"
+msgstr "Gastnaam in het gesprek vervangen door een neutraal woord"
 
 msgid "audit.job.send_refusal"
 msgstr "Melding geweigerde afspraak sturen"
@@ -13671,6 +13713,9 @@ msgstr "Wachttijd per poging om het gesprek te verbinden (seconden)"
 msgid "settings.field.embedded_call_connect_attempts.label"
 msgstr "Aantal pogingen om het gesprek te verbinden"
 
+msgid "settings.field.embedded_call_token_per_booking_per_hour.label"
+msgstr "Aantal keer per uur dat één afspraak toegang tot het gesprek mag vragen"
+
 msgid "settings.field.embedded_call_display_name.label"
 msgstr "Naam van de deelnemer voor de medewerker in het gesprek (voornaam of eigen woord)"
 
@@ -13802,3 +13847,164 @@ msgstr "De bezorgingen zijn gepauzeerd."
 
 msgid "admin.done.contact_center_resumed"
 msgstr "De bezorgingen zijn hervat."
+
+#. The participant's call page before the click that joins (ADR 0123 step 4b). No text names the video platform.
+
+msgid "settings.field.embedded_call_webex_option.label"
+msgstr "Weg naar de eigen app van het videoplatform naast het gesprek (nooit, alleen als de pagina het gesprek niet kan geven, of altijd)"
+
+msgid "callpage.start.body"
+msgstr "U voert het gesprek hier, in deze pagina. U hoeft niets te installeren."
+
+msgid "callpage.start.button"
+msgstr "Camera en microfoon testen"
+
+msgid "callpage.needs"
+msgstr "Voor het gesprek hebt u een browser nodig met JavaScript, een camera en een microfoon. Zet JavaScript aan of open deze pagina in een andere browser."
+
+msgid "callpage.other_way"
+msgstr "Op een andere manier deelnemen aan dit gesprek"
+
+msgid "callpage.unavailable.heading"
+msgstr "Het gesprek is in deze pagina nog niet beschikbaar"
+
+msgid "callpage.check.heading"
+msgstr "Controleer beeld en geluid"
+
+msgid "callpage.check.body"
+msgstr "Ziet u uzelf en beweegt de balk als u praat? Dan kunt u deelnemen."
+
+msgid "callpage.check.preview"
+msgstr "Uw eigen beeld"
+
+msgid "callpage.check.camera_off"
+msgstr "Uw camera staat uit"
+
+msgid "callpage.check.toggles"
+msgstr "Microfoon en camera"
+
+msgid "callpage.check.level"
+msgstr "Geluid van uw microfoon"
+
+msgid "callpage.check.level_heard"
+msgstr "We horen u."
+
+msgid "callpage.check.level_silent"
+msgstr "We horen u nog niet. Zeg iets."
+
+msgid "callpage.check.level_off"
+msgstr "Uw microfoon staat uit, dus we horen u niet."
+
+msgid "callpage.check.camera"
+msgstr "Camera"
+
+msgid "callpage.check.microphone"
+msgstr "Microfoon"
+
+msgid "callpage.check.speaker"
+msgstr "Luidspreker"
+
+msgid "callpage.check.test_sound"
+msgstr "Testgeluid afspelen"
+
+msgid "callpage.check.test_sound_playing"
+msgstr "U hoort nu twee tonen. Hoort u niets? Kies een andere luidspreker of zet het geluid harder."
+
+msgid "callpage.check.no_camera"
+msgstr "Geen camera gevonden. U kunt zonder beeld deelnemen."
+
+msgid "callpage.check.no_microphone"
+msgstr "Geen microfoon gevonden. U kunt zonder geluid deelnemen."
+
+msgid "callpage.check.external"
+msgstr "Een externe videodienst verzorgt dit videogesprek."
+
+msgid "callpage.check.join"
+msgstr "Deelnemen"
+
+msgid "callpage.check.join_camera"
+msgstr "Deelnemen zonder camera"
+
+msgid "callpage.check.join_microphone"
+msgstr "Deelnemen zonder microfoon"
+
+msgid "callpage.check.join_both"
+msgstr "Deelnemen zonder camera en microfoon"
+
+msgid "callpage.control.microphone"
+msgstr "Microfoon"
+
+msgid "callpage.control.camera"
+msgstr "Camera"
+
+msgid "callpage.control.on"
+msgstr "aan"
+
+msgid "callpage.control.off"
+msgstr "uit"
+
+msgid "callpage.denied.here"
+msgstr "Klik hier"
+
+msgid "callpage.denied.step_address_bar"
+msgstr "Klik in de adresbalk op het pictogram links van het webadres."
+
+msgid "callpage.denied.step_safari"
+msgstr "Kies in het menu Safari voor Instellingen voor deze website."
+
+msgid "callpage.denied.step_retry"
+msgstr "Klik daarna hieronder op Opnieuw proberen."
+
+msgid "callpage.denied.retry"
+msgstr "Opnieuw proberen"
+
+msgid "callpage.denied.camera.heading"
+msgstr "Uw browser staat de camera niet toe"
+
+msgid "callpage.denied.camera.step"
+msgstr "Zet de camera op Toestaan."
+
+msgid "callpage.denied.camera.without"
+msgstr "U kunt ook zonder camera deelnemen."
+
+msgid "callpage.denied.microphone.heading"
+msgstr "Uw browser staat de microfoon niet toe"
+
+msgid "callpage.denied.microphone.step"
+msgstr "Zet de microfoon op Toestaan."
+
+msgid "callpage.denied.microphone.without"
+msgstr "U kunt ook zonder microfoon deelnemen. U hoort de andere kant dan wel, maar zij horen u niet."
+
+msgid "callpage.denied.both.heading"
+msgstr "Uw browser staat de camera en de microfoon niet toe"
+
+msgid "callpage.denied.both.step"
+msgstr "Zet de camera en de microfoon op Toestaan."
+
+msgid "callpage.denied.both.without"
+msgstr "U kunt ook zonder camera en microfoon deelnemen. U ziet en hoort de andere kant dan wel, maar zij zien en horen u niet."
+
+msgid "callpage.say.checking"
+msgstr "We controleren uw camera en microfoon."
+
+msgid "callpage.say.ready"
+msgstr "Uw camera en microfoon zijn klaar."
+
+msgid "callpage.say.no_devices"
+msgstr "Geen camera of microfoon gevonden. Sluit er een aan en probeer het opnieuw."
+
+msgid "callpage.say.sound"
+msgstr "Het testgeluid wordt afgespeeld."
+
+msgid "callpage.say.camera_on"
+msgstr "Camera aan."
+
+msgid "callpage.say.camera_off"
+msgstr "Camera uit."
+
+msgid "callpage.say.microphone_on"
+msgstr "Microfoon aan."
+
+msgid "callpage.say.microphone_off"
+msgstr "Microfoon uit."

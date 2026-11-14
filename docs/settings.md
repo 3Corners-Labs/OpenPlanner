@@ -201,6 +201,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `UPDATE_LINE` | string | `""` | — | `settings.platform.manage` | Follow the patches of one minor `X.Y` only (ADR 0116 point 9); empty follows everything the channel offers. |
 | `UPDATE_WINDOW` | string | `""` | — | `settings.platform.manage` | When automatic updates happen, in `admin_timezone`: up to 7 ranges such as `mon 02:00-04:00, sat 01:00-05:00`, each at least 30 minutes (ADR 0116 point 9); empty is any time. A superuser's click is immediate. |
 | `UPDATE_CHECK_MINUTES` | int | `60` | 5–1440 | `settings.platform.manage` | Minutes between two release checks by the worker (ADR 0067); "Check now" on the updates page asks for one ahead of time. |
+| `UPDATE_STALLED_MINUTES` | int | `120` | 15–1440 | `settings.platform.manage` | Minutes a request the host updater claimed may stay silent (no step reported) before the application ends it as failed (`updater_stalled`), so it stops blocking later updates. |
 | `PLANNER_CHANGES_ALERT_PER_HOUR` | int | `50` | 5–1000 | `settings.platform.manage` | Changes by one planner per hour above which a system event warns (ADR 0044). |
 | `CONTACT_REVEALS_ALERT_PER_HOUR` | int | `20` | 5–500 | `settings.platform.manage` | Requests for participants' contact details by one person per hour above which a system event warns (ADR 0044 §2). |
 | `QUEUE_REFRESH_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of the own queue, a claimed booking and the participant's waiting page (ADR 0072). |
@@ -218,6 +219,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `EMBEDDED_CALL_ENABLED` | bool | `false` | — | `settings.platform.manage` | Whether groups on this installation may let participants join the call in the organisation's own page instead of the Webex app; off until the conditions of ADR 0123 point 18 are met. |
 | `EMBEDDED_CALL_CONNECT_SECONDS` | int | `30` | 10–90 | `settings.platform.manage` | Seconds the call page waits for one attempt at registering or joining before it tries again (ADR 0123). |
 | `EMBEDDED_CALL_CONNECT_ATTEMPTS` | int | `3` | 1–5 | `settings.platform.manage` | Attempts the call page makes before it says it cannot connect (ADR 0123). |
+| `EMBEDDED_CALL_TOKEN_PER_BOOKING_PER_HOUR` | int | `10` | 5–30 | `settings.platform.manage` | Guest tokens one booking may ask for in an hour on the call page; per address the common read limit applies (ADR 0123 point 6). |
 
 ## D. Organisation (portal, organisation settings; lockable by env)
 
@@ -259,3 +261,4 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `BOOKING_CONFIRM_REMINDERS` | int | `1` | 0–3 | `settings.organisation.manage` | Reminders to confirm, spread evenly over the time to confirm (ADR 0056). |
 | `EMBEDDED_CALL_DISPLAY_NAME` | enum | `first_name` | first_name, term | `settings.organisation.manage` | What staff see as the participant's name in the call page's meeting: the first name, or the organisation's word for a participant (ADR 0123). |
 | `EMBEDDED_CALL_STAFF_NAME` | enum | `name` | name, term | `settings.organisation.manage` | How the call page names the staff member to the participant: the name of their account, or the organisation's word for staff (ADR 0123). |
+| `EMBEDDED_CALL_WEBEX_OPTION` | enum | `hidden` | hidden, on_failure, always | `settings.organisation.manage` | Whether the call page shows the participant a way into the video platform's own app: never, only when the page cannot give the call, or always (ADR 0123 point 11). |

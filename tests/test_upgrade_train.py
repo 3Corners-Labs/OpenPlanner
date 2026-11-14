@@ -44,6 +44,12 @@ PRE_TRAIN = "0108"
 """The revision before ADR 0121's first migration (0109): the schema of a pre-train image."""
 TRAIN_TOUCHED = {"bookings", "slots"}
 """The only pre-train tables the train adds columns to; every other one is left as it was."""
+AFTER_TRAIN_TOUCHED = {"group_contact_center"}
+"""Pre-train tables that a migration after the train adds a column to, by the same additive rule:
+0116 (ADR 0123 step 7a) gives the group's contact-center routing its task kind."""
+AFTER_TRAIN_COLUMNS = {"group_contact_center": "task_kind VARCHAR(16) DEFAULT 'form' NOT NULL"}
+"""The one part each of those tables' definitions gains. The table is rebuilt to add it, which
+may reorder its keys and checks, so the definitions are compared part by part."""
 LATER = NOW + timedelta(days=3650)
 """A moment after every pending job's ``run_at``, as the upgrade check claims."""
 Rows = dict[str, list[tuple[object, ...]]]
@@ -228,7 +234,7 @@ def test_the_train_changes_only_bookings_and_slots_of_the_pre_train_tables_and_o
     head = schema(pre_train)
 
     changed = {table for table, columns in pre_train_shape.items() if head[table] != columns}
-    assert changed == TRAIN_TOUCHED
+    assert changed == TRAIN_TOUCHED | AFTER_TRAIN_TOUCHED
     for table, columns in pre_train_shape.items():
         old = {name: (kind, notnull, default) for name, kind, notnull, default in columns}
         now = {name: (kind, notnull, default) for name, kind, notnull, default in head[table]}
@@ -237,6 +243,11 @@ def test_the_train_changes_only_bookings_and_slots_of_the_pre_train_tables_and_o
         for name in now.keys() - old.keys():
             _, notnull, default = now[name]
             assert not notnull or default is not None, f"{table}.{name} needs a value"
+
+
+def _parts(definition: str) -> list[str]:
+    """Return the lines of a table's definition (columns, keys, checks), sorted, without commas."""
+    return sorted(line.strip().rstrip(",").strip() for line in definition.splitlines())
 
 
 def _indexes(path: Path, tables: set[str]) -> dict[str, str]:
@@ -278,8 +289,11 @@ def test_no_index_or_constraint_of_a_pre_train_table_becomes_stricter(
     assert after["uq_slots_pool"].endswith("WHERE capacity_pool_id IS NOT NULL")
     with closing(sqlite3.connect(pre_train)) as database:
         now = dict(database.execute("SELECT name, sql FROM sqlite_master WHERE type = 'table'"))
-    for table in tables - {"bookings", "slots"}:
+    for table in tables - {"bookings", "slots"} - AFTER_TRAIN_TOUCHED:
         assert now[table] == definitions[table], table  # checks and keys untouched
+    for table, added in AFTER_TRAIN_COLUMNS.items():
+        # every column, key and check as it was, plus the one defaulted column
+        assert _parts(now[table]) == sorted([*_parts(definitions[table]), added]), table
 
 
 def test_the_previous_image_writes_and_the_current_code_reads_and_claims_it(

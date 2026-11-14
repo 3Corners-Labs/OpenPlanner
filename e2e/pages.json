@@ -1,5 +1,5 @@
 {
-  "$comment": "Public pages under test. Single source for axe (tests/a11y.spec.ts) and Lighthouse (scripts/lighthouse.mjs). Each page is checked in every listed locale via ?lang=. /g/demo needs the demo seed (python -m app.cli seed-demo); the closure pages (ADR 0037) need python -m app.cli seed-closures > e2e/fixtures.json, which also resolves \"{name}\" paths. The widget pages (ADR 0035) are on the test host page of another origin, http://localhost:8001 (e2e/host/serve.mjs). The maintenance page (ADR 0038) closes every page, so it is checked in tests/maintenance.spec.ts, in its own CI step. The admin pages need a login at Keycloak as \"user\" and are checked by tests/admin-shell.spec.ts at phone, tablet and desktop width (SH-1), at desktop width (1280 px) also for content running past its box (e2e/layout.mjs); Lighthouse leaves them out. Booking pages (suspended booking, confirm, trial call) are opened by the emailed link /b/{token}, which sets the participant cookie and redirects to /b/m/{reference} (ADR 0093); the checks run on that final page, and the browser context keeps the cookie. The participant's journey around the video call (join link, the call, and the waiting room of a direct call, tests/direct-call.spec.ts) is not listed here: tests/video-journey.spec.ts walks it on the seeded journey bookings (fixtures.json, key journeys) with the simulator standing in for Webex. The immediate pages of ADR 0121 (gate item G06) need a request first: when a page names {immediate_request} or {claimed_request}, the global set-up e2e/requests.ts sends the immediate form of the demonstration (seed-closures writes it on demo) twice and has the e2e agent pick up the oldest; a page with \"cookie\" gets that request's cookie before it opens. Those entries wait for the rollback gate (ROLLBACK_SAFE), which keeps the pages dark until it opens.",
+  "$comment": "Public pages under test. Single source for axe (tests/a11y.spec.ts) and Lighthouse (scripts/lighthouse.mjs). Each page is checked in every listed locale via ?lang=. /g/demo needs the demo seed (python -m app.cli seed-demo); the closure pages (ADR 0037) need python -m app.cli seed-closures > e2e/fixtures.json, which also resolves \"{name}\" paths. The widget pages (ADR 0035) are on the test host page of another origin, http://localhost:8001 (e2e/host/serve.mjs). The call page (ADR 0123 step 4b, `{call_page}`: the emailed link of a confirmed booking, opened like the suspended booking's, on a stack with EMBEDDED_CALL_ENABLED) carries the island mark so its gates run on the start state; the device check and the refused permissions are walked in tests/call-page-device-check.spec.ts. The maintenance page (ADR 0038) closes every page, so it is checked in tests/maintenance.spec.ts, in its own CI step. The admin pages need a login at Keycloak as \"user\" and are checked by tests/admin-shell.spec.ts at phone, tablet and desktop width (SH-1), at desktop width (1280 px) also for content running past its box (e2e/layout.mjs); Lighthouse leaves them out. Booking pages (suspended booking, confirm, trial call) are opened by the emailed link /b/{token}, which sets the participant cookie and redirects to /b/m/{reference} (ADR 0093); the checks run on that final page, and the browser context keeps the cookie. The participant's journey around the video call (join link, the call, and the waiting room of a direct call, tests/direct-call.spec.ts) is not listed here: tests/video-journey.spec.ts walks it on the seeded journey bookings (fixtures.json, key journeys) with the simulator standing in for Webex. The immediate pages of ADR 0121 (gate item G06) need a request first: when a page names {immediate_request} or {claimed_request}, the global set-up e2e/requests.ts sends the immediate form of the demonstration (seed-closures writes it on demo) twice and has the e2e agent pick up the oldest; a page with \"cookie\" gets that request's cookie before it opens. Those entries wait for the rollback gate (ROLLBACK_SAFE), which keeps the pages dark until it opens.",
   "pages": [
     {
       "name": "home",
@@ -44,6 +44,15 @@
       ],
       "island": true,
       "cookie": "immediate_request_cookie"
+    },
+    {
+      "name": "call page",
+      "path": "{call_page}",
+      "locales": [
+        "nl",
+        "en"
+      ],
+      "island": true
     },
     {
       "name": "closed group",

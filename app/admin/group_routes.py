@@ -89,6 +89,7 @@ from app.admin.staffing_views import (
     split_fields,
     week,
 )
+from app.admin.task_kind_input import routing_with_task_kind, with_task_kind_field
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
 from app.domain.contact_center import ContactCenterRouting
@@ -682,6 +683,13 @@ async def _settings_response(
     """
     current = settings_of(context.group.group)
     planning, integrations = _settings_fields(form, current, locale.gettext)
+    integrations = with_task_kind_field(
+        integrations,
+        form,
+        current.contact_center,
+        embedded_call_enabled=request.app.state.settings.embedded_call_enabled,
+        _=locale.gettext,
+    )
     return group_page(
         request,
         locale,
@@ -773,7 +781,12 @@ async def save_settings(
     fallback = form.choice("dispatch_fallback", {f.value for f in DispatchFallback})
     chosen = (phone, dispatch, embedding, free_pick, trial, join_client, fallback, auto_send)
     try:
-        center = _form_routing(form)
+        center = routing_with_task_kind(
+            _form_routing(form),
+            form,
+            context.group.group.contact_center,
+            embedded_call_enabled=request.app.state.settings.embedded_call_enabled,
+        )
     except DomainError as error:
         form.refusal(error)
     if not form.errors and None not in chosen:

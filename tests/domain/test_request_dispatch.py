@@ -12,7 +12,7 @@ import pytest
 
 from app.domain.booking import BookingStatus
 from app.domain.calls import EventKind
-from app.domain.contact_center import ContactCenterKind
+from app.domain.contact_center import ContactCenterKind, TaskKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import EventOutcome
 from app.domain.job_plan import JobType
@@ -30,7 +30,7 @@ from app.domain.webhook_replay import INSTALLATION_SCOPE
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.contact_center_requests import CC_FLOW, WINDOW, Desk, cc_world, desk
-from tests.support.domain import NOW
+from tests.support.domain import NOW, webex_routing
 from tests.support.request_work import AGENT, FLOW, at, book
 
 SOURCE = "webex_cc"
@@ -193,6 +193,107 @@ async def test_a_late_task_of_an_attempt_in_doubt_is_adopted(
     assert task is not None
     assert task.id == "late-1"
     assert await the_desk.dispatch.fence_round() == 0
+
+
+async def test_an_adopted_task_keeps_the_kind_its_create_was_tried_as(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """ADR 0123 step 7a: the routing changes between the create and the adoption; the task is
+    given the kind the create was tried as, never one read from the routing afterwards."""
+    state = uow.state
+    state.groups[1] = replace(
+        state.groups[1], contact_center=webex_routing(task_kind=TaskKind.CONVERSATION)
+    )
+    conversation_desk = desk(uow, clock, conversation_enabled=True)
+    booking_id = await book(uow, clock, CC_FLOW)
+    conversation_desk.dispatcher.error = IntegrationError(
+        "unreachable", retryable=True, ambiguous=True
+    )
+    await dispatch(conversation_desk, booking_id)
+    uow.state.groups[1] = replace(uow.state.groups[1], contact_center=webex_routing())  # a form now
+    reference = uow.state.bookings[booking_id].reference
+
+    await event(conversation_desk, "late-3", EventKind.TASK_CONNECTED, reference)
+
+    task = uow.state.bookings[booking_id].contact_center_task
+    assert task is not None
+    assert (task.id, task.task_kind) == ("late-3", TaskKind.CONVERSATION)
+
+
+async def test_a_failed_attempt_leaves_no_kind_and_the_next_attempt_is_labelled_alone(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """The attempt's kind has its own column: a conversation attempt that failed for good is
+    forgotten, and a task adopted after a later attempt as a form is a form. Adoption cannot
+    tell which attempt an orphan belongs to (the platform's task carries only the reference),
+    so it reads the latest attempt."""
+    state = uow.state
+    state.groups[1] = replace(
+        state.groups[1], contact_center=webex_routing(task_kind=TaskKind.CONVERSATION)
+    )
+    the_desk = desk(uow, clock, conversation_enabled=True)
+    booking_id = await book(uow, clock, CC_FLOW)
+    the_desk.dispatcher.error = IntegrationError("rejected_409", retryable=False)
+
+    with pytest.raises(IntegrationError):
+        await dispatch(the_desk, booking_id)
+
+    booking = uow.state.bookings[booking_id]
+    assert booking.contact_center_task is None
+    assert booking.attempted_task_kind is TaskKind.FORM  # cleared by the final failure
+    uow.state.groups[1] = replace(uow.state.groups[1], contact_center=webex_routing())  # a form now
+    the_desk = desk(uow, clock, conversation_enabled=True)
+    the_desk.dispatcher.error = IntegrationError("unreachable", retryable=True, ambiguous=True)
+    at(clock)
+    assert await dispatch(the_desk, booking_id) == IN_DOUBT_SKIP
+    assert uow.state.bookings[booking_id].attempted_task_kind is TaskKind.FORM
+
+    await event(the_desk, "late-4", EventKind.TASK_CONNECTED, booking.reference)
+
+    task = uow.state.bookings[booking_id].contact_center_task
+    assert task is not None
+    assert (task.id, task.task_kind) == ("late-4", TaskKind.FORM)
+
+
+async def test_an_attempt_keeps_its_kind_while_it_is_in_doubt_and_loses_it_with_the_task(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    state = uow.state
+    state.groups[1] = replace(
+        state.groups[1], contact_center=webex_routing(task_kind=TaskKind.CONVERSATION)
+    )
+    the_desk = desk(uow, clock, conversation_enabled=True)
+    booking_id = await book(uow, clock, CC_FLOW)
+    the_desk.dispatcher.error = IntegrationError("unreachable", retryable=True, ambiguous=True)
+
+    await dispatch(the_desk, booking_id)
+    assert uow.state.bookings[booking_id].attempted_task_kind is TaskKind.CONVERSATION
+    reference = uow.state.bookings[booking_id].reference
+    await event(the_desk, "late-5", EventKind.TASK_CONNECTED, reference)
+
+    booking = uow.state.bookings[booking_id]
+    assert booking.attempted_task_kind is TaskKind.FORM  # stored task: nothing left to adopt
+    assert booking.contact_center_task is not None
+    assert booking.contact_center_task.task_kind is TaskKind.CONVERSATION
+
+
+async def test_a_conversation_is_not_created_while_the_switch_is_off(
+    uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """The switch also holds at dispatch: the routing holds a conversation, a form is made."""
+    state = uow.state
+    state.groups[1] = replace(
+        state.groups[1], contact_center=webex_routing(task_kind=TaskKind.CONVERSATION)
+    )
+    off = desk(uow, clock, conversation_enabled=False)
+    booking_id = await book(uow, clock, CC_FLOW)
+
+    assert await dispatch(off, booking_id) is None
+
+    assert off.dispatcher.kinds == [TaskKind.FORM]
+    task = uow.state.bookings[booking_id].contact_center_task
+    assert task is not None
+    assert task.task_kind is TaskKind.FORM
 
 
 async def test_an_attempt_in_doubt_is_fenced_and_a_later_task_is_ended(

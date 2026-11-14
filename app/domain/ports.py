@@ -40,6 +40,7 @@ from app.domain.calls import (
     EventKind,
     MeetingRequest,
     MeetingStatus,
+    ParticipantMessage,
     TaskSnapshot,
 )
 from app.domain.capacity import CapacityPool, PoolFlows
@@ -64,6 +65,7 @@ from app.domain.contact_center import (
     ContactCenterTaskRef,
     OrganisationConnection,
     Registration,
+    TaskKind,
 )
 from app.domain.contacts import ContactBlock
 from app.domain.diagnostic_mode import DiagnosticMode
@@ -456,9 +458,29 @@ class ContactCenterDispatcher(Protocol):
     async def create_task(self, task: ContactCenterTask) -> str:
         """Create the task and return its id at the platform.
 
+        The task's ``task_kind`` says what is created: the form (a work item) or the
+        conversation (ADR 0123 point 8), which opens with the task's ``first_message``.
+
         Raises:
             IntegrationError: If the platform refuses or cannot be reached, or ``not_ready``
-                for a task outside the adapter's declared capabilities.
+                for a task outside the adapter's declared capabilities. For a conversation:
+                ``messaging_not_configured`` when the platform's messaging feature or channel is
+                not set up for the organisation, ``conversation_open`` when the platform holds
+                an open conversation for the appointment already. Never answered with a form.
+        """
+        ...
+
+    async def append_message(self, task: ContactCenterTaskRef, message: ParticipantMessage) -> None:
+        """Append one participant message to a conversation task (ADR 0123 point 8).
+
+        ``message.message_id`` makes the append safe to retry: the same identifier twice is one
+        message at the platform. Accepted does not mean delivered: the platform confirms
+        through its events (step 7b).
+
+        Raises:
+            IntegrationError: ``not_ready`` for a task that is not a conversation,
+                ``messaging_not_configured`` as for ``create_task``, or the platform's refusal
+                or unreachability.
         """
         ...
 
@@ -1359,6 +1381,16 @@ class Transaction(Protocol):
         """Store the booking's contact-center task: its id and the platform that holds it."""
         ...
 
+    async def save_task_attempt(self, booking_id: int, task_kind: TaskKind | None) -> None:
+        """Store the kind the latest create is about to be tried as (step 7a); ``None`` clears.
+
+        Written before the platform answers, so that a task found afterwards without an answer
+        (adoption) is given the kind of the latest attempt, not one read from the routing. It
+        is cleared when a task is stored (``save_task``) and when an attempt fails for good.
+        Never touches the kind of a stored task.
+        """
+        ...
+
     async def get_booking_by_meeting(self, meeting_id: str) -> Booking | None:
         """Return the booking whose meeting has ``meeting_id``."""
         ...
@@ -1562,7 +1594,15 @@ class Transaction(Protocol):
         ...
 
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
-        """Set every PII column of the booking to NULL and record ``pii_purged_at``."""
+        """Set every PII column of the booking to NULL and record ``pii_purged_at``.
+
+        Storage only: which jobs follow a purge (the rename of a minted guest, ADR 0123 point
+        7) is the domain's rule, ``app.domain.purge.purge_booking``, which callers use.
+        """
+        ...
+
+    async def mark_guest_minted(self, booking_id: int, at: datetime) -> None:
+        """Remember that a guest was minted for the booking; keeps the first moment (ADR 0123)."""
         ...
 
     async def get_booking_by_public_ref(self, public_ref: str) -> Booking | None:

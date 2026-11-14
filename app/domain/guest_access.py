@@ -19,6 +19,7 @@ it out of its ``repr``.
 import hashlib
 import hmac
 import unicodedata
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -38,6 +39,16 @@ is ``SUBJECT_PREFIX`` and a digest, and it names no one."""
 
 NEUTRAL_TERM = "Participant"
 """The word the checks send as the guest's name: no participant, so no personal data."""
+
+
+GuestKeys = Callable[[], Sequence[bytes]]
+"""The keys of the guest subjects now in force, the current one first, then the previous one
+during a key rotation (``app.keys.guest_pseudonym_keys``). Minting uses the first; the rename at
+the purge uses all."""
+
+GUEST_TERM_KEY = "call.guest.term"
+"""The catalogue word for a participant that a guest is called by (ADR 0123 point 7). Its English
+default is ``NEUTRAL_TERM``: a test pins the two together."""
 
 
 class DisplayNameMode(StrEnum):

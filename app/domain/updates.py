@@ -27,6 +27,12 @@ from app.domain.errors import DomainError, ErrorCode
 CHECK_INTERVAL = timedelta(minutes=60)
 """Default of ``update_check_minutes``: how often the worker asks for the latest release."""
 
+STALLED_AFTER = timedelta(minutes=120)
+"""Default of ``update_stalled_minutes``: how long a running request may stay silent."""
+
+STALLED_REASON = "updater_stalled"
+"""Reason code of a running request the application ended because the updater went silent."""
+
 RESTORE_WINDOW = timedelta(hours=24)
 """How long after a successful update the previous version can be restored."""
 
@@ -485,6 +491,19 @@ def available_update(
 def open_request(history: Sequence[UpdateRequest]) -> UpdateRequest | None:
     """Return the request that is requested or running, if any (there is at most one)."""
     return next((r for r in history if r.is_open), None)
+
+
+def stalled(request: UpdateRequest, now: datetime, limit: timedelta) -> bool:
+    """Whether a running request has shown no sign of life for ``limit``.
+
+    The last sign is the step the updater reported last, or its claim. A host updater that
+    died (disk full, killed, host restarted) leaves its request running for ever, and a
+    running request blocks every other one, the worker's own included.
+    """
+    if request.status is not UpdateStatus.RUNNING:
+        return False
+    last = request.step_at or request.started_at or request.requested_at
+    return now - last >= limit
 
 
 def claimed(request: UpdateRequest, now: datetime) -> UpdateRequest:

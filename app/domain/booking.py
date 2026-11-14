@@ -20,7 +20,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from app.domain.channels import ChannelKind
-from app.domain.contact_center import ContactCenterTaskRef
+from app.domain.contact_center import ContactCenterTaskRef, TaskKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.flow_resolution import FlowRef
 from app.domain.form_fields import Answers, mailto_href, normalise_email, normalise_phone
@@ -273,6 +273,11 @@ class Booking:
     trial_count: int = 0
     contact_center_task: ContactCenterTaskRef | None = None
     """The task at the contact center and its platform (ADR 0032); purged with the contact."""
+    attempted_task_kind: TaskKind = TaskKind.FORM
+    """The kind the latest create of a task was tried as (ADR 0123 step 7a), stored before the
+    platform answers and cleared with a stored task or a failed attempt; a form when none is
+    pending. Adoption gives an orphan this kind: the platform's task carries no attempt id, so
+    the latest attempt is all there is to go by."""
     kind: BookingKind = BookingKind.SCHEDULED
     closure_id: int | None = None
     change_reason: ChangeReason | None = None
@@ -288,6 +293,10 @@ class Booking:
     """The flow and revision it was made under (ADR 0121); ``None`` is the service's default for
     its entry path (a booking from before flows, or a service without flow rows). A move keeps
     it."""
+    guest_minted_at: datetime | None = None
+    """When a guest was first minted for the booking at the video platform (ADR 0123 point 7);
+    set by the call page's token endpoint. A moment, no personal data, never purged: the purge
+    reads it to rename the guest at the platform."""
 
     @property
     def subject(self) -> str | None:

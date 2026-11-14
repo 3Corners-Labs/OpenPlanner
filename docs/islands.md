@@ -53,8 +53,9 @@ named, no `unsafe-` token) and a `Permissions-Policy` with camera, microphone an
 our own origin. A syntax-tree test names the modules that may use it
 (`tests/web/test_page_kinds.py`), the route does not exist while
 `embedded_call_enabled` is off, and the page contacts nobody before the participant's click. The
-call page's own scripts follow the accessibility rules above and the ban on markup sinks. In this
-step the page is a shell without any script.
+call page's own scripts follow the accessibility rules above and the ban on markup sinks. Since
+step 4b the page has one script of ours, `call-page.js`, and one stylesheet, `call-page.css`
+(entries below); the vendored file of the call itself follows in step 4c.
 
 ## Existing scripts
 
@@ -168,6 +169,36 @@ step the page is a shell without any script.
 - **Without the script:** the chart, its table and the day links as the server drew them.
 - **Used by:** the *Usage* pages of an organisation and a group (script CSP on these pages only).
 - **Size:** about 3 KB gzipped.
+
+### `call-page.js`
+
+- **ADR:** 0123 points 5, 10, 11 and 13 (build step 4b). Not an island: the call page is a kind of page
+  of its own (above), and the script is the page's, loaded by no other.
+- **Server renders:** the start state (the appointment, the sentence of what the call needs, the begin
+  button, `hidden`), the device check with its three refused-permission panels, the unavailable state,
+  one polite status element `[data-call-status]` and every word the script needs in `[data-call-texts]`.
+  All of it in the page's language; the script has no text of its own.
+- **Does:** after the begin button asks the browser for the camera and the microphone (never on load);
+  shows the participant's own picture, a level meter with a text that says whether they are heard, a test
+  sound, native selects for camera, microphone and (where the browser allows it) speaker, and toggle
+  buttons to join with either off. A refused permission is told apart from a missing device and explained
+  in the panel of that kind. The join button leads to the unavailable state: joining is step 4c. It makes no
+  request, stores nothing and sends nothing; `tests/web/test_call_page_assets.py` fails on any network,
+  storage, style or markup call.
+- **Keyboard:** every control is a native button, link or select in reading order; nothing is a pointer
+  gesture. Focus moves to the heading of each state (`h1`, or `h2` of a refused-permission panel) and, after
+  a successful try again, back to the heading of the check.
+- **Live regions:** the one polite status element: checking, ready, no device found, test sound playing,
+  camera and microphone on or off. The level meter is never in a live region; its words change only after
+  a short while of quiet or sound.
+- **Browser features:** `getUserMedia`, `enumerateDevices`, `AudioContext`, `MediaStream` (Baseline widely
+  available); `setSinkId` for the speaker choice where it exists. A browser without them keeps the start
+  state with the sentence of what the call needs.
+- **Without the script:** the start state, the appointment, the sentence that says the call needs a browser
+  with JavaScript, a camera and a microphone, the organisation's contact details and, where the
+  organisation allows it, the link to join another way.
+- **Used by:** the call page only (`call.html`, with `call-page.css`).
+- **Size:** about 4.7 KB gzipped (script), about 1.6 KB gzipped (styles).
 
 ### `vendor/webex/meetings.min.js`
 

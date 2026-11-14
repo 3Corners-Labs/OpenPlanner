@@ -2,11 +2,12 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from app.domain.booking import BookingStatus
+from app.domain.booking import Booking, BookingStatus, Contact
 from app.domain.closure_retention import DEFAULT_CLOSURE_RETENTION as LIMITS
 from app.domain.closure_retention import ClosureRetention
 from app.domain.flow_resolution import FlowRef
 from app.domain.immediate_intake import new_access
+from app.domain.job_plan import OUTLIVES_PURGE, JobType, PlannedJob
 from app.domain.retention import (
     PURGE_GRACE,
     GroupRetentionCounts,
@@ -15,6 +16,7 @@ from app.domain.retention import (
     candidates_before,
     is_backlog,
     is_overdue,
+    jobs_after_purge,
     purge_moment,
     summarise,
 )
@@ -222,3 +224,41 @@ def record(group_id: int, *, deleted_at: datetime) -> ServiceRequest:
         now=deleted_at - 2 * DAY,
         unresolved_hours=24,
     )
+
+
+def _booking(*, minted: bool, contact: bool = True) -> Booking:
+    return Booking(
+        id=1,
+        group_id=1,
+        slot_id=1,
+        start=NOW,
+        end=NOW + timedelta(minutes=30),
+        status=BookingStatus.CONFIRMED,
+        contact=Contact("Ada", "Lovelace", "ada@example.org", None) if contact else None,
+        locale="nl",
+        token_hash="h",
+        created_at=NOW,
+        guest_minted_at=NOW if minted else None,
+    )
+
+
+def test_a_purge_adds_one_rename_for_a_booking_whose_guest_was_minted() -> None:
+    assert jobs_after_purge(_booking(minted=True), NOW) == [
+        PlannedJob(JobType.RENAME_GUEST, NOW, None)
+    ]
+
+
+@pytest.mark.parametrize(
+    "booking",
+    [_booking(minted=False), _booking(minted=True, contact=False), None],
+    ids=["no guest minted", "purged before", "no such booking"],
+)
+def test_a_purge_adds_nothing_without_a_guest_or_for_a_booking_purged_before(
+    booking: Booking | None,
+) -> None:
+    assert jobs_after_purge(booking, NOW) == []
+
+
+def test_the_rename_is_the_one_job_that_outlives_a_purge() -> None:
+    assert frozenset({JobType.RENAME_GUEST}) == OUTLIVES_PURGE
+    assert JobType.PURGE_PII not in OUTLIVES_PURGE

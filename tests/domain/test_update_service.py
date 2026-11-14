@@ -21,6 +21,8 @@ from app.domain.updates import (
     HISTORY_DETAILS,
     HOST_ACTOR,
     RESTORE_WINDOW,
+    STALLED_AFTER,
+    STALLED_REASON,
     VERSION_ACTION,
     LineStatus,
     Release,
@@ -806,3 +808,61 @@ async def test_in_production_a_waiting_automatic_request_needs_its_window_to_be_
     )
 
     assert await cleared.claim() is None
+
+
+async def test_a_silent_running_request_is_ended_so_auto_apply_can_go_on(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    """The updater died mid-update (disk full): the request must not block updates for ever."""
+    request_id = await running(uow, clock, releases)
+    await service(uow, clock).report_step(request_id, UpdateStep.BACKING_UP)
+    clock.advance(STALLED_AFTER - timedelta(minutes=1))
+    assert await service(uow, clock).end_stalled() is None
+    clock.advance(timedelta(minutes=1))
+    ended = await service(uow, clock).end_stalled()
+    assert ended is not None
+    assert (ended.id, ended.status, ended.reason) == (
+        request_id,
+        UpdateStatus.FAILED,
+        STALLED_REASON,
+    )
+    event = uow.state.audit[-1]
+    assert (event.actor, event.outcome) == (UPDATER_ACTOR, Outcome.FAILURE)
+
+
+async def test_a_reported_step_keeps_a_request_alive(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    request_id = await running(uow, clock, releases)
+    clock.advance(STALLED_AFTER - timedelta(minutes=1))
+    await service(uow, clock).report_step(request_id, UpdateStep.PULLING)
+    clock.advance(STALLED_AFTER - timedelta(minutes=1))
+    assert await service(uow, clock).end_stalled() is None
+
+
+async def test_the_worker_asks_for_the_newer_version_again_after_a_stalled_request(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    await running(uow, clock, releases)
+    clock.advance(STALLED_AFTER + CHECK_INTERVAL)
+    updates = UpdateService(
+        uow,
+        clock,
+        AdminService(uow, clock),
+        current=V1,
+        releases=releases,
+        auto_apply=True,
+    )
+    assert await updates.check_if_due()
+    history = list(uow.state.update_requests.values())
+    assert [r.status for r in history] == [UpdateStatus.FAILED, UpdateStatus.REQUESTED]
+    assert history[-1].requested_by == SYSTEM_ACTOR
+
+
+async def test_the_updaters_claim_ends_a_stalled_request_first(
+    uow: InMemoryUnitOfWork, clock: FixedClock, releases: FakeReleases
+) -> None:
+    await running(uow, clock, releases)
+    clock.advance(STALLED_AFTER)
+    assert await service(uow, clock).claim() is None
+    assert next(iter(uow.state.update_requests.values())).reason == STALLED_REASON
