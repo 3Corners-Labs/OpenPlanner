@@ -79,17 +79,42 @@ async function inCall(page: Page, stub: false | unknown = {}, plan: Plan = {}): 
 /** How many times the endpoint was asked, as the page's own network log has it. */
 const asked = (stub: Stub): number => stub.seen.length;
 
-/** Let `ms` of the page's own time pass at once: a timer that is still running asks in it. */
+const probed = new WeakSet<Page>();
+
+/**
+ * Two requests of the page's own that a route of ours answers. They travel the road a request of
+ * the poll travels (the page, the network, this test), so when the second is back a request that a
+ * timer made before them has reached the stub, and its answer the page and the page's next timer.
+ */
+async function settled(page: Page): Promise<void> {
+  if (!probed.has(page)) {
+    probed.add(page);
+    await page.route('**/__probe', (route) => route.fulfill({ status: 204 }));
+  }
+  for (let i = 0; i < 2; i += 1) await page.evaluate(() => fetch('/__probe', { cache: 'no-store' }).then(() => 0));
+}
+
+/**
+ * Jump `ms` of the page's own time: a timer that is due fires once, and what it asked is settled.
+ * A timer that its answer sets needs the next jump, so several turns are several jumps (`turns`).
+ */
 const pass = async (page: Page, ms: number): Promise<void> => {
-  await page.clock.runFor(ms);
-  await page.evaluate(() => 0); // a round trip, so that a request the timers made has reached the stub
+  await page.clock.fastForward(ms);
+  await settled(page);
 };
 
-/** How much of the page's time goes by, in steps of 100 ms, until the endpoint is asked once more. */
+/** `n` jumps of `ms`: `n` turns of the poll at its interval, and `n` steps of whatever else waits. */
+const turns = async (page: Page, n: number, ms = 3_000): Promise<void> => {
+  for (let i = 0; i < n; i += 1) await pass(page, ms);
+};
+
+const STEP = 1_000;
+
+/** How much of the page's time goes by, in steps of a second, until the endpoint is asked once more. */
 async function gap(page: Page, stub: Stub, limit = 60_000): Promise<number> {
   const before = asked(stub);
-  for (let elapsed = 100; elapsed <= limit; elapsed += 100) {
-    await pass(page, 100);
+  for (let elapsed = STEP; elapsed <= limit; elapsed += STEP) {
+    await pass(page, STEP);
     if (asked(stub) > before) return elapsed;
   }
   throw new Error(`the endpoint was not asked again within ${limit} ms of the page's time`);
@@ -246,31 +271,32 @@ test('a name known in the lobby is said once on entering the call', async ({ pag
 
   await said(page, 'You are talking to Sanne.');
   await expect(label(page)).toContainText('Sanne');
-  await pass(page, 30_000); // more turns, the same answer
+  await turns(page, 8); // more turns, the same answer
   expect(await told(page, 'Sanne')).toBe(1);
 });
 
 test('the same answer asked many times is said once, a change once more, and a cleared name not at all', async ({ page }) => {
+  test.setTimeout(90_000); // some thirty turns of the poll, each a jump of the page's time with its round trips
   const stub = (await inCall(page, { name: 'Sanne' })) as Stub;
   const word = await term(page);
   await said(page, 'You are talking to Sanne.');
   await freeze(page);
 
   const before = asked(stub);
-  await pass(page, 60_000);
+  await turns(page, 12);
   expect(asked(stub)).toBeGreaterThanOrEqual(before + 10);
   expect(await told(page, 'Sanne')).toBe(1);
 
   stub.answer = { status: 200, body: { name: 'Tom' } };
-  await pass(page, 10_000);
+  await turns(page, 4);
   await said(page, 'You are talking to Tom.');
-  await pass(page, 30_000);
+  await turns(page, 6);
   expect(await told(page, 'Tom')).toBe(1);
 
   stub.answer = { status: 200, body: {} };
-  await pass(page, 10_000);
+  await turns(page, 2);
   await expect(label(page)).toHaveText(word);
-  await pass(page, 30_000);
+  await turns(page, 6);
   expect(await told(page)).toBe(2); // nothing was said for the cleared name
 });
 
@@ -293,7 +319,7 @@ test('a name that changes while its sentence still waits is heard once, the newe
     say('say_recording_off');
     say('say_staff_name', { name: 'Beta' });
   });
-  await pass(page, 20_000);
+  await turns(page, 10);
 
   expect((await statuses(page)).slice(before)).toEqual([texts.on, texts.off, 'You are talking to Beta.']);
 });
@@ -311,6 +337,7 @@ test('an answer that says the feature is off (404) brings the label back to the 
 });
 
 test('refusals and failures keep the name and make the turns wait longer, a success brings the interval back', async ({ page }) => {
+  test.setTimeout(90_000); // about a hundred jumps of a second of the page's time, each with its round trips
   const stub = (await inCall(page, { name: 'Sanne' })) as Stub;
   const word = await term(page);
   await expect(label(page)).toHaveText(`Sanne · ${word}`, NEXT);
@@ -326,7 +353,7 @@ test('refusals and failures keep the name and make the turns wait longer, a succ
 
   // Twice as long after each refusal, up to 30 seconds (resolution: one step of 100 ms).
   const expected = [2, 4, 8, 16, 16].map((n) => Math.min(turn * n, 30_000));
-  gaps.forEach((got, i) => expect(Math.abs(got - expected[i]), `gap ${i}: ${got} against ${expected[i]}`).toBeLessThanOrEqual(300));
+  gaps.forEach((got, i) => expect(Math.abs(got - expected[i]), `gap ${i}: ${got} against ${expected[i]} (all: ${gaps.join(', ')})`).toBeLessThanOrEqual(STEP));
   // Nothing is announced and the name stays.
   await expect(label(page)).toHaveText(`Sanne · ${word}`);
   expect(await told(page)).toBe(1);
@@ -334,7 +361,7 @@ test('refusals and failures keep the name and make the turns wait longer, a succ
   stub.answer = { status: 200, body: { name: 'Sanne' } };
   await gap(page, stub); // the request that is answered well
   const back = await gap(page, stub);
-  expect(Math.abs(back - turn)).toBeLessThanOrEqual(300);
+  expect(Math.abs(back - turn), `back at ${back}`).toBeLessThanOrEqual(STEP);
 });
 
 test('a network error is a failure like a refusal: the name stays and the next turn waits longer', async ({ page }) => {
@@ -414,9 +441,9 @@ for (const [name, stop] of [
     await expect(page.locator('[data-call-state="call"]')).toBeHidden();
     // A timer that was left running would ask at the next turn: wait one turn and a margin (a state
     // cannot be waited for when the thing to prove is that nothing happens any more).
-    await pass(page, 5_000);
+    await turns(page, 2);
     const stopped = asked(stub);
-    await pass(page, 120_000); // many turns of the poll, were it still running
+    await turns(page, 4, 30_000); // a timer that was left would be due in each of these jumps
 
     expect(asked(stub)).toBe(stopped);
   });
@@ -433,7 +460,7 @@ test('an answer that comes after the call ended changes nothing', async ({ page 
   await control(page, 'end');
   await expect(page.locator('[data-call-state="ended"]')).toBeVisible();
   release();
-  await pass(page, 60_000);
+  await turns(page, 3, 30_000);
 
   expect(await timesSaid(page, 'You are talking to Late.')).toBe(0);
   await expect(label(page)).toBeHidden();
