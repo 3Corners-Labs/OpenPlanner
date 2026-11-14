@@ -41,6 +41,7 @@ step 6 narrows to a service that uses the call page.
 """
 
 from typing import Annotated
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Request
 from starlette.exceptions import HTTPException
@@ -98,7 +99,9 @@ async def call_page(request: Request, public_ref: str) -> HTMLResponse:
         "group": group,
         "ref": public_ref,
         "slot_label": slot_label(booking.start, booking.end, group, locale),
-        "host": request.url.hostname or "",
+        # The address a participant sees in their address bar is the installation's public one
+        # (ADR 0086 point 4: never an address read from the request).
+        "host": urlsplit(current.public_base_url).hostname or "",
         "contacts": contact_view(await contact_service(request).public_for_group(group), locale),
         # The server decides what the browser may see: no link at all unless the setting allows.
         "other_way_href": f"/b/m/{public_ref}/join/go",
