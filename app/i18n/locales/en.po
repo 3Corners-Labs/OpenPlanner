@@ -8423,7 +8423,7 @@ msgid "admin.holidays.calendar_name"
 msgstr "Name of the calendar"
 
 msgid "admin.tab.login"
-msgstr "Login"
+msgstr "Authentication"
 
 msgid "authz.permission.identity_providers_view"
 msgstr "See the organisation's identity providers"
@@ -8483,10 +8483,10 @@ msgid "admin.form.error.issuer_taken"
 msgstr "This issuer is already registered, at this organisation, another one or as the platform provider."
 
 msgid "admin.idp.title"
-msgstr "Login"
+msgstr "Authentication"
 
 msgid "admin.idp.lead"
-msgstr "The identity providers where this organisation's staff log in. An organisation's own provider grants rights inside this organisation only; the email domains that choose the provider follow in a next step."
+msgstr "The identity providers (IdPs) this organisation's staff log in with, and how the login page decides which provider a staff member gets. An organisation's own provider grants rights inside this organisation only."
 
 msgid "admin.idp.providers"
 msgstr "Identity providers"
@@ -14372,3 +14372,117 @@ msgstr "Captions are off."
 
 msgid "callpage.say.captions_failed"
 msgstr "Captions could not be started. This call may not offer them."
+
+msgid "admin.idp.steps.title"
+msgstr "Steps"
+
+msgid "admin.idp.steps.lead"
+msgstr "This is how an own identity provider comes into use. Each step shows where it stands."
+
+msgid "admin.idp.steps.state.done"
+msgstr "Done"
+
+msgid "admin.idp.steps.state.todo"
+msgstr "To do"
+
+msgid "admin.idp.steps.state.blocked"
+msgstr "Waiting for an earlier step"
+
+msgid "admin.idp.steps.host_switch"
+msgstr "The host allows organisation providers"
+
+msgid "admin.idp.steps.host_switch.hint"
+msgstr "The server administrator switches ORGANISATION_IDPS_ENABLED on. While it is off, all staff log in at the platform provider."
+
+msgid "admin.idp.steps.register"
+msgstr "Register an identity provider"
+
+msgid "admin.idp.steps.register.hint"
+msgstr "Choose Add identity provider below (superuser). Register OpenPlanner at the provider first, with the redirect URI and the JWKS address from the provider page."
+
+msgid "admin.idp.steps.enable"
+msgstr "Run a test login and switch the provider on"
+
+msgid "admin.idp.steps.enable.hint"
+msgstr "Open the provider, choose Test login and then switch it on. A new provider starts switched off."
+
+msgid "admin.idp.steps.domain"
+msgstr "Add an email domain"
+
+msgid "admin.idp.steps.domain.hint"
+msgstr "Under Domains on the provider page. The domain decides which staff go to this provider."
+
+msgid "admin.idp.steps.verify"
+msgstr "Verify the domain with a TXT record"
+
+msgid "admin.idp.steps.verify.hint"
+msgstr "Have the organisation publish the TXT record shown in its DNS and choose Check. Only then does the domain route."
+
+msgid "admin.idp.steps.platform"
+msgstr "The platform account always keeps working: anyone who enters an address on another domain, or chooses Log in with a platform account on the login page, logs in at the platform provider."
+
+msgid "admin.idp.warnings"
+msgstr "Attention: this is not chosen yet"
+
+msgid "admin.idp.warning.enabled_without_domain"
+msgstr "Provider {provider} is on but has no verified domain. No staff member is sent to this provider."
+
+msgid "admin.idp.warning.domain_provider_off"
+msgstr "Domain {domain} is verified but provider {provider} is off. The domain only routes once the provider is on."
+
+msgid "admin.idp.warning.domain_pending"
+msgstr "Domain {domain} of provider {provider} is waiting for verification. Publish the TXT record in DNS and choose Check."
+
+msgid "admin.idp.warning.domain_failing"
+msgstr "The TXT record of domain {domain} (provider {provider}) has disappeared. The domain still routes but stops after the grace period."
+
+msgid "admin.idp.warning.domain_lapsed"
+msgstr "Domain {domain} of provider {provider} has lapsed and no longer routes. Put the TXT record back and check it again."
+
+msgid "admin.idp.check.title"
+msgstr "Try an address"
+
+msgid "admin.idp.check.lead"
+msgstr "Enter an email address or user name to see which provider the login page would choose and why. Nobody is logged in and the address is not kept."
+
+msgid "admin.idp.check.label"
+msgstr "Email address or user name"
+
+msgid "admin.idp.check.hint"
+msgstr "For example name@example.org. Only the domain counts."
+
+msgid "admin.idp.check.button"
+msgstr "Check"
+
+msgid "admin.idp.check.provider"
+msgstr "This address (domain {domain}) logs in at provider {provider}."
+
+msgid "admin.idp.check.foreign"
+msgstr "This address (domain {domain}) logs in at an identity provider of another organisation."
+
+msgid "admin.idp.check.no_domain"
+msgstr "This is a user name without a domain. It logs in at the platform provider."
+
+msgid "admin.idp.check.reserved_suffix"
+msgstr "Domain {domain} is reserved for the platform's bundled identity provider. This address logs in at the platform provider."
+
+msgid "admin.idp.check.no_domain_match"
+msgstr "No provider claims domain {domain}. This address logs in at the platform provider."
+
+msgid "admin.idp.check.domain_not_verified"
+msgstr "Provider {provider} claims domain {domain}, but the domain is not verified yet or has lapsed. This address therefore logs in at the platform provider."
+
+msgid "admin.idp.check.provider_off"
+msgstr "Provider {provider} claims domain {domain} but is off. This address therefore logs in at the platform provider."
+
+msgid "admin.idp.check.host_switch_off"
+msgstr "Provider {provider} would get this domain ({domain}), but the host does not allow organisation providers (ORGANISATION_IDPS_ENABLED). This address therefore logs in at the platform provider."
+
+msgid "admin.idp.check.foreign_domain_not_verified"
+msgstr "A provider of another organisation claims domain {domain}, but it is not verified yet. This address logs in at the platform provider."
+
+msgid "admin.idp.check.foreign_provider_off"
+msgstr "A provider of another organisation claims domain {domain} but is off. This address logs in at the platform provider."
+
+msgid "admin.idp.check.foreign_host_switch_off"
+msgstr "A provider of another organisation would get domain {domain}, but the host does not allow organisation providers. This address logs in at the platform provider."

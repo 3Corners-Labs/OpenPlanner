@@ -42,6 +42,7 @@ from app.domain.identity_providers import (
     jwks,
     validate_secret,
 )
+from app.domain.idp_setup import RouteCheck, check_route
 from app.domain.login_domains import (
     DEFAULT_GRACE,
     DomainClaim,
@@ -109,6 +110,8 @@ class ProviderOverview:
     providers: list[OrganisationProvider]
     limit: int
     """How many providers the organisation may have (``idp_max_per_organisation``)."""
+    claims: list[DomainClaim] = field(default_factory=list)
+    """The domains claimed by those providers."""
 
 
 @dataclass(frozen=True)
@@ -197,7 +200,33 @@ class IdentityProviderService:
             providers = [
                 p for p in await tx.list_identity_providers(_everything()) if p.organisation == slug
             ]
-        return ProviderOverview(organisation, providers, self._limit())
+            keys = {p.key for p in providers}
+            claims = [c for c in await tx.list_login_domains(_everything()) if c.provider in keys]
+        return ProviderOverview(organisation, providers, self._limit(), claims)
+
+    async def check_route(self, principal: Principal, slug: str, address: str) -> RouteCheck:
+        """Return where a login with ``address`` would go and why, for the authentication page.
+
+        Reads the same providers and domains as the login page, so the answer is the login's.
+        The address is neither stored nor logged; the result holds its domain only. A provider
+        of another organisation is reported as ``foreign`` without its key, as the redirect on the
+        login page reveals no more (B11).
+
+        Raises:
+            DomainError: ``not_permitted`` or ``organisation_not_found``.
+        """
+        require(await self._admin.authorize(principal, _VIEW, organisation_slug=slug))
+        async with self._uow.read() as tx:
+            await organisation_by_slug(tx, slug)
+            providers = await tx.list_identity_providers(_everything())
+            claims = await tx.list_login_domains(_everything())
+        found = check_route(
+            address, providers, claims, self._login_suffix(), routing=self._routing()
+        )
+        mine = {p.key for p in providers if p.organisation == slug}
+        if found.provider and found.provider not in mine:
+            return replace(found, provider="", foreign=True)
+        return found
 
     async def provider(self, principal: Principal, slug: str, key: str) -> ProviderDetail:
         """Return one provider of the organisation with its keys.

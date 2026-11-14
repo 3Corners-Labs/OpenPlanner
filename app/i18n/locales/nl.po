@@ -8436,7 +8436,7 @@ msgid "admin.holidays.calendar_name"
 msgstr "Naam van de kalender"
 
 msgid "admin.tab.login"
-msgstr "Inloggen"
+msgstr "Authenticatie"
 
 msgid "authz.permission.identity_providers_view"
 msgstr "Identity providers van de organisatie bekijken"
@@ -8496,10 +8496,10 @@ msgid "admin.form.error.issuer_taken"
 msgstr "Deze issuer is al geregistreerd, bij deze organisatie, een andere organisatie of als platformprovider."
 
 msgid "admin.idp.title"
-msgstr "Inloggen"
+msgstr "Authenticatie"
 
 msgid "admin.idp.lead"
-msgstr "De identity providers waar medewerkers van deze organisatie inloggen. Een eigen provider geeft alleen rechten binnen deze organisatie; de e-maildomeinen die de provider kiest, volgen in een volgende stap."
+msgstr "De identity providers (IdP's) waarmee medewerkers van deze organisatie inloggen, en hoe het inlogscherm bepaalt welke provider een medewerker krijgt. Een eigen provider geeft alleen rechten binnen deze organisatie."
 
 msgid "admin.idp.providers"
 msgstr "Identity providers"
@@ -14385,3 +14385,117 @@ msgstr "Ondertitels staan uit."
 
 msgid "callpage.say.captions_failed"
 msgstr "De ondertitels konden niet worden gestart. Dit gesprek biedt ze misschien niet aan."
+
+msgid "admin.idp.steps.title"
+msgstr "Stappenplan"
+
+msgid "admin.idp.steps.lead"
+msgstr "Zo komt een eigen identity provider in gebruik. Elke stap staat hier met zijn stand."
+
+msgid "admin.idp.steps.state.done"
+msgstr "Klaar"
+
+msgid "admin.idp.steps.state.todo"
+msgstr "Te doen"
+
+msgid "admin.idp.steps.state.blocked"
+msgstr "Wacht op een eerdere stap"
+
+msgid "admin.idp.steps.host_switch"
+msgstr "De host staat providers van organisaties toe"
+
+msgid "admin.idp.steps.host_switch.hint"
+msgstr "De serverbeheerder zet ORGANISATION_IDPS_ENABLED aan. Zolang die uit staat, loggen alle medewerkers in bij de platformprovider."
+
+msgid "admin.idp.steps.register"
+msgstr "Identity provider registreren"
+
+msgid "admin.idp.steps.register.hint"
+msgstr "Kies Identity provider toevoegen hieronder (superuser). Registreer OpenPlanner eerst bij de provider met de redirect-URI en het JWKS-adres van de providerpagina."
+
+msgid "admin.idp.steps.enable"
+msgstr "Proeflogin doen en de provider aanzetten"
+
+msgid "admin.idp.steps.enable.hint"
+msgstr "Open de provider, kies Proeflogin en zet hem daarna aan. Een nieuwe provider staat uit."
+
+msgid "admin.idp.steps.domain"
+msgstr "E-maildomein toevoegen"
+
+msgid "admin.idp.steps.domain.hint"
+msgstr "Onder Domeinen op de providerpagina. Het domein bepaalt welke medewerkers naar deze provider gaan."
+
+msgid "admin.idp.steps.verify"
+msgstr "Domein verifiëren met een TXT-record"
+
+msgid "admin.idp.steps.verify.hint"
+msgstr "Laat de organisatie het getoonde TXT-record in haar DNS zetten en kies Controleren. Pas dan routeert het domein."
+
+msgid "admin.idp.steps.platform"
+msgstr "Het platformaccount blijft altijd bruikbaar: wie een adres op een ander domein invult, of op het inlogscherm Inloggen met een platformaccount kiest, logt in bij de platformprovider."
+
+msgid "admin.idp.warnings"
+msgstr "Let op: dit wordt nog niet gekozen"
+
+msgid "admin.idp.warning.enabled_without_domain"
+msgstr "Provider {provider} staat aan, maar heeft geen geverifieerd domein. Geen enkele medewerker wordt naar deze provider gestuurd."
+
+msgid "admin.idp.warning.domain_provider_off"
+msgstr "Domein {domain} is geverifieerd, maar provider {provider} staat uit. Het domein routeert pas als de provider aan staat."
+
+msgid "admin.idp.warning.domain_pending"
+msgstr "Domein {domain} van provider {provider} wacht op verificatie. Zet het TXT-record in de DNS en kies Controleren."
+
+msgid "admin.idp.warning.domain_failing"
+msgstr "Het TXT-record van domein {domain} (provider {provider}) is verdwenen. Het domein routeert nog, maar stopt na de tolerantieperiode."
+
+msgid "admin.idp.warning.domain_lapsed"
+msgstr "Domein {domain} van provider {provider} is vervallen en routeert niet meer. Zet het TXT-record terug en controleer het opnieuw."
+
+msgid "admin.idp.check.title"
+msgstr "Probeer een adres"
+
+msgid "admin.idp.check.lead"
+msgstr "Vul een e-mailadres of inlognaam in om te zien welke provider het inlogscherm zou kiezen en waarom. Er wordt niets ingelogd en het adres wordt niet bewaard."
+
+msgid "admin.idp.check.label"
+msgstr "E-mailadres of inlognaam"
+
+msgid "admin.idp.check.hint"
+msgstr "Bijvoorbeeld naam@voorbeeld.nl. Alleen het domein telt."
+
+msgid "admin.idp.check.button"
+msgstr "Controleren"
+
+msgid "admin.idp.check.provider"
+msgstr "Dit adres (domein {domain}) logt in bij provider {provider}."
+
+msgid "admin.idp.check.foreign"
+msgstr "Dit adres (domein {domain}) logt in bij een identity provider van een andere organisatie."
+
+msgid "admin.idp.check.no_domain"
+msgstr "Dit is een inlognaam zonder domein. Die logt in bij de platformprovider."
+
+msgid "admin.idp.check.reserved_suffix"
+msgstr "Domein {domain} is gereserveerd voor de ingebouwde identiteitsprovider van het platform. Dit adres logt in bij de platformprovider."
+
+msgid "admin.idp.check.no_domain_match"
+msgstr "Geen enkele provider claimt domein {domain}. Dit adres logt in bij de platformprovider."
+
+msgid "admin.idp.check.domain_not_verified"
+msgstr "Provider {provider} claimt domein {domain}, maar het domein is nog niet geverifieerd of vervallen. Dit adres logt daarom in bij de platformprovider."
+
+msgid "admin.idp.check.provider_off"
+msgstr "Provider {provider} claimt domein {domain}, maar staat uit. Dit adres logt daarom in bij de platformprovider."
+
+msgid "admin.idp.check.host_switch_off"
+msgstr "Provider {provider} zou dit domein ({domain}) krijgen, maar de host staat providers van organisaties niet toe (ORGANISATION_IDPS_ENABLED). Dit adres logt daarom in bij de platformprovider."
+
+msgid "admin.idp.check.foreign_domain_not_verified"
+msgstr "Een provider van een andere organisatie claimt domein {domain}, maar het is nog niet geverifieerd. Dit adres logt in bij de platformprovider."
+
+msgid "admin.idp.check.foreign_provider_off"
+msgstr "Een provider van een andere organisatie claimt domein {domain}, maar staat uit. Dit adres logt in bij de platformprovider."
+
+msgid "admin.idp.check.foreign_host_switch_off"
+msgstr "Een provider van een andere organisatie zou domein {domain} krijgen, maar de host staat providers van organisaties niet toe. Dit adres logt in bij de platformprovider."

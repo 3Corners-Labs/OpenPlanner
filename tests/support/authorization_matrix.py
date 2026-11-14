@@ -1450,6 +1450,12 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/organisations/andere/login": statuses(200, 403, 403, 200, 403, 403, 403),
         "/admin/organisations/nope/login": statuses(404, 403, 403, 403, 403, 403, 403),
     },
+    # The route check reads the same as the page: the same people may ask it.
+    "POST /admin/organisations/{org}/login/_check": {
+        "/admin/organisations/demo/login/_check": statuses(200, 200, 403, 403, 200, 403, 403),
+        "/admin/organisations/andere/login/_check": statuses(200, 403, 403, 200, 403, 403, 403),
+        "/admin/organisations/nope/login/_check": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
     "GET /admin/organisations/{org}/login/new": {
         "/admin/organisations/demo/login/new": statuses(200, 403, 403, 403, 403, 403, 403),
         "/admin/organisations/nope/login/new": statuses(404, 403, 403, 403, 403, 403, 403),
