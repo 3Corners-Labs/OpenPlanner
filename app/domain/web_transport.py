@@ -1,12 +1,27 @@
-"""The hop between a reverse proxy and the web container (ADR 0091 point 3).
+"""The hops inside one Docker host that stay plain HTTP, as recorded exceptions (ADR 0091).
 
-The bundled proxy reaches web over the ``edge`` network of one Docker host; that hop stays plain
-HTTP as a recorded exception. An own proxy on another machine crosses a real network, so web
-should serve TLS there. Pure Python: the settings arrive as plain values.
+Two hops never leave the host, so they run without TLS, each as a recorded exception:
+
+* the bundled proxy to web, over the ``edge`` network (ADR 0091 point 2). An own proxy on
+  another machine crosses a real network, so web should serve TLS there (point 3);
+* web and worker to the bundled identity provider, over the compose network (ADR 0125). The
+  browser reaches that provider through the proxy over https; only the back channel (discovery,
+  token, keys, the staff directory) takes the internal address.
+
+Pure Python: the settings arrive as plain values.
 """
 
 BUNDLED_PROXY_ADDRESS = "172.31.240.2"
 """The fixed address of the bundled proxy on the ``edge`` network (``docker-compose.yml``)."""
+
+BUNDLED_IDP_DISCOVERY_URL = (
+    "http://idp:8080/idp/realms/openplanner/.well-known/openid-configuration"
+)
+"""Where web reads the bundled provider's login on the compose network (ADR 0112 point 4).
+
+The compose service ``idp`` on its fixed port, under the proxy's ``/idp`` path, realm
+``openplanner``: what ``scripts/render-keycloak-realm.sh`` writes for an https public address.
+"""
 
 
 def proxy_hop_unencrypted(forwarded_allow_ips: str | None, *, web_tls: bool) -> bool:
@@ -27,3 +42,21 @@ def proxy_hop_unencrypted(forwarded_allow_ips: str | None, *, web_tls: bool) -> 
         return False
     trusted = {part.strip() for part in (forwarded_allow_ips or "").split(",") if part.strip()}
     return bool(trusted - {BUNDLED_PROXY_ADDRESS})
+
+
+def bundled_idp_hop(discovery_url: str, issuer: str | None) -> bool:
+    """Return whether a plain-http login is the bundled provider's internal hop (ADR 0125).
+
+    Only the exact address the render script writes counts, and only with an https issuer:
+    the issuer is the address the browser is sent to, where the password and the one-time code
+    travel, so the exception never covers more than the back channel. Any other http discovery
+    URL, or this one with an http or derived issuer, is not the exception.
+
+    Args:
+        discovery_url: ``OIDC_DISCOVERY_URL``.
+        issuer: ``OIDC_ISSUER``; ``None`` when the issuer is derived from the discovery URL.
+
+    Returns:
+        ``True`` when production may accept the plain-http discovery URL.
+    """
+    return discovery_url == BUNDLED_IDP_DISCOVERY_URL and (issuer or "").startswith("https://")

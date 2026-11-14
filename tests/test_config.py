@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from app.config import Settings
 from app.domain.event_schema import Envelope
+from app.domain.web_transport import BUNDLED_IDP_DISCOVERY_URL
 from app.i18n.dates import ClockStyle
 
 
@@ -115,6 +116,41 @@ def test_production_refuses_development_placeholder_secrets(field: str, key: str
 
     assert Settings(environment="dev", **{field: placeholder}).environment == "dev"  # type: ignore[arg-type]
     assert Settings(**production).environment == "prod"  # type: ignore[arg-type]
+
+
+BUNDLED_LOGIN = {
+    "oidc_discovery_url": BUNDLED_IDP_DISCOVERY_URL,
+    "oidc_issuer": "https://afspraak.example.nl/idp/realms/openplanner",
+    "oidc_client_secret": "rendered-client-secret",
+}
+
+
+def test_production_starts_with_the_bundled_provider_on_the_internal_network() -> None:
+    """ADR 0125: the default production install (ADR 0106) logs in through the internal hop."""
+    production = {
+        "environment": "prod",
+        "management_token_key": "m" * 40,
+        "session_secret": "s" * 40,
+        "public_base_url": "https://afspraak.example.nl",
+    }
+
+    settings = Settings(**production, **BUNDLED_LOGIN)  # type: ignore[arg-type]
+
+    assert settings.oidc_discovery_url == BUNDLED_IDP_DISCOVERY_URL
+    assert settings.production_problems() == []
+    for missing in ("oidc_issuer", "oidc_client_secret"):
+        with pytest.raises(ValidationError, match="OIDC needs an https discovery URL"):
+            Settings(**production, **{**BUNDLED_LOGIN, missing: None})  # type: ignore[arg-type]
+    elsewhere = BUNDLED_IDP_DISCOVERY_URL.replace("idp:8080", "idp.example.nl")
+    with pytest.raises(ValidationError, match="OIDC needs an https discovery URL"):
+        Settings(**production, **{**BUNDLED_LOGIN, "oidc_discovery_url": elsewhere})  # type: ignore[arg-type]
+
+
+def test_a_test_installation_with_the_bundled_provider_lists_no_login_problem() -> None:
+    """System status no longer warns about what production now accepts (ADR 0042 §11)."""
+    settings = Settings(environment="test", **BUNDLED_LOGIN)  # type: ignore[arg-type]
+
+    assert "oidc_incomplete" not in {p.code for p in settings.production_problems()}
 
 
 def test_the_simulator_is_off_unless_switched_on(monkeypatch: pytest.MonkeyPatch) -> None:

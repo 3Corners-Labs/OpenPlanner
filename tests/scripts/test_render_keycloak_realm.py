@@ -15,6 +15,8 @@ from typing import Any
 
 import pytest
 
+from app.domain.web_transport import BUNDLED_IDP_DISCOVERY_URL
+
 REPO = Path(__file__).parents[2]
 SCRIPT = REPO / "scripts/render-keycloak-realm.sh"
 TEMPLATE = REPO / "deploy/keycloak/realm.template.json"
@@ -350,9 +352,8 @@ def test_an_https_address_puts_keycloak_under_idp_and_writes_the_login(tmp_path:
     assert keycloak["KC_HTTP_RELATIVE_PATH"] == "/idp"
     assert keycloak["KC_PROXY_HEADERS"] == "xforwarded"
     assert app["KEYCLOAK_ADMIN_URL"] == "http://idp:8080/idp/admin/realms/openplanner"
-    assert app["OIDC_DISCOVERY_URL"] == (
-        "http://idp:8080/idp/realms/openplanner/.well-known/openid-configuration"
-    )
+    # The one internal address production accepts over http (ADR 0125), with an https issuer.
+    assert app["OIDC_DISCOVERY_URL"] == BUNDLED_IDP_DISCOVERY_URL
     assert app["OIDC_ISSUER"] == "https://docker01.example.nl/idp/realms/openplanner"
     assert app["OIDC_CLIENT_SECRET"] == FIXED["KC_OPENPLANNER_CLIENT_SECRET"]
     realm = json.loads((tmp_path / "secrets/keycloak-realm.json").read_text())

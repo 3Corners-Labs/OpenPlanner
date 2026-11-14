@@ -10,9 +10,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+import yaml
 
 from app.adapters.bootstrap import GENERATED
+from app.config import Settings
 from app.domain.settings_registry import BY_KEY
+from app.domain.web_transport import BUNDLED_IDP_DISCOVERY_URL
 from tests.fakes import updater_host
 from tests.fakes.updater_host import digest
 
@@ -1060,6 +1063,28 @@ def test_production_runs_the_bundled_keycloak_on_its_own_database(host: Host) ->
     assert keycloak["KC_HTTP_ENABLED"] == "true"
     assert host.settings("secrets/idp-db.env")["POSTGRES_PASSWORD"] == keycloak["KC_DB_PASSWORD"]
     assert host.settings(".env")["ADMIN_MFA_REQUIRED"] == "true"
+
+
+def test_web_and_worker_start_on_what_a_production_install_with_the_bundled_keycloak_wrote(
+    host: Host,
+) -> None:
+    """ADR 0125: the login is the bundled provider's internal hop, which production accepts.
+
+    The fake compose never runs the image, so the start-up check is run here on the env files
+    the containers read, in the order ``docker-compose.yml`` lists them (a later file wins).
+    """
+    _production_bundled(host)
+
+    values: dict[str, str] = {}
+    for entry in yaml.safe_load((REPO / "docker-compose.yml").read_text())["x-app"]["env_file"]:
+        if host.file(entry["path"]).is_file():
+            values |= host.settings(entry["path"])
+    settings = Settings(**{key.lower(): value for key, value in values.items()})
+
+    assert settings.environment == "prod"
+    assert settings.oidc_discovery_url == BUNDLED_IDP_DISCOVERY_URL
+    assert settings.oidc_issuer == "https://afspraak.example.nl/idp/realms/openplanner"
+    assert settings.production_problems() == []
 
 
 def test_test_and_lab_keep_the_development_start_and_h2(host: Host) -> None:

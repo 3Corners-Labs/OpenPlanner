@@ -639,7 +639,10 @@ Restart `web` and `worker` after changing it.
 
 Without `OIDC_DISCOVERY_URL` the admin portal is disabled; participants' pages work regardless.
 In production also set `SESSION_SECRET` (at least 32 random bytes); the image refuses to start
-without it, and with an `http` discovery URL or without `OIDC_CLIENT_SECRET` (ADR 0013).
+without it, and with an `http` discovery URL or without `OIDC_CLIENT_SECRET` (ADR 0013). The one
+http discovery URL production accepts is the bundled identity provider's internal address,
+`http://idp:8080/idp/realms/openplanner/...` with an https `OIDC_ISSUER`, as
+`scripts/render-keycloak-realm.sh` writes it (a recorded exception, ADR 0125).
 
 In PingFederate, create an OIDC client:
 
