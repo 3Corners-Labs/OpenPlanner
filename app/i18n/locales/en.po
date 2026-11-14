@@ -13232,6 +13232,9 @@ msgstr "This completion is only for existing services and cannot be chosen."
 msgid "admin.flows.reason.rollback_not_safe"
 msgstr "Activation waits until the previous version of OpenPlanner can also keep track of appointments on a shared capacity pool. This follows in a later version."
 
+msgid "admin.flows.reason.contact_center_not_ready"
+msgstr "Activating a flow that dispatches to the contact center waits until the contact center is released for go-live. This follows in a later version."
+
 msgid "admin.flows.summary.none"
 msgstr "Not set"
 

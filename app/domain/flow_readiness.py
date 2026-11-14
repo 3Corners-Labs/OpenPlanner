@@ -89,10 +89,17 @@ class ReadinessReason(StrEnum):
     ROLLBACK_NOT_SAFE = "rollback_not_safe"
     """The rollback gate ``ROLLBACK_SAFE`` is shut: the previous supported version could not
     yet account for the pool slots a new flow writes (ADR 0122 decision 12)."""
+    CONTACT_CENTER_NOT_READY = "contact_center_not_ready"
+    """The flow dispatches to the contact center, which waits for the go-live items G13 to G15
+    (``CONTACT_CENTER_FLOWS_READY``, product owner 2026-11-14)."""
 
 
 FOLLOWING: frozenset[ReadinessReason] = frozenset(
-    {ReadinessReason.NOT_BUILT_YET, ReadinessReason.ROLLBACK_NOT_SAFE}
+    {
+        ReadinessReason.NOT_BUILT_YET,
+        ReadinessReason.ROLLBACK_NOT_SAFE,
+        ReadinessReason.CONTACT_CENTER_NOT_READY,
+    }
 )
 """The reasons an administrator cannot fix: a part of OpenPlanner that follows in a later
 version. They keep a checklist from being complete, never make it incomplete."""
@@ -282,11 +289,19 @@ def _rollback_reason(revision: FlowRevision) -> ReadinessReason | None:
     """Return why the rollback check fails, if it does.
 
     Whether the previous supported version could still account for the flow's records after a
-    rollback (``ROLLBACK_SAFE``, ADR 0121 point 9, ADR 0122 decision 12), read when called.
+    rollback (``ROLLBACK_SAFE``, ADR 0121 point 9, ADR 0122 decision 12), and, once it can,
+    whether a flow that dispatches to the contact center may go live
+    (``CONTACT_CENTER_FLOWS_READY``, checklist G13 to G15); both read when called. This is the
+    one place the contact-center rule is applied, so the portal and the configuration import
+    both meet it. A legacy revision is never refused.
     """
-    if revision.legacy or flows.ROLLBACK_SAFE:
+    if revision.legacy:
         return None
-    return ReadinessReason.ROLLBACK_NOT_SAFE
+    if not flows.ROLLBACK_SAFE:
+        return ReadinessReason.ROLLBACK_NOT_SAFE
+    if revision.dispatch is DispatchKind.CONTACT_CENTER and not flows.CONTACT_CENTER_FLOWS_READY:
+        return ReadinessReason.CONTACT_CENTER_NOT_READY
+    return None
 
 
 def readiness(

@@ -156,6 +156,18 @@ def test_the_gate_stays_shut_while_a_blocking_item_is_open() -> None:
         assert service_flows.ROLLBACK_SAFE is False, open_blocking
 
 
+def test_contact_center_flows_stay_blocked_while_a_cc_item_is_open() -> None:
+    """G13 to G15 are enforced by code until they are done (product owner, 2026-11-14)."""
+    open_cc = [
+        name
+        for name, item in _checklist().items()
+        if item.blocks == "cc" and not item.status.startswith("done")
+    ]
+
+    assert open_cc
+    assert service_flows.CONTACT_CENTER_FLOWS_READY is False, open_cc
+
+
 def _acceptance() -> dict[str, list[str]]:
     """Return the cells of the acceptance section's rows by row."""
     text = MATRIX.read_text(encoding="utf-8").split("## 4. Acceptance matrix", 1)[1]

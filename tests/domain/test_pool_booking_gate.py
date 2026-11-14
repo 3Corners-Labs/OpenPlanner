@@ -259,5 +259,9 @@ def test_the_legacy_wrapper_never_waits_for_the_gate() -> None:
     assert can_activate(readiness(legacy(), pool(), offered_subjects=()))
 
 
-def test_the_following_reasons_are_exactly_the_two_an_administrator_cannot_fix() -> None:
-    assert {ReadinessReason.NOT_BUILT_YET, ReadinessReason.ROLLBACK_NOT_SAFE} == FOLLOWING
+def test_the_following_reasons_are_exactly_the_three_an_administrator_cannot_fix() -> None:
+    assert {
+        ReadinessReason.NOT_BUILT_YET,
+        ReadinessReason.ROLLBACK_NOT_SAFE,
+        ReadinessReason.CONTACT_CENTER_NOT_READY,
+    } == FOLLOWING
