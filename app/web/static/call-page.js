@@ -74,6 +74,7 @@
       wish: { camera: true, microphone: true }, // asked for by the participant
       has: { camera: false, microphone: false }, // a live track
       soundPlayed: false,
+      speaker: false, // the browser can choose a speaker and there is one to choose
       focus: "", // "state" or "denied": the place of focus in this render
       say: null, // key of the sentence for the live region; "" clears it; null leaves it
     };
@@ -92,16 +93,38 @@
     return microphone ? texts.join_microphone : texts.join;
   }
 
+  // The polite region gets one sentence at a time, each kept on screen for a minimum time, so a
+  // new sentence never replaces one that has not been read out: none is dropped, none repeats
+  // (a sentence equal to the one waiting last is not queued twice). "" clears region and queue.
+  var SAY_MS = 1500;
+  var queue = [];
   var sayTimer = 0;
-  function say(key) {
-    // Clearing first makes an unchanged sentence, such as a second test sound, read out again;
-    // a sentence that is not said yet is dropped when a newer one comes.
-    window.clearTimeout(sayTimer);
+  var sayBusy = false;
+  function pump() {
+    if (sayBusy || !queue.length) return;
+    sayBusy = true;
     statusLine.textContent = "";
-    if (!key) return;
-    sayTimer = window.setTimeout(function () {
-      statusLine.textContent = texts[key] || "";
+    var next = queue.shift();
+    // Emptied first, so a sentence equal to the one before is read out again.
+    window.setTimeout(function () {
+      statusLine.textContent = next;
     }, 60);
+    sayTimer = window.setTimeout(function () {
+      sayBusy = false;
+      pump();
+    }, SAY_MS);
+  }
+  function say(key) {
+    if (!key) {
+      window.clearTimeout(sayTimer);
+      queue = [];
+      sayBusy = false;
+      statusLine.textContent = "";
+      return;
+    }
+    var text = texts[key] || "";
+    if (text && queue[queue.length - 1] !== text) queue.push(text);
+    pump();
   }
 
   function render() {
@@ -131,6 +154,12 @@
         texts[view.has[name] ? "on" : "off"];
     });
     preview.hidden = !view.has.camera;
+    // The list of a device that is refused or not found would only list placeholders.
+    KINDS.forEach(function (name) {
+      var absent = view.refused.indexOf(name) !== -1 || view.missing.indexOf(name) !== -1;
+      $('[data-call-field="' + name + '"]').hidden = checking ? absent : true;
+    });
+    $("[data-call-speaker-field]").hidden = !(checking && view.speaker);
     $("[data-call-sound-note]").hidden = !view.soundPlayed;
     joinButton.textContent = joinLabel(view.refused.concat(view.missing));
 
@@ -147,6 +176,7 @@
   var stream = null;
   var run = 0;
   var chosen = { camera: "", microphone: "", speaker: "" };
+  var pending = { camera: false, microphone: false }; // a request for that device is waiting
 
   function tracksOf(kind) {
     if (!stream) return [];
@@ -266,7 +296,7 @@
   }
 
   function outcomeSay(kind) {
-    return kind ? "say_refused_" + kind : null;
+    return kind ? "say_without_" + kind : null;
   }
 
   function acquire() {
@@ -316,9 +346,14 @@
   }
 
   function switchOn(kind) {
+    // A second request for a device that is still waiting is ignored: two tracks of one kind
+    // must never be added.
+    if (pending[kind]) return Promise.resolve();
+    pending[kind] = true;
     var mine = run;
     view.wish[kind] = true;
     return askOne(kind).then(function (one) {
+      pending[kind] = false;
       if (mine !== run) {
         if (one.stream) {
           one.stream.getTracks().forEach(function (track) {
@@ -345,6 +380,7 @@
   }
 
   function replace(kind) {
+    if (pending[kind]) return Promise.resolve();
     dropTracks(kind);
     return switchOn(kind);
   }
@@ -385,7 +421,8 @@
       fill(selects.speaker, of("audiooutput"), chosen.speaker, texts.device_speaker);
       // Choosing a speaker is not possible in every browser; the test sound always is.
       var canChoose = "setSinkId" in HTMLMediaElement.prototype && of("audiooutput").length > 0;
-      $("[data-call-speaker-field]").hidden = !canChoose;
+      view.speaker = canChoose;
+      render();
     });
   }
 

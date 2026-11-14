@@ -48,7 +48,7 @@ def _read_by_the_script() -> set[str]:
     names |= set(re.findall(r'"((?:say|level)_\w+)"', SCRIPT))
     names |= {"on", "off"}  # texts[on ? "on" : "off"]
     names |= {f"say_{kind}_{state}" for kind in ("camera", "microphone") for state in ("on", "off")}
-    names |= {f"say_refused_{kind}" for kind in ("camera", "microphone", "both")}
+    names |= {f"say_without_{kind}" for kind in ("camera", "microphone", "both")}
     return {name for name in names if not name.endswith("_")}
 
 

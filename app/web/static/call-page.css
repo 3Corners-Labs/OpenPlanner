@@ -126,6 +126,9 @@
 }
 
 .call-level meter {
+  /* Without this the browser draws its own meter and ignores the colours below. */
+  -webkit-appearance: none;
+  appearance: none;
   display: block;
   width: 100%;
   max-width: 30rem;

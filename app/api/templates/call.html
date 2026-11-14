@@ -80,11 +80,11 @@
           <meter id="call-level" min="0" max="1" value="0" aria-labelledby="call-level-label" aria-describedby="call-level-text" data-call-level></meter>
           <p class="hint" id="call-level-text" data-call-level-text>{{ _("callpage.check.level_silent") }}</p>
         </div>
-        <div class="field">
+        <div class="field" data-call-field="camera">
           <label for="call-camera">{{ _("callpage.check.camera") }}</label>
           <select id="call-camera" data-call-select="camera"></select>
         </div>
-        <div class="field">
+        <div class="field" data-call-field="microphone">
           <label for="call-microphone">{{ _("callpage.check.microphone") }}</label>
           <select id="call-microphone" data-call-select="microphone"></select>
         </div>
@@ -126,9 +126,9 @@
     <span data-text="say_ready">{{ _("callpage.say.ready") }}</span>
     <span data-text="say_no_devices">{{ _("callpage.say.no_devices") }}</span>
     <span data-text="say_sound">{{ _("callpage.say.sound") }}</span>
-    <span data-text="say_refused_camera">{{ _("callpage.denied.camera.heading") }}</span>
-    <span data-text="say_refused_microphone">{{ _("callpage.denied.microphone.heading") }}</span>
-    <span data-text="say_refused_both">{{ _("callpage.denied.both.heading") }}</span>
+    <span data-text="say_without_camera">{{ _("callpage.denied.camera.without") }}</span>
+    <span data-text="say_without_microphone">{{ _("callpage.denied.microphone.without") }}</span>
+    <span data-text="say_without_both">{{ _("callpage.denied.both.without") }}</span>
     <span data-text="say_camera_on">{{ _("callpage.say.camera_on") }}</span>
     <span data-text="say_camera_off">{{ _("callpage.say.camera_off") }}</span>
     <span data-text="say_microphone_on">{{ _("callpage.say.microphone_on") }}</span>

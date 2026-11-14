@@ -181,7 +181,7 @@ class ClosureExamples:
         pending_flow_webkit: The same for WebKit.
         proposal_page: The page where a participant takes a proposed new time (ADR 0057), of
             a booking awaiting a new time with an open proposal; never confirmed by the checks.
-        call_page: The call page of a confirmed booking that starts in ten minutes (ADR 0123
+        call_page: The call page of a confirmed booking that starts in two hours (ADR 0123
             step 4b), reached through its emailed link; the checks never join it.
         trial_page: The trial call page of that booking. It shows the page's "not available
             for this appointment" state; its other states are covered by the API tests.
@@ -355,7 +355,8 @@ async def seed_closure_examples(
         call_token, _ = await store_example_booking(
             tx,
             journey_group,
-            now + JOURNEY_CALL_IN,
+            # Its own start, so no count of the journey's bookings at their time changes.
+            now + JOURNEY_CALL_IN + timedelta(hours=2),
             now,
             token_key,
             status=BookingStatus.CONFIRMED,
