@@ -76,6 +76,7 @@ class DeliveryView:
         faults: Faults of single calls by kind in the window, non-zero rows only.
         inside_list: Refusals in the window from inside the connection's own list of networks.
         paused_dropped: Verified events dropped while the address was paused, in the window.
+        by_previous: Deliveries the previous secret verified in the window (ADR 0124 point 8).
     """
 
     last_accepted: str
@@ -85,6 +86,7 @@ class DeliveryView:
     faults: list[DeliveryRow]
     inside_list: int
     paused_dropped: int
+    by_previous: int = 0
 
 
 def delivery_view(
@@ -125,6 +127,7 @@ def delivery_view(
         ],
         view.inside_list,
         view.paused_dropped,
+        view.by_previous,
     )
 
 

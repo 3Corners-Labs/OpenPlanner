@@ -10,7 +10,7 @@ live meeting status per ADR 0010), ``ContactCenterDispatcher`` (WP6, ADR 0007; o
 from collections.abc import Collection, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Protocol
 
 from app.domain.admin_sessions import AdminSession, EndReason
@@ -132,6 +132,7 @@ from app.domain.usage_report import DayStatusCount, ReportGroup
 from app.domain.usage_rollup import UsageBatch, UsagePruned, UsageState
 from app.domain.usage_staff import StaffCell
 from app.domain.wallboard_link import WallboardLink
+from app.domain.webhook_secrets import Sighting, WebhookSecrets
 from app.domain.worker_check import WorkerHeartbeat
 
 
@@ -580,11 +581,30 @@ class ContactCenterConnections(Protocol):
         ...
 
     async def rotate_webhook_secret(self, organisation_id: int, now: datetime) -> None:
-        """Generate a new webhook secret for an existing connection, replacing the old one."""
+        """Generate a new webhook secret for an existing connection.
+
+        The secret that was current is kept, sealed, as the previous one and the one before it is
+        removed (ADR 0124 point 8; ``app.domain.webhook_secrets.rotated`` is the rule).
+        """
+        ...
+
+    async def drop_expired_previous(
+        self, organisation_ids: Sequence[int], now: datetime, overlap: timedelta
+    ) -> int:
+        """Remove the previous secrets whose overlap has ended at ``now``; return how many went."""
         ...
 
     async def set_inbound_enabled(self, organisation_id: int, enabled: bool, now: datetime) -> None:
         """Pause or resume the address of an existing connection; nothing else of it changes."""
+        ...
+
+    async def set_registration(
+        self, organisation_id: int, state: Registration | None, now: datetime
+    ) -> None:
+        """Remember what the last registration came to, or ``None`` once it succeeded.
+
+        Only that field of an existing connection changes (ADR 0124 point 8).
+        """
         ...
 
     async def delete(self, organisation_id: int) -> None:
@@ -602,6 +622,15 @@ class ContactCenterConnections(Protocol):
         """Return the webhook secret when the organisation is connected to ``kind``; else ``None``.
 
         For the webhook gate and the dispatcher only (ADR 0032 point 10); never shown.
+        """
+        ...
+
+    async def webhook_secrets(
+        self, organisation_id: int, kind: ContactCenterKind
+    ) -> WebhookSecrets | None:
+        """Return the current and previous webhook secret with the time of the rotation.
+
+        As ``webhook_secret``, for the webhook gate (ADR 0124 point 8); never shown.
         """
         ...
 
@@ -2575,6 +2604,17 @@ class Transaction(Protocol):
 
     async def save_address_check(self, check: AddressCheck) -> None:
         """Replace the latest round trip of ``check.kind``."""
+        ...
+
+    async def get_secret_sighting(self, platform: str) -> Sighting | None:
+        """Return when the installation's webhook secret of ``platform`` was first seen.
+
+        A keyed fingerprint and a time, never the secret (ADR 0124 point 8); ``None`` before.
+        """
+        ...
+
+    async def save_secret_sighting(self, platform: str, sighting: Sighting) -> None:
+        """Store the first sighting of the installation's webhook secret of ``platform``."""
         ...
 
     async def delete_address_check(self, kind: AddressKind) -> None:

@@ -19,9 +19,9 @@ from app.adapters.contact_center_connections import ConnectionCredentials, Seale
 from app.adapters.db.credentials import Secrets
 from app.adapters.db.record_names import organisation_tokens_name
 from app.adapters.webex_auth import AuthorizedClient, ServiceAppConfig, WebexTokens
-from app.adapters.webhook_registration import replace_wxcc
+from app.adapters.webhook_registration import secret_update
 from app.adapters.webhooks import WXCC_INBOUND
-from app.adapters.wxcc import WxccTasks, wxcc_tasks
+from app.adapters.wxcc import DESCRIPTOR, WxccTasks, wxcc_tasks
 from app.domain.contact_center import ContactCenterKind, Registration
 from app.domain.ports import (
     Clock,
@@ -104,7 +104,10 @@ class OrganisationWxcc:
     async def register(self, organisation_id: int, organisation: str) -> Registration:
         """Make WxCC send the organisation's events to its own address, with its secret (CC-4d).
 
-        The subscriptions at the address are replaced, so a rotated secret takes effect.
+        How a rotated secret reaches the platform is what the descriptor declares
+        (``capabilities.webhook_secret_update``, ADR 0124 point 8): WxCC keeps a subscription's
+        secret, so a new subscription is made before the old one is removed, and no event is
+        refused on the way (``webhook_registration.SECRET_UPDATES`` is the one table).
         """
         credentials = await self._connections.credentials(organisation_id)
         secret = await self._connections.webhook_secret(organisation_id, ContactCenterKind.WEBEX_CC)
@@ -116,7 +119,8 @@ class OrganisationWxcc:
         client = AuthorizedClient(self._http, built.tokens, self._request_log)
         target = WXCC_INBOUND.organisation_url(self._webhook_base, organisation)
         try:
-            return await replace_wxcc(client, credentials.api_base_url, target, secret)
+            update = secret_update(DESCRIPTOR.capabilities.webhook_secret_update)
+            return await update(client, credentials.api_base_url, target, secret)
         except IntegrationError as error:
             return Registration.FAILED if error.retryable else Registration.REFUSED
 

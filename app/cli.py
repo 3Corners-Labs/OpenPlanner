@@ -13,7 +13,8 @@ Usage:
         database for the upgrade matrix; with ``--compare`` exit 1 on a broken invariant
     ``python -m app.cli authz-matrix``  print the authorisation matrix (docs/authorization.md)
     ``python -m app.cli admin-map``  print the admin structure (docs/admin-map.md, ADR 0047)
-    ``python -m app.cli register-webhooks``  register Webex webhooks and the WxCC subscription
+    ``python -m app.cli register-webhooks [--update-secret]``  register Webex webhooks and the WxCC
+        subscription; ``--update-secret`` gives them a rotated installation secret (ADR 0124)
     ``python -m app.cli wxcc-check``  probe every Webex/WxCC call; status and missing scope
     ``python -m app.cli wxcc-config-check``  compare WxCC's routing configuration per group
     ``python -m app.cli wxcc-sample-flow --group SLUG [--queue VALUE=QUEUE] [--fallback-queue Q]``
@@ -171,10 +172,16 @@ from app.adapters.settings_report import (
 )
 from app.adapters.signing_keys import EcSigningKeys
 from app.adapters.webex_auth import AuthorizedClient, TokenHealth, WebexTokens
-from app.adapters.webhook_registration import register_webex, register_wxcc
+from app.adapters.webhook_registration import (
+    register_webex,
+    register_wxcc,
+    renewal_line,
+    secret_update,
+    update_webex_secrets,
+)
 from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks, self_test
 from app.adapters.webhooks import WXCC_INBOUND
-from app.adapters.wxcc import channel_and_address, wxcc_mapping
+from app.adapters.wxcc import DESCRIPTOR, channel_and_address, wxcc_mapping
 from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, region_check
 from app.adapters.wxcc_sample_flow import Route, sample_flow
 from app.cli_config import add_arguments as add_document_arguments
@@ -410,9 +417,18 @@ NOT_CONFIGURED = (
 
 
 async def _register_webhooks(
-    settings: Settings, transport: httpx.AsyncBaseTransport | None = None
+    settings: Settings,
+    transport: httpx.AsyncBaseTransport | None = None,
+    *,
+    update_secret: bool = False,
 ) -> str:
-    """Register the webhooks the configured integrations need; return a report."""
+    """Register the webhooks the configured integrations need; return a report.
+
+    With ``update_secret`` the existing Webex webhooks are updated in place with the secret now in
+    the environment and the WxCC subscription is renewed, so a rotated installation secret reaches
+    the platform without a gap in the events (ADR 0124 point 8; the previous value verifies in the
+    meantime).
+    """
     base = settings.webhook_base
     if not settings.video_configured or settings.webex_webhook_secret is None:
         return NOT_CONFIGURED
@@ -425,7 +441,8 @@ async def _register_webhooks(
         if tokens is None:  # pragma: no cover - video_configured implies tokens
             return "Webex is not configured; nothing to do.\n"
         client = AuthorizedClient(http, tokens)
-        lines = await register_webex(
+        webex = update_webex_secrets if update_secret else register_webex
+        lines = await webex(
             client,
             settings.webex_api_base_url,
             f"{base}/webhooks/webex",
@@ -433,14 +450,16 @@ async def _register_webhooks(
             hosts=_hosts(await _groups(settings)),
         )
         if settings.wxcc_api_base_url and settings.wxcc_webhook_secret is not None:
-            lines.append(
-                await register_wxcc(
-                    client,
-                    settings.wxcc_api_base_url,
-                    f"{base}{WXCC_INBOUND.registered_path}",
-                    settings.wxcc_webhook_secret.get_secret_value(),
+            target = f"{base}{WXCC_INBOUND.registered_path}"
+            wxcc_secret = settings.wxcc_webhook_secret.get_secret_value()
+            if update_secret:
+                apply = secret_update(DESCRIPTOR.capabilities.webhook_secret_update)
+                outcome = await apply(client, settings.wxcc_api_base_url, target, wxcc_secret)
+                lines.append(renewal_line(outcome))
+            else:
+                lines.append(
+                    await register_wxcc(client, settings.wxcc_api_base_url, target, wxcc_secret)
                 )
-            )
     return "".join(f"{line}\n" for line in lines)
 
 
@@ -1750,7 +1769,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     check_cmd.add_argument("--compare", type=Path, help="an earlier state; exit 1 on a finding")
     commands.add_parser("authz-matrix", help="print the authorisation matrix as Markdown")
     commands.add_parser("admin-map", help="print the admin structure as Markdown")
-    commands.add_parser("register-webhooks", help="register Webex webhooks and WxCC subscription")
+    register_cmd = commands.add_parser(
+        "register-webhooks", help="register Webex webhooks and WxCC subscription"
+    )
+    register_cmd.add_argument(
+        "--update-secret",
+        action="store_true",
+        help="after rotating WEBEX_WEBHOOK_SECRET or WXCC_WEBHOOK_SECRET: give the existing "
+        "webhooks and subscription the new secret (ADR 0124 point 8)",
+    )
     commands.add_parser("wxcc-check", help="probe the Webex and WxCC calls (status, scope hints)")
     commands.add_parser("wxcc-config-check", help="check WxCC's routing configuration per group")
     sample_cmd = commands.add_parser(
@@ -2011,7 +2038,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             asyncio.run(_wxcc_sample_flow(Settings(), args.group, args.queue, args.fallback_queue))
         )
     if args.command == "register-webhooks":
-        report = asyncio.run(_register_webhooks(Settings()))
+        report = asyncio.run(_register_webhooks(Settings(), update_secret=args.update_secret))
         sys.stdout.write(report)
         return 1 if ": refused" in report or "no webhooks registered" in report else 0
     sys.stdout.write(asyncio.run(_seed_demo(Settings())))

@@ -86,7 +86,15 @@ stored secret.
 After saving you see this organisation's **Webhook address**. The contact center reports the
 status of tasks there. OpenPlanner checks every report with a secret the server makes itself;
 nobody types or sees it. **Make a new webhook secret** replaces it, for example when you suspect
-it leaked; the old one stops working at once. **Remove the own connection** erases the connection
+it leaked. The contact center is told the new secret at once. The old secret keeps working for a
+short time (the platform administrator sets how long, 60 minutes by default), so that no event is
+lost while the contact center takes the new one up; the card says until when. Making yet another
+new secret straight after stops the old ones at once: that is how you end a secret that leaked
+without waiting (the platform administrator can also set that time to 0). *Deliveries seen* counts
+how many deliveries were still verified with the old secret: when that stays at zero the contact
+center uses the new one. If the card says the contact center was not told the new secret, or that
+there is no subscription now, nothing retries by itself: check the Service App's rights and press
+**Save** on the card to register again. **Remove the own connection** erases the connection
 and its secrets.
 
 As long as an organisation has no connection of its own, it uses the installation's. That

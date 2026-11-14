@@ -232,6 +232,9 @@ class InboundWebhook:
             stored before ADR 0032 keep matching).
         secret: Reads the webhook secret from the settings; without it the endpoint does not
             exist.
+        previous: Reads the previous value of that secret from the settings, or ``None`` outside
+            a rotation of the installation's own secret (ADR 0124 point 8); it verifies for the
+            overlap after the application first saw the current secret.
         verify: ``(body, headers, secret, now)`` → ``None`` when authentic, untampered and within
             300 s, else ``Refusal.SIGNATURE`` or ``Refusal.STALE`` (ADR 0124 point 2).
         parse: The verified JSON object → the event, or ``None`` when OpenPlanner ignores it.
@@ -241,6 +244,7 @@ class InboundWebhook:
     platform: Platform
     source: str
     secret: Callable[[Settings], SecretStr | None]
+    previous: Callable[[Settings], SecretStr | None]
     verify: Callable[[bytes, Mapping[str, str], str, datetime], Refusal | None]
     parse: Callable[[dict[str, Any]], ParsedEvent | None]
     event_type: Callable[[dict[str, Any]], str]
@@ -316,11 +320,17 @@ def _wxcc_secret(settings: Settings) -> SecretStr | None:
     return settings.wxcc_webhook_secret
 
 
+def _wxcc_previous(settings: Settings) -> SecretStr | None:
+    """Return the WxCC subscription secret before a rotation (``WXCC_WEBHOOK_SECRET_PREVIOUS``)."""
+    return settings.wxcc_webhook_secret_previous
+
+
 WXCC_INBOUND = ContactCenterWebhook(
     kind=ContactCenterKind.WEBEX_CC,
     platform=Platform.WXCC,
     source="wxcc",
     secret=_wxcc_secret,
+    previous=_wxcc_previous,
     verify=_verify_wxcc_headers,
     parse=parse_wxcc,
     event_type=_wxcc_type,
@@ -339,10 +349,16 @@ def _webex_secret(settings: Settings) -> SecretStr | None:
     return settings.webex_webhook_secret
 
 
+def _webex_previous(settings: Settings) -> SecretStr | None:
+    """Return the Webex webhook secret before a rotation (``WEBEX_WEBHOOK_SECRET_PREVIOUS``)."""
+    return settings.webex_webhook_secret_previous
+
+
 WEBEX_INBOUND = InboundWebhook(
     platform=Platform.WEBEX,
     source="webex",
     secret=_webex_secret,
+    previous=_webex_previous,
     verify=check_webex,
     parse=parse_webex,
     event_type=_webex_type,

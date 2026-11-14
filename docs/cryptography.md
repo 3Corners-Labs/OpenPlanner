@@ -69,7 +69,12 @@ the code changes, this document changes in the same pull request. `docs/threat-m
   (`app/domain/tokens.py`). The salt is 32 random bytes per booking; the database keeps the salt and
   `sha256(token)`, compared with `hmac.compare_digest`. Derived keys (`app/keys.py`), each with its
   own HKDF-SHA256 label: the client pseudonym key (ADR 0053, security events) and the agent
-  pseudonym key (ADR 0043, who claimed a booking); the pseudonyms themselves are HMAC-SHA256.
+  pseudonym key (ADR 0043, who claimed a booking); the pseudonyms themselves are HMAC-SHA256. A
+  third label makes the fingerprint of the installation's webhook secrets (ADR 0124 point 8): an
+  HMAC-SHA256 of the secret that tells the application the secret in the environment is the one it
+  saw before, without keeping it; during a rotation of this key the fingerprint under the previous
+  key still matches and is made again. The fingerprint and the time of the first sighting are in
+  the table `webhook_secret_sightings`; never the secret.
 - **Lives in.** `MANAGEMENT_TOKEN_KEY` (at least 32 bytes), environment or `X_FILE`. The token is
   never stored, never in a job payload or a log.
 - **Who can read it.** The host operator and the `web` and `worker` processes. A copy of the
@@ -151,11 +156,15 @@ the code changes, this document changes in the same pull request. `docs/threat-m
   is a random secret of at least 32 characters, constant-time comparison, and replay protection by
   `event_key` (Webex sends no signed event time). When Webex offers SHA-256 the adapter switches
   (ADR 0094 point 5).
-- **Lives in.** `WEBEX_WEBHOOK_SECRET` and `WXCC_WEBHOOK_SECRET`, environment or `X_FILE`; the
-  provider holds the same value in its subscription. Neither is typed into the portal.
+- **Lives in.** `WEBEX_WEBHOOK_SECRET` and `WXCC_WEBHOOK_SECRET`, the environment only: they are class C,
+  which takes no `X_FILE` (that is for classes A and B), and so do their previous values
+  (`..._PREVIOUS`, ADR 0124 point 8); the provider holds the same value in its subscription. None is
+  typed into the portal.
 - **Who can read it.** The host operator and the `web` process.
-- **Rotation.** Replace the value in the secret store, restart `web`, run `python -m app.cli
-  register-webhooks` so the subscriptions carry the new secret. Until then events are refused
+- **Rotation.** Replace the value in the secret store and put the old one in `..._PREVIOUS`, restart
+  `web`, run `python -m app.cli register-webhooks --update-secret` so the subscriptions carry the new
+  secret; the old value verifies for `webhook_secret_overlap_minutes` (ADR 0124 point 8, runbook
+  *Rotating secrets*). Without a previous value events signed with the old secret are refused at once
   (`webhook.rejected`).
 - **Destruction.** Remove the old value from the secret store.
 

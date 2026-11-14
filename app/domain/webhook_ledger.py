@@ -160,6 +160,9 @@ class LedgerView:
         last_accepted: When a delivery was last accepted, across windows.
         last_refused_at: When a call was last refused, across windows.
         last_refused_reason: The code of that refusal.
+        by_previous: How many of the window's verified deliveries the previous secret verified
+            (ADR 0124 point 8): a count of its own, not an outcome, so the rows of outcomes still
+            add up to the calls.
     """
 
     window_started: datetime | None
@@ -170,6 +173,7 @@ class LedgerView:
     last_accepted: datetime | None
     last_refused_at: datetime | None
     last_refused_reason: str | None
+    by_previous: int = 0
 
     @property
     def paused_dropped(self) -> int:
@@ -186,6 +190,7 @@ class _Entry:
     faults: dict[ChainFault, int] = field(default_factory=dict)
     counted: dict[AlertGroup, dict[str, int]] = field(default_factory=dict)
     inside_list: int = 0
+    by_previous: int = 0
     verified: bool = False
     alerted: set[AlertGroup] = field(default_factory=set)
     retracted: dict[AlertGroup, datetime] = field(default_factory=dict)
@@ -197,6 +202,7 @@ class _Entry:
         self.started = now
         self.outcomes, self.faults, self.counted = {}, {}, {}
         self.inside_list = 0
+        self.by_previous = 0
         self.verified = False
         self.alerted = set()
         self.retracted = {}
@@ -255,6 +261,16 @@ class WebhookLedger:
             entry.last_accepted = now
         group = alert_group(outcome, organisational=key.organisation is not None)
         return self._maybe_alert(key, entry, group, outcome.value)
+
+    def verified_by_previous(self, key: AddressKey) -> None:
+        """Count a call that verified under the previous secret (point 8), and nothing else.
+
+        It counts beside the call's outcome (``delivered`` is told that too), never instead of it:
+        no alert, no last-accepted time, no effect on the window.
+        """
+        entry = self._entry(key, self._clock.now())
+        if entry is not None:
+            entry.by_previous += 1
 
     def refused(
         self,
@@ -316,6 +332,7 @@ class WebhookLedger:
             entry.last_accepted,
             entry.last_refused[0] if entry.last_refused else None,
             entry.last_refused[1] if entry.last_refused else None,
+            entry.by_previous if live else 0,
         )
 
     def _entry(self, key: AddressKey, now: datetime) -> _Entry | None:

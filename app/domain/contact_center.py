@@ -118,6 +118,21 @@ class AttributeSpec:
             raise ValueError("invalid attribute spec")
 
 
+class WebhookSecretUpdate(StrEnum):
+    """How a platform lets the secret of an organisation's webhook subscription change.
+
+    A property of the platform's API, declared by its adapter (ADR 0124 point 8); general code
+    never asks which platform it is, only which of these the adapter declared. A platform that
+    could change the secret of a subscription in place would add a value here together with the
+    function that does it (``app.adapters.webhook_registration.SECRET_UPDATES``); no value is
+    declared that nothing implements.
+    """
+
+    RENEW = "renew"
+    """The platform keeps a subscription's secret: a new subscription is made inside the overlap
+    and the old one removed after it, so no event is refused on the way."""
+
+
 @dataclass(frozen=True)
 class ContactCenterCapabilities:
     """What one contact-center platform's adapter can carry (ADR 0121 step 6).
@@ -131,11 +146,15 @@ class ContactCenterCapabilities:
         skills: Whether the platform can route on the mapped skill codes (ADR 0121 step 4b).
         task_kinds: The kinds of task the platform can create (ADR 0123 step 7a): the form (a
             work item), the conversation, or both.
+        webhook_secret_update: How the secret of an organisation's webhook subscription is
+            changed at the platform (ADR 0124 point 8); renewing is the default because it works
+            on every platform.
     """
 
     interaction_kinds: frozenset[InteractionKind] = frozenset()
     skills: bool = False
     task_kinds: frozenset[TaskKind] = frozenset()
+    webhook_secret_update: WebhookSecretUpdate = WebhookSecretUpdate.RENEW
 
     def carries(self, interaction: InteractionKind) -> bool:
         """Return whether the platform can hand work of ``interaction`` to an agent."""
@@ -343,6 +362,13 @@ class OrganisationConnection:
         has_client_secret: Whether a client secret is stored.
         has_refresh_token: Whether a refresh token is stored.
         webhook_secret_at: When the webhook secret was generated; ``None`` before the first.
+        has_previous_webhook_secret: Whether the secret before the last rotation is still kept
+            (ADR 0124 point 8); the card says until when it verifies, from ``webhook_secret_at``
+            and the live overlap. Never the secret.
+        registration: What the last registration at the platform came to when it left the
+            platform in a state an administrator must know (``REPLACED``, ``GONE``, ``REFUSED``,
+            ``FAILED``), until a registration succeeds; ``None`` otherwise. Nothing retries it by
+            itself (ADR 0124 point 8).
         allowed_networks: The networks the platform's webhooks may come from (ADR 0124 point 3),
             canonical CIDR; empty: the installation's default applies; or unreadable (a stored
             list that cannot be read, never taken for an empty one). Not secret.
@@ -359,6 +385,8 @@ class OrganisationConnection:
     webhook_secret_at: datetime | None
     allowed_networks: NetworkList = NetworkList()
     inbound_enabled: bool = True
+    has_previous_webhook_secret: bool = False
+    registration: "Registration | None" = None
 
 
 @dataclass(frozen=True)
@@ -426,6 +454,13 @@ class Registration(StrEnum):
     UNTOUCHED = "untouched"
     """The connection has its webhook secret and nothing the subscription depends on changed
     (only the allowed networks), so it was left as it was (ADR 0124 point 3)."""
+    REPLACED = "replaced"
+    """The platform tells the organisation's events with the new secret now, but the old
+    subscription had to be removed before the new one could be made (the platform allows one per
+    address), so events in between may have been missed (ADR 0124 point 8)."""
+    GONE = "gone"
+    """The old subscription was removed and the platform refused the new one: there is no
+    subscription now and nothing is delivered until a registration succeeds (ADR 0124 point 8)."""
     REFUSED = "refused"
     """The platform refused (rights, address or secret); the reason is in the request log."""
     FAILED = "failed"

@@ -10,27 +10,89 @@ unreadable list, never as an empty one) and whether the address handles its even
 (``inbound_enabled``, the pause of ADR 0124 point 9; a record without the field reads as on, and
 only a stored ``False`` pauses). Nothing of it is readable in the portal:
 ``get`` returns ``OrganisationConnection``, which says only whether a secret is set.
-``webhook_secret`` is for the webhook route only, outside the domain.
+``webhook_secret`` and ``webhook_secrets`` are for the webhook route and the dispatcher only,
+outside the domain's views.
+
+A rotated webhook secret leaves the one before it in the same sealed record
+(``previous_webhook_secret``, ADR 0124 point 8), sealed like the current one; the time of the
+rotation is ``webhook_secret_at``. Whether it still verifies is decided by the clock at each call
+(``app.domain.webhook_secrets``); here it is only *removed*: at any write of the record once no
+setting could keep it (``lapsed``), and by ``drop_expired_previous`` for the periodic sweep, which
+knows the live overlap.
 """
 
 import secrets as random
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.adapters.db.credentials import Secrets
 from app.adapters.db.record_names import contact_center_credential_name, organisation_tokens_name
-from app.domain.contact_center import ConnectionChange, ContactCenterKind, OrganisationConnection
+from app.domain.contact_center import (
+    ConnectionChange,
+    ContactCenterKind,
+    OrganisationConnection,
+    Registration,
+)
 from app.domain.networks import NetworkList
 from app.domain.source_networks import read_stored_networks
+from app.domain.webhook_secrets import OVERLAP_MAX, WebhookSecrets, rotated, settled
 
 WEBHOOK_SECRET_BYTES = 32
 """Random bytes of a generated webhook secret: 43 URL-safe characters (WxCC wants 32–256)."""
 
 
+PREVIOUS_KEY = "previous_webhook_secret"
+"""The field of the sealed record that holds the secret before the last rotation."""
+
+
 def new_webhook_secret() -> str:
     """Return a fresh webhook secret (URL-safe, never typed or shown)."""
     return random.token_urlsafe(WEBHOOK_SECRET_BYTES)
+
+
+def _registration_of(value: object) -> Registration | None:
+    """Return a stored registration state, or ``None`` for none or one that does not parse."""
+    try:
+        return Registration(value) if isinstance(value, str) else None
+    except ValueError:
+        return None
+
+
+def _time_of(value: object) -> datetime | None:
+    """Return a stored ISO time, or ``None`` for anything else."""
+    return datetime.fromisoformat(value) if isinstance(value, str) else None
+
+
+def secrets_of(record: dict[str, object]) -> WebhookSecrets | None:
+    """Return the webhook secrets a sealed record holds, or ``None`` without a current one."""
+    current, previous = record.get("webhook_secret"), record.get(PREVIOUS_KEY)
+    if not isinstance(current, str) or not current:
+        return None
+    return WebhookSecrets(
+        current,
+        previous if isinstance(previous, str) and previous else None,
+        _time_of(record.get("webhook_secret_at")),
+    )
+
+
+def _write_secrets(record: dict[str, object], secrets: WebhookSecrets) -> None:
+    """Put ``secrets`` into ``record``; a missing previous secret leaves no field behind."""
+    record["webhook_secret"] = secrets.current
+    record["webhook_secret_at"] = secrets.rotated_at.isoformat() if secrets.rotated_at else None
+    if secrets.previous is None:
+        record.pop(PREVIOUS_KEY, None)
+    else:
+        record[PREVIOUS_KEY] = secrets.previous
+
+
+def _tidied(record: dict[str, object], now: datetime) -> dict[str, object]:
+    """Drop a previous secret that no setting could keep alive any more, at a write."""
+    held = secrets_of(record)
+    if held is not None and held.previous is not None:
+        if settled(held, now, OVERLAP_MAX).previous is None:
+            record.pop(PREVIOUS_KEY, None)
+    return record
 
 
 @dataclass(frozen=True)
@@ -90,8 +152,10 @@ class SealedConnections:
             has_client_secret=bool(record.get("client_secret")),
             has_refresh_token=bool(record.get("refresh_token")),
             webhook_secret_at=datetime.fromisoformat(rotated) if isinstance(rotated, str) else None,
+            has_previous_webhook_secret=bool(record.get(PREVIOUS_KEY)),
             allowed_networks=networks,
             inbound_enabled=record.get("inbound_enabled") is not False,
+            registration=_registration_of(record.get("registration")),
         )
 
     async def paused(self, organisation_ids: Sequence[int]) -> dict[int, ContactCenterKind]:
@@ -107,54 +171,148 @@ class SealedConnections:
             if record.get("inbound_enabled") is False
         }
 
+    async def _change(
+        self,
+        organisation_id: int,
+        change: Callable[[dict[str, object] | None], dict[str, object] | None],
+        now: datetime,
+    ) -> bool:
+        """Change the organisation's record where it is read: one locked transaction.
+
+        Every writer of the record goes through here, so a write of one field (the pause, the
+        registration, a rotation) is never overwritten by another that read the record earlier.
+        """
+        name = contact_center_credential_name(organisation_id)
+        return await self._store.update(name, change, now)
+
     async def save(self, organisation_id: int, change: ConnectionChange, now: datetime) -> None:
         """Store the connection; a ``None`` secret keeps the stored one.
 
         A new connection gets its webhook secret at once, so its address works from the start;
         a changed API host or client id gets a new one, so a subscription the previous tenant
-        still holds no longer verifies (CC-4d). Changing the allowed networks alone touches
-        neither the secret nor anything else of the record.
+        still holds no longer verifies (CC-4d), and with it go the previous secret and the stored
+        registration outcome, in the same write: an overlap is for a rotation, not for a move, and
+        what a registration left at the old tenant says nothing about the new one. Changing the
+        allowed networks alone touches neither the secret nor anything else of the record.
         """
-        record = dict(await self._record(organisation_id) or {})
-        moved = (record.get("api_base_url"), record.get("client_id")) != (
-            change.api_base_url,
-            change.client_id,
-        )
-        record |= {
-            "kind": change.kind.value,
-            "api_base_url": change.api_base_url,
-            "client_id": change.client_id,
-        }
-        if change.allowed_networks is not None:
-            record["allowed_networks"] = list(change.allowed_networks)
-        if change.client_secret is not None:
-            record["client_secret"] = change.client_secret
-        if change.refresh_token is not None:
-            record["refresh_token"] = change.refresh_token
-        if moved or not record.get("webhook_secret"):
-            # Another tenant (host or client): the old tenant's subscription must stop verifying.
-            record |= {"webhook_secret": new_webhook_secret(), "webhook_secret_at": now.isoformat()}
-        await self._store.put(contact_center_credential_name(organisation_id), record, now)
+
+        def apply(stored: dict[str, object] | None) -> dict[str, object]:
+            record = _tidied(dict(stored or {}), now)
+            moved = (record.get("api_base_url"), record.get("client_id")) != (
+                change.api_base_url,
+                change.client_id,
+            )
+            record |= {
+                "kind": change.kind.value,
+                "api_base_url": change.api_base_url,
+                "client_id": change.client_id,
+            }
+            if change.allowed_networks is not None:
+                record["allowed_networks"] = list(change.allowed_networks)
+            if change.client_secret is not None:
+                record["client_secret"] = change.client_secret
+            if change.refresh_token is not None:
+                record["refresh_token"] = change.refresh_token
+            if moved:
+                record.pop("registration", None)
+            if moved or not record.get("webhook_secret"):
+                made = {
+                    "webhook_secret": new_webhook_secret(),
+                    "webhook_secret_at": now.isoformat(),
+                }
+                record |= made
+                record.pop(PREVIOUS_KEY, None)
+            return record
+
+        await self._change(organisation_id, apply, now)
 
     async def set_inbound_enabled(self, organisation_id: int, enabled: bool, now: datetime) -> None:
         """Pause or resume the address (ADR 0124 point 9): that one field, nothing else.
 
-        Nothing happens for an organisation whose record went away in the meantime, as for
-        ``rotate_webhook_secret``.
+        Read and written in one locked transaction (``_change``). Nothing happens for an
+        organisation whose record went away in the meantime, as for ``rotate_webhook_secret``.
         """
-        record = await self._record(organisation_id)
-        if record is None:
-            return
-        record["inbound_enabled"] = enabled
-        await self._store.put(contact_center_credential_name(organisation_id), record, now)
+
+        def apply(record: dict[str, object] | None) -> dict[str, object] | None:
+            if record is None:
+                return None
+            _tidied(record, now)
+            record["inbound_enabled"] = enabled
+            return record
+
+        await self._change(organisation_id, apply, now)
+
+    async def set_registration(
+        self, organisation_id: int, state: Registration | None, now: datetime
+    ) -> None:
+        """Remember what the last registration came to; ``None`` forgets it (ADR 0124 point 8).
+
+        Only that field changes, read and written in one locked transaction (``_change``), so a
+        rotation that happened in between is never overwritten. Nothing happens for an
+        organisation whose record went away.
+        """
+
+        def apply(record: dict[str, object] | None) -> dict[str, object] | None:
+            if record is None:
+                return None
+            _tidied(record, now)
+            if state is None:
+                record.pop("registration", None)
+            else:
+                record["registration"] = state.value
+            return record
+
+        await self._change(organisation_id, apply, now)
 
     async def rotate_webhook_secret(self, organisation_id: int, now: datetime) -> None:
-        """Replace the webhook secret of an existing connection; nothing without one."""
-        record = await self._record(organisation_id)
-        if record is None:
-            return
-        record |= {"webhook_secret": new_webhook_secret(), "webhook_secret_at": now.isoformat()}
-        await self._store.put(contact_center_credential_name(organisation_id), record, now)
+        """Replace the webhook secret of an existing connection; nothing without one.
+
+        The secret that was current is kept, sealed, as the previous one (ADR 0124 point 8); the
+        previous one from before it is gone, whatever was left of its overlap. Read and written in
+        one locked transaction (``_change``).
+        """
+
+        def apply(record: dict[str, object] | None) -> dict[str, object] | None:
+            if record is None:
+                return None
+            _write_secrets(record, rotated(secrets_of(record), new_webhook_secret(), now))
+            return record
+
+        await self._change(organisation_id, apply, now)
+
+    async def drop_expired_previous(
+        self, organisation_ids: Sequence[int], now: datetime, overlap: timedelta
+    ) -> int:
+        """Remove the previous secrets whose overlap has ended at ``now``; return how many.
+
+        For the periodic sweep, which knows the live overlap. One read to find the records that
+        hold a previous secret, then each one is changed where it is read (``_change``), so a
+        rotation that happens meanwhile is not overwritten.
+        """
+        names = {contact_center_credential_name(i): i for i in organisation_ids}
+        removed = 0
+        for name, record in (await self._store.get_many(list(names))).items():
+            held = secrets_of(record)
+            if held is None or held.previous is None:
+                continue
+            if settled(held, now, overlap).previous is not None:
+                continue
+            dropped = False
+
+            def apply(current: dict[str, object] | None) -> dict[str, object] | None:
+                nonlocal dropped
+                found = secrets_of(current) if current else None
+                if current is None or found is None or found.previous is None:
+                    return None
+                if settled(found, now, overlap).previous is not None:
+                    return None  # rotated again in the meantime: its overlap is running
+                current.pop(PREVIOUS_KEY, None)
+                dropped = True
+                return current
+
+            await self._store.update(name, apply, now)
+            removed += dropped
+        return removed
 
     async def delete(self, organisation_id: int) -> None:
         """Remove the organisation's connection, its secrets and the access tokens it was given."""
@@ -184,3 +342,16 @@ class SealedConnections:
             return None
         secret = record.get("webhook_secret")
         return secret if isinstance(secret, str) and secret else None
+
+    async def webhook_secrets(
+        self, organisation_id: int, kind: ContactCenterKind
+    ) -> WebhookSecrets | None:
+        """Return the current and the previous webhook secret with the time of the rotation.
+
+        ``None`` unless the organisation is connected to ``kind`` with a secret. For the webhook
+        gate only (ADR 0124 point 8): whether the previous one still counts is decided there.
+        """
+        record = await self._record(organisation_id)
+        if record is None or record.get("kind") != kind.value:
+            return None
+        return secrets_of(record)
