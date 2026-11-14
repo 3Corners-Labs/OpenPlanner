@@ -38,8 +38,9 @@ services:
       # Second pass of check-proxy.sh: an own certificate from the mounted directory.
       TLS_CERT_FILE: ${PROXY_CERT_FILE:-}
       TLS_KEY_FILE: ${PROXY_KEY_FILE:-}
-      # Third and fourth pass: Caddy's internal authority, and the /idp route (ADR 0112, ADR 0126)
-      # to a probe that answers like a hostile provider, then to the bundled Keycloak itself.
+      # Third to fifth pass: Caddy's internal authority, and the /idp route (ADR 0112, ADR 0126)
+      # to a probe that answers like a hostile provider, to the stand-in at the bundled provider's
+      # fixed address (ADR 0125), then to the bundled Keycloak itself at that address.
       TLS_INTERNAL: ${PROXY_INTERNAL:-}
       IDP_UPSTREAM: ${PROXY_IDP_UPSTREAM:-}
     volumes:
@@ -53,7 +54,7 @@ services:
       # A visitor over IPv6 (ipv6_client_check): the gateway of the probe network the script
       # makes, an address on this machine only.
       - "[${PROBE6_ADDRESS:?set by scripts/check-proxy.sh}]:18444:8443"
-  # Fourth pass (ADR 0126): the bundled identity provider as docker-compose.yml defines it, with
+  # Fifth pass (ADR 0126): the bundled identity provider as docker-compose.yml defines it, with
   # a realm the script renders for the check's address in its temporary directory, no data volume
   # and a loopback port of its own (a developer's Keycloak may hold 8080).
   idp:

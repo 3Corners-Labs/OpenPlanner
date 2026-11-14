@@ -8,8 +8,8 @@ only. Partly built: steps 0 and 1 merged (#845); step 2 open.
 ## Context
 
 ADR 0112 point 4 serves the bundled Keycloak under `/idp` on the portal's own host name and
-certificate: `handle /idp/*` with `reverse_proxy idp:8080`, for every path, with every header
-in both directions. Measured on Keycloak 26.8.1 behind the bundled proxy (2026-11-14):
+certificate: `handle /idp/*` with `reverse_proxy` to the provider (`IDP_UPSTREAM`), for every
+path, with every header in both directions. Measured on Keycloak 26.8.1 behind the bundled proxy (2026-11-14):
 
 1. **The admin console is public.** `https://<host>/idp/admin/master/console/` and realm
    `master` answer 200 through the proxy, and the admin REST API answers 401 (reachable).
@@ -43,8 +43,8 @@ in both directions. Measured on Keycloak 26.8.1 behind the bundled proxy (2026-1
    console served on the loopback names only the loopback for its code, its login and its API,
    and realm `openplanner` keeps its public address and issuer.
 5. **What must keep working.** The login back channel and the staff directory (ADR 0095) call
-   `http://idp:8080/idp/...` on the internal network, never through the proxy; `kcadm.sh`
-   runs inside the container. The account console stays public: ADR 0100 point 7 sends staff
+   the provider on the internal network (`http://<its address>:8080/idp/...`, a fixed address
+   since ADR 0125 step 2), never through the proxy; `kcadm.sh` runs inside the container. The account console stays public: ADR 0100 point 7 sends staff
    there to change their password and second factor.
 
 ## Decision
@@ -103,10 +103,10 @@ in both directions. Measured on Keycloak 26.8.1 behind the bundled proxy (2026-1
    any of point 4. Not chosen now: it needs a second name and certificate on every
    installation, and a lab without public DNS has one name. Points 1 to 4 close what was
    found; what remains is in *Consequences*. Revisit when a production installation runs the
-   bundled provider (ADR 0125 step 2).
+   bundled provider, which ADR 0125 step 2 no longer warns against.
 6. **Proven against the proxy and against Keycloak.** `scripts/check-proxy.sh` pass 3 puts a
    probe behind the route that sends every header of point 4 and reports what reached it;
-   pass 4 runs the Keycloak image pinned in `docker-compose.yml` behind the proxy: the login
+   pass 5 runs the Keycloak image pinned in `docker-compose.yml` behind the proxy: the login
    page, every asset it names and the account console load, the console and realm `master`
    answer 404 through the proxy and 200 on the loopback, the console on the loopback names
    only the loopback, and the staff directory's calls on the internal network work. A
@@ -135,7 +135,7 @@ None, after checking. Every value below is a fixed security rule or follows from
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR | #845 | merged |
-| 1 | `deploy/proxy/idp.caddy` (public paths, cookies, answers, service worker) imported by the entrypoint; `deploy/keycloak/kcadm-as-admin.sh` mounted into the container; the installer sets realm `master`'s frontend URL to the loopback (`idp_console`); `scripts/check-proxy.sh` pass 3 (probe) and pass 4 (Keycloak); runbook, threat model and data flow corrected; ADR 0112's Status line | #845 | merged |
+| 1 | `deploy/proxy/idp.caddy` (public paths, cookies, answers, service worker) imported by the entrypoint; `deploy/keycloak/kcadm-as-admin.sh` mounted into the container; the installer sets realm `master`'s frontend URL to the loopback (`idp_console`); `scripts/check-proxy.sh` pass 3 (probe) and pass 5 (Keycloak, at the address of pass 4's stand-in, ADR 0125); runbook, threat model and data flow corrected; ADR 0112's Status line | #845 | merged |
 | 2 | docker01 takes the release with step 1: realm `master`'s frontend URL set with the runbook's command, `idp` published on the loopback only (no port 8780); checked from outside (`/idp/admin/` 404, the login works) and through the tunnel (the console) | | planned |
 
 ## Consequences
@@ -144,7 +144,7 @@ None, after checking. Every value below is a fixed security rule or follows from
   through an SSH tunnel (runbook). On a host that predates step 1, the console on the loopback
   cannot log in until the command of point 2 has run; `kcadm.sh` works throughout.
 - Keycloak's pages run under the added policy. A later Keycloak that fetches outside `/idp/`
-  or starts a worker would be blocked there; pass 4 shows a broken login page at the Renovate
+  or starts a worker would be blocked there; pass 5 shows a broken login page at the Renovate
   pull request, and the experiment of 2026-11-14 (login with a second factor and the account
   console in three engines, no violation) is the record for 26.8.1.
 - What remains with one origin:
@@ -172,10 +172,12 @@ None, after checking. Every value below is a fixed security rule or follows from
 
   A host name of its own (point 5) removes all of them. The product owner accepts them with this
   decision, or decides on that host name instead.
-- What ADR 0125 counts as caught by whatever answers the name `idp` while its container is down
-  shrinks: through the proxy it no longer gets the portal's cookies, and the directory's secret
-  no longer reaches the admin REST API over the public route. The threat model and the
-  runbook's recovery say so; ADR 0125 itself stays as recorded.
+- What ADR 0125 counts as caught by whatever answers the name `idp` while its container is down,
+  on a host the installer has not yet moved to the fixed addresses of its step 2, shrinks:
+  through the proxy it no longer gets the portal's cookies, and the directory's secret no longer
+  reaches the admin REST API over the public route. The threat model says so; the runbook's
+  recovery, for an outage before that move, keeps the whole list; ADR 0125 itself stays as
+  recorded.
 - A reverse proxy of the operator's own in front of the bundled provider must do the same; the
   runbook lists what.
 - Updated with this decision: `docs/runbook.md`, `docs/threat-model.md`, `docs/dataflow.md`,

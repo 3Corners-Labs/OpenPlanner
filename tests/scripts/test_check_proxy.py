@@ -3,13 +3,20 @@
 The script needs Docker and runs in CI (step *proxy check*). This test keeps its shape honest
 without Docker: the TLS-version and HSTS checks belong to ``edge_checks``, which every pass
 calls, every pass also runs the round trip, the wrong proxy address is tried once, and the first
-pass checks that a visitor over IPv6 keeps their address.
+pass checks that a visitor over IPv6 keeps their address. Pass 3 and pass 5 (ADR 0126) put a
+probe that answers like a hostile provider and then the pinned Keycloak behind the /idp route;
+pass 4 (ADR 0125 step 2) stops each container another one reaches and lets an impostor answer its
+name: these tests hold that the checks use the addresses a host gets and that each refusal
+follows a control.
 """
 
 import re
 from pathlib import Path
 
+import pytest
+
 from app.api.security_headers import SECURITY_HEADERS
+from tests.support.compose import compose_file
 from tests.support.idp_route import dropped_headers, set_headers
 
 REPO = Path(__file__).parents[2]
@@ -18,19 +25,26 @@ FORUM_MINIMUM_HSTS_SECONDS = 31536000
 """One year, the Forum Standaardisatie minimum the script asserts."""
 
 
+def _program(name: str) -> str:
+    """Return the Python program the script keeps in the shell variable ``NAME_code``."""
+    match = re.search(rf"^{name}_code='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
+    assert match, f"{name}_code is not in check-proxy.sh"
+    return match.group(1)
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["sniffer", "ipv6_client", "idp_probe", "probe_direct", "directory", "responder", "fetch"],
+)
+def test_every_program_the_script_runs_in_a_container_compiles(name: str) -> None:
+    compile(_program(name), name, "exec")
+
+
 def _body(name: str) -> str:
     """Return the body of the shell function ``name``."""
     match = re.search(rf"^{name}\(\) \{{.*?^\}}$", SCRIPT, re.MULTILINE | re.DOTALL)
     assert match, f"{name} is not defined in check-proxy.sh"
     return match.group(0)
-
-
-def _program(name: str) -> str:
-    """Return the Python program the script keeps in the shell variable ``name``."""
-    match = re.search(rf"^{name}='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
-    assert match, f"{name} is not in the script"
-    compile(match.group(1), name, "exec")
-    return match.group(1)
 
 
 def test_every_pass_runs_the_standards_through_edge_checks() -> None:
@@ -91,7 +105,7 @@ def test_every_pass_sends_a_forged_forwarded_header_and_looks_at_the_wire() -> N
 
 def test_the_sniffer_prints_only_the_forwarded_headers() -> None:
     """The wire is read for ``X-Forwarded-*`` lines and nothing else (no paths, no tokens)."""
-    code = _program("sniffer_code")
+    code = _program("sniffer")
 
     assert 'startswith(b"x-forwarded-")' in code
     assert "print(line" in code
@@ -112,12 +126,11 @@ def test_a_visitor_over_ipv6_must_reach_web_with_their_own_address() -> None:
     assert "enable_ip_masquerade=false" in SCRIPT
     overlay = (REPO / "deploy/proxy/compose.pebble.yml").read_text()
     assert '"[${PROBE6_ADDRESS:?set by scripts/check-proxy.sh}]:18444:8443"' in overlay
-    _program("ipv6_client_code")
 
 
 def test_pass_three_puts_a_hostile_provider_behind_the_route() -> None:
     """ADR 0126: a probe sends what the route must drop; first asked directly, as the control."""
-    probe = _program("idp_probe_code")
+    probe = _program("idp_probe")
     body = _body("idp_route_checks")
 
     # Every header the route drops or sets, the probe sends, and a header the route sets comes
@@ -148,21 +161,34 @@ def test_pass_three_puts_a_hostile_provider_behind_the_route() -> None:
     assert re.search(r"^idp_route_checks$", SCRIPT, re.MULTILINE)
 
 
-def test_pass_four_runs_the_pinned_keycloak_as_compose_defines_it() -> None:
-    """The overlay changes the realm, the data and the port; image and command stay compose's."""
+def test_pass_five_runs_the_pinned_keycloak_as_compose_defines_it() -> None:
+    """The overlay changes the realm, the data and the port; image and command stay compose's,
+    and the real Keycloak takes the place and the address of pass 4's stand-in."""
     overlay = (REPO / "deploy/proxy/compose.pebble.yml").read_text()
     idp = overlay[overlay.index("\n  idp:\n") :]
+    text = _pass(5)
 
     assert "image:" not in idp
     assert "command:" not in idp
     assert "${KEYCLOAK_CHECK_DIR:?set by scripts/check-proxy.sh}/secrets/keycloak-realm.json" in idp
     assert '"127.0.0.1:18090:8080"' in idp
-    assert re.search(r"^keycloak_up\nexport PROXY_IDP_UPSTREAM=idp:8080$", SCRIPT, re.MULTILINE)
-    assert re.search(r"^keycloak_checks$", SCRIPT, re.MULTILINE)
+    assert re.search(r'^standins=""\nkeycloak_up\nkeycloak_checks$', text, re.MULTILINE)
+    assert "--no-deps idp" in _body("keycloak_up")  # pass 4's stand-in idp-db stays untouched
+    # The route stays where pass 4 put it: the address the installer writes, never a name.
+    assert 'export PROXY_IDP_UPSTREAM="$BUNDLED_IDP_ADDRESS:$BUNDLED_IDP_PORT"' in _pass(4)
+    assert "PROXY_IDP_UPSTREAM" not in text
     assert "--profile idp" in _body("compose")
 
 
-def test_pass_four_proves_each_refusal_against_the_loopback_and_the_console_after_the_change() -> (
+def test_the_stand_ins_are_layered_in_pass_4_only() -> None:
+    """Pass 5 must meet the Keycloak of docker-compose.yml, not the stand-in of pass 4."""
+    assert "${standins:+-f $standins}" in _body("compose")
+    assigned = re.findall(r"^standins=(\S*)", SCRIPT, re.MULTILINE)
+    assert assigned == ['""', "deploy/proxy/compose.standins.yml", '""']
+    assert "standins=deploy/proxy/compose.standins.yml" in _pass(4)
+
+
+def test_pass_five_proves_each_refusal_against_the_loopback_and_the_console_after_the_change() -> (
     None
 ):
     body = _body("keycloak_checks")
@@ -181,7 +207,102 @@ def test_pass_four_proves_each_refusal_against_the_loopback_and_the_console_afte
     assert 'assets_load "$page" "the login page"' in body
     assert "the account console" in body
     # The staff directory as web builds it, from the values the render script wrote for web.
-    directory = _program("directory_code")
+    directory = _program("directory")
     assert "directory_from_settings(Settings())" in directory
     assert ".reachable()" in directory
     assert "secrets/keycloak-app.env" in body
+
+
+def _pass(number: int) -> str:
+    """Return pass NUMBER of the script, from its heading to its closing line."""
+    start = SCRIPT.index(f"# Pass {number}:")
+    return SCRIPT[start : SCRIPT.index(f'echo "pass {number} ok', start)]
+
+
+def test_pass_4_proves_the_addresses_a_host_gets_not_addresses_of_its_own() -> None:
+    """The login, directory and database host from the render script, the /idp route from the
+    address file the installer reads too."""
+    text = _pass(4)
+
+    assert "bash scripts/render-keycloak-realm.sh" in text
+    assert "--database postgres" in text
+    for key in ("OIDC_DISCOVERY_URL", "KEYCLOAK_ADMIN_URL", "KC_DB_URL_HOST"):
+        assert f"s/^{key}=//p" in text
+    assert ". scripts/fixed-addresses.sh" in text
+    assert '. "$DIR/scripts/fixed-addresses.sh"' in (REPO / "scripts/install.sh").read_text()
+    assert "172.31.240." not in text
+    # Every hop answers while its container runs: a refusal later is then the container's absence.
+    for hop in ('fetch web "$login"', 'fetch worker "$directory"', 'fetch idp "$database"'):
+        assert text.index(hop) < text.index("impostor idp-db idp-store 5432")
+
+
+def test_an_impostor_is_reached_by_name_before_any_refusal_counts() -> None:
+    """The control runs inside ``impostor``, so no refusal can come before it."""
+    body = _body("impostor")
+
+    assert body.index("[ $# -gt 0 ] || fail") < body.index('for client in "$@"')
+    assert body.index('for client in "$@"') < body.index('requests "$impostor_name" >')
+    assert 'fetch "$client" "$impostor_url"' in body
+    assert "a refusal would prove nothing" in body
+
+
+def _impostor_blocks() -> list[str]:
+    """Return pass 4's blocks, each from its ``impostor`` line to the first blank line."""
+    starts = re.split(r"^(?=impostor )", _pass(4), flags=re.MULTILINE)[1:]
+    return [start.split("\n\n", 1)[0] for start in starts]
+
+
+def test_every_impostor_block_ends_with_untouched_for_the_same_name() -> None:
+    """What the impostor answered after its controls is a hop that followed the name."""
+    blocks = _impostor_blocks()
+
+    assert [block.split()[1] for block in blocks] == ["idp-db", "idp", "web"]
+    for block in blocks:
+        name = block.split()[1]
+        lines = block.strip().splitlines()
+        assert lines[-1] == f"untouched {name}", block
+        assert any('= "refused" ]' in line or '= " 502" ]' in line for line in lines[1:-1])
+
+
+def test_every_client_that_must_fail_reached_the_impostor_by_name_first() -> None:
+    """A refusal proves something only from a client that reached the impostor in its control."""
+    for block in _impostor_blocks():
+        head, *lines = block.splitlines()
+        clients = set(head.split()[4:])  # impostor NAME NETWORK PORT CLIENT...
+        refusing = {client for line in lines for client in re.findall(r"fetch (\w+) ", line)}
+        if any("proxied " in line for line in lines):
+            refusing.add("proxy")
+
+        assert refusing, block
+        assert refusing <= clients, block
+
+
+def test_the_stand_ins_keep_where_docker_compose_puts_them() -> None:
+    """The overlay swaps the image, never the networks or fixed addresses, and publishes nothing."""
+    check = compose_file("deploy/proxy/compose.standins.yml")["services"]
+    base = compose_file()["services"]
+
+    for name in ("idp", "idp-db"):
+        assert "networks" not in check[name]
+        assert check[name].get("ports", []) == []
+        assert base[name]["networks"]
+    assert "/pebble/responder.py" in check["idp"]["command"]
+
+
+def test_the_responder_prints_one_line_per_request_and_nothing_it_carried() -> None:
+    code = _program("responder")
+
+    assert 'print("request", flush=True)' in code
+    assert "def log_message" in code  # http.server's own access log, with paths, stays silent
+
+
+def test_the_impostors_are_removed_before_the_networks_they_hold() -> None:
+    cleanup = _body("cleanup")
+
+    assert cleanup.index('"$project-impostor-$name"') < cleanup.index("compose down -v")
+    assert cleanup.index('"$project-idp-probe"') < cleanup.index("compose down -v")
+
+
+def test_an_impostor_counts_only_the_hops_that_reach_it() -> None:
+    """The image's health check asks 127.0.0.1:8000, which the impostor for web answers."""
+    assert "--no-healthcheck" in _body("impostor")

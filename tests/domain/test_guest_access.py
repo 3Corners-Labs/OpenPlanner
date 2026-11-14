@@ -74,7 +74,8 @@ def test_the_registry_choices_come_from_the_enums() -> None:
 
     assert BY_KEY["embedded_call_display_name"].choices == ("first_name", "term")
     assert BY_KEY["embedded_call_staff_name"].choices == tuple(m.value for m in StaffNameMode)
-    assert [m.value for m in StaffNameMode] == ["name", "term"]
+    assert [m.value for m in StaffNameMode] == ["screen_name", "name", "term"]
+    assert BY_KEY["embedded_call_staff_name"].default == "screen_name"
 
 
 def test_the_neutral_word_and_the_catalogues_default_for_a_participant_are_the_same_word() -> None:

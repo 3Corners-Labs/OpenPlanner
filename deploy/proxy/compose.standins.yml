@@ -1,0 +1,29 @@
+# Stand-ins for pass 4 of scripts/check-proxy.sh (ADR 0125 step 2), layered over
+# compose.pebble.yml in that pass only: the bundled identity provider and its database at the
+# addresses docker-compose.yml gives them, so the check needs neither Keycloak nor PostgreSQL. The
+# application image answers every request with the stand-in's name (responder.py, written by the
+# script next to the test CA); the networks and fixed addresses stay those of docker-compose.yml.
+# Pass 5 runs the real Keycloak of docker-compose.yml without this file (ADR 0126). Never for
+# production.
+services:
+  idp:
+    image: ${OPENPLANNER_IMAGE:-openplanner:local}
+    profiles: [tls]
+    command: ["python", "-I", "/pebble/responder.py", "stand-in idp", "8080"]
+    env_file: !reset []
+    volumes: !override
+      - ${PEBBLE_CERTS:?set by scripts/check-proxy.sh}:/pebble:ro
+    ports: !reset []
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8080), 2)"]
+      interval: 2s
+  idp-db:
+    image: ${OPENPLANNER_IMAGE:-openplanner:local}
+    profiles: [tls]
+    command: ["python", "-I", "/pebble/responder.py", "stand-in idp-db", "5432"]
+    env_file: !reset []
+    volumes: !override
+      - ${PEBBLE_CERTS:?set by scripts/check-proxy.sh}:/pebble:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 5432), 2)"]
+      interval: 2s

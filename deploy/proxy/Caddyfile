@@ -66,8 +66,10 @@ http://{$TLS_DOMAIN}:8080 {
 	# entrypoint.sh renders IDP_DIRECTIVE as `import /etc/caddy/idp.caddy` (ADR 0126: only the
 	# login, none of the portal's cookies, nothing that acts on the whole origin), empty otherwise.
 	{$IDP_DIRECTIVE}
+	# Everything else goes to web at its fixed address on edge (WEB_UPSTREAM, docker-compose.yml),
+	# never to a name this host's DNS could answer while web is down (ADR 0125 step 2).
 	handle {
-		reverse_proxy web:8000
+		reverse_proxy {$WEB_UPSTREAM}
 	}
 	# Every answer the proxy makes itself (a refusal under /idp, a body over its limit, a 502
 	# while web restarts) is a page of the portal's own origin. It gets the portal's deny-by-

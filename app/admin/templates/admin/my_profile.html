@@ -1,0 +1,35 @@
+{% extends "admin/layout.html" %}
+{% from "admin/_subtabs.html" import subtab_row %}
+{% from "admin/_fields.html" import field with context %}
+{% block title %}{{ _("admin.profile.title") }} – {{ _("admin.title") }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 id="page-title">{{ _("admin.profile.title") }}</h1>
+    <p class="page-header__lead">{{ _("admin.profile.intro") }}</p>
+  </div>
+</div>
+{{ subtab_row(entry_tabs, _("admin.rights.sections")) }}
+<section class="card" aria-labelledby="account-name-heading">
+  <h2 id="account-name-heading">{{ _("admin.profile.account.heading") }}</h2>
+  <p><strong>{{ account_name }}</strong></p>
+  <p class="muted">{{ _("admin.profile.account.note") }}</p>
+</section>
+<section class="card" id="screen-name" aria-labelledby="screen-name-heading">
+  <h2 id="screen-name-heading">{{ _("admin.staff.screen_name.heading") }}</h2>
+  <p class="muted">{{ _("admin.profile.screen_name.where") }}</p>
+  {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+  {% if screen_name_field %}
+  <form method="post" action="/admin/rights/profile/screen-name" novalidate>
+    {{ field(screen_name_field) }}
+    <div class="form-actions">
+      <button type="submit" class="button">{{ _("admin.staff.screen_name.save") }}</button>
+    </div>
+  </form>
+  {% elif no_record %}
+  <p class="empty-state">{{ _("admin.profile.screen_name.no_record") }}</p>
+  {% else %}
+  <p class="empty-state">{{ _("admin.profile.screen_name.erased") }}</p>
+  {% endif %}
+</section>
+{% endblock %}

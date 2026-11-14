@@ -59,8 +59,15 @@ class DisplayNameMode(StrEnum):
 
 
 class StaffNameMode(StrEnum):
-    """How the staff member is named to the participant (``embedded_call_staff_name``)."""
+    """How the staff member is named to the participant (``embedded_call_staff_name``).
 
+    ``SCREEN_NAME`` is the default (ADR 0123 point 10, decided 2026-11-14): the name kept with the
+    staff record for the participant's side. ``NAME`` is the account's display name and ``TERM``
+    the organisation's word for staff alone. A value stored before ``SCREEN_NAME`` existed keeps
+    working.
+    """
+
+    SCREEN_NAME = "screen_name"
     NAME = "name"
     TERM = "term"
 

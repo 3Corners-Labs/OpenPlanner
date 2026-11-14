@@ -33,7 +33,10 @@
 #                      (scripts/render-keycloak-realm.sh), the proxy serves its login under /idp
 #                      (ADR 0126), and after every start its mail server and its admin console's
 #                      loopback address are set (realm master's frontend URL; every published port
-#                      on the loopback, or nothing is set). --idp own asks for the login of
+#                      on the loopback, or nothing is set). Every hop reaches it, and it its
+#                      database, at a fixed address (ADR 0125 step 2); a host that reached it by
+#                      the name idp is moved there, and both client secrets are replaced in the
+#                      files and, after the start, in Keycloak. --idp own asks for the login of
 #                      your own provider, as before, and on a host that ran the bundled one removes
 #                      its login (secrets/keycloak-app.env), its /idp route and its containers
 #                      (ADR 0125; volumes stay). Production runs Keycloak in production
@@ -69,6 +72,16 @@ PIN_FILE=$DIR/.env.update
 SECRETS_FILE=$DIR/secrets/secrets.env
 # The login from a configuration package (ADR 0089 point 8); Compose reads it before .env.
 CONFIG_ENV=$DIR/secrets/config.env
+# ADR 0125 step 2: the proxy reaches the bundled identity provider at its fixed address on the
+# edge network, never by the name idp, which this host's DNS could answer while the container is
+# down. The address lives in scripts/fixed-addresses.sh, with the render script's.
+# shellcheck source=scripts/fixed-addresses.sh
+. "$DIR/scripts/fixed-addresses.sh"
+BUNDLED_IDP_UPSTREAM=$BUNDLED_IDP_ADDRESS:$BUNDLED_IDP_PORT
+# Written once the bundled provider's old client secrets are dropped, removed once Keycloak has
+# the new ones (new_client_secrets, idp_client_secrets): a run that stops in between leaves it,
+# and the next run finishes the job with the same secrets instead of making a second pair.
+ROTATION_MARK=$DIR/secrets/keycloak-secrets.pending
 # Where the package or document is copied for the web container, and its name inside the container.
 PACKAGE_IN_WEB=/srv/data/configuration-package.sqlite
 DOCUMENT_IN_WEB=/srv/data/configuration-document.json
@@ -176,9 +189,6 @@ parse_args() {
     if [[ $MODE == production && -n ${OIDC_DISCOVERY_URL:-$(value "$ENV_FILE" OIDC_DISCOVERY_URL)} ]]; then IDP=own; else IDP=bundled; fi
   fi
   case $IDP in bundled | own) ;; *) die "--idp must be bundled or own, not '$IDP'" ;; esac
-  # ADR 0125 point 7: until its step 2 gives the bundled provider a fixed address, production
-  # reaches it by the name idp, which this host's DNS may answer while its container is down.
-  [[ $MODE != production || $IDP != bundled ]] || warn "production with the bundled identity provider: until ADR 0125 step 2, its name idp can be answered by this host's DNS while its container is down; read ADR 0125 before going live, or install with --idp own"
   REPOSITORY=${REPOSITORY:-$(value "$ENV_FILE" UPDATE_REPOSITORY)}
   REPOSITORY=${REPOSITORY:-3Corners-Labs/OpenPlanner}
   [[ $REPOSITORY =~ $REPOSITORY_RE ]] || die "--repository must be owner/name"
@@ -389,13 +399,31 @@ ask() {
 
 put() { [[ -z $2 ]] || printf "%s='%s'\n" "$1" "$2"; }
 
-# Write a file through a private temporary one, so a half-written settings file never exists.
+# write_private FILE [COMMAND...]: replace FILE, mode 600, with what COMMAND prints (standard
+# input when no command is given), through a private temporary file, so a half-written settings
+# file never exists. FILE is replaced only when the command succeeded, so a filter that cannot
+# read it (a file left to root by a render under sudo) never empties it: status 1, FILE as it was.
 write_private() {
   local target=$1 tmp
+  shift
+  (($#)) || set -- cat
   tmp=$(mktemp "$target.XXXXXX")
   chmod 600 "$tmp"
-  cat >"$tmp"
-  mv "$tmp" "$target"
+  if "$@" >"$tmp"; then
+    mv "$tmp" "$target"
+  else
+    rm -f "$tmp"
+    return 1
+  fi
+}
+
+# drop_lines FILE PATTERN: rewrite FILE without the lines that match the extended regular
+# expression PATTERN (write_private); the run stops if that fails, with FILE as it was. The
+# pattern reaches awk through its environment, where no backslash in it is rewritten.
+drop_lines() {
+  # shellcheck disable=SC2016 # an awk program
+  write_private "$1" env DROP_PATTERN="$2" awk '$0 !~ ENVIRON["DROP_PATTERN"]' "$1" \
+    || die "could not rewrite $1"
 }
 
 # public_address HINT DEFAULT: with the HTTPS proxy the address follows the host name.
@@ -486,8 +514,9 @@ login_value() {
 rewrite_env() {
   local backup
   backup=$ENV_FILE.bak.$(date -u +%Y%m%dT%H%M%SZ)
-  [[ -f $backup ]] || { cp "$ENV_FILE" "$backup" && chmod 600 "$backup"; }
-  awk "$@" "$ENV_FILE" | write_private "$ENV_FILE"
+  [[ -f $backup ]] || { cp "$ENV_FILE" "$backup" && chmod 600 "$backup"; } \
+    || die "could not back up $ENV_FILE to $backup; it is as it was"
+  write_private "$ENV_FILE" awk "$@" "$ENV_FILE" || die "could not rewrite $ENV_FILE; it is as it was (backup: $backup)"
   printf '%s' "$backup"
 }
 
@@ -742,8 +771,9 @@ render_idp() {
   [[ $MODE != production ]] || database=postgres
   address=$(value "$ENV_FILE" PUBLIC_BASE_URL)
   if [[ -f $kept && -n $address && $(value "$kept" KC_OPENPLANNER_BASE_URL) != "${address%/}" ]]; then
-    sed -i.bak "/^KC_OPENPLANNER_BASE_URL=/d; /^KC_HOSTNAME=/d" "$kept" && rm -f "$kept.bak"
+    drop_lines "$kept" '^(KC_OPENPLANNER_BASE_URL|KC_HOSTNAME)='
   fi
+  new_client_secrets "$kept"
   [[ -f $DIR/scripts/render-keycloak-realm.sh ]] || die "scripts/render-keycloak-realm.sh is missing from $DIR"
   log "rendering the bundled identity provider's realm"
   "$BASH" "$DIR/scripts/render-keycloak-realm.sh" --dir "$DIR" --database "$database" || die "the realm could not be rendered"
@@ -751,10 +781,26 @@ render_idp() {
   log "first password of the portal user 'super': KC_SUPER_PASSWORD in $kept (changed at the first login)"
 }
 
+# ADR 0125 step 2: a kept pair of client secrets that the render script did not make since every
+# hop has a fixed address (no KC_CLIENT_SECRETS_PINNED) was in use while the provider was reached
+# by the name idp, so whatever answered that name while the container was down may hold it, and
+# the render script keeps existing values. The pair is dropped here, the render script makes and
+# marks a new one for the files, and idp_client_secrets sets it in Keycloak once it runs. The mark
+# goes after the drop: a run that stops before it drops again (no harm), one that stops after it
+# keeps the new pair for the next run.
+new_client_secrets() {
+  local kept=$1
+  [[ -f $kept && ! -f $ROTATION_MARK && $(value "$kept" KC_CLIENT_SECRETS_PINNED) != true ]] || return 0
+  drop_lines "$kept" '^(KC_OPENPLANNER_CLIENT_SECRET|KC_DIRECTORY_CLIENT_SECRET)='
+  : >"$ROTATION_MARK"
+  log "replacing the bundled identity provider's two client secrets: they were in use while it was reached by the name idp, which this host's DNS could answer (ADR 0125)"
+}
+
 # ADR 0125 point 6: a host that leaves the bundled provider (--idp own) drops the application's
 # half of it. Compose reads secrets/keycloak-app.env after .env, so its login and directory would
 # override the ones the operator chose. Nothing is lost: the render script writes the file again
-# from secrets/keycloak.env when the host returns to --idp bundled.
+# from secrets/keycloak.env when the host returns to --idp bundled, with new client secrets
+# (new_client_secrets).
 retire_bundled_login() {
   local app_env=$DIR/secrets/keycloak-app.env
   [[ -f $app_env ]] || return 0
@@ -793,13 +839,20 @@ proxy_settings() {
       fi
     } | write_private "$PROXY_ENV"
   fi
-  # ADR 0112: the proxy serves the bundled Keycloak under /idp. A host that leaves it (--idp own,
-  # ADR 0125 point 6) drops the route, which would otherwise keep sending /idp/* to the name idp.
-  if [[ $IDP == bundled && -z $(value "$PROXY_ENV" IDP_UPSTREAM) ]]; then
-    printf '# The bundled identity provider, under /idp on this host name (ADR 0112).\nIDP_UPSTREAM=idp:8080\n' >>"$PROXY_ENV"
-  elif [[ $IDP != bundled && -n $(value "$PROXY_ENV" IDP_UPSTREAM) ]]; then
-    sed -i.bak '/^# The bundled identity provider, under \/idp/d; /^IDP_UPSTREAM=/d' "$PROXY_ENV" && rm -f "$PROXY_ENV.bak"
-    log "removed IDP_UPSTREAM from $PROXY_ENV: with --idp own the proxy serves no /idp route"
+  # ADR 0112: with --idp bundled the proxy serves Keycloak under /idp, at its fixed address (ADR
+  # 0125 step 2): a route that names anything else, such as the name idp before that step, is
+  # replaced. With --idp own (ADR 0125 point 6) the route goes.
+  local wanted='' upstream
+  [[ $IDP != bundled ]] || wanted=$BUNDLED_IDP_UPSTREAM
+  upstream=$(value "$PROXY_ENV" IDP_UPSTREAM)
+  if [[ $upstream != "$wanted" ]]; then
+    drop_lines "$PROXY_ENV" '^(# The bundled identity provider, under /idp|IDP_UPSTREAM=)'
+    if [[ -n $wanted ]]; then
+      printf '# The bundled identity provider, under /idp on this host name (ADR 0112), at its fixed address (ADR 0125).\nIDP_UPSTREAM=%s\n' "$wanted" >>"$PROXY_ENV"
+      [[ -z $upstream ]] || log "IDP_UPSTREAM in $PROXY_ENV: the bundled provider's fixed address $wanted instead of $upstream (ADR 0125)"
+    else
+      log "removed IDP_UPSTREAM from $PROXY_ENV: with --idp own the proxy serves no /idp route"
+    fi
   fi
   [[ -n $TLS_DOMAIN ]] || die "$PROXY_ENV needs TLS_DOMAIN"
   [[ -n $(value "$PROXY_ENV" ACME_EMAIL) || -n $(value "$PROXY_ENV" TLS_CERT_FILE) \
@@ -964,14 +1017,16 @@ start() {
 }
 
 # The identity provider once web and worker run: with --idp own the bundled one is retired (ADR
-# 0125); with the bundled one its mail server and its admin console's loopback address are set
-# (ADR 0106 step 5, ADR 0126), sharing one wait (IDP_DEADLINE, which idp_kcadm reads).
+# 0125); the bundled one takes the client secrets the run replaced (ADR 0125 step 2), then its mail
+# server and its admin console's loopback address are set (ADR 0106 step 5, ADR 0126). The steps
+# share one wait (IDP_DEADLINE, which idp_kcadm reads).
 idp_after_start() {
   if [[ $IDP != bundled ]]; then
     retire_bundled_provider
     return 0
   fi
   local IDP_DEADLINE=$((SECONDS + HEALTH_TIMEOUT))
+  idp_client_secrets
   idp_mail
   idp_console
 }
@@ -979,14 +1034,16 @@ idp_after_start() {
 # idp_kcadm INPUT ARGS...: kcadm.sh ARGS as realm master's admin in the idp container, through
 # deploy/keycloak/kcadm-as-admin.sh (ADR 0126), retried until Keycloak answers or IDP_DEADLINE
 # passes (status 1); the steps share that one wait. INPUT goes to it on stdin, for a body read with
-# `-f -`, so a secret in it is never an argument.
+# `-f -`, so a secret in it is never an argument (which ps shows); what kcadm.sh prints is the
+# output.
 idp_kcadm() {
-  local input=$1
+  local input=$1 output
   shift
-  until printf '%s' "$input" | compose exec -T idp sh /opt/openplanner/kcadm-as-admin.sh "$@" >/dev/null 2>&1; do
+  until output=$(printf '%s' "$input" | compose exec -T idp sh /opt/openplanner/kcadm-as-admin.sh "$@" 2>/dev/null); do
     ((SECONDS < IDP_DEADLINE)) || return 1
     sleep 5
   done
+  printf '%s' "$output"
 }
 
 # ADR 0125 point 6: a host that left the bundled provider stops it, after `up -d` has replaced
@@ -1003,6 +1060,9 @@ retire_bundled_provider() {
   ((TLS)) || warn "without the HTTPS proxy, remove any /idp route your own reverse proxy has to this host"
 }
 
+# json_escape VALUE: VALUE for a JSON string, its backslashes and double quotes escaped.
+json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+
 # ADR 0106 step 5: the realm's mail server, for the invitations and password resets that Keycloak
 # itself sends. The lab's Mailpit, else the installation's own SMTP settings; the password goes to
 # the container through stdin, never through an argument.
@@ -1018,16 +1078,42 @@ idp_mail() {
   from=$(value "$ENV_FILE" MAIL_FROM)
   from=${from##*<} from=${from%%>*} # "Name <address>" → address
   from=${from:-noreply@openplanner.invalid}
-  json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
   json=$(printf '{"smtpServer":{"host":"%s","port":"%s","from":"%s","fromDisplayName":"OpenPlanner","starttls":"%s","ssl":"false","auth":"%s"%s}}' \
     "$(json_escape "$host")" "${port:-587}" "$(json_escape "$from")" "${starttls:-true}" \
     "$([[ -n $user ]] && echo true || echo false)" \
     "$([[ -n $user ]] && printf ',"user":"%s","password":"%s"' "$(json_escape "$user")" "$(json_escape "$password")")")
-  if ! idp_kcadm "$json" update realms/openplanner -f -; then
+  if ! idp_kcadm "$json" update realms/openplanner -f - >/dev/null; then
     warn "the bundled identity provider did not take its mail server within ${HEALTH_TIMEOUT}s; set it in its console (docs/runbook.md)"
     return 0
   fi
   log "the bundled identity provider's mail server: $host (Keycloak mails invitations and resets itself)"
+}
+
+# ADR 0125 step 2: Keycloak takes the client secrets that new_client_secrets had rendered. It
+# imports the realm only while the realm does not exist, so a new render never reaches a running
+# one: kcadm.sh sets both, each value on stdin and never in an argument or on a disk. Until then
+# staff cannot log in, so a failure stops the run; the mark stays, and the next run sets the same
+# secrets.
+idp_client_secrets() {
+  [[ -f $ROTATION_MARK ]] || return 0
+  local kept=$DIR/secrets/keycloak.env
+  if ! idp_client_secret openplanner-admin "$(value "$kept" KC_OPENPLANNER_CLIENT_SECRET)" \
+    || ! idp_client_secret openplanner-directory "$(value "$kept" KC_DIRECTORY_CLIENT_SECRET)"; then
+    die "the bundled identity provider did not take its new client secrets within ${HEALTH_TIMEOUT}s, so staff cannot log in" \
+      "Check that KC_BOOTSTRAP_ADMIN_PASSWORD in secrets/keycloak.env is the password of 'admin' in realm master (the runbook's recovery after an unexplained outage changes it), then run this script again: it sets the same new secrets."
+  fi
+  rm -f "$ROTATION_MARK"
+  log "the bundled identity provider took its new client secrets; the old ones no longer work (ADR 0125)"
+}
+
+# idp_client_secret CLIENT VALUE: VALUE as the secret of CLIENT in realm openplanner (status 1 for
+# an empty VALUE, an unknown CLIENT or a refusal).
+idp_client_secret() {
+  local id
+  [[ -n $2 ]] || return 1
+  id=$(idp_kcadm '' get clients -r openplanner -q "clientId=$1" --fields id --format csv --noquotes) || return 1
+  [[ $id =~ ^[A-Za-z0-9-]+$ ]] || return 1
+  idp_kcadm "{\"secret\":\"$(json_escape "$2")\"}" update "clients/$id" -r openplanner -f - >/dev/null
 }
 
 # ADR 0126: Keycloak's own port is for this host alone: every port Docker publishes for the
@@ -1054,7 +1140,7 @@ idp_console() {
     return 0
   fi
   console=http://$published$path
-  if ! idp_kcadm '' update realms/master -s "attributes.frontendUrl=$console"; then
+  if ! idp_kcadm '' update realms/master -s "attributes.frontendUrl=$console" >/dev/null; then
     warn "the bundled identity provider did not take the loopback address of its admin console within ${HEALTH_TIMEOUT}s (docs/runbook.md, Opening the admin console)"
     return 0
   fi

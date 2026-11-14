@@ -56,7 +56,7 @@
             <p class="admin-profile__who">{{ principal.display_name }}</p>
             {% if role_labels %}<p class="admin-profile__role">{{ role_labels | join(", ") }}</p>{% endif %}
           </div>
-          <p class="admin-profile__source">{{ _("admin.profile.source") }}{% if can("rights.view") %} <a href="/admin/rights">{{ _("admin.profile.my_rights") }}</a>{% endif %}</p>
+          <p class="admin-profile__source">{{ _("admin.profile.source") }}{% if can("rights.view") %} <a href="/admin/rights">{{ _("admin.profile.my_rights") }}</a> <a href="/admin/rights/profile">{{ _("admin.profile.my_profile") }}</a>{% endif %}</p>
           {% if can("dashboard.view") %}
           <form method="get" action="/admin/preferences">
             <input type="hidden" name="next" value="{{ return_to }}">

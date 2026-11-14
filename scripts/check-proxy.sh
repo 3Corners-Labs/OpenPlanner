@@ -13,27 +13,36 @@
 # applies again when it is withdrawn; then the same proxy serves an own certificate from files and
 # one issued by its internal authority (ADR 0112; the root is published, trusted by `tls-check`),
 # and `tls-check` from the web container reads either certificate and judges it. The /idp route
-# of ADR 0126 is proven twice: against a probe that answers like a hostile provider (only the
-# login passes, the portal's cookies stay out, nothing in an answer acts on the whole origin) and
-# against the Keycloak image docker-compose.yml pins (what a browser needs loads, the admin console
-# and realm master do not, the console works on the loopback, the staff directory's calls work).
-# Used by CI and by `make proxy-check`. Needs docker with compose v2, curl and openssl.
+# of ADR 0126 is proven twice: in pass 3 against a probe that answers like a hostile provider
+# (only the login passes, the portal's cookies stay out, nothing in an answer acts on the whole
+# origin) and in pass 5 against the Keycloak image docker-compose.yml pins (what a browser needs
+# loads, the admin console and realm master do not, the console works on the loopback, the staff
+# directory's calls work). Pass 4 shows that every hop on the host goes to a fixed address and
+# fails closed while its container is down, even when an impostor answers the container's name as
+# the host's DNS could (ADR 0125 step 2).
+# Used by CI and by `make proxy-check`. Needs docker with compose v2, bash, curl and openssl.
 set -eu
 
 project=openplanner-proxy-check
 certs="$(mktemp -d)"
-keycloak_dir="$certs/keycloak" # the realm of pass 4, rendered for this check's address
+keycloak_dir="$certs/keycloak" # the realm of pass 5, rendered for this check's address
 # A visitor over IPv6 (ipv6_client_check): the proxy is also published on the gateway address of
 # a probe network made below, without masquerading, so a request from that address keeps it.
 probe6_network=$project-ipv6
 probe6_subnet=fdf2:d3f5:96ab:1::/64
 probe6=fdf2:d3f5:96ab:1::1
+standins="" # pass 4 layers deploy/proxy/compose.standins.yml: stand-ins for idp and idp-db
 compose() {
+  # shellcheck disable=SC2086 # the overlay's option and path are two words, or none
   PEBBLE_CERTS="$certs" PROBE6_ADDRESS="$probe6" KEYCLOAK_CHECK_DIR="$keycloak_dir" docker compose \
-    -p "$project" -f docker-compose.yml -f deploy/proxy/compose.pebble.yml --profile tls --profile idp "$@"
+    -p "$project" -f docker-compose.yml -f deploy/proxy/compose.pebble.yml \
+    ${standins:+-f $standins} --profile tls --profile idp "$@"
 }
 cleanup() {
+  # The probe of pass 3 and the impostors of pass 4 first: a network with a container attached
+  # cannot be removed.
   docker rm -f "$project-idp-probe" >/dev/null 2>&1 || true
+  for name in idp idp-db web; do docker rm -f "$project-impostor-$name" >/dev/null 2>&1 || true; done
   compose down -v >/dev/null 2>&1 || true
   docker network rm "$probe6_network" >/dev/null 2>&1 || true
   rm -rf "$certs"
@@ -108,8 +117,7 @@ https_edge_checks() { # what the proxy lets through on 443: TRACE, static direct
   [ "$(status_of -X TRACE https://booking.test:18443/g/x)" = "405" ] || fail "TRACE is not answered with 405"
   [ "$(status_of https://booking.test:18443/static/)" = "404" ] || fail "/static/ lists or serves a directory"
   for path in /b/x /admin/login; do # /admin itself only redirects; the login page is its HTML
-    # shellcheck disable=SC2086
-    curl -sk $resolve -D - -o /dev/null "https://booking.test:18443$path" | grep -qi '^cache-control:.*no-store' \
+    head_of "https://booking.test:18443$path" | grep -qi '^cache-control:.*no-store' \
       || fail "$path is not marked Cache-Control: no-store"
   done
 }
@@ -139,9 +147,7 @@ tls_version_checks() { # NCSC TLS guidelines (ADR 0086): TLS 1.2 and 1.3 only, A
 }
 
 hsts_checks() { # Forum Standaardisatie, RFC 6797: HSTS of a year or more on HTTPS, never on HTTP
-  # shellcheck disable=SC2086
-  header="$(curl -sk $resolve -D - -o /dev/null https://booking.test:18443/healthz \
-    | tr -d '\r' | grep -i '^strict-transport-security:' || true)"
+  header="$(head_of https://booking.test:18443/healthz | grep -i '^strict-transport-security:' || true)"
   [ -n "$header" ] || fail "no Strict-Transport-Security header on a proxied response"
   max_age="$(echo "$header" | sed -n 's/.*[mM]ax-[aA]ge=\([0-9]*\).*/\1/p')"
   [ -n "$max_age" ] && [ "$max_age" -ge 31536000 ] || fail "HSTS max-age is below one year ($header)"
@@ -448,12 +454,13 @@ idp_route_checks() { # pass 3: the route of ADR 0126 in front of a provider that
     || fail "the policy the proxy adds on /idp is missing"
 }
 
-keycloak_up() { # pass 4: the bundled provider of docker-compose.yml, with a realm for this check
+keycloak_up() { # pass 5: the bundled provider of docker-compose.yml, with a realm for this check
   mkdir -p "$keycloak_dir/deploy/keycloak"
   cp deploy/keycloak/realm.template.json "$keycloak_dir/deploy/keycloak/"
   printf 'PUBLIC_BASE_URL=https://booking.test:18443\n' >"$keycloak_dir/.env"
-  scripts/render-keycloak-realm.sh --dir "$keycloak_dir" >/dev/null 2>&1 || fail "the check's realm could not be rendered"
-  compose up -d idp
+  bash scripts/render-keycloak-realm.sh --dir "$keycloak_dir" >/dev/null 2>&1 || fail "the check's realm could not be rendered"
+  # Pass 4's stand-in gives way; its idp-db stays, since Keycloak in development mode has its own.
+  compose up -d --no-deps idp
   for _ in $(seq 1 60); do
     curl -sf -o /dev/null http://127.0.0.1:18090/idp/realms/openplanner/.well-known/openid-configuration && return 0
     sleep 2
@@ -470,7 +477,7 @@ assets_load() { # assets_load HTML WHAT: every asset under /idp/ that a page nam
   done
 }
 
-keycloak_checks() { # pass 4: what a browser needs passes the route, the admin console does not
+keycloak_checks() { # pass 5: what a browser needs passes the route, the admin console does not
   base=https://booking.test:18443
   loopback=http://127.0.0.1:18090
   pkce='response_type=code&scope=openid&state=s&nonce=n&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256'
@@ -537,6 +544,89 @@ tls_check() { # tls_check EXPECTED_FINDING EXPECTED_ISSUER_FRAGMENT: run the CLI
   echo "$report" | grep -q "^finding  *$1" || fail "tls-check did not find '$1'"
   echo "$report" | grep -q "^issuer  *.*$2" || fail "tls-check did not read the issuer '$2'"
   echo "$report" | grep -Eq '^valid until .*\([0-9]+ days\)' || fail "tls-check did not report the days left"
+}
+
+# A stand-in or an impostor of pass 4: answers every request with its name and prints one line
+# per request, never a path, a header or a body, so the script can count what reached it.
+responder_code='
+import http.server
+import sys
+
+name, port = sys.argv[1], int(sys.argv[2])
+
+
+class Answer(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = name.encode()
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+        print("request", flush=True)
+
+    do_POST = do_GET
+
+    def log_message(self, *args):
+        pass
+
+
+http.server.ThreadingHTTPServer(("0.0.0.0", port), Answer).serve_forever()
+'
+
+# What a container gets from a URL: the body, or `refused` (and why, on stderr) when nothing
+# answers within ten seconds.
+fetch_code='
+import sys
+import urllib.request
+
+try:
+    print(urllib.request.urlopen(sys.argv[1], timeout=10).read().decode())
+except OSError as error:
+    print("refused")
+    print(f"  {sys.argv[1]}: {error}", file=sys.stderr)
+'
+
+fetch() { # fetch SERVICE URL: what SERVICE gets from URL, `refused` when nothing answers
+  if [ "$1" = proxy ]; then # Caddy's image has no Python; busybox wget does the same
+    compose exec -T proxy wget -q -O - -T 10 "$2" || echo refused
+  else
+    compose exec -T "$1" python -I -c "$fetch_code" "$2"
+  fi
+}
+
+proxied() { # proxied PATH: the body of a request through the proxy, a space, its status
+  # shellcheck disable=SC2086
+  curl -sk $resolve -w ' %{http_code}' "https://booking.test:18443$1"
+}
+
+requests() { # requests NAME: how many requests the impostor for NAME has answered
+  docker logs "$project-impostor-$1" 2>/dev/null | grep -c '^request$' || true
+}
+
+impostor() { # impostor NAME NETWORK PORT CLIENT...: stop container NAME, let another answer NAME
+  # on NETWORK as this host's DNS could, and make each CLIENT reach it by that name first (the
+  # control: with nobody answering, a refusal would prove nothing). What it answered so far is
+  # kept for `untouched`. Without the image's own health check, which asks 127.0.0.1:8000.
+  impostor_name=$1 impostor_url="http://$1:$3/"
+  docker stop "$(compose ps -q "$1")" >/dev/null
+  docker run -d --rm --no-healthcheck --name "$project-impostor-$1" --network "${project}_$2" \
+    --network-alias "$1" -v "$certs:/pebble:ro" --entrypoint python "$image" \
+    -I /pebble/responder.py "impostor $1" "$3" >/dev/null
+  shift 3
+  [ $# -gt 0 ] || fail "impostor $impostor_name names no client, so nothing would prove the name first"
+  for client in "$@"; do
+    tries=0
+    until [ "$(fetch "$client" "$impostor_url" 2>/dev/null)" = "impostor $impostor_name" ]; do
+      tries=$((tries + 1))
+      [ "$tries" -lt 15 ] || fail "nothing answers $impostor_url for $client, so a refusal would prove nothing"
+      sleep 1
+    done
+  done
+  requests "$impostor_name" >"$certs/seen-$impostor_name"
+}
+
+untouched() { # untouched NAME: the impostor for NAME answered nothing since its controls
+  [ "$(requests "$1")" = "$(cat "$certs/seen-$1")" ] || fail "the impostor for $1 received a hop meant for $1"
 }
 
 # Pass 1: ACME against Pebble.
@@ -633,15 +723,73 @@ edge_checks
 docker rm -f "$project-idp-probe" >/dev/null
 echo "pass 3 ok: internal authority, root published without a key, tls-check ok, /idp passes only the login and keeps the portal's cookies and the whole origin out of the provider's reach, redirect, body limit, non-root, TLS versions, HSTS"
 
-# Pass 4: the bundled identity provider itself behind the route (ADR 0126), the Keycloak image and
-# service docker-compose.yml define. A Keycloak update (Renovate) runs it too.
-keycloak_up
-export PROXY_IDP_UPSTREAM=idp:8080
+# Pass 4: every hop on the host goes to a fixed address, never to a name (ADR 0125 step 2).
+# Stand-ins answer at the addresses docker-compose.yml gives the bundled identity provider and its
+# database (compose.standins.yml, layered in this pass only). The login, the staff directory and
+# the database host are what the render script writes, the /idp route what the installer writes
+# (IDP_UPSTREAM), the route to web what docker-compose.yml hands the proxy (WEB_UPSTREAM). Then
+# each container is stopped and an impostor answers its name on that network, as the host's DNS
+# could: the name reaches the impostor (the control, so a refusal means something), the hop fails,
+# and the impostor sees none of it.
+printf '%s' "$responder_code" >"$certs/responder.py"
+chmod 644 "$certs/responder.py"
+render="$certs/render"
+mkdir -p "$render/deploy/keycloak"
+cp deploy/keycloak/realm.template.json "$render/deploy/keycloak/"
+printf 'PUBLIC_BASE_URL=https://booking.test\n' >"$render/.env"
+bash scripts/render-keycloak-realm.sh --dir "$render" --database postgres >/dev/null 2>&1 \
+  || fail "the realm could not be rendered"
+login="$(sed -n 's/^OIDC_DISCOVERY_URL=//p' "$render/secrets/keycloak-app.env")"
+directory="$(sed -n 's/^KEYCLOAK_ADMIN_URL=//p' "$render/secrets/keycloak-app.env")"
+database="http://$(sed -n 's/^KC_DB_URL_HOST=//p' "$render/secrets/keycloak.env"):5432/"
+# The route the installer writes: the address both share (scripts/fixed-addresses.sh).
+# shellcheck source=scripts/fixed-addresses.sh
+. scripts/fixed-addresses.sh
+export PROXY_IDP_UPSTREAM="$BUNDLED_IDP_ADDRESS:$BUNDLED_IDP_PORT"
+standins=deploy/proxy/compose.standins.yml
+[ -n "$login" ] && [ -n "$directory" ] || fail "the render script named no address"
+# The worker too: no other pass starts it, and it reads the staff directory.
+compose up -d --wait idp-db idp worker
 compose up -d --force-recreate --wait proxy
 wait_for_proxy
+image="$(docker inspect -f '{{.Config.Image}}' "$(compose ps -q web)")"
+idp_path=/idp/realms/openplanner/.well-known/openid-configuration
+
+[ "$(fetch web "$login")" = "stand-in idp" ] || fail "web does not reach the login at its address ($login)"
+[ "$(fetch worker "$directory")" = "stand-in idp" ] \
+  || fail "the worker does not reach the staff directory at its address ($directory)"
+[ "$(fetch idp "$database")" = "stand-in idp-db" ] \
+  || fail "the identity provider does not reach its database at its address ($database)"
+[ "$(proxied "$idp_path")" = "stand-in idp 200" ] || fail "/idp does not reach $PROXY_IDP_UPSTREAM"
+[ "$(status_of https://booking.test:18443/healthz)" = "200" ] || fail "the proxy does not reach web"
+
+impostor idp-db idp-store 5432 idp
+[ "$(fetch idp "$database")" = "refused" ] || fail "Keycloak's database hop reached something while idp-db was down"
+untouched idp-db
+
+impostor idp edge 8080 web proxy worker
+[ "$(fetch web "$login")" = "refused" ] || fail "web's login reached something while idp was down"
+[ "$(fetch web "$directory")" = "refused" ] || fail "web's staff directory reached something while idp was down"
+[ "$(fetch worker "$directory")" = "refused" ] || fail "the worker's staff directory reached something while idp was down"
+[ "$(proxied "$idp_path")" = " 502" ] || fail "/idp answered while idp was down"
+untouched idp
+
+impostor web edge 8000 proxy
+[ "$(proxied /healthz)" = " 502" ] || fail "the proxy reached something while web was down"
+untouched web
+
+for name in idp idp-db web; do docker rm -f "$project-impostor-$name" >/dev/null; done
+compose up -d --wait web idp-db idp
+echo "pass 4 ok: login, staff directory, database, /idp and web at fixed addresses; each fails closed while its container is down, and an impostor answering its name gets nothing"
+
+# Pass 5: the bundled identity provider itself behind the route (ADR 0126), the Keycloak image and
+# service docker-compose.yml define, in place of pass 4's stand-in and at the same address. A
+# Keycloak update (Renovate) runs it too.
+standins=""
+keycloak_up
 keycloak_checks
 compose stop idp >/dev/null 2>&1
-echo "pass 4 ok: the bundled Keycloak's login, assets and account console pass the route; its admin console, REST API and realm master do not; the console works on the loopback; the staff directory works on the internal network"
+echo "pass 5 ok: the bundled Keycloak's login, assets and account console pass the route; its admin console, REST API and realm master do not; the console works on the loopback; the staff directory works on the internal network"
 unset PROXY_INTERNAL PROXY_IDP_UPSTREAM
 
 # A half-configured own certificate must stop the container, never serve plain HTTP.

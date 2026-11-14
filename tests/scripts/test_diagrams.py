@@ -39,6 +39,34 @@ def test_every_building_block_is_on_plate_one_and_in_the_register() -> None:
     assert [row[1][0] for row in documents.register_rows()] == ids
 
 
+def _styles(page: ET.Element, text: str) -> list[str]:
+    return [c.get("style") or "" for c in page.iter("mxCell") if text in (c.get("value") or "")]
+
+
+def test_explored_systems_and_planned_lanes_are_drawn_dashed() -> None:
+    overview, _, integrations = ET.fromstring(drawio.build()).findall("diagram")  # noqa: S314
+    explored = [e for e in content.EXTERNALS if e.explored]
+    planned = [lane for lane in content.LANES if lane.planned]
+    solid = next(e for e in content.EXTERNALS if not e.explored)
+
+    assert explored
+    assert planned
+    for external in explored:
+        styles = _styles(overview, external.name)
+        assert styles
+        assert all("dashed=1" in s for s in styles)
+    for lane in planned:
+        styles = [
+            *_styles(integrations, lane.adapter),
+            *_styles(integrations, lane.system_note),
+            *_styles(integrations, lane.wire),
+        ]
+        assert len(styles) >= 3
+        assert all("dashed=1" in s for s in styles)
+    assert _styles(overview, solid.name)
+    assert all("dashed=1" not in s for s in _styles(overview, solid.name))
+
+
 def test_component_tags_name_existing_blocks() -> None:
     known = {b.id for b in content.BLOCKS}
     tags = {t for layer in content.LAYERS for c in layer.components for t in c.tags.split()}

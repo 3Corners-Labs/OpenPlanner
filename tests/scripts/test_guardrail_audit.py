@@ -350,7 +350,13 @@ def test_every_full_lane_job_runs_on_a_pull_request_into_a_line() -> None:
         if "contains(github.event.pull_request.labels.*.name, 'ci:full')" in block
     ]
 
-    assert len(full_lane) == 3
+    # matrix, container, e2e-browser (one job per browser) and e2e (the required check's name).
+    assert [block.split(":", 1)[0].strip() for block in full_lane] == [
+        "matrix",
+        "container",
+        "e2e-browser",
+        "e2e",
+    ]
     assert all("startsWith(github.base_ref, 'release/')" in block for block in full_lane)
 
 

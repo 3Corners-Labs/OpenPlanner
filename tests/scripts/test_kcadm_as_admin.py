@@ -2,7 +2,7 @@
 
 The installer, ``scripts/check-proxy.sh`` and the runbook run Keycloak's admin CLI through this
 one script inside the bundled identity provider's container. These tests run it with a stand-in
-``kcadm.sh`` that records its arguments and its stdin; ``scripts/check-proxy.sh`` pass 4 runs it in
+``kcadm.sh`` that records its arguments and its stdin; ``scripts/check-proxy.sh`` pass 5 runs it in
 the real container (ADR 0126).
 """
 
