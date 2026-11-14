@@ -181,6 +181,8 @@ class ClosureExamples:
         pending_flow_webkit: The same for WebKit.
         proposal_page: The page where a participant takes a proposed new time (ADR 0057), of
             a booking awaiting a new time with an open proposal; never confirmed by the checks.
+        call_page: The call page of a confirmed booking that starts in ten minutes (ADR 0123
+            step 4b), reached through its emailed link; the checks never join it.
         trial_page: The trial call page of that booking. It shows the page's "not available
             for this appointment" state; its other states are covered by the API tests.
         journeys: The participant's journey per e2e browser (``BROWSERS``), new each run.
@@ -197,6 +199,7 @@ class ClosureExamples:
     pending_flow_firefox: str
     pending_flow_webkit: str
     proposal_page: str
+    call_page: str
     trial_page: str
     journeys: dict[str, JourneyExample]
     demo_agenda: str
@@ -349,6 +352,14 @@ async def seed_closure_examples(
         journeys = {
             browser: await _journey(tx, journey_group, now, token_key) for browser in BROWSERS
         }
+        call_token, _ = await store_example_booking(
+            tx,
+            journey_group,
+            now + JOURNEY_CALL_IN,
+            now,
+            token_key,
+            status=BookingStatus.CONFIRMED,
+        )
     return ClosureExamples(
         closed_group=f"/g/{CLOSED_GROUP_SLUG}",
         planned_closure=f"/g/{PLANNED_GROUP_SLUG}/closure",
@@ -359,6 +370,7 @@ async def seed_closure_examples(
         pending_flow_firefox=f"/b/{pending[2]}/confirm",
         pending_flow_webkit=f"/b/{pending[3]}/confirm",
         proposal_page=f"/b/{proposed}/proposal",
+        call_page=f"/b/{call_token}/call",
         trial_page=f"/b/{token}/test",
         journeys=journeys,
         demo_agenda=_agenda_path(demo, demo_day),

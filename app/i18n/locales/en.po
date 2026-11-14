@@ -13844,7 +13844,7 @@ msgid "callpage.needs"
 msgstr "The call needs a browser with JavaScript, a camera and a microphone. Turn JavaScript on, or open this page in another browser."
 
 msgid "callpage.other_way"
-msgstr "Join another way"
+msgstr "Join this call another way"
 
 msgid "callpage.unavailable.heading"
 msgstr "The call is not available in this page yet"

@@ -13857,7 +13857,7 @@ msgid "callpage.needs"
 msgstr "Voor het gesprek hebt u een browser nodig met JavaScript, een camera en een microfoon. Zet JavaScript aan of open deze pagina in een andere browser."
 
 msgid "callpage.other_way"
-msgstr "Op een andere manier deelnemen"
+msgstr "Op een andere manier deelnemen aan dit gesprek"
 
 msgid "callpage.unavailable.heading"
 msgstr "Het gesprek is in deze pagina nog niet beschikbaar"

@@ -93,7 +93,7 @@ async def call_page(request: Request, public_ref: str) -> HTMLResponse:
     details = await bookings.find(await authorise(request, public_ref))
     current = follow(request, details.group.organisation_id)
     booking, group = details.booking, details.group
-    offer = OtherWayOffer(current.embedded_call_webex_option)
+    offer = OtherWayOffer.of(current.embedded_call_webex_option)
     context = {
         "group": group,
         "ref": public_ref,

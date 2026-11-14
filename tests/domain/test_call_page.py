@@ -27,3 +27,12 @@ def test_the_setting_is_an_organisation_setting_that_defaults_to_hidden() -> Non
     assert spec.default == "hidden"
     assert spec.choices == ("hidden", "on_failure", "always")
     assert spec.class_ is SettingClass.ORGANISATION
+
+
+@pytest.mark.parametrize("value", ["", "ALWAYS", "sometimes", "on-failure"])
+def test_a_value_that_is_none_of_the_three_fails_closed(value: str) -> None:
+    offer = OtherWayOffer.of(value)
+
+    assert offer is OtherWayOffer.HIDDEN
+    assert shows_other_way(offer, failed=True) is False
+    assert OtherWayOffer.of("always") is OtherWayOffer.ALWAYS

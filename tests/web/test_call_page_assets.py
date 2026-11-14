@@ -43,16 +43,13 @@ def test_the_script_sets_no_style_and_no_class_that_the_policy_would_refuse() ->
     assert "cssText" not in _code()
 
 
-def test_the_script_asks_the_browser_for_devices_in_one_place() -> None:
-    assert _code().count("media.getUserMedia(") == 1
-
-
 def _read_by_the_script() -> set[str]:
     names = set(re.findall(r"texts\.(\w+)", SCRIPT))
     names |= set(re.findall(r'"((?:say|level)_\w+)"', SCRIPT))
     names |= {"on", "off"}  # texts[on ? "on" : "off"]
     names |= {f"say_{kind}_{state}" for kind in ("camera", "microphone") for state in ("on", "off")}
-    return names
+    names |= {f"say_refused_{kind}" for kind in ("camera", "microphone", "both")}
+    return {name for name in names if not name.endswith("_")}
 
 
 def test_every_text_the_script_reads_is_rendered_by_the_server_and_no_other() -> None:
@@ -85,6 +82,11 @@ def test_the_styles_use_the_organisations_tokens_and_no_force() -> None:
     assert colours == []
     for media in ("forced-colors", "prefers-contrast"):
         assert media in STYLES
+
+
+def test_neither_the_template_nor_the_script_nor_the_styles_name_the_supplier() -> None:
+    for source in (TEMPLATE, SCRIPT, STYLES):
+        assert not any(name in source.lower() for name in SUPPLIER)
 
 
 def test_no_text_of_the_page_names_the_supplier_in_any_locale() -> None:

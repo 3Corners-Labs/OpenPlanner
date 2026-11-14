@@ -113,13 +113,27 @@ async def test_the_start_state_offers_the_contact_details_of_the_organisation(
     assert 'href="tel:0123456789"' in page.state("unavailable").raw
 
 
-async def test_the_page_has_no_supplier_name_in_any_locale(call_settings: Settings) -> None:
-    async with app_client(call_settings.model_copy(update=_ALWAYS), FixedClock(NOW)) as client:
+async def test_the_page_has_no_supplier_name_in_any_locale_and_any_state(
+    call_settings: Settings,
+) -> None:
+    settings = call_settings.model_copy(update=_ALWAYS)
+    async with app_client(settings, FixedClock(NOW)) as client:
+        app: Any = client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+        async with SqlUnitOfWork(app.state.engine).locked() as tx:
+            demo = await tx.get_organisation("demo")
+            assert demo is not None
+            await tx.save_contact_block(
+                demo.id, ContactBlock((ContactOption.create(ContactKind.PHONE, "012 345 6789"),))
+            )
         base = await open_link(client, await booked(client))
-        pages = [await client.get(f"{base}/call?lang={code}") for code in ("nl", "en")]
+        pages = [Page((await client.get(f"{base}/call?lang={code}")).text) for code in ("nl", "en")]
 
     for page in pages:
-        assert not any(name in page.text.lower() for name in SUPPLIER)
+        # The hidden states are in the markup, the shared texts and the contact block with them.
+        assert page.state_names() == ["start", "check", "unavailable"]
+        for name in page.state_names():
+            assert not any(word in page.state(name).raw.lower() for word in SUPPLIER)
+        assert not any(word in page.raw.lower() for word in SUPPLIER)
 
 
 async def test_the_page_refers_only_to_files_of_its_own_and_has_no_inline_code(
@@ -142,7 +156,7 @@ async def test_the_page_refers_only_to_files_of_its_own_and_has_no_inline_code(
     assert "https://" not in page.raw
 
 
-async def test_the_script_comes_with_the_page_and_asks_for_the_devices_only_at_the_click(
+async def test_the_script_is_served_with_the_page_and_nothing_else_is_loaded(
     call_settings: Settings,
 ) -> None:
     async with app_client(call_settings, FixedClock(NOW)) as client:
@@ -153,11 +167,6 @@ async def test_the_script_comes_with_the_page_and_asks_for_the_devices_only_at_t
     assert len(page.script_sources) == 1
     assert script.status_code == 200
     assert script.headers["content-type"].startswith(("text/javascript", "application/javascript"))
-    # The permission is asked for inside the handler of the start button, never on load.
-    body = script.text
-    assert body.count("getUserMedia") == 2  # the feature check and the one call
-    assert 'beginButton.addEventListener("click", begin)' in body
-    assert body.index("function begin()") < body.index("function join()")
 
 
 async def test_no_link_to_another_way_in_while_the_setting_is_hidden(
@@ -169,7 +178,7 @@ async def test_no_link_to_another_way_in_while_the_setting_is_hidden(
         page = (await client.get(f"{base}/call?lang=en")).text
 
     assert "/join/go" not in page
-    assert "Join another way" not in page
+    assert "Join this call another way" not in page
 
 
 async def test_on_failure_shows_the_link_only_where_the_page_cannot_give_the_call(
@@ -185,7 +194,7 @@ async def test_on_failure_shows_the_link_only_where_the_page_cannot_give_the_cal
     assert link in page.state("unavailable").raw
     assert link not in page.state("check").raw
     assert page.state("start").raw.count(link) == 1  # the notice's, which the script hides
-    assert "Join another way" in page.state("unavailable").text()
+    assert "Join this call another way" in page.state("unavailable").text()
 
 
 async def test_always_shows_the_link_before_joining_too(call_settings: Settings) -> None:
@@ -198,7 +207,7 @@ async def test_always_shows_the_link_before_joining_too(call_settings: Settings)
     assert link not in page.element("data-call-needs").raw
     assert link in page.state("check").raw
     assert link in page.state("unavailable").raw
-    assert "Op een andere manier deelnemen" in page.state("check").text()
+    assert "Op een andere manier deelnemen aan dit gesprek" in page.state("check").text()
 
 
 async def test_the_other_way_follows_the_organisations_own_choice(

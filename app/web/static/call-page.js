@@ -7,6 +7,11 @@
  * permission. Every word is the server's own markup ([data-call-texts] and the sections of the
  * page); the script only shows and hides them and sets text with textContent.
  *
+ * One `view` says what the page is in (the screen, what was refused or is missing, which devices
+ * are on) and one `render` makes the page show it: every hidden flag, every pressed state, the
+ * focus and the sentence for the live region. Nothing reads the page to learn what was written.
+ * The next steps add screens to that one function.
+ *
  * Never: it makes no request of any kind, loads no other file, stores nothing and sends nothing
  * anywhere; the picture and the sound stay in this browser. It sets no inline style and builds
  * no markup out of text. The join button leads to the state that says the call is not available in
@@ -31,6 +36,7 @@
   var $$ = function (selector) {
     return Array.prototype.slice.call(root.querySelectorAll(selector));
   };
+  var KINDS = ["camera", "microphone"];
 
   var texts = {};
   $$("[data-call-texts] [data-text]").forEach(function (node) {
@@ -42,8 +48,8 @@
   var level = $("[data-call-level]");
   var levelText = $("[data-call-level-text]");
   var joinButton = $("[data-call-join]");
-  var soundNote = $("[data-call-sound-note]");
   var testAudio = $("[data-call-test-audio]");
+  var beginButton = $("[data-call-begin]");
   var selects = {
     camera: $('[data-call-select="camera"]'),
     microphone: $('[data-call-select="microphone"]'),
@@ -53,16 +59,39 @@
     camera: $('[data-call-toggle="camera"]'),
     microphone: $('[data-call-toggle="microphone"]'),
   };
-
-  var want = { camera: true, microphone: true };
-  var chosen = { camera: "", microphone: "", speaker: "" };
-  var stream = null;
-  var run = 0;
-  var audioContext = null;
-  var meter = { source: null, timer: 0, frame: 0, shown: "" };
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var safari =
+    /Safari/.test(navigator.userAgent) &&
+    !/Chrome|Chromium|Edg|Firefox|FxiOS|CriOS/.test(navigator.userAgent);
 
-  // ---- states, focus and announcements --------------------------------------------------
+  // ---- the view and its one render ------------------------------------------------------------
+  var view;
+  function fresh() {
+    return {
+      screen: "start", // start, check or unavailable
+      refused: [], // kinds the browser refuses
+      missing: [], // kinds with no device
+      wish: { camera: true, microphone: true }, // asked for by the participant
+      has: { camera: false, microphone: false }, // a live track
+      soundPlayed: false,
+      focus: "", // "state" or "denied": the place of focus in this render
+      say: null, // key of the sentence for the live region; "" clears it; null leaves it
+    };
+  }
+
+  function deniedKind(refused) {
+    if (refused.length === 2) return "both";
+    return refused.length === 1 ? refused[0] : "";
+  }
+
+  function joinLabel(absent) {
+    var camera = absent.indexOf("camera") !== -1;
+    var microphone = absent.indexOf("microphone") !== -1;
+    if (camera && microphone) return texts.join_both;
+    if (camera) return texts.join_camera;
+    return microphone ? texts.join_microphone : texts.join;
+  }
+
   var sayTimer = 0;
   function say(key) {
     // Clearing first makes an unchanged sentence, such as a second test sound, read out again;
@@ -75,38 +104,62 @@
     }, 60);
   }
 
-  function show(name) {
+  function render() {
+    var checking = view.screen === "check";
+    var kind = deniedKind(view.refused);
     $$("[data-call-state]").forEach(function (section) {
-      section.hidden = section.dataset.callState !== name;
+      section.hidden = section.dataset.callState !== view.screen;
     });
-    say("");
-    var heading = $('[data-call-state="' + name + '"] h1');
-    if (heading) heading.focus();
-  }
+    $$("[data-call-denied]").forEach(function (panel) {
+      panel.hidden = !(checking && panel.dataset.callDenied === kind);
+    });
+    $$("[data-call-missing]").forEach(function (note) {
+      note.hidden = !(checking && view.missing.indexOf(note.dataset.callMissing) !== -1);
+    });
+    // Nothing found and nothing refused: the participant may plug something in and look again.
+    $("[data-call-recheck]").hidden = !(
+      checking &&
+      !view.has.camera &&
+      !view.has.microphone &&
+      view.refused.length === 0 &&
+      view.wish.camera &&
+      view.wish.microphone
+    );
+    KINDS.forEach(function (name) {
+      toggles[name].setAttribute("aria-pressed", String(view.has[name]));
+      toggles[name].querySelector("[data-call-toggle-state]").textContent =
+        texts[view.has[name] ? "on" : "off"];
+    });
+    preview.hidden = !view.has.camera;
+    $("[data-call-sound-note]").hidden = !view.soundPlayed;
+    joinButton.textContent = joinLabel(view.refused.concat(view.missing));
 
-  function setToggle(button, on) {
-    button.setAttribute("aria-pressed", String(on));
-    button.querySelector("[data-call-toggle-state]").textContent = texts[on ? "on" : "off"];
+    if (view.say !== null) say(view.say);
+    view.say = null;
+    var target = null;
+    if (view.focus === "denied") target = $('[data-call-denied="' + kind + '"] h2');
+    else if (view.focus === "state") target = $('[data-call-state="' + view.screen + '"] h1');
+    view.focus = "";
+    if (target) target.focus();
   }
 
   // ---- the browser's devices ----------------------------------------------------------------
+  var stream = null;
+  var run = 0;
+  var chosen = { camera: "", microphone: "", speaker: "" };
+
   function tracksOf(kind) {
     if (!stream) return [];
     return kind === "camera" ? stream.getVideoTracks() : stream.getAudioTracks();
   }
 
-  function release() {
-    stopMeter();
-    if (stream) {
-      stream.getTracks().forEach(function (track) {
-        track.stop();
-      });
-    }
-    stream = null;
-    preview.srcObject = null;
+  function constraint(kind) {
+    var exact = chosen[kind] ? { deviceId: { exact: chosen[kind] } } : null;
+    if (kind === "microphone") return exact || true;
+    return Object.assign({ width: { ideal: 1280 } }, exact);
   }
 
-  function attempt(constraints) {
+  function ask(constraints) {
     return media.getUserMedia(constraints).then(
       function (found) {
         return { stream: found };
@@ -122,137 +175,183 @@
     return name === "NotAllowedError" || name === "SecurityError" || name === "PermissionDeniedError";
   }
 
+  // One device alone. A saved choice that the browser can no longer satisfy is dropped, for
+  // this device only, and the device is asked for again without it.
+  function askOne(kind) {
+    var constraints = {};
+    constraints[kind === "camera" ? "video" : "audio"] = constraint(kind);
+    return ask(constraints).then(function (one) {
+      var stale = one.error && one.error.name === "OverconstrainedError" && chosen[kind];
+      if (!stale) return one;
+      chosen[kind] = "";
+      return askOne(kind);
+    });
+  }
+
+  function problem(kind, error) {
+    view.refused = view.refused.filter(function (name) {
+      return name !== kind;
+    });
+    view.missing = view.missing.filter(function (name) {
+      return name !== kind;
+    });
+    if (error) (refusal(error) ? view.refused : view.missing).push(kind);
+  }
+
+  function attach() {
+    var tracks = tracksOf("camera");
+    preview.srcObject = tracks.length ? new MediaStream(tracks) : null;
+    KINDS.forEach(function (kind) {
+      view.has[kind] = tracksOf(kind).length > 0;
+    });
+  }
+
+  function dropTracks(kind) {
+    tracksOf(kind).forEach(function (track) {
+      track.stop();
+      stream.removeTrack(track);
+    });
+    if (kind === "microphone") stopMeter();
+  }
+
   // Ask for both at once (one prompt). When that fails, ask for each alone to tell which is the
-  // trouble: "refused" (the browser says no) or "missing" (nothing found, or in use elsewhere).
+  // trouble: refused (the browser says no) or missing (nothing found, or in use elsewhere).
   function open() {
-    var video = false;
-    if (want.camera) {
-      video = { width: { ideal: 1280 } };
-      if (chosen.camera) video.deviceId = { exact: chosen.camera };
-    }
-    var audio = chosen.microphone ? { deviceId: { exact: chosen.microphone } } : true;
-    return attempt({ video: video, audio: audio }).then(function (both) {
-      if (both.stream) return { stream: both.stream, problems: {} };
-      var gone = both.error && both.error.name === "OverconstrainedError";
-      if (gone && (chosen.camera || chosen.microphone)) {
-        chosen.camera = "";
-        chosen.microphone = "";
-        return open();
-      }
-      var parts = [];
-      var problems = {};
-      var asks = [];
-      if (video) asks.push(["camera", { video: video }]);
-      asks.push(["microphone", { audio: audio }]);
-      return asks
-        .reduce(function (chain, ask) {
+    var wanted = KINDS.filter(function (kind) {
+      return view.wish[kind];
+    });
+    if (!wanted.length) return Promise.resolve({ tracks: [], errors: {} });
+    var constraints = {
+      video: view.wish.camera ? constraint("camera") : false,
+      audio: view.wish.microphone ? constraint("microphone") : false,
+    };
+    return ask(constraints).then(function (both) {
+      if (both.stream) return { tracks: both.stream.getTracks(), errors: {} };
+      var tracks = [];
+      var errors = {};
+      return wanted
+        .reduce(function (chain, kind) {
           return chain.then(function () {
-            return attempt(ask[1]).then(function (one) {
-              if (one.stream) parts = parts.concat(one.stream.getTracks());
-              else problems[ask[0]] = refusal(one.error) ? "refused" : "missing";
+            return askOne(kind).then(function (one) {
+              if (one.stream) tracks = tracks.concat(one.stream.getTracks());
+              else errors[kind] = one.error;
             });
           });
         }, Promise.resolve())
         .then(function () {
-          return { stream: parts.length ? new MediaStream(parts) : null, problems: problems };
+          return { tracks: tracks, errors: errors };
         });
     });
   }
 
-  function problemKinds(problems, which) {
-    return Object.keys(problems).filter(function (kind) {
-      return problems[kind] === which;
-    });
-  }
-
-  function browserKey() {
-    var agent = navigator.userAgent;
-    var safari = /Safari/.test(agent) && !/Chrome|Chromium|Edg|Firefox|FxiOS|CriOS/.test(agent);
-    return safari ? "safari" : "other";
-  }
-
-  function deniedKind(refused) {
-    if (refused.length === 2) return "both";
-    return refused.length === 1 ? refused[0] : "";
-  }
-
-  function showDenied(kind) {
-    var key = browserKey();
-    $$("[data-call-denied]").forEach(function (panel) {
-      panel.hidden = panel.dataset.callDenied !== kind;
-      panel.querySelectorAll("[data-call-browser]").forEach(function (step) {
-        step.hidden = step.dataset.callBrowser !== key;
+  function stopDevices() {
+    stopMeter();
+    if (stream) {
+      stream.getTracks().forEach(function (track) {
+        track.stop();
       });
+    }
+    stream = null;
+    preview.srcObject = null;
+    KINDS.forEach(function (kind) {
+      view.has[kind] = false;
     });
   }
 
-  function joinLabel(absent) {
-    var camera = absent.indexOf("camera") !== -1;
-    var microphone = absent.indexOf("microphone") !== -1;
-    if (camera && microphone) return texts.join_both;
-    if (camera) return texts.join_camera;
-    return microphone ? texts.join_microphone : texts.join;
+  // Leaving the check: the devices and the audio context are given back.
+  function release() {
+    stopDevices();
+    if (audioContext) audioContext.close().catch(function () {});
+    audioContext = null;
   }
 
-  function deniedShown() {
-    return $$("[data-call-denied]").some(function (panel) {
-      return !panel.hidden;
-    });
+  function outcomeSay(kind) {
+    return kind ? "say_refused_" + kind : null;
   }
 
   function acquire() {
     var mine = (run += 1);
-    var hadDenied = deniedShown();
-    release();
-    say("say_checking");
+    var hadRefusal = view.refused.length > 0;
+    stopDevices();
+    view.refused = [];
+    view.missing = [];
+    view.say = "say_checking";
+    render();
     return open().then(function (outcome) {
       if (mine !== run) {
-        // A newer request took over; do not keep this one's devices.
-        if (outcome.stream) {
-          outcome.stream.getTracks().forEach(function (track) {
+        // A newer request, or leaving the page, took over: this one's devices are given back.
+        outcome.tracks.forEach(function (track) {
+          track.stop();
+        });
+        return;
+      }
+      stream = outcome.tracks.length ? new MediaStream(outcome.tracks) : null;
+      KINDS.forEach(function (kind) {
+        if (outcome.errors[kind]) problem(kind, outcome.errors[kind]);
+      });
+      tracksOf("microphone").forEach(function (track) {
+        track.enabled = true;
+      });
+      attach();
+      var kind = deniedKind(view.refused);
+      view.focus = kind ? "denied" : hadRefusal ? "state" : "";
+      view.say = outcomeSay(kind) || (stream ? "say_ready" : "say_no_devices");
+      if (!outcome.tracks.length && !view.wish.camera && !view.wish.microphone) view.say = "";
+      render();
+      if (view.has.microphone) startMeter();
+      else showLevel(0, "level_off");
+      list();
+    });
+  }
+
+  // One device switched on or off. Off gives the device back, so the browser's indicator goes
+  // out; on asks for that one device again and leaves the other alone.
+  function switchOff(kind) {
+    view.wish[kind] = false;
+    dropTracks(kind);
+    attach();
+    if (kind === "microphone") showLevel(0, "level_off");
+    view.say = "say_" + kind + "_off";
+    render();
+  }
+
+  function switchOn(kind) {
+    var mine = run;
+    view.wish[kind] = true;
+    return askOne(kind).then(function (one) {
+      if (mine !== run) {
+        if (one.stream) {
+          one.stream.getTracks().forEach(function (track) {
             track.stop();
           });
         }
         return;
       }
-      stream = outcome.stream;
-      apply(outcome.problems, hadDenied);
+      problem(kind, one.error);
+      if (one.stream) {
+        stream = stream || new MediaStream();
+        one.stream.getTracks().forEach(function (track) {
+          stream.addTrack(track);
+        });
+      }
+      attach();
+      var denied = deniedKind(view.refused);
+      view.focus = denied ? "denied" : "";
+      view.say = outcomeSay(denied) || (one.stream ? "say_" + kind + "_on" : "say_no_devices");
+      render();
+      if (kind === "microphone" && view.has.microphone) startMeter();
+      if (one.stream) list();
     });
   }
 
-  function apply(problems, hadDenied) {
-    var hasCamera = tracksOf("camera").length > 0;
-    var hasMicrophone = tracksOf("microphone").length > 0;
-    tracksOf("microphone").forEach(function (track) {
-      track.enabled = want.microphone;
-    });
-    preview.srcObject = hasCamera ? stream : null;
-    preview.hidden = !hasCamera;
-    setToggle(toggles.camera, want.camera && hasCamera);
-    setToggle(toggles.microphone, want.microphone && hasMicrophone);
+  function replace(kind) {
+    dropTracks(kind);
+    return switchOn(kind);
+  }
 
-    var refused = problemKinds(problems, "refused");
-    var missing = problemKinds(problems, "missing");
-    $$("[data-call-missing]").forEach(function (note) {
-      note.hidden = missing.indexOf(note.dataset.callMissing) === -1;
-    });
-    // Nothing found and nothing refused: the participant may plug something in and look again.
-    $("[data-call-recheck]").hidden = Boolean(stream) || refused.length > 0;
-    joinButton.textContent = joinLabel(refused.concat(missing));
-
-    var kind = deniedKind(refused);
-    showDenied(kind);
-    if (hasMicrophone) startMeter();
-    else showLevel(0, "level_off");
-    list();
-
-    if (kind) {
-      var heading = $('[data-call-denied="' + kind + '"] h2');
-      if (heading) heading.focus();
-    } else if (hadDenied) {
-      $('[data-call-state="check"] h1').focus();
-    }
-    if (!kind) say(stream ? "say_ready" : "say_no_devices");
+  function toggle(kind) {
+    if (view.has[kind]) switchOff(kind);
+    else switchOn(kind);
   }
 
   // ---- the lists of devices -------------------------------------------------------------------
@@ -291,6 +390,9 @@
   }
 
   // ---- the level meter ------------------------------------------------------------------------
+  var audioContext = null;
+  var meter = { source: null, timer: 0, frame: 0, shown: "", announced: false };
+
   function context() {
     audioContext = audioContext || new AudioContextClass();
     if (audioContext.state === "suspended") audioContext.resume();
@@ -302,6 +404,11 @@
     if (meter.shown !== key) {
       meter.shown = key;
       levelText.textContent = texts[key];
+      // The first time sound is heard after the microphone starts, once: never while it moves.
+      if (key === "level_heard" && !meter.announced) {
+        meter.announced = true;
+        say("level_heard");
+      }
     }
   }
 
@@ -314,6 +421,8 @@
   }
 
   function startMeter() {
+    stopMeter();
+    meter.announced = false;
     var ctx = context();
     var analyser = ctx.createAnalyser();
     analyser.fftSize = 512;
@@ -325,13 +434,11 @@
       analyser.getFloatTimeDomainData(samples);
       var sum = 0;
       for (var i = 0; i < samples.length; i += 1) sum += samples[i] * samples[i];
-      var on = want.microphone;
-      var value = on ? Math.min(1, Math.sqrt(sum / samples.length) * 6) : 0;
+      var value = Math.min(1, Math.sqrt(sum / samples.length) * 6);
       var now = window.performance.now();
       if (value > 0.05) lastHeard = now;
       // The words change only after a short while of quiet, so they do not flicker.
-      var key = !on ? "level_off" : now - lastHeard < 1500 ? "level_heard" : "level_silent";
-      showLevel(value, key);
+      showLevel(value, now - lastHeard < 1500 ? "level_heard" : "level_silent");
       // Under reduced motion the bar moves a few times a second, not on every frame.
       if (reduceMotion.matches) meter.timer = window.setTimeout(tick, 250);
       else meter.frame = window.requestAnimationFrame(tick);
@@ -362,68 +469,65 @@
       tone.stop(start + index * 0.45 + 0.3);
     });
     testAudio.srcObject = output.stream;
-    soundNote.hidden = false;
-    say("say_sound");
+    view.soundPlayed = true;
+    view.say = "say_sound";
+    render();
     return useSpeaker().then(function () {
       return testAudio.play().catch(function () {});
     });
   }
 
   // ---- what the participant does -------------------------------------------------------------------
-  function toggle(kind) {
-    var button = toggles[kind];
-    var on = button.getAttribute("aria-pressed") !== "true";
-    want[kind] = on;
-    setToggle(button, on);
-    say("say_" + kind + "_" + (on ? "on" : "off"));
-    if (kind === "microphone") {
-      if (on && tracksOf("microphone").length === 0) acquire();
-      tracksOf("microphone").forEach(function (track) {
-        track.enabled = on;
-      });
-      return;
-    }
-    if (on) {
-      acquire();
-      return;
-    }
-    tracksOf("camera").forEach(function (track) {
-      track.stop();
-      stream.removeTrack(track);
-    });
-    preview.srcObject = null;
-    preview.hidden = true;
-  }
-
   function begin() {
     // Made here, in the click, so the browser lets the meter and the test sound make sound.
     context();
-    show("check");
+    view.screen = "check";
+    view.focus = "state";
+    view.say = "";
+    render();
     return acquire();
   }
 
   function join() {
+    run += 1;
     release();
-    show("unavailable");
+    view.screen = "unavailable";
+    view.focus = "state";
+    view.say = "";
+    render();
   }
 
-  var beginButton = $("[data-call-begin]");
+  function leave() {
+    // A request that is still waiting is dropped, so a stream that arrives late is stopped.
+    run += 1;
+    release();
+  }
+
+  function restart(event) {
+    // Restored by the browser (its back-forward cache): the devices are gone, so start again at the start.
+    if (!event.persisted) return;
+    run += 1;
+    release();
+    view = fresh();
+    render();
+  }
+
+  $$("[data-call-browser]").forEach(function (step) {
+    step.hidden = step.dataset.callBrowser !== (safari ? "safari" : "other");
+  });
   $$("[data-call-retry]").forEach(function (button) {
     button.addEventListener("click", acquire);
   });
   beginButton.addEventListener("click", begin);
   joinButton.addEventListener("click", join);
   $("[data-call-test-sound]").addEventListener("click", playTestSound);
-  toggles.camera.addEventListener("click", function () {
-    toggle("camera");
-  });
-  toggles.microphone.addEventListener("click", function () {
-    toggle("microphone");
-  });
-  ["camera", "microphone"].forEach(function (kind) {
+  KINDS.forEach(function (kind) {
+    toggles[kind].addEventListener("click", function () {
+      toggle(kind);
+    });
     selects[kind].addEventListener("change", function () {
       chosen[kind] = selects[kind].value;
-      acquire();
+      if (view.has[kind]) replace(kind);
     });
   });
   selects.speaker.addEventListener("change", function () {
@@ -431,11 +535,13 @@
     useSpeaker();
   });
   media.addEventListener("devicechange", function () {
-    if (!$('[data-call-state="check"]').hidden) list();
+    if (view.screen === "check") list();
   });
-  window.addEventListener("pagehide", release);
+  window.addEventListener("pagehide", leave);
+  window.addEventListener("pageshow", restart);
 
   // The browser can run the call: the sentence that says what it needs is no longer true.
+  view = fresh();
   $("[data-call-needs]").hidden = true;
   beginButton.hidden = false;
 })();

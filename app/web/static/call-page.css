@@ -209,6 +209,28 @@
 
 /* --- Preferences ------------------------------------------------------------------------ */
 @media (forced-colors: active) {
+  /* The bar and its fill keep system colours, so the bar does not vanish. */
+  .call-level meter,
+  .call-level meter::-webkit-meter-bar {
+    border: 1px solid CanvasText;
+    background: Canvas;
+  }
+
+  .call-level meter::-webkit-meter-optimum-value,
+  .call-level meter::-webkit-meter-suboptimum-value,
+  .call-level meter::-webkit-meter-even-less-good-value {
+    background: Highlight;
+  }
+
+  .call-level meter::-moz-meter-bar {
+    background: Highlight;
+  }
+
+  /* The toggles keep the page's focus outline. */
+  .call-toggle:focus-visible {
+    outline: 3px solid Highlight;
+  }
+
   .call-preview {
     border-color: CanvasText;
   }

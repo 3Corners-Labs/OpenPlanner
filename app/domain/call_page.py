@@ -20,6 +20,18 @@ class OtherWayOffer(StrEnum):
     ON_FAILURE = "on_failure"
     ALWAYS = "always"
 
+    @classmethod
+    def of(cls, value: str) -> "OtherWayOffer":
+        """Return the offer named by a stored setting value; anything unknown is ``HIDDEN``.
+
+        The page fails closed: a value that is none of the three never shows a way into the
+        platform's own app.
+        """
+        try:
+            return cls(value)
+        except ValueError:
+            return cls.HIDDEN
+
 
 def shows_other_way(offer: OtherWayOffer, *, failed: bool) -> bool:
     """Return whether the page shows the link "join another way".

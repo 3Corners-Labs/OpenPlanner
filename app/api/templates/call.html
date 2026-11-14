@@ -6,7 +6,7 @@
 {% from "_contact_block.html" import contact_block %}
 
 {% macro other_way(class="") -%}
-<a class="call-other-way {{ class }}" href="{{ other_way_href }}">{{ _("callpage.other_way") }}</a>
+<a class="{{ ("call-other-way " ~ class)|trim }}" href="{{ other_way_href }}">{{ _("callpage.other_way") }}</a>
 {%- endmacro %}
 
 {% macro denied_panel(kind, heading, step_two, without) -%}
@@ -61,7 +61,7 @@
     {{ denied_panel("both", _("callpage.denied.both.heading"), _("callpage.denied.both.step"), _("callpage.denied.both.without")) }}
     <div class="call-check">
       <div class="call-preview">
-        <video muted playsinline autoplay aria-label="{{ _("callpage.check.preview") }}" data-call-preview></video>
+        <video muted playsinline autoplay hidden aria-label="{{ _("callpage.check.preview") }}" data-call-preview></video>
         <p class="call-preview__off" data-call-preview-off>{{ _("callpage.check.camera_off") }}</p>
       </div>
       <div class="call-check__side">
@@ -126,6 +126,9 @@
     <span data-text="say_ready">{{ _("callpage.say.ready") }}</span>
     <span data-text="say_no_devices">{{ _("callpage.say.no_devices") }}</span>
     <span data-text="say_sound">{{ _("callpage.say.sound") }}</span>
+    <span data-text="say_refused_camera">{{ _("callpage.denied.camera.heading") }}</span>
+    <span data-text="say_refused_microphone">{{ _("callpage.denied.microphone.heading") }}</span>
+    <span data-text="say_refused_both">{{ _("callpage.denied.both.heading") }}</span>
     <span data-text="say_camera_on">{{ _("callpage.say.camera_on") }}</span>
     <span data-text="say_camera_off">{{ _("callpage.say.camera_off") }}</span>
     <span data-text="say_microphone_on">{{ _("callpage.say.microphone_on") }}</span>
