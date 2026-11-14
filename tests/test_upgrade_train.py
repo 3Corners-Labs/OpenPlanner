@@ -44,10 +44,14 @@ PRE_TRAIN = "0108"
 """The revision before ADR 0121's first migration (0109): the schema of a pre-train image."""
 TRAIN_TOUCHED = {"bookings", "slots"}
 """The only pre-train tables the train adds columns to; every other one is left as it was."""
-AFTER_TRAIN_TOUCHED = {"group_contact_center"}
+AFTER_TRAIN_TOUCHED = {"group_contact_center", "staff"}
 """Pre-train tables that a migration after the train adds a column to, by the same additive rule:
-0116 (ADR 0123 step 7a) gives the group's contact-center routing its task kind."""
-AFTER_TRAIN_COLUMNS = {"group_contact_center": "task_kind VARCHAR(16) DEFAULT 'form' NOT NULL"}
+0116 (ADR 0123 step 7a) gives the group's contact-center routing its task kind, and 0118
+(ADR 0123 step 5c) gives the staff record its screen name."""
+AFTER_TRAIN_COLUMNS = {
+    "group_contact_center": "task_kind VARCHAR(16) DEFAULT 'form' NOT NULL",
+    "staff": "screen_name VARCHAR(40)",
+}
 """The one part each of those tables' definitions gains. The table is rebuilt to add it, which
 may reorder its keys and checks, so the definitions are compared part by part."""
 LATER = NOW + timedelta(days=3650)
@@ -246,8 +250,17 @@ def test_the_train_changes_only_bookings_and_slots_of_the_pre_train_tables_and_o
 
 
 def _parts(definition: str) -> list[str]:
-    """Return the lines of a table's definition (columns, keys, checks), sorted, without commas."""
-    return sorted(line.strip().rstrip(",").strip() for line in definition.splitlines())
+    """Return the parts of a table's definition (columns, keys, checks), sorted, without commas.
+
+    A column that SQLite appends in place (``ALTER TABLE ... ADD COLUMN``) lands on the line of the
+    column before it, so a line is split at ``", "`` too; both sides are split the same way.
+    """
+    return sorted(
+        part.strip().rstrip(",").strip()
+        for line in definition.splitlines()
+        for part in line.split(", ")
+        if part.strip().rstrip(",").strip()
+    )
 
 
 def _indexes(path: Path, tables: set[str]) -> dict[str, str]:

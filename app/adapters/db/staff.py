@@ -135,6 +135,7 @@ def _member(
         status_at=row.status_at,
         email=row.email,
         email_at=row.email_at,
+        screen_name=row.screen_name,
         refused=tuple(
             RefusedEntitlement(r.value, r.reason, r.organisation, r.received_at)
             for r in sorted(refusals, key=lambda r: r.value)
@@ -187,6 +188,7 @@ class StaffQueries:
         row.status_at = member.status_at
         row.email = member.email
         row.email_at = member.email_at
+        row.screen_name = member.screen_name
         await self._session.flush()
         await self._session.execute(
             delete(StaffMembershipRow).where(StaffMembershipRow.staff_id == row.id)
@@ -222,11 +224,23 @@ class StaffQueries:
             row.status_at = at
             await self._session.flush()
 
+    async def set_staff_screen_name(
+        self: _Transaction, subject: str, screen_name: str | None
+    ) -> bool:
+        """Set or clear the screen name of ``subject``; ``False`` for no or an erased record."""
+        row = await self._session.scalar(select(StaffRow).where(StaffRow.subject == subject))
+        if row is None or row.status == StaffStatus.ERASED.value:
+            return False
+        row.screen_name = screen_name
+        await self._session.flush()
+        return True
+
     async def erase_staff(self: _Transaction, subject: str, at: datetime) -> None:
         """Erase the record of ``subject``; the subject, the id and the times stay.
 
-        The name, address, roles, memberships, refused values, skills and the own overview layout
-        go, and the usage figures about the person are folded into *former team members* (ADR 0117).
+        The name, screen name, address, roles, memberships, refused values, skills and the own
+        overview layout go, and the usage figures about the person are folded into *former team
+        members* (ADR 0117).
         """
         row = await self._session.scalar(select(StaffRow).where(StaffRow.subject == subject))
         if row is None or row.status == StaffStatus.ERASED.value:
@@ -235,6 +249,7 @@ class StaffQueries:
         row.roles = ""
         row.email = None  # ADR 0117 step 10b: the address goes with the person
         row.email_at = None
+        row.screen_name = None  # ADR 0123 step 5c: the name for the participant's side goes too
         row.status = StaffStatus.ERASED.value
         row.status_at = at
         await self._session.execute(

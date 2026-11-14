@@ -118,6 +118,9 @@ OPEN_ROUTES = frozenset(
         # the video platform and marks the booking, as ``/join/go`` records the click; neither
         # changes what the installation holds about the appointment.
         "/b/m/{public_ref}/call/token",
+        # ADR 0123 step 5c: who the participant talks to. The call runs during maintenance, so the
+        # page's poll stays open like the token: a read of our own record that changes nothing.
+        "/b/m/{public_ref}/call/staff",
         "/b/m/{public_ref}/wait",
         "/b/m/{public_ref}/wait/status",
         "/r/{ref}",

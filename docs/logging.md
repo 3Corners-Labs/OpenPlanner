@@ -188,6 +188,7 @@ failure `error`. The fields in braces fill the message; `actor`, `organisation`,
 | `staff.erased` | `info`, outcome | `staff` | Staff erased after their retention. | Suspended staff past their retention were erased (ADR 0046). | Nothing. |
 | `staff.membership_changed` | outcome | – | A staff member's roles or groups changed: {detail}. | `detail` names the role or grant added or removed. | Nothing; the audit log shows who did it. |
 | `staff.reinstated` | outcome | – | A staff member was reinstated. | A suspended person can sign in again. | Nothing; the audit log shows who did it. |
+| `staff.screen_name_changed` | outcome | – | A staff member's screen name was set or cleared. | The name the participant of a call sees for the staff member (ADR 0123 step 5c); the event says that it changed and never to what. | Nothing; the audit log shows who did it. |
 | `staff.suspended` | outcome | – | A staff member was suspended. | The person can no longer sign in; their sessions ended. | Nothing; the audit log shows who did it. |
 | `system.maintenance` | outcome | `what`, `hours` | Maintenance mode: {what}. | Maintenance mode was switched on or off, or a change was refused (ADR 0084). | Nothing; the audit log shows who did it. |
 | `wallboard.session_started` | outcome | – | A display link was used for the first time: a screen was opened. | The first request of a display link opened a screen session (ADR 0117 point 20). The detail names the link, never its token, its cookie or the address. | Nothing; the audit log shows who did it. |

@@ -64,10 +64,9 @@ const remote = (page: Page) => page.locator('[data-call-remote]');
 const leave = (page: Page) => page.getByRole('button', { name: /^Leave the (call|waiting room)$/ });
 const frames = (page: Page): Promise<unknown> => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
-/** The organisation's word for staff, as the page itself names the other side's picture. */
+/** The organisation's word for staff, as the page itself names the other side's picture (no name is known here). */
 async function term(page: Page): Promise<string> {
-  const label = (await remote(page).getAttribute('aria-label')) ?? '';
-  return label.replace('Picture of the ', '');
+  return (await remote(page).getAttribute('aria-label')) ?? '';
 }
 
 /** Into the call; the meeting offers captions and sharing unless the plan says otherwise. */
@@ -441,7 +440,7 @@ test('captions are offered only when the meeting has them, and the real-time lin
 
 test('captions show who speaks in the page\'s own words, never the platform\'s name, newest lines last, an interim line until its final text', async ({ page }) => {
   await inCall(page);
-  const who = (await term(page)).replace(/^./, (c) => c.toUpperCase());
+  const who = await term(page); // the label of the picture: no name is known here, so the team's word alone
   await captionsToggle(page).click();
   await said(page, CAPTIONS_ON);
 

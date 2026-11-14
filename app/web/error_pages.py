@@ -79,9 +79,9 @@ async def _too_many_unknown_links(request: Request) -> Response:
     return _rate_limited_response(request)
 
 
-JSON_ROUTES = frozenset({"/b/m/{public_ref}/call/token"})
+JSON_ROUTES = frozenset({"/b/m/{public_ref}/call/token", "/b/m/{public_ref}/call/staff"})
 """Routes a script calls: a limited call is answered as JSON like their other refusals, not as a
-page (ADR 0123 point 6). The event it leaves is the same."""
+page (ADR 0123 points 6 and 10). The event it leaves is the same."""
 
 RETRY_AFTER = "60"
 """The ``Retry-After`` seconds of a rate-limit answer."""

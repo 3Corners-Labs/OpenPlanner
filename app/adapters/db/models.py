@@ -931,6 +931,8 @@ class StaffRow(Base):
     # ADR 0117 step 10b: the verified ``email`` claim of the last login; personal data.
     email: Mapped[str | None] = mapped_column(String(320))
     email_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # ADR 0123 step 5c: the name the participant of a call sees; personal data, cleared on erasure.
+    screen_name: Mapped[str | None] = mapped_column(String(40))
 
 
 class OverviewLayoutRow(Base):

@@ -82,12 +82,11 @@ its own in `.env` (or names one in the environment of the run) stays on `own`; `
 moves it, and the users are re-invited. Without the HTTPS proxy the bundled provider answers on the
 host only (`127.0.0.1:8080`): logging in from another machine needs `--tls-domain`. The choice is
 remembered in `.env.update` (`OPENPLANNER_IDP`). `web` and `worker` reach the bundled provider on
-the internal network as `http://idp:8080/idp/...`, a recorded exception that production accepts
-for exactly that address with an https `OIDC_ISSUER` (ADR 0125). **Until its step 2 gives the
-provider a fixed address, that name can leave the host while the `idp` container is down**,
-and whatever answers it can receive staff passwords and log in as a superuser: the installer
-warns in `production`, and the advice for a production host that goes live before step 2 is
-`--idp own`.
+the internal network at its fixed address, `http://172.31.240.4:8080/idp/...`, a recorded
+exception that production accepts for exactly that address with an https `OIDC_ISSUER` (ADR
+0125). The proxy reaches it there too, and Keycloak reaches `idp-db` at a fixed address on its
+own internal network: no hop is found by a name that the host's DNS could answer while a
+container is down (ADR 0125 step 2; runbook, *Fixed addresses on the host*).
 
 ## Prerequisites
 
@@ -106,6 +105,10 @@ warns in `production`, and the advice for a production host that goes live befor
 - With an `AAAA` record: Docker Engine 27 or newer with `ip6tables` on (its default), so that
   visitors over IPv6 keep their address; the script warns otherwise (runbook, *Visitors over
   IPv6*). The host needs no IPv6 address for the rest; a kernel without IPv6 is fine too.
+- Two address ranges free on the host, for the containers' fixed addresses (ADR 0125):
+  `172.31.240.0/28` (the network `edge`) and `172.31.240.16/28` (`idp-store`, between the
+  bundled identity provider and its database), and `fdf2:d3f5:96ab::/64` for `edge`'s IPv6. A
+  Docker network or VPN route of the host that holds one of them stops `docker compose up`.
 
 Everything else the script installs or brings up to date:
 
@@ -321,6 +324,7 @@ by hand afterwards, set the `OIDC_*` values in `.env`: Compose reads `config.env
 | an HTTPS proxy running where `--no-tls` was chosen (restarts for ever without `proxy.env`) | removes it |
 | the HTTPS proxy runs but its image is not pinned (installed before ADR 0064 step 2, when the host built it) | pulls and verifies the proxy image at the version of the pinned application image and pins it; the proxy restarts on the released image |
 | the `edge` network has no IPv6 (made before it became dual-stack; Compose 2.29 kept it, 2.31 recreates it itself), or has IPv6 on a kernel without it | `docker compose down` (volumes stay), then the start makes it again; a few seconds offline (runbook, *Visitors over IPv6*) |
+| the bundled identity provider reached by the name `idp` (installed before ADR 0125 step 2) | writes `IDP_UPSTREAM` with the provider's fixed address, renders the login, the staff directory and the database host at their fixed addresses, and replaces both client secrets unless the render script made them since that step (`KC_CLIENT_SECRETS_PINNED`): in `secrets/keycloak.env`, `secrets/keycloak-app.env`, the realm file and, once Keycloak runs, in Keycloak; stops while Keycloak refuses them (a wrong `KC_BOOTSTRAP_ADMIN_PASSWORD`), and the next run sets the same pair |
 | a kernel booted with `ipv6.disable=1` | writes `OPENPLANNER_EDGE_IPV6=false` to `.env.update`, so `edge` stays IPv4 only; a later run on a kernel with IPv6 drops it again |
 | `PUBLIC_BASE_URL` or the OIDC URL on `http` in production, a missing OIDC client secret, `ENVIRONMENT` not matching the mode | stops with the list; nothing is pulled or started. The login is checked as Compose sees it: `.env`, else `secrets/config.env`, so a `.env` without `OIDC_*` is in order when `config.env` holds them |
 | a release that does not pass `cosign verify` (either image) | stops; the running version stays |
@@ -347,7 +351,10 @@ candidate directly.
   the host updater pulls and verifies both, backs up and switches, with automatic rollback
   (runbook, *Updates from the admin portal*). The proxy restarts with the new version.
 - **Compose file and scripts** change with the release too. After a portal update, bring the
-  checkout to the same tag and run the installer, which also reinstalls the updater:
+  checkout to the same tag and run the installer, which also reinstalls the updater (and, from
+  ADR 0125 step 2, moves the hops on the host to their fixed addresses; a production host whose
+  bundled login still names `idp` runs it before the portal update, since the new image refuses
+  that address at start):
 
   ```sh
   cd ~/openplanner
@@ -382,6 +389,7 @@ git fetch --depth 1 origin tag v0.3.0 && git checkout -f v0.3.0
 | `is not signed by a release of ...` | the image is not a signed release of this repository: check `--repository` and `--version`; never work around it |
 | `Docker's release key has fingerprint ...` | the download was not Docker's key; check the network path (proxy, DNS) before trying again |
 | `checksum of cosign_... does not match` | the download is damaged or not the release; run it again later |
+| `the bundled identity provider did not take its new client secrets` | staff cannot log in until it does: `KC_BOOTSTRAP_ADMIN_PASSWORD` in `secrets/keycloak.env` is not the password of `admin` in realm `master` (the runbook's recovery after an unexplained outage changes it). Write the current one there with an editor and run the script again; it sets the same new secrets (ADR 0125, runbook *Fixed addresses on the host*) |
 | `.env needs changes:` | fix the listed settings in `.env`, run it again |
 | `--configuration and --passphrase-file go together` | a SQLite package needs both options, and a passphrase file needs a configuration (or set `OPENPLANNER_CONFIGURATION` and `OPENPLANNER_PASSPHRASE_FILE`) |
 | `the configuration document holds sealed secrets: give --passphrase-file` | it was exported with secrets; pass the file whose first line is the passphrase; nothing was written |
