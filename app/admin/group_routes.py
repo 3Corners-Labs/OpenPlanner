@@ -42,14 +42,10 @@ from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.adapters.contact_centers import routing
+from app.adapters.db.reports import ReportStore
 from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.block_subjects import block_subject_values, read_block_subjects, subject_choices
-from app.admin.call_client_input import (
-    embedded_offer,
-    organisation_option,
-    read_call_client,
-    with_call_client_fields,
-)
+from app.admin.call_client_input import EmbeddedOffer, read_call_client, with_call_client_fields
 from app.admin.check_routes import check_service, check_view
 from app.admin.form_summary import form_summary
 from app.admin.forms import (
@@ -98,6 +94,7 @@ from app.admin.staffing_views import (
 from app.admin.task_kind_input import routing_with_task_kind, with_task_kind_field
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
+from app.domain.call_page import OtherWayOffer
 from app.domain.contact_center import ContactCenterRouting
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.planning import (
@@ -121,6 +118,7 @@ from app.domain.scheduling import (
     MIN_TRIAL_CALL_MINUTES,
     DispatchFallback,
     DispatchKind,
+    Group,
     GroupSummary,
     JoinClient,
     PhoneMode,
@@ -136,6 +134,7 @@ from app.i18n.dates import (
 from app.web.authz_labels import PERMISSION_LABELS
 from app.web.locale import RequestLocale
 from app.web.navigation import object_page
+from app.web.organisation_settings import follow
 from app.web.security_policy import PageKind
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -239,6 +238,22 @@ def planning_service(request: Request) -> PlanningService:
     """Return the application's planning service."""
     service: PlanningService = request.app.state.planning_service
     return service
+
+
+async def _call_client_inputs(
+    request: Request, group: Group
+) -> tuple[EmbeddedOffer, OtherWayOffer]:
+    """Return what the settings form needs to offer ``embedded`` and its option, resolved here.
+
+    The platform switch and the stored finding of the guest check, and the value of the option that
+    holds for the group's organisation (what a service without its own value gets).
+    """
+    offer = EmbeddedOffer(
+        request.app.state.settings.embedded_call_enabled,
+        await ReportStore(request.app.state.engine).guest_check_passed(),
+    )
+    organisation = follow(request, group.organisation_id).embedded_call_webex_option
+    return offer, OtherWayOffer.of(organisation)
 
 
 def group_page(
@@ -672,13 +687,9 @@ async def _settings_response(
     """
     current = settings_of(context.group.group)
     planning, integrations = _settings_fields(form, current, locale.gettext)
+    offer, organisation_option = await _call_client_inputs(request, context.group.group)
     integrations = with_call_client_fields(
-        integrations,
-        form,
-        current,
-        await embedded_offer(request),
-        organisation_option(request, context.group.group.organisation_id),
-        locale.gettext,
+        integrations, form, current, offer, organisation_option, locale.gettext
     )
     integrations = with_task_kind_field(
         integrations,
@@ -772,9 +783,8 @@ async def save_settings(
     dispatch = form.choice("dispatch_kind", {kind.value for kind in DispatchKind})
     embedding = form.choice("embedding_enabled", {"yes", "no"})
     trial = form.choice("trial_call_enabled", {"yes", "no"})
-    client, webex_option = read_call_client(
-        form, settings_of(context.group.group), await embedded_offer(request)
-    )
+    offer, _option = await _call_client_inputs(request, context.group.group)
+    client, webex_option = read_call_client(form, settings_of(context.group.group), offer)
     free_pick = form.choice("queue_free_pick_allowed", {"yes", "no"})
     auto_send = form.choice("reschedule_auto_send", {"yes", "no"})
     fallback = form.choice("dispatch_fallback", {f.value for f in DispatchFallback})

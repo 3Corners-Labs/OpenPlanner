@@ -3,8 +3,9 @@
 ``embedded`` is a third value of ``join_client``. It is offered only while the platform switch
 ``embedded_call_enabled`` is on (a group that holds it keeps it on the list), and choosing it is
 refused until the latest service-app check minted a guest token. The service's option for a way into
-the video platform shows only for an embedded group. Group edit rights guard all of it, and the
-audit event names the changed fields and no value.
+the video platform shows wherever ``embedded`` is offered or held; its first choice, "as the
+organisation", is the default and stores nothing. Group edit rights guard all of it, and the audit
+event names the changed fields and no value.
 """
 
 from datetime import UTC, datetime
@@ -93,7 +94,10 @@ async def test_the_form_offers_the_organisations_own_page_while_the_switch_is_on
     assert _options(page) == ["browser", "choice", "embedded"]
     assert "In the organisation&#39;s own page" in page or "In the organisation's own page" in page
     assert "Service App check on Integrations" in page  # the check has not run yet
-    assert f'name="{OPTION}"' not in page  # the option acts only for an embedded group
+    # the option is there wherever embedded is offered; "as the organisation" is first and chosen
+    assert _options(page, OPTION) == ["", "hidden", "on_failure", "always"]
+    assert '<option value="" selected' in page
+    assert "As the organisation (now: Never)" in page
 
 
 # --- choosing it ------------------------------------------------------------------------------
@@ -172,7 +176,8 @@ async def test_a_held_embedded_choice_stays_on_the_list_and_says_what_the_switch
 
     assert _options(page) == ["browser", "choice", "embedded"]
     assert '<option value="embedded" selected' in page
-    assert "participants of this group get the redirect to Webex for now" in page
+    assert "Participants of this group go to Webex for now" in page
+    assert f'name="{OPTION}"' in page  # held, so the option stays editable
 
 
 async def test_saving_another_setting_never_resets_a_held_choice_or_asks_for_the_check(
@@ -200,18 +205,86 @@ async def test_the_option_is_saved_with_the_group_and_shown_back(site: Site) -> 
 
     assert (await _stored(site)).embedded_call_webex_option is OtherWayOffer.ON_FAILURE
     page = (await site.client.get(f"{GROUP}/settings")).text
-    assert _options(page, OPTION) == ["hidden", "on_failure", "always"]
+    assert _options(page, OPTION) == ["", "hidden", "on_failure", "always"]
     assert '<option value="on_failure" selected' in page
 
 
-async def test_a_service_without_a_value_shows_its_organisations(site: Site) -> None:
+async def _organisation_says(site: Site, value: str) -> None:
+    """Set the organisation's value of the option and let the running process read it."""
+    saved = await site.client.post(
+        "/admin/organisations/demo/settings/embedded_call_webex_option",
+        data={"value": value},
+        headers=SAME_ORIGIN,
+    )
+    assert saved.status_code == 303
+    await _app(site).state.live_settings.refresh()
+
+
+async def test_a_service_without_a_value_follows_its_organisation_and_says_what_that_is(
+    site: Site,
+) -> None:
     await site.login_as(SUPER)
     await _embedded(site)
+    await _organisation_says(site, "always")
 
-    page = (await site.client.get(f"{GROUP}/settings")).text
+    page = (await site.client.get(f"{GROUP}/settings?lang=en")).text
 
     assert (await _stored(site)).embedded_call_webex_option is None
-    assert '<option value="hidden" selected' in page  # the organisation's default
+    assert '<option value="" selected' in page  # nothing pinned
+    assert "As the organisation (now: Always, also before joining)" in page
+
+
+async def test_a_save_that_did_not_touch_the_option_never_pins_the_organisations_value(
+    site: Site,
+) -> None:
+    """The form is rendered with its first choice selected, so posting it back changes nothing."""
+    await site.login_as(SUPER)
+    await _embedded(site)
+    await _organisation_says(site, "on_failure")
+
+    await _post(site, {**SETTINGS_FORM, "name": "Q", CLIENT: "embedded", OPTION: ""})
+
+    stored = await _stored(site)
+    assert stored.name == "Q"
+    assert stored.embedded_call_webex_option is None  # still follows, so a later change reaches it
+
+
+async def test_choosing_as_the_organisation_again_takes_the_services_own_value_away(
+    site: Site,
+) -> None:
+    await site.login_as(SUPER)
+    await _embedded(site, "always")
+
+    await _post(site, {**SETTINGS_FORM, CLIENT: "embedded", OPTION: ""})
+
+    assert (await _stored(site)).embedded_call_webex_option is None
+
+
+async def test_the_option_is_there_before_embedded_is_chosen_and_hidden_when_not_offered(
+    site: Site,
+) -> None:
+    await site.login_as(SUPER)
+
+    off = (await site.client.get(f"{GROUP}/settings")).text  # the switch is off, nothing held
+    _switch(site, on=True)
+    on = (await site.client.get(f"{GROUP}/settings")).text
+
+    assert f'name="{OPTION}"' not in off
+    assert f'name="{OPTION}"' in on  # no second save is needed to reach it
+
+
+async def test_a_held_choice_whose_check_failed_gets_its_own_sentence(site: Site) -> None:
+    await site.login_as(SUPER)
+    await _embedded(site)
+    await _check(site, guest=False)  # the scope was revoked since
+
+    held = (await site.client.get(f"{GROUP}/settings?lang=en")).text
+    await _post(site, {**SETTINGS_FORM, CLIENT: "browser"})
+    free = (await site.client.get(f"{GROUP}/settings?lang=en")).text
+
+    assert "latest Service App check could not create a guest" in held
+    assert "can be chosen once" not in held  # the sentence for a choice not yet made
+    assert "can be chosen once" in free
 
 
 async def test_a_value_that_is_no_option_is_refused(site: Site) -> None:

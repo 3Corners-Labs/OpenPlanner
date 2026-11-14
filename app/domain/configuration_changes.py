@@ -94,7 +94,8 @@ class RuleContext:
         production: Whether this is a production installation (stricter address rules).
         now: The current time (UTC), for rules about the past.
         settings: The platform's effective settings by registry key (limits such as the
-            number of custom form fields), as the running installation uses them.
+            number of custom form fields, and the switch ``embedded_call_enabled`` that a
+            group's choice of ``embedded`` needs), as the running installation uses them.
         built_in_claim_values: The login values of the built-in roles, which a custom role
             may not take.
         smtp_plaintext_relay_allowed: Whether the host allows an unencrypted mail relay.

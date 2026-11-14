@@ -437,9 +437,16 @@ a way into the Webex app next to our call page. **Never** (the default): the par
 into Webex; if the call does not work they can try again or call you. **Only when our page cannot
 give the call**: after a failed connection, or in a browser that cannot run the page, the link "join
 another way" appears. **Always, also before joining**: that link is there before the participant
-starts too. The link leads to the Webex web app and does not name Webex. It is a setting of this
-team; a team that never chose one follows the organisation's value until the next minor version. The
-field appears after you have saved the choice of the organisation's own page.
+starts too. The link leads to the Webex web app and does not name Webex.
+
+The first choice, **As the organisation**, is the default: the value that your organisation has set
+holds for this team, and the choice shows what that value is now. Choose another value to set one
+for this team alone; a later change of the organisation's value then no longer reaches it. The field
+is there as soon as the organisation's own page can be chosen, so you set both in one go. It acts
+only for a team that uses the organisation's own page.
+
+"Never" hides the offer and closes the link, but it is not a lock: the page needs the meeting's
+address to join, so a participant who knows how to look can find a way into the Webex app anyway.
 
 <!-- field: offer -->
 ### Offer per block

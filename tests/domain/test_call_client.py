@@ -9,13 +9,14 @@ from app.domain.call_client import (
     EmbeddedBlocker,
     allows_other_way,
     call_client,
+    chosen_client,
     embedded_blocker,
     other_way_offer,
     redirect_client,
     uses_call_page,
 )
 from app.domain.call_page import OtherWayOffer
-from app.domain.calls import join_link
+from app.domain.calls import RedirectClient, join_link
 from app.domain.scheduling import JoinClient
 from tests.support.domain import make_group
 
@@ -59,16 +60,34 @@ def test_the_switch_is_the_kill_switch_whatever_the_service_says() -> None:
     assert not uses_call_page(group, JoinClient.EMBEDDED, platform_enabled=False)
 
 
-@pytest.mark.parametrize("client", JoinClient)
-def test_every_client_has_a_redirect_the_link_builder_knows(client: JoinClient) -> None:
-    shaped = join_link(LINK, redirect_client(client))
+@pytest.mark.parametrize("service", JoinClient)
+def test_every_client_has_a_redirect_shape_the_link_builder_knows(service: JoinClient) -> None:
+    shape = redirect_client(make_group(join_client=service))
+    shaped = join_link(LINK, shape)
 
     assert shaped is not None
-    if client is JoinClient.CHOICE:
+    if service is JoinClient.CHOICE:
+        assert shape is RedirectClient.CHOICE
         assert shaped == LINK
     else:  # browser, and embedded as its way around our page
+        assert shape is RedirectClient.BROWSER
         assert shaped.endswith("x=1&launchApp=true")
-    assert join_link(LINK, client) == shaped  # the builder takes embedded itself, no fall-through
+
+
+def test_a_redirect_has_no_embedded_shape_and_the_flow_wins_over_the_service() -> None:
+    assert {shape.value for shape in RedirectClient} == {"browser", "choice"}
+    group = make_group(join_client=JoinClient.CHOICE)
+    assert redirect_client(group, JoinClient.EMBEDDED) is RedirectClient.BROWSER
+    assert redirect_client(make_group(join_client=JoinClient.EMBEDDED), JoinClient.CHOICE) is (
+        RedirectClient.CHOICE
+    )
+
+
+@pytest.mark.parametrize(("service", "flow"), list(itertools.product(JoinClient, CLIENTS)))
+def test_what_was_chosen_is_the_flows_else_the_services_whatever_the_switch(
+    service: JoinClient, flow: JoinClient | None
+) -> None:
+    assert chosen_client(make_group(join_client=service), flow) is (flow or service)
 
 
 @pytest.mark.parametrize(

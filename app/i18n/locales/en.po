@@ -1202,7 +1202,7 @@ msgid "admin.field.join_client"
 msgstr "How the participant gets into the call"
 
 msgid "admin.field.join_client_hint"
-msgstr "How the participant gets into the call. Straight into the browser and Webex lets the participant choose send them to Webex; the organisation's own page gives the call in our page (the trial call still opens in Webex)."
+msgstr "How the participant gets into the call. 'Straight into the browser': the participant goes to Webex and the call opens in its web version. 'Webex lets the participant choose': the participant goes to Webex and chooses there between the app and the browser. 'In the organisation's own page': the call runs in our own page. The trial call always opens in Webex."
 
 msgid "admin.group.join_client_browser"
 msgstr "Straight into the browser"
@@ -1214,16 +1214,19 @@ msgid "admin.group.join_client_embedded"
 msgstr "In the organisation's own page"
 
 msgid "admin.field.join_client_embedded_off"
-msgstr "The call page is switched off for this installation (platform setting), so participants of this group get the redirect to Webex for now."
+msgstr "The call page is switched off for this installation (platform setting). Participants of this group go to Webex for now."
 
 msgid "admin.field.join_client_embedded_unchecked"
 msgstr "The organisation's own page can be chosen once the Service App check on Integrations has succeeded with the guest scopes."
+
+msgid "admin.field.join_client_embedded_held_unchecked"
+msgstr "The latest Service App check could not create a guest. Participants of this group still get our page, but they may not get into the call. Restore the guest scopes of the Service App and run the check on Integrations again; or set the group to 'Straight into the browser' for now."
 
 msgid "admin.field.embedded_call_webex_option"
 msgstr "Way into Webex next to our page"
 
 msgid "admin.field.embedded_call_webex_option_hint"
-msgstr "Whether the participant is ever shown a way into the Webex app next to our call page. It leads to Webex's web app and never names Webex to the participant."
+msgstr "Applies when 'In the organisation's own page' is chosen above. The participant is shown a way into Webex's web version next to our call page: never, only when the page cannot give the call, or always. The text does not name Webex. 'As the organisation' follows the organisation's setting."
 
 msgid "admin.group.webex_option_hidden"
 msgstr "Never"
@@ -1233,6 +1236,9 @@ msgstr "Only when our page cannot give the call"
 
 msgid "admin.group.webex_option_always"
 msgstr "Always, also before joining"
+
+msgid "admin.group.webex_option_follow"
+msgstr "As the organisation (now: {value})"
 
 msgid "admin.form.error.embedded_platform_switch"
 msgstr "The call in the organisation's own page is switched off for this installation."
@@ -14048,7 +14054,7 @@ msgstr "Deliveries are resumed."
 #. The participant's call page before the click that joins (ADR 0123 step 4b). No text names the video platform.
 
 msgid "settings.field.embedded_call_webex_option.label"
-msgstr "Default way into the video platform's own app next to the call, for a service that has not chosen its own (each service chooses it under Group, Settings, Video; this value is read for one more minor version)"
+msgstr "Way into the video platform's own app next to the call (never, only when the page cannot give the call, or always). It holds for every team that has not chosen its own; a team chooses it under Group, Settings, Video"
 
 msgid "callpage.start.body"
 msgstr "You have the call here, in this page. There is nothing to install."

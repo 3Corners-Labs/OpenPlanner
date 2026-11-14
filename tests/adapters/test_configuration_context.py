@@ -26,7 +26,11 @@ def test_the_context_carries_the_installation_s_limits_roles_and_flags() -> None
         "idp_max_per_organisation",
         "booking_form_max_custom_fields",
         "bundled_idp_login_suffix",
+        "embedded_call_enabled",  # the platform switch a group's choice of ``embedded`` needs
     }
+    assert context.settings["embedded_call_enabled"] is False
+    # the guest check's finding is installation state, not a setting: the planner fills it in
+    assert not context.guest_check_passed
 
 
 def test_the_cross_field_rule_of_the_settings_is_wired() -> None:

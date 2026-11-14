@@ -2274,6 +2274,18 @@ write lock only for a group that lacks something. On an error it prints one line
 above zero, and the log lines `flows.repair_failed` and `flows.repair_incomplete` say the same
 for the worker's own run.
 
+**Services that use the call page (ADR 0123 step 6a).** Look here before going back to an image
+from before step 6a. That image cannot read a group whose client is `embedded` (it builds
+`JoinClient(row.join_client)`, which fails on the value), so such a group breaks every page and job
+that loads it. Before going back, set every such group to `browser`: on the group's settings form
+(Group → Settings → Video, *How the participant gets into the call*), or with a configuration
+package that sets `join_client` of those groups (export one first and look for `"join_client":
+"embedded"` to find them). Switching `embedded_call_enabled` off is not enough: the stored value
+stays. Migration 0119's downgrade does this by itself (it sets every `embedded` group to `browser`),
+but only when the schema is downgraded with `alembic downgrade 0118`; starting the previous image
+on the current schema does not. The service's own option is lost by that downgrade; the
+organisation's value is never touched.
+
 **Services, flows and requests (ADR 0121, ADR 0122; proof in `docs/service-flows-compatibility.md`).**
 Migrations 0109 to 0115 (minor 0.6) only add: tables, nullable or defaulted columns on
 `bookings` and `slots`, and a backfill of one legacy pool and the default flows per service.
@@ -2909,9 +2921,10 @@ per-booking bound.
 The call page (`/b/m/{ref}/call`, only while `embedded_call_enabled` is on) joins a call with the
 video supplier's SDK file, vendored under `app/web/static/vendor/webex/` and never installed. The
 supplier supports only its latest version and says an older one may stop working after about
-eighteen months, so this entry is part of running the product. Until a service chooses
-`join_client = embedded` (step 6) no participant is sent to the page; it is reached by its address,
-on a test installation.
+eighteen months, so this entry is part of running the product. A service chooses the page with
+`join_client = embedded` (Group → Settings → Video, step 6a); only the participants of such a
+service are sent to it, and only while `embedded_call_enabled` is on. Every other service keeps the
+redirect.
 
 **What you see.**
 
@@ -2926,15 +2939,21 @@ on a test installation.
 
 **What to do.**
 
-1. **A participant cannot join in our page.** Tell them to use the link in the confirmation (the
-   redirect of ADR 0075, `/join/go`) or the organisation's contact details. The redirect is a
-   separate route: it does not use the SDK and keeps working.
+1. **A participant cannot join in our page.** For a service of the page the confirmation's link
+   and `/join/go` lead back to the page unless the service's option allows the other way, so with
+   the option `hidden` telling the participant to use the link does not help. Give the participant
+   the organisation's contact details, and use item 3 (the service's option) or item 2 (the platform
+   switch) so the other way works for them. The redirect itself does not use the SDK.
 2. **Switch the page off for everyone.** Set `embedded_call_enabled` off (Platform settings,
    `settings.platform.manage`). The page and the token endpoint then answer as an address that
-   does not exist, and every group is back on the redirect. Nothing else has to change.
-3. **Offer the other way meanwhile.** An organisation can set `embedded_call_webex_option` to
-   `on_failure` (the link "join another way" in the failure state and in the not-available state) or
-   `always`. With `hidden` the participant sees the organisation's contact details instead.
+   does not exist, and every group is back on the redirect (a group that holds `embedded` acts as
+   the default client meanwhile and keeps its choice). Nothing else has to change.
+3. **Offer the other way meanwhile.** Set the service's option *Way into Webex next to our page*
+   (Group → Settings → Video, `group.edit`) to `on_failure` (the link "join another way" in the
+   failure state and in the not-available state, and `/join/go` leads to the video platform) or
+   `always`. A service that has not set its own follows the organisation's value
+   (`embedded_call_webex_option`, Organisation settings). With `hidden` the participant sees the
+   organisation's contact details instead and `/join/go` leads back to the page.
 4. **The checksum finding.** Put the file back that the manifest names, or replace the file and its
    checksum together: take the file of the pinned version from the supplier's published package
    (`umd/meetings.min.js`), place it as `meetings.min.js`, run `shasum -a 256` on it and write

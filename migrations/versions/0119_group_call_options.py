@@ -1,32 +1,32 @@
 """A service chooses the call page and what is offered next to it (ADR 0123 step 6a).
 
-Expand only (ADR 0116): add, widen, backfill; nothing is dropped or tightened.
+Expand only (ADR 0116): add and widen; nothing is dropped, tightened or backfilled.
 
 * ``groups.join_client`` may now be ``embedded`` (the call in our own page). The check is
   widened, which SQLite does by copying the table; no row changes. Every group keeps the value
   it has.
 * ``groups.embedded_call_webex_option`` (new, nullable, checked): whether the participant of an
-  embedded call is ever shown a way into the video platform's own app, a service's setting from
-  now on. NULL reads as "the organisation's value", which the call page and the join path still
-  honour for one minor (a persisted name moves by writing the new place and reading both, ADR
-  0116). The backfill writes the organisation's own stored value, where it has one, into each
-  of its groups, so a group acts as it did before; an organisation without a stored value
-  leaves its groups at NULL, which keeps following the installation's value.
+  embedded call is ever shown a way into the video platform's own app. The organisation's value
+  stays the default and a service may set its own, for good: NULL means "as the organisation".
+  Nothing is backfilled, so after the upgrade every service follows its organisation exactly as
+  before, and a later change of the organisation's value still reaches it.
 
-The previous image does not know ``embedded``: a group saved as ``embedded`` by this image makes
-the previous image fail to read that group. The step ships dark (``embedded_call_enabled`` is off
-and a group can be saved as ``embedded`` only after the guest check passed), so a rollback before
-anybody chose it is safe; after that, set such a group back to ``browser`` first.
+The previous image does not know ``embedded``: it reads ``join_client`` through
+``JoinClient(row.join_client)``, so a group saved as ``embedded`` by this image makes it fail to
+read that group. The step ships dark (``embedded_call_enabled`` is off and a group can be saved as
+``embedded`` only after the guest check passed), so a rollback before anybody chose it is safe.
+After that, set every such group to ``browser`` before going back to the previous image (the
+group's settings form, or the configuration package); the downgrade below does it by itself, but
+only when the schema is downgraded.
 
 Downgrade turns every ``embedded`` group into ``browser`` (what the previous image would have
-done for a participant: the redirect), narrows the check again and drops the column; the
-per-service option is lost, the organisation's own stored value was never touched.
+done for a participant: the redirect), narrows the check again and drops the column; a service's
+own option is lost, the organisation's value was never touched.
 
 Revision ID: 0119
 Revises: 0118
 """
 
-import json
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -43,7 +43,7 @@ OPTION_CHECK = "embedded_call_webex_option IS NULL OR embedded_call_webex_option
 
 
 def upgrade() -> None:
-    """Allow ``embedded``, add the service's option and copy the organisation's value into it."""
+    """Allow ``embedded`` and add the service's own option (empty: as the organisation)."""
     with op.batch_alter_table("groups") as batch:
         batch.add_column(sa.Column("embedded_call_webex_option", sa.String(length=16)))
         batch.drop_constraint(op.f("ck_groups_join_client"), type_="check")
@@ -53,26 +53,6 @@ def upgrade() -> None:
         batch.create_check_constraint(
             op.f("ck_groups_embedded_call_webex_option"), OPTION_CHECK.format(OPTIONS)
         )
-    bind = op.get_bind()
-    stored = bind.execute(
-        sa.text(
-            "SELECT organisation_id, value FROM organisation_settings"
-            " WHERE key = 'embedded_call_webex_option'"
-        )
-    ).all()
-    for organisation_id, raw in stored:
-        try:
-            value = json.loads(raw)
-        except ValueError:
-            continue  # not a value the setting could hold: the group keeps following the default
-        if value in OPTIONS:
-            bind.execute(
-                sa.text(
-                    "UPDATE groups SET embedded_call_webex_option = :value"
-                    " WHERE organisation_id = :organisation"
-                ),
-                {"value": value, "organisation": organisation_id},
-            )
 
 
 def downgrade() -> None:

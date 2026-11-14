@@ -22,6 +22,7 @@ from app.api.link_session import authorise
 from app.api.participant import participant_page
 from app.domain.call_client import (
     allows_other_way,
+    call_client,
     other_way_offer,
     redirect_client,
     uses_call_page,
@@ -57,14 +58,14 @@ async def join_page(request: Request, public_ref: str) -> HTMLResponse:
     follow(request, details.group.organisation_id)
     booking, group = details.booking, details.group
     state = join_state(booking, clock.now())
-    enabled = request.app.state.settings.embedded_call_enabled
+    client = call_client(group, platform_enabled=request.app.state.settings.embedded_call_enabled)
     if state is JoinState.OPEN and booking.id is not None:
         await integration.record(booking.id, EventKind.JOIN_PAGE_OPENED)
     context = {
         "group": group,
         "ref": public_ref,
         "state": state.value,
-        "call_page": uses_call_page(group, platform_enabled=enabled),
+        "client": client.value,
         "refresh": state in REFRESHING,
         "trial_offered": group.trial_call_enabled and group.video_enabled,
         "slot_label": slot_label(booking.start, booking.end, group, locale),
@@ -83,9 +84,8 @@ async def join_go(request: Request, public_ref: str) -> Response:
     booking, group = details.booking, details.group
     # The link comes from Webex: ``join_link`` refuses anything but https and sets the group's
     # client (ADR 0075), so nothing else can ever become a redirect.
-    link = join_link(
-        booking.meeting.link if booking.meeting else None, redirect_client(group.join_client)
-    )
+    shape = redirect_client(group)
+    link = join_link(booking.meeting.link if booking.meeting else None, shape)
     if join_state(booking, clock.now()) is not JoinState.OPEN or not link or booking.id is None:
         return RedirectResponse(f"/b/m/{public_ref}/join", status_code=303)
     enabled = request.app.state.settings.embedded_call_enabled
@@ -93,7 +93,5 @@ async def join_go(request: Request, public_ref: str) -> Response:
     if uses_call_page(group, platform_enabled=enabled) and not allows_other_way(offer):
         # The call is in our page; the platform's address stays closed around it (point 11).
         return RedirectResponse(f"/b/m/{public_ref}/call", status_code=303)
-    await integration.record(
-        booking.id, EventKind.JOIN_CLICKED, detail=redirect_client(group.join_client).value
-    )
+    await integration.record(booking.id, EventKind.JOIN_CLICKED, detail=shape.value)
     return RedirectResponse(link, status_code=303)

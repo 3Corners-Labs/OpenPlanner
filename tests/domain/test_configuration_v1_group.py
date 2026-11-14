@@ -172,9 +172,18 @@ def test_a_new_embedded_group_is_accepted_where_the_form_would_accept_it() -> No
 @pytest.mark.parametrize(
     "context",
     [
-        CONTEXT,  # the switch is off here
-        RuleContext(now=NOW, settings={"embedded_call_enabled": True}),  # no guest minted yet
-        RuleContext(now=NOW, settings={"embedded_call_enabled": False}, guest_check_passed=True),
+        pytest.param(CONTEXT, id="switch off"),
+        pytest.param(
+            RuleContext(now=NOW, settings={"embedded_call_enabled": True}), id="no guest minted yet"
+        ),
+        # Only ``EmbeddedBlocker.PLATFORM_SWITCH`` can refuse this one: the form never offers
+        # ``embedded`` while the switch is off, so the package is where that reason is reached.
+        pytest.param(
+            RuleContext(
+                now=NOW, settings={"embedded_call_enabled": False}, guest_check_passed=True
+            ),
+            id="switch off, guest minted",
+        ),
     ],
 )
 def test_embedded_is_refused_where_the_form_refuses_it_with_its_field(context: RuleContext) -> None:

@@ -24,6 +24,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from app.domain.booking import Booking, ChangeReason
+from app.domain.call_client import chosen_client
 from app.domain.change_requests import ChangeAction, ChangeRequest, appointment_code
 from app.domain.channels import ChannelKind
 from app.domain.closure import Closure
@@ -523,7 +524,7 @@ class MessageComposer:
             "book_text": _("message.book_again"),
             "book_link": _("message.book_again_link"),
             "join_url": join_url,
-            "join_text": _(_JOIN_TEXT_KEYS[group.join_client]),
+            "join_text": _(_JOIN_TEXT_KEYS[chosen_client(group)]),
             "join_link": _("message.join_link"),
             "trial_url": f"{manage_url}/test" if join_url and group.trial_call_enabled else None,
             "trial_text": _("message.trial"),

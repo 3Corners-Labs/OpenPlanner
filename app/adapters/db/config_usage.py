@@ -7,7 +7,6 @@ hold a future booking, and the places taken on every future slot. Counts and tim
 participant data is read.
 """
 
-import json
 from datetime import datetime
 
 from sqlalchemy import func, select
@@ -20,16 +19,14 @@ from app.adapters.db.models import (
     BookingRow,
     ClosureRow,
     GroupRow,
-    IntegrationReportRow,
     OrganisationRow,
     ShortfallAcceptanceRow,
     SlotRow,
 )
+from app.adapters.db.report_findings import guest_token_minted
 from app.domain.booking import HOLDS_PLACE
 from app.domain.configuration_changes import SlotLoad, Usage
 from app.domain.configuration_v1_names import GROUP_KIND
-from app.domain.guest_access import guest_check_passed
-from app.domain.integration_check import SERVICE_APP_REPORT
 
 _HOLDS_PLACE = sorted(status.value for status in HOLDS_PLACE)
 
@@ -110,17 +107,5 @@ async def read_usage(
         future_bookings=frozenset(future),
         slot_loads={address: tuple(found) for address, found in loads.items()},
         locked_settings=locked_settings,
-        guest_check_passed=await _guest_check_passed(session),
+        guest_check_passed=await guest_token_minted(session),
     )
-
-
-async def _guest_check_passed(session: AsyncSession) -> bool:
-    """Return whether the stored service-app check minted a guest token (ADR 0123 point 17)."""
-    row = await session.get(IntegrationReportRow, SERVICE_APP_REPORT)
-    if row is None:
-        return False
-    try:
-        body = json.loads(row.body)
-    except ValueError:
-        return False
-    return guest_check_passed(body if isinstance(body, dict) else None)

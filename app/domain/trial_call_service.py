@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from app.domain.booking import Booking, MeetingRef, TrialCall
+from app.domain.call_client import redirect_client
 from app.domain.calls import EventKind, MeetingRequest
 from app.domain.calls import join_link as client_link
 from app.domain.errors import DomainError, ErrorCode
@@ -139,13 +140,13 @@ class TrialCallService:
         """
         async with self._uow.read() as tx:
             booking, group = await self._load(tx, management_token)
-        # Same builder as the appointment's link (ADR 0075): https only, the group's client.
-        link = client_link(booking.trial.meeting.link if booking.trial else None, group.join_client)
+        # Same builder as the appointment's link (ADR 0075): https only, the redirect's shape for
+        # the group's client. The event records the shape the participant really got.
+        shape = redirect_client(group)
+        link = client_link(booking.trial.meeting.link if booking.trial else None, shape)
         if trial_state(booking, group, self._clock.now()) is not TrialState.ACTIVE or not link:
             return None
-        await self._integration.record(
-            _id(booking), EventKind.TRIAL_JOINED, detail=group.join_client.value
-        )
+        await self._integration.record(_id(booking), EventKind.TRIAL_JOINED, detail=shape.value)
         return link
 
     def _view(self, booking: Booking, group: Group) -> TrialView:

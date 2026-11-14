@@ -50,11 +50,12 @@ from app.adapters.webhook_selftest import self_test
 from app.adapters.webhooks import WXCC_INBOUND
 from app.adapters.wxcc import channel_and_address
 from app.adapters.wxcc_config import GroupRouting, check_group, fetch_config, region_check
-from app.domain.call_client import uses_call_page
+from app.domain.call_client import call_client, uses_call_page
 from app.domain.calls import (
     BROWSER_LINK_PARAMS,
     EventKind,
     MeetingRequest,
+    RedirectClient,
     join_link,
     probe_task,
 )
@@ -267,9 +268,10 @@ class PlatformChecker:
         its join page, and that redirect must still contain ``launchApp=true``. A warning, never
         a failure: without the parameter the participant gets Webex's own choice page.
         """
-        if group.join_client is not JoinClient.BROWSER:
+        client = call_client(group, platform_enabled=self._config.call_page_enabled)
+        if client is not JoinClient.BROWSER:
             return []  # choice has no parameter to lose; embedded has no link of this kind
-        url = join_link(link, JoinClient.BROWSER)
+        url = join_link(link, RedirectClient.BROWSER)
         if url is None:  # not an https link: never visited
             return [_browser_finding("webex.browser_link_lost", (("status", "-"),))]
         started = time.monotonic()

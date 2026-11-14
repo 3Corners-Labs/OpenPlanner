@@ -14,6 +14,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.db.models import IntegrationReportRow
+from app.adapters.db.report_findings import guest_token_minted, report_object
 from app.adapters.db.uow import locked_session
 
 REGISTRATIONS_REPORT = "webhook_registrations"
@@ -45,8 +46,12 @@ class ReportStore:
             row = await session.get(IntegrationReportRow, name)
         if row is None:
             return None
-        body = json.loads(row.body)
-        return StoredReport(body if isinstance(body, dict) else {}, row.checked_at)
+        return StoredReport(report_object(row.body), row.checked_at)
+
+    async def guest_check_passed(self) -> bool:
+        """Return whether the latest service-app check minted a guest token."""
+        async with AsyncSession(self._engine) as session:
+            return await guest_token_minted(session)
 
     async def put(self, name: str, body: dict[str, Any], now: datetime) -> None:
         """Create or replace the report ``name``."""

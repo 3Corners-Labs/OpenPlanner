@@ -1,8 +1,9 @@
 """Migration 0119 (ADR 0123 step 6a): a service chooses the call page and its option.
 
-An expand step (ADR 0116): ``join_client`` may be ``embedded``, ``embedded_call_webex_option``
-is added and backfilled from the organisation's own stored value, so a group acts as it did.
-Downgrading gives every embedded group the default client and drops the option.
+An expand step (ADR 0116): ``join_client`` may be ``embedded`` and ``embedded_call_webex_option``
+is added empty, which means "as the organisation": nothing is backfilled, so every group follows
+its organisation exactly as before. Downgrading gives every embedded group the default client and
+drops the option.
 """
 
 import sqlite3
@@ -24,7 +25,7 @@ GROUP = (
 
 @pytest.fixture
 def old_database(alembic_config: Config, tmp_path: Path) -> Path:
-    """Return a database at 0118: two organisations with different values, one without."""
+    """Return a database at 0118: two organisations with a stored value, one without."""
     command.upgrade(alembic_config, "0118")
     path = tmp_path / "migrate.db"
     with closing(sqlite3.connect(path)) as database:
@@ -52,35 +53,20 @@ def _options(path: Path) -> list[tuple[int, str | None]]:
         ).fetchall()
 
 
-def test_every_group_gets_the_value_of_its_organisation_and_keeps_the_rest(
+def test_no_group_gets_a_value_of_its_own_so_every_group_follows_its_organisation(
     alembic_config: Config, old_database: Path
 ) -> None:
     command.upgrade(alembic_config, "0119")
 
-    # acme says always, voorbeeld on_failure; demo has none stored: it keeps following the default
-    assert _options(old_database) == [(1, "always"), (2, "always"), (3, "on_failure"), (4, None)]
+    # Nothing is backfilled: the organisations' stored values stay where they are and still hold.
+    assert _options(old_database) == [(1, None), (2, None), (3, None), (4, None)]
     with closing(sqlite3.connect(old_database)) as database:
         assert database.execute("SELECT DISTINCT join_client FROM groups").fetchall() == [
             ("browser",)
         ]
-        assert database.execute("SELECT COUNT(*) FROM organisation_settings").fetchone() == (2,)
-
-
-def test_a_stored_value_that_is_no_option_leaves_the_group_following_the_default(
-    alembic_config: Config, old_database: Path
-) -> None:
-    with closing(sqlite3.connect(old_database)) as database:
-        database.execute(
-            "UPDATE organisation_settings SET value = '\"sometimes\"' WHERE organisation_id = 1"
-        )
-        database.execute(
-            "UPDATE organisation_settings SET value = 'not json' WHERE organisation_id = 2"
-        )
-        database.commit()
-
-    command.upgrade(alembic_config, "0119")
-
-    assert _options(old_database) == [(1, None), (2, None), (3, None), (4, None)]
+        assert database.execute(
+            "SELECT organisation_id, value FROM organisation_settings ORDER BY organisation_id"
+        ).fetchall() == [(1, '"always"'), (2, '"on_failure"')]
 
 
 def test_embedded_and_the_options_are_the_only_values_the_checks_accept(
@@ -123,4 +109,4 @@ def test_the_downgrade_gives_embedded_groups_the_default_client_and_goes_up_agai
             database.execute("UPDATE groups SET join_client = 'embedded' WHERE id = 2")
         assert database.execute("SELECT COUNT(*) FROM organisation_settings").fetchone() == (2,)
     command.upgrade(alembic_config, "0119")
-    assert _options(old_database) == [(1, "always"), (2, "always"), (3, "on_failure"), (4, None)]
+    assert _options(old_database) == [(1, None), (2, None), (3, None), (4, None)]

@@ -230,7 +230,9 @@ async def test_following_the_trial_link_says_which_page_the_participant_was_sent
         for e in setup.uow.state.booking_events[setup.booking_id]
         if e.kind is EventKind.TRIAL_JOINED
     ]
-    assert [e.detail for e in joined] == [client.value]
+    # the page the participant really got: an embedded service's trial call opens the web app
+    shape = "browser" if client is JoinClient.EMBEDDED else client.value
+    assert [e.detail for e in joined] == [shape]
 
 
 @pytest.mark.parametrize(

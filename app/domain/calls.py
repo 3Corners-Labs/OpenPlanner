@@ -32,7 +32,7 @@ from app.domain.contact_center import (
 )
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.interaction import InteractionKind
-from app.domain.scheduling import Group, JoinClient
+from app.domain.scheduling import Group
 
 BROWSER_LINK_PARAMS: tuple[tuple[str, str], ...] = (("launchApp", "true"),)
 """What Webex's own *join from this browser* button adds to the meeting link (ADR 0075).
@@ -90,22 +90,32 @@ class EventKind(StrEnum):
     INTEGRATION_ERROR = "integration_error"
 
 
-def join_link(link: str | None, client: JoinClient) -> str | None:
+class RedirectClient(StrEnum):
+    """How a redirect to the video platform is shaped (ADR 0075).
+
+    Only two shapes exist: ``embedded`` is not one of them, because our own page is never a
+    redirect. ``app.domain.call_client.redirect_client`` turns a service's client into one.
+    """
+
+    BROWSER = "browser"
+    """The platform's web app straight away (``BROWSER_LINK_PARAMS``)."""
+    CHOICE = "choice"
+    """The platform's own choice page: the link as it is."""
+
+
+def join_link(link: str | None, client: RedirectClient) -> str | None:
     """Return the link to send the participant to for ``client``, or ``None`` when there is none.
 
     The stored link comes from Webex and is personal data, so it is never altered in storage;
     this builds the redirect target. A link that is not ``https`` is refused, so a poisoned
-    value can never become a redirect. ``JoinClient.BROWSER`` (and ``EMBEDDED``, see
-    ``app.domain.call_client.redirect_client``) sets the parameters of
+    value can never become a redirect. ``RedirectClient.BROWSER`` sets the parameters of
     ``BROWSER_LINK_PARAMS`` (replacing a value that says the opposite) and keeps every other
     part of the link; applying it twice gives the same link.
     """
     if not link or not link.startswith("https://"):
         return None
-    if client is JoinClient.CHOICE:
+    if client is RedirectClient.CHOICE:
         return link
-    # BROWSER and EMBEDDED alike: a redirect of an embedded service (its way around our page,
-    # ADR 0123 point 11) opens the web app straight away, like the default.
     parts = urlsplit(link)
     names = {name for name, _ in BROWSER_LINK_PARAMS}
     query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k not in names]

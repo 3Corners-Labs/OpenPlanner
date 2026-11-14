@@ -49,14 +49,11 @@ AFTER_TRAIN_TOUCHED = {"group_contact_center", "groups", "staff"}
 0116 (ADR 0123 step 7a) gives the group's contact-center routing its task kind, 0118
 (ADR 0123 step 5c) gives the staff record its screen name, and 0119 (ADR 0123 step 6a) gives the
 group the service's option next to the call page and widens one check (``AFTER_TRAIN_WIDENED``)."""
-AFTER_TRAIN_WIDENED = {
-    "groups": (
-        "join_client IN ('browser', 'choice')",
-        "join_client IN ('browser', 'choice', 'embedded')",
-    )
-}
-"""The one check each of those tables has widened (never narrowed): ``groups.join_client`` may
-now be ``embedded`` (0119). Every value the previous image writes still meets it."""
+AFTER_TRAIN_WIDENED = {"groups": ("join_client", ("browser", "choice"), "embedded")}
+"""The one check each of those tables has widened (never narrowed), as ``(column, the values it
+allowed, the one value added)``: ``groups.join_client`` may now be ``embedded`` (0119). Every value
+the previous image writes still meets it. The test builds both forms of the check from this, so
+the exemption is exactly "the same constraint with one more allowed value" and nothing else."""
 AFTER_TRAIN_COLUMNS = {
     "group_contact_center": "task_kind VARCHAR(16) DEFAULT 'form' NOT NULL",
     "staff": "screen_name VARCHAR(40)",
@@ -265,18 +262,35 @@ def test_the_train_changes_only_bookings_and_slots_of_the_pre_train_tables_and_o
             assert not notnull or default is not None, f"{table}.{name} needs a value"
 
 
+def _split(line: str) -> list[str]:
+    """Split ``line`` at the ``", "`` outside brackets, so an ``IN (...)`` list stays whole."""
+    parts, depth, start = [], 0, 0
+    for at, char in enumerate(line):
+        depth += (char == "(") - (char == ")")
+        if depth == 0 and line.startswith(", ", at):
+            parts.append(line[start:at])
+            start = at + 2
+    return [*parts, line[start:]]
+
+
 def _parts(definition: str) -> list[str]:
     """Return the parts of a table's definition (columns, keys, checks), sorted, without commas.
 
     A column that SQLite appends in place (``ALTER TABLE ... ADD COLUMN``) lands on the line of the
-    column before it, so a line is split at ``", "`` too; both sides are split the same way.
+    column before it, so a line is split at ``", "`` too, outside brackets; both sides are split
+    the same way.
     """
     return sorted(
         part.strip().rstrip(",").strip()
         for line in definition.splitlines()
-        for part in line.split(", ")
+        for part in _split(line)
         if part.strip().rstrip(",").strip()
     )
+
+
+def _in_check(column: str, values: tuple[str, ...]) -> str:
+    """Return the text of the check ``column IN (...)`` for ``values``."""
+    return f"{column} IN ({', '.join(repr(value) for value in values)})"
 
 
 def _indexes(path: Path, tables: set[str]) -> dict[str, str]:
@@ -323,9 +337,10 @@ def test_no_index_or_constraint_of_a_pre_train_table_becomes_stricter(
     for table, added in AFTER_TRAIN_COLUMNS.items():
         text = definitions[table]
         if table in AFTER_TRAIN_WIDENED:
-            narrow, wide = AFTER_TRAIN_WIDENED[table]
+            column, allowed, added_value = AFTER_TRAIN_WIDENED[table]
+            narrow = _in_check(column, allowed)
             assert narrow in text, table
-            text = text.replace(narrow, wide)
+            text = text.replace(narrow, _in_check(column, (*allowed, added_value)))
         # every column, key and check as it was (a widened one as widened), plus what was added
         assert _parts(now[table]) == sorted([*_parts(text), *_parts(added.replace(" | ", ", "))])
 

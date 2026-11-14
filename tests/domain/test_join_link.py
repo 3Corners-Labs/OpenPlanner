@@ -4,7 +4,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from app.domain.calls import BROWSER_LINK_PARAMS, join_link
+from app.domain.calls import BROWSER_LINK_PARAMS, RedirectClient, join_link
 from app.domain.scheduling import JoinClient
 from tests.support.domain import make_group
 
@@ -17,11 +17,11 @@ def test_a_group_opens_the_browser_unless_it_says_otherwise() -> None:
 
 
 def test_the_choice_link_is_the_stored_link_unchanged() -> None:
-    assert join_link(SHORT, JoinClient.CHOICE) == SHORT
+    assert join_link(SHORT, RedirectClient.CHOICE) == SHORT
 
 
 def test_the_browser_link_adds_the_parameter_and_keeps_the_rest() -> None:
-    link = join_link(SHORT, JoinClient.BROWSER)
+    link = join_link(SHORT, RedirectClient.BROWSER)
 
     parts = urlsplit(link)
     assert (parts.scheme, parts.netloc, parts.path) == (
@@ -36,25 +36,25 @@ def test_the_browser_link_adds_the_parameter_and_keeps_the_rest() -> None:
 
 
 def test_the_browser_link_is_the_same_when_applied_twice() -> None:
-    once = join_link(SHORT, JoinClient.BROWSER)
+    once = join_link(SHORT, RedirectClient.BROWSER)
 
-    assert join_link(once, JoinClient.BROWSER) == once
+    assert join_link(once, RedirectClient.BROWSER) == once
 
 
 def test_the_browser_link_replaces_a_parameter_that_says_the_opposite() -> None:
-    link = join_link(SHORT + "&launchApp=false", JoinClient.BROWSER)
+    link = join_link(SHORT + "&launchApp=false", RedirectClient.BROWSER)
 
     assert parse_qs(urlsplit(link).query)["launchApp"] == ["true"]
 
 
 def test_the_browser_link_works_on_a_link_without_a_query() -> None:
-    link = join_link("https://example.webex.com/meet/room", JoinClient.BROWSER)
+    link = join_link("https://example.webex.com/meet/room", RedirectClient.BROWSER)
 
     assert link == "https://example.webex.com/meet/room?launchApp=true"
 
 
-@pytest.mark.parametrize("client", list(JoinClient))
-def test_a_link_that_is_not_https_is_never_handed_out(client: JoinClient) -> None:
+@pytest.mark.parametrize("client", list(RedirectClient))
+def test_a_link_that_is_not_https_is_never_handed_out(client: RedirectClient) -> None:
     assert join_link("http://evil.example/j.php?MTID=x", client) is None
     assert join_link("javascript:alert(1)", client) is None
     assert join_link(None, client) is None

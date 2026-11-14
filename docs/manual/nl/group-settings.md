@@ -449,9 +449,18 @@ geen weg naar Webex; lukt het gesprek niet, dan kan de deelnemer het opnieuw pro
 **Alleen als onze pagina het gesprek niet kan geven**: na een mislukte verbinding, of in een browser
 die de pagina niet kan draaien, verschijnt de link "op een andere manier deelnemen". **Altijd, ook
 voor het deelnemen**: die link staat er ook voordat de deelnemer begint. De link leidt naar de
-webversie van Webex en noemt Webex niet bij naam. Het is een instelling van dit team; een team dat
-er nooit een koos volgt tot de volgende minor-versie nog de waarde van de organisatie. Het veld
-verschijnt na het opslaan van de keuze voor de eigen pagina.
+webversie van Webex en noemt Webex niet bij naam.
+
+De eerste keuze, **Zoals de organisatie**, is de standaard: de waarde die uw organisatie heeft
+ingesteld geldt voor dit team, en de keuze toont wat die waarde nu is. Kies een andere waarde om er
+een voor dit team alleen in te stellen; een latere wijziging van de waarde van de organisatie bereikt
+het team dan niet meer. Het veld staat er zodra de eigen pagina van de organisatie te kiezen is, dus
+u stelt beide in één keer in. Het werkt alleen voor een team dat de eigen pagina van de organisatie
+gebruikt.
+
+'Nooit' verbergt het aanbod en sluit de link, maar het is geen slot: de pagina heeft het adres van
+de vergadering nodig om deel te nemen, dus een deelnemer die weet waar te kijken kan toch een weg
+naar de Webex-app vinden.
 
 <!-- field: offer -->
 ### Aanbod per tijdblok
