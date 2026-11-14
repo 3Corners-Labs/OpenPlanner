@@ -547,20 +547,20 @@ async def test_the_webhook_target_carries_the_pause(
     assert (await service.webhook_target("andere", WXCC)).inbound_enabled
 
 
-async def test_the_paused_organisations_are_listed_for_the_status_screens_within_reach(
+async def test_the_paused_connections_are_listed_for_the_status_screens_within_reach(
     registering: ContactCenterConnectionService,
 ) -> None:
     """ADR 0124 point 9: a pause must show on the status screens, but only to who may see it."""
     await registering.save(SUPER, "demo", change())
     await registering.save(SUPER, "andere", change())
-    assert await registering.paused_organisations(SUPER) == []
+    assert await registering.paused_connections(SUPER) == {}
 
     await registering.set_inbound(SUPER, "andere", enabled=False)
 
-    assert await registering.paused_organisations(SUPER) == ["andere"]
-    assert await registering.paused_organisations(ORG_ADMIN) == []  # not its own organisation
+    assert await registering.paused_connections(SUPER) == {"andere": WXCC}
+    assert await registering.paused_connections(ORG_ADMIN) == {}  # not its own organisation
     await registering.set_inbound(SUPER, "andere", enabled=True)
-    assert await registering.paused_organisations(SUPER) == []
+    assert await registering.paused_connections(SUPER) == {}
 
 
 async def test_without_a_settings_key_no_organisation_is_paused(
@@ -570,4 +570,4 @@ async def test_without_a_settings_key_no_organisation_is_paused(
         uow, clock, AdminService(uow, clock), None, lambda: None
     )
 
-    assert await service.paused_organisations(SUPER) == []
+    assert await service.paused_connections(SUPER) == {}

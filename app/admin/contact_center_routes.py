@@ -20,7 +20,6 @@ from app.admin.delivery_status import delivery_view
 from app.admin.forms import Field, FormData, moment_label
 from app.admin.pages import Locale, SameOrigin
 from app.admin.source_findings import card_finding
-from app.domain.authorization import Principal
 from app.domain.contact_center import ContactCenterKind, OrganisationConnection, Registration
 from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.errors import DomainError
@@ -180,24 +179,6 @@ async def connection_view(
         )
         if stored
         else None,
-    }
-
-
-async def paused_addresses(request: Request, principal: Principal) -> dict[str, int]:
-    """Return the organisations whose webhook address is paused, with the events dropped for each.
-
-    For the status screens (ADR 0124 point 9): *Koppelingen* and the overview's status widget say
-    paused instead of showing a healthy or a silent connection. The count is this web process's
-    ledger (the window's), summed over the platforms an organisation could be connected to.
-    """
-    paused = await connection_service(request).paused_organisations(principal)
-    return {
-        slug: sum(
-            view.paused_dropped
-            for inbound in INBOUND.values()
-            if (view := ledger_view(request, AddressKey(inbound.source, slug))) is not None
-        )
-        for slug in paused
     }
 
 

@@ -243,7 +243,7 @@ def health_view(
     gettext: Callable[..., str],
     moment: Callable[[datetime], str],
     organisations: Callable[[str | None], bool],
-    paused: Mapping[str, int] | None = None,
+    paused: Mapping[tuple[Platform, str], int] | None = None,
 ) -> HealthView:
     """Return the health rows the reader may see (``organisations``) and the last webhooks.
 
@@ -253,8 +253,8 @@ def health_view(
         gettext: The request's translator.
         moment: Writes a time in the reader's zone.
         organisations: Whether the reader may see an organisation's rows.
-        paused: The organisations whose contact-center address is paused, with the events the
-            gate dropped for each (ADR 0124 point 9). A paused address is shown as paused: its
+        paused: The paused addresses by platform and organisation, with the events the gate
+            dropped at each (ADR 0124 point 9). A paused address is shown as paused: its
             platform's last event stands still while it lasts, which is not health.
     """
     paused = paused or {}
@@ -267,7 +267,7 @@ def health_view(
             moment(entry.since),
             entry.requests,
             entry.failures,
-            entry.platform is Platform.WXCC and entry.organisation in paused,
+            (entry.platform, entry.organisation or "") in paused,
         )
         for entry in entries
         if organisations(entry.organisation)
@@ -278,7 +278,10 @@ def health_view(
             InboundRow(gettext(PLATFORM_LABELS[e.platform]), moment(e.at), e.kind, e.outcome)
             for e in inbound
         ],
-        [PausedRow(slug, dropped) for slug, dropped in sorted(paused.items())],
+        [
+            PausedRow(slug, dropped)
+            for (_, slug), dropped in sorted(paused.items(), key=lambda p: p[0][1])
+        ],
     )
 
 

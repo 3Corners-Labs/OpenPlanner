@@ -520,28 +520,33 @@ count under their platform and never per guessed slug, and at most `security_eve
 entries are kept (windows that ended are dropped first, then the oldest). A refused call writes
 nothing to the database for the ledger: a stranger cannot make the platform write.
 
-**The alert.** When one address passes `webhook_refusal_alert_count` (class C, default 20, 5 to 1000,
-read live) of the outcomes below inside the window, exactly one system event
-`webhook.refusal_alert` is written for the organisation (reason `too_many_refusals`, detail
-`platform:<code>,count:<n>,reasons:<codes>`, nothing else), once per address and window. A failure
-to write it changes no answer. What counts is what a passer-by cannot cause alone, because anyone
-who knows a slug can send calls that fail:
+**The alerts: two groups, one event each per address and window.** What the alert counts is split
+in two groups, each with the threshold `webhook_refusal_alert_count` (class C, default 20, 5 to
+1000, read live) and at most one system event `webhook.refusal_alert` per address and window,
+written for the organisation (reason `too_many_refusals`, detail
+`platform:<code>,group:<list|signed>,count:<n>,reasons:<codes>`, nothing else). So noise cannot
+hide a signal: one group spending its alert leaves the other its own. A failure to write an event
+changes no answer, and the event is tried again by the next counted outcome of its group.
 
-| Counted | Why |
-|---|---|
-| `stale` | It was signed: a replay, or a clock that is off |
-| any refusal from inside the connection's own list of networks, for a connection that has one | The caller is the supplier or someone inside its range, and still fails |
-| `network` while a delivery was verified earlier in the same window | The supplier's ranges may have changed and the list gone stale (point 3) |
-| a verified event about work this connection did not create (organisation addresses only) | Usually a subscription that points at the wrong address (point 12) |
+| Group | Counted | Why |
+|---|---|---|
+| `signed` | `stale` | It was signed: a replay, or a clock that is off |
+| `signed` | any refusal from inside the connection's own list of networks, for a connection that has one | The caller is the supplier or someone inside its range, and still fails |
+| `signed` | a verified event about work this connection did not create (organisation addresses only) | Usually a subscription that points at the wrong address (point 12) |
+| `list` | `network` while a delivery was verified earlier in the same window | The supplier's ranges may have changed and the list gone stale (point 3) |
 
-Not counted, however many: refusals from strangers (`invalid_signature`, `content_type`,
-`too_large`, `rate`, `unknown_address`, `source_unknown`, and `network` before any delivery in the
-window). An address of the installation is shared by every tenant of the platform, so work that
-is not ours is routine there and never counts; its alert, if it comes, names no organisation and
-only the superuser sees it. The accepted remainder: while real deliveries are arriving, a stranger
-who knows an organisation's slug and is outside its list can pass the threshold with `network`
-refusals alone (the refused-calls bucket of `rate_limit_webhook_per_minute` limits how fast); the
-alert says only that the list should be looked at, and changes nothing.
+A passer-by cannot cause the `signed` group alone. **The `list` alert can be raised by a stranger**
+who knows the address while real deliveries arrive: it costs one event per window and cannot hide
+the `signed` alert. It says only that the list should be looked at, and changes nothing. Not
+counted at all, however many: refusals from strangers (`invalid_signature`, `content_type`,
+`too_large`, `rate`, `unknown_address`, `source_unknown`) and `network` before any delivery in the
+window. An address of the installation is shared by every tenant of the platform, so work that is
+not ours is routine there and never counts; its alert, if it comes, names no organisation and
+only the superuser sees it.
+
+If the ledger is full (every entry inside its window and alerted) a new address is not recorded and
+the log line `webhook.ledger_full` names the platform; making room otherwise drops entries whose
+window ended, then the oldest that has not alerted, so a live alert state is never erased.
 
 ## Inbound: Webex webhooks (`POST /webhooks/webex`)
 

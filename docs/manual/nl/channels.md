@@ -173,13 +173,17 @@ beveiligingsgebeurtenissen, een instelling van de platformbeheerder). Een hersta
 elk proces telt voor zichzelf, dus een rustige kaart na een herstart zegt niets. De laatste tijden
 blijven staan zolang het proces draait.
 
-Gebeurt het volgende op dit adres binnen het venster vaker dan het *waarschuwingsaantal voor
-weigeringen* van het platform (standaard 20), dan meldt één systeemgebeurtenis het: een
-bezorging die wel getekend was maar te oud is, een weigering van een aanroep van binnen uw eigen
-netwerklijst, een weigering vanwege het netwerk nadat een bezorging was geaccepteerd (uw lijst kan
-verouderd zijn), of een gebeurtenis over werk dat deze koppeling niet heeft aangemaakt (de
-aanmelding wijst mogelijk naar het verkeerde adres). Aanroepen van vreemden die mislukken, staan
-op de kaart en geven geen melding.
+Er zijn twee meldingen, elk hooguit eenmaal per venster, zodat de een de ander niet kan
+verbergen. Gebeurt het volgende op dit adres binnen het venster vaker dan het *waarschuwingsaantal
+voor weigeringen* van het platform (standaard 20), dan meldt één systeemgebeurtenis het. Groep
+*signed*: een bezorging die wel getekend was maar te oud is, een weigering van een aanroep van
+binnen uw eigen netwerklijst, of een gebeurtenis over werk dat deze koppeling niet heeft
+aangemaakt (de aanmelding wijst mogelijk naar het verkeerde adres); een vreemde kan dit niet
+alleen veroorzaken. Groep *list*: weigeringen vanwege het netwerk nadat een bezorging was
+geaccepteerd, wat betekent dat uw lijst verouderd kan zijn. Een vreemde die het adres kent kan
+de *list*-melding ook veroorzaken terwijl echte bezorgingen binnenkomen: het kost één
+gebeurtenis per venster en verbergt niets. Andere mislukte aanroepen van vreemden staan op de
+kaart en geven geen melding.
 
 ## Wat wordt vastgelegd
 

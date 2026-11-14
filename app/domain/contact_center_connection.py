@@ -132,25 +132,21 @@ class ContactCenterConnectionService:
             return None
         return await self._connections.get(organisation_id)
 
-    async def paused_organisations(self, principal: Principal) -> list[str]:
-        """Return the slugs of the organisations whose webhook address is paused.
+    async def paused_connections(self, principal: Principal) -> dict[str, ContactCenterKind]:
+        """Return the organisations whose webhook address is paused, with their platform.
 
         For the status screens (ADR 0124 point 9), so that a pause reads as paused and not as a
         healthy or a silent connection. Only organisations the reader may manage integrations
-        for; empty without a settings key.
+        for; empty without a settings key. One read of the connections for all of them.
         """
         if self._connections is None:
-            return []
+            return {}
         async with self._uow.read() as tx:
             organisations = await tx.list_organisations(
                 scope_for(principal, Permission.INTEGRATIONS_MANAGE)
             )
-        paused: list[str] = []
-        for organisation in organisations:
-            stored = await self._connections.get(organisation.id)
-            if stored is not None and not stored.inbound_enabled:
-                paused.append(organisation.slug)
-        return paused
+        paused = await self._connections.paused([o.id for o in organisations])
+        return {o.slug: paused[o.id] for o in organisations if o.id in paused}
 
     async def webhook_target(self, slug: str, kind: ContactCenterKind) -> WebhookTarget:
         """Return whether an organisation's own webhook address exists (ADR 0032 point 10).

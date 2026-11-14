@@ -2,56 +2,69 @@
 
 from datetime import timedelta
 
-from app.domain.audit import Category, Outcome, Source
+import pytest
+
 from app.domain.inbound_gate import Refusal
 from app.domain.webhook_ledger import (
-    ALERT_ACTION,
     AddressKey,
+    AlertGroup,
     Delivered,
     WebhookLedger,
-    counts_toward_alert,
-    write_alert,
+    alert_group,
 )
 from app.domain.webhook_sources import ChainFault
 from tests.fakes.clock import FixedClock
-from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import NOW
 
 WINDOW = timedelta(minutes=15)
 ACME = AddressKey("webex_cc", "acme")
 
 
-def _ledger(*, threshold: int = 3, max_entries: int = 1000) -> tuple[WebhookLedger, FixedClock]:
+def _ledger(
+    *, threshold: int = 3, max_entries: int = 1000, dropped: list[str] | None = None
+) -> tuple[WebhookLedger, FixedClock]:
     clock = FixedClock(NOW)
-    return WebhookLedger(clock, WINDOW, threshold, max_entries=max_entries), clock
+    told = dropped if dropped is not None else []
+    return (
+        WebhookLedger(clock, WINDOW, threshold, max_entries=max_entries, on_dropped=told.append),
+        clock,
+    )
 
 
-# --- the rule: what the alert counts ----------------------------------------------------------
+# --- the rule: which group an outcome is counted in --------------------------------------------
 
 
-def test_only_what_a_passer_by_cannot_cause_alone_counts() -> None:
-    counted = {
-        "stale": counts_toward_alert(Refusal.STALE.value),
-        "unknown work": counts_toward_alert(Delivered.UNKNOWN_WORK.value),
-        "inside the list": counts_toward_alert(Refusal.SIGNATURE.value, inside_list=True),
-        "network after a delivery": counts_toward_alert(
-            Refusal.NETWORK.value, delivered_earlier=True
-        ),
-    }
-    ignored = {
-        "stranger's signature": counts_toward_alert(Refusal.SIGNATURE.value),
-        "stranger's size": counts_toward_alert(Refusal.TOO_LARGE.value),
-        "stranger's type": counts_toward_alert(Refusal.CONTENT_TYPE.value),
-        "stranger's rate": counts_toward_alert(Refusal.RATE.value),
-        "untrusted address": counts_toward_alert(Refusal.SOURCE_UNKNOWN.value),
-        "network without a delivery": counts_toward_alert(Refusal.NETWORK.value),
-        "no such address": counts_toward_alert(Refusal.UNKNOWN_ADDRESS.value),
-        "accepted": counts_toward_alert(Delivered.ACCEPTED.value),
-        "paused": counts_toward_alert(Delivered.PAUSED.value),
-    }
+def test_what_a_passer_by_cannot_cause_alone_is_the_signed_group() -> None:
+    assert alert_group(Refusal.STALE) is AlertGroup.SIGNED
+    assert alert_group(Delivered.UNKNOWN_WORK) is AlertGroup.SIGNED
+    assert alert_group(Refusal.SIGNATURE, inside_list=True) is AlertGroup.SIGNED
+    assert alert_group(Refusal.RATE, inside_list=True) is AlertGroup.SIGNED
 
-    assert all(counted.values()), counted
-    assert not any(ignored.values()), ignored
+
+def test_a_refusal_for_the_network_after_a_delivery_is_the_list_group() -> None:
+    assert alert_group(Refusal.NETWORK, delivered_earlier=True) is AlertGroup.LIST
+
+
+@pytest.mark.parametrize(
+    "outcome",
+    [
+        Refusal.SIGNATURE,
+        Refusal.TOO_LARGE,
+        Refusal.CONTENT_TYPE,
+        Refusal.RATE,
+        Refusal.SOURCE_UNKNOWN,
+        Refusal.NETWORK,
+        Refusal.UNKNOWN_ADDRESS,
+        Refusal.MALFORMED,
+        Delivered.ACCEPTED,
+        Delivered.DUPLICATE,
+        Delivered.PAUSED,
+    ],
+)
+def test_a_strangers_refusal_and_a_plain_delivery_join_no_group(
+    outcome: Refusal | Delivered,
+) -> None:
+    assert alert_group(outcome) is None
 
 
 def test_unknown_work_at_an_address_of_the_installation_is_routine_and_never_counts() -> None:
@@ -65,7 +78,7 @@ def test_unknown_work_at_an_address_of_the_installation_is_routine_and_never_cou
     assert not any(results)
     assert view is not None
     assert (view.outcomes, view.counted) == ({"unknown_work": 50}, 0)
-    assert not counts_toward_alert(Delivered.UNKNOWN_WORK.value, organisational=False)
+    assert alert_group(Delivered.UNKNOWN_WORK, organisational=False) is None
 
 
 # --- counting ---------------------------------------------------------------------------------
@@ -74,10 +87,8 @@ def test_unknown_work_at_an_address_of_the_installation_is_routine_and_never_cou
 def test_every_outcome_is_counted_per_address_and_the_times_are_kept() -> None:
     ledger, clock = _ledger()
 
-    ledger.delivered(ACME, Delivered.ACCEPTED)
-    ledger.delivered(ACME, Delivered.DUPLICATE)
-    ledger.delivered(ACME, Delivered.PAUSED)
-    ledger.delivered(ACME, Delivered.UNKNOWN_WORK)
+    for outcome in Delivered:
+        ledger.delivered(ACME, outcome)
     clock.advance(timedelta(minutes=1))
     ledger.refused(ACME, Refusal.SIGNATURE)
     ledger.refused(ACME, Refusal.SIGNATURE)
@@ -94,10 +105,8 @@ def test_every_outcome_is_counted_per_address_and_the_times_are_kept() -> None:
         "malformed": 1,
     }
     assert view.last_accepted == NOW
-    assert (view.last_refused_at, view.last_refused_reason) == (
-        NOW + timedelta(minutes=1),
-        "malformed",
-    )
+    assert view.last_refused_at == NOW + timedelta(minutes=1)
+    assert view.last_refused_reason == "malformed"
     assert view.paused_dropped == 1
 
 
@@ -153,19 +162,19 @@ def test_an_unknown_address_counts_under_its_platform_and_never_under_a_slug() -
     assert ledger.size == 1
 
 
-# --- the alert --------------------------------------------------------------------------------
+# --- the alerts: two groups, one each per window ------------------------------------------------
 
 
-def test_the_alert_comes_once_when_the_counted_refusals_pass_the_threshold() -> None:
+def test_the_signed_alert_comes_once_when_its_count_passes_the_threshold() -> None:
     ledger, _ = _ledger(threshold=3)
 
     results = [ledger.refused(ACME, Refusal.STALE) for _ in range(6)]
 
     alerts = [a for a in results if a is not None]
     assert results[:3] == [None, None, None]
-    assert len(alerts) == 1
-    assert results[3] is alerts[0]
-    assert (alerts[0].key, alerts[0].count, alerts[0].reasons) == (ACME, 4, ("stale",))
+    assert alerts == [results[3]]
+    assert (alerts[0].key, alerts[0].group, alerts[0].count) == (ACME, AlertGroup.SIGNED, 4)
+    assert alerts[0].reasons == ("stale",)
 
 
 def test_the_alert_names_the_reasons_it_counted_and_nothing_else() -> None:
@@ -213,20 +222,79 @@ def test_a_refusal_for_the_network_counts_only_after_a_delivery_in_the_same_wind
 
     assert not any(before)
     assert [a is not None for a in after] == [False, False, False, True]
+    assert after[3] is not None
+    assert after[3].group is AlertGroup.LIST
 
     clock.advance(WINDOW)  # the next window has had no delivery yet
     assert not any(ledger.refused(ACME, Refusal.NETWORK) for _ in range(10))
 
 
-def test_every_verified_outcome_shows_the_supplier_reaches_us() -> None:
-    for outcome in (Delivered.DUPLICATE, Delivered.PAUSED, Delivered.UNKNOWN_WORK):
-        ledger, _ = _ledger(threshold=99)
-        ledger.delivered(ACME, outcome)
-        ledger.refused(ACME, Refusal.NETWORK)
+@pytest.mark.parametrize("outcome", [Delivered.DUPLICATE, Delivered.PAUSED, Delivered.UNKNOWN_WORK])
+def test_every_verified_outcome_shows_the_supplier_reaches_us(outcome: Delivered) -> None:
+    ledger, _ = _ledger(threshold=1)
+    ledger.delivered(ACME, outcome)
 
-        view = ledger.view(ACME)
-        assert view is not None
-        assert view.counted == (2 if outcome is Delivered.UNKNOWN_WORK else 1)
+    ledger.refused(ACME, Refusal.NETWORK)
+    alert = ledger.refused(ACME, Refusal.NETWORK)
+
+    assert alert is not None
+    assert alert.group is AlertGroup.LIST
+
+
+def test_a_stranger_passing_the_list_threshold_cannot_hide_the_signed_alert() -> None:
+    """The point of two groups: noise spends its own alert, not the signal's."""
+    ledger, _ = _ledger(threshold=3)
+    ledger.delivered(ACME, Delivered.ACCEPTED)
+
+    noise = [ledger.refused(ACME, Refusal.NETWORK) for _ in range(10)]
+    signal = [ledger.refused(ACME, Refusal.STALE) for _ in range(6)]
+
+    assert [a.group for a in noise if a] == [AlertGroup.LIST]
+    assert [a.group for a in signal if a] == [AlertGroup.SIGNED]
+
+
+def test_each_group_alerts_at_most_once_per_window() -> None:
+    ledger, _ = _ledger(threshold=1)
+    ledger.delivered(ACME, Delivered.ACCEPTED)
+
+    alerts = [ledger.refused(ACME, reason) for reason in (Refusal.NETWORK, Refusal.STALE) * 10]
+
+    assert sorted(a.group for a in alerts if a) == [AlertGroup.LIST, AlertGroup.SIGNED]
+
+
+def test_an_alert_that_could_not_be_written_is_raised_again_by_the_next_counted_outcome() -> None:
+    ledger, _ = _ledger(threshold=1)
+    ledger.refused(ACME, Refusal.STALE)
+    alert = ledger.refused(ACME, Refusal.STALE)
+    assert alert is not None
+    assert ledger.refused(ACME, Refusal.STALE) is None  # marked
+
+    ledger.retract(alert)
+
+    again = ledger.refused(ACME, Refusal.STALE)
+    assert again is not None
+    assert (again.group, again.count) == (AlertGroup.SIGNED, 4)
+
+
+def test_taking_a_mark_back_touches_neither_the_other_group_nor_a_later_window() -> None:
+    ledger, clock = _ledger(threshold=1)
+    ledger.delivered(ACME, Delivered.ACCEPTED)
+    ledger.refused(ACME, Refusal.NETWORK)
+    listed = ledger.refused(ACME, Refusal.NETWORK)
+    ledger.refused(ACME, Refusal.STALE)
+    signed = ledger.refused(ACME, Refusal.STALE)
+    assert listed is not None
+    assert signed is not None
+
+    ledger.retract(listed)
+    assert ledger.refused(ACME, Refusal.STALE) is None  # the signed mark stays
+
+    clock.advance(WINDOW)
+    ledger.refused(ACME, Refusal.STALE)
+    later = ledger.refused(ACME, Refusal.STALE)
+    assert later is not None
+    ledger.retract(signed)  # an old window's alert: nothing to take back
+    assert ledger.refused(ACME, Refusal.STALE) is None
 
 
 def test_the_threshold_is_read_at_each_call() -> None:
@@ -243,24 +311,64 @@ def test_the_threshold_is_read_at_each_call() -> None:
 # --- bounded memory ---------------------------------------------------------------------------
 
 
-def test_the_ledger_never_holds_more_entries_than_its_cap_and_drops_the_oldest_first() -> None:
-    ledger, clock = _ledger(max_entries=3)
-    for slug in ("a", "b", "c"):
-        ledger.refused(AddressKey("webex_cc", slug), Refusal.MALFORMED)
-        clock.advance(timedelta(seconds=1))
+def _key(slug: str) -> AddressKey:
+    return AddressKey("webex_cc", slug)
 
-    ledger.refused(AddressKey("webex_cc", "d"), Refusal.MALFORMED)
+
+def test_room_is_made_first_from_entries_whose_window_ended() -> None:
+    ledger, clock = _ledger(threshold=1, max_entries=2)
+    for _ in range(3):
+        ledger.refused(_key("old"), Refusal.STALE)  # alerted
+    clock.advance(WINDOW)
+    ledger.refused(_key("fresh"), Refusal.MALFORMED)
+
+    ledger.refused(_key("new"), Refusal.MALFORMED)
+
+    assert ledger.view(_key("old")) is None  # ended: gone although it alerted
+    assert ledger.view(_key("fresh")) is not None
+    assert ledger.view(_key("new")) is not None
+
+
+def test_then_the_oldest_entry_that_has_not_alerted_goes_and_an_alerted_one_stays() -> None:
+    ledger, clock = _ledger(threshold=1, max_entries=3)
+    for _ in range(3):
+        ledger.refused(_key("alerted"), Refusal.STALE)  # the oldest, but alerted
+    clock.advance(timedelta(seconds=1))
+    ledger.refused(_key("quiet-old"), Refusal.MALFORMED)
+    clock.advance(timedelta(seconds=1))
+    ledger.refused(_key("quiet-new"), Refusal.MALFORMED)
+
+    ledger.refused(_key("new"), Refusal.MALFORMED)
 
     assert ledger.size == 3
-    assert ledger.view(AddressKey("webex_cc", "a")) is None
-    assert ledger.view(AddressKey("webex_cc", "d")) is not None
+    assert ledger.view(_key("alerted")) is not None
+    assert ledger.view(_key("quiet-old")) is None
+    assert ledger.view(_key("quiet-new")) is not None
+    assert ledger.view(_key("new")) is not None
+
+
+def test_when_every_entry_is_live_and_alerted_the_new_address_is_not_recorded() -> None:
+    dropped: list[str] = []
+    ledger, _ = _ledger(threshold=1, max_entries=2, dropped=dropped)
+    for slug in ("a", "b"):
+        for _ in range(3):
+            ledger.refused(_key(slug), Refusal.STALE)
+
+    result = ledger.refused(_key("c"), Refusal.STALE)
+
+    assert result is None
+    assert dropped == ["webex_cc"]  # the platform's code, never the slug
+    assert ledger.size == 2
+    assert ledger.view(_key("c")) is None
+    assert ledger.view(_key("a")) is not None
+    assert ledger.view(_key("b")) is not None
 
 
 def test_a_flood_over_many_addresses_stays_within_the_cap() -> None:
     ledger, _ = _ledger(max_entries=50)
 
     for index in range(5000):
-        ledger.refused(AddressKey("webex_cc", f"org{index}"), Refusal.MALFORMED)
+        ledger.refused(_key(f"org{index}"), Refusal.MALFORMED)
 
     assert ledger.size == 50
 
@@ -273,44 +381,5 @@ def test_a_view_holds_codes_counts_and_times_only() -> None:
     view = ledger.view(ACME)
 
     assert view is not None
-    texts = {*view.outcomes, *(fault.value for fault in view.faults)}
-    assert texts <= {"accepted", "source_unknown", "no_address"}
-    assert all(isinstance(n, int) for n in (*view.outcomes.values(), *view.faults.values()))
-
-
-# --- the event --------------------------------------------------------------------------------
-
-
-async def test_the_alert_is_one_system_event_for_the_organisation_with_codes_only() -> None:
-    ledger, _ = _ledger(threshold=1)
-    ledger.refused(ACME, Refusal.STALE)
-    alert = ledger.refused(ACME, Refusal.MALFORMED, inside_list=True)
-    assert alert is not None
-    uow = InMemoryUnitOfWork(State())
-
-    await write_alert(uow, alert, NOW)
-
-    (event,) = uow.state.audit
-    assert (event.action, event.outcome, event.source) == (
-        ALERT_ACTION,
-        Outcome.FAILURE,
-        Source.SYSTEM,
-    )
-    assert (event.organisation, event.group, event.category) == ("acme", None, Category.SYSTEM)
-    assert event.detail == "platform:webex_cc,count:2,reasons:malformed+stale"
-    assert event.reason == "too_many_refusals"
-
-
-async def test_an_alert_for_an_installation_address_names_no_organisation() -> None:
-    ledger, _ = _ledger(threshold=1)
-    key = AddressKey("webex")
-    ledger.refused(key, Refusal.STALE)
-    alert = ledger.refused(key, Refusal.STALE)
-    assert alert is not None
-    uow = InMemoryUnitOfWork(State())
-
-    await write_alert(uow, alert, NOW)
-
-    (event,) = uow.state.audit
-    assert event.organisation is None
-    assert event.detail.startswith("platform:webex,")
+    assert view.outcomes == {"accepted": 1, "source_unknown": 1}
+    assert view.faults == {ChainFault.NO_ADDRESS: 1}

@@ -17,10 +17,16 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
+from fastapi import Request
+
+from app.adapters.contact_centers import INBOUND
+from app.domain.authorization import Principal
+from app.domain.connection_health import Platform
 from app.domain.inbound_gate import Refusal
-from app.domain.webhook_ledger import Delivered, LedgerView
+from app.domain.webhook_ledger import AddressKey, Delivered, LedgerView
 from app.domain.webhook_sources import ChainFault
 from app.i18n import BoundGettext
+from app.web.webhook_ledger import ledger_view
 
 OUTCOME_LABELS: dict[str, str] = {
     Delivered.ACCEPTED.value: "admin.delivery.outcome.accepted",
@@ -120,3 +126,22 @@ def delivery_view(
         view.inside_list,
         view.paused_dropped,
     )
+
+
+async def paused_addresses(
+    request: Request, principal: Principal
+) -> dict[tuple[Platform, str], int]:
+    """Return the paused webhook addresses, keyed by platform and organisation's slug.
+
+    For the status screens (ADR 0124 point 9): each says paused instead of showing a healthy or a
+    silent connection, looking up its own platform. The value is the events this web process
+    dropped at the address in the window (its ledger). Only organisations the reader may manage
+    integrations for.
+    """
+    service = request.app.state.contact_center_connection_service
+    found: dict[tuple[Platform, str], int] = {}
+    for slug, kind in (await service.paused_connections(principal)).items():
+        inbound = INBOUND[kind]
+        view = ledger_view(request, AddressKey(inbound.source, slug))
+        found[(inbound.platform, slug)] = view.paused_dropped if view else 0
+    return found

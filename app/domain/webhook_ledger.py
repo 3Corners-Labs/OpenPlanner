@@ -12,13 +12,15 @@ decides an outcome:
 **It lives in memory, in the web process**, like the security log and the rate limiter. A restart
 empties it, and each process keeps its own: what the card shows is what *this* process has seen
 since the window began (the card says so). Nothing is written to the database when a call is
-refused: a stranger must not be able to make the platform write. Only the alert, which a stranger
-cannot cause alone, is written (``write_alert``).
+refused: a stranger must not be able to make the platform write. Only the alert is written, by
+``app.web.webhook_ledger`` (the web side owns the unit of work, as ``app.web.security_events``).
 
 What it holds is bounded and holds nothing personal. An entry exists only for an address that
 exists (a platform and an organisation's slug, or the installation); calls to an address that does
 not exist count under their platform, never per guessed slug. At most ``max_entries`` entries are
-kept; beyond that the ones whose window ended are dropped first, then the oldest. An entry holds
+kept. Making room never erases a live alert state: entries whose window ended go first, then the
+oldest entry that has not alerted in its window; when every entry is inside its window and has
+alerted, the new address is not recorded (``on_dropped`` is told its platform). An entry holds
 codes (outcomes and reasons from closed lists), counts and times: no body, header, signature,
 address or pseudonym.
 
@@ -26,13 +28,19 @@ A window starts with the first call to an address after the previous window ende
 long as the security log's (``security_event_window_minutes``). The counts start again with the
 next window; the last accepted and last refused times stay.
 
-**The alert rule** (``counts_toward_alert``) counts what a passer-by cannot cause alone, because
-anyone who knows a slug can send calls that fail: a ``stale`` delivery (it was signed), any
-refusal from inside the connection's own list of networks, a refusal for the network while a
-delivery was verified earlier in the same window (the list may have gone stale, point 3), and an
-event about work this connection did not create (point 12). When their number passes
-``webhook_refusal_alert_count`` the ledger returns one ``Alert`` for the window; ``write_alert``
-turns it into one system event for the organisation.
+**Two alerts per address and window, one per group** (``alert_group``), each with the threshold
+``webhook_refusal_alert_count``, so noise cannot hide a signal:
+
+- ``list``: a refusal for the network while a delivery was verified earlier in the same window
+  (point 3: the list may have gone stale). A stranger who knows the address can cause this while
+  real deliveries arrive; it costs one event per window and cannot hide the other alert.
+- ``signed``: what a passer-by cannot cause alone: a ``stale`` delivery (it was signed), any
+  refusal from inside the connection's own list of networks, and an event about work this
+  connection did not create (point 12, an organisation's own address only).
+
+When a group passes the threshold the ledger returns one ``Alert`` for that group and window. If
+the event could not be written, ``retract`` takes the mark back and the next counted outcome
+raises it again.
 """
 
 from collections.abc import Callable
@@ -40,17 +48,10 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
 
-from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
 from app.domain.inbound_gate import Refusal
-from app.domain.ports import Clock, UnitOfWork
+from app.domain.ports import Clock
 from app.domain.tunable import value_of
 from app.domain.webhook_sources import ChainFault
-
-ALERT_ACTION = "webhook.refusal_alert"
-"""The system event an address that passed the threshold raises, once per window."""
-
-ALERT_REASON = "too_many_refusals"
-"""Reason of ``webhook.refusal_alert``."""
 
 
 class Delivered(StrEnum):
@@ -64,6 +65,15 @@ class Delivered(StrEnum):
     """Verified at a paused address and dropped (point 9)."""
     UNKNOWN_WORK = "unknown_work"
     """Verified, about work this connection did not create (point 12); answered 204."""
+
+
+class AlertGroup(StrEnum):
+    """The two kinds of outcome the alert counts, each with its own count and its own alert."""
+
+    LIST = "list"
+    """A refusal for the network after a verified delivery: a stale list, or a stranger."""
+    SIGNED = "signed"
+    """Signed or from inside the list, or unknown work: what a passer-by cannot cause alone."""
 
 
 @dataclass(frozen=True)
@@ -83,17 +93,17 @@ class AddressKey:
     unknown: bool = False
 
 
-def counts_toward_alert(
-    reason: str,
+def alert_group(
+    outcome: Refusal | Delivered,
     *,
     inside_list: bool = False,
     delivered_earlier: bool = False,
     organisational: bool = True,
-) -> bool:
-    """Return whether an outcome joins the alert (ADR 0124 points 3, 10 and 12).
+) -> AlertGroup | None:
+    """Return the group an outcome is counted in for the alert, or ``None`` (ADR 0124 10, 12).
 
     Args:
-        reason: A refusal's code, or ``unknown_work``.
+        outcome: A refusal's reason, or what came of a verified call.
         inside_list: The call came from inside the connection's own list of networks (a list
             applies and the source check passed).
         delivered_earlier: A call was verified for this address earlier in the same window.
@@ -101,28 +111,34 @@ def counts_toward_alert(
             shared by every tenant of the platform, so an event about work that is not ours is
             routine there and never counts.
     """
-    if reason == Delivered.UNKNOWN_WORK.value:
-        return organisational
-    if reason == Refusal.STALE.value:
-        return True
-    if reason in {r.value for r in Refusal}:
-        return inside_list or (reason == Refusal.NETWORK.value and delivered_earlier)
-    return False
+    if outcome is Delivered.UNKNOWN_WORK:
+        return AlertGroup.SIGNED if organisational else None
+    if not isinstance(outcome, Refusal):
+        return None
+    if outcome is Refusal.STALE or inside_list:
+        return AlertGroup.SIGNED
+    if outcome is Refusal.NETWORK and delivered_earlier:
+        return AlertGroup.LIST
+    return None
 
 
 @dataclass(frozen=True)
 class Alert:
-    """An address that passed the threshold in this window; the system event says exactly this.
+    """An address whose group passed the threshold in this window; the event says exactly this.
 
     Attributes:
         key: The address.
-        count: How many outcomes were counted when it passed.
-        reasons: The codes of what was counted, sorted; nothing else.
+        group: Which group of outcomes passed it.
+        count: How many outcomes of the group were counted when it passed.
+        reasons: The codes of what the group counted, sorted; nothing else.
+        started: When the window it belongs to began (so ``retract`` never touches a later one).
     """
 
     key: AddressKey
+    group: AlertGroup
     count: int
     reasons: tuple[str, ...]
+    started: datetime
 
 
 @dataclass(frozen=True)
@@ -134,7 +150,7 @@ class LedgerView:
         outcomes: Calls per outcome code in the window (``Delivered`` and ``Refusal`` values).
         faults: The faults of single calls (the caller is the proxy, ...) by kind, in the window.
         inside_list: Refusals in the window that came from inside the connection's own list.
-        counted: How many outcomes the alert counted in the window.
+        counted: How many outcomes the alert counted in the window, over both groups.
         last_accepted: When a delivery was last accepted, across windows.
         last_refused_at: When a call was last refused, across windows.
         last_refused_reason: The code of that refusal.
@@ -162,10 +178,10 @@ class _Entry:
     started: datetime
     outcomes: dict[str, int] = field(default_factory=dict)
     faults: dict[ChainFault, int] = field(default_factory=dict)
-    counted: dict[str, int] = field(default_factory=dict)
+    counted: dict[AlertGroup, dict[str, int]] = field(default_factory=dict)
     inside_list: int = 0
     verified: bool = False
-    alerted: bool = False
+    alerted: set[AlertGroup] = field(default_factory=set)
     last_accepted: datetime | None = None
     last_refused: tuple[datetime, str] | None = None
 
@@ -174,7 +190,8 @@ class _Entry:
         self.started = now
         self.outcomes, self.faults, self.counted = {}, {}, {}
         self.inside_list = 0
-        self.verified = self.alerted = False
+        self.verified = False
+        self.alerted = set()
 
 
 class WebhookLedger:
@@ -183,9 +200,11 @@ class WebhookLedger:
     Args:
         clock: Current time.
         window: How long counts are kept together (``security_event_window_minutes``).
-        alert_count: The number of counted outcomes the alert needs to pass
+        alert_count: The number of counted outcomes a group needs to pass
             (``webhook_refusal_alert_count``); read at each call, so a portal change applies.
         max_entries: How many addresses are kept at most.
+        on_dropped: Told the platform's code when a new address could not be recorded because
+            every entry is inside its window and has alerted.
     """
 
     def __init__(
@@ -195,12 +214,14 @@ class WebhookLedger:
         alert_count: int | Callable[[], int],
         *,
         max_entries: int | Callable[[], int] = 1000,
+        on_dropped: Callable[[str], None] = lambda platform: None,
     ) -> None:
         """Store the collaborators; no address has been seen yet."""
         self._clock = clock
         self._window = window
         self._alert_count = alert_count
         self._max_entries = max_entries
+        self._on_dropped = on_dropped
         self._entries: dict[AddressKey, _Entry] = {}
 
     @property
@@ -217,13 +238,14 @@ class WebhookLedger:
         """
         now = self._clock.now()
         entry = self._entry(key, now)
+        if entry is None:
+            return None
         self._count(entry, outcome.value)
         entry.verified = True
         if outcome is Delivered.ACCEPTED:
             entry.last_accepted = now
-        if counts_toward_alert(outcome.value, organisational=key.organisation is not None):
-            return self._maybe_alert(key, entry, outcome.value)
-        return None
+        group = alert_group(outcome, organisational=key.organisation is not None)
+        return self._maybe_alert(key, entry, group, outcome.value)
 
     def refused(
         self,
@@ -243,17 +265,26 @@ class WebhookLedger:
         """
         now = self._clock.now()
         entry = self._entry(key, now)
+        if entry is None:
+            return None
         self._count(entry, reason.value)
         entry.last_refused = (now, reason.value)
         if fault is not None:
             entry.faults[fault] = entry.faults.get(fault, 0) + 1
         if inside_list:
             entry.inside_list += 1
-        if counts_toward_alert(
-            reason.value, inside_list=inside_list, delivered_earlier=entry.verified
-        ):
-            return self._maybe_alert(key, entry, reason.value)
-        return None
+        group = alert_group(reason, inside_list=inside_list, delivered_earlier=entry.verified)
+        return self._maybe_alert(key, entry, group, reason.value)
+
+    def retract(self, alert: Alert) -> None:
+        """Take back the mark of an alert whose event could not be written.
+
+        The next counted outcome of its group then raises it again. Nothing happens when the
+        window has moved on or the entry is gone.
+        """
+        entry = self._entries.get(alert.key)
+        if entry is not None and entry.started == alert.started:
+            entry.alerted.discard(alert.group)
 
     def view(self, key: AddressKey) -> LedgerView | None:
         """Return what the ledger knows of an address, or ``None`` when it never saw it.
@@ -265,77 +296,68 @@ class WebhookLedger:
         if entry is None:
             return None
         live = self._clock.now() - entry.started < value_of(self._window)
+        counted = sum(sum(codes.values()) for codes in entry.counted.values())
         return LedgerView(
             entry.started if live else None,
             dict(entry.outcomes) if live else {},
             dict(entry.faults) if live else {},
             entry.inside_list if live else 0,
-            sum(entry.counted.values()) if live else 0,
+            counted if live else 0,
             entry.last_accepted,
             entry.last_refused[0] if entry.last_refused else None,
             entry.last_refused[1] if entry.last_refused else None,
         )
 
-    def _entry(self, key: AddressKey, now: datetime) -> _Entry:
-        """Return the address's entry in its current window at ``now``; make room for a new one."""
+    def _entry(self, key: AddressKey, now: datetime) -> _Entry | None:
+        """Return the address's entry in its current window at ``now``, or ``None`` if full.
+
+        A new address needs room; when none can be made without erasing a live alert state it is
+        not recorded and ``on_dropped`` is told.
+        """
         entry = self._entries.get(key)
         if entry is None:
-            self._make_room(now)
+            if not self._make_room(now):
+                self._on_dropped(key.platform)
+                return None
             entry = self._entries[key] = _Entry(now)
         elif now - entry.started >= value_of(self._window):
             entry.start_window(now)
         return entry
 
-    def _make_room(self, now: datetime) -> None:
-        """Keep the ledger within its bound: windows that ended go first, then the oldest."""
+    def _make_room(self, now: datetime) -> bool:
+        """Keep the ledger within its bound without erasing a live alert state.
+
+        Entries whose window ended go first, then the oldest entry that has not alerted in its
+        window. Returns ``False`` when every entry is inside its window and has alerted.
+        """
         limit = value_of(self._max_entries)
         if len(self._entries) < limit:
-            return
+            return True
         window = value_of(self._window)
-        for stale in [k for k, e in self._entries.items() if now - e.started >= window]:
-            del self._entries[stale]
+        for ended in [k for k, e in self._entries.items() if now - e.started >= window]:
+            del self._entries[ended]
         while len(self._entries) >= limit:
-            oldest = min(self._entries, key=lambda k: self._entries[k].started)
-            del self._entries[oldest]
+            quiet = [k for k, e in self._entries.items() if not e.alerted]
+            if not quiet:
+                return False
+            del self._entries[min(quiet, key=lambda k: self._entries[k].started)]
+        return True
 
     @staticmethod
     def _count(entry: _Entry, code: str) -> None:
         """Add one to the window's count of ``code``."""
         entry.outcomes[code] = entry.outcomes.get(code, 0) + 1
 
-    def _maybe_alert(self, key: AddressKey, entry: _Entry, code: str) -> Alert | None:
-        """Count a call towards the alert and return the alert once the threshold is passed."""
-        entry.counted[code] = entry.counted.get(code, 0) + 1
-        total = sum(entry.counted.values())
-        if entry.alerted or total <= value_of(self._alert_count):
+    def _maybe_alert(
+        self, key: AddressKey, entry: _Entry, group: AlertGroup | None, code: str
+    ) -> Alert | None:
+        """Count a call in its group and return the group's alert once its threshold is passed."""
+        if group is None:
             return None
-        entry.alerted = True
-        return Alert(key, total, tuple(sorted(entry.counted)))
-
-
-async def write_alert(uow: UnitOfWork, alert: Alert, at: datetime) -> None:
-    """Write the alert as one system event for the organisation.
-
-    The detail carries the platform's code, the count and the reasons' codes; nothing from any
-    call. An address of the installation names no organisation, so only the superuser sees it.
-
-    Args:
-        uow: Opens the database transaction.
-        alert: What the ledger said.
-        at: When it happened.
-    """
-    detail = f"platform:{alert.key.platform},count:{alert.count},reasons:{'+'.join(alert.reasons)}"
-    async with uow.locked() as tx:
-        await tx.add_audit_event(
-            AuditEvent(
-                at,
-                SYSTEM_ACTOR,
-                ALERT_ACTION,
-                Outcome.FAILURE,
-                ALERT_REASON,
-                alert.key.organisation,
-                None,
-                detail,
-                Source.SYSTEM,
-            )
-        )
+        codes = entry.counted.setdefault(group, {})
+        codes[code] = codes.get(code, 0) + 1
+        total = sum(codes.values())
+        if group in entry.alerted or total <= value_of(self._alert_count):
+            return None
+        entry.alerted.add(group)
+        return Alert(key, group, total, tuple(sorted(codes)), entry.started)

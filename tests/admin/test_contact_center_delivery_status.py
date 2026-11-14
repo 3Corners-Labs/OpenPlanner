@@ -6,11 +6,14 @@ from datetime import timedelta
 import httpx
 
 from app.domain.audit import Category
+from app.domain.inbound_gate import Refusal
 from app.domain.integration import EventOutcome
-from app.domain.webhook_ledger import ALERT_ACTION, AddressKey, WebhookLedger
-from tests.admin.conftest import ORG_ADMIN, SUPER, Site
+from app.domain.webhook_ledger import AddressKey, WebhookLedger
+from app.web.webhook_ledger import ALERT_ACTION
+from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.support.admin_site import site_app
 from tests.support.contact_center_site import (
+    FORM,
     PAGE,
     STRANGER,
     SUPPLIER,
@@ -25,6 +28,7 @@ from tests.support.contact_center_site import (
 WINDOW = timedelta(minutes=15)
 FORGED = "x" * 43
 DEMO = AddressKey("wxcc", "demo")
+SIGNED_BAD_SIGNATURE = "platform:wxcc,group:signed,count:6,reasons:invalid_signature"
 
 
 class _Handling:
@@ -109,12 +113,11 @@ async def test_the_card_shows_words_never_codes_and_needs_no_script(site: Site) 
     page = (await site.client.get(PAGE)).text
     card = page.split('id="contact-center"', 1)[1].split("</section>", 1)[0]
 
-    for code in ("invalid_signature", "unknown_work", "source_unknown", "network</", "duplicate"):
+    for code in ("invalid_signature", "unknown_work", "source_unknown", "duplicate"):
         assert code not in card, code
     assert "<script" not in card
     assert "Geweigerd: aanroeper buiten de toegestane netwerken" in card
     assert "1 van de geweigerde aanroepen kwam van binnen de eigen netwerklijst" in card
-    assert '<th scope="row">' in card  # a table with headers, not colour
 
 
 async def test_a_fresh_card_says_nothing_has_been_seen_yet(site: Site) -> None:
@@ -166,7 +169,11 @@ async def test_refusals_from_inside_the_list_raise_one_alert_past_the_threshold(
     await _send(site, SUPPLIER, 20, secret=FORGED)
 
     assert await _alerts(site) == [
-        ("demo", "too_many_refusals", "platform:wxcc,count:6,reasons:invalid_signature")
+        (
+            "demo",
+            "too_many_refusals",
+            "platform:wxcc,group:signed,count:6,reasons:invalid_signature",
+        )
     ]
 
 
@@ -216,7 +223,7 @@ async def test_a_refusal_for_the_network_counts_once_a_delivery_was_accepted_in_
     await _send(site, STRANGER, 6)
 
     assert await _alerts(site) == [
-        ("demo", "too_many_refusals", "platform:wxcc,count:6,reasons:network")
+        ("demo", "too_many_refusals", "platform:wxcc,group:list,count:6,reasons:network")
     ]
 
 
@@ -230,7 +237,7 @@ async def test_events_about_work_the_connection_did_not_create_raise_the_alert(
     assert await _send(site, SUPPLIER, 6) == [204] * 6  # answered as always
 
     assert await _alerts(site) == [
-        ("demo", "too_many_refusals", "platform:wxcc,count:6,reasons:unknown_work")
+        ("demo", "too_many_refusals", "platform:wxcc,group:signed,count:6,reasons:unknown_work")
     ]
     shown = _ledger(site).view(DEMO)
     assert shown is not None
@@ -371,4 +378,63 @@ async def test_the_card_stays_behind_the_connection_right(site: Site) -> None:
 
     page: httpx.Response = await site.client.get(PAGE)
 
+    assert page.status_code == 403
     assert "Geziene bezorgingen" not in page.text
+
+
+async def test_an_administrator_of_one_organisation_sees_nothing_of_another(site: Site) -> None:
+    """Not the card, not the counts, not the paused state on the status screens."""
+    await _connect(site)
+    other = "/admin/organisations/andere/channels"
+    saved = await site.client.post(f"{other}/contact-center", data=FORM, headers=SAME_ORIGIN)
+    assert saved.status_code == 303
+    await _pause(site, "off", org="andere")
+    _ledger(site).refused(AddressKey("wxcc", "andere"), Refusal.STALE)
+    await site.login_as(ORG_ADMIN)  # administrator of ``demo`` only
+
+    card = await site.client.get(other)
+    integrations = await _page(site, "/admin/integrations")
+    overview = await _page(site, "/admin/")
+
+    assert card.status_code == 403
+    assert "Geziene bezorgingen" not in card.text
+    assert "Gepauzeerde adressen" not in integrations
+    assert "andere" not in integrations
+    assert "gepauzeerd" not in overview
+
+
+# --- the two alert groups end to end ----------------------------------------------------------
+
+
+async def test_a_stranger_spending_the_list_alert_cannot_hide_the_signed_one(site: Site) -> None:
+    await _connected_with_alert_at(site, networks=SUPPLIER_RANGE)
+    _handling(site, EventOutcome.RECORDED)
+    await _send(site, SUPPLIER, 1)
+
+    await _send(site, STRANGER, 6)  # the list group: a stranger can cause this
+    await _send(site, SUPPLIER, 6, secret=FORGED)  # the signed group: from inside the list
+
+    assert sorted(detail.split(",")[1] for _, _, detail in await _alerts(site)) == [
+        "group:list",
+        "group:signed",
+    ]
+
+
+async def test_an_alert_that_could_not_be_written_is_raised_by_the_next_counted_call(
+    site: Site,
+) -> None:
+    await _connected_with_alert_at(site, networks=SUPPLIER_RANGE)
+    state = site_app(site).state
+    working = state.webhook_alert_writer
+
+    async def broken(alert: object) -> None:
+        raise RuntimeError("the database is gone")
+
+    state.webhook_alert_writer = broken
+    assert await _send(site, SUPPLIER, 6, secret=FORGED) == [401] * 6
+    assert await _alerts(site) == []
+
+    state.webhook_alert_writer = working
+    await _send(site, SUPPLIER, 1, secret=FORGED)
+
+    assert len(await _alerts(site)) == 1

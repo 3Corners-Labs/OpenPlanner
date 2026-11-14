@@ -89,8 +89,8 @@
   {% endif %}
   {% if health.paused %}
   <h3 id="paused-heading">{{ _("admin.integrations.paused") }}</h3>
-  <p role="status"><span class="chip chip--warning">{{ _("admin.source.paused_chip") }}</span> {{ _("admin.integrations.paused_lead") }}</p>
-  <div class="table-scroll">
+  <p><span class="chip chip--warning">{{ _("admin.source.paused_chip") }}</span> {{ _("admin.integrations.paused_lead") }}</p>
+  <div class="table-scroll" role="region" aria-labelledby="paused-heading" tabindex="0">
   <table class="data-table">
     <caption class="visually-hidden">{{ _("admin.integrations.paused") }}</caption>
     <thead><tr><th scope="col">{{ _("admin.integrations.col.organisation") }}</th><th scope="col">{{ _("admin.delivery.paused_dropped") }}</th></tr></thead>

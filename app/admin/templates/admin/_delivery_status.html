@@ -1,17 +1,18 @@
-{#- What the gate has seen at one webhook address (ADR 0124 point 10): last accepted, last refused with its reason, the window's calls per outcome and the faults of single calls. Set `delivery` (a DeliveryView), `delivery_id` (the heading's id) and optionally `delivery_tag` (default h3) before including. Server-rendered, no script; the counts are this process's, since the window began. -#}
-{% set tag = delivery_tag|default("h3") %}
-<{{ tag }} id="{{ delivery_id }}">{{ _("admin.delivery.title") }}</{{ tag }}>
+{#- What the gate has seen at one webhook address (ADR 0124 point 10): last accepted, last refused with its reason, the window's calls per outcome and the faults of single calls. Set `delivery` (a DeliveryView), `delivery_id` (the heading's id) and optionally `delivery_tag` (default h3) and `delivery_label` (which address it is about, said in the heading when a page shows several) before including. Server-rendered, no script; the counts are this process's, since the window began. -#}
+{% set tag = delivery_tag|default("h3") %}{% set label = delivery_label|default("") %}
+<section aria-labelledby="{{ delivery_id }}">
+<{{ tag }} id="{{ delivery_id }}">{{ _("admin.delivery.title") }}{% if label %}: {{ label }}{% endif %}</{{ tag }}>
 <p class="hint">{{ _("admin.delivery.process_note") }}</p>
-<dl class="facts" aria-labelledby="{{ delivery_id }}">
+<dl class="facts">
   <div><dt>{{ _("admin.delivery.last_accepted") }}</dt><dd>{{ delivery.last_accepted }}</dd></div>
   <div><dt>{{ _("admin.delivery.last_refused") }}</dt><dd>{{ delivery.last_refused }}</dd></div>
   {% if delivery.window %}<div><dt>{{ _("admin.delivery.window") }}</dt><dd>{{ delivery.window }}</dd></div>{% endif %}
   <div><dt>{{ _("admin.delivery.paused_dropped") }}</dt><dd>{{ delivery.paused_dropped }}</dd></div>
 </dl>
 {% if delivery.outcomes %}
-<div class="table-scroll">
+<div class="table-scroll" role="region" aria-labelledby="{{ delivery_id }}-counts" tabindex="0">
 <table class="data-table">
-  <caption class="visually-hidden">{{ _("admin.delivery.counts") }}</caption>
+  <caption id="{{ delivery_id }}-counts" class="visually-hidden">{{ _("admin.delivery.counts") }}{% if label %}: {{ label }}{% endif %}</caption>
   <thead><tr><th scope="col">{{ _("admin.delivery.col.what") }}</th><th scope="col">{{ _("admin.delivery.col.calls") }}</th></tr></thead>
   <tbody>
     {% for row in delivery.outcomes %}<tr><th scope="row">{{ row.label }}</th><td>{{ row.count }}</td></tr>{% endfor %}
@@ -23,9 +24,9 @@
 <p class="empty-state">{{ _("admin.delivery.no_calls") }}</p>
 {% endif %}
 {% if delivery.faults %}
-<div class="table-scroll">
+<div class="table-scroll" role="region" aria-labelledby="{{ delivery_id }}-faults" tabindex="0">
 <table class="data-table">
-  <caption class="visually-hidden">{{ _("admin.delivery.faults") }}</caption>
+  <caption id="{{ delivery_id }}-faults" class="visually-hidden">{{ _("admin.delivery.faults") }}{% if label %}: {{ label }}{% endif %}</caption>
   <thead><tr><th scope="col">{{ _("admin.delivery.col.fault") }}</th><th scope="col">{{ _("admin.delivery.col.calls") }}</th></tr></thead>
   <tbody>
     {% for row in delivery.faults %}<tr><th scope="row">{{ row.label }}</th><td>{{ row.count }}</td></tr>{% endfor %}
@@ -33,3 +34,4 @@
 </table>
 </div>
 {% endif %}
+</section>

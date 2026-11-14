@@ -11,7 +11,7 @@ from app.domain.webhook_sources import (
     ChainFault,
     ProxyChain,
     SourceState,
-    check_source,
+    SourceVerdict,
     judge_source,
     source_list_that_applies,
     source_state,
@@ -22,6 +22,13 @@ LISTED = NetworkList(("8.8.8.0/24", "2001:4860:4860::/48"))
 NONE = NetworkList()
 UNREADABLE = NetworkList(unreadable=True)
 SOUND = ProxyChain(("172.31.240.2",), address_is_public=True, headers_ignored=False)
+
+
+def refusal_of(
+    caller: str | None, sources: NetworkList, *, required: bool, chain: ProxyChain
+) -> Refusal | None:
+    """Return only the refusal of the gate's one judgement of the source."""
+    return judge_source(caller, sources, required=required, chain=chain).refusal
 
 
 def chain(*trusted: str, public: bool = True, headers_ignored: bool = False) -> ProxyChain:
@@ -47,25 +54,23 @@ def test_an_unreadable_list_refuses_every_call_for_its_network_never_passes_it(
     caller: str | None, required: bool
 ) -> None:
     for bad_chain in (SOUND, chain("*")):
-        assert check_source(caller, UNREADABLE, required=required, chain=bad_chain) is (
+        assert refusal_of(caller, UNREADABLE, required=required, chain=bad_chain) is (
             Refusal.NETWORK
         )
 
 
 def test_an_address_without_a_list_accepts_any_source_unless_a_list_is_required() -> None:
-    assert check_source(SUPPLIER, NONE, required=False, chain=SOUND) is None
-    assert check_source("192.0.2.1", NONE, required=False, chain=SOUND) is None
-    assert check_source(SUPPLIER, NONE, required=True, chain=SOUND) is Refusal.NETWORK
+    assert refusal_of(SUPPLIER, NONE, required=False, chain=SOUND) is None
+    assert refusal_of("192.0.2.1", NONE, required=False, chain=SOUND) is None
+    assert refusal_of(SUPPLIER, NONE, required=True, chain=SOUND) is Refusal.NETWORK
 
 
 def test_a_caller_inside_the_list_passes_and_one_outside_it_is_refused_for_its_network() -> None:
-    assert check_source(SUPPLIER, LISTED, required=False, chain=SOUND) is None
-    assert check_source("2001:4860:4860:1::9", LISTED, required=True, chain=SOUND) is None
-    assert check_source("::ffff:8.8.8.8", LISTED, required=False, chain=SOUND) is None
-    assert check_source("8.8.4.4", LISTED, required=False, chain=SOUND) is Refusal.NETWORK
-    assert check_source("2001:4860:4861::1", LISTED, required=False, chain=SOUND) is (
-        Refusal.NETWORK
-    )
+    assert refusal_of(SUPPLIER, LISTED, required=False, chain=SOUND) is None
+    assert refusal_of("2001:4860:4860:1::9", LISTED, required=True, chain=SOUND) is None
+    assert refusal_of("::ffff:8.8.8.8", LISTED, required=False, chain=SOUND) is None
+    assert refusal_of("8.8.4.4", LISTED, required=False, chain=SOUND) is Refusal.NETWORK
+    assert refusal_of("2001:4860:4861::1", LISTED, required=False, chain=SOUND) is (Refusal.NETWORK)
 
 
 @pytest.mark.parametrize("trusted", ["*", "10.0.0.0/8", "172.31.0.0/16", "2001:db8::/32"])
@@ -76,15 +81,15 @@ def test_a_proxy_trust_wider_than_single_hosts_makes_the_address_untrustworthy(
     wide = chain(trusted)
 
     assert wide.standing_faults() == (ChainFault.WIDE_TRUST,)
-    assert check_source(SUPPLIER, LISTED, required=False, chain=wide) is Refusal.SOURCE_UNKNOWN
+    assert refusal_of(SUPPLIER, LISTED, required=False, chain=wide) is Refusal.SOURCE_UNKNOWN
     # even a caller that is in the list: the address is not believed
-    assert check_source("8.8.4.4", LISTED, required=True, chain=wide) is Refusal.SOURCE_UNKNOWN
+    assert refusal_of("8.8.4.4", LISTED, required=True, chain=wide) is Refusal.SOURCE_UNKNOWN
 
 
 @pytest.mark.parametrize("trusted", ["172.31.240.2", "172.31.240.2/32", "2001:db8::1/128"])
 def test_single_hosts_are_a_trustworthy_proxy(trusted: str) -> None:
     assert chain(trusted).standing_faults() == ()
-    assert check_source(SUPPLIER, LISTED, required=False, chain=chain(trusted)) is None
+    assert refusal_of(SUPPLIER, LISTED, required=False, chain=chain(trusted)) is None
 
 
 @pytest.mark.parametrize(
@@ -97,10 +102,10 @@ def test_an_entry_that_cannot_be_read_is_a_standing_fault_of_its_own_and_refuses
     unreadable = chain("172.31.240.2", entry)
 
     assert unreadable.standing_faults() == (ChainFault.UNREADABLE_TRUST,)
-    assert check_source(SUPPLIER, LISTED, required=False, chain=unreadable) is (
+    assert refusal_of(SUPPLIER, LISTED, required=False, chain=unreadable) is (
         Refusal.SOURCE_UNKNOWN
     )
-    assert check_source(SUPPLIER, NONE, required=False, chain=unreadable) is None
+    assert refusal_of(SUPPLIER, NONE, required=False, chain=unreadable) is None
     assert chain("*", entry).standing_faults() == (
         ChainFault.WIDE_TRUST,
         ChainFault.UNREADABLE_TRUST,
@@ -114,7 +119,7 @@ def test_a_caller_that_is_one_of_the_trusted_proxies_means_a_hop_did_not_hand_it
     behind = chain("172.31.240.2", "2001:db8:ffff::2")
 
     assert behind.fault_for(caller) is ChainFault.CALLER_IS_PROXY
-    assert check_source(caller, LISTED, required=False, chain=behind) is Refusal.SOURCE_UNKNOWN
+    assert refusal_of(caller, LISTED, required=False, chain=behind) is Refusal.SOURCE_UNKNOWN
     assert behind.fault_for(SUPPLIER) is None
 
 
@@ -125,7 +130,7 @@ def test_a_loopback_or_private_caller_while_the_public_address_is_public_is_not_
     private = NetworkList(("10.0.0.0/8", "::1/128"))
 
     assert SOUND.fault_for(caller) is ChainFault.HOP_NOT_HANDED_ON
-    assert check_source(caller, private, required=False, chain=SOUND) is Refusal.SOURCE_UNKNOWN
+    assert refusal_of(caller, private, required=False, chain=SOUND) is Refusal.SOURCE_UNKNOWN
 
 
 def test_a_private_caller_is_fine_when_the_public_address_is_private_too() -> None:
@@ -133,7 +138,7 @@ def test_a_private_caller_is_fine_when_the_public_address_is_private_too() -> No
 
     assert internal.fault_for("10.1.2.3") is None
     assert (
-        check_source("10.1.2.3", NetworkList(("10.1.0.0/16",)), required=False, chain=internal)
+        refusal_of("10.1.2.3", NetworkList(("10.1.0.0/16",)), required=False, chain=internal)
         is None
     )
 
@@ -144,8 +149,8 @@ def test_forwarded_headers_this_call_carried_and_the_server_ignored_make_it_untr
 
     assert ignored.standing_faults() == ()
     assert ignored.fault_for(SUPPLIER) is ChainFault.UNTRUSTED_HOP
-    assert check_source(SUPPLIER, LISTED, required=False, chain=ignored) is Refusal.SOURCE_UNKNOWN
-    assert check_source(SUPPLIER, LISTED, required=False, chain=chain("172.31.240.2")) is None
+    assert refusal_of(SUPPLIER, LISTED, required=False, chain=ignored) is Refusal.SOURCE_UNKNOWN
+    assert refusal_of(SUPPLIER, LISTED, required=False, chain=chain("172.31.240.2")) is None
     assert chain("*", headers_ignored=True).standing_faults() == (ChainFault.WIDE_TRUST,)
 
 
@@ -154,7 +159,7 @@ def test_a_caller_without_an_address_is_not_believed_when_a_list_applies(
     caller: str | None,
 ) -> None:
     assert SOUND.fault_for(caller) is ChainFault.NO_ADDRESS
-    assert check_source(caller, LISTED, required=False, chain=SOUND) is Refusal.SOURCE_UNKNOWN
+    assert refusal_of(caller, LISTED, required=False, chain=SOUND) is Refusal.SOURCE_UNKNOWN
 
 
 @pytest.mark.parametrize(
@@ -168,7 +173,7 @@ def test_a_caller_without_an_address_is_not_believed_when_a_list_applies(
 )
 def test_an_address_without_a_list_is_never_affected_by_the_proxy_chain(bad: ProxyChain) -> None:
     for caller in (SUPPLIER, "172.31.240.2", "127.0.0.1", None):
-        assert check_source(caller, NONE, required=False, chain=bad) is None
+        assert refusal_of(caller, NONE, required=False, chain=bad) is None
 
 
 def test_the_chain_is_read_from_the_settings_the_way_system_status_shows_them() -> None:
@@ -224,14 +229,19 @@ def test_the_judgement_names_the_fault_of_this_call_behind_a_source_unknown(
     """The card counts the per-call faults by kind; only ``source_unknown`` has one."""
     judged = judge_source(caller, LISTED, required=False, chain=chain(trusted))
 
-    assert judged == (Refusal.SOURCE_UNKNOWN, fault)
+    assert judged == SourceVerdict(Refusal.SOURCE_UNKNOWN, fault)
+    assert not judged.inside_list
 
 
-def test_the_judgement_names_no_fault_for_the_other_answers() -> None:
-    assert judge_source("8.8.4.4", LISTED, required=False, chain=SOUND) == (Refusal.NETWORK, None)
-    assert judge_source(SUPPLIER, LISTED, required=False, chain=SOUND) == (None, None)
-    assert judge_source(SUPPLIER, NONE, required=True, chain=SOUND) == (Refusal.NETWORK, None)
-    assert judge_source(SUPPLIER, UNREADABLE, required=False, chain=SOUND) == (
-        Refusal.NETWORK,
-        None,
-    )
+def test_the_judgement_says_whether_the_call_came_from_inside_the_list() -> None:
+    inside = judge_source(SUPPLIER, LISTED, required=False, chain=SOUND)
+    outside = judge_source("8.8.4.4", LISTED, required=False, chain=SOUND)
+    unlisted = judge_source(SUPPLIER, NONE, required=False, chain=SOUND)
+    unreadable = judge_source(SUPPLIER, UNREADABLE, required=False, chain=SOUND)
+    required = judge_source(SUPPLIER, NONE, required=True, chain=SOUND)
+
+    assert inside == SourceVerdict(None, None, inside_list=True)
+    assert outside == SourceVerdict(Refusal.NETWORK)
+    assert unlisted == SourceVerdict(None)  # no list applies: not "inside" one
+    assert unreadable == SourceVerdict(Refusal.NETWORK)
+    assert required == SourceVerdict(Refusal.NETWORK)

@@ -168,12 +168,15 @@ These numbers are of the running web process since the window began (the securit
 setting of the platform administrator). A restart empties them and each process counts for itself,
 so a quiet card after a restart means nothing. The last times stay while the process runs.
 
-When more than the platform's *refusal alert* number (20 by default) of the following happen at
-this address inside the window, one system event tells you: a delivery that was signed but is
-too old, a refusal for a call from inside your own list of networks, a refusal for the network
-after a delivery was accepted (your list may be out of date), or an event about work this
-connection did not create (the subscription may point at the wrong address). Calls from strangers
-that fail are counted on the card and raise nothing.
+There are two alerts, each at most once per window, so one cannot hide the other. When more than
+the platform's *refusal alert* number (20 by default) of the following happen at this address
+inside the window, one system event tells you. Group *signed*: a delivery that was signed but is
+too old, a refusal for a call from inside your own list of networks, or an event about work this
+connection did not create (the subscription may point at the wrong address); a stranger cannot
+cause these alone. Group *list*: refusals for the network after a delivery was accepted, which
+means your list may be out of date. A stranger who knows the address can also cause the *list*
+alert while real deliveries arrive: it costs one event per window and hides nothing. Other calls
+from strangers that fail are counted on the card and raise nothing.
 
 ## What is recorded
 

@@ -50,7 +50,7 @@ from app.admin.authz import (
     overview_layout,
 )
 from app.admin.closure_routes import closure_service
-from app.admin.contact_center_routes import paused_addresses
+from app.admin.delivery_status import paused_addresses
 from app.admin.forms import done_message
 from app.admin.integration_views import HEALTH_LABELS, PLATFORM_LABELS, worst_health
 from app.admin.live import key
@@ -502,12 +502,12 @@ async def _connection_rows(
     health: IntegrationHealthService = request.app.state.health_service
     entries, inbound = await health.overview()
     last = {event.platform: event for event in inbound}
-    paused = len(await paused_addresses(request, principal))
+    paused = await paused_addresses(request, principal)
     rows: list[StatusRow] = []
     for platform in Platform:
         state = worst_health(entries, platform)
         event = last.get(platform)
-        held = paused if platform is Platform.WXCC else 0
+        held = sum(1 for held_platform, _ in paused if held_platform is platform)
         if state is None and event is None and not held:
             continue
         label, tone = HEALTH_LABELS[state or HealthState.UNKNOWN]

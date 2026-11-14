@@ -6,10 +6,11 @@ lock (``BEGIN IMMEDIATE``) like every other writer.
 """
 
 import json
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, Protocol
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.adapters.crypto import SecretBox
@@ -22,6 +23,10 @@ class Secrets(Protocol):
 
     async def get(self, name: str) -> dict[str, object] | None:
         """Return the credential ``name``, or ``None``."""
+        ...
+
+    async def get_many(self, names: Sequence[str]) -> dict[str, dict[str, object]]:
+        """Return the credentials among ``names`` that exist, in one query."""
         ...
 
     async def put(self, name: str, value: dict[str, object], now: datetime) -> None:
@@ -54,6 +59,21 @@ class CredentialStore:
             return None
         value: dict[str, Any] = json.loads(self._box.open(name, row.nonce, row.ciphertext))
         return value
+
+    async def get_many(self, names: Sequence[str]) -> dict[str, dict[str, Any]]:
+        """Return the credentials among ``names`` that exist, read in one query."""
+        if not names:
+            return {}
+        async with AsyncSession(self._engine) as session:
+            rows = (
+                await session.scalars(
+                    select(IntegrationCredentialRow).where(IntegrationCredentialRow.name.in_(names))
+                )
+            ).all()
+        return {
+            row.name: json.loads(self._box.open(row.name, row.nonce, row.ciphertext))
+            for row in rows
+        }
 
     async def delete(self, name: str) -> None:
         """Remove the credential ``name``, if any."""

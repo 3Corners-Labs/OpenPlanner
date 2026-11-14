@@ -238,6 +238,23 @@ class _Failed:
     fault: ChainFault | None = None
 
 
+@dataclass(frozen=True)
+class _Passed:
+    """A call that passed every check up to the shape.
+
+    Attributes:
+        payload: The body as a JSON object.
+        now: The time the checks used.
+        identity: The identity of the verified body.
+        inside_list: A list applies and the call passed its source check.
+    """
+
+    payload: dict[str, Any]
+    now: datetime
+    identity: str
+    inside_list: bool
+
+
 def _json_object(body: bytes) -> dict[str, Any] | None:
     """Return the body as a JSON object, or ``None`` if it is not one."""
     try:
@@ -247,9 +264,7 @@ def _json_object(body: bytes) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
-async def _inspect(
-    request: Request, address: Address[InboundWebhook]
-) -> _Failed | tuple[dict[str, Any], datetime, str]:
+async def _inspect(request: Request, address: Address[InboundWebhook]) -> _Failed | _Passed:
     """Run the checks of an address that exists, up to the shape; no limit is counted here.
 
     The source network comes first (ADR 0124 point 3): a caller from outside the list, or whose
@@ -258,20 +273,19 @@ async def _inspect(
 
     Returns:
         The first check that fails (its reason, whether the call came from inside the list and
-        the fault of its proxy chain), else the payload, the time used and the identity of the
-        verified body.
+        the fault of its proxy chain), else the verified payload with the time used, the identity
+        of the body and whether the call came from inside the list.
     """
     settings: Settings = request.app.state.settings
-    source, fault = judge_source(
+    verdict = judge_source(
         client_address(request),
         address.sources,
         required=settings.webhook_source_networks_required,
         chain=proxy_chain(request),
     )
-    if source is not None:
-        return _Failed(source, fault=fault)
-    # The source check passed: with a list that applies, the call is from inside it.
-    inside = bool(address.sources.networks)
+    if verdict.refusal is not None:
+        return _Failed(verdict.refusal, fault=verdict.fault)
+    inside = verdict.inside_list
     if not accepts_content_type(request.headers.get("content-type")):
         return _Failed(Refusal.CONTENT_TYPE, inside)
     body = await read_capped(request, MAX_BODY_BYTES)
@@ -285,7 +299,7 @@ async def _inspect(
     payload = _json_object(body)
     if payload is None:
         return _Failed(Refusal.MALFORMED, inside)
-    return payload, now, body_identity(body)
+    return _Passed(payload, now, body_identity(body), inside)
 
 
 GATE_MARKER = "is_webhook_gate"
@@ -332,16 +346,13 @@ def webhook_gate[W: InboundWebhook](
                 fault=inspected.fault,
             )
         if not within_webhook_limit(source, bucket, caller):
-            await _refuse(
-                request, Refusal.RATE, address, inside_list=bool(address.sources.networks)
-            )
-        payload, now, identity = inspected
+            await _refuse(request, Refusal.RATE, address, inside_list=inspected.inside_list)
         if address.paused:
             # Verified, so a stranger cannot get a 204 this way; dropped before any handling.
             log.info("webhook.paused", source=source, organisation=organisation)
             await note_delivered(request, key_of(address), Delivered.PAUSED)
             raise WebhookPaused
-        return Delivery(address, payload, now, identity)
+        return Delivery(address, inspected.payload, inspected.now, inspected.identity)
 
     setattr(gate, GATE_MARKER, True)
     return gate
