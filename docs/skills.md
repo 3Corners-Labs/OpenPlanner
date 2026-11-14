@@ -11,6 +11,7 @@ green CI and a decision with the product owner's label (ADR 0078), never through
 |---|---|---|
 | Start | `/context-restore` | Pick up where the previous session stopped |
 | Before coding | `/plan-eng-review` | Check the design against the architecture rules before writing code |
+| Before coding, and before changing a shared symbol | Graphify MCP (`graphify_find`, `graphify_impact` with `include_risk=true`, `graphify_tests_for`) | Find the definition, the callers, the blast radius and the linked tests from the code graph instead of grepping; CLAUDE.md, *How to work in this repo*, says when to read the file instead |
 | While coding | `/freeze app/<module>` (optional) | Keep edits inside the module being built |
 | Bug or failing test | `/investigate` | Find the root cause before fixing |
 | Before the PR | `pre-pr-review` (repo) | The review CLAUDE.md asks for before every PR, in one command; see *Repo skills* |
