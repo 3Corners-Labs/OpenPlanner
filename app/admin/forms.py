@@ -183,6 +183,7 @@ DONE_MESSAGES: dict[str, str] = {
     "pool_archived": "admin.done.pool_archived",
     "staff_skills_saved": "admin.done.staff_skills_saved",
     "staff_screen_name_saved": "admin.done.staff_screen_name_saved",
+    "staff_screen_name_cleared": "admin.done.staff_screen_name_cleared",
     "staff_screen_name_unchanged": "admin.done.staff_screen_name_unchanged",
     # ADR 0121 step 2d: the flows of a service.
     "flow_created": "admin.done.flow_created",

@@ -187,6 +187,7 @@ async def test_more_ticks_than_the_organisation_can_have_skills_are_refused(site
     assert response.status_code == 422
     assert 'href="#skills-demo"' in response.text
     assert "Een gekozen vaardigheid bestaat niet meer" in response.text
+    assert 'href="/admin/staff" aria-current="page"' in response.text  # the entry stays active
     assert not [e for e in await audit_log(site) if e.detail.startswith("staff_skills")]
 
 
