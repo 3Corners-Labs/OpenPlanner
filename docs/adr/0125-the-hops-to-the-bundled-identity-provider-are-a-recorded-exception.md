@@ -102,7 +102,8 @@ Two other ways out were weighed:
    must carry `OIDC_ISSUER` exactly. Because the exception requires `OIDC_ISSUER`, the issuer
    of the bundled login is never derived from the internal address.
 4. **Recorded where the first exception is**: the outbound connections of `docs/dataflow.md`
-   (with rows for both hops, and the staff directory, which was missing), `docs/threat-model.md`,
+   (with rows for the three hops, and the staff directory, which was missing),
+   `docs/threat-model.md`,
    `docs/asvs.md` (V12.3.3), the architecture, the runbook, and the text of `oidc_incomplete` on
    System status. `oidc-check` already reports the internal back channel as expected (ADR 0112).
 5. **The provider is reached at a fixed address, never through a name the host could answer.**
@@ -126,10 +127,11 @@ Two other ways out were weighed:
    says the same.
 8. **A recovery for a host that ran on the name.** The runbook says what to do after an
    unexplained outage of the `idp` container on such a host, in an order that leaves nothing
-   behind: secure Keycloak's console, give both clients new secrets, check and disable what
-   nobody can explain in the realm and in Keycloak's own configuration, sign everyone out of
-   Keycloak and of the portal, and read the portal's audit log from the start of the outage
-   until the end of the recovery, because what was taken keeps working after it.
+   behind: realm `master` first and always (a new administrator password, what gives
+   administrator rights checked, its sessions ended), then new client secrets, then the
+   checks of realm `openplanner`, then everyone signed out of Keycloak and of the portal (with
+   the site's data cleared in staff browsers), and the portal's audit log read from the start
+   of the outage to the end of the recovery, because what was taken keeps working after it.
 
 ## Settings
 
@@ -158,9 +160,11 @@ want the hops chooses `--idp own`.
   product owner weighs that against production not starting at all with the default. Step 2
   should therefore be built before a production host goes live on `--idp bundled`; until then
   the advice for such a host is `--idp own`, and the installer's warning says so.
-- The admin console under `https://<host>/idp/admin/` and the forwarding of the portal's cookie
-  to the provider come from ADR 0112's route; this ADR records them, and closing them is a
-  decision of its own.
+- The admin console under `https://<host>/idp/admin/`, the forwarding of the portal's cookie to
+  the provider, and the fact that whatever answers `idp` serves pages and script on the
+  portal's own address (a service worker there can outlive the outage) come from ADR 0112's
+  route on the same host name; this ADR records them, and closing them is a decision of its
+  own.
 - `KEYCLOAK_ADMIN_URL` is still not checked at start-up: the staff directory exists only for
   the bundled provider (ADR 0095), and the render script writes its internal address. Step 2
   moves it to the fixed address with the login.

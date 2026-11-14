@@ -1019,30 +1019,36 @@ render and a restart of `idp` and `web`.
 step 2, web, worker and the proxy reach Keycloak by the name `idp`. While its container is
 down, this host's DNS may answer that name, and whoever answered may hold staff passwords and
 one-time codes, the portal's session cookie, Keycloak's own session cookies (of the console too)
-and both client secrets, and all of these work after the outage. When the `idp` container was
-down and the reason is not known (an update or a restart you did yourself is known), work
-through these steps in this order:
+and both client secrets, all of which work after the outage; it also served pages and script on
+the portal's own address. Nothing logs whether Keycloak's console was used in that time (the
+proxy keeps no access log, Keycloak no event log here), so assume it was. When the `idp`
+container was down and the reason is not known (an update or a restart you did yourself is
+known), work through these steps in this order:
 
-1. **Keycloak's console first**, if anyone opened it (`/idp/admin/`) during or after the
-   outage: give `admin` (realm `master`) a new password, using only `A-Z a-z 0-9 _ . : / -`;
-   write it as `KC_BOOTSTRAP_ADMIN_PASSWORD` in `secrets/keycloak.env` with an editor (the
-   installer logs in with it to set the realm's mail server); and sign out every session of realm
-   `master` (*Sessions* → *Sign out all active sessions*). Otherwise a stolen console session can
-   read the new client secrets of the next step.
+1. **Realm `master` first, always**, before any new secret exists (a `master` administrator can
+   read every client's secret):
+   - give `admin` a new password, using only `A-Z a-z 0-9 _ . : / -`, and write it as
+     `KC_BOOTSTRAP_ADMIN_PASSWORD` in `secrets/keycloak.env` with an editor (the installer logs
+     in with it to set the realm's mail server);
+   - remove what nobody can explain among what gives administrator rights in `master`: users
+     and groups with the realm role `admin` or with roles of the clients `master-realm` and
+     `openplanner-realm`, clients with a service account, identity providers and authentication
+     flows (a fresh installation has `admin` and none of the rest);
+   - sign out every session of realm `master` (*Sessions* → *Sign out all active sessions*).
 2. **New client secrets.** In realm `openplanner` → *Clients* → `openplanner-admin`, then
    `openplanner-directory` → *Credentials* → *Regenerate*. The old secrets stop working at once.
    Replace the values of `KC_OPENPLANNER_CLIENT_SECRET` and `KC_DIRECTORY_CLIENT_SECRET` in
    `secrets/keycloak.env` with the new ones, in an editor on the host (never on a command line,
    and do not add second lines: the render script reads the first), and run
    `scripts/render-keycloak-realm.sh`, which writes `secrets/keycloak-app.env` from them.
-3. **Check and disable before anyone is signed out**, so nothing planted logs in again:
-   - realm `openplanner`: its accounts and roles against the invitations and grants in the
-     portal's audit log (not against *Manage › Staff*, which reads the realm), and each
-     account's *Credentials* dates (a password reset or a removed authenticator nobody asked
-     for); disable what nobody can explain;
-   - Keycloak itself, which keeps no event log here: other administrators in realm `master`,
-     clients with `realm-management` roles, identity providers, authentication flows (the
-     browser flow must still ask for the second factor) and mappers, in both realms, against
+3. **Check and disable in realm `openplanner`**, now that the old directory secret no longer
+   works, and before anyone is signed out, so nothing planted logs in again:
+   - its accounts and roles against the invitations and grants in the portal's audit log (not
+     against *Manage › Staff*, which reads the realm), and each account's *Credentials* dates (a
+     password reset or a removed authenticator nobody asked for); disable what nobody can
+     explain;
+   - its clients with `realm-management` roles, identity providers, authentication flows (the
+     browser flow must still ask for the second factor) and mappers, against
      `deploy/keycloak/realm.template.json`.
 4. **Sign everyone out**: in Keycloak, realm `openplanner` → *Sessions* → *Sign out all active
    sessions*; in the portal, restart web and worker and end every admin session:
@@ -1051,10 +1057,13 @@ through these steps in this order:
    docker compose --env-file .env.update up -d web worker
    docker compose --env-file .env.update exec web python -m app.cli sessions end-all --reason cli
    ```
-5. **Read the audit log** from the start of the outage until step 4 was done: logins, staff
-   changes, API clients created or rotated, configuration exports and changes to integrations.
-   Staff whose password or authenticator may have been used reset it and register their
-   authenticator again.
+
+   Staff who used the portal since the outage began clear this site's data in their browser
+   (cookies, storage and service workers): whoever answered `idp` could have left script there.
+5. **Read the audit log** from the start of the outage to the end of the recovery, and undo what
+   nobody can explain: logins, staff changes, API clients created or rotated (revoke them),
+   configuration exports and changes to integrations. Staff whose password or authenticator may
+   have been used reset it and register their authenticator again.
 
 ## Webex meetings and Webex Contact Center
 
