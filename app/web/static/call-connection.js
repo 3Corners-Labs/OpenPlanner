@@ -303,6 +303,7 @@
     app.streams.remote = null;
     app.streams.audio = null;
     app.streams.share = null;
+    app.remote.offered(null);
     var leaving = joined && meeting ? giveUp(meeting.leave()) : Promise.resolve();
     return leaving.then(function () {
       if (client && client.meetings && client.meetings.registered) {

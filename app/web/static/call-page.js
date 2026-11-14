@@ -96,7 +96,6 @@
       lines: [], // the captions in view: their final lines (in memory only, gone with the call)
       interim: null, // the caption being spoken, until its final text arrives
       can: { share: false, captions: false }, // what the meeting offers this participant
-      stopHeld: false, // focus was last on the notice's stop button (it goes away with the share)
     };
   }
   var state = fresh();
@@ -196,6 +195,8 @@
   var view = app.view; // call-render.js, loaded before this file
 
   function render() {
+    // Taken before anything is hidden: did the notice's stop button, which goes with the share, have focus?
+    var stopHad = document.activeElement === $("[data-call-share-stop]");
     var screen = state.screen;
     var checking = screen === "check";
     var inCall = screen === "lobby" || screen === "call";
@@ -235,10 +236,12 @@
     $("[data-call-sound-note]").hidden = !state.soundPlayed;
     joinButton.textContent = joinLabel();
     renderCall(inCall);
-    // The notice's stop button goes away with the share; focus does not fall to the page.
-    if (state.stopHeld && state.share !== "mine") {
-      state.stopHeld = false;
-      $('[data-call-switch="share"]').focus();
+    // The stop button went away with the share; focus does not fall to the page: it goes to the
+    // switch of sharing when that is shown, else to the heading of the screen.
+    if (stopHad && state.share !== "mine") {
+      var toggle = $('[data-call-switch="share"]');
+      var target = toggle.hidden ? $('[data-call-state="' + screen + '"] h1') : toggle;
+      if (target) target.focus();
     }
   }
 
@@ -341,10 +344,8 @@
     app.callMedia.share(false);
   });
   $('[data-call-switch="captions"]').addEventListener("click", app.captions.press);
-  // The last place of focus: a stop button that goes away is not a stop button that loses focus.
-  document.addEventListener("focusin", function (event) {
-    state.stopHeld = event.target === $("[data-call-share-stop]");
-  });
+  // The captions' box may start or stop to scroll with the window's size.
+  window.addEventListener("resize", render);
   KINDS.forEach(function (kind) {
     toggles[kind].forEach(function (button) {
       button.addEventListener("click", function () {

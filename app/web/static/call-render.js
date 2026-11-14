@@ -8,7 +8,8 @@
  * and text, and nothing it draws is kept anywhere else.
  *
  * Never: it decides nothing, moves no focus, changes no state, makes no request and stores
- * nothing. `render` in call-page.js is the one caller and the one place that decides what is
+ * nothing. It does measure: the captions' box is looked at for its layout (does it scroll, at what place is
+ * the newest line), and the newest line's identity is kept on the box itself, never in the state. `render` in call-page.js is the one caller and the one place that decides what is
  * shown and the place focus goes to. Text of outside origin (a caption) is only ever set with `textContent`.
  */
 (function () {
@@ -86,24 +87,29 @@
     return paragraph;
   }
 
-  // The captions' lines, as text nodes only. The box scrolls inside itself, to the start of the
-  // newest line (or to its foot when that line is short); it takes focus only when it can scroll,
-  // and keeps the reader's place while it has focus.
+  // The captions' lines, as text nodes only. The box scrolls inside itself. When a new line has
+  // arrived it scrolls to the start of that line (or to its foot when the line is short); on any
+  // other change the reader place is kept. It takes focus only when it can scroll, and keeps it
+  // while it has focus.
   function captions(state) {
     var box = app.$("[data-call-captions]");
     var lines = app.captions.shown(state);
-    var reading = document.activeElement === box;
     var kept = box.scrollTop;
     box.replaceChildren.apply(box, lines.map(row));
     box.hidden = lines.length === 0;
     if (!lines.length) {
+      delete box.dataset.newest;
       box.removeAttribute("tabindex");
       return;
     }
     if (box.scrollHeight > box.clientHeight) box.setAttribute("tabindex", "0");
-    else box.removeAttribute("tabindex");
-    var last = box.lastElementChild;
-    box.scrollTop = reading ? kept : Math.min(box.scrollHeight - box.clientHeight, last.offsetTop);
+    else if (document.activeElement !== box) box.removeAttribute("tabindex");
+    var last = lines[lines.length - 1];
+    var newest = last.key + ":" + last.text;
+    var arrived = box.dataset.newest !== newest;
+    box.dataset.newest = newest;
+    var end = box.scrollHeight - box.clientHeight;
+    box.scrollTop = arrived ? Math.min(end, box.lastElementChild.offsetTop) : Math.min(kept, end);
   }
 
   // The one bar of the lobby and the call, its way out and the panel of devices.

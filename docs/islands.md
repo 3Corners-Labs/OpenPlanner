@@ -206,7 +206,7 @@ to another at run time goes through `app` and may reach a file loaded later.
   and only where the meeting offers them, sets `data-call-share` on the stage (a hook for the style only) and
   asks `call-render.js` (pure drawing of the call's parts out of the state) to draw the pictures, the notices,
   the sharing switches and the captions' lines. Where focus goes for the stop button that went away with a
-  share is decided in `render` out of the state (`stopHeld`, the last place of focus).
+  share is decided in `render` out of what had focus when it began (the notice's stop button): no field in the state.
 - **`call-status.js` owns** the queue behind the one polite status element: one sentence at a time, each
   kept on screen for a minimum time, none dropped, none repeated.
 - **`call-sound.js` owns** the level meter (a bar and a text that says whether the participant is heard) and
@@ -252,7 +252,7 @@ to another at run time goes through `app` and may reach a file loaded later.
 - **`call-remote.js` owns** the other side's picture, sound and screen: whether their picture moves (said once
   each way), playing their sound (and the button when the browser wants a tap), and the staff member's screen,
   which takes the place of their picture; their start ends the participant's own share through
-  `app.callMedia.endShare`, and one sentence says both. A screen that arrives when their share is over is not kept.
+  `app.callMedia.endShare`, and one sentence says both. A screen that arrives while their share is off waits only as pending (dropped at the end of the call or when it is no longer running) and is not kept as theirs.
 - **`call-render.js` owns** the drawing of the call's parts out of the state, as pure functions: the pictures,
   the notices, the sharing switches and the staff member's screen, the captions' lines and the bar with its
   panel. It decides nothing and moves no focus; `render` in `call-page.js` is the one caller.
@@ -293,9 +293,9 @@ to another at run time goes through `app` and may reach a file loaded later.
   with JavaScript, a camera and a microphone, the organisation's contact details (or one plain sentence
   when it has none) and, where the organisation allows it, the link to join another way.
 - **Used by:** the call page only (`call.html`, with `call-page.css`).
-- **Size** (lines): `call-status.js` 53, `call-sound.js` 130, `call-devices.js` 389, `call-connection.js` 438,
-  `call-media.js` 325, `call-captions.js` 187, `call-remote.js` 134, `call-render.js` 123, `call-events.js` 110,
-  `call-page.js` 372; about 0.8, 1.8, 4.1, 5.2, 4.0, 2.6, 2.0, 2.0, 1.7 and 5.1 KB gzipped (in the order of
+- **Size** (lines): `call-status.js` 53, `call-sound.js` 130, `call-devices.js` 389, `call-connection.js` 439,
+  `call-media.js` 334, `call-captions.js` 187, `call-remote.js` 142, `call-render.js` 129, `call-events.js` 110,
+  `call-page.js` 373; about 0.8, 1.8, 4.1, 5.3, 4.2, 2.6, 2.1, 2.2, 1.7 and 5.2 KB gzipped (in the order of
   the loading), about 4.6 KB gzipped (styles). `call-connection.js` and `call-devices.js` are the files to watch.
 
 ### `call-status.js`

@@ -16,7 +16,7 @@
  */
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { displayLog, displayMode, endDisplay, said, statuses, stubDisplay, type DisplayMode } from '../call-page';
+import { displayLog, displayMode, endDisplay, releaseDisplay, said, spy, statuses, stubDisplay, type DisplayMode } from '../call-page';
 import {
   callsOf,
   caption,
@@ -41,6 +41,7 @@ import {
   type Plan,
 } from '../call-sdk';
 import { expectNoAxeViolations, tabTo } from '../helpers';
+import { fixture } from '../pages';
 
 test.use({ locale: 'en-US' });
 
@@ -241,6 +242,41 @@ test('leaving, the meeting ending and the connection failing each stop a share t
     await expect.poll(async () => (await displayLog(other)).stops, how).toBeGreaterThan(0);
     await expect(notice(other, 'sharing')).toBeHidden();
   }
+});
+
+test('two presses in a row give one picker, one share and a stop that works', async ({ page }) => {
+  await inCall(page, {}, 'held');
+  await shareToggle(page).click(); // the picker is open
+  await shareToggle(page).click(); // a second press does not end a share that is starting
+  await frames(page);
+  expect((await displayLog(page)).requests).toBe(1);
+  expect(await callsOf(page, 'unpublishStreams')).toBe(0);
+  await releaseDisplay(page);
+  await pressed(shareToggle(page), true);
+  await expect(notice(page, 'sharing')).toBeVisible();
+  expect((await sdk(page)).published.filter((kind) => kind === 'screenShare')).toHaveLength(1);
+  expect((await displayLog(page)).stops).toBe(0); // nothing was taken out while it was being sent
+  await shareToggle(page).click();
+  await said(page, STOPPED);
+  await pressed(shareToggle(page), false);
+  expect((await displayLog(page)).stops).toBeGreaterThan(0);
+  await expect.poll(async () => callsOf(page, 'unpublishStreams')).toBe(1);
+});
+
+test('a meeting that stops allowing sharing while the picker is open gets no share when the picker answers', async ({ page }) => {
+  await inCall(page, {}, 'held');
+  await shareToggle(page).click();
+  await expect.poll(async () => (await displayLog(page)).requests).toBe(1);
+  await rights(page, false, true);
+  await expect(shareToggle(page)).toBeHidden();
+  await releaseDisplay(page);
+  await expect.poll(async () => (await displayLog(page)).stops).toBeGreaterThan(0); // the screen is given back
+  await expect(notice(page, 'sharing')).toBeHidden();
+  expect((await sdk(page)).published).not.toContain('screenShare');
+  await rights(page, true, true);
+  await pressed(shareToggle(page), false); // and the state is off: a new press is possible
+  await displayMode(page, 'ok');
+  await shareNow(page);
 });
 
 // ---- the staff member shares a screen -----------------------------------------------------------------
@@ -455,64 +491,88 @@ test('captions switched off stop, the lines go and the toggle says so; switched 
   expect(await timesSaid(page, CAPTIONS_OFF)).toBe(1);
 });
 
-test('the transcription is stopped when captions go off and when the call is left, ended or fails', async ({ page }) => {
-  await inCall(page);
-  await captionsToggle(page).click();
-  await said(page, CAPTIONS_ON);
-  await captionsToggle(page).click();
-  await said(page, CAPTIONS_OFF);
-  expect(await callsOf(page, 'stopTranscription')).toBe(1);
-  expect((await captioning(page)).on).toBe(false);
+// One test for each way the transcription ends; each joins once and waits on the double's own log
+// (the call was made), not on a sentence of the polite region, whose queue is not what is tested.
+for (const how of ['off', 'left', 'ended', 'failed'] as const) {
+  test(`the transcription is stopped when ${how === 'off' ? 'captions go off' : `the call is ${how}`}`, async ({ page }) => {
+    await inCall(page);
+    await captionsToggle(page).click();
+    await pressed(captionsToggle(page), true);
+    await expect.poll(async () => (await captioning(page)).on).toBe(true);
+    expect(await callsOf(page, 'stopTranscription')).toBe(0);
+    if (how === 'off') await captionsToggle(page).click();
+    else if (how === 'left') await leave(page).click();
+    else if (how === 'ended') await control(page, 'end');
+    else await reconnection(page, 'fail');
+    await expect.poll(async () => callsOf(page, 'stopTranscription')).toBe(1);
+    expect((await captioning(page)).on).toBe(false);
+  });
+}
 
-  for (const how of ['leave', 'end', 'fail'] as const) {
-    const other = await page.context().newPage();
-    await inCall(other);
-    await captionsToggle(other).click();
-    await said(other, CAPTIONS_ON);
-    expect(await callsOf(other, 'stopTranscription')).toBe(0);
-    if (how === 'leave') await leave(other).click();
-    else if (how === 'end') await control(other, 'end');
-    else await reconnection(other, 'fail');
-    await expect.poll(async () => callsOf(other, 'stopTranscription'), how).toBe(1);
-    expect((await captioning(other)).on).toBe(false);
-  }
-});
-
-test('a long caption can be read to its start, at twice the text size on a narrow window', async ({ page }) => {
+test('a long caption can be read to its start and to its end with the keyboard, at twice the text size on a narrow window', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 640 });
   await inCall(page);
   await page.evaluate(() => (document.documentElement.style.fontSize = '200%'));
   await captionsToggle(page).click();
-  await said(page, CAPTIONS_ON);
-  const long = Array.from({ length: 40 }, (_, n) => `word${n}`).join(' ');
-  await caption(page, [{ id: '1', text: 'A short line' }, { id: '2', text: long }]);
+  await pressed(captionsToggle(page), true);
+  const words = Array.from({ length: 40 }, (_, n) => `word${n}`);
+  await caption(page, [{ id: '1', text: 'A short line' }, { id: '2', text: words.join(' ') }]);
   await expect(rowsOf(page)).toHaveCount(2);
   const box = captionBox(page);
-  const measure = () =>
-    box.evaluate((el) => {
-      const last = el.lastElementChild as HTMLElement;
+  // Is the first (or last) word of the newest line inside the box's visible area? Client rects.
+  const visible = (which: 'first' | 'last') =>
+    box.evaluate((el, end) => {
+      const text = (el.lastElementChild as HTMLElement).querySelector('.call-caption__text')?.firstChild as Text;
+      const range = document.createRange();
+      if (end === 'first') range.setStart(text, 0), range.setEnd(text, 5);
+      else range.setStart(text, text.length - 5), range.setEnd(text, text.length);
+      const r = range.getBoundingClientRect();
       const b = el.getBoundingClientRect();
-      const r = last.getBoundingClientRect();
-      return { scrolls: el.scrollHeight > el.clientHeight, top: r.top - b.top, scrollTop: el.scrollTop, max: el.scrollHeight - el.clientHeight, tab: el.getAttribute('tabindex') };
-    });
-  const m = await measure();
-  expect(m.scrolls).toBe(true);
-  expect(m.tab).toBe('0'); // it can scroll, so the keyboard can reach it
-  expect(m.top).toBeGreaterThanOrEqual(-1); // the newest line begins inside the box
-  // The keyboard reads on to its end, and back to its start.
+      return r.top >= b.top - 1 && r.bottom <= b.bottom + 1;
+    }, which);
+  const scrolls = () => box.evaluate((el) => el.scrollHeight > el.clientHeight);
+  expect(await scrolls()).toBe(true);
+  expect(await box.getAttribute('tabindex')).toBe('0'); // higher than itself: a tab stop
+  expect(await visible('first')).toBe(true); // the newest line begins inside the box
+  expect(await visible('last')).toBe(false); // and does not end there
+
   await box.focus();
   await page.keyboard.press('End');
-  expect((await measure()).scrollTop).toBeGreaterThan(m.scrollTop);
+  await expect.poll(() => visible('last')).toBe(true); // the keyboard reaches its end
   await page.keyboard.press('Home');
-  expect((await measure()).scrollTop).toBe(0);
-  // A box with nothing to scroll is no tab stop.
+  expect(await box.evaluate((el) => el.scrollTop)).toBe(0);
+  for (let i = 0; i < 30 && !(await visible('first')); i++) await page.keyboard.press('PageDown'); // and back to its start
+  expect(await visible('first')).toBe(true);
+
+  // A box with nothing higher than itself is no tab stop.
   await captionsToggle(page).click();
   await pressed(captionsToggle(page), false);
   await captionsToggle(page).click();
   await pressed(captionsToggle(page), true);
   await caption(page, [{ id: '3', text: 'Short' }]);
-  await expect(rowsOf(page).last().locator('.call-caption__text')).toHaveText('Short');
+  await expect(rowsOf(page)).toHaveCount(1);
+  expect(await scrolls()).toBe(false);
   expect(await box.getAttribute('tabindex')).toBeNull();
+});
+
+test('a reader who scrolled back is not moved by a change that brings no new line, and is by a new one', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await inCall(page);
+  await page.evaluate(() => (document.documentElement.style.fontSize = '200%'));
+  await captionsToggle(page).click();
+  await pressed(captionsToggle(page), true);
+  await caption(page, [{ id: '1', text: Array.from({ length: 40 }, (_, n) => `word${n}`).join(' ') }]);
+  const box = captionBox(page);
+  const top = () => box.evaluate((el) => el.scrollTop);
+  await box.evaluate((el) => (el.scrollTop = 0)); // the reader scrolled away from the newest line's start
+  const kept = await top();
+  await page.getByRole('button', { name: /^Microphone/ }).click(); // a change that brings no line
+  await pressed(page.getByRole('button', { name: /^Microphone/ }), false);
+  await recording(page, true);
+  await expect(notice(page, 'sharing')).toBeHidden();
+  expect(await top()).toBe(kept);
+  await caption(page, [{ id: '1', text: Array.from({ length: 40 }, (_, n) => `word${n}`).join(' ') }, { id: '2', text: Array.from({ length: 40 }, (_, n) => `next${n}`).join(' ') }]);
+  await expect.poll(top).toBeGreaterThan(kept); // a new line moves it to that line
 });
 
 test('captions that cannot be started leave the toggle off and say so in one sentence', async ({ page }) => {
@@ -623,44 +683,68 @@ async function barHolds(page: Page, height: number, what: string): Promise<void>
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 }
 
-for (const size of [
-  { width: 1280, height: 400, name: 'a wide window 400 px high' },
-  { width: 1056, height: 600, name: '1056 px wide (66 rem) and 600 px high' },
-  { width: 768, height: 600, name: '768 px wide and 600 px high' },
-  { width: 641, height: 600, name: '641 px wide (just over 40 rem) and 600 px high' },
-  { width: 320, height: 640, name: '320 px wide and 640 px high' },
-  { width: 320, height: 400, name: '320 px wide and 400 px high' },
-  { width: 320, height: 256, name: '400 % zoom (a 1280 by 1024 window)' },
-]) {
-  test(`the one bar holds in the call with sharing, captions, every notice and the panel shown, ${size.name}`, async ({ page }) => {
-    await page.setViewportSize({ width: size.width, height: size.height });
-    await inCall(page);
-    await captionsToggle(page).click();
-    await said(page, CAPTIONS_ON);
-    await caption(page, [1, 2, 3, 4].map((n) => ({ id: String(n), text: `A line of the captions, number ${n}`, own: n % 2 === 0 })), [{ text: 'an interim line' }]);
-    await recording(page, true);
-    await reconnection(page, 'start');
-    await shareNow(page);
-    await expect(rowsOf(page)).toHaveCount(3);
-    expect((await rowOf(page)).count).toBe(6); // microphone, camera, captions, share, devices and the way out
-    await barHolds(page, size.height, 'sharing');
-    // The captions are capped: they never take the picture's place or push the bar.
-    const box = await captionBox(page).boundingBox();
-    expect(box?.height ?? 0).toBeLessThanOrEqual(size.height / 2);
+/** Into the call in `lang`; Dutch is walked by data attributes, as the helpers' names are English. */
+async function inCallIn(page: Page, lang: 'en' | 'nl'): Promise<void> {
+  if (lang === 'en') return inCall(page);
+  await stubToken(page, granted());
+  await stubDisplay(page);
+  await spy(page, { devices: 'made-up' });
+  await page.addInitScript((p) => ((window as unknown as { __sdkPlan: Plan }).__sdkPlan = p), { captions: true });
+  await page.goto(`${fixture('call_page')}?lang=nl`);
+  await page.locator('[data-call-begin]').click();
+  await expect(page.locator('[data-call-state="check"] [data-call-toggle="camera"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-call-state="check"] [data-call-toggle="microphone"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('[data-call-join]').click();
+  await expect(page.locator('[data-call-state="call"]')).toBeVisible();
+}
 
-    // The panel of devices above the row: inside the window, its foot at the row's top.
-    await page.getByRole('button', { name: 'Devices' }).click();
-    const panel = await page.getByRole('group', { name: 'Your devices' }).boundingBox();
-    const row = await rowOf(page);
-    expect(panel?.y ?? -1, 'panel top').toBeGreaterThanOrEqual(0);
-    expect((panel?.y ?? 0) + (panel?.height ?? 0), 'panel foot').toBeLessThanOrEqual(row.top + 1);
-    await page.keyboard.press('Escape');
+const SIZES = [
+  { width: 1280, height: 400, name: 'a wide window 400 px high', langs: ['en'] },
+  { width: 1152, height: 600, name: '1152 px wide (72 rem) and 600 px high', langs: ['en', 'nl'] },
+  { width: 1056, height: 600, name: '1056 px wide (66 rem) and 600 px high', langs: ['en'] },
+  { width: 768, height: 600, name: '768 px wide and 600 px high', langs: ['en'] },
+  { width: 736, height: 600, name: '736 px wide (46 rem) and 600 px high', langs: ['en', 'nl'] },
+  { width: 641, height: 600, name: '641 px wide (just over 40 rem) and 600 px high', langs: ['en'] },
+  { width: 320, height: 640, name: '320 px wide and 640 px high', langs: ['en'] },
+  { width: 320, height: 400, name: '320 px wide and 400 px high', langs: ['en'] },
+  { width: 320, height: 256, name: '400 % zoom (a 1280 by 1024 window)', langs: ['en'] },
+] as const;
 
-    await remoteShare(page, true); // the staff member's screen instead
-    await expect(notice(page, 'theirs')).toBeVisible();
-    await barHolds(page, size.height, 'their screen');
-    await expectNoAxeViolations(page);
-  });
+for (const size of SIZES) {
+  for (const lang of size.langs) {
+    test(`the one bar holds in the call with sharing, captions, every notice and the panel shown, ${size.name}, ${lang}`, async ({ page }) => {
+      await page.setViewportSize({ width: size.width, height: size.height });
+      await inCallIn(page, lang);
+      const switchOf = (kind: 'captions' | 'share') => page.locator(`[data-call-switch="${kind}"]`);
+      await switchOf('captions').click();
+      await pressed(switchOf('captions'), true);
+      await caption(page, [1, 2, 3, 4].map((n) => ({ id: String(n), text: `A line of the captions, number ${n}`, own: n % 2 === 0 })), [{ text: 'an interim line' }]);
+      await recording(page, true);
+      await reconnection(page, 'start');
+      await switchOf('share').click();
+      await pressed(switchOf('share'), true);
+      await expect(notice(page, 'sharing')).toBeVisible();
+      await expect(rowsOf(page)).toHaveCount(3);
+      expect((await rowOf(page)).count).toBe(6); // microphone, camera, captions, share, devices and the way out
+      await barHolds(page, size.height, 'sharing');
+      // The captions are capped: they never take the picture's place or push the bar.
+      const box = await captionBox(page).boundingBox();
+      expect(box?.height ?? 0).toBeLessThanOrEqual(size.height / 2);
+
+      // The panel of devices above the row: inside the window, its foot at the row's top.
+      await page.locator('[data-call-devices-button]').click();
+      const panel = await page.locator('[data-call-devices-panel]').boundingBox();
+      const row = await rowOf(page);
+      expect(panel?.y ?? -1, 'panel top').toBeGreaterThanOrEqual(0);
+      expect((panel?.y ?? 0) + (panel?.height ?? 0), 'panel foot').toBeLessThanOrEqual(row.top + 1);
+      await page.keyboard.press('Escape');
+
+      await remoteShare(page, true); // the staff member's screen instead
+      await expect(notice(page, 'theirs')).toBeVisible();
+      await barHolds(page, size.height, 'their screen');
+      await expectNoAxeViolations(page);
+    });
+  }
 }
 
 test('the buttons keep their full names for assistive technology when the window is low', async ({ page }) => {

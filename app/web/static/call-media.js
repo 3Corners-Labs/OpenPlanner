@@ -266,8 +266,11 @@
     var state = app.state;
     var epoch = call.epoch;
     if (state.screen !== "call") return Promise.resolve();
+    // A share that is starting (the picker is open or the screen is being sent) is not stopped by a
+    // second press: it ends by its own failure, by the browser's control, or once it is the
+    // participant's own, so a stream can never be taken out of the meeting while it is still being sent.
     if (!on) {
-      endShare(call.screen, { say: "say_share_off" });
+      if (state.share !== "asking") endShare(call.screen, { say: "say_share_off" });
       return Promise.resolve();
     }
     if (state.share !== "off" || !state.can.share) return Promise.resolve();
@@ -283,8 +286,14 @@
       })
       .then(function (display) {
         picked = display;
-        // The call ended, or the staff member began to share while the picker was open: give it back.
-        if (epoch !== call.epoch || state.share !== "asking") return display.stop();
+        // The call ended, the staff member began to share or the meeting stopped allowing it while the
+        // picker was open: give it back.
+        if (epoch !== call.epoch) return display.stop();
+        if (state.share !== "asking" || !state.can.share) {
+          display.stop();
+          if (state.share === "asking") app.go("call", { share: "off", say: "say_share_failed" });
+          return null;
+        }
         call.screen = display;
         watch(display, epoch);
         return send("screen", display, epoch).then(function () {

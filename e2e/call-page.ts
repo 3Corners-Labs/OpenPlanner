@@ -133,14 +133,14 @@ export const checkList = (page: Page, label: 'Camera' | 'Microphone') =>
  * page's `ended` listeners itself and `endDisplay` calls them, as the browser's own "stop sharing"
  * control would.
  */
-export type DisplayMode = 'ok' | 'cancel' | 'broken' | 'absent';
+export type DisplayMode = 'ok' | 'cancel' | 'broken' | 'absent' | 'held';
 export type DisplayLog = { requests: number; stops: number; tracks: number };
 
 export async function stubDisplay(page: Page, mode: DisplayMode = 'ok'): Promise<void> {
   await page.addInitScript((m) => {
-    type Held = { mode: string; requests: number; stops: number; ended: EventListener[][] };
+    type Held = { mode: string; requests: number; stops: number; ended: EventListener[][]; release: () => void };
     const w = window as unknown as { __display: Held };
-    w.__display = { mode: m, requests: 0, stops: 0, ended: [] };
+    w.__display = { mode: m, requests: 0, stops: 0, ended: [], release: () => {} };
     if (m === 'absent') {
       Object.defineProperty(navigator.mediaDevices, 'getDisplayMedia', { configurable: true, value: undefined });
       return;
@@ -149,6 +149,8 @@ export async function stubDisplay(page: Page, mode: DisplayMode = 'ok'): Promise
       w.__display.requests += 1;
       if (w.__display.mode === 'cancel') throw new DOMException('cancelled', 'NotAllowedError');
       if (w.__display.mode === 'broken') throw new DOMException('broken', 'NotReadableError');
+      // The picker is open until the test lets it answer (a share that is still starting).
+      if (w.__display.mode === 'held') await new Promise<void>((resolve) => (w.__display.release = resolve));
       const canvas = document.createElement('canvas');
       canvas.width = 320;
       canvas.height = 180;
@@ -188,3 +190,6 @@ export const endDisplay = (page: Page): Promise<void> =>
     const d = (window as unknown as { __display: { ended: EventListener[][] } }).__display;
     for (const listener of d.ended[d.ended.length - 1] ?? []) listener(new Event('ended'));
   });
+/** The picker that `held` keeps open answers now. */
+export const releaseDisplay = (page: Page): Promise<void> =>
+  page.evaluate(() => (window as unknown as { __display: { release: () => void } }).__display.release());

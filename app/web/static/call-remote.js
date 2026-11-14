@@ -98,11 +98,15 @@
     play();
   }
 
-  // The staff member's screen: only a stream that is still running is kept, one that arrives
-  // after their share ended is not. Said only in the call; a share that began before the
-  // participant was let in is said when the call opens.
+  // The staff member's screen as the meeting hands it out. It may come just before the event that
+  // their share began, so it waits as `pending`, and only a stream that is still running is used
+  // when their share begins; nothing is kept while their share is off, and `offered(null)` (the
+  // end of the call) drops it. A share that began before the participant was let in is said when the
+  // call opens.
+  var pending = null;
   function offered(stream) {
-    if (stream && stream.active !== false) app.streams.share = stream;
+    pending = stream && stream.active !== false ? stream : null;
+    if (pending && app.state.share === "theirs") app.streams.share = pending;
   }
 
   // The staff member starts or stops sharing their screen. One share in a meeting: the
@@ -111,12 +115,16 @@
     var state = app.state;
     if (on === (state.share === "theirs")) return;
     var said = state.screen === "call";
+    var stream = pending && pending.active !== false ? pending : null;
+    pending = null;
     if (!on) {
       app.streams.share = null;
       app.go(state.screen, { share: "off", say: said ? "say_share_theirs_off" : undefined });
     } else if (app.call.screen) {
+      app.streams.share = stream;
       app.callMedia.endShare(app.call.screen, { share: "theirs", say: said ? "say_share_replaced" : undefined });
     } else {
+      app.streams.share = stream;
       app.go(state.screen, { share: "theirs", say: said ? "say_share_theirs" : undefined });
     }
   }
