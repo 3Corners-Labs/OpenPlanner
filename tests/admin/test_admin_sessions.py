@@ -7,9 +7,7 @@ from pathlib import Path
 
 import structlog
 
-from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.authorization import Scope
-from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, Site
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, Site, audit_log
 
 
 def _cookie_value(site: Site) -> str:
@@ -34,10 +32,7 @@ def _decode(value: str) -> dict[str, object]:
 
 
 async def _audit(site: Site) -> list[tuple[str, str, str]]:
-    app = site.app
-    async with SqlUnitOfWork(app.state.engine).read() as tx:
-        events = await tx.list_audit_events(Scope(everything=True), limit=100)
-    return [(e.event.actor, e.event.action, e.event.reason) for e in events]
+    return [(e.actor, e.action, e.reason) for e in reversed(await audit_log(site, limit=100))]
 
 
 async def test_a_copied_cookie_is_dead_after_logout(site: Site) -> None:

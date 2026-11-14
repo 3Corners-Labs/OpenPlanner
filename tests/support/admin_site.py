@@ -1,10 +1,11 @@
 """The admin site of the HTTP tests: the app in-process with the demo data, and its admins.
 
 ``running_site`` seeds the demo data and runs the app with a fake identity provider, clock and
-DNS resolver; ``Site`` is what it yields. The fixtures that start one are ``site`` and
-``admin_db`` in ``tests/conftest.py`` (the admin and the web tests share them) and the variants
-in ``tests/admin/conftest.py``. The admins below log in through ``Site.login_as``; a form post,
-the site's database and its audit log come with them.
+DNS resolver; ``Site`` is what it yields, and ``Site.browser`` is the same site in another
+browser. The fixtures that start one are ``site`` and ``admin_db`` in ``tests/conftest.py`` (the
+admin and the web tests share them) and the variants in ``tests/admin/conftest.py``. The admins
+below log in through ``Site.login_as``; a form post, the site's database and its audit log come
+with them.
 """
 
 from collections.abc import AsyncIterator
@@ -32,6 +33,7 @@ from tests.fakes.identity_providers import (
 )
 from tests.fakes.log_destinations import FakeFactory
 from tests.fakes.staff_directory import FakeStaffDirectory
+from tests.support.app_client import in_process, served
 from tests.support.domain import NOW
 from tests.support.principals import legacy_claims, principal
 
@@ -87,6 +89,27 @@ class Site:
         self.log_senders = log_senders or FakeFactory()
         """The senders the log destinations deliver through (ADR 0085): fakes, no network."""
 
+    def browser(self, peer: str | None = None) -> "Site":
+        """Return this site in another browser: no session, its own cookie jar.
+
+        Its requests come from the address ``peer`` if one is given; the app, identity provider,
+        clock and the other fakes are this site's own.
+        """
+        client = httpx.AsyncClient(
+            transport=in_process(self.app, peer), base_url=self.client.base_url
+        )
+        return Site(
+            self.app,
+            client,
+            self.idp,
+            self.clock,
+            self.dns,
+            self.discovery,
+            self.providers,
+            self.directory,
+            self.log_senders,
+        )
+
     async def login_as(self, principal: Principal) -> httpx.Response:
         """Log in as ``principal`` through the legacy claims that resolve to it."""
         return await self.login_with(legacy_claims(principal))
@@ -126,12 +149,7 @@ async def running_site(
         staff_directory=directory,
         log_sender_factory=log_senders,
     )
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
-        ) as client,
-    ):
+    async with served(app) as client:
         yield Site(app, client, idp, clock, dns, discovery, providers, directory, log_senders)
 
 
@@ -145,10 +163,10 @@ async def post_form(site: Site, path: str, data: dict[str, str] | None = None) -
     return await site.client.post(path, data=data or {}, headers=SAME_ORIGIN)
 
 
-async def audit_log(site: Site) -> list[AuditEvent]:
-    """Return the newest 50 audit events of the site, oldest first."""
+async def audit_log(site: Site, limit: int = 50) -> list[AuditEvent]:
+    """Return the newest ``limit`` audit events of the site, oldest first."""
     async with site_uow(site).read() as tx:
-        events = await tx.list_audit_events(Scope(everything=True), limit=50)
+        events = await tx.list_audit_events(Scope(everything=True), limit=limit)
     return [e.event for e in reversed(events)]
 
 

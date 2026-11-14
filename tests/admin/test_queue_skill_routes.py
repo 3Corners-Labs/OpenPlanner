@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.db.models import BookingRow
 from tests.support.admin_site import AGENT, SAME_ORIGIN, SUPER, Site
 from tests.support.flow_seed import add_flow, publish_flow
-from tests.support.flows import engine_of, flow_ids
+from tests.support.flows import flow_ids
 from tests.support.queue import own_queue
 from tests.support.skill_seed import add_pool, add_skill, staff_id
 
@@ -27,7 +27,7 @@ async def _booking_needing_german(site: Site) -> tuple[int, int]:
     pool = await add_pool(site, "Loket", (german,))
     await add_flow(site, "advies", pool, required_skill_ids=frozenset({german}))
     await publish_flow(site)
-    engine = engine_of(site.client)
+    engine = site.app.state.engine
     flow_id = (await flow_ids(engine))["advies"]
     async with AsyncSession(engine) as session, session.begin():
         await session.execute(

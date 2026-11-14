@@ -21,6 +21,7 @@ from tests.fakes.clock import FixedClock
 from tests.fakes.identity import FakeIdentityProvider
 from tests.fakes.tls import FakeCertificateProbe
 from tests.support.admin_site import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.app_client import served
 from tests.support.certificates import make_pair
 from tests.support.domain import NOW
 
@@ -61,10 +62,7 @@ async def site(
     app = create_app(
         settings.model_copy(update={"database_url": admin_db}), clock, idp, certificate_probe=probe
     )
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=f"https://{HOST}") as c,
-    ):
+    async with served(app, f"https://{HOST}") as c:
         yield Site(app, c, idp, clock)
 
 

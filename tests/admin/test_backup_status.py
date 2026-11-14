@@ -3,7 +3,6 @@
 import os
 from datetime import timedelta
 from pathlib import Path
-from typing import Any
 
 from app.adapters.db.backup import backup_directory
 from app.domain.backup_age import BACKUP_GRACE, BACKUP_LIFETIME
@@ -11,7 +10,7 @@ from tests.support.admin_site import AUDITOR, SUPER, Site
 
 
 def _directory(site: Site) -> Path:
-    app: Any = site.app
+    app = site.app
     return backup_directory(app.state.settings.database_url)
 
 

@@ -1,22 +1,18 @@
 """The *Usage reporting* part of System status (ADR 0117 point 4)."""
 
 from datetime import timedelta
-from typing import Any
 
-from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.usage import FactKind, UsageFact, hour_of
-from tests.support.admin_site import AUDITOR, SUPER, Site
+from tests.support.admin_site import AUDITOR, SUPER, Site, site_uow
 
 
 async def _fact(site: Site) -> None:
-    app: Any = site.app
-    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+    async with site_uow(site).locked() as tx:
         await tx.record_usage(UsageFact(FactKind.BOOKING_SLOTTED, hour_of(site.clock.now()), 1, 1))
 
 
 async def _roll(site: Site) -> None:
-    app: Any = site.app
-    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+    async with site_uow(site).locked() as tx:
         await tx.advance_usage_watermark(1, site.clock.now())
 
 
@@ -75,7 +71,7 @@ async def test_the_english_page_uses_english_words(site: Site) -> None:
 
 
 async def test_an_unreadable_database_is_a_warning_not_a_healthy_card(site: Site) -> None:
-    app: Any = site.app
+    app = site.app
     async with app.state.engine.begin() as connection:
         await connection.exec_driver_sql("DROP TABLE usage_events")
     await site.login_as(SUPER)

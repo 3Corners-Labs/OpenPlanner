@@ -28,7 +28,15 @@ from app.domain.authorization import Principal
 from app.domain.privacy import PII_FIELDS
 from app.domain.tokens import derive_token, hash_token
 from app.web.protection import booking_limit, unknown_link_limit
-from tests.support.admin_site import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site, running_site
+from tests.support.admin_site import (
+    AUDITOR,
+    ORG_ADMIN,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+    running_site,
+    site_uow,
+)
 from tests.support.configuration_package import PACKAGE_PASSPHRASE
 from tests.support.legacy_package import package_of
 from tests.support.principals import principal
@@ -435,10 +443,8 @@ def test_every_personal_data_field_has_a_card_label() -> None:
 
 async def test_system_status_shows_the_latest_certificate_check(site: Site) -> None:
     # ADR 0064: what the worker found, in words, with issuer and days left.
-    from app.adapters.db.uow import SqlUnitOfWork
     from app.domain.tls import Certificate, CertificateCheck, Finding, Trust
 
-    app = site.app
     certificate = Certificate(
         "afspraak.example.nl",
         "Let's Encrypt (R11)",
@@ -446,7 +452,7 @@ async def test_system_status_shows_the_latest_certificate_check(site: Site) -> N
         site.clock.now() + timedelta(days=59, hours=12),
         ("afspraak.example.nl",),
     )
-    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+    async with site_uow(site).locked() as tx:
         await tx.save_certificate_check(
             CertificateCheck(
                 site.clock.now(), "afspraak.example.nl", Finding.OK, certificate, Trust.TRUSTED

@@ -7,12 +7,18 @@ from typing import Any
 
 import pytest
 
-from app.adapters.db.uow import SqlUnitOfWork
 from app.admin.usage_routes import EXPORT_REFUSALS
 from app.domain.audit import Outcome
-from app.domain.authorization import Scope
 from app.domain.csv_export import ExportLimits, ExportRefusal
-from tests.support.admin_site import AGENT, AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, Site
+from tests.support.admin_site import (
+    AGENT,
+    AUDITOR,
+    GROUP_ADMIN,
+    ORG_ADMIN,
+    OUTSIDER,
+    Site,
+    audit_log,
+)
 from tests.support.usage_data import DAY
 from tests.support.usage_data import fill as _fill
 
@@ -25,10 +31,7 @@ def _rows(text: str) -> list[list[str]]:
 
 
 async def _exports(site: Site) -> list[Any]:
-    app: Any = site.app
-    async with SqlUnitOfWork(app.state.engine).read() as tx:
-        entries = await tx.list_audit_events(Scope(everything=True), limit=50)
-    return [e.event for e in reversed(entries) if e.event.action == "reports.export"]
+    return [e for e in await audit_log(site) if e.action == "reports.export"]
 
 
 async def test_a_group_admin_downloads_the_screen_as_csv(site: Site) -> None:
@@ -161,7 +164,7 @@ async def test_an_export_over_the_day_limit_goes_back_to_the_report_with_the_rea
     # Post/redirect/get: the refusal is never a page at the export's own address, where a
     # reload, a language switch or a login would run the export again.
     await site.login_as(ORG_ADMIN)
-    app: Any = site.app
+    app = site.app
     app.state.usage_export_service._limits = lambda: ExportLimits(100, 31)  # noqa: SLF001
 
     response = await site.client.get(export)

@@ -2,17 +2,15 @@
 
 from datetime import timedelta
 
-from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.services import BookingService
-from tests.support.admin_site import AUDITOR, ORG_ADMIN, OUTSIDER, SUPER, Site
+from tests.support.admin_site import AUDITOR, ORG_ADMIN, OUTSIDER, SUPER, Site, site_uow
 from tests.support.domain import ADA, FRIDAY_0900, TEST_TOKEN_KEY
 
 
 async def _book(site: Site) -> None:
-    app = site.app
-    await BookingService(
-        SqlUnitOfWork(app.state.engine), site.clock, TEST_TOKEN_KEY, treatment_buffer=0
-    ).book(group_slug="demo", start=FRIDAY_0900, contact=ADA, locale="nl")
+    await BookingService(site_uow(site), site.clock, TEST_TOKEN_KEY, treatment_buffer=0).book(
+        group_slug="demo", start=FRIDAY_0900, contact=ADA, locale="nl"
+    )
 
 
 async def test_a_booking_past_its_purge_moment_needs_attention(site: Site) -> None:

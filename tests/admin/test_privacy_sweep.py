@@ -23,7 +23,6 @@ import json
 from collections import Counter
 from dataclasses import fields
 from pathlib import Path
-from typing import Any
 
 from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
@@ -364,7 +363,7 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
         "/admin/organisations/demo/settings/reporting_wallboard_display_links_enabled",
         {"value": "true"},
     )
-    links_app: Any = site.app
+    links_app = site.app
     await links_app.state.live_settings.refresh()
     refused_screen = await site.client.get("/display")
     assert refused_screen.status_code == 403
@@ -382,7 +381,7 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
         "/admin/organisations/demo/settings/reporting_staff_view_enabled",
         {"value": "true"},
     )
-    app: Any = site.app
+    app = site.app
     await app.state.live_settings.refresh()
     team = await site.client.get("/admin/organisations/demo/usage?view=team")
     assert team.status_code == 200

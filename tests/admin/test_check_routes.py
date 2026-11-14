@@ -16,6 +16,7 @@ from tests.fakes.clock import FixedClock
 from tests.fakes.identity import FakeIdentityProvider
 from tests.fakes.integrations import FakeChecker
 from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site, audit_events
+from tests.support.app_client import served
 from tests.support.domain import NOW
 from tests.support.group_settings import SETTINGS_FORM
 
@@ -52,12 +53,7 @@ async def _site(settings: Settings, admin_db: str, checker: FakeChecker) -> Asyn
         idp,
         Integrations(checker=checker),
     )
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
-        ) as client,
-    ):
+    async with served(app) as client:
         yield Site(app, client, idp, FixedClock(NOW))
 
 

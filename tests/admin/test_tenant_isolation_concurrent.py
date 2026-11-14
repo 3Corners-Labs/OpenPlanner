@@ -264,20 +264,13 @@ async def _configure(site: Site, app: FastAPI) -> None:
             )
 
 
-async def public_client(site: Site) -> httpx.AsyncClient:
-    """Return a client without cookies, as one more visitor."""
-    return httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=site.app), base_url="http://testserver"
-    )
-
-
 async def admin_clients(site: Site) -> dict[str, httpx.AsyncClient]:
-    """Log in one org admin per organisation, each in a client of their own."""
+    """Log in one org admin per organisation, each in a browser of their own."""
     clients: dict[str, httpx.AsyncClient] = {}
     for org in ORGS:
-        client = await public_client(site)
-        await Site(site.app, client, site.idp, site.clock, site.dns).login_as(org.admin)
-        clients[org.slug] = client
+        browser = site.browser()
+        await browser.login_as(org.admin)
+        clients[org.slug] = browser.client
     return clients
 
 
@@ -418,7 +411,7 @@ def cases(visitor: httpx.AsyncClient, admins: dict[str, httpx.AsyncClient]) -> l
 
 
 async def test_both_organisations_stay_apart_under_concurrent_requests(proof: Site) -> None:
-    visitor = await public_client(proof)
+    visitor = proof.browser().client  # without cookies, as one more visitor
     admins = await admin_clients(proof)
     rounds = -(-MIN_REQUESTS // len(cases(visitor, admins)))
     batch = [case for _ in range(rounds) for case in cases(visitor, admins)]

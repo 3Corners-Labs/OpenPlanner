@@ -2,10 +2,8 @@
 
 from dataclasses import replace
 
-from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.authorization import Scope
 from app.domain.services import BookingService
-from tests.support.admin_site import GROUP_ADMIN, ORG_ADMIN, Site, post_form
+from tests.support.admin_site import GROUP_ADMIN, ORG_ADMIN, Site, audit_log, post_form, site_uow
 from tests.support.domain import ADA, FRIDAY_0900, TEST_TOKEN_KEY
 
 PAGE = "/admin/groups/demo/settings/form"
@@ -29,10 +27,7 @@ CUSTOMER = {
 
 
 async def _details(site: Site) -> list[str]:
-    app = site.app
-    async with SqlUnitOfWork(app.state.engine).read() as tx:
-        events = await tx.list_audit_events(Scope(everything=True), limit=50)
-    return [e.event.detail for e in reversed(events) if e.event.action == "group.edit"]
+    return [e.detail for e in await audit_log(site) if e.action == "group.edit"]
 
 
 async def test_the_settings_link_to_the_booking_form(site: Site) -> None:
@@ -238,9 +233,8 @@ async def test_the_booking_page_shows_the_answers_with_their_labels(site: Site) 
     await site.login_as(ORG_ADMIN)
     await post_form(site, PAGE, CUSTOMER)
     await post_form(site, PAGE, TOPIC)
-    app = site.app
     receipt = await BookingService(
-        SqlUnitOfWork(app.state.engine), site.clock, TEST_TOKEN_KEY, treatment_buffer=0
+        site_uow(site), site.clock, TEST_TOKEN_KEY, treatment_buffer=0
     ).book(
         group_slug="demo",
         start=FRIDAY_0900,

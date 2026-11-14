@@ -19,7 +19,7 @@ HOUR = datetime(2026, 1, 1, 8, tzinfo=UTC)
 
 async def fill(site: Site, slug: str, count: int) -> None:
     """Write ``count`` bookings created and cancelled for a group, and roll them up."""
-    app: Any = site.app
+    app = site.app
     await fill_app(app, site.clock, slug, count)
 
 

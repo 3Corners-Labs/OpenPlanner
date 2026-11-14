@@ -335,12 +335,10 @@ async def test_the_status_widget_warns_about_a_proxy_hop_without_tls_adr_0091(
 
 async def test_the_status_widget_shows_the_connection_health_and_last_event(site: Site) -> None:
     """ADR 0082 points 5 and 7: one row per platform, linked only for who may open it."""
-    from app.adapters.db.uow import SqlUnitOfWork
     from app.domain.connection_health import HealthEntry, HealthState, InboundEvent, Platform
 
-    app = site.app
     now = site.clock.now()
-    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+    async with site_uow(site).locked() as tx:
         await tx.save_health(
             (HealthEntry("demo", Platform.WXCC, HealthState.DOWN, now, 10, 9, "failures"),), now
         )

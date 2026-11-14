@@ -3,11 +3,11 @@
 import re
 
 from app.domain.admin import AdminService
-from app.domain.authorization import Role, Scope
+from app.domain.authorization import Role
 from app.domain.calls import EventKind
 from app.domain.integration import IntegrationService
 from app.web.static_assets import ASSETS
-from tests.support.admin_site import AGENT, GROUP_ADMIN, SAME_ORIGIN, Site
+from tests.support.admin_site import AGENT, GROUP_ADMIN, SAME_ORIGIN, Site, audit_log
 from tests.support.admin_site import site_uow as _uow
 from tests.support.principals import principal
 from tests.support.queue import own_queue as _own_queue
@@ -75,9 +75,7 @@ async def test_pick_up_next_opens_the_meeting_for_that_agent_only(site: Site) ->
     assert "Er is geen afspraak meer om op te pakken." in again.text
     assert other.status_code == 409
     assert "webex.example" not in other.text
-    async with _uow(site).read() as tx:
-        events = await tx.list_audit_events(Scope(everything=True), limit=5)
-    assert any(e.event.detail == "queue.claimed" for e in events)
+    assert any(e.detail == "queue.claimed" for e in await audit_log(site, limit=5))
 
 
 async def test_a_group_admin_releases_a_colleagues_claim(site: Site) -> None:

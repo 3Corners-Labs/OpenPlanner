@@ -6,13 +6,19 @@ from contextlib import asynccontextmanager
 import httpx
 import pytest
 
-from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
 from app.domain.audit import Outcome
-from app.domain.authorization import Role, Scope
+from app.domain.authorization import Role
 from app.domain.entitlements import LoginClaims
 from tests.fakes.staff_directory import FakeStaffDirectory
-from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site, running_site
+from tests.support.admin_site import (
+    ORG_ADMIN,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+    audit_log,
+    running_site,
+)
 
 SUPERUSER = LoginClaims("sub-root", "Root", entitlements=frozenset({"openplanner:superuser"}))
 TEAM_LEAD = LoginClaims(
@@ -47,27 +53,10 @@ async def shadow(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
 
 
 async def events(site: Site) -> list[tuple[str, str, Outcome, str, str | None, str]]:
-    app = site.app
-    uow = SqlUnitOfWork(app.state.engine)
-    async with uow.read() as tx:
-        found = await tx.list_audit_events(Scope(everything=True), limit=100)
     return [
-        (
-            e.event.actor,
-            e.event.action,
-            e.event.outcome,
-            e.event.reason,
-            e.event.organisation,
-            e.event.detail,
-        )
-        for e in reversed(found)
+        (e.actor, e.action, e.outcome, e.reason, e.organisation, e.detail)
+        for e in await audit_log(site, limit=100)
     ]
-
-
-async def second_client(site: Site) -> httpx.AsyncClient:
-    """Another browser on the same app, for a second session next to ``site.client``."""
-    app = site.app
-    return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://testserver")
 
 
 async def login(client: httpx.AsyncClient, site: Site, claims: LoginClaims) -> httpx.Response:
@@ -127,7 +116,7 @@ async def test_a1_an_entitlement_login_grants_exactly_its_values(entitled: Site)
 async def test_a9_a12_access_follows_the_idp_value_and_a_change_takes_effect_at_once(
     entitled: Site,
 ) -> None:
-    other = await second_client(entitled)
+    other = entitled.browser().client  # a second session next to ``entitled.client``
     async with other:
         assert (await login(other, entitled, TEAM_LEAD)).status_code == 303
         assert (await other.get("/admin/groups/demo")).status_code == 200

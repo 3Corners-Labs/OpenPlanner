@@ -1,18 +1,13 @@
 """Subjects and routing screen (ADR 0081): subjects, routing questions, mapping, block binding."""
 
-from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.authorization import Scope
-from tests.support.admin_site import GROUP_ADMIN, ORG_ADMIN, Site, post_form
+from tests.support.admin_site import GROUP_ADMIN, ORG_ADMIN, Site, audit_log, post_form
 
 PAGE = "/admin/groups/demo/settings/routing"
 MOVE = {"code": "move", "label_nl": "Verhuizing", "label_en": "Moving"}
 
 
 async def _details(site: Site) -> list[str]:
-    app = site.app
-    async with SqlUnitOfWork(app.state.engine).read() as tx:
-        events = await tx.list_audit_events(Scope(everything=True), limit=50)
-    return [e.event.detail for e in reversed(events) if e.event.action == "group.edit"]
+    return [e.detail for e in await audit_log(site) if e.action == "group.edit"]
 
 
 async def test_the_settings_link_to_the_routing_screen(site: Site) -> None:

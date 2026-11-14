@@ -1,15 +1,10 @@
 """Alert targets on Koppelingen and on an organisation's Kanalen page (ADR 0082 point 9)."""
 
-from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.authorization import Scope
-from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site, audit_log
 
 
 async def _details(site: Site) -> list[str]:
-    app = site.app
-    async with SqlUnitOfWork(app.state.engine).read() as tx:
-        events = await tx.list_audit_events(Scope(everything=True), limit=50)
-    return [e.event.detail for e in reversed(events) if e.event.detail.startswith("alert_")]
+    return [e.detail for e in await audit_log(site) if e.detail.startswith("alert_")]
 
 
 async def test_a_platform_target_is_added_tested_and_removed(site: Site) -> None:

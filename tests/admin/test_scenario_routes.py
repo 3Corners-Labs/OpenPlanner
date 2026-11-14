@@ -6,9 +6,15 @@ and uses the organisation's, read-only. "Start closure" picks a scenario and cop
 
 import re
 
-from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.authorization import Scope
-from tests.support.admin_site import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, Site, post_form
+from tests.support.admin_site import (
+    GROUP_ADMIN,
+    ORG_ADMIN,
+    OUTSIDER,
+    SAME_ORIGIN,
+    Site,
+    audit_log,
+    post_form,
+)
 from tests.support.closure_pages import CLOSURE
 from tests.support.images import SECRET, jpeg, png
 from tests.support.participant import booked_page
@@ -31,10 +37,7 @@ CONTACTS = {"contact_1_kind": "phone", "contact_1_value": "012 345 6789"}
 
 async def _details(site: Site) -> list[str]:
     """Return the detail of every audit event, oldest first."""
-    app = site.app
-    async with SqlUnitOfWork(app.state.engine).read() as tx:
-        events = await tx.list_audit_events(Scope(everything=True), limit=50)
-    return [e.event.detail for e in reversed(events)]
+    return [e.detail for e in await audit_log(site)]
 
 
 async def _create(site: Site, base: str, data: dict[str, str]) -> str:

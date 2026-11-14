@@ -90,8 +90,7 @@ async def _call_from(site: Site, address: str, secret: str | None = None) -> htt
     assert secret is not None
     stamp = int(site.clock.now().timestamp() * 1000)
     body = _event(stamp)
-    transport = httpx.ASGITransport(app=site.app, client=(address, 4711))
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
+    async with site.browser(address).client as c:
         return await c.post(ADDRESS, content=body, headers=sign_wxcc(body, secret, stamp))
 
 

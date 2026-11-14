@@ -20,6 +20,7 @@ from tests.support.admin_site import (
     Site,
     audit_events,
     running_site,
+    site_uow,
 )
 
 LOGGING = "/admin/logging"
@@ -99,11 +100,9 @@ async def test_nothing_secret_reaches_any_page_or_the_audit_log(superuser: Site)
         text = (await superuser.client.get(path)).text
         assert TOKEN not in text
         assert "rotated-token-9876" not in text
-    app = superuser.app
-    from app.adapters.db.uow import SqlUnitOfWork  # noqa: PLC0415
     from app.domain.authorization import Scope  # noqa: PLC0415
 
-    async with SqlUnitOfWork(app.state.engine).read() as tx:
+    async with site_uow(superuser).read() as tx:
         stored = repr(await tx.list_audit_events(Scope(everything=True), limit=50))
     assert TOKEN not in stored
     assert "rotated-token-9876" not in stored
@@ -231,11 +230,9 @@ async def test_the_status_of_each_process_is_shown_without_any_platform_text(
 ) -> None:
     url = await create(superuser)
     destination_id = int(url.rsplit("/", 1)[1])
-    app = superuser.app
-    from app.adapters.db.uow import SqlUnitOfWork  # noqa: PLC0415
     from app.domain.log_destinations import DestinationStatus, State  # noqa: PLC0415
 
-    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+    async with site_uow(superuser).locked() as tx:
         await tx.save_log_destination_status(
             DestinationStatus(
                 destination_id, "worker", State.FAILING, failed=3, dropped=7, last_error="tls"

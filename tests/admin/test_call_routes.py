@@ -6,7 +6,6 @@ import pytest
 
 from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
-from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.registrations import (
     Listing,
     ListingError,
@@ -45,8 +44,7 @@ from tests.support.domain import ADA, FRIDAY_0900, TEST_TOKEN_KEY, book_confirme
 
 
 async def _book(site: Site, slug: str, contact: ContactInput = ADA) -> int:
-    app = site.app
-    uow = SqlUnitOfWork(app.state.engine)
+    uow = site_uow(site)
     receipt = await book_confirmed(
         BookingService(uow, site.clock, TEST_TOKEN_KEY, treatment_buffer=0),
         group_slug=slug,
@@ -101,8 +99,7 @@ async def test_the_booking_links_back_to_its_day_in_the_agenda(site: Site) -> No
 
 async def test_a_failed_meeting_explains_what_to_check(site: Site) -> None:
     booking_id = await _book(site, "demo")
-    app = site.app
-    uow = SqlUnitOfWork(app.state.engine)
+    uow = site_uow(site)
     integration = IntegrationService(uow, site.clock, AdminService(uow, site.clock))
     await integration.record(
         booking_id,
@@ -268,8 +265,7 @@ async def test_integrations_page_shows_the_last_checks_read_only(site: Site) -> 
 
 async def test_timeline_explains_a_work_item_that_could_not_be_ended(site: Site) -> None:
     booking_id = await _book(site, "demo")
-    app = site.app
-    uow = SqlUnitOfWork(app.state.engine)
+    uow = site_uow(site)
     integration = IntegrationService(uow, site.clock, AdminService(uow, site.clock))
     await integration.record(booking_id, EventKind.END_NOT_POSSIBLE, detail="rejected_403")
     await integration.record(booking_id, EventKind.TASK_MARKED_CANCELLED)
@@ -286,7 +282,7 @@ async def test_timeline_explains_a_work_item_that_could_not_be_ended(site: Site)
 async def _failed_meeting(site: Site) -> int:
     """A booking of ``demo`` (with a Webex host) whose meeting job failed on an older version."""
     app = site.app
-    uow = SqlUnitOfWork(app.state.engine)
+    uow = site_uow(site)
     async with uow.locked() as tx:
         demo = await tx.get_group("demo")
         assert demo is not None
@@ -374,8 +370,7 @@ async def test_a_retry_counts_toward_the_planners_alert_with_its_platform_settin
 
 async def _in_fallback(site: Site, slug: str) -> None:
     """Put the group in fallback to its own queue, as the worker does when the center is down."""
-    app = site.app
-    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+    async with site_uow(site).locked() as tx:
         group = await tx.get_group(slug)
         assert group is not None
         fallback = DispatchFallback.OWN_QUEUE
@@ -405,8 +400,7 @@ async def test_ending_a_fallback_by_hand_counts_toward_the_planners_alert(
 
 async def _with_meeting(site: Site, booking_id: int, meeting_id: str) -> None:
     """Give the booking the Webex meeting ``meeting_id``, as the worker would."""
-    app = site.app
-    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+    async with site_uow(site).locked() as tx:
         await tx.save_meeting(booking_id, MeetingRef(meeting_id, "https://site.webex.com/m/1"))
 
 

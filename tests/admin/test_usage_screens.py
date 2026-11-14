@@ -25,7 +25,7 @@ HOUR = datetime(2025, 12, 31, 8, tzinfo=UTC)
 
 async def _put(site: Site, slug: str, build: Any) -> None:
     """Write the cells ``build(organisation_id, group_id)`` returns for the group ``slug``."""
-    app: Any = site.app
+    app = site.app
     engine = app.state.engine
     async with AsyncSession(engine) as session:
         group = (await session.execute(select(GroupRow).where(GroupRow.slug == slug))).scalar_one()
@@ -158,7 +158,7 @@ async def test_a_small_count_is_hidden_in_the_table_and_the_chart_and_cannot_be_
 
 async def _fresh(site: Site) -> Site:
     """Remove the cells again so the next write starts from nothing."""
-    app: Any = site.app
+    app = site.app
     from sqlalchemy import delete
 
     from app.adapters.db.models import UsageHourRow
