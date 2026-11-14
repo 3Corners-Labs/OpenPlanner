@@ -170,7 +170,8 @@ test('the device check with the real fake devices: picture, meter, test sound', 
 
   // The microphone off: the bar is empty and stays empty.
   await page.getByRole('button', { name: /^Microphone/ }).click();
-  await expect(page.getByText('Your microphone is off, so we do not hear you.')).toBeVisible();
+  // The page also holds this sentence in its hidden texts, so the meter's own line is asked.
+  await expect(page.locator('[data-call-level-text]')).toHaveText('Your microphone is off, so we do not hear you.');
   await expect.poll(() => level(page)).toBe(0);
   await expectNoAxeViolations(page);
 });
@@ -330,7 +331,9 @@ test('forced colours and reduced motion: the focus ring and the meter bar stay v
   const page = await context.newPage();
   await spy(page);
   await openCallPage(page);
-  await begin(page).click();
+  // By keyboard, as the focus ring only shows for keyboard focus (`:focus-visible`).
+  await begin(page).focus();
+  await page.keyboard.press('Enter');
   await expect.poll(() => level(page), { timeout: 20_000 }).toBeGreaterThan(0);
 
   const toggle = page.getByRole('button', { name: /^Microphone/ });
