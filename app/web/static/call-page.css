@@ -6,11 +6,12 @@
  * is a constant of this page. No inline styles and no forced declarations; the page works from 320 px.
  */
 /* The bar is fixed at the foot of the window, so a page needs room at its end for it, and a focused
-   control is scrolled to rest above it (WCAG 2.4.11). On a wide window the row of buttons is one line,
-   about 4.5 rem with its frame; on a narrow one it wraps to at most half the window and, at normal
-   size, about 190 px: the lesser of half the window and 13 rem. `body` is a plain block, so a bottom
-   padding is the room after the footer. A browser without `:has()` only loses the room at the end. */
-html {
+   control is scrolled to rest above it (WCAG 2.4.11); both exist only while the bar shows. From 48 rem
+   wide the row of buttons is one line, about 4.5 rem with its frame; below that it wraps to two or
+   three rows, at most half the window and, at normal size, about 190 px: the lesser of half the window
+   and 13 rem. `body` is a plain block, so a bottom padding is the room after the footer. A browser
+   without `:has()` only loses the room at the end. */
+html:has([data-call-controls]:not([hidden])) {
   scroll-padding-bottom: 4.5rem;
 }
 
@@ -18,8 +19,8 @@ html:has([data-call-controls]:not([hidden])) body {
   padding-bottom: 4.5rem;
 }
 
-@media (max-width: 40rem) {
-  html {
+@media (max-width: 48rem) {
+  html:has([data-call-controls]:not([hidden])) {
     scroll-padding-bottom: min(50vh, 13rem);
   }
 
@@ -275,10 +276,6 @@ html:has([data-call-controls]:not([hidden])) body {
   margin: 0 auto var(--booking-space-m);
 }
 
-.call-card .call-toggles {
-  justify-content: center;
-}
-
 .call-spinner {
   display: block;
   box-sizing: border-box;
@@ -382,10 +379,6 @@ html:has([data-call-controls]:not([hidden])) body {
 
 .call-notice[data-call-notice="recording"] {
   border-left-color: var(--booking-color-error);
-}
-
-.call-card .call-notice {
-  text-align: left;
 }
 
 /* The one bar of the lobby and the call is fixed at the foot of the window: a sticky bar leaves the

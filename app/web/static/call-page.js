@@ -85,7 +85,7 @@
       soundBlocked: false, // the browser refused to play the other side's sound
       panel: false, // the panel of devices in the call is open
       recording: "off", // off, pending (being recorded, not yet said) or on (said): the meeting is recorded
-      connection: "ok", // ok or restoring: the connection of the call is being restored
+      connection: "ok", // ok, pending (being restored, not yet said) or restoring (said)
     };
   }
   var state = fresh();
@@ -130,10 +130,14 @@
     }
     render();
     if (sentence !== undefined) app.say(sentence);
-    // A recording is said once, when its notice first shows: it may have started while connecting.
+    // A notice is said once, when it first shows: it may have started while connecting.
     if (state.recording === "pending" && inCall) {
       state.recording = "on";
       app.say("say_recording_on");
+    }
+    if (state.connection === "pending" && inCall) {
+      state.connection = "restoring";
+      app.say("say_restoring");
     }
     var target = null;
     if (focus === "denied") {
@@ -253,10 +257,14 @@
     // Notices last while they hold; the panel of devices is a disclosure of the call's bar.
     $$("[data-call-notice]").forEach(function (notice) {
       var restoring = notice.dataset.callNotice === "restoring";
-      var held = restoring ? state.connection === "restoring" : state.recording !== "off";
+      var held = restoring ? state.connection !== "ok" : state.recording !== "off";
       notice.hidden = !(inCall && held);
     });
     $("[data-call-controls]").hidden = !inCall;
+    // The way out says what it leaves: in the lobby the participant is not in the call yet.
+    $$("[data-call-leave-label]").forEach(function (label) {
+      label.hidden = label.dataset.callLeaveLabel !== screen;
+    });
     var open = inCall && state.panel;
     $("[data-call-devices-panel]").hidden = !open;
     $("[data-call-devices-button]").setAttribute("aria-expanded", String(open));

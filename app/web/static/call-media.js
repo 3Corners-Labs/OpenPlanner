@@ -122,9 +122,9 @@
     if (!on) {
       if (!stream) switched(kind, false);
       else if (app.state.media === "added") {
-        return track(kind, call.meeting.unpublishStreams([stream]).then(drop, mute));
-      }
-      else drop();
+        // Under the time of an attempt: a refusal and a silence are both "kept, muted".
+        return track(kind, app.within(call.meeting.unpublishStreams([stream])).then(drop, mute));
+      } else drop();
       return Promise.resolve();
     }
     if (stream) {
@@ -182,8 +182,8 @@
         function () {
           if (epoch !== call.epoch) return created.stop();
           if (call[kind] !== old || !app.state.live[kind]) {
-            created.stop();
-            return kept();
+            // Already sent: taken out of the meeting first (as a toggle that goes off does), then stopped.
+            return giveBack(created).then(kept);
           }
           call[kind] = created;
           old.stop();
@@ -199,6 +199,18 @@
     return track(kind, changing);
   }
 
+  // A stream that was sent and is no longer wanted: out of the meeting, then stopped.
+  function giveBack(created) {
+    var stop = function () {
+      created.stop();
+    };
+    if (app.state.media !== "added" || !call.meeting) {
+      stop();
+      return Promise.resolve();
+    }
+    return app.within(call.meeting.unpublishStreams([created])).then(stop, stop);
+  }
+
   // The one rule for sending a new stream: when it arrives and the media is in (after an adding
   // that is under way, unless that adding took it along); never earlier, never twice.
   function send(kind, created, epoch) {
@@ -208,7 +220,7 @@
       var taken = call.sent && call.sent[kind] === created;
       var published = {};
       published[kind] = created;
-      return app.state.media === "added" && !taken ? call.meeting.publishStreams(published) : null;
+      return app.state.media === "added" && !taken ? app.within(call.meeting.publishStreams(published)) : null;
     });
   }
 

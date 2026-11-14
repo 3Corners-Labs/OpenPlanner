@@ -86,6 +86,8 @@
     });
   }
 
+  app.within = within; // for call-media.js: the same time limit for taking a stream out or sending it
+
   function giveUp(promise) {
     var limit = new Promise(function (resolve) {
       window.setTimeout(resolve, GIVE_UP_MS);
@@ -284,6 +286,7 @@
     call.meeting = null;
     call.joined = false;
     call.capturing = null;
+    call.making = { camera: null, microphone: null }; // a device being made or taken out is given up with the call
     call.sent = null;
     call.epoch += 1;
     if (call.abort) {

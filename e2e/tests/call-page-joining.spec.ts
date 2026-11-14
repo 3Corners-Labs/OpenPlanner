@@ -355,7 +355,7 @@ test('the lobby: waiting words, own picture, working toggles that give the devic
   await expect(page.getByText('There is nothing you need to do. The call starts by itself.')).toBeVisible();
   await saidLike(page, /^Waiting for the .+ to let you in\.$/);
   await expect(state(page, 'lobby').getByLabel('Your picture')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Leave the call' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Leave the waiting room' })).toBeVisible(); // not in the call yet
   // Not in the call yet: no media was added, the other side is not shown.
   expect((await sdk(page)).calls).not.toContain('addMedia');
   await expect(state(page, 'call')).toBeHidden();

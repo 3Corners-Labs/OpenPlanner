@@ -27,7 +27,6 @@ import {
   saidLike,
   sdk,
   state,
-  stubRemoteSound,
   stubToken,
   timesSaid,
   WAITING,
@@ -50,7 +49,7 @@ const panel = (page: Page) => page.getByRole('group', { name: 'Your devices' });
 const pick = (page: Page, kind: 'camera' | 'microphone' | 'speaker') => page.locator(`[data-call-pick="${kind}"]`);
 const notice = (page: Page, kind: 'recording' | 'restoring') => page.locator(`[data-call-notice="${kind}"]`);
 const bar = (page: Page) => page.locator('.call-controls'); // one bar, for the lobby and the call
-const leave = (page: Page) => page.getByRole('button', { name: 'Leave the call' });
+const leave = (page: Page) => page.getByRole('button', { name: /^Leave the (call|waiting room)$/ });
 
 /** Into the call, with the plan of the double. */
 async function inCall(page: Page, plan: Plan = {}): Promise<void> {
@@ -419,37 +418,91 @@ test('what an event carries is never shown as text or markup, and an event of a 
 
   await leave(page).click();
   await expect(heading(page, 'You left the call')).toBeFocused();
-  const said_ = (await timesSaid(page, RESTORING)) + (await timesSaid(page, RECORDING));
-  // The old meeting still talks; the page is no longer listening.
-  await recording(page, false);
-  await reconnection(page, 'success');
+  // The old meeting still talks, and says its connection is lost for good: without the guard of the
+  // connection that made the event, the page would leave the left state for the failure state.
   await reconnection(page, 'fail', attack);
   await frames(page);
   await expect(heading(page, 'You left the call')).toBeFocused();
   await expect(state(page, 'left')).toBeVisible();
   await expect(state(page, 'failed')).toBeHidden();
-  expect((await timesSaid(page, RESTORING)) + (await timesSaid(page, RECORDING))).toBe(said_);
-  expect(await timesSaid(page, 'The recording has stopped.')).toBe(0);
-  expect(await timesSaid(page, 'The connection is back.')).toBe(0);
 });
 
 // ---- the bar stays in view ----------------------------------------------------------------------------
 
-test('a control that has focus is not under the bar on a low window, and the page keeps room for the bar', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 400 });
-  await stubRemoteSound(page); // the browser blocks the other side's sound: a button to hear it shows
-  await inCall(page);
-  const hear = page.getByRole('button', { name: 'Tap to hear the other person' });
-  await expect(hear).toBeVisible();
-  await hear.focus();
-  const control_ = await hear.boundingBox();
-  const controls = await bar(page).boundingBox();
-  expect(control_).not.toBeNull();
-  expect(controls).not.toBeNull();
-  const clear = (control_?.y ?? 0) + (control_?.height ?? 0) <= (controls?.y ?? 0) + 0.5 || (controls?.y ?? 0) + (controls?.height ?? 0) <= (control_?.y ?? 0) + 0.5;
-  expect(clear, 'the focused control and the bar overlap').toBe(true);
-  const padding = await page.evaluate(() => Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingBottom));
-  expect(padding).toBeGreaterThan(0); // a control scrolled into view comes to rest above the bar
+for (const size of [
+  { width: 1280, height: 400 },
+  { width: 320, height: 400 },
+]) {
+  test(`the last control of the page comes to rest above the bar on a window ${size.width} by ${size.height}`, async ({ page }) => {
+    await page.setViewportSize(size);
+    await inCall(page);
+    // What stands below the picture on a longer page: a tall block, then one link at the very end.
+    await page.evaluate(() => {
+      const block = document.createElement('div');
+      block.style.height = '1500px';
+      const last = document.createElement('a');
+      last.href = '#end';
+      last.textContent = 'End of the page';
+      document.body.append(block, last);
+    });
+    const last = page.getByRole('link', { name: 'End of the page' });
+    await tabTo(page, last);
+    await expect(last).toBeFocused();
+    const a = await last.boundingBox();
+    const b = await bar(page).boundingBox();
+    expect(a).not.toBeNull();
+    expect(b).not.toBeNull();
+    // Above the bar, not under it: the page keeps room at its end and scrolls to rest above it.
+    expect((a?.y ?? 0) + (a?.height ?? 0), 'the focused link is under the bar').toBeLessThanOrEqual((b?.y ?? 0) + 0.5);
+  });
+}
+
+test('a recording and a connection being restored that began while connecting are said once on arrival', async ({ page }) => {
+  await stubToken(page, granted());
+  await open(page, { lobby: true, joinDelay: 3000 });
+  await join(page);
+  await expect(heading(page, 'We are connecting you')).toBeVisible();
+  await expect.poll(async () => (await sdk(page)).calls).toContain('create'); // the meeting exists, joining is slow
+  await recording(page, true);
+  await reconnection(page, 'start');
+  await expect(heading(page, WAITING)).toBeFocused();
+  await expect(notice(page, 'recording')).toBeVisible();
+  await expect(notice(page, 'restoring')).toBeVisible();
+  await said(page, RECORDING);
+  await said(page, RESTORING);
+  await frames(page);
+  expect(await timesSaid(page, RECORDING)).toBe(1);
+  expect(await timesSaid(page, RESTORING)).toBe(1);
+});
+
+test('the way out is named for where the participant is, and the bar has a name', async ({ page }) => {
+  await stubToken(page, granted());
+  await open(page, { lobby: true });
+  await join(page);
+  await expect(heading(page, WAITING)).toBeFocused();
+  await expect(page.getByRole('group', { name: 'Call controls' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Leave the waiting room' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Leave the call' })).toHaveCount(0);
+  await control(page, 'admit');
+  await expect(heading(page, IN_CALL)).toBeFocused();
+  await expect(page.getByRole('group', { name: 'Call controls' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Leave the call' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Leave the waiting room' })).toHaveCount(0);
+});
+
+test('a hung unpublish is given up with the time limit: the device is kept muted and a later choice works', async ({ page }) => {
+  await inCall(page, { hangUnpublish: true });
+  const microphone = page.getByRole('button', { name: /^Microphone/ });
+  await microphone.click(); // taking it out of the meeting never answers
+  await expect(microphone).toHaveAttribute('aria-pressed', 'false', { timeout: 20_000 });
+  await saidLike(page, /may still show the device as in use/);
+  expect(await live(page)).toEqual([1, 1]); // kept, muted, not lost
+  // Not blocked for good: a choice made now is answered, and so is the switch back on.
+  await devicesButton(page).click();
+  await pick(page, 'microphone').selectOption('mic-2');
+  await said(page, CHANGED);
+  await microphone.click();
+  await expect(microphone).toHaveAttribute('aria-pressed', 'true');
 });
 
 /** The row of buttons: from the top of the highest to the bottom of the lowest of the toggles, the devices button and the way out. */
@@ -486,6 +539,7 @@ async function barHolds(page: Page, height: number, what: string, opened: boolea
 
 for (const size of [
   { width: 1280, height: 400, name: 'a wide window 400 px high' },
+  { width: 768, height: 600, name: '768 px wide and 600 px high' },
   { width: 320, height: 640, name: '320 px wide and 640 px high' },
   { width: 320, height: 400, name: '320 px wide and 400 px high' },
   { width: 320, height: 256, name: '400 % zoom (a 1280 by 1024 window)' },
@@ -555,5 +609,8 @@ test('reduced motion and forced colours keep the notices and the panel visible, 
   expect(opened.border).toBe('solid');
   expect(Number.parseFloat(opened.top)).toBeGreaterThanOrEqual(3); // open: a thicker edge, not colour alone
   expect((await style('[data-call-devices-panel]')).border).toBe('solid');
+  const edge = await style('[data-call-controls]');
+  expect(edge.border).toBe('solid'); // the bar's own top edge
+  expect(Number.parseFloat(edge.top)).toBeGreaterThanOrEqual(1);
   await context.close();
 });

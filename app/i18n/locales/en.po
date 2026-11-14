@@ -14258,3 +14258,9 @@ msgstr "The picture or sound of the call could not be set up. You can try again.
 
 msgid "callpage.failed.lost"
 msgstr "The connection was lost and could not be restored. You can try again."
+
+msgid "callpage.control.leave_lobby"
+msgstr "Leave the waiting room"
+
+msgid "callpage.control.bar"
+msgstr "Call controls"

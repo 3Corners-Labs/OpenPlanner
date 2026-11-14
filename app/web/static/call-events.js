@@ -51,10 +51,11 @@
       else if (state.recording === "pending") mark(epoch, { recording: "off" });
     });
     meeting.on("meeting:reconnectionStarts", function () {
-      if (state.connection !== "restoring") mark(epoch, { connection: "restoring", say: "say_restoring" });
+      if (state.connection === "ok") mark(epoch, { connection: "pending" });
     });
     meeting.on("meeting:reconnectionSuccess", function () {
       if (state.connection === "restoring") mark(epoch, { connection: "ok", say: "say_restored" });
+      else if (state.connection === "pending") mark(epoch, { connection: "ok" });
     });
     meeting.on("meeting:reconnectionFailure", function () {
       if (current()) app.connection.lost();

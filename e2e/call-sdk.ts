@@ -26,6 +26,8 @@ export type Plan = {
   slowLeave?: number;
   unpublishFails?: boolean;
   slowUnpublish?: number;
+  hangUnpublish?: boolean;
+  joinDelay?: number;
   publishFails?: boolean;
   authFailAt?: 'create' | 'join';
   mediaFailures?: number;

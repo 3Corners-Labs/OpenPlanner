@@ -14271,3 +14271,9 @@ msgstr "Beeld of geluid van het gesprek kon niet worden klaargezet. U kunt het o
 
 msgid "callpage.failed.lost"
 msgstr "De verbinding is verbroken en kon niet worden hersteld. U kunt het opnieuw proberen."
+
+msgid "callpage.control.leave_lobby"
+msgstr "De wachtkamer verlaten"
+
+msgid "callpage.control.bar"
+msgstr "Bediening van het gesprek"

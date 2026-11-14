@@ -234,11 +234,11 @@ to another at run time goes through `app` and may reach a file loaded later.
   that began before the lobby is said once when its notice first shows; a connection lost for good ends in the
   failure state. Events of a connection that is over are ignored and what an event carries is never read.
 - The controls of the lobby and the call are one bar, in the markup once, a child of the whole call area (`render`
-  shows it on those two screens): the toggles, the devices button with its panel and the way out. It is fixed at
+  shows it on those two screens): the toggles, the devices button with its panel and the way out (named "Call controls"; the way out reads "Leave the waiting room" in the lobby and "Leave the call" in the call). It is fixed at
   the foot of the window (a sticky bar leaves the foot at the page's end), and the page keeps room for it at its end; its row of buttons is at most half the window
   (on a window under 32 rem high the buttons are 2 rem high, under 20 rem the toggles' words "on" and "off" are
   for assistive technology only), the panel of devices overlays the page above the row (out of flow, at most half the window less 1.5 rem),
-  and scrolls inside itself. `scroll-padding-bottom` and the page's bottom padding are 4.5 rem (narrow window: `min(50vh, 13rem)`), the bar's height at most. The panel
+  and scrolls inside itself. `scroll-padding-bottom` and the page's bottom padding exist only while the bar shows and are 4.5 rem (under 48 rem wide: `min(50vh, 13rem)`), the bar's height at most. The panel
   is a disclosure wired in `call-page.js` with the page's other controls.
 
 - **Keyboard:** every control is a native button, link or select in reading order; nothing is a pointer
@@ -259,9 +259,9 @@ to another at run time goes through `app` and may reach a file loaded later.
   with JavaScript, a camera and a microphone, the organisation's contact details (or one plain sentence
   when it has none) and, where the organisation allows it, the link to join another way.
 - **Used by:** the call page only (`call.html`, with `call-page.css`).
-- **Size** (lines): `call-status.js` 53, `call-sound.js` 130, `call-devices.js` 389, `call-connection.js` 428,
-  `call-media.js` 226, `call-events.js` 65, `call-page.js` 436; about 0.8, 1.8, 4.1, 5.1, 2.7, 1.1 and 5.9 KB
-  gzipped (in the order of the loading), about 3.1 KB gzipped (styles). Step 5b (sharing, captions) and the chat
+- **Size** (lines): `call-status.js` 53, `call-sound.js` 130, `call-devices.js` 389, `call-connection.js` 431,
+  `call-media.js` 238, `call-events.js` 66, `call-page.js` 446; about 0.8, 1.8, 4.1, 5.1, 2.9, 1.1 and 5.9 KB
+  gzipped (in the order of the loading), about 3.8 KB gzipped (styles). Step 5b (sharing, captions) and the chat
   of 7c add to the same state and `render`; `call-page.js` and `call-connection.js` are the files to watch.
 
 ### `call-status.js`

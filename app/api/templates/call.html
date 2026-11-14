@@ -43,12 +43,15 @@
 {%- endmacro %}
 
 {% macro leave_button() -%}
-<button type="button" class="button button--danger call-leave" data-call-leave>{{ _("callpage.control.leave") }}</button>
+<button type="button" class="button button--danger call-leave" data-call-leave><span data-call-leave-label="call">{{ _("callpage.control.leave") }}</span><span data-call-leave-label="lobby" hidden>{{ _("callpage.control.leave_lobby") }}</span></button>
 {%- endmacro %}
 
 {#- The two notices that last while they hold (the recording, the connection being restored): an
     icon and a word, never colour alone; text, not a live region (the one polite region says each
-    change once). One place for both, shown in the lobby and the call (the participant is recorded in both). -#}
+    change once). One place for both, shown in the lobby and the call (the participant is recorded in both).
+    It stands at the top of the page, before the screen's heading, because the sentences must be in the
+    markup once and the two screens share it; a screen reader user is told by the one polite region when
+    a notice starts and ends, and the heading takes focus on entering the screen. -#}
 {% macro notices() -%}
 <div class="call-notices">
   <p class="call-notice" data-call-notice="recording" hidden>
@@ -229,7 +232,7 @@
   {#- The one bar of controls, for the lobby and the call: a child of the whole call area, so that it
       stays at the foot of the window wherever the page is scrolled. `render` shows it on those two
       screens only. The panel of devices opens in the bar's own box, above the row of buttons. -#}
-  <div class="call-controls" data-call-controls hidden>
+  <div class="call-controls" role="group" aria-label="{{ _("callpage.control.bar") }}" data-call-controls hidden>
     <div class="call-bar">
       {{ toggles() }}
       <div class="call-bar__devices">
