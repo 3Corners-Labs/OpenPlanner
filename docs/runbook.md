@@ -864,7 +864,7 @@ domain every `idp_domain_recheck_hours`; a record that disappears raises the sys
 `idp.domain_check` and, after `idp_domain_grace_days`, the domain stops routing.
 
 **Registering an organisation's provider.**
-1. In the portal: Organisations › *organisation* › Overview › Login › *Add*. Enter the
+1. In the portal: Organisations › *organisation* › Overview › Authentication › *Add*. Enter the
    discovery URL and the client id, and choose the client authentication:
    - `private_key_jwt` (default): give the organisation's IdP team the JWKS address shown on
      the provider's page;
