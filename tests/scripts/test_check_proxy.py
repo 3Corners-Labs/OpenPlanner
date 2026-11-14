@@ -3,18 +3,35 @@
 The script needs Docker and runs in CI (step *proxy check*). This test keeps its shape honest
 without Docker: the TLS-version and HSTS checks belong to ``edge_checks``, which every pass
 calls, every pass also runs the round trip, the wrong proxy address is tried once, and the first
-pass checks that a visitor over IPv6 keeps their address.
+pass checks that a visitor over IPv6 keeps their address. Pass 4 (ADR 0125 step 2) stops each
+container another one reaches and lets an impostor answer its name: these tests hold that it
+uses the addresses a host gets and that each refusal follows a control.
 """
 
 import re
 from pathlib import Path
 
+import pytest
+
 from app.api.security_headers import SECURITY_HEADERS
+from tests.support.compose import compose_file
 
 REPO = Path(__file__).parents[2]
 SCRIPT = (REPO / "scripts/check-proxy.sh").read_text()
 FORUM_MINIMUM_HSTS_SECONDS = 31536000
 """One year, the Forum Standaardisatie minimum the script asserts."""
+
+
+def _program(name: str) -> str:
+    """Return the Python program the script keeps in the shell variable ``NAME_code``."""
+    match = re.search(rf"^{name}_code='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
+    assert match, f"{name}_code is not in check-proxy.sh"
+    return match.group(1)
+
+
+@pytest.mark.parametrize("name", ["sniffer", "ipv6_client", "responder", "fetch"])
+def test_every_program_the_script_runs_in_a_container_compiles(name: str) -> None:
+    compile(_program(name), name, "exec")
 
 
 def _body(name: str) -> str:
@@ -82,11 +99,8 @@ def test_every_pass_sends_a_forged_forwarded_header_and_looks_at_the_wire() -> N
 
 def test_the_sniffer_prints_only_the_forwarded_headers() -> None:
     """The wire is read for ``X-Forwarded-*`` lines and nothing else (no paths, no tokens)."""
-    match = re.search(r"^sniffer_code='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
-    assert match, "the sniffer program is not in the script"
-    code = match.group(1)
+    code = _program("sniffer")
 
-    compile(code, "sniffer", "exec")
     assert 'startswith(b"x-forwarded-")' in code
     assert "print(line" in code
 
@@ -106,6 +120,97 @@ def test_a_visitor_over_ipv6_must_reach_web_with_their_own_address() -> None:
     assert "enable_ip_masquerade=false" in SCRIPT
     overlay = (REPO / "deploy/proxy/compose.pebble.yml").read_text()
     assert '"[${PROBE6_ADDRESS:?set by scripts/check-proxy.sh}]:18444:8443"' in overlay
-    match = re.search(r"^ipv6_client_code='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
-    assert match, "the IPv6 client program is not in the script"
-    compile(match.group(1), "ipv6 client", "exec")
+
+
+def _pass_4() -> str:
+    """Return pass 4 of the script, from its heading to its closing line (ADR 0125 step 2)."""
+    start = SCRIPT.index("# Pass 4:")
+    return SCRIPT[start : SCRIPT.index('echo "pass 4 ok', start)]
+
+
+def test_pass_4_proves_the_addresses_a_host_gets_not_addresses_of_its_own() -> None:
+    """The login, directory and database host from the render script, the /idp route from the
+    address file the installer reads too."""
+    text = _pass_4()
+
+    assert "bash scripts/render-keycloak-realm.sh" in text
+    assert "--database postgres" in text
+    for key in ("OIDC_DISCOVERY_URL", "KEYCLOAK_ADMIN_URL", "KC_DB_URL_HOST"):
+        assert f"s/^{key}=//p" in text
+    assert ". scripts/fixed-addresses.sh" in text
+    assert '. "$DIR/scripts/fixed-addresses.sh"' in (REPO / "scripts/install.sh").read_text()
+    assert "172.31.240." not in text
+    # Every hop answers while its container runs: a refusal later is then the container's absence.
+    for hop in ('fetch web "$login"', 'fetch worker "$directory"', 'fetch idp "$database"'):
+        assert text.index(hop) < text.index("impostor idp-db idp-store 5432")
+
+
+def test_an_impostor_is_reached_by_name_before_any_refusal_counts() -> None:
+    """The control runs inside ``impostor``, so no refusal can come before it."""
+    body = _body("impostor")
+
+    assert body.index("[ $# -gt 0 ] || fail") < body.index('for client in "$@"')
+    assert body.index('for client in "$@"') < body.index('requests "$impostor_name" >')
+    assert 'fetch "$client" "$impostor_url"' in body
+    assert "a refusal would prove nothing" in body
+
+
+def _impostor_blocks() -> list[str]:
+    """Return pass 4's blocks, each from its ``impostor`` line to the first blank line."""
+    starts = re.split(r"^(?=impostor )", _pass_4(), flags=re.MULTILINE)[1:]
+    return [start.split("\n\n", 1)[0] for start in starts]
+
+
+def test_every_impostor_block_ends_with_untouched_for_the_same_name() -> None:
+    """What the impostor answered after its controls is a hop that followed the name."""
+    blocks = _impostor_blocks()
+
+    assert [block.split()[1] for block in blocks] == ["idp-db", "idp", "web"]
+    for block in blocks:
+        name = block.split()[1]
+        lines = block.strip().splitlines()
+        assert lines[-1] == f"untouched {name}", block
+        assert any('= "refused" ]' in line or '= " 502" ]' in line for line in lines[1:-1])
+
+
+def test_every_client_that_must_fail_reached_the_impostor_by_name_first() -> None:
+    """A refusal proves something only from a client that reached the impostor in its control."""
+    for block in _impostor_blocks():
+        head, *lines = block.splitlines()
+        clients = set(head.split()[4:])  # impostor NAME NETWORK PORT CLIENT...
+        refusing = {client for line in lines for client in re.findall(r"fetch (\w+) ", line)}
+        if any("proxied " in line for line in lines):
+            refusing.add("proxy")
+
+        assert refusing, block
+        assert refusing <= clients, block
+
+
+def test_the_stand_ins_keep_where_docker_compose_puts_them() -> None:
+    """The overlay swaps the image, never the networks or fixed addresses, and publishes nothing."""
+    check = compose_file("deploy/proxy/compose.pebble.yml")["services"]
+    base = compose_file()["services"]
+
+    for name in ("idp", "idp-db"):
+        assert "networks" not in check[name]
+        assert check[name].get("ports", []) == []
+        assert base[name]["networks"]
+    assert "/pebble/responder.py" in check["idp"]["command"]
+
+
+def test_the_responder_prints_one_line_per_request_and_nothing_it_carried() -> None:
+    code = _program("responder")
+
+    assert 'print("request", flush=True)' in code
+    assert "def log_message" in code  # http.server's own access log, with paths, stays silent
+
+
+def test_the_impostors_are_removed_before_the_networks_they_hold() -> None:
+    cleanup = _body("cleanup")
+
+    assert cleanup.index("impostor") < cleanup.index("compose down -v")
+
+
+def test_an_impostor_counts_only_the_hops_that_reach_it() -> None:
+    """The image's health check asks 127.0.0.1:8000, which the impostor for web answers."""
+    assert "--no-healthcheck" in _body("impostor")

@@ -47,11 +47,11 @@ TRAIN_TOUCHED = {"bookings", "slots"}
 AFTER_TRAIN_TOUCHED = {"group_contact_center", "groups", "staff"}
 """Pre-train tables that a migration after the train adds a column to, by the same additive rule:
 0116 (ADR 0123 step 7a) gives the group's contact-center routing its task kind, 0118
-(ADR 0123 step 5c) gives the staff record its screen name, and 0119 (ADR 0123 step 6a) gives the
+(ADR 0123 step 5c) gives the staff record its screen name, and 0120 (ADR 0123 step 6a) gives the
 group the service's option next to the call page and widens one check (``AFTER_TRAIN_WIDENED``)."""
 AFTER_TRAIN_WIDENED = {"groups": ("join_client", ("browser", "choice"), "embedded")}
 """The one check each of those tables has widened (never narrowed), as ``(column, the values it
-allowed, the one value added)``: ``groups.join_client`` may now be ``embedded`` (0119). Every value
+allowed, the one value added)``: ``groups.join_client`` may now be ``embedded`` (0120). Every value
 the previous image writes still meets it. The test builds both forms of the check from this, so
 the exemption is exactly "the same constraint with one more allowed value" and nothing else."""
 AFTER_TRAIN_COLUMNS = {

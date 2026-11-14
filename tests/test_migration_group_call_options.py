@@ -1,4 +1,4 @@
-"""Migration 0119 (ADR 0123 step 6a): a service chooses the call page and its option.
+"""Migration 0120 (ADR 0123 step 6a): a service chooses the call page and its option.
 
 An expand step (ADR 0116): ``join_client`` may be ``embedded`` and ``embedded_call_webex_option``
 is added empty, which means "as the organisation": nothing is backfilled, so every group follows
@@ -25,8 +25,8 @@ GROUP = (
 
 @pytest.fixture
 def old_database(alembic_config: Config, tmp_path: Path) -> Path:
-    """Return a database at 0118: two organisations with a stored value, one without."""
-    command.upgrade(alembic_config, "0118")
+    """Return a database at 0119: two organisations with a stored value, one without."""
+    command.upgrade(alembic_config, "0119")
     path = tmp_path / "migrate.db"
     with closing(sqlite3.connect(path)) as database:
         for org, slug in ((1, "acme"), (2, "voorbeeld"), (3, "demo")):
@@ -56,7 +56,7 @@ def _options(path: Path) -> list[tuple[int, str | None]]:
 def test_no_group_gets_a_value_of_its_own_so_every_group_follows_its_organisation(
     alembic_config: Config, old_database: Path
 ) -> None:
-    command.upgrade(alembic_config, "0119")
+    command.upgrade(alembic_config, "0120")
 
     # Nothing is backfilled: the organisations' stored values stay where they are and still hold.
     assert _options(old_database) == [(1, None), (2, None), (3, None), (4, None)]
@@ -72,7 +72,7 @@ def test_no_group_gets_a_value_of_its_own_so_every_group_follows_its_organisatio
 def test_embedded_and_the_options_are_the_only_values_the_checks_accept(
     alembic_config: Config, old_database: Path
 ) -> None:
-    command.upgrade(alembic_config, "0119")
+    command.upgrade(alembic_config, "0120")
 
     with closing(sqlite3.connect(old_database)) as database:
         database.execute("UPDATE groups SET join_client = 'embedded' WHERE id = 1")
@@ -88,13 +88,13 @@ def test_embedded_and_the_options_are_the_only_values_the_checks_accept(
 def test_the_downgrade_gives_embedded_groups_the_default_client_and_goes_up_again(
     alembic_config: Config, old_database: Path
 ) -> None:
-    command.upgrade(alembic_config, "0119")
+    command.upgrade(alembic_config, "0120")
     with closing(sqlite3.connect(old_database)) as database:
         database.execute("UPDATE groups SET join_client = 'embedded' WHERE id = 1")
         database.execute("UPDATE groups SET join_client = 'choice' WHERE id = 3")
         database.commit()
 
-    command.downgrade(alembic_config, "0118")
+    command.downgrade(alembic_config, "0119")
 
     with closing(sqlite3.connect(old_database)) as database:
         columns = [row[1] for row in database.execute("PRAGMA table_info(groups)")]
@@ -108,5 +108,5 @@ def test_the_downgrade_gives_embedded_groups_the_default_client_and_goes_up_agai
         with pytest.raises(sqlite3.IntegrityError):
             database.execute("UPDATE groups SET join_client = 'embedded' WHERE id = 2")
         assert database.execute("SELECT COUNT(*) FROM organisation_settings").fetchone() == (2,)
-    command.upgrade(alembic_config, "0119")
+    command.upgrade(alembic_config, "0120")
     assert _options(old_database) == [(1, None), (2, None), (3, None), (4, None)]
