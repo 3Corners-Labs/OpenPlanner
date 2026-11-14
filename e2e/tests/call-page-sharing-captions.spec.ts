@@ -64,10 +64,9 @@ const remote = (page: Page) => page.locator('[data-call-remote]');
 const leave = (page: Page) => page.getByRole('button', { name: /^Leave the (call|waiting room)$/ });
 const frames = (page: Page): Promise<unknown> => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
-/** The organisation's word for staff, as the page itself names the other side's picture. */
+/** The organisation's word for staff, as the page itself names the other side's picture (no name is known here). */
 async function term(page: Page): Promise<string> {
-  const label = (await remote(page).getAttribute('aria-label')) ?? '';
-  return label.replace('Picture of the ', '');
+  return (await remote(page).getAttribute('aria-label')) ?? '';
 }
 
 /** Into the call; the meeting offers captions and sharing unless the plan says otherwise. */
@@ -441,7 +440,7 @@ test('captions are offered only when the meeting has them, and the real-time lin
 
 test('captions show who speaks in the page\'s own words, never the platform\'s name, newest lines last, an interim line until its final text', async ({ page }) => {
   await inCall(page);
-  const who = (await term(page)).replace(/^./, (c) => c.toUpperCase());
+  const who = await term(page); // the label of the picture: no name is known here, so the team's word alone
   await captionsToggle(page).click();
   await said(page, CAPTIONS_ON);
 
@@ -583,7 +582,23 @@ test('a long caption can be read to its start and to its end with the keyboard, 
   await expect.poll(() => visible('last')).toBe(true); // the keyboard reaches its end
   await page.keyboard.press('Home');
   await expect.poll(() => box.evaluate((el) => el.scrollTop)).toBe(0); // a key scrolls over a few frames
-  for (let i = 0; i < 30 && !(await visible('first')); i++) await page.keyboard.press('PageDown'); // and back to its start
+  // A key's scroll takes a few frames: look only once the box has come to rest, or the next key is
+  // pressed while the newest line's start is still on its way in, and carries it past the box.
+  const atRest = async (): Promise<void> => {
+    let before = -1;
+    await expect
+      .poll(async () => {
+        const now = await box.evaluate((el) => el.scrollTop);
+        const same = now === before;
+        before = now;
+        return same;
+      })
+      .toBe(true);
+  };
+  for (let i = 0; i < 30 && !(await visible('first')); i++) {
+    await page.keyboard.press('PageDown'); // and back to its start
+    await atRest();
+  }
   expect(await visible('first')).toBe(true);
 
   // A box with nothing higher than itself is no tab stop.

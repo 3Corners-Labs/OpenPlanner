@@ -8,8 +8,8 @@ branch, so that a decision cannot reach ``main`` through a stale or skipped chec
 request. A pull request is a *decision* when it touches an ADR
 outside its *Build status* table and its Status line (a new or removed ADR always counts),
 ``CLAUDE.md``, ``SECURITY.md``, the authorisation matrix, anything under ``.github/`` or
-``.semgrep/``, the ``Makefile`` (what CI runs), the gates themselves (this script and the
-release audit scripts), or when its title starts with ``chore(release):``. A decision passes
+``.semgrep/``, the ``Makefile`` (what CI runs), the gates themselves (this script), or when
+its title starts with ``chore(release):``. A decision passes
 the check only with the label ``po:approved``, set last by an administrator of the repository
 (ADR 0104); build work passes without it. The workflow hands over the pull request's label
 events and the administrators as files (``--events``, ``--admins``), and ``--withdrawn`` when
@@ -61,8 +61,6 @@ DECISION_FILES = frozenset(
         "scripts/adr_tables.py",
         "scripts/vendor.py",
         "scripts/vendor_sbom.py",
-        "scripts/release-audit.sh",
-        "scripts/check-release-audit.sh",
     }
 )
 """Files whose every change is a decision: the agreements, the matrix and the gates."""

@@ -224,6 +224,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `EMBEDDED_CALL_CONNECT_SECONDS` | int | `30` | 10–90 | `settings.platform.manage` | Seconds the call page waits for one attempt at registering or joining before it tries again (ADR 0123). |
 | `EMBEDDED_CALL_CONNECT_ATTEMPTS` | int | `3` | 1–5 | `settings.platform.manage` | Attempts the call page makes before it says it cannot connect (ADR 0123). |
 | `EMBEDDED_CALL_TOKEN_PER_BOOKING_PER_HOUR` | int | `10` | 5–30 | `settings.platform.manage` | Guest tokens one booking may ask for in an hour on the call page; per address the common read limit applies (ADR 0123 point 6). |
+| `EMBEDDED_CALL_CHAT_POLL_SECONDS` | int | `3` | 2–10 | `settings.platform.manage` | Seconds between two looks of the call page at who is in the call, and from the chat's step on at its new messages: the one poll of the page while it waits or is in the call (ADR 0123). |
 
 ## D. Organisation (portal, organisation settings; lockable by env)
 
@@ -264,5 +265,5 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `BOOKING_CONFIRM_CUTOFF_HOURS` | int | `2` | 0–24 | `settings.organisation.manage` | Hours before the start by which the participant confirms at the latest (ADR 0056). |
 | `BOOKING_CONFIRM_REMINDERS` | int | `1` | 0–3 | `settings.organisation.manage` | Reminders to confirm, spread evenly over the time to confirm (ADR 0056). |
 | `EMBEDDED_CALL_DISPLAY_NAME` | enum | `first_name` | first_name, term | `settings.organisation.manage` | What staff see as the participant's name in the call page's meeting: the first name, or the organisation's word for a participant (ADR 0123). |
-| `EMBEDDED_CALL_STAFF_NAME` | enum | `name` | name, term | `settings.organisation.manage` | How the call page names the staff member to the participant: the name of their account, or the organisation's word for staff (ADR 0123). |
+| `EMBEDDED_CALL_STAFF_NAME` | enum | `screen_name` | screen_name, name, term | `settings.organisation.manage` | How the call page names the staff member to the participant: the screen name kept with their staff record (the organisation's word for staff alone when they have none), the name of their account, or the organisation's word for staff alone (ADR 0123). |
 | `EMBEDDED_CALL_WEBEX_OPTION` | enum | `hidden` | hidden, on_failure, always | `settings.organisation.manage` | Whether the call page shows the participant a way into the video platform's own app: never, only when the page cannot give the call, or always (ADR 0123 point 11). |

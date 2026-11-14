@@ -342,6 +342,16 @@ class InMemoryTransaction(ServiceRequestStore):
                 self.state.staff[subject], status=status, status_at=at
             )
 
+    async def get_staff_by_id(self, staff_id: int) -> StaffMember | None:
+        return next((m for m in self.state.staff.values() if m.id == staff_id), None)
+
+    async def set_staff_screen_name(self, subject: str, screen_name: str | None) -> bool:
+        member = self.state.staff.get(subject)
+        if member is None or member.status is StaffStatus.ERASED:
+            return False
+        self.state.staff[subject] = replace(member, screen_name=screen_name)
+        return True
+
     async def get_overview_layout(self, subject: str) -> tuple[str, ...] | None:
         return self.state.overview_layouts.get(subject)
 

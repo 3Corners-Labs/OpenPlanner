@@ -12,8 +12,8 @@ or writes it, so it keeps working on this schema and a restore into it loses not
 Downgrade drops the table. Nothing depends on it: the first sighting is made again by the next
 call, which at worst starts the overlap of a previous value in the environment again.
 
-Revision ID: 0118
-Revises: 0117
+Revision ID: 0119
+Revises: 0118
 """
 
 from collections.abc import Sequence
@@ -23,8 +23,8 @@ from alembic import op
 
 from app.adapters.db.types import UTCDateTime
 
-revision: str = "0118"
-down_revision: str | None = "0117"
+revision: str = "0119"
+down_revision: str | None = "0118"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

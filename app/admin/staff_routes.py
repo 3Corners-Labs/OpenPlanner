@@ -31,6 +31,12 @@ person's number, never a name. A person the viewer may not see, or an organisati
 right in, answers like an unknown address. A change applies from the next request that is picked
 up or started.
 
+A person's page also holds, for an administrator with ``staff.manage``, the person's screen
+name: the name the participant of a call in our own page sees (ADR 0123 step 5c), set in
+``app.admin.staff_screen_name_routes``. The list marks, in words, a person who has none while the
+organisation of the person shows the screen name (``embedded_call_staff_name``), so a manager sees
+who would still show as the team's word alone.
+
 A person's page also lists the entitlement values of their last login that this installation
 did not recognise, with the reason (ADR 0049 point 8), within the viewer's scope.
 """
@@ -42,11 +48,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import HTMLResponse, Response
 
+from app.adapters.live_settings import LiveSettings
 from app.admin.audit_routes import audit_views
 from app.admin.authz import AdminContext, RequirePermission, admin_service, skill_service
-from app.admin.forms import FormData, Option, done_message, read_form, redirect_done
+from app.admin.forms import Field, FormData, Option, done_message, read_form, redirect_done
 from app.admin.idp_mapping_routes import reason_label
-from app.admin.pages import Locale, SameOrigin, admin_moment
+from app.admin.pages import Locale, SameOrigin, admin_moment, with_manual
 from app.admin.pages import page as _page
 from app.admin.skill_inputs import (
     SkillChoice,
@@ -64,8 +71,10 @@ from app.admin.staff_directory_routes import (
 from app.domain.audit import AuditFilter
 from app.domain.authorization import Permission, Principal, Role, scope_for
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.guest_access import StaffNameMode
 from app.domain.identity import PLATFORM
 from app.domain.scheduling import GroupSummary
+from app.domain.screen_name import MAX_LENGTH as SCREEN_NAME_MAX
 from app.domain.staff import StaffFilter, StaffMember, StaffStatus
 from app.web.authz_labels import ROLE_LABELS
 from app.web.locale import RequestLocale
@@ -115,6 +124,9 @@ class StaffView:
     """The identity provider the person logs in through: a provider key, or the platform."""
     email: str = ""
     """The verified address of the last login; empty when none (ADR 0117 step 10b)."""
+    no_screen_name: bool = False
+    """The person has no screen name while an organisation of theirs shows the screen name to
+    participants (ADR 0123 step 5c): the list says so in words."""
 
 
 PLATFORM_VALUE = "platform"
@@ -143,6 +155,32 @@ def _dormant_after(request: Request) -> timedelta:
     return timedelta(days=settings_for(request).staff_dormant_after_days)
 
 
+def _screen_name_organisations(request: Request, members: list[StaffMember]) -> frozenset[str]:
+    """Return the slugs, among the organisations of ``members``, that show the screen name.
+
+    Each organisation's setting is read once for the page, not once per person.
+    """
+    live: LiveSettings = request.app.state.live_settings
+    slugs = {slug for member in members for slug in member.organisations}
+    return frozenset(
+        slug
+        for slug in slugs
+        if live.for_organisation(live.organisation_id(slug)).embedded_call_staff_name
+        == StaffNameMode.SCREEN_NAME.value
+    )
+
+
+def _lacks_screen_name(member: StaffMember, showing: frozenset[str]) -> bool:
+    """Whether ``member`` has no screen name though an organisation of theirs shows it.
+
+    One screen name belongs to the person, whichever organisation's participants see it, so the
+    mark is on when any of the person's organisations (those the viewer sees) shows the screen name.
+    """
+    if member.screen_name or member.status is StaffStatus.ERASED:
+        return False
+    return any(slug in showing for slug in member.organisations)
+
+
 def _names(in_scope: list[GroupSummary]) -> tuple[dict[str, str], dict[str, str]]:
     """Organisation and group names by slug, from the groups in the viewer's scope."""
     organisations = {g.organisation_slug: g.organisation_name for g in in_scope}
@@ -156,6 +194,7 @@ def _view(
     member: StaffMember,
     names: tuple[dict[str, str], dict[str, str]],
     now: datetime,
+    showing: frozenset[str],
 ) -> StaffView:
     """Translate a person for the templates; unknown slugs are shown as the slug."""
     _ = locale.gettext
@@ -182,6 +221,7 @@ def _view(
         provider=member.provider or _("admin.staff.platform_provider"),
         email="" if erased else member.email or "",
         dormant=not erased and member.is_dormant(now, _dormant_after(request)),
+        no_screen_name=_lacks_screen_name(member, showing),
         suspended=member.status is StaffStatus.SUSPENDED,
         erased=erased,
         refused=tuple(
@@ -270,6 +310,7 @@ async def staff_list(
     )
     members = await service.staff(context.principal, narrow)
     names = _names(in_scope)
+    showing = _screen_name_organisations(request, members)
     filters = StaffFilterView(
         organisations=tuple(Option(slug, name) for slug, name in sorted(names[0].items())),
         organisation=narrow.organisation or "",
@@ -301,7 +342,7 @@ async def staff_list(
         "admin/staff.html",
         context.principal,
         {
-            "people": [_view(request, locale, m, names, now) for m in members],
+            "people": [_view(request, locale, m, names, now, showing) for m in members],
             "can_invite": directory.available and manager and not unreachable,
             "directory_notice": _directory_notice(locale, directory.missing, unreachable)
             if manager
@@ -423,7 +464,11 @@ async def member_page(
         "admin/staff_member.html",
         context.principal,
         {
-            "person": _view(request, locale, member, names, now),
+            "person": _view(
+                request, locale, member, names, now, _screen_name_organisations(request, [member])
+            ),
+            "screen_name_field": _screen_name_field(request, locale, context, member, form),
+            "screen_name_done": done_message(request, locale.gettext, only=SCREEN_NAME_DONE),
             "events": activity,
             "manage": manage,
             "add_fields": add_fields(
@@ -437,6 +482,38 @@ async def member_page(
     )
     response.status_code = status
     return response
+
+
+SCREEN_NAME_DONE = ("staff_screen_name_saved", "staff_screen_name_unchanged")
+"""The confirmations of a save of the screen name, shown in that section of the page."""
+
+
+def _screen_name_field(
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    member: StaffMember,
+    form: FormData | None,
+) -> Field | None:
+    """Return the input of the screen name for a viewer who may manage staff, else ``None``.
+
+    ``form`` re-shows the text of a refused save. An erased person has no screen name to set.
+    """
+    if member.status is StaffStatus.ERASED:
+        return None
+    if scope_for(context.principal, Permission.STAFF_MANAGE).is_empty:
+        return None
+    _ = locale.gettext
+    field = Field(
+        "screen_name",
+        _("admin.staff.screen_name.label"),
+        value=form.text("screen_name") if form is not None else member.screen_name or "",
+        hint=_("admin.staff.screen_name.hint"),
+        error=form.error_for("screen_name") if form is not None else None,
+        required=False,
+        attributes={"maxlength": str(SCREEN_NAME_MAX), "autocomplete": "off"},
+    )
+    return with_manual(request, locale, [field])[0]
 
 
 @router.get("/staff/{member_id}", response_class=HTMLResponse)

@@ -2448,6 +2448,18 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=30,
     ),
     S(
+        "embedded_call_chat_poll_seconds",
+        K.INT,
+        3,
+        _C,
+        T.WEBEX,
+        "Seconds between two looks of the call page at who is in the call, and from the chat's "
+        "step on at its new messages: the one poll of the page while it waits or is in the "
+        "call (ADR 0123).",
+        minimum=2,
+        maximum=10,
+    ),
+    S(
         "embedded_call_display_name",
         K.ENUM,
         "first_name",
@@ -2460,11 +2472,13 @@ REGISTRY: tuple[SettingSpec, ...] = (
     S(
         "embedded_call_staff_name",
         K.ENUM,
-        "name",
+        "screen_name",
         _D,
         T.DISPLAY,
-        "How the call page names the staff member to the participant: the name of their "
-        "account, or the organisation's word for staff (ADR 0123).",
+        "How the call page names the staff member to the participant: the screen name kept "
+        "with their staff record (the organisation's word for staff alone when they have "
+        "none), the name of their account, or the organisation's word for staff alone "
+        "(ADR 0123).",
         choices=tuple(m.value for m in StaffNameMode),
     ),
     S(

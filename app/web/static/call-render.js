@@ -2,7 +2,7 @@
  * How the call's parts look, as a function of the page's state (ADR 0123 steps 5a and 5b).
  *
  * Owns: drawing the lobby's and the call's parts out of `app.state`: the pictures (the participant's
- * own, the other side's, the button for their sound), the notices, the two switches of sharing and
+ * own, the other side's with its label, the button for their sound), the notices, the two switches of sharing and
  * captions with the staff member's screen, the captions' lines and the bar with its panel of
  * devices. Each is one function of the state onto the elements: it sets `hidden`, pressed states
  * and text, and nothing it draws is kept anywhere else.
@@ -21,6 +21,18 @@
     return state.screen === "lobby" || state.screen === "call";
   };
 
+  // Who the participant talks to, as the picture's label: the name, a middle dot and the term, or
+  // the term alone (the texts are the server's; the name is our server's answer, only ever text).
+  function staffLabel(state) {
+    return state.staffName ? app.texts.staff_named.replace("{name}", state.staffName) : app.texts.staff_term;
+  }
+
+  // The other side in the captions: the same label as on the picture (the approved design shows
+  // "name · term"; the term alone while no name is known).
+  function speaker(state) {
+    return staffLabel(state);
+  }
+
   function show(video, stream) {
     if (video.srcObject !== stream) video.srcObject = stream;
   }
@@ -36,6 +48,13 @@
     show(app.$("[data-call-remote]"), screen === "call" ? app.streams.remote : null);
     show(app.$("[data-call-remote-audio]"), screen === "call" ? app.streams.audio : null);
     app.$("[data-call-remote-off]").hidden = state.remote === "live";
+    // Who the participant talks to: the name and the team's word, or the word alone. The label is
+    // text in the page and the picture's accessible name; the name is only ever set as text.
+    var label = staffLabel(state);
+    var tag = app.$("[data-call-remote-label]");
+    if (tag.textContent !== label) tag.textContent = label;
+    tag.hidden = screen !== "call";
+    app.$("[data-call-remote]").setAttribute("aria-label", label);
     app.$("[data-call-hear]").hidden = !(screen === "call" && state.soundBlocked);
   }
 
@@ -79,7 +98,7 @@
     if (line.interim) paragraph.classList.add("call-caption--interim");
     var who = document.createElement("strong");
     who.classList.add("call-caption__who");
-    who.textContent = line.own ? app.texts.captions_you : app.texts.captions_other;
+    who.textContent = line.own ? app.texts.captions_you : speaker(app.state);
     var words = document.createElement("span");
     words.classList.add("call-caption__text");
     words.textContent = line.text;

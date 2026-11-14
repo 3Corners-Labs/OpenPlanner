@@ -117,6 +117,12 @@ def agent_pseudonym_key_previous(settings: Settings) -> bytes | None:
     return None if previous is None else _derive_from(previous, AGENT_PSEUDONYM_INFO)
 
 
+def agent_pseudonym_keys(settings: Settings) -> list[bytes]:
+    """Return the keys of the agents' pseudonyms in force: the current one, then the previous."""
+    previous = agent_pseudonym_key_previous(settings)
+    return [agent_pseudonym_key(settings)] + ([previous] if previous is not None else [])
+
+
 def guest_pseudonym_key(settings: Settings) -> bytes:
     """Return the key of the guest subjects sent to the video provider (ADR 0123)."""
     return _derived(settings, GUEST_PSEUDONYM_INFO)

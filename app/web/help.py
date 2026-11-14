@@ -95,7 +95,12 @@ TOPICS = (
     ),
     HelpTopic(
         "staff",
-        ("/admin/staff", "/admin/staff/invite", "/admin/staff/{member_id}"),
+        (
+            "/admin/staff",
+            "/admin/staff/invite",
+            "/admin/staff/{member_id}",
+            "/admin/staff/{member_id}/screen-name",
+        ),
         Permission.STAFF_VIEW,
     ),
     HelpTopic("my-sessions", ("/admin/rights/sessions",), Permission.RIGHTS_VIEW),

@@ -492,6 +492,24 @@ body:has([data-call-state="call"]:not([hidden])) .call-stage {
   text-align: center;
 }
 
+/* Who the participant talks to: a pill on the picture's top left, text in the page (its words are
+   also the picture's accessible name). It stays above the staff member's tile and screen. */
+.call-remote__label {
+  position: absolute;
+  top: var(--booking-space-s);
+  left: var(--booking-space-s);
+  z-index: 2;
+  max-width: calc(100% - 2 * var(--booking-space-s));
+  margin: 0;
+  padding: var(--booking-space-xs) var(--booking-space-m);
+  border-radius: 999px;
+  background: var(--call-stage);
+  color: var(--call-on-stage);
+  font-size: 1rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
 /* The small tiles in the stage (the participant's own, and the staff member's camera while their screen
    is shared) are as high as the stage allows, 55 % of it and 6.75 rem at most, 16 by 9, and no wider
    than 30 % of it: a low picture still shows them whole and side by side. */
@@ -773,6 +791,10 @@ body:has([data-call-state="call"]:not([hidden])) .call-stage {
 
   .call-stage[data-call-share="theirs"] .call-remote {
     border-color: CanvasText;
+  }
+
+  .call-remote__label {
+    border: 1px solid CanvasText;
   }
 
   .call-toggle[aria-disabled="true"] {

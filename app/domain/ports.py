@@ -1024,6 +1024,21 @@ class Transaction(Protocol):
         """Set the status of ``subject`` (suspended or active again); unknown ones are ignored."""
         ...
 
+    async def get_staff_by_id(self, staff_id: int) -> StaffMember | None:
+        """Return the staff record with this row id, or ``None``.
+
+        One read by the primary key; the call page's name lookup uses it (ADR 0123 step 5c).
+        """
+        ...
+
+    async def set_staff_screen_name(self, subject: str, screen_name: str | None) -> bool:
+        """Set or clear (``None``) the screen name of ``subject`` (ADR 0123 step 5c).
+
+        Returns ``False`` when ``subject`` has no staff record or the record is erased (an erased
+        record keeps no name); nothing is written then.
+        """
+        ...
+
     async def get_overview_layout(self, subject: str) -> tuple[str, ...] | None:
         """Return the own overview layout of ``subject`` (ADR 0096), or ``None`` without one."""
         ...

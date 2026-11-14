@@ -215,6 +215,7 @@ organisation provider ──ID token (sub, name, email, email_verified, entitlem
 |---|---|---|---|---|
 | Admin subject identifier | `audit_events.actor`, `staff.subject`, `admin_sessions.subject`; `audit_events.detail` of the two volume warnings (`planner.changes_alert`, `booking.contact_reveals_alert`: `actor:<subject>,…`, ADR 0044) | identity provider | admin actions: `AUDIT_RETENTION_DAYS` (default 2 years, product owner 2026-10-29); system 90 days, security 1 year, debug 7 days (ADR 0040) | no |
 | Admin display name | `staff.display_name`, `admin_sessions.claims` | identity provider | replaced at every login; erased daily by the worker for people without a login for `staff_retention_days` (class C, 365 days, 90–1825; ADR 0046 step 2), or by the superuser for a suspended person; the session row follows the session clean-up | no |
+| Staff screen name (ADR 0123 step 5c) | `staff.screen_name` | typed by someone with `staff.manage` on the staff page (the staff member's own choice of name for the participant's side) | kept until cleared, replaced or the record is erased (manual, or `staff_retention_days`: erasure empties it); shown to `staff.manage` in the form and, through `GET /b/m/{ref}/call/staff`, to the participant of a booking this staff member accepted; never in a log, audit event (the event says that it changed, not to what), job payload or URL | no |
 | Admin email address (ADR 0117 step 10b) | `staff.email`, `staff.email_at` (not `admin_sessions.claims`) | identity provider claim `email`, kept only when `email_verified` is true | replaced or cleared at every login; removed with the display name at erasure (manual, or `staff_retention_days`); shown on the staff page to `staff.view`; read by the digest at send time, never in a log, audit event or job payload | no; mail to the person for the usage digest only |
 | Admin roles and memberships | `staff.roles`, `staff_memberships` (role key, organisation and group slugs: one row per grant, ADR 0049) | identity provider claims | replaced at every login; changes audited as `staff.membership_changed`; removed with the display name at erasure | no |
 | Staff skills (ADR 0121) | `staff_skills` (staff id, skill id, when and by whom granted; who granted a skill is kept as a staff id and is emptied when that person is erased; so is `published_by` on a flow revision, the staff id of whoever published it); the skill catalogue `skills` holds codes and labels only | granted by an administrator with `skills.manage` | data about staff, not about participants; replaced as a set on every grant; deleted with the staff record at erasure (`erase_staff`); a skill that is archived stays on the grants that held it | no |
@@ -292,7 +293,7 @@ web ──HTTPS GET /meetings/{id}, /meetingParticipants?meetingId=──> Webex
 | Fallback per group (ADR 0082 points 11 and 12): the choice, the team's Webex room id and since when the group is in fallback; per booking the flag `fallback` | `groups.dispatch_fallback`, `groups.fallback_space_room_id`, `groups.fallback_active_since`, `call_status.fallback` | the group's settings; the worker from the health state | the settings until changed; the state until the fallback ends; the flag with the call status | **the first name** of a booking that lands in the queue during a fallback, with its start time and a link to the queue, leaves to the Webex Messaging API, only for a group that chose the fallback and set its own space (the organisation chooses this by switching it on); never the host join link. **Retention:** those messages stay in the Webex space after OpenPlanner purges the booking (`slot.end + 24h`): OpenPlanner cannot delete Webex messages, so they fall under the organisation's own Webex retention. The manual topic *Contactcenter inrichten* (step 10) tells the administrator so |
 | Alert targets and deliveries (ADR 0082 point 9): an administrator's email address or a Webex room id, a minimum level; per target and alert the streak sent, when, counts and retry state; the bot token sealed in `integration_credentials` (`webex-bot:<organisation>`) | `alert_targets`, `alert_deliveries`, `integration_credentials` | the superuser on *Koppelingen* and an organisation's *Kanalen* | until the target is removed (its deliveries go with it); the token until replaced or removed | no participant data; an administrator's address is staff data. The alert message (codes, slugs, times, a count, the version, a portal link) leaves to the organisation's mail server or the Webex Messaging API |
 | Last inbound event per platform and connection health (ADR 0082): time, event type, outcome code; per organisation and platform the state, since when and the request counts | `integration_reports` (`inbound-webex`, `inbound-wxcc`, `integration-health`) | the webhooks; the worker from the `integration.request` events | replaced by the next event or evaluation | no; shown on **Koppelingen** and *System status* |
-| When the application first saw each installation webhook secret (ADR 0124 point 8): a keyed fingerprint (HMAC-SHA256 under a purpose key of `MANAGEMENT_TOKEN_KEY`, not reversible) and a time, one row per platform | `webhook_secret_sightings` (platform, fingerprint, first seen; migration 0118) | the web process, when it first sees a secret from the environment | replaced when the secret changes; emptied by a configuration package; dropped by the downgrade | no secret and no previous secret; read only by the gate and System status |
+| When the application first saw each installation webhook secret (ADR 0124 point 8): a keyed fingerprint (HMAC-SHA256 under a purpose key of `MANAGEMENT_TOKEN_KEY`, not reversible) and a time, one row per platform | `webhook_secret_sightings` (platform, fingerprint, first seen; migration 0119) | the web process, when it first sees a secret from the environment | replaced when the secret changes; emptied by a configuration package; dropped by the downgrade | no secret and no previous secret; read only by the gate and System status |
 | Service App tokens | `integration_credentials` (AES-256-GCM) | Webex | rotated automatically | sent only to Webex |
 | Last webhook listing and delivery test (registration ids, events, host account filters, target URLs without query, statuses, outcome codes) | `integration_reports` | Webex, WxCC, the self-test | replaced by the next check | no; shown read-only on **Koppelingen** |
 
@@ -396,6 +397,8 @@ participant presses the share button; the browser's own picker is the second dec
 | The staff member shares a screen | nothing | their screen's picture, shown in place of their picture | no |
 | Captions are switched on | the SDK asks the meeting to start them and, at that press, for its real-time data link; the page's language is passed on; the call's sound reaches the platform as it did | text made by the platform from the sound of the call, with a speaker; the page shows the text and a word of its own for who spoke, and reads nothing else of the speaker | no: shown and not kept, not logged, not sent to us; gone when switched off or the call ends |
 
+The speaker of a caption is named by the page, not by the platform: the participant's own lines "You", the other side's the name described under *The staff member's name* below, or the team's word for staff.
+
 The real-time data link is asked for at the press, not at the join (`enableAutomaticLLM` stays off,
 see step 4c); a participant who never switches captions on never opens it, if the SDK allows that
 (a first real meeting shows it). The text of a caption is personal data of the call by nature; the
@@ -406,6 +409,33 @@ platform makes it at its side, and what it keeps is for the DPIA, not for this p
 | Whose speech becomes text | The participant's press asks the meeting to start captions. It is probably meeting-wide: the platform turns the whole call's speech into text, the staff member's too, and a stop by the participant may end the captions for the staff member as well. | Who is affected, who sees the captions, and whether the platform keeps a transcript of the meeting (where, how long): asked of the supplier (`docs/research/call-page-on-the-meetings-sdk.md`, section 14, questions 10 and 11). The staff member is not told by this page. |
 | The real-time link and the transcription are closed | Switching captions off stops the transcription; leaving, the end of the call and a failure stop it too, then the meeting is left. The page knows no call that closes the link itself (the prototype has none): the link stays open until the meeting is left. | Whether the SDK has such a call, and whether leaving the meeting closes the link. |
 | A shared screen | The page asks the SDK for a display stream and gives no option for sound. Stopping it stops the track the browser gave; the stream is then taken out of the meeting. | That the SDK's display stream asks for no sound of the screen, and that stopping it ends the browser's capture on every browser. |
+
+
+### The staff member's name (ADR 0123 point 10, step 5c)
+
+Who the participant talks to is learnt from our own server and from nobody else. The video platform
+is asked nothing and told nothing for this; the name on the picture is never the name the platform
+reports for a member of the meeting.
+
+    staff.screen_name (typed by a manager)          booking claim (pseudonym of who accepted)
+                 │                                              │
+                 └────────► StaffScreenNames ◄───────────────────┘
+                                 │  by the organisation's embedded_call_staff_name:
+                                 │  screen_name (default) · name · term
+                                 ▼
+          GET /b/m/{ref}/call/staff  (the participant's link session, no-store)
+                                 ▼
+                 {"name": "..."} or {}  ─►  the page's state  ─►  text on the picture and in the captions
+
+| What happens | What leaves the browser | What comes in | Stored by us |
+|---|---|---|---|
+| The page asks who the participant talks to, on entering the lobby and the call and then every `embedded_call_chat_poll_seconds` while it is there | one `GET` to our own address, the participant's session cookie; no identifier of the staff member | a name (at most 40 characters) or nothing | no: the name lives in the page's state and is gone with the call; nothing in the browser's storage |
+| The server resolves the claim | nothing | nothing | the pseudonym-to-row-id map in the web process's memory, rebuilt at most once a minute and only on a miss; it holds pseudonyms and row ids, never a name |
+
+After the booking's purge the claim is gone and so is the name; erasing the staff record clears the
+screen name and the account name, and the endpoint answers `{}` for it. The account's name is shown
+only where the organisation chose `name`; with the default a staff member without a screen name is shown
+by the organisation's word for staff alone.
 
 
 ## Own queue (ADR 0043)

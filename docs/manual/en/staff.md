@@ -136,6 +136,38 @@ sets this in *Advanced settings*, 90 to 1825 days: *Erase staff data after*) is 
 worker, once a day, as a system event `staff.erased`. Someone who comes back before that
 moment is kept.
 
+<!-- field: screen_name -->
+## Screen name
+
+On a staff member's page, under **Screen name**, you set the name the participant sees in a call
+on the organisation's own call page: next to the staff member's picture, with the organisation's
+own word for staff beside it ("Sanne · agent"), and in the captions. Whoever holds `staff.manage`
+(organisation admins and the superuser) fills it in for the people they see; an empty field removes
+the name.
+
+The staff member must not be findable by their account name, so the participant sees a screen name
+and never the account name by default. Choose a **first name or a made-up name**, not the full name.
+It has 2 to 40 characters: letters of any script, digits, spaces, a hyphen, an apostrophe and a
+full stop. A staff member without a screen name is shown by the organisation's word for staff alone.
+
+The organisation chooses what the participant is told in *Organisation settings* (the setting
+*embedded_call_staff_name*): the screen name (the default), the name of the account, or the word
+alone. While the screen name is chosen, the staff list marks everyone who has none with
+**No screen name**, so you see who is still shown by the word alone.
+
+A screen name needs at least one letter or digit, and an accent only after a letter. The portal
+stores it in the normal form of Unicode and counts the characters after that. Zero-width and direction
+characters are refused, which also refuses, for now, a name that can only be spelled with a
+zero-width non-joiner or joiner (some Persian names); at most four accents in a row are accepted.
+
+There is one screen name per person, whichever organisation's participants see it: a manager of
+one organisation sets what the participants of every organisation of that person see. The list
+marks a person as having **No screen name** when any of their organisations (those you see) shows
+the screen name.
+
+The screen name is personal data of the staff member. Erasing the staff record deletes it, and the
+audit log says that it was set or cleared, never what it is.
+
 ## Second factor (MFA)
 
 Staff log in with a second factor besides their password: a code from an authenticator app

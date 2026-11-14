@@ -390,7 +390,9 @@ test('in the call: the other side, the own picture, the toggles that give the de
   await saidLike(page, /let you in\. The call has started\.$/);
   const remote = page.locator('[data-call-remote]');
   await expect(remote).toBeVisible();
-  await expect(page.getByLabel(/^Picture of the /)).toBeVisible();
+  // The picture is named by the label on it: the team's word for staff (no staff member has accepted the fixture's booking).
+  await expect(page.locator('[data-call-remote-label]')).toBeVisible();
+  await expect(remote).toHaveAccessibleName(await page.locator('[data-call-remote-label]').innerText());
   await expect.poll(() => remote.evaluate((v) => (v as HTMLVideoElement).srcObject !== null)).toBe(true);
   await expect.poll(() => page.locator('[data-call-remote-audio]').evaluate((a) => (a as HTMLAudioElement).srcObject !== null)).toBe(true);
   await expect(state(page, 'call').getByLabel('Your picture')).toBeVisible();
