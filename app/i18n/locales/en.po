@@ -6187,7 +6187,7 @@ msgid "admin.settings.problem.webex_incomplete"
 msgstr "Webex needs WEBEX_CLIENT_SECRET, WEBEX_REFRESH_TOKEN and SETTINGS_ENCRYPTION_KEY in production."
 
 msgid "admin.settings.problem.oidc_incomplete"
-msgstr "login (OIDC) needs an https discovery URL and a client secret in production."
+msgstr "login (OIDC) needs an https discovery URL and a client secret in production; only the bundled identity provider may use its internal address, with an https OIDC_ISSUER."
 
 msgid "admin.settings.problem.update_channel"
 msgstr "the rc update channel is not allowed in production: production follows releases."
@@ -13231,6 +13231,9 @@ msgstr "This completion is only for existing services and cannot be chosen."
 
 msgid "admin.flows.reason.rollback_not_safe"
 msgstr "Activation waits until the previous version of OpenPlanner can also keep track of appointments on a shared capacity pool. This follows in a later version."
+
+msgid "admin.flows.reason.contact_center_not_ready"
+msgstr "Activating a flow that dispatches to the contact center waits until the contact center is released for go-live. This follows in a later version."
 
 msgid "admin.flows.summary.none"
 msgstr "Not set"

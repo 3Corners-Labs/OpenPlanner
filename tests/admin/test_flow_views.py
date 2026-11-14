@@ -81,7 +81,11 @@ def test_the_state_follows_is_for_not_built_yet_and_missing_for_every_other_reas
     shown = views.readiness_view(items, nl_locale(), draft=True)
 
     for row, reason in zip(shown.rows, ReadinessReason, strict=True):
-        follows = reason in {ReadinessReason.NOT_BUILT_YET, ReadinessReason.ROLLBACK_NOT_SAFE}
+        follows = reason in {
+            ReadinessReason.NOT_BUILT_YET,
+            ReadinessReason.ROLLBACK_NOT_SAFE,
+            ReadinessReason.CONTACT_CENTER_NOT_READY,
+        }
         assert row.word == ("Volgt" if follows else "Ontbreekt"), reason
         assert row.missing is True
     assert shown.ready is False

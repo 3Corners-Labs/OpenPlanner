@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from app.config import Settings
 from app.domain.event_schema import Envelope
+from app.domain.web_transport import BUNDLED_IDP_DISCOVERY_URL
 from app.i18n.dates import ClockStyle
 
 
@@ -94,6 +95,15 @@ def test_production_is_the_default_and_refuses_development_defaults(
     assert not settings.simulator_enabled
 
 
+PRODUCTION = {
+    "environment": "prod",
+    "management_token_key": "m" * 40,
+    "session_secret": "s" * 40,
+    "public_base_url": "https://afspraak.example.nl",
+}
+"""What production needs before anything else is checked."""
+
+
 @pytest.mark.parametrize(
     ("field", "key"),
     [("oidc_client_secret", "OIDC_CLIENT_SECRET"), ("session_secret", "SESSION_SECRET")],
@@ -101,10 +111,7 @@ def test_production_is_the_default_and_refuses_development_defaults(
 def test_production_refuses_development_placeholder_secrets(field: str, key: str) -> None:
     # .env.example and the dev Keycloak realm share "dev-only-openplanner-admin-secret".
     production = {
-        "environment": "prod",
-        "management_token_key": "m" * 40,
-        "session_secret": "s" * 40,
-        "public_base_url": "https://afspraak.example.nl",
+        **PRODUCTION,
         "oidc_discovery_url": "https://idp.example.nl/.well-known/openid-configuration",
         "oidc_client_secret": "real-client-secret",
     }
@@ -117,6 +124,34 @@ def test_production_refuses_development_placeholder_secrets(field: str, key: str
     assert Settings(**production).environment == "prod"  # type: ignore[arg-type]
 
 
+BUNDLED_LOGIN = {
+    "oidc_discovery_url": BUNDLED_IDP_DISCOVERY_URL,
+    "oidc_issuer": "https://afspraak.example.nl/idp/realms/openplanner",
+    "oidc_client_secret": "rendered-client-secret",
+}
+
+
+def test_production_starts_with_the_bundled_provider_on_the_internal_network() -> None:
+    """ADR 0125: the default production install (ADR 0106) logs in through the internal hop."""
+    settings = Settings(**PRODUCTION, **BUNDLED_LOGIN)  # type: ignore[arg-type]
+
+    assert settings.oidc_discovery_url == BUNDLED_IDP_DISCOVERY_URL
+    assert settings.production_problems() == []
+    for missing in ("oidc_issuer", "oidc_client_secret"):
+        with pytest.raises(ValidationError, match="OIDC needs an https discovery URL"):
+            Settings(**PRODUCTION, **{**BUNDLED_LOGIN, missing: None})  # type: ignore[arg-type]
+    elsewhere = BUNDLED_IDP_DISCOVERY_URL.replace("idp:8080", "idp.example.nl")
+    with pytest.raises(ValidationError, match="OIDC needs an https discovery URL"):
+        Settings(**PRODUCTION, **{**BUNDLED_LOGIN, "oidc_discovery_url": elsewhere})  # type: ignore[arg-type]
+
+
+def test_a_test_installation_with_the_bundled_provider_lists_no_login_problem() -> None:
+    """System status no longer warns about what production now accepts (ADR 0042 §11)."""
+    settings = Settings(environment="test", **BUNDLED_LOGIN)  # type: ignore[arg-type]
+
+    assert "oidc_incomplete" not in {p.code for p in settings.production_problems()}
+
+
 def test_the_simulator_is_off_unless_switched_on(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("SIMULATOR_ENABLED", raising=False)
     assert not Settings(environment="dev").simulator_enabled
@@ -125,16 +160,10 @@ def test_the_simulator_is_off_unless_switched_on(monkeypatch: pytest.MonkeyPatch
 
 
 def test_production_webex_needs_secrets_and_the_encryption_key() -> None:
-    production = {
-        "environment": "prod",
-        "management_token_key": "m" * 40,
-        "session_secret": "s" * 40,
-        "public_base_url": "https://afspraak.example.nl",
-    }
     with pytest.raises(ValueError, match="WEBEX_CLIENT_SECRET"):
-        Settings(**production, webex_client_id="client")  # type: ignore[arg-type]
+        Settings(**PRODUCTION, webex_client_id="client")  # type: ignore[arg-type]
     configured = Settings(
-        **production,  # type: ignore[arg-type]
+        **PRODUCTION,  # type: ignore[arg-type]
         webex_client_id="client",
         webex_client_secret="secret",
         webex_refresh_token="refresh",
@@ -145,16 +174,10 @@ def test_production_webex_needs_secrets_and_the_encryption_key() -> None:
 
 
 def test_webhooks_can_use_their_own_https_base_url() -> None:
-    production = {
-        "environment": "prod",
-        "management_token_key": "m" * 40,
-        "session_secret": "s" * 40,
-        "public_base_url": "https://afspraak.example.nl",
-    }
     with pytest.raises(ValueError, match="WEBHOOK_BASE_URL"):
-        Settings(**production, webhook_base_url="http://tunnel.example.nl")  # type: ignore[arg-type]
+        Settings(**PRODUCTION, webhook_base_url="http://tunnel.example.nl")  # type: ignore[arg-type]
 
-    assert Settings(**production).webhook_base == "https://afspraak.example.nl"  # type: ignore[arg-type]
+    assert Settings(**PRODUCTION).webhook_base == "https://afspraak.example.nl"  # type: ignore[arg-type]
     dev = Settings(
         environment="dev",
         public_base_url="http://127.0.0.1:8000",
