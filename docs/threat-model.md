@@ -1007,6 +1007,37 @@ the one of the flow above and leaves what that flow leaves; the SDK file, the po
 test double are defects of the build or of the installation, found by the tests and the check named
 in the table, with no request to attribute at run time.
 
+## Flow: in the call (ADR 0123 step 5a)
+
+Inside the call the participant can open a panel of devices and choose another camera, microphone
+or speaker; the page shows two notices (the meeting is recorded, the connection is being restored)
+and ends in the ended state or the failure state. Inputs from outside: the participant's choice
+in a list the browser filled (a device id), and the events of the meeting (recording started or
+stopped, reconnection started, succeeded or failed, the meeting removed). No event's payload is read.
+No new endpoint, setting or request.
+
+| Abuse case | Control | Test |
+|---|---|---|
+| A device stays open after a change (the old camera or microphone keeps its light on, or a new one that could not be sent stays open) | A new device is taken first and sent by the one rule of `call-media.js`; only when that worked is the old one stopped; a device that cannot be taken or sent is stopped again and the old one stays; leaving the call stops every stream | `e2e/tests/call-page-controls.spec.ts` (`choosing another camera or microphone …` counts the open tracks; `a device that cannot be sent is stopped again`; `a device that cannot be taken keeps the old one`) |
+| A text from outside (an event's payload, a device's name) is shown as markup or as a sentence | The notices and every sentence are the server's own markup, shown and hidden by the script; an event is read for its name only; device names are set with `textContent` in `option` elements | `e2e/tests/call-page-controls.spec.ts` (`what an event carries is never shown as text or markup`), `tests/web/test_call_page_assets.py` (the script writes no markup and has no sentence of its own) |
+| A state is reached after the page was left (a late event shows a notice, says a sentence or ends a call that is already over) | Every event is tied to the connection that made it; one counter moves when a connection ends, and a late event does nothing; the state machine refuses a move out of an end state; the panel and the notices end with the call | `e2e/tests/call-page-controls.spec.ts` (`… an event of a call that is over changes nothing`; `a connection lost for good … trying again works` shows no notice and a closed panel afterwards) |
+| A notice or an announcement repeats without end (a flood of events used to flood a screen reader) | The page keeps the state of each notice and says a change only when the state changes; one polite region with one sentence at a time | `e2e/tests/call-page-controls.spec.ts` (the recording and the reconnection are each said once, however often the event repeats) |
+| The notice hides the controls (a notice pushes the way out off the window) | The bar of controls stays in view whatever the notices and the panel show; the picture gives way | `e2e/tests/call-page-controls.spec.ts` (`the bar and the way out stay in view` at 1280 by 400, 320 by 400 and 320 by 256) |
+| The ended state promises a deletion the system does not make | The sentence names the retention rule (the personal data of the call is deleted 24 hours after the end of the appointment, never "anonymised") and the purge job works from `app/domain/privacy.py` | `tests/api/test_call_pages.py::test_the_ended_state_says_what_is_deleted_and_when_in_both_languages`, `e2e/tests/call-page-controls.spec.ts` |
+
+What an attack on this flow leaves in the log: nothing; the page makes no request in the call.
+
+What the controls do not cover, said plainly:
+
+- **The names of the events are the SDK's.** `meeting:recording:started` and `:stopped`,
+  `meeting:reconnectionStarts` and `meeting:reconnectionSuccess` come from the prototype of the
+  spike; `meeting:reconnectionFailure` and the replacement of a published stream by publishing a new
+  one are the SDK's documented behaviour as far as is known and have not been seen in a real
+  meeting: if one is named wrongly, the notice or the failure state would not appear. Only a real
+  meeting shows it.
+- **Which device the browser really uses** (the speaker especially) is the browser's: the page asks,
+  the browser may refuse, and then the page says the old device stays.
+
 What the controls do not cover, said plainly:
 
 - **The SDK runs on our origin with the token in its reach.** It must hold the token to join, and

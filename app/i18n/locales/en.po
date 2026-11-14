@@ -14038,7 +14038,7 @@ msgid "callpage.ended.heading"
 msgstr "The call has ended"
 
 msgid "callpage.ended.body"
-msgstr "The call is over. You can close this window, or go back to your appointment."
+msgstr "Thank you for the call. You can close this window, or go back to your appointment."
 
 msgid "callpage.failed.heading"
 msgstr "We cannot connect"
@@ -14093,3 +14093,51 @@ msgstr "Your browser blocked the sound. Use the button to hear the other person.
 
 msgid "callpage.say.device_kept"
 msgstr "It is off for the other side, but your browser may still show the device as in use."
+
+msgid "callpage.ended.deleted"
+msgstr "The personal data of this call is deleted 24 hours after the end of your appointment."
+
+msgid "callpage.control.devices"
+msgstr "Devices"
+
+msgid "callpage.devices.heading"
+msgstr "Your devices"
+
+msgid "callpage.devices.hint"
+msgstr "A choice applies at once."
+
+msgid "callpage.notice.recording.word"
+msgstr "Recording"
+
+msgid "callpage.notice.recording.body"
+msgstr "This call is being recorded. The picture and sound are saved."
+
+msgid "callpage.notice.restoring.word"
+msgstr "Reconnecting"
+
+msgid "callpage.notice.restoring.body"
+msgstr "The connection was interrupted. It is being restored by itself. Stay on this page."
+
+msgid "callpage.say.recording_on"
+msgstr "This call is being recorded."
+
+msgid "callpage.say.recording_off"
+msgstr "The recording has stopped."
+
+msgid "callpage.say.restoring"
+msgstr "The connection was interrupted. We are restoring it."
+
+msgid "callpage.say.restored"
+msgstr "The connection is back."
+
+msgid "callpage.say.device_changed"
+msgstr "Device changed."
+
+msgid "callpage.say.device_change_failed"
+msgstr "That device did not work. Your previous device stays in use."
+
+msgid "callpage.failed.media"
+msgstr "The picture or sound of the call could not be set up. You can try again."
+
+msgid "callpage.failed.lost"
+msgstr "The connection was lost and could not be restored. You can try again."

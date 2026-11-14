@@ -1,6 +1,6 @@
 """The call page's own scripts and styles (ADR 0123 steps 4b and 4c).
 
-The three scripts are checked for what they must never do (reach anything but the token and the
+The scripts are checked for what they must never do (reach anything but the token and the
 SDK file, set a style, build markup, log), for the texts they read (the server renders every one,
 once), for their shape (each under 500 lines, each with a header that says what it owns and never
 does) and the catalogue's texts of the page for the supplier's name (point 14). The behaviour
@@ -14,8 +14,14 @@ from pathlib import Path
 from app.i18n import CATALOGUE_DIR, load_catalogues
 
 STATIC = Path("app/web/static")
-SCRIPT_FILES = ("call-devices.js", "call-connection.js", "call-media.js", "call-page.js")
-"""In the order the page loads them: the three that only define, then the page that starts them."""
+SCRIPT_FILES = (
+    "call-devices.js",
+    "call-connection.js",
+    "call-media.js",
+    "call-controls.js",
+    "call-page.js",
+)
+"""In the order the page loads them: the four that only define, then the page that starts them."""
 SOURCES = {name: (STATIC / name).read_text() for name in SCRIPT_FILES}
 SCRIPT = "\n".join(SOURCES.values())
 STYLES = (STATIC / "call-page.css").read_text()
@@ -82,7 +88,15 @@ def _read_by_the_script() -> set[str]:
     names |= {f"say_without_{kind}" for kind in ("camera", "microphone", "both")}
     names |= {  # "say_failed_" + reason of fail()
         f"say_failed_{reason}"
-        for reason in ("attempts", "generic", "not_open", "rate_limited", "unavailable")
+        for reason in (
+            "attempts",
+            "generic",
+            "media",
+            "lost",
+            "not_open",
+            "rate_limited",
+            "unavailable",
+        )
     }
     return {name for name in names if not name.endswith("_")}
 

@@ -5,7 +5,9 @@
  * both (one prompt), keeps a refused permission and a missing device apart, shows the own picture, a
  * level meter and a test sound, lists the devices, lets the participant switch either off and
  * choose another, and hands the choice to the call at the click that joins. It gives every track
- * back when the check ends.
+ * back when the check ends. It is also the one home of the lists of devices and of choosing a
+ * device in the call (step 5a): the panel of the call is filled by the same list, and a choice there
+ * goes to call-media.js (camera, microphone) or to the other side's sound (speaker).
  *
  * Never: it makes no request of any kind, loads no file, stores nothing, and reads or writes no
  * text of its own. Every change of what the page shows goes through `app.go` (the one state of
@@ -22,7 +24,8 @@
   var level;
   var levelText;
   var testAudio;
-  var selects;
+  var lists; // the three lists of the check and the three of the call's panel
+  var remoteAudio;
   var reduceMotion;
   var stream = null; // the tracks of the check
   var run = 0; // moves when a request is replaced or the check ends; an older answer is dropped
@@ -287,9 +290,12 @@
       };
       chosen.camera = chosen.camera || currentId("camera");
       chosen.microphone = chosen.microphone || currentId("microphone");
-      fill(selects.camera, of("videoinput"), chosen.camera, app.texts.device_camera);
-      fill(selects.microphone, of("audioinput"), chosen.microphone, app.texts.device_microphone);
-      fill(selects.speaker, of("audiooutput"), chosen.speaker, app.texts.device_speaker);
+      // The check's three lists and the call's three are filled alike: one list of devices.
+      lists.forEach(function (one) {
+        fill(one.camera, of("videoinput"), chosen.camera, app.texts.device_camera);
+        fill(one.microphone, of("audioinput"), chosen.microphone, app.texts.device_microphone);
+        fill(one.speaker, of("audiooutput"), chosen.speaker, app.texts.device_speaker);
+      });
       // Choosing a speaker is not possible in every browser; the test sound always is.
       set({ speaker: "setSinkId" in HTMLMediaElement.prototype && of("audiooutput").length > 0 });
     });
@@ -297,9 +303,36 @@
 
   // A device chosen in a list: the camera or the microphone is replaced, the speaker is used.
   function choose(kind, id) {
+    if (app.state.screen === "call") return chooseInCall(kind, id);
     chosen[kind] = id;
     if (kind === "speaker") useSpeaker();
     else if (app.state.has[kind]) replace(kind);
+    return Promise.resolve();
+  }
+
+  // In the call the speaker is the other side's sound, applied at once; a camera or microphone is
+  // sent through the one rule of call-media.js. A choice the browser or the call refuses leaves
+  // the old device in use, and the page says so; the lists show what is in use.
+  function chooseInCall(kind, id) {
+    var applied = kind === "speaker" ? sink(id) : app.callMedia.change(kind, id);
+    return applied.then(function (ok) {
+      if (ok === undefined) return null; // the call ended meanwhile
+      if (ok) chosen[kind] = id;
+      set({ say: ok ? "say_device_changed" : "say_device_change_failed" });
+      return ok ? null : list();
+    });
+  }
+
+  function sink(id) {
+    if (!remoteAudio.setSinkId) return Promise.resolve(false);
+    return remoteAudio.setSinkId(id).then(
+      function () {
+        return true;
+      },
+      function () {
+        return false;
+      },
+    );
   }
 
   // ---- the level meter ------------------------------------------------------------------------
@@ -392,11 +425,14 @@
     level = app.$("[data-call-level]");
     levelText = app.$("[data-call-level-text]");
     testAudio = app.$("[data-call-test-audio]");
-    selects = {
-      camera: app.$('[data-call-select="camera"]'),
-      microphone: app.$('[data-call-select="microphone"]'),
-      speaker: app.$('[data-call-select="speaker"]'),
-    };
+    remoteAudio = app.$("[data-call-remote-audio]");
+    lists = ["select", "pick"].map(function (name) {
+      var one = {};
+      ["camera", "microphone", "speaker"].forEach(function (kind) {
+        one[kind] = app.$("[data-call-" + name + '="' + kind + '"]');
+      });
+      return one;
+    });
     reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   }
 

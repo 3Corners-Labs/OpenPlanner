@@ -4,7 +4,9 @@
  * Owns: taking the participant's streams out of the SDK (the devices they left on), switching
  * either on or off in the lobby and in the call, and giving a device back when it is off: in the
  * call the stream is taken out of the meeting and stopped, and switching on takes a new one and
- * sends it. A press while the media is being added waits until that is done.
+ * sends it. Choosing another camera or microphone in the call takes the new one, sends it by the
+ * same rule and only then gives the old one back. A press while the media is being added waits
+ * until that is done.
  *
  * Never: it makes no request, loads no file and stores nothing. It works on the `call` object of
  * call-connection.js (`app.call`, the SDK's client and meeting; that file is loaded first) and
@@ -125,16 +127,7 @@
       if (epoch !== call.epoch) return created.stop();
       call[kind] = created;
       showSelf();
-      var settled = function () {};
-      return (call.adding || Promise.resolve())
-        .then(settled, settled)
-        .then(function () {
-          if (epoch !== call.epoch) return null;
-          var taken = call.sent && call.sent[kind] === created;
-          var published = {};
-          published[kind] = created;
-          return app.state.media === "added" && !taken ? call.meeting.publishStreams(published) : null;
-        })
+      return send(kind, created, epoch)
         .then(function () {
           if (epoch === call.epoch && call[kind] === created) switched(kind, true);
         })
@@ -146,6 +139,67 @@
           said();
         });
     }, said);
+    return track(kind, making);
+  }
+
+  // Another camera or microphone, chosen in the panel of devices in the call. It is taken first
+  // and sent by the one rule above; only when that worked is the old one given back (stopped) and
+  // the choice kept. A device that cannot be taken or sent is stopped again, the old one stays
+  // and the choice is as it was. A device that is off only has its choice noted. Resolves true
+  // (changed), false (the old one stays) or undefined (the call ended meanwhile). A press while a
+  // device is being made or the media added waits, like a toggle.
+  function change(kind, id) {
+    var epoch = call.epoch;
+    var busy = call.adding || call.capturing || call.making[kind];
+    if (busy) {
+      var replay = function () {
+        return epoch === call.epoch ? change(kind, id) : undefined;
+      };
+      return busy.then(replay, replay);
+    }
+    var key = kind + "Id";
+    var previous = choice[key];
+    var old = call[kind];
+    choice[key] = id;
+    if (!app.state.live[kind] || !old) return Promise.resolve(true);
+    var kept = function () {
+      choice[key] = previous;
+      return epoch === call.epoch ? false : undefined;
+    };
+    var changing = createStream(kind).then(function (created) {
+      if (epoch !== call.epoch) return created.stop();
+      return send(kind, created, epoch).then(
+        function () {
+          if (epoch !== call.epoch) return created.stop();
+          call[kind] = created;
+          old.stop();
+          showSelf();
+          return true;
+        },
+        function () {
+          created.stop();
+          return kept();
+        },
+      );
+    }, kept);
+    return track(kind, changing);
+  }
+
+  // The one rule for sending a new stream: when it arrives and the media is in (after an adding
+  // that is under way, unless that adding took it along); never earlier, never twice.
+  function send(kind, created, epoch) {
+    var settled = function () {};
+    return (call.adding || Promise.resolve()).then(settled, settled).then(function () {
+      if (epoch !== call.epoch) return null;
+      var taken = call.sent && call.sent[kind] === created;
+      var published = {};
+      published[kind] = created;
+      return app.state.media === "added" && !taken ? call.meeting.publishStreams(published) : null;
+    });
+  }
+
+  // A device being made is a promise that a press of its toggle, or a choice, waits for.
+  function track(kind, making) {
     var done = function () {
       if (call.making[kind] === making) call.making[kind] = null;
     };
@@ -154,5 +208,5 @@
     return making;
   }
 
-  app.callMedia = { capture: capture, setLive: setLive };
+  app.callMedia = { capture: capture, setLive: setLive, change: change };
 })();

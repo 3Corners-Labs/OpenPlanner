@@ -1,5 +1,5 @@
 /*
- * The call of the participant's call page (ADR 0123 steps 4c and 5).
+ * The call of the participant's call page (ADR 0123 steps 4c and 5a).
  *
  * Owns: everything that follows the click that joins, except the participant's own devices
  * (call-media.js). It loads the video SDK file (with its checksum as integrity), asks our server
@@ -220,9 +220,10 @@
     meeting.on("meeting:self:guestAdmitted", function () {
       if (epoch !== call.epoch) return;
       enter(epoch).then(null, function () {
-        if (epoch === call.epoch) fail("generic");
+        if (epoch === call.epoch) fail("media");
       });
     });
+    app.controls.follow(meeting, epoch);
     meeting.on("media:ready", function (media) {
       if (epoch !== call.epoch) return;
       if (media.type === "remoteVideo") app.setRemote("remote", media.stream);
@@ -337,7 +338,7 @@
     var epoch = (call.epoch += 1);
     // The count is shown for every retry; it is said once, at the first.
     if (number > 1) {
-      var retry = { attempt: number, media: "none" };
+      var retry = { attempt: number, media: "none", recording: false, connection: "ok" };
       if (number === 2) retry.say = "say_retry";
       if (!app.go("connecting", retry)) return;
     }
@@ -403,6 +404,11 @@
     finish("left");
   }
 
+  // The meeting says its connection is lost for good (call-controls.js, which checks the epoch).
+  function lost() {
+    fail("lost");
+  }
+
   // The page goes away or comes back out of the browser's memory: nothing of a call stays.
   function hangUp() {
     forget();
@@ -426,6 +432,7 @@
     start: start,
     again: again,
     leave: leave,
+    lost: lost,
     hangUp: hangUp,
     setLive: function (kind, on) {
       return app.callMedia.setLive(kind, on);
