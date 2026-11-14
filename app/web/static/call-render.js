@@ -105,7 +105,7 @@
     if (box.scrollHeight > box.clientHeight) box.setAttribute("tabindex", "0");
     else if (document.activeElement !== box) box.removeAttribute("tabindex");
     var last = lines[lines.length - 1];
-    var newest = last.key + ":" + last.text;
+    var newest = last.interim ? "interim:" + last.own : last.key; // an interim line that grows is not a new line
     var arrived = box.dataset.newest !== newest;
     box.dataset.newest = newest;
     var end = box.scrollHeight - box.clientHeight;

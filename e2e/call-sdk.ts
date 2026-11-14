@@ -38,6 +38,7 @@ export type Plan = {
   captionsFail?: boolean;
   canShare?: boolean;
   shareSendFails?: boolean;
+  holdPublish?: boolean;
 };
 export type Log = {
   calls: string[];
@@ -182,3 +183,6 @@ export const captioning = (page: Page): Promise<{ on: boolean; language: string 
     return { on: s.captioning, language: s.captionLanguage };
   });
 export const callsOf = async (page: Page, name: string): Promise<number> => (await sdk(page)).calls.filter((c) => c === name).length;
+/** The screen that `holdPublish` keeps under way lands in the meeting now. */
+export const releasePublish = (page: Page): Promise<void> =>
+  page.evaluate(() => (window as unknown as { __sdk: { releasePublish: () => void } }).__sdk.releasePublish());

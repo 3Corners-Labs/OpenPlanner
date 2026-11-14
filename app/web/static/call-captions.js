@@ -123,10 +123,17 @@
     return [speaker.speakerId, speaker.memberId, speaker.id].indexOf(self) !== -1;
   }
 
+  // A short number out of a text, for the identity of a line that has no id: the text itself is not kept as a key.
+  function digest(text) {
+    var hash = 5381;
+    for (var i = 0; i < text.length; i += 1) hash = ((hash * 33) ^ text.charCodeAt(i)) >>> 0;
+    return hash;
+  }
+
   function lineOf(caption) {
     if (!caption || typeof caption.text !== "string" || !caption.text.trim()) return null;
     var text = caption.text.trim().slice(0, MAX_CHARS);
-    var key = caption.id !== undefined ? "id" + caption.id : "at" + caption.timestamp + text;
+    var key = caption.id !== undefined ? "id" + caption.id : "at" + digest(caption.timestamp + text);
     return { key: key, own: isOwn(caption.speaker), text: text, interim: false };
   }
 

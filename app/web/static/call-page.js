@@ -344,8 +344,15 @@
     app.callMedia.share(false);
   });
   $('[data-call-switch="captions"]').addEventListener("click", app.captions.press);
-  // The captions' box may start or stop to scroll with the window's size.
-  window.addEventListener("resize", render);
+  // The captions' box may start or stop to scroll with the window's size: one render a frame.
+  var resizing = 0;
+  window.addEventListener("resize", function () {
+    if (resizing) return;
+    resizing = window.requestAnimationFrame(function () {
+      resizing = 0;
+      render();
+    });
+  });
   KINDS.forEach(function (kind) {
     toggles[kind].forEach(function (button) {
       button.addEventListener("click", function () {
