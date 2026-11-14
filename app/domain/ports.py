@@ -591,6 +591,13 @@ class ContactCenterConnections(Protocol):
         """Remove the organisation's connection and its secrets."""
         ...
 
+    async def paused(self, organisation_ids: Sequence[int]) -> dict[int, ContactCenterKind]:
+        """Return, of ``organisation_ids``, those whose address is paused, with their platform.
+
+        One read for all of them (ADR 0124 point 9, for the status screens).
+        """
+        ...
+
     async def webhook_secret(self, organisation_id: int, kind: ContactCenterKind) -> str | None:
         """Return the webhook secret when the organisation is connected to ``kind``; else ``None``.
 

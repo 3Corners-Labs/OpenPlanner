@@ -6363,6 +6363,9 @@ msgstr "Tokenaanvragen machine-API per client"
 msgid "settings.field.rate_limit_webhook_per_minute.label"
 msgstr "Binnenkomende webhooks per minuut, per koppeling en bronadres"
 
+msgid "settings.field.webhook_refusal_alert_count.label"
+msgstr "Geweigerde of onbekende webhookmeldingen op één adres, binnen het gebeurtenisvenster, waarboven een systeemgebeurtenis waarschuwt"
+
 msgid "settings.field.rate_limit_agent_calls.label"
 msgstr "Aanroepen machine-API per client"
 
@@ -13828,7 +13831,121 @@ msgid "admin.source.paused_chip"
 msgstr "Gepauzeerd"
 
 msgid "admin.source.paused_text"
-msgstr "Dit adres is gepauzeerd: bezorgingen worden geaccepteerd en weggegooid, en het platform houdt zijn aanmelding. De laatste gebeurtenis op de statusschermen staat stil zolang het duurt. Hervat om gebeurtenissen weer te verwerken; de periodieke controle van de taken haalt gemiste toestanden daarna in."
+msgstr "Dit adres is gepauzeerd: bezorgingen worden geaccepteerd en weggegooid, en het platform houdt zijn aanmelding. De laatste gebeurtenis op de statusschermen staat stil zolang het duurt, en ze tonen het adres als gepauzeerd. Hervat om gebeurtenissen weer te verwerken; de periodieke controle van de taken haalt gemiste toestanden daarna in."
+
+msgid "admin.delivery.title"
+msgstr "Geziene bezorgingen"
+
+msgid "admin.delivery.process_note"
+msgstr "Deze aantallen zijn van het draaiende webproces sinds het venster begon. Een herstart maakt ze leeg, en elk proces telt voor zichzelf."
+
+msgid "admin.delivery.last_accepted"
+msgstr "Laatst geaccepteerd"
+
+msgid "admin.delivery.last_refused"
+msgstr "Laatst geweigerd"
+
+msgid "admin.delivery.window"
+msgstr "Telvenster"
+
+msgid "admin.delivery.window_since"
+msgstr "Sinds {time}"
+
+msgid "admin.delivery.paused_dropped"
+msgstr "Gebeurtenissen weggegooid tijdens de pauze"
+
+msgid "admin.delivery.none_seen"
+msgstr "Geen gezien sinds dit proces startte"
+
+msgid "admin.delivery.last_refused_at"
+msgstr "{time}: {reason}"
+
+msgid "admin.delivery.counts"
+msgstr "Aanroepen in dit venster per uitkomst"
+
+msgid "admin.delivery.col.what"
+msgstr "Uitkomst"
+
+msgid "admin.delivery.col.calls"
+msgstr "Aanroepen"
+
+msgid "admin.delivery.col.fault"
+msgstr "Fout bij de aanroep"
+
+msgid "admin.delivery.no_calls"
+msgstr "Geen aanroepen in dit venster."
+
+msgid "admin.delivery.inside_list"
+msgstr "{count} van de geweigerde aanroepen kwam van binnen de eigen netwerklijst van deze koppeling."
+
+msgid "admin.delivery.faults"
+msgstr "Aanroepen waarvan het bronadres niet te vertrouwen was, per fout"
+
+msgid "admin.delivery.outcome.accepted"
+msgstr "Geaccepteerd en verwerkt"
+
+msgid "admin.delivery.outcome.duplicate"
+msgstr "Geaccepteerd, al eerder gezien (opnieuw bezorgd)"
+
+msgid "admin.delivery.outcome.paused"
+msgstr "Gecontroleerd, weggegooid tijdens de pauze"
+
+msgid "admin.delivery.outcome.unknown_work"
+msgstr "Gecontroleerd, over werk dat deze koppeling niet heeft aangemaakt"
+
+msgid "admin.delivery.reason.unknown_address"
+msgstr "Geweigerd: dat adres bestaat niet"
+
+msgid "admin.delivery.reason.network"
+msgstr "Geweigerd: aanroeper buiten de toegestane netwerken"
+
+msgid "admin.delivery.reason.source_unknown"
+msgstr "Geweigerd: het adres van de aanroeper was niet te vertrouwen"
+
+msgid "admin.delivery.reason.rate"
+msgstr "Geweigerd: te veel aanroepen"
+
+msgid "admin.delivery.reason.content_type"
+msgstr "Geweigerd: geen JSON-aanroep"
+
+msgid "admin.delivery.reason.too_large"
+msgstr "Geweigerd: inhoud te groot"
+
+msgid "admin.delivery.reason.invalid_signature"
+msgstr "Geweigerd: handtekening klopt niet"
+
+msgid "admin.delivery.reason.stale"
+msgstr "Geweigerd: getekende tijd te ver van nu"
+
+msgid "admin.delivery.reason.malformed"
+msgstr "Geweigerd: inhoud heeft niet de verwachte vorm"
+
+msgid "admin.delivery.fault.wide_trust"
+msgstr "Het vertrouwen in de proxy is ruimer dan losse hosts"
+
+msgid "admin.delivery.fault.unreadable_trust"
+msgstr "Een regel van het proxyvertrouwen is niet te lezen"
+
+msgid "admin.delivery.fault.untrusted_hop"
+msgstr "De aanroep had doorgestuurde headers van een afzender die niet wordt vertrouwd"
+
+msgid "admin.delivery.fault.caller_is_proxy"
+msgstr "De aanroeper was de proxy zelf, die de aanroeper niet doorgaf"
+
+msgid "admin.delivery.fault.hop_not_handed_on"
+msgstr "Een schakel onderweg gaf het adres van de aanroeper niet door"
+
+msgid "admin.delivery.fault.no_address"
+msgstr "De aanroep had geen adres"
+
+msgid "admin.overview.widget.status.paused"
+msgstr "{count} adres(sen) gepauzeerd"
+
+msgid "admin.integrations.paused"
+msgstr "Gepauzeerde adressen"
+
+msgid "admin.integrations.paused_lead"
+msgstr "Deze organisaties pauzeerden hun contactcenteradres. Het platform krijgt nog zijn 204 en houdt zijn aanmelding, maar gecontroleerde gebeurtenissen worden weggegooid, dus de laatste gebeurtenis hierboven staat stil. Dit is geen gezonde en ook geen rustige koppeling."
 
 msgid "admin.channels.cc_pause_title"
 msgstr "Bezorgingen"

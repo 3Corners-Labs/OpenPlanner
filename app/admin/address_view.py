@@ -13,6 +13,9 @@ from dataclasses import dataclass
 
 from fastapi import Request
 
+from app.adapters.contact_centers import INBOUND
+from app.adapters.webhooks import WEBEX_INBOUND
+from app.admin.delivery_status import DeliveryView, delivery_view
 from app.admin.pages import admin_moment
 from app.admin.source_findings import FAULT_TEXTS, SourceFinding, source_finding
 from app.config import Settings
@@ -31,7 +34,9 @@ from app.domain.public_address import (
     url_on,
 )
 from app.domain.web_transport import proxy_hop_unencrypted
+from app.domain.webhook_ledger import AddressKey
 from app.web.locale import RequestLocale
+from app.web.webhook_ledger import ledger_view
 from app.web.webhook_sources import contact_center_networks, proxy_chain, video_networks
 from app.web.widget_bundle import SCRIPT_URL_PATH
 
@@ -84,11 +89,12 @@ class CheckView:
 
 @dataclass(frozen=True)
 class SourceRow:
-    """The source networks of one installation-wide webhook address (ADR 0124 point 13)."""
+    """The source networks and the deliveries of an installation-wide webhook address (ADR 0124)."""
 
     label: str
     finding: SourceFinding
     faults: list[str]
+    delivery: DeliveryView
 
 
 @dataclass(frozen=True)
@@ -145,15 +151,32 @@ def _source_rows(request: Request, locale: RequestLocale, settings: Settings) ->
     chain = proxy_chain(request)
     required = settings.webhook_source_networks_required
     findings = [
-        (label, source_finding(_, networks, own=False, required=required, chain=chain))
-        for label, networks in (
-            ("admin.settings.address.sources.video", video_networks(request)),
-            ("admin.settings.address.sources.contact_center", contact_center_networks(request)),
+        (label, source_finding(_, networks, own=False, required=required, chain=chain), platform)
+        for label, networks, platform in (
+            (
+                "admin.settings.address.sources.video",
+                video_networks(request),
+                WEBEX_INBOUND.source,
+            ),
+            (
+                "admin.settings.address.sources.contact_center",
+                contact_center_networks(request),
+                next(iter(INBOUND.values())).source,
+            ),
         )
     ]
     return [
-        SourceRow(_(label), found, [_(FAULT_TEXTS[fault]) for fault in found.faults])
-        for label, found in findings
+        SourceRow(
+            _(label),
+            found,
+            [_(FAULT_TEXTS[fault]) for fault in found.faults],
+            delivery_view(
+                _,
+                ledger_view(request, AddressKey(platform)),
+                lambda at: admin_moment(request, locale, at),
+            ),
+        )
+        for label, found, platform in findings
     ]
 
 

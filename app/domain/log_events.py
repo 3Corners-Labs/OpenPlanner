@@ -1293,6 +1293,26 @@ _OPERATIONS = (
         "A verified webhook of a contact-center platform was processed (ADR 0032).",
     ),
     _e(
+        "webhook.alert_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The warning about refused webhook deliveries could not be written: {error}.",
+        "The system event `webhook.refusal_alert` (ADR 0124 point 10) was not saved; the "
+        "webhook was answered as usual and a later counted outcome raises it again, after 60 s.",
+        _CHECK_HOST,
+    ),
+    _e(
+        "webhook.ledger_failed",
+        _OPS,
+        "warning",
+        "error",
+        "The delivery ledger could not note a webhook call: {error}.",
+        "The in-memory ledger behind the connection card (ADR 0124 point 10) failed on a call; "
+        "the webhook was answered as usual.",
+        _CHECK_HOST,
+    ),
+    _e(
         "webhook.paused",
         _OPS,
         "info",
@@ -1651,6 +1671,35 @@ _AUDIT = (
         "the actor and the count; nothing was refused.",
         "Ask the person whether the requests were theirs; if not, use *End all sessions* on their "
         "page under Staff, which also lists what they did.",
+    ),
+    _e(
+        "webhook.refusal_alert",
+        _SYS,
+        "outcome",
+        "",
+        "Many refused or unmatched webhook deliveries at one address.",
+        "At one webhook address, more than `webhook_refusal_alert_count` outcomes of one group "
+        "inside the event window (ADR 0124 points 10 and 12). Group `list`: refusals for the "
+        "network after a delivery was verified, which a stale list causes and a stranger who "
+        "knows the address can cause too. Group `signed`: what a passer-by cannot cause alone, "
+        "a signed but stale delivery, a refusal from inside the connection's own list of "
+        "networks, or an event about work the connection did not create. The detail names the "
+        "platform, the group, the count and the reasons' codes; nothing was changed. Written "
+        "at most once per group, address and window.",
+        "`list`: check the supplier's current ranges against the connection's list. `signed`: "
+        "`stale` means check the clocks; `unknown_work` means the subscription may point at "
+        "the wrong address; others, check the webhook secret.",
+    ),
+    _e(
+        "webhook.ledger_full",
+        _OPS,
+        "warning",
+        "source",
+        "The webhook delivery ledger is full: an address of {source} was not recorded.",
+        "Every entry of the in-memory delivery ledger is inside its window and has alerted, so a "
+        "new address was not recorded (ADR 0124 point 10); its calls were answered as usual. "
+        "Logged once per platform and window.",
+        "Raise `security_event_max_sources`, or wait for a window to end.",
     ),
     _e(
         "booking_rows.rollup",

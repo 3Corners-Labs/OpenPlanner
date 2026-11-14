@@ -16,6 +16,7 @@ from app.adapters.contact_centers import DESCRIPTORS, INBOUND
 from app.admin import forms
 from app.admin.authz import AdminContext
 from app.admin.channel_fields import Manage, channels_url, secret_field, value_of
+from app.admin.delivery_status import delivery_view
 from app.admin.forms import Field, FormData, moment_label
 from app.admin.pages import Locale, SameOrigin
 from app.admin.source_findings import card_finding
@@ -24,10 +25,12 @@ from app.domain.contact_center_connection import ContactCenterConnectionService
 from app.domain.errors import DomainError
 from app.domain.networks import NetworkList
 from app.domain.source_networks import MAX_WEBHOOK_NETWORKS
+from app.domain.webhook_ledger import AddressKey
 from app.domain.webhook_sources import source_list_that_applies
 from app.i18n import BoundGettext
 from app.web.locale import RequestLocale
 from app.web.protection import RejectedRequest
+from app.web.webhook_ledger import ledger_view
 from app.web.webhook_sources import contact_center_networks, proxy_chain
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -144,7 +147,8 @@ async def connection_view(
     """Return the contact-center card (ADR 0032, ADR 0124 point 13).
 
     It holds the form, the webhook address, when its secret was made, where its webhooks may
-    come from and whether the address is paused (the chip and the sentence, ADR 0124 point 9).
+    come from, whether the address is paused (the chip and the sentence, ADR 0124 point 9) and
+    what the gate has seen at the address (``delivery``: this web process's ledger, point 10).
     """
     service = connection_service(request)
     _ = locale.gettext
@@ -168,6 +172,13 @@ async def connection_view(
         "secret_made": moment_label(made, tz, locale.code) if made else "",
         "sources": sources,
         "paused": stored is not None and not stored.inbound_enabled,
+        "delivery": delivery_view(
+            _,
+            ledger_view(request, AddressKey(INBOUND[stored.kind].source, org)),
+            lambda at: moment_label(at, tz, locale.code),
+        )
+        if stored
+        else None,
     }
 
 

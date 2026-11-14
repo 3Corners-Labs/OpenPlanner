@@ -1425,6 +1425,14 @@ How to read what you see:
 
 Deliveries refused for their network (a stale list):
 
+0. The first sign is the system event `webhook.refusal_alert` for the organisation (reasons in its
+   detail, written once per group, address and event window, threshold
+   `webhook_refusal_alert_count`; group `list` is the one for this section, and a stranger who
+   knows the address can raise it while real deliveries arrive, so check the supplier's ranges
+   first; group `signed` is something else: stale, refused from inside the list, or unknown
+   work), and
+   the connection card's *Deliveries seen* (*Last accepted*, *Last refused* with its reason). The
+   card is the web process's memory since the window began: after a restart it starts empty.
 1. Find the refusals: the security events `webhook.rejected` (the audit log and your log destinations), reason `network`,
    `source:wxcc` or `source:webex` and, at an organisation's address, `organisation:<slug>`.
 2. Ask the supplier for its current source ranges and compare. A supplier that moved addresses is
