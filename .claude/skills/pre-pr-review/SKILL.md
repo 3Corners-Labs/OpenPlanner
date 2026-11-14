@@ -44,6 +44,12 @@ Tell both that the Graphify MCP is available: `graphify_impact` (`include_risk=t
 symbol faster than grep. The graph describes the indexed commit, so anything changed in this
 scope is read from the file, and a graph answer is never a finding on its own.
 
+Before the reviewers start, run `make deadcode` and list the new public functions, classes and
+constants of the scope with, for each, the nearest existing symbol found by `graphify_find` or
+`query_graph` that does a similar job (ADR 0127). Give both reviewers that list. A routine the
+change leaves without a caller (`graphify_callers`, then a text search for registration by name)
+is deleted in this change, not left for later.
+
 While they run, do the correctness pass in this thread with the built-in `code-review` skill at
 level `high`, so that its findings come back to you in full. Where its instructions gather the
 diff, use the scope of section 1, never `main` or `@{upstream}`. When `code-review` is not

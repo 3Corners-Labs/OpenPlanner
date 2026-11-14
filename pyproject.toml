@@ -72,6 +72,16 @@ known-first-party = ["app", "scripts", "tests"]
 "migrations/**" = ["N999", "D103"]
 
 # --- mypy -------------------------------------------------------------------
+# ADR 0127: unused code in app/ fails `make deadcode`. 80 is the lowest confidence at which
+# vulture's findings are certain (an unused variable or import); the lower tiers are framework
+# entry points and go through the graph sweep of the ADR, not through the gate.
+[tool.vulture]
+paths = ["app"]
+min_confidence = 80
+# Names a signature must carry although its body does not read them: Pydantic's settings hook,
+# the memo of copy.deepcopy, logging.Formatter's format spec, and the stat tuple of the bundle.
+ignore_names = ["file_secret_settings", "memo", "format_spec", "mtime_ns"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
