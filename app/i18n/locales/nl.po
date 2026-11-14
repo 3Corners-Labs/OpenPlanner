@@ -6187,7 +6187,7 @@ msgid "admin.settings.problem.webex_incomplete"
 msgstr "Webex heeft in productie WEBEX_CLIENT_SECRET, WEBEX_REFRESH_TOKEN en SETTINGS_ENCRYPTION_KEY nodig."
 
 msgid "admin.settings.problem.oidc_incomplete"
-msgstr "inloggen (OIDC) heeft in productie een https-adres en een client secret nodig."
+msgstr "inloggen (OIDC) heeft in productie een https-adres en een client secret nodig; alleen de ingebouwde identiteitsprovider mag via zijn interne adres, met een https-OIDC_ISSUER."
 
 msgid "admin.settings.problem.update_channel"
 msgstr "het updatekanaal rc mag in productie niet gekozen zijn: productie volgt releases."

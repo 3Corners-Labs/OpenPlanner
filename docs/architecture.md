@@ -134,9 +134,10 @@ flowchart TB
     worker <--> volume
     worker -- "SMTP, STARTTLS or TLS" --> smtp
     web -- "OIDC, https" --> idp
-    web -- "OIDC and directory API (ADR 0095)" --> keycloak
+    web -- "OIDC and directory API (ADR 0095), http, one host (recorded exception, ADR 0125)" --> keycloak
+    worker -- "directory API, http, one host (ADR 0125)" --> keycloak
     keycloak <--> idpdata
-    proxy -- "/idp route (ADR 0112)" --> keycloak
+    proxy -- "/idp route (ADR 0112), http, one host (ADR 0125)" --> keycloak
     web -- https --> cisco
     worker -- https --> cisco
     web -- "syslog+tls or https" --> logs
@@ -174,10 +175,13 @@ flowchart TB
   Keycloak runs next to `web`; staff are managed in it from the portal (ADR 0095). In a lab
   without a public name the proxy can issue its certificates from its own certificate authority
   (`TLS_INTERNAL=true`, ADR 0112), publish the root for download on *System status*, and serve
-  Keycloak under `/idp` on the same https address. Step 6 of ADR 0112 (the installer writes
-  `IDP_UPSTREAM`) is not built.
-- **Every hop with personal data is encrypted, or a recorded exception (ADR 0091).** The one
-  exception is the bundled proxy to `web` on the `edge` network of one host. An own reverse proxy
+  Keycloak under `/idp` on the same https address.
+- **Every hop with personal data is encrypted, or a recorded exception (ADR 0091).** The
+  exceptions are all on one host: the bundled proxy to `web` on the `edge` network (ADR 0091),
+  and the hops to the bundled Keycloak as `idp:8080`, from `web` and `worker` and from the proxy,
+  and from Keycloak to its database `idp-db` (ADR 0125; the browser reaches the proxy over
+  https, and production accepts no other http login; until its step 2 these names, and `web`,
+  can leave the host while their container is not running). An own reverse proxy
   on another machine gets HTTPS from uvicorn (`WEB_TLS_CERT_FILE`, `WEB_TLS_KEY_FILE`, class B;
   the image's healthcheck follows), and *System status* warns while `FORWARDED_ALLOW_IPS` names
   another proxy and web serves no TLS. All outbound connections are listed in `docs/dataflow.md`
