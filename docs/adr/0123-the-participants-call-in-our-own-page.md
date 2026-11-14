@@ -395,7 +395,7 @@ What constrains the answer:
 | `embedded_call_connect_attempts` | C platform | 3 | 1–5 | `settings.platform.manage` | Attempts before the page reports that it cannot connect |
 | `embedded_call_chat_poll_seconds` | C platform | 3 | 2–10 | `settings.platform.manage` | How often the call page asks our server for new chat messages. Registered in step 7c |
 | `embedded_call_chat_max_chars` | D organisation | 1000 | 200–4000 | `settings.organisation.manage` | Longest chat message a participant may send. Registered in step 7b |
-| `embedded_call_token_per_booking_per_hour` | C platform | 20 | 5–60 | `settings.platform.manage` | Guest tokens one booking may ask for in an hour; per address the common read limit applies. Registered in step 4a |
+| `embedded_call_token_per_booking_per_hour` | C platform | 10 | 5–30 | `settings.platform.manage` | Guest tokens one booking may ask for in an hour; per address the common read limit applies. Registered in step 4a. A token lives for hours, cannot be withdrawn and can write to any account whose address it knows, and the page reuses a valid token and retries at most five times, so a participant needs a handful an hour at most |
 | `embedded_call_chat_per_minute` | C platform | 20 | 5–60 | `settings.platform.manage` | Chat messages one participant may send in a minute. Registered in step 7b |
 
 Classes:

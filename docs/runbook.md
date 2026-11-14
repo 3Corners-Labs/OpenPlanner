@@ -1736,6 +1736,16 @@ old key. Without the previous key a message sent after the rotation to an open b
 (reminder, change, confirmation) carries a link that no longer works, and agents no longer
 see their earlier claims as their own (ADR 0043 pseudonyms).
 
+**Guests of the call page (ADR 0123 point 7).** The guest's subject at the video platform is
+derived from this key. After the purge a job renames the guest to a neutral word, under the
+current and, while it is set, the previous key. Keep `MANAGEMENT_TOKEN_KEY_PREVIOUS` configured
+for at least the longest span from a booking to its purge (the booking's time, plus the 24 hours
+of retention, plus any closure hold up to `closure_max_retention_days`); a guest minted under a
+key that is no longer configured keeps the participant's first name at the video platform. A
+worker that cannot rename (no video provider or no key) skips the job and writes one system
+event `job.rename_guest` with the outcome `skipped` and the reason `no_guest_key`, with no name
+and no token; the audit log shows it.
+
 ## Releasing a version (ADR 0052, ADR 0079)
 
 A merge to `main` is **not** a release. An installation only sees a new version after a tag

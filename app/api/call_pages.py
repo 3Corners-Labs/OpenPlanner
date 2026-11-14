@@ -13,20 +13,22 @@ not available yet. It loads no script and contacts nobody; the page's way in is 
     POST /b/m/{ref}/call/token   the guest token for the click that joins (ADR 0123 point 6)
 
 The token endpoint (step 4a) answers JSON with ``token``, ``expires_at`` (UTC, ISO 8601) and
-``link`` (the meeting's guest link, never the host's), always ``Cache-Control: no-store``. It
-needs the participant's session for the booking and the form protection of every participant
-post, answers only inside the join window of ``/join/go`` (``join_state``), and is limited per
-address (the common read limit) and per booking (``embedded_call_token_per_booking_per_hour``).
-The token and the links are never stored, logged, put in a URL, an event or a job. Answers:
+``link`` (the meeting's guest link, never the host's). Every answer the endpoint builds carries
+``Cache-Control: no-store``; the 403 and 404 pages are the site's own, as for every page under the
+link. It needs the participant's session for the booking and the form protection of every
+participant post, answers only inside the join window of ``/join/go`` (``join_state``), and is
+limited per address (the common read limit) and per booking, counted for an open booking only
+(``embedded_call_token_per_booking_per_hour``). The token and the links are never stored, logged,
+put in a URL, an event or a job. Answers:
 
-    200  the token                      409 ``{"error": "not_open"}``   not confirmed, not in the
-    404  switch off (an address that        window, or no meeting (as ``/join/go`` sends back)
-         does not exist)                503 ``{"error": "unavailable"}`` the platform refused
-    403  no session for this booking,           or cannot be reached (as the trial call says)
-         or a cross-site post           429  over a limit (the site's rate-limit page)
-         (as every page under the link;
-         a booking that does not exist
-         or is not theirs answers alike)
+    200  the token
+    403  no session for this booking, or a cross-site post (a booking that does not exist or is
+         not theirs answers alike)
+    404  the switch is off (an address that does not exist)
+    409  ``{"error": "not_open"}``: not confirmed, not in the window, or no meeting
+    429  ``{"error": "rate_limited"}`` with ``Retry-After``, from either limit
+    503  ``{"error": "unavailable"}``: the platform refused or cannot be reached
+
 
 Until step 6 gives a service its ``join_client = embedded`` the endpoint is dark behind the
 platform switch alone: any booking of an installation that turned the switch on may ask, which
@@ -42,8 +44,13 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from app.api.labels import slot_label
 from app.api.link_session import authorise
 from app.api.participant import participant_call_page
-from app.domain.call_token_service import CallToken, CallTokenService, TokenRefusal
-from app.domain.guest_access import DisplayNameMode
+from app.domain.call_token_service import (
+    REFUSAL_STATUS,
+    CallToken,
+    CallTokenService,
+    TokenRefusal,
+)
+from app.domain.guest_access import GUEST_TERM_KEY, DisplayNameMode
 from app.domain.services import BookingService
 from app.web.error_pages import refuse_rate_limited
 from app.web.locale import resolve_locale
@@ -58,9 +65,6 @@ from app.web.protection import (
 router = APIRouter(include_in_schema=False)
 
 SameOrigin = Annotated[None, Depends(require_same_origin)]
-
-GUEST_TERM_KEY = "call.guest.term"
-"""The catalogue word for a participant that the guest is called by (ADR 0123 point 7)."""
 
 NO_STORE = {"cache-control": "no-store"}
 """A token, or the answer that there is none, is never kept by a browser or a proxy."""
@@ -107,10 +111,8 @@ async def call_token(request: Request, public_ref: str, _: SameOrigin) -> Respon
     if not settings.embedded_call_enabled:
         raise HTTPException(status_code=404)
     ref = await authorise(request, public_ref)
-    if not within_call_token_limit(public_ref):
-        return await refuse_rate_limited(request)
     bookings: BookingService = request.app.state.booking_service
-    details = await bookings.find(ref)
+    details = await bookings.find(ref)  # the one read: the service takes the booking from here
     current = follow(request, details.group.organisation_id)
     term = (
         resolve_locale(request)
@@ -118,9 +120,18 @@ async def call_token(request: Request, public_ref: str, _: SameOrigin) -> Respon
         .gettext(GUEST_TERM_KEY)
     )
     service: CallTokenService = request.app.state.call_token_service
-    outcome = await service.issue(ref, DisplayNameMode(current.embedded_call_display_name), term)
+    outcome = await service.issue(
+        details.booking,
+        DisplayNameMode(current.embedded_call_display_name),
+        term,
+        lambda: within_call_token_limit(public_ref),
+    )
+    if outcome is TokenRefusal.RATE_LIMITED:
+        return await refuse_rate_limited(request)
     if isinstance(outcome, TokenRefusal):
-        return _refusal(outcome)
+        return JSONResponse(
+            {"error": outcome.value}, status_code=REFUSAL_STATUS[outcome], headers=NO_STORE
+        )
     return _answer(outcome)
 
 
@@ -134,10 +145,3 @@ def _answer(token: CallToken) -> JSONResponse:
         },
         headers=NO_STORE,
     )
-
-
-def _refusal(why: TokenRefusal) -> JSONResponse:
-    """Return the answer for a booking that gets no token: the window, or the platform."""
-    if why is TokenRefusal.NOT_OPEN:
-        return JSONResponse({"error": why.value}, status_code=409, headers=NO_STORE)
-    return JSONResponse({"error": why.value}, status_code=503, headers=NO_STORE)

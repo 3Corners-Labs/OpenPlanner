@@ -6,6 +6,7 @@ from app.domain.audit import Outcome
 from app.domain.guest_access import NEUTRAL_TERM, guest_subject
 from app.domain.job_plan import BACKOFF, JobType
 from app.domain.ports import IntegrationError
+from app.domain.purge import purge_booking
 from app.jobs.calls import NO_GUEST_KEY
 from tests.fakes.jobs import FakeQueue, job
 from tests.support.call_jobs import WIRED, Setup, group_uow
@@ -29,7 +30,7 @@ def _renames(setup: Setup, booking_id: int) -> list[JobType]:
 
 async def _purge(setup: Setup, booking_id: int) -> None:
     async with setup.uow.locked() as tx:
-        await tx.purge_personal_data(booking_id, NOW)
+        await purge_booking(tx, booking_id, NOW)
 
 
 async def test_a_purge_enqueues_one_rename_when_a_guest_was_minted(setup: Setup) -> None:

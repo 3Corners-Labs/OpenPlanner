@@ -120,6 +120,11 @@ the next minor switches to the new value, and this mapping lets this image read 
 a rollback."""
 
 
+OUTLIVES_PURGE = frozenset({JobType.RENAME_GUEST})
+"""Job types that are added by a purge or must survive one: everything else pending for a purged
+booking is deleted (``retention.purge_booking``, the sweep and ``replace_jobs`` all read this)."""
+
+
 TEAM_INVITES = frozenset({JobType.SEND_TEAM_INVITE, JobType.SEND_TEAM_CANCEL})
 """The calendar invite to an own-queue team's address and its cancellation (ADR 0043)."""
 

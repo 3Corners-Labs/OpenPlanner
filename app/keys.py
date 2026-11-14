@@ -128,6 +128,17 @@ def guest_pseudonym_key_previous(settings: Settings) -> bytes | None:
     return None if previous is None else _derive_from(previous, GUEST_PSEUDONYM_INFO)
 
 
+def guest_pseudonym_keys(settings: Settings) -> list[bytes]:
+    """Return the keys a guest's subject may have been derived under, the current one first.
+
+    The one place a rotation is handled for guests (ADR 0123 point 7): minting uses the first,
+    the rename at the purge uses all of them.
+    """
+    previous = guest_pseudonym_key_previous(settings)
+    current = guest_pseudonym_key(settings)
+    return [current] if previous is None else [current, previous]
+
+
 def session_secret(settings: Settings) -> str:
     """Return the key that signs the admin session cookie (ADR 0013)."""
     return _bootstrap_key(

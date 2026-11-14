@@ -27,6 +27,7 @@ from app.domain.calls import EventKind
 from app.domain.guest_access import guest_subject
 from app.domain.maintenance import MaintenanceReason
 from app.domain.ports import IntegrationError
+from app.domain.settings_registry import BY_KEY
 from app.keys import guest_pseudonym_key
 from app.logging import set_line_tap
 from tests.conftest import app_client
@@ -415,7 +416,8 @@ async def test_one_booking_may_ask_a_limited_number_of_times_an_hour(
         assert len(video.guests) == 5
         refused = await running.post()
         assert refused.headers["retry-after"] == "60"
-        assert "guest-token" not in refused.text
+        assert refused.headers["cache-control"] == "no-store"
+        assert refused.json() == {"error": "rate_limited"}
 
 
 async def test_a_caller_without_the_session_cannot_use_a_bookings_budget_up(
@@ -445,6 +447,10 @@ async def test_one_address_is_held_by_the_common_read_limit(demo_settings: Setti
 
         assert answers[:3] == [200, 200, 200]
         assert answers[3:] == [429, 429]
+        limited = await running.post()
+        assert limited.json() == {"error": "rate_limited"}  # a script's route answers JSON too
+        assert limited.headers["cache-control"] == "no-store"
+        assert limited.headers["retry-after"] == "60"
 
 
 # --- what is kept -------------------------------------------------------------------------
@@ -507,6 +513,34 @@ async def test_the_answer_is_never_cacheable_and_never_in_an_address(site: Site)
     assert ok.headers["cache-control"] == "no-store"
     assert "guest-token" not in str(ok.request.url)
     assert "guest-token" not in refused.text
+
+
+async def test_attempts_outside_the_window_do_not_use_the_bookings_budget_up(
+    demo_settings: Settings,
+) -> None:
+    video = FakeVideo()
+    settings = _on(
+        demo_settings,
+        rate_limit_enabled=True,
+        embedded_call_token_per_booking_per_hour=5,
+        rate_limit_reads="600/minute",
+    )
+    async for running in _site(settings, START - timedelta(minutes=30), video):
+        early = [(await running.post()).status_code for _ in range(8)]
+        running.clock.advance(timedelta(minutes=25))  # the window opens
+        answers = [(await running.post()).status_code for _ in range(6)]
+
+        assert early == [409] * 8
+        assert answers == [200] * 5 + [429]
+
+
+async def test_the_default_budget_of_a_booking_is_a_handful_an_hour(
+    demo_settings: Settings,
+) -> None:
+    spec = BY_KEY["embedded_call_token_per_booking_per_hour"]
+
+    assert demo_settings.embedded_call_token_per_booking_per_hour == 10
+    assert (spec.default, spec.minimum, spec.maximum) == (10, 5, 30)
 
 
 async def test_the_way_into_a_call_stays_open_during_maintenance(demo_settings: Settings) -> None:

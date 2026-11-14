@@ -167,7 +167,7 @@ from app.keys import (
     agent_pseudonym_key,
     agent_pseudonym_key_previous,
     client_pseudonym_key,
-    guest_pseudonym_key,
+    guest_pseudonym_keys,
     management_token_key,
     management_token_key_previous,
     session_secret,
@@ -379,7 +379,7 @@ def create_app(
                 wired.video,
                 app.state.integration_service,
                 clock,
-                guest_pseudonym_key(settings),
+                lambda: guest_pseudonym_keys(settings),
             )
             app.state.integration_check_service = IntegrationCheckService(
                 uow,

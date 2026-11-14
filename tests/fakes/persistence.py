@@ -65,7 +65,14 @@ from app.domain.identity_providers import (
 )
 from app.domain.images import ImageFile, ImageText
 from app.domain.integration_check import CHECK_EVENT, PROBE_REASON_PREFIX
-from app.domain.job_plan import JobCounts, JobStatus, JobSummary, JobType, PlannedJob
+from app.domain.job_plan import (
+    OUTLIVES_PURGE,
+    JobCounts,
+    JobStatus,
+    JobSummary,
+    JobType,
+    PlannedJob,
+)
 from app.domain.log_destinations import DestinationStatus, LogDestination
 from app.domain.login_domains import DomainClaim
 from app.domain.maintenance import OFF as MAINTENANCE_OFF
@@ -1219,9 +1226,6 @@ class InMemoryTransaction(ServiceRequestStore):
             self.state.bookings[booking_id] = replace(booking, guest_minted_at=at)
 
     async def purge_personal_data(self, booking_id: int, now: datetime) -> None:
-        before = self.state.bookings[booking_id]
-        if before.guest_minted_at is not None and booking_id not in self.state.purged_at:
-            await self.add_jobs(booking_id, [PlannedJob(JobType.RENAME_GUEST, now, None)])
         self.state.bookings[booking_id] = replace(
             self.state.bookings[booking_id],
             contact=None,
@@ -1371,7 +1375,8 @@ class InMemoryTransaction(ServiceRequestStore):
         self.state.bookings[booking_id] = replace(self.state.bookings[booking_id], contact=contact)
 
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
-        self.state.jobs[booking_id] = list(jobs)
+        kept = [j for j in self.state.jobs.get(booking_id, []) if j.type in OUTLIVES_PURGE]
+        self.state.jobs[booking_id] = [*kept, *jobs]
 
     async def add_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
         self.state.jobs.setdefault(booking_id, []).extend(jobs)

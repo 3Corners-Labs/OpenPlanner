@@ -2375,13 +2375,13 @@ REGISTRY: tuple[SettingSpec, ...] = (
     S(
         "embedded_call_token_per_booking_per_hour",
         K.INT,
-        20,
+        10,
         _C,
         T.WEBEX,
         "Guest tokens one booking may ask for in an hour on the call page; per address the "
         "common read limit applies (ADR 0123 point 6).",
         minimum=5,
-        maximum=60,
+        maximum=30,
     ),
     S(
         "embedded_call_display_name",

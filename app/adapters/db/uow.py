@@ -195,6 +195,7 @@ from app.domain.flow_resolution import FlowRef
 from app.domain.holidays import GroupHolidays, Holiday, HolidayCalendar, HolidaySource
 from app.domain.images import PageImage
 from app.domain.job_plan import (
+    OUTLIVES_PURGE,
     JobCounts,
     JobStatus,
     JobSummary,
@@ -1949,19 +1950,8 @@ class SqlTransaction(
         column is unique and not null; the old hash can no longer find the booking) and records
         ``pii_purged_at``. The salt stays: without the token it identifies nothing.
 
-        A booking for which a guest was minted at the video platform (``guest_minted_at``) and
-        that was not purged before gets one ``rename_guest`` job in the same transaction (ADR
-        0123 point 7); the job carries the booking's id and nothing else.
+        Storage only: what follows a purge is decided by ``app.domain.retention.purge_booking``.
         """
-        marks = (
-            await self._session.execute(
-                select(BookingRow.guest_minted_at, BookingRow.pii_purged_at).where(
-                    BookingRow.id == booking_id
-                )
-            )
-        ).one_or_none()
-        if marks is not None and marks.guest_minted_at is not None and marks.pii_purged_at is None:
-            await self.add_jobs(booking_id, [PlannedJob(JobType.RENAME_GUEST, now, None)])
         await self._session.execute(
             update(BookingRow)
             .where(BookingRow.id == booking_id)
@@ -2047,9 +2037,16 @@ class SqlTransaction(
         )
 
     async def replace_jobs(self, booking_id: int, jobs: Sequence[PlannedJob]) -> None:
-        """Delete the booking's pending jobs and insert ``jobs``."""
+        """Delete the booking's pending jobs and insert ``jobs``.
+
+        A job that outlives a purge (``OUTLIVES_PURGE``) is never deleted here.
+        """
         await self._session.execute(
-            delete(JobRow).where(JobRow.booking_id == booking_id, JobRow.status == _PENDING)
+            delete(JobRow).where(
+                JobRow.booking_id == booking_id,
+                JobRow.status == _PENDING,
+                JobRow.type.not_in(sorted(t.value for t in OUTLIVES_PURGE)),
+            )
         )
         await self.add_jobs(booking_id, jobs)
 

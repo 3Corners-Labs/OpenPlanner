@@ -1,9 +1,10 @@
 """The job runner on fake video and contact-centre adapters, for the call job tests (ADR 0018)."""
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 
 from app.domain.admin import AdminService
 from app.domain.calls import EventKind
+from app.domain.guest_access import GuestKeys
 from app.domain.integration import IntegrationService
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
@@ -47,7 +48,7 @@ class Setup:
         *,
         translator: Translator | None = None,
         conversation_enabled: Callable[[], bool] | None = None,
-        guest_keys: Callable[[], Sequence[bytes]] | None = None,
+        guest_keys: GuestKeys | None = None,
     ) -> JobRunner:
         """Return a job runner that takes its jobs from ``queue`` and calls the fakes.
 

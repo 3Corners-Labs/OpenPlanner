@@ -12,7 +12,7 @@ Ending a cancelled booking's task (ADR 0021), the cancellation message first:
              ─► end_task       ─► task_end_requested      (refused: end_not_possible, code)
 """
 
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from datetime import datetime
 
@@ -30,7 +30,7 @@ from app.domain.contact_center import TaskKind
 from app.domain.contact_center_dispatch import DispatcherChoice
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.fallback import FallbackService
-from app.domain.guest_access import NEUTRAL_TERM, guest_subject
+from app.domain.guest_access import NEUTRAL_TERM, GuestKeys, guest_subject
 from app.domain.integration import IntegrationService
 from app.domain.interaction import InteractionKind
 from app.domain.job_plan import JobType
@@ -54,9 +54,6 @@ OpeningText = Callable[[str | None, ContactCenterTask], str]
 the function."""
 ConversationEnabled = Callable[[], bool]
 """Whether the platform switch ``embedded_call_enabled`` is on now; read at the edge, class C."""
-GuestKeys = Callable[[], Sequence[bytes]]
-"""The keys of the guest subjects now in force: the current one, then the previous one during a
-key rotation (``app.keys``)."""
 OPENING_MESSAGE = "opening_message"
 """What a refusal names when a conversation task cannot be given its first message."""
 

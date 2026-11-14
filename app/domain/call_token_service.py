@@ -1,7 +1,9 @@
 """The guest token for the participant's call page (ADR 0123 points 6 and 7).
 
-    issue ─► the booking behind the authorised reference
+    issue ─► the booking the route already read, after the participant's session was checked
           ─► inside the join window of ``/join/go`` (``join_state``)? else ``NOT_OPEN``
+          ─► the booking's own budget of tokens (``admit``)? else ``RATE_LIMITED``; only a real
+             attempt, inside the window, counts
           ─► the guest is remembered on the booking (``guest_minted_at``, no personal data)
           ─► the provider mints for the booking's subject under the chosen name
              (refused or unreachable: ``UNAVAILABLE``, one ``integration_error`` on the timeline)
@@ -16,15 +18,20 @@ form protection); the rules "when" (the join window) and "what is sent" (subject
 here.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 
 from app.domain.booking import Booking
 from app.domain.calls import EventKind, JoinState, join_link, join_state
-from app.domain.errors import DomainError, ErrorCode
-from app.domain.guest_access import DisplayNameMode, GuestAccess, guest_display_name, guest_subject
+from app.domain.guest_access import (
+    DisplayNameMode,
+    GuestAccess,
+    GuestKeys,
+    guest_display_name,
+    guest_subject,
+)
 from app.domain.integration import IntegrationService
-from app.domain.participant_links import PublicRef
 from app.domain.ports import Clock, IntegrationError, UnitOfWork, VideoProvider
 from app.domain.scheduling import JoinClient
 
@@ -35,8 +42,18 @@ class TokenRefusal(StrEnum):
     NOT_OPEN = "not_open"
     """Not confirmed, not inside the join window, or without a meeting: what ``/join/go`` sends
     back to the status page for."""
+    RATE_LIMITED = "rate_limited"
+    """The booking asked for more tokens than its hourly budget allows."""
     UNAVAILABLE = "unavailable"
     """The video platform is not configured, refused or could not be reached."""
+
+
+REFUSAL_STATUS: dict[TokenRefusal, int] = {
+    TokenRefusal.NOT_OPEN: 409,
+    TokenRefusal.RATE_LIMITED: 429,
+    TokenRefusal.UNAVAILABLE: 503,
+}
+"""The HTTP status of each refusal, the one table the endpoint answers from."""
 
 
 @dataclass(frozen=True)
@@ -57,11 +74,12 @@ class CallTokenService:
     """Mints guest tokens for participants who join in the call page.
 
     Args:
-        uow: Reads the booking and remembers that a guest was minted for it.
+        uow: Remembers that a guest was minted for the booking.
         video: The video provider, or ``None`` when none is configured.
         integration: Records a failed minting on the booking's timeline.
         clock: The current time.
-        key: The key of the guest subjects (``app.keys.guest_pseudonym_key``).
+        keys: The keys of the guest subjects (``app.keys.guest_pseudonym_keys``); a guest is
+            minted under the first.
     """
 
     def __init__(
@@ -70,48 +88,52 @@ class CallTokenService:
         video: VideoProvider | None,
         integration: IntegrationService,
         clock: Clock,
-        key: bytes,
+        keys: GuestKeys,
     ) -> None:
         """Store the collaborators."""
         self._uow = uow
         self._video = video
         self._integration = integration
         self._clock = clock
-        self._key = key
+        self._keys = keys
 
     async def issue(
-        self, ref: PublicRef, display: DisplayNameMode, term: str
+        self,
+        booking: Booking,
+        display: DisplayNameMode,
+        term: str,
+        admit: Callable[[], bool],
     ) -> CallToken | TokenRefusal:
-        """Mint a guest token for the booking behind ``ref``, or say why not.
+        """Mint a guest token for ``booking``, or say why not.
 
         Args:
-            ref: The booking, after the caller checked the participant's session.
+            booking: The booking, read by the caller after it checked the participant's session.
             display: What the guest is called (``embedded_call_display_name`` of the booking's
                 organisation).
             term: The organisation's word for a participant, for ``TERM`` and as the fallback.
+            admit: Counts one real attempt against the booking's hourly budget and says whether
+                it may go on; called only for a booking that is open now.
 
         Returns:
-            The token and the guest link, or ``NOT_OPEN`` or ``UNAVAILABLE``.
-
-        Raises:
-            DomainError: ``booking_not_found``.
+            The token and the guest link, or the refusal.
         """
-        async with self._uow.read() as tx:
-            booking = await tx.get_booking_by_public_ref(ref.value)
-        if booking is None or booking.id is None:
-            raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
-        now = self._clock.now()
-        # The one rule of the join page (``join_state``) and its https-only link (``join_link``).
+        if booking.id is None:  # pragma: no cover - stored bookings always have an id
+            raise ValueError("booking has no id")
+        # The one rule of the join page (``join_state``). The link is not shaped by the group's
+        # join client as ``/join/go`` does (``launchApp`` sends the browser to the Webex app):
+        # the SDK takes the stored guest link as it is, so the unaltered form is asked for here.
         link = join_link(booking.meeting.link if booking.meeting else None, JoinClient.CHOICE)
-        if join_state(booking, now) is not JoinState.OPEN or link is None:
+        if join_state(booking, self._clock.now()) is not JoinState.OPEN or link is None:
             return TokenRefusal.NOT_OPEN
+        if not admit():
+            return TokenRefusal.RATE_LIMITED
         if self._video is None:
             return TokenRefusal.UNAVAILABLE
         async with self._uow.locked() as tx:
-            await tx.mark_guest_minted(booking.id, now)
+            await tx.mark_guest_minted(booking.id, self._clock.now())
         try:
             access = await self._video.guest_access(
-                guest_subject(booking.id, self._key), _name(booking, display, term)
+                guest_subject(booking.id, self._keys()[0]), _name(booking, display, term)
             )
         except IntegrationError as error:
             # The code only: the provider's reason is not asked for on this request (it carries
@@ -125,6 +147,5 @@ class CallTokenService:
 
 def _name(booking: Booking, display: DisplayNameMode, term: str) -> str:
     """Return the name the guest joins under: the first name or the organisation's word."""
-    return guest_display_name(
-        booking.contact.first_name if booking.contact else None, display, term
-    )
+    first = booking.contact.first_name if booking.contact else None
+    return guest_display_name(first, display, term)

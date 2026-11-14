@@ -6,6 +6,7 @@ import pytest
 
 from app.domain.guest_access import (
     CHECK_SUBJECT,
+    GUEST_TERM_KEY,
     MAX_DISPLAY_NAME,
     NEUTRAL_TERM,
     SUBJECT_PREFIX,
@@ -14,6 +15,7 @@ from app.domain.guest_access import (
     guest_display_name,
     guest_subject,
 )
+from app.i18n import Translator, load_catalogues
 
 KEY = b"k" * 32
 
@@ -73,3 +75,8 @@ def test_the_registry_choices_come_from_the_enums() -> None:
     assert BY_KEY["embedded_call_display_name"].choices == ("first_name", "term")
     assert BY_KEY["embedded_call_staff_name"].choices == tuple(m.value for m in StaffNameMode)
     assert [m.value for m in StaffNameMode] == ["name", "term"]
+
+
+def test_the_neutral_word_and_the_catalogues_default_for_a_participant_are_the_same_word() -> None:
+    """The rename at the purge sends the constant; the guest is minted under the catalogue word."""
+    assert Translator(load_catalogues()).gettext("en", GUEST_TERM_KEY) == NEUTRAL_TERM

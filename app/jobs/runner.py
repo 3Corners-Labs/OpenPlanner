@@ -25,7 +25,7 @@ While that group or its organisation is in diagnostic mode, each job also writes
 its own retention period.
 """
 
-from collections.abc import Awaitable, Callable, Collection, Sequence
+from collections.abc import Awaitable, Callable, Collection
 from datetime import datetime, timedelta
 from functools import partial
 from time import perf_counter
@@ -44,6 +44,7 @@ from app.domain.diagnostics import DiagnosticLog
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.event_context import bind_booking, current, trace_scope
 from app.domain.fallback import FallbackService
+from app.domain.guest_access import GuestKeys
 from app.domain.integration import IntegrationService
 from app.domain.job_plan import (
     BACKOFF,
@@ -64,6 +65,7 @@ from app.domain.ports import (
     UnitOfWork,
     VideoProvider,
 )
+from app.domain.purge import purge_booking
 from app.domain.request_dispatch import RequestDispatch
 from app.domain.request_work import RequestWork
 from app.domain.system_log import EventRetention, SystemLog
@@ -183,7 +185,7 @@ class JobRunner:
         request_work: RequestWork | None = None,
         reconcile_minutes: Callable[[], int] | None = None,
         conversation_enabled: Callable[[], bool] | None = None,
-        guest_keys: Callable[[], Sequence[bytes]] | None = None,
+        guest_keys: GuestKeys | None = None,
     ) -> None:
         """Store the collaborators and decide which job types this worker can handle."""
         self._queue = queue
@@ -319,7 +321,7 @@ class JobRunner:
             return await self._calls.run(job)
         if job.type is JobType.PURGE_PII:
             async with self._uow.locked() as tx:
-                await tx.purge_personal_data(job.booking_id, now)
+                await purge_booking(tx, job.booking_id, now)
             log.info("job.purged", job_id=job.id, booking_id=job.booking_id)
             return None
         if job.type in LAPSES:  # ADR 0044 / 0056: no new time chosen, or not confirmed

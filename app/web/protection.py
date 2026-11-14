@@ -213,10 +213,7 @@ def count_unknown_link(request: Request) -> bool:
     Returns:
         Whether the caller is now over the bound; always ``False`` while rate limits are off.
     """
-    if not limiter.enabled:
-        return False
-    item = parse(unknown_link_limit())
-    return not limiter.limiter.hit(item, "unknown-management-link", caller_of(request))
+    return not _within(unknown_link_limit(), "unknown-management-link", caller_of(request))
 
 
 def asset_limit() -> str:
@@ -257,11 +254,23 @@ def webhook_retry_after() -> str:
     return str(parse(webhook_limit()).get_expiry())
 
 
-def _within(bucket: str, platform: str, organisation: str, source: str) -> bool:
-    """Count one call against ``bucket`` of one platform, organisation and caller address."""
+def _within(limit: str, bucket: str, *key: str) -> bool:
+    """Count one hit against the bucket ``bucket`` of ``key`` and say whether it may go on.
+
+    The one place a keyed bucket is counted: every bucket of this module (unknown links,
+    webhooks, guest tokens) is one call, and the off switch ``RATE_LIMIT_ENABLED`` is read here.
+
+    Args:
+        limit: The limit string, e.g. ``20/hour``.
+        bucket: The bucket's name; the same name and key share one count.
+        key: What the bucket is per (an address, a booking, a platform and an organisation).
+
+    Returns:
+        ``False`` when the key is over the limit; always ``True`` while rate limits are off.
+    """
     if not limiter.enabled:
         return True
-    return limiter.limiter.hit(parse(webhook_limit()), bucket, platform, organisation, source)
+    return limiter.limiter.hit(parse(limit), bucket, *key)
 
 
 def within_webhook_limit(platform: str, organisation: str, source: str) -> bool:
@@ -281,7 +290,7 @@ def within_webhook_limit(platform: str, organisation: str, source: str) -> bool:
     Returns:
         ``False`` when the caller is over the limit; always ``True`` while rate limits are off.
     """
-    return _within("webhook", platform, organisation, source)
+    return _within(webhook_limit(), "webhook", platform, organisation, source)
 
 
 def within_refused_limit(platform: str, organisation: str, source: str) -> bool:
@@ -297,7 +306,7 @@ def within_refused_limit(platform: str, organisation: str, source: str) -> bool:
         organisation: The organisation's slug, or ``-``.
         source: The caller's address, as the server derived it.
     """
-    return _within("webhook-refused", platform, organisation, source)
+    return _within(webhook_limit(), "webhook-refused", platform, organisation, source)
 
 
 def within_unknown_address_limit(source: str) -> bool:
@@ -316,9 +325,7 @@ def within_unknown_address_limit(source: str) -> bool:
     Returns:
         ``False`` when the caller is over the bucket; always ``True`` while rate limits are off.
     """
-    if not limiter.enabled:
-        return True
-    return limiter.limiter.hit(parse(webhook_limit()), "webhook-unknown", source)
+    return _within(webhook_limit(), "webhook-unknown", source)
 
 
 def within_call_token_limit(public_ref: str) -> bool:
@@ -335,9 +342,7 @@ def within_call_token_limit(public_ref: str) -> bool:
     Returns:
         ``False`` when the booking is over its limit; always ``True`` while rate limits are off.
     """
-    if not limiter.enabled:
-        return True
-    return limiter.limiter.hit(parse(LIMITS.call_tokens), "call-token", public_ref)
+    return _within(LIMITS.call_tokens, "call-token", public_ref)
 
 
 def check_limit() -> str:

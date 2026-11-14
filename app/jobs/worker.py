@@ -97,8 +97,7 @@ from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
 from app.jobs.usage import backfill_usage, close_slots, roll_up_usage
 from app.keys import (
-    guest_pseudonym_key,
-    guest_pseudonym_key_previous,
+    guest_pseudonym_keys,
     management_token_key,
     management_token_key_previous,
 )
@@ -275,14 +274,7 @@ async def run_worker(
                 reconcile_minutes=lambda: live.settings.contact_center_reconcile_minutes,
                 conversation_enabled=lambda: live.settings.embedded_call_enabled,
                 # ADR 0123 point 7: the guest renamed at the purge, under both keys in a rotation.
-                guest_keys=lambda: [
-                    key
-                    for key in (
-                        guest_pseudonym_key(settings),
-                        guest_pseudonym_key_previous(settings),
-                    )
-                    if key is not None
-                ],
+                guest_keys=lambda: guest_pseudonym_keys(settings),
                 integration=integration,
                 fallback=fallback,
                 retention=lambda: live.settings.event_retention,
