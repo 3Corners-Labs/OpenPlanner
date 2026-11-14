@@ -125,6 +125,7 @@ from app.adapters.db.routing_json import (
 from app.adapters.db.scenarios import ScenarioQueries
 from app.adapters.db.schedule_rules import rule_from_row
 from app.adapters.db.scope import scope_filter
+from app.adapters.db.secret_sightings import SecretSightingQueries
 from app.adapters.db.service_flows import ServiceFlowQueries
 from app.adapters.db.service_requests import ServiceRequestQueries
 from app.adapters.db.skills import SkillQueries
@@ -522,6 +523,7 @@ class SqlTransaction(
     FormFieldQueries,
     CertificateQueries,
     PublicAddressQueries,
+    SecretSightingQueries,
     OwnCertificateQueries,
 ):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.

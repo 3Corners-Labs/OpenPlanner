@@ -598,6 +598,15 @@ class ContactCenterConnections(Protocol):
         """Pause or resume the address of an existing connection; nothing else of it changes."""
         ...
 
+    async def set_registration(
+        self, organisation_id: int, state: Registration | None, now: datetime
+    ) -> None:
+        """Remember what the last registration came to, or ``None`` once it succeeded.
+
+        Only that field of an existing connection changes (ADR 0124 point 8).
+        """
+        ...
+
     async def delete(self, organisation_id: int) -> None:
         """Remove the organisation's connection and its secrets."""
         ...
@@ -623,22 +632,6 @@ class ContactCenterConnections(Protocol):
 
         As ``webhook_secret``, for the webhook gate (ADR 0124 point 8); never shown.
         """
-        ...
-
-
-class SecretSightings(Protocol):
-    """Remembers when the application first saw each installation webhook secret (ADR 0124 point 8).
-
-    Only a keyed fingerprint and a time per platform, never a secret: the installation's secrets
-    come from the environment, so the moment of their rotation is the moment they were first seen.
-    """
-
-    async def get(self, platform: str) -> Sighting | None:
-        """Return what was stored for ``platform`` (``webex``, ``wxcc``), or ``None``."""
-        ...
-
-    async def put(self, platform: str, sighting: Sighting) -> None:
-        """Store the sighting of ``platform``, replacing the one before."""
         ...
 
 
@@ -2596,6 +2589,17 @@ class Transaction(Protocol):
 
     async def save_address_check(self, check: AddressCheck) -> None:
         """Replace the latest round trip of ``check.kind``."""
+        ...
+
+    async def get_secret_sighting(self, platform: str) -> Sighting | None:
+        """Return when the installation's webhook secret of ``platform`` was first seen.
+
+        A keyed fingerprint and a time, never the secret (ADR 0124 point 8); ``None`` before.
+        """
+        ...
+
+    async def save_secret_sighting(self, platform: str, sighting: Sighting) -> None:
+        """Store the first sighting of the installation's webhook secret of ``platform``."""
         ...
 
     async def delete_address_check(self, kind: AddressKind) -> None:

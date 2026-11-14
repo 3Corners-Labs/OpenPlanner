@@ -115,9 +115,14 @@
   {% set delivery = row.delivery %}{% set delivery_id = "address-delivery-" ~ loop.index ~ "-heading" %}{% set delivery_tag = "h5" %}{% set delivery_label = row.label %}
   {% include "admin/_delivery_status.html" %}
   {% endfor %}
-  {% for row in address.secrets %}
-  <p><strong>{{ row.label }}</strong> <span class="chip chip--warning">{{ _("admin.source.finding") }}</span> {{ row.text }}</p>
-  {% endfor %}
+  {% if address.secrets %}
+  <h4 id="address-secrets-heading">{{ _("admin.settings.address.secrets.title") }}</h4>
+  <ul aria-labelledby="address-secrets-heading">
+    {% for row in address.secrets %}
+    <li><strong>{{ row.label }}</strong> <span class="chip chip--warning">{{ _("admin.source.finding") }}</span> {{ row.text }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
   <h3 id="tls-heading">{{ _("admin.settings.tls.title") }}</h3>
   {% if internal_ca %}<p>{{ _("admin.settings.tls.internal_ca") }} <a href="/admin/settings/tls/ca.crt">{{ _("admin.settings.tls.internal_ca.download") }}</a></p>{% endif %}
   {% if certificate %}

@@ -102,7 +102,6 @@ def test_every_outcome_is_counted_per_address_and_the_times_are_kept() -> None:
         "duplicate": 1,
         "paused": 1,
         "unknown_work": 1,
-        "previous_secret": 1,
         "invalid_signature": 2,
         "malformed": 1,
     }
@@ -445,8 +444,8 @@ def test_a_view_holds_codes_counts_and_times_only() -> None:
     assert view.faults == {ChainFault.NO_ADDRESS: 1}
 
 
-def test_a_delivery_under_the_previous_secret_is_a_count_beside_its_outcome() -> None:
-    """ADR 0124 point 8: accepted like any other; the one more count is for the card only."""
+def test_a_delivery_under_the_previous_secret_is_a_count_of_its_own() -> None:
+    """ADR 0124 point 8: accepted like any other; the count is for the card only, not an outcome."""
     ledger, clock = _ledger(threshold=1)
 
     assert ledger.delivered(ACME, Delivered.ACCEPTED) is None
@@ -455,18 +454,21 @@ def test_a_delivery_under_the_previous_secret_is_a_count_beside_its_outcome() ->
 
     view = ledger.view(ACME)
     assert view is not None
-    assert view.outcomes == {"accepted": 1, "previous_secret": 2}
-    assert view.by_previous_secret == 2
-    assert view.last_accepted == clock.now()  # from the accepted outcome, not from the count
+    assert view.outcomes == {"accepted": 1}  # the rows of outcomes still add up to the calls
+    assert view.by_previous == 2
+    assert view.last_accepted == clock.now()
     assert view.counted == 0  # it never counts towards an alert
 
 
-def test_a_count_under_the_previous_secret_alone_is_no_delivery() -> None:
-    ledger, _ = _ledger()
+def test_a_count_under_the_previous_secret_alone_is_no_delivery_and_ends_with_the_window() -> None:
+    ledger, clock = _ledger()
 
     ledger.verified_by_previous(ACME)
+    first = ledger.view(ACME)
+    clock.advance(WINDOW)
+    after = ledger.view(ACME)
 
-    view = ledger.view(ACME)
-    assert view is not None
-    assert view.last_accepted is None
-    assert view.by_previous_secret == 1
+    assert first is not None
+    assert (first.last_accepted, first.by_previous, first.outcomes) == (None, 1, {})
+    assert after is not None
+    assert after.by_previous == 0

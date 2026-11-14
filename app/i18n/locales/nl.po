@@ -6447,6 +6447,12 @@ msgstr "API-adres Webex Contact Center"
 msgid "settings.field.wxcc_webhook_secret.label"
 msgstr "Webhookgeheim Webex Contact Center"
 
+msgid "settings.field.webex_webhook_secret_previous.label"
+msgstr "Webhookgeheim Webex vóór een vernieuwing"
+
+msgid "settings.field.wxcc_webhook_secret_previous.label"
+msgstr "Webhookgeheim Webex Contact Center vóór een vernieuwing"
+
 msgid "settings.field.update_repository.label"
 msgstr "Repository met releases"
 
@@ -10970,13 +10976,28 @@ msgid "admin.channels.cc_secret_made"
 msgstr "Geheim gemaakt op {at}."
 
 msgid "admin.channels.cc_rotate_lead"
-msgstr "Maak een nieuw geheim als u vermoedt dat het oude is uitgelekt, of als vast onderdeel van uw eigen routine. Het contactcenter krijgt het nieuwe geheim direct te horen. Het oude geheim blijft nog {minutes} minuten werken, zodat er geen melding verloren gaat terwijl het contactcenter het nieuwe overneemt; is het oude geheim uitgelekt, vraag dan eerst de platformbeheerder die tijd op 0 te zetten."
+msgstr "Maak een nieuw geheim als u vermoedt dat het oude is uitgelekt, of als vast onderdeel van uw eigen routine. Het contactcenter krijgt het nieuwe geheim direct te horen. Maakt u één keer een nieuw geheim, dan blijft het oude nog {minutes} minuten geldig (de kaart toont dan tot wanneer), zodat er geen melding verloren gaat terwijl het contactcenter het nieuwe overneemt. Maakt u daarna meteen nog een nieuw geheim, dan werkt het oude direct niet meer: zo beëindigt u een uitgelekt geheim zonder te wachten. De platformbeheerder kan die tijd ook op 0 zetten."
 
 msgid "admin.channels.cc_rotate_lead_now"
 msgstr "Maak een nieuw geheim als u vermoedt dat het oude is uitgelekt, of als vast onderdeel van uw eigen routine. Het contactcenter krijgt het nieuwe geheim direct te horen en het oude geheim werkt direct niet meer: meldingen die al onderweg zijn kunnen worden geweigerd."
 
 msgid "admin.channels.cc_rotate_again"
 msgstr "Maakt u nu nog een nieuw geheim, dan werkt het vorige geheim direct niet meer, samen met het geheim daarvoor."
+
+msgid "admin.channels.cc_registration_chip"
+msgstr "Aanmelding bij het contactcenter"
+
+msgid "admin.channels.cc_registration_replaced"
+msgstr "Het abonnement bij het contactcenter is vervangen toen het nieuwe geheim werd ingesteld, omdat het er één per adres toestaat. Bezorgingen in de tussentijd kunnen gemist zijn; de periodieke controle van open taken haalt achterstand in."
+
+msgid "admin.channels.cc_registration_gone"
+msgstr "Er is nu geen abonnement bij het contactcenter: het oude is verwijderd en het nieuwe is geweigerd. Er wordt niets bezorgd tot een aanmelding lukt. Controleer de rechten van de Service App en druk daarna op Opslaan op deze kaart om opnieuw aan te melden; er probeert niets vanzelf opnieuw."
+
+msgid "admin.channels.cc_registration_failed_until"
+msgstr "Het contactcenter heeft het nieuwe geheim niet gekregen (niet bereikbaar of geweigerd). Het tekent nog met het oude geheim, dat wordt geaccepteerd tot {at}; daarna worden zijn bezorgingen geweigerd. Er probeert niets vanzelf opnieuw: druk op Opslaan op deze kaart, of maak een nieuw geheim, om opnieuw aan te melden."
+
+msgid "admin.channels.cc_registration_failed"
+msgstr "Het contactcenter heeft het nieuwe geheim niet gekregen (niet bereikbaar of geweigerd) en het oude geheim wordt niet meer geaccepteerd: zijn bezorgingen worden geweigerd. Er probeert niets vanzelf opnieuw: druk op Opslaan op deze kaart, of maak een nieuw geheim, om opnieuw aan te melden."
 
 msgid "admin.channels.cc_previous_until"
 msgstr "Het vorige geheim werkt nog tot {at}."
@@ -11039,6 +11060,12 @@ msgstr "Opgeslagen. Het contactcenter meldt de taken van deze organisatie nu op 
 
 msgid "admin.done.contact_center_saved_not_ready"
 msgstr "Opgeslagen. Het webhookadres wordt aangemeld zodra het clientgeheim en het refresh-token zijn ingevuld."
+
+msgid "admin.done.contact_center_replaced"
+msgstr "Opgeslagen. Het contactcenter staat één abonnement per adres toe, dus het oude is vervangen: bezorgingen in de tussentijd kunnen gemist zijn."
+
+msgid "admin.done.contact_center_gone"
+msgstr "Opgeslagen, maar er is nu geen abonnement bij het contactcenter: het oude is verwijderd en het nieuwe is geweigerd. Er wordt niets bezorgd tot u opnieuw aanmeldt; controleer de rechten van de Service App en druk op Opslaan op deze kaart."
 
 msgid "admin.done.contact_center_not_registered"
 msgstr "Opgeslagen, maar het contactcenter weigerde het webhookadres of was niet bereikbaar. Controleer de rechten van de Service App en maak daarna een nieuw webhookgeheim; dat meldt het adres opnieuw aan."
@@ -13785,6 +13812,9 @@ msgstr "Bronnetwerken van webhooks"
 msgid "admin.settings.address.sources.intro"
 msgstr "Waarvandaan de webhookadressen van de hele installatie aanroepen accepteren. De eigen lijst van een organisatie staat op de kaart van haar koppeling. Een lijst is een extra laag; de handtekening houdt een vreemde buiten. Een adres met een lijst weigert ook een aanroep waarvan het adres niet te vertrouwen is: een aanroep met doorgestuurde headers die zijn peer niet mocht sturen, de proxy zelf, of een loopback- of privéadres terwijl het publieke adres publiek is. Dat wordt per aanroep beslist en staat als weigering in de gebeurtenissen, niet hier."
 
+msgid "admin.settings.address.secrets.title"
+msgstr "Vorige webhookgeheimen in de omgeving"
+
 msgid "admin.settings.address.secrets.ended"
 msgstr "Er staat nog een vorig webhookgeheim in de omgeving, en de overlap is voorbij: het controleert niets meer. Haal WEBEX_WEBHOOK_SECRET_PREVIOUS of WXCC_WEBHOOK_SECRET_PREVIOUS (of de _FILE-variabele) uit de omgeving."
 
@@ -13905,8 +13935,8 @@ msgstr "Geaccepteerd en verwerkt"
 msgid "admin.delivery.outcome.duplicate"
 msgstr "Geaccepteerd, al eerder gezien (opnieuw bezorgd)"
 
-msgid "admin.delivery.outcome.previous_secret"
-msgstr "Waarvan gecontroleerd met het vorige geheim"
+msgid "admin.delivery.by_previous"
+msgstr "Gecontroleerd met het vorige geheim"
 
 msgid "admin.delivery.outcome.paused"
 msgstr "Gecontroleerd, weggegooid tijdens de pauze"

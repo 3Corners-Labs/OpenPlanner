@@ -1549,6 +1549,20 @@ class PublicAddressCheckRow(Base):
     error: Mapped[str] = mapped_column(String(40), server_default=text("''"))
 
 
+class WebhookSecretSightingRow(Base):
+    """When the application first saw an installation webhook secret (ADR 0124 point 8).
+
+    One row per platform: its code, a keyed fingerprint of the secret (not reversible) and the
+    first time it was seen. Never a secret.
+    """
+
+    __tablename__ = "webhook_secret_sightings"
+
+    platform: Mapped[str] = mapped_column(String(16), primary_key=True)
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    first_seen: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
 class PlatformSettingRow(Base):
     """The portal value of one class C setting (ADR 0042 §4), as JSON; never a secret."""
 

@@ -73,7 +73,8 @@ the code changes, this document changes in the same pull request. `docs/threat-m
   third label makes the fingerprint of the installation's webhook secrets (ADR 0124 point 8): an
   HMAC-SHA256 of the secret that tells the application the secret in the environment is the one it
   saw before, without keeping it; during a rotation of this key the fingerprint under the previous
-  key still matches and is made again.
+  key still matches and is made again. The fingerprint and the time of the first sighting are in
+  the table `webhook_secret_sightings`; never the secret.
 - **Lives in.** `MANAGEMENT_TOKEN_KEY` (at least 32 bytes), environment or `X_FILE`. The token is
   never stored, never in a job payload or a log.
 - **Who can read it.** The host operator and the `web` and `worker` processes. A copy of the

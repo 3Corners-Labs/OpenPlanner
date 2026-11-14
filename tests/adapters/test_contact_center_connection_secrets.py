@@ -2,12 +2,8 @@
 
 from datetime import timedelta
 
-import httpx
-import pytest
-
 from app.adapters.contact_center_connections import PREVIOUS_KEY, SealedConnections
 from app.adapters.db.record_names import contact_center_credential_name
-from app.adapters.organisation_dispatch import OrganisationWxcc
 from app.adapters.wxcc import DESCRIPTOR
 from app.domain.contact_center import (
     ConnectionChange,
@@ -16,7 +12,6 @@ from app.domain.contact_center import (
     WebhookSecretUpdate,
 )
 from app.domain.webhook_secrets import OVERLAP_MAX
-from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeSecrets
 from tests.support.domain import NOW
 
@@ -140,27 +135,21 @@ def test_the_contact_center_adapter_declares_how_its_subscription_secret_changes
     assert DESCRIPTOR.capabilities.webhook_secret_update is WebhookSecretUpdate.RENEW
 
 
-async def test_a_capability_the_adapter_has_no_way_for_is_refused_not_guessed(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    store = FakeSecrets()
-    connections = SealedConnections(store)
-    await connections.save(1, OWN, NOW)
-    seen: list[httpx.Request] = []
+async def test_the_registration_state_is_kept_until_a_registration_succeeds() -> None:
+    connections, store = await _connected()
 
-    def answer(request: httpx.Request) -> httpx.Response:
-        seen.append(request)
-        return httpx.Response(200, json={"access_token": "t", "expires_in": 3600})
+    await connections.set_registration(1, Registration.GONE, NOW)
+    gone = await connections.get(1)
+    await connections.set_registration(1, None, NOW)
+    cleared = await connections.get(1)
+    store.values[NAME]["registration"] = "something-odd"
+    odd = await connections.get(1)
+    await connections.set_registration(2, Registration.GONE, NOW)  # no such connection
 
-    organisations = OrganisationWxcc(
-        connections,
-        FakeSecrets(),
-        httpx.AsyncClient(transport=httpx.MockTransport(answer)),
-        FixedClock(NOW),
-        "https://webexapis.com/v1/access_token",
-        webhook_base="https://openplanner.example",
-    )
-    monkeypatch.setattr("app.adapters.organisation_dispatch._SECRET_UPDATES", {})
-
-    assert await organisations.register(1, "demo") is Registration.REFUSED
-    assert not [r for r in seen if "subscriptions" in r.url.path]
+    assert gone is not None
+    assert gone.registration is Registration.GONE
+    assert cleared is not None
+    assert cleared.registration is None
+    assert odd is not None
+    assert odd.registration is None  # a value that does not parse is read as none
+    assert await connections.get(2) is None

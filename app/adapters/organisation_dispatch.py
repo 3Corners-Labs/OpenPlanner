@@ -11,7 +11,6 @@ organisation's tasks then wait for it and never go to the installation's tenant
 """
 
 import hashlib
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 import httpx
@@ -20,10 +19,10 @@ from app.adapters.contact_center_connections import ConnectionCredentials, Seale
 from app.adapters.db.credentials import Secrets
 from app.adapters.db.record_names import organisation_tokens_name
 from app.adapters.webex_auth import AuthorizedClient, ServiceAppConfig, WebexTokens
-from app.adapters.webhook_registration import renew_wxcc
+from app.adapters.webhook_registration import secret_update
 from app.adapters.webhooks import WXCC_INBOUND
 from app.adapters.wxcc import DESCRIPTOR, WxccTasks, wxcc_tasks
-from app.domain.contact_center import ContactCenterKind, Registration, WebhookSecretUpdate
+from app.domain.contact_center import ContactCenterKind, Registration
 from app.domain.ports import (
     Clock,
     IntegrationError,
@@ -31,12 +30,6 @@ from app.domain.ports import (
     RequestLog,
 )
 from app.domain.security_log import SecurityLog
-
-_SECRET_UPDATES: dict[
-    WebhookSecretUpdate, Callable[[AuthorizedClient, str, str, str], Awaitable[Registration]]
-] = {WebhookSecretUpdate.RENEW: renew_wxcc}
-"""What this adapter can do for each way a platform may let a webhook secret change: WxCC's API
-offers no in-place change, so a new subscription is made (``renew_wxcc``)."""
 
 
 def _digest(credentials: ConnectionCredentials) -> str:
@@ -114,7 +107,7 @@ class OrganisationWxcc:
         How a rotated secret reaches the platform is what the descriptor declares
         (``capabilities.webhook_secret_update``, ADR 0124 point 8): WxCC keeps a subscription's
         secret, so a new subscription is made before the old one is removed, and no event is
-        refused on the way. A capability without a way here is refused, never guessed.
+        refused on the way (``webhook_registration.SECRET_UPDATES`` is the one table).
         """
         credentials = await self._connections.credentials(organisation_id)
         secret = await self._connections.webhook_secret(organisation_id, ContactCenterKind.WEBEX_CC)
@@ -126,9 +119,7 @@ class OrganisationWxcc:
         client = AuthorizedClient(self._http, built.tokens, self._request_log)
         target = WXCC_INBOUND.organisation_url(self._webhook_base, organisation)
         try:
-            update = _SECRET_UPDATES.get(DESCRIPTOR.capabilities.webhook_secret_update)
-            if update is None:
-                return Registration.REFUSED
+            update = secret_update(DESCRIPTOR.capabilities.webhook_secret_update)
             return await update(client, credentials.api_base_url, target, secret)
         except IntegrationError as error:
             return Registration.FAILED if error.retryable else Registration.REFUSED

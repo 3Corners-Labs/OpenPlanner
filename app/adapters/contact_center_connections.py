@@ -28,10 +28,15 @@ from datetime import datetime, timedelta
 
 from app.adapters.db.credentials import Secrets
 from app.adapters.db.record_names import contact_center_credential_name, organisation_tokens_name
-from app.domain.contact_center import ConnectionChange, ContactCenterKind, OrganisationConnection
+from app.domain.contact_center import (
+    ConnectionChange,
+    ContactCenterKind,
+    OrganisationConnection,
+    Registration,
+)
 from app.domain.networks import NetworkList
 from app.domain.source_networks import read_stored_networks
-from app.domain.webhook_secrets import WebhookSecrets, lapsed, rotated, settled
+from app.domain.webhook_secrets import OVERLAP_MAX, WebhookSecrets, rotated, settled
 
 WEBHOOK_SECRET_BYTES = 32
 """Random bytes of a generated webhook secret: 43 URL-safe characters (WxCC wants 32–256)."""
@@ -44,6 +49,14 @@ PREVIOUS_KEY = "previous_webhook_secret"
 def new_webhook_secret() -> str:
     """Return a fresh webhook secret (URL-safe, never typed or shown)."""
     return random.token_urlsafe(WEBHOOK_SECRET_BYTES)
+
+
+def _registration_of(value: object) -> Registration | None:
+    """Return a stored registration state, or ``None`` for none or one that does not parse."""
+    try:
+        return Registration(value) if isinstance(value, str) else None
+    except ValueError:
+        return None
 
 
 def _time_of(value: object) -> datetime | None:
@@ -76,8 +89,9 @@ def _write_secrets(record: dict[str, object], secrets: WebhookSecrets) -> None:
 def _tidied(record: dict[str, object], now: datetime) -> dict[str, object]:
     """Drop a previous secret that no setting could keep alive any more, at a write."""
     held = secrets_of(record)
-    if held is not None and lapsed(held, now):
-        record.pop(PREVIOUS_KEY, None)
+    if held is not None and held.previous is not None:
+        if settled(held, now, OVERLAP_MAX).previous is None:
+            record.pop(PREVIOUS_KEY, None)
     return record
 
 
@@ -141,6 +155,7 @@ class SealedConnections:
             has_previous_webhook_secret=bool(record.get(PREVIOUS_KEY)),
             allowed_networks=networks,
             inbound_enabled=record.get("inbound_enabled") is not False,
+            registration=_registration_of(record.get("registration")),
         )
 
     async def paused(self, organisation_ids: Sequence[int]) -> dict[int, ContactCenterKind]:
@@ -200,6 +215,23 @@ class SealedConnections:
         record["inbound_enabled"] = enabled
         await self._store.put(contact_center_credential_name(organisation_id), record, now)
 
+    async def set_registration(
+        self, organisation_id: int, state: Registration | None, now: datetime
+    ) -> None:
+        """Remember what the last registration came to; ``None`` forgets it (ADR 0124 point 8).
+
+        Only that field changes. Nothing happens for an organisation whose record went away.
+        """
+        record = await self._record(organisation_id)
+        if record is None:
+            return
+        _tidied(record, now)
+        if state is None:
+            record.pop("registration", None)
+        else:
+            record["registration"] = state.value
+        await self._store.put(contact_center_credential_name(organisation_id), record, now)
+
     async def rotate_webhook_secret(self, organisation_id: int, now: datetime) -> None:
         """Replace the webhook secret of an existing connection; nothing without one.
 
@@ -224,7 +256,9 @@ class SealedConnections:
         removed = 0
         for name, record in (await self._store.get_many(list(names))).items():
             held = secrets_of(record)
-            if held is None or held.previous is None or settled(held, now, overlap) is held:
+            if held is None or held.previous is None:
+                continue
+            if settled(held, now, overlap).previous is not None:
                 continue
             record.pop(PREVIOUS_KEY, None)
             await self._store.put(name, record, now)

@@ -32,11 +32,14 @@
   <p>{{ _("admin.channels.cc_webhook_lead") }}</p>
   <p><code>{{ cc.webhook }}</code></p>
   <p class="hint">{{ _("admin.channels.cc_secret_made", at=cc.secret_made) }}</p>
-  {% if cc.previous_until %}<p class="hint" role="status">{{ _("admin.channels.cc_previous_until", at=cc.previous_until) }}</p>{% endif %}
+  {% if cc.previous_until %}<p class="hint" id="cc-previous-until">{{ _("admin.channels.cc_previous_until", at=cc.previous_until) }}</p>{% endif %}
+  {% if cc.registration %}
+  <p role="alert"><span class="chip chip--{{ 'warning' if cc.registration == 'replaced' else 'danger' }}">{{ _("admin.channels.cc_registration_chip") }}</span> {% if cc.registration == "replaced" %}{{ _("admin.channels.cc_registration_replaced") }}{% elif cc.registration == "gone" %}{{ _("admin.channels.cc_registration_gone") }}{% elif cc.previous_until %}{{ _("admin.channels.cc_registration_failed_until", at=cc.previous_until) }}{% else %}{{ _("admin.channels.cc_registration_failed") }}{% endif %}</p>
+  {% endif %}
   <form method="post" action="/admin/organisations/{{ organisation.slug }}/channels/contact-center/webhook-secret">
-    <p>{% if cc.overlap_minutes %}{{ _("admin.channels.cc_rotate_lead", minutes=cc.overlap_minutes) }}{% else %}{{ _("admin.channels.cc_rotate_lead_now") }}{% endif %}</p>
-    {% if cc.previous_until %}<p>{{ _("admin.channels.cc_rotate_again") }}</p>{% endif %}
-    <button type="submit" class="button button--secondary">{{ _("admin.channels.cc_rotate") }}</button>
+    <p id="cc-rotate-lead">{% if cc.overlap_minutes %}{{ _("admin.channels.cc_rotate_lead", minutes=cc.overlap_minutes) }}{% else %}{{ _("admin.channels.cc_rotate_lead_now") }}{% endif %}</p>
+    {% if cc.previous_until %}<p id="cc-rotate-again">{{ _("admin.channels.cc_rotate_again") }}</p>{% endif %}
+    <button type="submit" class="button button--secondary" aria-describedby="cc-rotate-lead{% if cc.previous_until %} cc-rotate-again{% endif %}">{{ _("admin.channels.cc_rotate") }}</button>
   </form>
   <form method="post" action="/admin/organisations/{{ organisation.slug }}/channels/contact-center/delete">
     <p>{{ _("admin.channels.cc_remove_lead") }}</p>

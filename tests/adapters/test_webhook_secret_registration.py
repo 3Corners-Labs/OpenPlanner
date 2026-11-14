@@ -13,12 +13,15 @@ import pytest
 
 from app.adapters.webex_auth import AuthorizedClient
 from app.adapters.webhook_registration import (
+    SECRET_UPDATES,
     WEBEX_EVENTS,
     register_webex,
-    register_wxcc,
     renew_wxcc,
+    renewal_line,
+    secret_update,
+    update_webex_secrets,
 )
-from app.domain.contact_center import Registration
+from app.domain.contact_center import Registration, WebhookSecretUpdate
 from app.domain.ports import IntegrationError
 from tests.fakes.tokens import authorized_client
 
@@ -88,8 +91,8 @@ async def test_a_wxcc_subscription_is_made_before_the_old_one_is_removed() -> No
     assert seen[2].url.path == "/v2/subscriptions/old-1"
 
 
-async def test_when_wxcc_refuses_a_second_subscription_the_old_ones_go_first() -> None:
-    """The fall-back of the unproven case: made anew, with a short gap the retry must cover."""
+async def test_a_duplicate_refusal_falls_back_to_removing_the_old_one_and_says_so() -> None:
+    """The unproven case: WxCC allows one subscription per address; the gap is reported."""
     old = {"id": "old-1", "destinationUrl": WXCC_TARGET}
     client, seen = _client(
         _wxcc_platform([old], create=lambda old_exists: 409 if old_exists else 201)
@@ -97,15 +100,45 @@ async def test_when_wxcc_refuses_a_second_subscription_the_old_ones_go_first() -
 
     outcome = await renew_wxcc(client, WXCC_BASE, WXCC_TARGET, "new-secret")
 
-    assert outcome is Registration.REGISTERED
-    assert [r.method for r in seen] == ["GET", "POST", "DELETE", "POST"]
+    assert outcome is Registration.REPLACED
+    assert [r.method for r in seen] == ["GET", "POST", "GET", "DELETE", "POST"]
 
 
-async def test_a_refused_create_with_nothing_to_fall_back_on_is_refused() -> None:
-    client, seen = _client(_wxcc_platform([], create=lambda old_exists: 403))
+@pytest.mark.parametrize("status", [400, 401, 403, 422])
+async def test_a_refusal_of_rights_or_validation_deletes_nothing(status: int) -> None:
+    old = {"id": "old-1", "destinationUrl": WXCC_TARGET}
+    client, seen = _client(_wxcc_platform([old], create=lambda old_exists: status))
+
+    outcome = await renew_wxcc(client, WXCC_BASE, WXCC_TARGET, "new-secret")
+
+    assert outcome is Registration.REFUSED
+    assert "DELETE" not in [r.method for r in seen]  # the working subscription stays
+
+
+async def test_a_refusal_after_the_old_subscription_let_go_of_the_address_deletes_nothing() -> None:
+    """Re-listed after the refusal: only a subscription that still holds the address is removed."""
+    held = [{"id": "old-1", "destinationUrl": WXCC_TARGET}]
+    lists = iter([held, []])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(200, json={"data": next(lists), "meta": {}})
+        return httpx.Response(409, json={})
+
+    client, seen = _client(handler)
 
     assert await renew_wxcc(client, WXCC_BASE, WXCC_TARGET, "s") is Registration.REFUSED
-    assert [r.method for r in seen] == ["GET", "POST"]
+    assert "DELETE" not in [r.method for r in seen]
+
+
+async def test_a_retry_refused_after_the_delete_is_reported_as_no_subscription() -> None:
+    old = {"id": "old-1", "destinationUrl": WXCC_TARGET}
+    client, seen = _client(_wxcc_platform([old], create=lambda old_exists: 409))
+
+    outcome = await renew_wxcc(client, WXCC_BASE, WXCC_TARGET, "new-secret")
+
+    assert outcome is Registration.GONE
+    assert [r.method for r in seen] == ["GET", "POST", "GET", "DELETE", "POST"]
 
 
 async def test_an_outage_leaves_the_old_subscription_to_verify_under_the_previous_secret() -> None:
@@ -138,24 +171,6 @@ async def test_an_odd_listing_is_refused_and_nothing_is_changed() -> None:
     assert [r.method for r in seen] == ["GET"]
 
 
-async def test_the_installation_wxcc_subscription_is_renewed_with_the_flag() -> None:
-    old = {"id": "old-1", "destinationUrl": WXCC_TARGET}
-    client, seen = _client(_wxcc_platform([old]))
-
-    renewed = await register_wxcc(client, WXCC_BASE, WXCC_TARGET, "new", update_secret=True)
-
-    assert renewed == "wxcc subscription: renewed"
-    assert [r.method for r in seen] == ["GET", "POST", "DELETE"]
-
-
-async def test_a_refused_renewal_is_reported_without_the_secret() -> None:
-    client, _ = _client(_wxcc_platform([], create=lambda old_exists: 403))
-
-    report = await register_wxcc(client, WXCC_BASE, WXCC_TARGET, "new-secret", update_secret=True)
-
-    assert report == "wxcc subscription: refused (see the request log)"
-
-
 # --- the video platform: updated in place -------------------------------------------------------
 
 
@@ -168,9 +183,7 @@ async def test_the_video_platforms_webhooks_are_updated_in_place_with_the_new_se
         return httpx.Response(200, json={})
 
     client, seen = _client(handler)
-    report = await register_webex(
-        client, BASE, TARGET, "new-secret", hosts=[HOST], update_secret=True
-    )
+    report = await update_webex_secrets(client, BASE, TARGET, "new-secret", hosts=[HOST])
 
     assert report == [f"{resource}/{event} [{HOST}]: updated" for resource, event in WEBEX_EVENTS]
     puts = [r for r in seen if r.method == "PUT"]
@@ -184,7 +197,7 @@ async def test_the_video_platforms_webhooks_are_updated_in_place_with_the_new_se
 async def test_a_webhook_missing_at_the_video_platform_is_still_created_when_updating() -> None:
     client, seen = _client(lambda r: httpx.Response(200, json={"items": [], "id": "w"}))
 
-    report = await register_webex(client, BASE, TARGET, "s", hosts=[HOST], update_secret=True)
+    report = await update_webex_secrets(client, BASE, TARGET, "s", hosts=[HOST])
 
     assert all(line.endswith(": created") for line in report)
     assert len([r for r in seen if r.method == "POST"]) == 4
@@ -209,7 +222,7 @@ async def test_a_refused_update_is_reported_and_the_rest_still_tried() -> None:
         return httpx.Response(403 if request.url.path.endswith("w-started") else 200, json={})
 
     client, seen = _client(handler)
-    report = await register_webex(client, BASE, TARGET, "s", hosts=[HOST], update_secret=True)
+    report = await update_webex_secrets(client, BASE, TARGET, "s", hosts=[HOST])
 
     assert report[0].startswith(f"meetings/started [{HOST}]: refused (rejected_403)")
     assert report[1:] == [f"{r}/{e} [{HOST}]: updated" for r, e in WEBEX_EVENTS[1:]]
@@ -220,7 +233,7 @@ async def test_an_update_with_a_bad_webhook_id_leaves_it_as_it_was() -> None:
     held = [_hook("meetings", "started", "../x")]
     client, seen = _client(lambda r: httpx.Response(200, json={"items": held, "id": "w"}))
 
-    report = await register_webex(client, BASE, TARGET, "s", hosts=[HOST], update_secret=True)
+    report = await update_webex_secrets(client, BASE, TARGET, "s", hosts=[HOST])
 
     assert report[0] == f"meetings/started [{HOST}]: refused (no usable id): left as it was"
     assert not [r for r in seen if r.method == "PUT"]
@@ -237,4 +250,22 @@ async def test_a_retryable_failure_of_an_update_is_raised_for_the_caller() -> No
     client, _ = _client(handler)
 
     with pytest.raises(IntegrationError):
-        await register_webex(client, BASE, TARGET, "s", hosts=[HOST], update_secret=True)
+        await update_webex_secrets(client, BASE, TARGET, "s", hosts=[HOST])
+
+
+# --- one table from the capability to the function ------------------------------------------------
+
+
+def test_every_declared_capability_has_a_function_in_the_one_table() -> None:
+    assert set(SECRET_UPDATES) == set(WebhookSecretUpdate)
+    assert secret_update(WebhookSecretUpdate.RENEW) is renew_wxcc
+
+
+def test_the_command_lines_report_says_what_came_of_a_renewal_and_holds_no_secret() -> None:
+    lines = {outcome: renewal_line(outcome) for outcome in Registration}
+
+    assert lines[Registration.REGISTERED] == "wxcc subscription: renewed"
+    assert "events in between may have been missed" in lines[Registration.REPLACED]
+    assert "there is none now" in lines[Registration.GONE]
+    assert lines[Registration.REFUSED] == "wxcc subscription: refused (see the request log)"
+    assert all(line.startswith("wxcc subscription: ") for line in lines.values())

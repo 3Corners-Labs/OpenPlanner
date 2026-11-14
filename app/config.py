@@ -526,8 +526,9 @@ class Settings(BaseSettings):
     # ADR 0124 point 8: the webhook secret before a rotation of the installation's own secret,
     # set only during one. It verifies for ``webhook_secret_overlap_minutes`` counted from the
     # moment the application first saw the current secret; remove it afterwards (System status
-    # says when). Class B: the application cannot write the environment, and which secrets a
-    # host holds is the host's; ``X_FILE`` works for it.
+    # says when). Class C like its sibling and declared exactly like it: not editable in the
+    # portal (``GENERATED_SECRETS``) and no ``X_FILE``, which is for the bootstrap secrets of
+    # classes A and B (ADR 0042 section 9): one rule for the four webhook secrets.
     webex_webhook_secret_previous: SecretStr | None = None
     # WxCC API host of the organisation's region, e.g. https://api.wxcc-eu1.cisco.com.
     wxcc_api_base_url: str | None = None

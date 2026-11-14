@@ -89,7 +89,7 @@ async def test_a_delivery_under_the_previous_secret_is_accepted_like_any_other(
 
     view = site_app(site).state.webhook_ledger.view(KEY)
     assert view is not None
-    assert view.by_previous_secret == 1
+    assert view.by_previous == 1
     # Both are verified deliveries of the same kind (an event about work this connection did not
     # create): whichever secret verified it, the outcome is the same.
     assert view.outcomes.get(Delivered.UNKNOWN_WORK.value) == 2
@@ -149,7 +149,7 @@ async def test_the_card_says_until_when_the_previous_secret_works_and_what_the_b
     later = (await site.client.get(PAGE)).text
 
     assert "Het vorige geheim werkt nog tot" not in before
-    assert "blijft nog 60 minuten werken" in before  # the button says what will happen
+    assert "nog 60 minuten geldig" in before  # the button says what will happen
     assert "Het vorige geheim werkt nog tot" in after
     assert "09:00" in after  # NOW is 09:00 Amsterdam; 60 minutes on, in the organisation's zone
     assert "Maakt u nu nog een nieuw geheim" in after  # warns before a second rotation
@@ -166,7 +166,7 @@ async def test_the_button_says_so_when_the_overlap_is_nothing(site: Site) -> Non
     rotated = (await site.client.get(PAGE)).text
 
     assert "werkt direct niet meer" in page
-    assert "blijft nog" not in page
+    assert "minuten geldig" not in page
     assert "Het vorige geheim werkt nog tot" not in rotated
 
 
@@ -177,7 +177,7 @@ async def test_the_card_counts_what_the_previous_secret_verified(site: Site) -> 
 
     page = (await site.client.get(PAGE)).text
 
-    assert "Waarvan gecontroleerd met het vorige geheim" in page
+    assert "Gecontroleerd met het vorige geheim" in page
 
 
 async def test_a_write_removes_a_previous_secret_that_no_setting_could_keep(site: Site) -> None:

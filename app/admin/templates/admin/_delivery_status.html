@@ -8,6 +8,7 @@
   <div><dt>{{ _("admin.delivery.last_refused") }}</dt><dd>{{ delivery.last_refused }}</dd></div>
   {% if delivery.window %}<div><dt>{{ _("admin.delivery.window") }}</dt><dd>{{ delivery.window }}</dd></div>{% endif %}
   <div><dt>{{ _("admin.delivery.paused_dropped") }}</dt><dd>{{ delivery.paused_dropped }}</dd></div>
+  <div><dt>{{ _("admin.delivery.by_previous") }}</dt><dd>{{ delivery.by_previous }}</dd></div>
 </dl>
 {% if delivery.outcomes %}
 <div class="table-scroll" role="region" aria-labelledby="{{ delivery_id }}-counts" tabindex="0">

@@ -80,8 +80,6 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `WEBHOOK_SOURCE_NETWORKS_REQUIRED` | bool | `false` | Whether an inbound webhook address without allowed networks refuses every call. Class B because whether a list is mandatory is a protection, and a protection is not switched off from the portal (ADR 0124 point 3). |
 | `OIDC_CLAIM_MODE` | enum | `legacy` | Where rights come from: legacy (three claims), shadow (compare), entitlements (ADR 0049); moving back to legacy weakens a protection, so env only. |
 | `SMTP_PLAINTEXT_RELAY_ALLOWED` | bool | `false` | Allow mail without TLS in production, for a relay on a trusted network (ADR 0091); otherwise saving it is refused and System status reports it. Never in the portal. |
-| `WEBEX_WEBHOOK_SECRET_PREVIOUS` | secret | — | The video platform's webhook secret before a rotation; set only during one, then removed. It verifies for `webhook_secret_overlap_minutes` from the moment the application first saw the current secret. Class B, not C: the installation's own secrets come from the environment, which the application cannot write, so the portal cannot rotate them and a portal value would be a second home for the same secret; `X_FILE` works (ADR 0124 point 8). |
-| `WXCC_WEBHOOK_SECRET_PREVIOUS` | secret | — | The installation-wide contact-center webhook secret before a rotation; as `webex_webhook_secret_previous`, set only during one (ADR 0124 point 8). |
 
 ## C. Platform (portal, *Advanced settings*; lockable by env)
 
@@ -196,6 +194,8 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `WEBEX_CLIENT_SECRET` | secret | — | — | `settings.platform.manage` | Service App secret; write-only. |
 | `WEBEX_REFRESH_TOKEN` | secret | — | — | `settings.platform.manage` | Bootstraps the token store; write-only. |
 | `WEBEX_WEBHOOK_SECRET` | secret | — | — | `settings.platform.manage` | Webex webhook secret; to be generated and rotated by the server. |
+| `WEBEX_WEBHOOK_SECRET_PREVIOUS` | secret | — | — | `settings.platform.manage` | The video platform's webhook secret before a rotation; set only during one, then removed. It verifies for `webhook_secret_overlap_minutes` from the moment the application first saw the current secret. Declared exactly like `webex_webhook_secret`: class C, set in the environment, not editable in the portal and no `X_FILE` (that is for the bootstrap secrets of classes A and B), so one rule holds for the four webhook secrets (ADR 0124 point 8). |
+| `WXCC_WEBHOOK_SECRET_PREVIOUS` | secret | — | — | `settings.platform.manage` | The installation-wide contact-center webhook secret before a rotation; as `webex_webhook_secret_previous`, set only during one (ADR 0124 point 8). |
 | `WXCC_API_BASE_URL` | url | — | https only | `settings.platform.manage` | WxCC API host of the region. |
 | `WXCC_WEBHOOK_SECRET` | secret | — | — | `settings.platform.manage` | WxCC webhook secret; to be generated and rotated by the server. |
 | `UPDATE_REPOSITORY` | string | — | — | `settings.platform.manage` | owner/name of the release repository (ADR 0029). |

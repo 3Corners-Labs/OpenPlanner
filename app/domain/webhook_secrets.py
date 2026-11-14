@@ -15,7 +15,8 @@ Three rules carry the design:
   time of the check with the time of the rotation plus the overlap as it is *now*, so no job has
   to remove anything for the previous secret to stop counting, and a shorter overlap in the portal
   (0 for a secret that leaked) takes effect for the next call. Removing the sealed value is
-  housekeeping (``lapsed`` for the write path, ``settled`` for the sweep), never the rule.
+  housekeeping (``settled``: at the longest overlap for a write of the record, at the live one
+  for the sweep), never the rule.
 - **Both secrets are always compared**, the previous one too when it no longer counts (against a
   stand-in, its result thrown away), and neither comparison stops the other, so the time a check
   takes says nothing about which secret matched or whether a previous secret exists. Each
@@ -71,9 +72,21 @@ class WebhookSecrets:
         return self.rotated_at + overlap
 
     def previous_counts(self, now: datetime, overlap: timedelta) -> bool:
-        """Return whether the previous secret verifies at ``now``: decided by the clock, here."""
+        """Return whether the previous secret verifies at ``now``: the one rule, decided here.
+
+        It counts from the rotation until the overlap has passed. A rotation in the future (the
+        clock was set back) does not count: the overlap is measured from a moment that has not
+        come, and a secret that cannot be shown to be inside its overlap is not accepted.
+        """
         ends = self.previous_ends(overlap)
-        return ends is not None and now < ends
+        return ends is not None and self.rotated_at is not None and self.rotated_at <= now < ends
+
+    def previous_valid_until(self, now: datetime, overlap: timedelta) -> datetime | None:
+        """Return when the previous secret stops verifying, or ``None`` when none verifies now.
+
+        For the connection card's sentence: the same rule as ``previous_counts``.
+        """
+        return self.previous_ends(overlap) if self.previous_counts(now, overlap) else None
 
 
 def rotated(secrets: WebhookSecrets | None, new: str, now: datetime) -> WebhookSecrets:
@@ -86,31 +99,13 @@ def rotated(secrets: WebhookSecrets | None, new: str, now: datetime) -> WebhookS
     return WebhookSecrets(new, secrets.current if secrets else None, now)
 
 
-def previous_until(
-    has_previous: bool, rotated_at: datetime | None, now: datetime, overlap: timedelta
-) -> datetime | None:
-    """Return when a previous secret stops verifying, or ``None`` when none verifies at ``now``.
-
-    For the connection card, which sees whether a previous secret is kept (never the secret) and
-    when the rotation was: the same rule as ``WebhookSecrets.previous_counts``.
-    """
-    if not has_previous or rotated_at is None or now >= rotated_at + overlap:
-        return None
-    return rotated_at + overlap
-
-
-def lapsed(secrets: WebhookSecrets, now: datetime) -> bool:
-    """Return whether the previous secret can never count again, so it may be removed at a write.
-
-    The longest overlap the setting allows has passed; the write path of the sealed record knows
-    no setting, and this holds for every setting.
-    """
-    ends = secrets.previous_ends(OVERLAP_MAX)
-    return secrets.previous is not None and (ends is None or now >= ends)
-
-
 def settled(secrets: WebhookSecrets, now: datetime, overlap: timedelta) -> WebhookSecrets:
-    """Return ``secrets`` without a previous secret whose overlap has ended at ``now``."""
+    """Return ``secrets`` without a previous secret that does not count at ``now``.
+
+    The one way a previous secret is removed: the sweep calls it with the live overlap, and a write
+    of the sealed record with ``OVERLAP_MAX``, the longest the setting allows (no setting could
+    keep it past that). Callers compare ``previous`` of the result with what they held.
+    """
     if secrets.previous is None or secrets.previous_counts(now, overlap):
         return secrets
     return WebhookSecrets(secrets.current, None, secrets.rotated_at)
@@ -190,6 +185,5 @@ def previous_finding(
         return None
     if hmac.compare_digest(previous.encode(), current.encode()):
         return SecretFinding.SAME
-    if now >= since + overlap:
-        return SecretFinding.ENDED
-    return None
+    held = WebhookSecrets(current, previous, since)
+    return None if held.previous_counts(now, overlap) else SecretFinding.ENDED

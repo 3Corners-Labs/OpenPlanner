@@ -27,7 +27,7 @@ from app.domain.errors import DomainError
 from app.domain.networks import NetworkList
 from app.domain.source_networks import MAX_WEBHOOK_NETWORKS
 from app.domain.webhook_ledger import AddressKey
-from app.domain.webhook_secrets import previous_until
+from app.domain.webhook_secrets import WebhookSecrets
 from app.domain.webhook_sources import source_list_that_applies
 from app.i18n import BoundGettext
 from app.web.locale import RequestLocale
@@ -44,6 +44,8 @@ SAVED_DONE = {
     Registration.REGISTERED: "contact_center_registered",
     Registration.NOT_READY: "contact_center_saved_not_ready",
     Registration.UNTOUCHED: "contact_center_saved",
+    Registration.REPLACED: "contact_center_replaced",
+    Registration.GONE: "contact_center_gone",
     Registration.REFUSED: "contact_center_not_registered",
     Registration.FAILED: "contact_center_not_registered",
 }
@@ -53,6 +55,8 @@ INBOUND_STATES = {"on": True, "off": False}
 ROTATED_DONE = {
     Registration.REGISTERED: "webhook_secret_rotated",
     Registration.NOT_READY: "webhook_secret_rotated",
+    Registration.REPLACED: "contact_center_replaced",
+    Registration.GONE: "contact_center_gone",
     Registration.REFUSED: "contact_center_not_registered",
     Registration.FAILED: "contact_center_not_registered",
 }
@@ -160,13 +164,9 @@ async def connection_view(
     base = settings.webhook_base
     made = stored.webhook_secret_at if stored else None
     overlap = timedelta(minutes=settings.webhook_secret_overlap_minutes)
-    until = (
-        previous_until(
-            stored.has_previous_webhook_secret, made, request.app.state.clock.now(), overlap
-        )
-        if stored
-        else None
-    )
+    # The card never sees a secret: the placeholders stand in so that the one rule answers.
+    shape = WebhookSecrets("", "-" if stored and stored.has_previous_webhook_secret else None, made)
+    until = shape.previous_valid_until(request.app.state.clock.now(), overlap)
     own = stored.allowed_networks if stored else NetworkList()
     sources = card_finding(
         _,
@@ -183,6 +183,7 @@ async def connection_view(
         "secret_made": moment_label(made, tz, locale.code) if made else "",
         "previous_until": moment_label(until, tz, locale.code) if until else "",
         "overlap_minutes": settings.webhook_secret_overlap_minutes,
+        "registration": stored.registration.value if stored and stored.registration else "",
         "sources": sources,
         "paused": stored is not None and not stored.inbound_enabled,
         "delivery": delivery_view(

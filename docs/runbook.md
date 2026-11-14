@@ -2530,11 +2530,14 @@ is refused while the platform takes up the new one.
 *An organisation's secret*: on the organisation's *Kanalen* page press *Make a new webhook secret*.
 The server makes the secret and tells the platform (the card says what came of it). The card then
 says until when the previous secret still works. A rotation inside that time stops the previous
-secret at once, together with the one before it. In the *Deliveries seen* table the count *Of
-which verified under the previous secret* goes to zero once the platform has taken the new one up; if
-it does not, press the button again only after reading the refusals there. **If the old secret
-leaked**, set the overlap to 0 first (superuser, *Advanced settings*), then rotate: the old secret is
-refused from the next call, and events already on their way may be refused too. Removal of the
+secret at once, together with the one before it. In *Deliveries seen* the count *Verified with the
+previous secret* goes to zero once the platform has taken the new one up. **If the old secret
+leaked**, an organisation's administrator rotates twice in a row: the first rotation keeps the old
+secret valid until the time shown, the second ends it at once. The superuser can instead set the
+overlap to 0 first (*Advanced settings*) and rotate once. Either way events already on their way may be
+refused. **If the card says registering did not succeed** (a gap, no subscription, or the platform not
+told), nothing retries it by itself: check the Service App's rights and press *Save* on the card to
+register again; the card says until when the old secret is still accepted. Removal of the
 sealed previous secret is housekeeping (an hourly sweep, and any write of the record after 24 hours);
 what counts is the clock at each delivery.
 
@@ -2543,14 +2546,16 @@ environment, which the application cannot write:
 
 1. Make the new value (at least 32 random characters; WxCC wants 32 to 256).
 2. Set the **new** value as `WEBEX_WEBHOOK_SECRET` (or `WXCC_WEBHOOK_SECRET`) and the **old** value
-   as `WEBEX_WEBHOOK_SECRET_PREVIOUS` (or `WXCC_WEBHOOK_SECRET_PREVIOUS`); `X_FILE` works for both.
+   as `WEBEX_WEBHOOK_SECRET_PREVIOUS` (or `WXCC_WEBHOOK_SECRET_PREVIOUS`). Like `WEBEX_WEBHOOK_SECRET`
+   and `WXCC_WEBHOOK_SECRET` they are class C and take no `_FILE`; set them in the environment.
 3. Restart `web` and `worker`. The previous value verifies for the overlap counted from the moment
    the application first saw the new secret (it is kept in the database as a fingerprint, so a later
    restart does not start it again).
 4. Tell the platform the new secret straight away, inside the overlap:
    `docker compose exec web python -m app.cli register-webhooks --update-secret`. The video
    platform's webhooks are updated in place; the WxCC subscription is made again before the old one is
-   removed. The report never holds a secret.
+   removed (a report line says when the old one had to be removed first, with a gap, or when
+   there is no subscription now: run it again). The report never holds a secret.
 5. After the overlap, **remove the `_PREVIOUS` variable** and restart. System status (*Address and
    proxy*) shows a finding for a previous value that is still set after its overlap, and for one that
    equals the current secret. A restart with only the new secret set and no previous value refuses the old

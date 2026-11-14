@@ -18,17 +18,17 @@ from typing import cast
 import httpx
 import pytest
 import structlog.testing
-from fastapi import Request
+from fastapi import FastAPI, Request
 from pydantic import SecretStr
+from sqlalchemy import text
 
 from app.adapters.db.engine import create_engine
-from app.adapters.db.reports import ReportStore
-from app.adapters.db.secret_sightings import NAME_PREFIX, StoredSightings
+from app.adapters.db.uow import SqlTransaction, SqlUnitOfWork
 from app.adapters.webhooks import WEBEX_INBOUND, WXCC_INBOUND, sign_webex, sign_wxcc
 from app.config import Settings
 from app.domain.webhook_secrets import SecretFinding
 from app.main import create_app
-from app.web.webhook_secrets import installation_status
+from app.web.webhook_secrets import install_installation_secrets, installation_status
 from tests.fakes.clock import FixedClock
 from tests.support.database import migrated_database
 from tests.support.domain import NOW
@@ -201,24 +201,26 @@ async def test_only_a_keyed_fingerprint_and_a_time_are_stored_never_a_secret(
         await _wxcc(client, clock, NEW)
 
     engine = create_engine(database_url)
-    report = await ReportStore(engine).get(f"{NAME_PREFIX}wxcc")
+    async with engine.connect() as connection:
+        columns = (await connection.execute(text("SELECT * FROM webhook_secret_sightings"))).keys()
+        rows = (await connection.execute(text("SELECT * FROM webhook_secret_sightings"))).all()
     await engine.dispose()
-    assert report is not None
-    text = json.dumps(report.body)
-    assert NEW not in text
-    assert OLD not in text
-    assert set(report.body) == {"fingerprint", "since"}
-    assert report.body["since"] == NOW.isoformat()
-    assert len(report.body["fingerprint"]) == 64
+    assert list(columns) == ["platform", "fingerprint", "first_seen"]
+    ((platform, made, first_seen),) = rows
+    assert platform == "wxcc"
+    assert NEW not in repr(rows)
+    assert OLD not in repr(rows)
+    assert len(made) == 64
+    assert str(first_seen).startswith(NOW.strftime("%Y-%m-%d %H:%M"))
 
 
 async def test_a_store_that_cannot_be_read_grants_no_overlap(
     settings: Settings, database_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    async def broken(self: StoredSightings, platform: str) -> None:
+    async def broken(self: SqlTransaction, platform: str) -> None:
         raise OSError("the database is locked")
 
-    monkeypatch.setattr(StoredSightings, "get", broken)
+    monkeypatch.setattr(SqlTransaction, "get_secret_sighting", broken)
     clock = FixedClock(NOW)
 
     async with _running(_settings(settings, database_url), clock) as client:
@@ -252,10 +254,15 @@ async def test_no_secret_or_fingerprint_reaches_a_log(
 
 @asynccontextmanager
 async def _request(settings: Settings, clock: FixedClock, url: str) -> AsyncIterator[Request]:
+    """A request whose application has the settings and the service, as ``app.main`` builds them."""
     engine = create_engine(url)
     state = SimpleNamespace(settings=settings, clock=clock, engine=engine)
+    app = SimpleNamespace(state=state)
+    install_installation_secrets(
+        cast(FastAPI, app), SqlUnitOfWork(engine), clock, lambda: cast(Settings, state.settings)
+    )
     try:
-        yield cast(Request, SimpleNamespace(app=SimpleNamespace(state=state)))
+        yield cast(Request, SimpleNamespace(app=app))
     finally:
         await engine.dispose()
 

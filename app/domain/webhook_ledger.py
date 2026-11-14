@@ -71,10 +71,6 @@ class Delivered(StrEnum):
     """Verified at a paused address and dropped (point 9)."""
     UNKNOWN_WORK = "unknown_work"
     """Verified, about work this connection did not create (point 12); answered 204."""
-    PREVIOUS_SECRET = "previous_secret"  # noqa: S105 - an outcome code, not a secret
-    """Verified under the previous secret, inside its overlap (point 8). Not an outcome of its own:
-    the call is accepted like any other and counted under that too; this is the one more count
-    that tells the card whether the platform has taken up the new secret yet."""
 
 
 class AlertGroup(StrEnum):
@@ -164,6 +160,9 @@ class LedgerView:
         last_accepted: When a delivery was last accepted, across windows.
         last_refused_at: When a call was last refused, across windows.
         last_refused_reason: The code of that refusal.
+        by_previous: How many of the window's verified deliveries the previous secret verified
+            (ADR 0124 point 8): a count of its own, not an outcome, so the rows of outcomes still
+            add up to the calls.
     """
 
     window_started: datetime | None
@@ -174,11 +173,7 @@ class LedgerView:
     last_accepted: datetime | None
     last_refused_at: datetime | None
     last_refused_reason: str | None
-
-    @property
-    def by_previous_secret(self) -> int:
-        """How many deliveries the previous secret verified in the window (ADR 0124 point 8)."""
-        return self.outcomes.get(Delivered.PREVIOUS_SECRET.value, 0)
+    by_previous: int = 0
 
     @property
     def paused_dropped(self) -> int:
@@ -195,6 +190,7 @@ class _Entry:
     faults: dict[ChainFault, int] = field(default_factory=dict)
     counted: dict[AlertGroup, dict[str, int]] = field(default_factory=dict)
     inside_list: int = 0
+    by_previous: int = 0
     verified: bool = False
     alerted: set[AlertGroup] = field(default_factory=set)
     retracted: dict[AlertGroup, datetime] = field(default_factory=dict)
@@ -206,6 +202,7 @@ class _Entry:
         self.started = now
         self.outcomes, self.faults, self.counted = {}, {}, {}
         self.inside_list = 0
+        self.by_previous = 0
         self.verified = False
         self.alerted = set()
         self.retracted = {}
@@ -254,9 +251,6 @@ class WebhookLedger:
             key: The address.
             outcome: What came of the call.
         """
-        if outcome is Delivered.PREVIOUS_SECRET:
-            self.verified_by_previous(key)  # a count beside an outcome, not an outcome
-            return None
         now = self._clock.now()
         entry = self._entry(key, now)
         if entry is None:
@@ -276,7 +270,7 @@ class WebhookLedger:
         """
         entry = self._entry(key, self._clock.now())
         if entry is not None:
-            self._count(entry, Delivered.PREVIOUS_SECRET.value)
+            entry.by_previous += 1
 
     def refused(
         self,
@@ -338,6 +332,7 @@ class WebhookLedger:
             entry.last_accepted,
             entry.last_refused[0] if entry.last_refused else None,
             entry.last_refused[1] if entry.last_refused else None,
+            entry.by_previous if live else 0,
         )
 
     def _entry(self, key: AddressKey, now: datetime) -> _Entry | None:

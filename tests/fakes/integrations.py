@@ -38,7 +38,7 @@ from app.domain.ports import (
     RequestRecord,
 )
 from app.domain.scheduling import Group
-from app.domain.webhook_secrets import WebhookSecrets, lapsed, rotated, settled
+from app.domain.webhook_secrets import OVERLAP_MAX, WebhookSecrets, rotated, settled
 
 GUEST_EXPIRES = datetime(2026, 1, 1, 18, tzinfo=UTC)
 """When the fake's guest tokens expire."""
@@ -303,6 +303,13 @@ class FakeContactCenterConnections:
         if old is not None:
             self.connections[organisation_id] = replace(old, inbound_enabled=enabled)
 
+    async def set_registration(
+        self, organisation_id: int, state: Registration | None, now: datetime
+    ) -> None:
+        old = self.connections.get(organisation_id)
+        if old is not None:
+            self.connections[organisation_id] = replace(old, registration=state)
+
     async def rotate_webhook_secret(self, organisation_id: int, now: datetime) -> None:
         old = self.connections.get(organisation_id)
         if old is not None:
@@ -323,7 +330,7 @@ class FakeContactCenterConnections:
             held = self.secrets.get(organisation_id)
             if held is not None and held.previous is not None:
                 after = settled(held, now, overlap)
-                if after is not held:
+                if after.previous is None:
                     self.secrets[organisation_id] = after
                     removed += 1
         return removed
@@ -353,7 +360,7 @@ class FakeContactCenterConnections:
             return None
         held = self.secrets.get(organisation_id)
         if held is not None:
-            return held if not lapsed(held, datetime.now(UTC)) else WebhookSecrets(current)
+            return settled(held, datetime.now(UTC), OVERLAP_MAX)
         shown = self.connections[organisation_id]
         return WebhookSecrets(current, None, shown.webhook_secret_at)
 

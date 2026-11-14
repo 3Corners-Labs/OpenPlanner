@@ -172,10 +172,16 @@ from app.adapters.settings_report import (
 )
 from app.adapters.signing_keys import EcSigningKeys
 from app.adapters.webex_auth import AuthorizedClient, TokenHealth, WebexTokens
-from app.adapters.webhook_registration import register_webex, register_wxcc
+from app.adapters.webhook_registration import (
+    register_webex,
+    register_wxcc,
+    renewal_line,
+    secret_update,
+    update_webex_secrets,
+)
 from app.adapters.webhook_selftest import deliveries_to_report, delivery_checks, self_test
 from app.adapters.webhooks import WXCC_INBOUND
-from app.adapters.wxcc import channel_and_address, wxcc_mapping
+from app.adapters.wxcc import DESCRIPTOR, channel_and_address, wxcc_mapping
 from app.adapters.wxcc_config import GroupRouting, check_groups, fetch_config, region_check
 from app.adapters.wxcc_sample_flow import Route, sample_flow
 from app.cli_config import add_arguments as add_document_arguments
@@ -435,24 +441,25 @@ async def _register_webhooks(
         if tokens is None:  # pragma: no cover - video_configured implies tokens
             return "Webex is not configured; nothing to do.\n"
         client = AuthorizedClient(http, tokens)
-        lines = await register_webex(
+        webex = update_webex_secrets if update_secret else register_webex
+        lines = await webex(
             client,
             settings.webex_api_base_url,
             f"{base}/webhooks/webex",
             settings.webex_webhook_secret.get_secret_value(),
             hosts=_hosts(await _groups(settings)),
-            update_secret=update_secret,
         )
         if settings.wxcc_api_base_url and settings.wxcc_webhook_secret is not None:
-            lines.append(
-                await register_wxcc(
-                    client,
-                    settings.wxcc_api_base_url,
-                    f"{base}{WXCC_INBOUND.registered_path}",
-                    settings.wxcc_webhook_secret.get_secret_value(),
-                    update_secret=update_secret,
+            target = f"{base}{WXCC_INBOUND.registered_path}"
+            wxcc_secret = settings.wxcc_webhook_secret.get_secret_value()
+            if update_secret:
+                apply = secret_update(DESCRIPTOR.capabilities.webhook_secret_update)
+                outcome = await apply(client, settings.wxcc_api_base_url, target, wxcc_secret)
+                lines.append(renewal_line(outcome))
+            else:
+                lines.append(
+                    await register_wxcc(client, settings.wxcc_api_base_url, target, wxcc_secret)
                 )
-            )
     return "".join(f"{line}\n" for line in lines)
 
 

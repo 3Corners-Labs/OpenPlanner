@@ -140,6 +140,12 @@ SETTING_LABELS: dict[str, str] = {
     "webex_webhook_secret": "settings.field.webex_webhook_secret.label",  # nosec B105 - an i18n key
     "wxcc_api_base_url": "settings.field.wxcc_api_base_url.label",
     "wxcc_webhook_secret": "settings.field.wxcc_webhook_secret.label",  # nosec B105 - an i18n key
+    "webex_webhook_secret_previous": (  # nosec B105 - an i18n key
+        "settings.field.webex_webhook_secret_previous.label"
+    ),
+    "wxcc_webhook_secret_previous": (  # nosec B105 - an i18n key
+        "settings.field.wxcc_webhook_secret_previous.label"
+    ),
     "update_repository": "settings.field.update_repository.label",
     "update_channel": "settings.field.update_channel.label",
     "update_auto_apply": "settings.field.update_auto_apply.label",

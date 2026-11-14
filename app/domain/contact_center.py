@@ -122,11 +122,12 @@ class WebhookSecretUpdate(StrEnum):
     """How a platform lets the secret of an organisation's webhook subscription change.
 
     A property of the platform's API, declared by its adapter (ADR 0124 point 8); general code
-    never asks which platform it is, only which of these the adapter declared.
+    never asks which platform it is, only which of these the adapter declared. A platform that
+    could change the secret of a subscription in place would add a value here together with the
+    function that does it (``app.adapters.webhook_registration.SECRET_UPDATES``); no value is
+    declared that nothing implements.
     """
 
-    IN_PLACE = "in_place"
-    """The platform changes the secret of an existing subscription; nothing is made anew."""
     RENEW = "renew"
     """The platform keeps a subscription's secret: a new subscription is made inside the overlap
     and the old one removed after it, so no event is refused on the way."""
@@ -364,6 +365,10 @@ class OrganisationConnection:
         has_previous_webhook_secret: Whether the secret before the last rotation is still kept
             (ADR 0124 point 8); the card says until when it verifies, from ``webhook_secret_at``
             and the live overlap. Never the secret.
+        registration: What the last registration at the platform came to when it left the
+            platform in a state an administrator must know (``REPLACED``, ``GONE``, ``REFUSED``,
+            ``FAILED``), until a registration succeeds; ``None`` otherwise. Nothing retries it by
+            itself (ADR 0124 point 8).
         allowed_networks: The networks the platform's webhooks may come from (ADR 0124 point 3),
             canonical CIDR; empty: the installation's default applies; or unreadable (a stored
             list that cannot be read, never taken for an empty one). Not secret.
@@ -381,6 +386,7 @@ class OrganisationConnection:
     allowed_networks: NetworkList = NetworkList()
     inbound_enabled: bool = True
     has_previous_webhook_secret: bool = False
+    registration: "Registration | None" = None
 
 
 @dataclass(frozen=True)
@@ -448,6 +454,13 @@ class Registration(StrEnum):
     UNTOUCHED = "untouched"
     """The connection has its webhook secret and nothing the subscription depends on changed
     (only the allowed networks), so it was left as it was (ADR 0124 point 3)."""
+    REPLACED = "replaced"
+    """The platform tells the organisation's events with the new secret now, but the old
+    subscription had to be removed before the new one could be made (the platform allows one per
+    address), so events in between may have been missed (ADR 0124 point 8)."""
+    GONE = "gone"
+    """The old subscription was removed and the platform refused the new one: there is no
+    subscription now and nothing is delivered until a registration succeeds (ADR 0124 point 8)."""
     REFUSED = "refused"
     """The platform refused (rights, address or secret); the reason is in the request log."""
     FAILED = "failed"

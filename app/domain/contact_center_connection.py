@@ -27,6 +27,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.domain.admin import AdminService, record_change
+from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.contact_center import (
     CONNECTION_FIELD,
@@ -45,6 +46,13 @@ PERMISSION = Permission.INTEGRATIONS_MANAGE
 AUDIT_KEY = "contact_center_connection"
 NETWORKS_AUDIT = "allowed_networks"
 """The audit names the field that changed, never the networks (as it does for the secrets)."""
+GAP_EVENT = "webhook.subscription_gap"
+"""The system event written when a registration left a gap or no subscription at the platform
+(ADR 0124 point 8); its reason is a code (``replaced`` or ``gone``), never platform text."""
+LEFT_STATE = frozenset(
+    {Registration.REPLACED, Registration.GONE, Registration.REFUSED, Registration.FAILED}
+)
+"""What a registration can come to that the card keeps showing until one succeeds."""
 PAUSE_AUDIT = {True: "resume", False: "pause"}
 """The audit action of setting the pause (``contact_center_connection.pause`` or ``.resume``),
 written only when the state changes; never a value."""
@@ -299,7 +307,37 @@ class ContactCenterConnectionService:
             return Registration.NOT_READY
         outcome = await registrar.register(organisation_id, organisation)
         await self._audit(principal, organisation, f"{AUDIT_KEY}.register,outcome:{outcome.value}")
+        await self._remember(organisation_id, organisation, outcome)
         return outcome
+
+    async def _remember(
+        self, organisation_id: int, organisation: str, outcome: Registration
+    ) -> None:
+        """Keep what the registration left for the card; say it as a system event when it is a gap.
+
+        A registration that succeeded clears the state. A gap (``REPLACED``) or no subscription
+        (``GONE``) is also a system event for the organisation, with a code and no platform text.
+        """
+        if self._connections is None:
+            return
+        await self._connections.set_registration(
+            organisation_id, outcome if outcome in LEFT_STATE else None, self._clock.now()
+        )
+        if outcome in (Registration.REPLACED, Registration.GONE):
+            async with self._uow.locked() as tx:
+                await tx.add_audit_event(
+                    AuditEvent(
+                        self._clock.now(),
+                        SYSTEM_ACTOR,
+                        GAP_EVENT,
+                        Outcome.FAILURE,
+                        outcome.value,
+                        organisation,
+                        None,
+                        "",
+                        Source.SYSTEM,
+                    )
+                )
 
     def _ready(self) -> ContactCenterConnections:
         """Return the sealed connections, or refuse when no settings key is configured."""

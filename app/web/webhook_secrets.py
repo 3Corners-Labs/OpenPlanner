@@ -16,16 +16,16 @@ environment cannot change without a restart. When the database cannot be read th
 is *not* used: an overlap that cannot be measured never extends.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 import structlog
-from fastapi import Request
+from fastapi import FastAPI, Request
 
-from app.adapters.db.secret_sightings import StoredSightings
 from app.adapters.webhooks import InboundWebhook
 from app.config import Settings
-from app.domain.ports import Clock, SecretSightings
+from app.domain.ports import Clock, UnitOfWork
 from app.domain.webhook_secrets import (
     SecretFinding,
     Sighting,
@@ -53,62 +53,83 @@ class InstallationSecrets:
     finding: SecretFinding | None
 
 
-async def _sighting(
-    request: Request, inbound: InboundWebhook, secret: str, now: datetime
-) -> Sighting | None:
-    """Return when ``secret`` was first seen at this platform's address; ``None`` if unknown.
+class InstallationSecretsService:
+    """Reads the installation's webhook secrets and keeps their first sightings.
 
-    Read once per process and secret, then kept in ``app.state``; the store is written when the
-    secret is new (or its fingerprint is remade under the current key).
+    Built once at start-up (``install_installation_secrets``). A secret in the environment cannot
+    change without a restart, so a sighting is read from the database once per process and secret
+    and then kept here; it is written when the secret is new, or when its fingerprint is made
+    again under the current key.
+
+    Args:
+        uow: Opens the transactions that read and write the sightings.
+        clock: Current time.
+        live: Returns the settings as they are now.
     """
-    state = request.app.state
-    keys = webhook_fingerprint_keys(state.settings)
-    made = fingerprint(keys[0], secret)
-    cache: dict[str, Sighting] | None = getattr(state, "webhook_sightings", None)
-    if cache is None:
-        cache = state.webhook_sightings = {}
-    cached = cache.get(inbound.source)
-    if cached is not None and cached.fingerprint == made:
-        return cached
-    store: SecretSightings = StoredSightings(state.engine)
-    try:
-        stored = await store.get(inbound.source)
-        seen = sighted(stored, secret, keys, now)
-        if seen != stored:
-            await store.put(inbound.source, seen)
-    except Exception as exc:  # an overlap that cannot be measured is not granted
-        log.warning("webhook.sighting_failed", source=inbound.source, error=type(exc).__name__)
-        return None
-    cache[inbound.source] = seen
-    return seen
+
+    def __init__(self, uow: UnitOfWork, clock: Clock, live: Callable[[], Settings]) -> None:
+        """Store the collaborators; no secret has been seen yet."""
+        self._uow = uow
+        self._clock = clock
+        self._live = live
+        self._seen: dict[str, Sighting] = {}
+
+    async def _sighting(self, source: str, secret: str, now: datetime) -> Sighting | None:
+        """Return when ``secret`` was first seen at ``source``'s address; ``None`` if unknown."""
+        keys = webhook_fingerprint_keys(self._live())
+        cached = self._seen.get(source)
+        if cached is not None and cached.fingerprint == fingerprint(keys[0], secret):
+            return cached
+        try:
+            async with self._uow.locked() as tx:
+                stored = await tx.get_secret_sighting(source)
+                seen = sighted(stored, secret, keys, now)
+                if seen != stored:
+                    await tx.save_secret_sighting(source, seen)
+        except Exception as exc:  # an overlap that cannot be measured is not granted
+            log.warning("webhook.sighting_failed", source=source, error=type(exc).__name__)
+            return None
+        self._seen[source] = seen
+        return seen
+
+    async def status(self, inbound: InboundWebhook) -> InstallationSecrets | None:
+        """Return the installation-wide secrets of a platform, or ``None`` without a current one.
+
+        The previous value counts only with a known sighting of the current secret; without one it
+        is dropped. The finding (``ended`` after the overlap, ``same`` as the current value) is
+        what System status shows.
+        """
+        settings = self._live()
+        current = inbound.secret(settings)
+        if current is None:
+            return None
+        now = self._clock.now()
+        value = current.get_secret_value()
+        previous_secret = inbound.previous(settings)
+        previous = previous_secret.get_secret_value() if previous_secret is not None else None
+        seen = await self._sighting(inbound.source, value, now)
+        if seen is None or previous is None:
+            return InstallationSecrets(WebhookSecrets(value), None)
+        overlap = timedelta(minutes=settings.webhook_secret_overlap_minutes)
+        return InstallationSecrets(
+            installation_secrets(value, previous, seen.since),
+            previous_finding(value, previous, seen.since, now, overlap),
+        )
+
+
+def install_installation_secrets(
+    app: FastAPI, uow: UnitOfWork, clock: Clock, live: Callable[[], Settings]
+) -> None:
+    """Put the installation's secrets service on ``app.state`` (called by an install function)."""
+    app.state.installation_secrets = InstallationSecretsService(uow, clock, live)
 
 
 async def installation_status(
     request: Request, inbound: InboundWebhook
 ) -> InstallationSecrets | None:
-    """Return the installation-wide secrets of a platform, or ``None`` without a current secret.
-
-    The previous value counts only with a known sighting of the current secret; without one it is
-    dropped. The finding (``ended`` after the overlap, ``same`` as the current value) is what
-    System status shows.
-    """
-    settings: Settings = request.app.state.settings
-    current = inbound.secret(settings)
-    if current is None:
-        return None
-    clock: Clock = request.app.state.clock
-    now = clock.now()
-    value = current.get_secret_value()
-    previous_secret = inbound.previous(settings)
-    previous = previous_secret.get_secret_value() if previous_secret is not None else None
-    seen = await _sighting(request, inbound, value, now)
-    if seen is None or previous is None:
-        return InstallationSecrets(WebhookSecrets(value), None)
-    overlap = timedelta(minutes=settings.webhook_secret_overlap_minutes)
-    return InstallationSecrets(
-        installation_secrets(value, previous, seen.since),
-        previous_finding(value, previous, seen.since, now, overlap),
-    )
+    """Return the installation-wide secrets of a platform for this application."""
+    service: InstallationSecretsService = request.app.state.installation_secrets
+    return await service.status(inbound)
 
 
 async def installation_secrets_of(

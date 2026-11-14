@@ -115,6 +115,7 @@ from app.domain.tasks import ActiveJob, ActiveJobs
 from app.domain.tls import CertificateCheck
 from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
 from app.domain.usage import StaffFact, UsageFact
+from app.domain.webhook_secrets import Sighting
 from app.domain.worker_check import WorkerHeartbeat
 from tests.fakes.service_request_store import ServiceRequestStore
 from tests.support.domain import NOW
@@ -183,6 +184,7 @@ class State:
     instance_id: str | None = None
     probe_nonce: tuple[str, datetime] | None = None
     address_checks: dict[AddressKind, AddressCheck] = field(default_factory=dict)
+    secret_sightings: dict[str, Sighting] = field(default_factory=dict)
     own_certificate: OwnCertificate | None = None
     maintenance: MaintenanceState = MAINTENANCE_OFF
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
@@ -1833,6 +1835,12 @@ class InMemoryTransaction(ServiceRequestStore):
 
     async def save_address_check(self, check: AddressCheck) -> None:
         self.state.address_checks[check.kind] = check
+
+    async def get_secret_sighting(self, platform: str) -> Sighting | None:
+        return self.state.secret_sightings.get(platform)
+
+    async def save_secret_sighting(self, platform: str, sighting: Sighting) -> None:
+        self.state.secret_sightings[platform] = sighting
 
     async def delete_address_check(self, kind: AddressKind) -> None:
         self.state.address_checks.pop(kind, None)

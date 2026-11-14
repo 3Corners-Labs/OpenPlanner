@@ -121,6 +121,7 @@ STATE_TABLES = frozenset(
         "usage_rollup_state",
         "usage_staff_hour",
         "webhook_events",
+        "webhook_secret_sightings",  # this host's first sightings of its webhook secrets (ADR 0124)
         "work_items",  # requests and their work: what happened, like bookings (ADR 0121 step 5)
     }
 )

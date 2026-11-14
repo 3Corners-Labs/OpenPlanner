@@ -53,6 +53,9 @@ async def test_a_previous_value_equal_to_the_current_one_is_a_finding_at_once(si
     part = await _part(site)
 
     assert "gelijk is aan het huidige" in part
+    assert 'id="address-secrets-heading">Vorige webhookgeheimen in de omgeving</h4>' in part
+    assert 'aria-labelledby="address-secrets-heading"' in part
+    assert part.count("<li><strong>") == 1  # each finding is a list item of its own
     assert "Videoplatform" in part
     assert "same-secret-value" not in part
 
@@ -61,4 +64,7 @@ async def test_without_a_previous_value_there_is_no_finding(site: Site) -> None:
     _settings(site, webex_webhook_secret=SecretStr("only-secret-value"))
     await site.login_as(AUDITOR)
 
-    assert "vorig webhookgeheim" not in await _part(site)
+    part = await _part(site)
+
+    assert "vorig webhookgeheim" not in part
+    assert "address-secrets-heading" not in part  # no heading without findings

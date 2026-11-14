@@ -13,9 +13,7 @@ from app.domain.webhook_secrets import (
     WebhookSecrets,
     fingerprint,
     installation_secrets,
-    lapsed,
     previous_finding,
-    previous_until,
     rotated,
     settled,
     sighted,
@@ -64,7 +62,7 @@ def test_a_second_rotation_inside_the_overlap_drops_the_secret_from_before() -> 
 
 
 @pytest.mark.parametrize(
-    ("minutes", "counts"), [(0, True), (59, True), (60, False), (61, False), (-1, True)]
+    ("minutes", "counts"), [(0, True), (59, True), (60, False), (61, False), (-1, False)]
 )
 def test_the_previous_secret_counts_until_the_overlap_has_passed(
     minutes: int, counts: bool
@@ -184,10 +182,12 @@ def test_the_longest_overlap_is_a_day() -> None:
 def test_a_write_removes_a_previous_secret_only_when_no_setting_could_keep_it() -> None:
     secrets = rotated(rotated(None, "old", NOW), "new", NOW)
 
-    assert lapsed(secrets, NOW + OVERLAP_MAX - timedelta(seconds=1)) is False
-    assert lapsed(secrets, NOW + OVERLAP_MAX) is True
-    assert lapsed(WebhookSecrets("new", None, NOW), NOW + OVERLAP_MAX) is False
-    assert lapsed(WebhookSecrets("new", "old", None), NOW) is True
+    kept = settled(secrets, NOW + OVERLAP_MAX - timedelta(seconds=1), OVERLAP_MAX)
+    gone = settled(secrets, NOW + OVERLAP_MAX, OVERLAP_MAX)
+
+    assert kept.previous == "old"
+    assert gone.previous is None
+    assert settled(WebhookSecrets("new", "old", None), NOW, OVERLAP_MAX).previous is None
 
 
 def test_the_sweep_removes_a_previous_secret_once_the_live_overlap_has_ended() -> None:
@@ -257,24 +257,27 @@ def test_the_findings_on_a_previous_value_in_the_environment() -> None:
     assert previous_finding("same", "same", NOW, inside, OVERLAP) is SecretFinding.SAME
 
 
-# --- what the card says -----------------------------------------------------------------------
+# --- what the card says, and a clock set back --------------------------------------------------
 
 
-def test_the_card_names_the_moment_the_previous_secret_stops() -> None:
+def test_the_card_names_the_moment_the_previous_secret_stops_through_the_one_rule() -> None:
+    secrets = WebhookSecrets("new", "old", NOW)
     inside = NOW + timedelta(minutes=30)
 
-    assert previous_until(True, NOW, inside, OVERLAP) == NOW + OVERLAP
-    assert previous_until(True, NOW, NOW + OVERLAP, OVERLAP) is None
-    assert previous_until(False, NOW, inside, OVERLAP) is None
-    assert previous_until(True, None, inside, OVERLAP) is None
-    assert previous_until(True, NOW, NOW, timedelta(0)) is None
+    assert secrets.previous_valid_until(inside, OVERLAP) == NOW + OVERLAP
+    assert secrets.previous_valid_until(NOW + OVERLAP, OVERLAP) is None
+    assert WebhookSecrets("new", None, NOW).previous_valid_until(inside, OVERLAP) is None
+    assert WebhookSecrets("new", "old", None).previous_valid_until(inside, OVERLAP) is None
+    assert secrets.previous_valid_until(NOW, timedelta(0)) is None
 
 
-def test_the_card_and_the_gate_agree_on_when_the_previous_secret_counts() -> None:
-    secrets = rotated(rotated(None, "old", NOW), "new", NOW)
+def test_a_rotation_in_the_future_does_not_keep_the_previous_secret() -> None:
+    """A clock set back must not stretch the overlap: the previous secret is then not accepted."""
+    secrets = WebhookSecrets("new", "old", NOW + timedelta(hours=2))
 
-    for minutes in (0, 30, 59, 60, 90):
-        at = NOW + timedelta(minutes=minutes)
-        assert (previous_until(True, NOW, at, OVERLAP) is not None) is secrets.previous_counts(
-            at, OVERLAP
-        )
+    assert secrets.previous_counts(NOW, OVERLAP) is False
+    assert verify_with_overlap(secrets, NOW, OVERLAP, _only("old")).refusal is Refusal.SIGNATURE
+    assert secrets.previous_valid_until(NOW, OVERLAP) is None
+    assert previous_finding("new", "old", NOW + timedelta(hours=2), NOW, OVERLAP) is (
+        SecretFinding.ENDED
+    )

@@ -1313,6 +1313,21 @@ _OPERATIONS = (
         _CHECK_HOST,
     ),
     _e(
+        "webhook.subscription_gap",
+        _SYS,
+        "outcome",
+        "",
+        "A contact-center subscription left a gap or none for the organisation.",
+        "Setting a new webhook secret at the contact center left a gap in the deliveries "
+        "(reason `replaced`: the old subscription had to be removed before the new one could be "
+        "made, so events in between may have been missed) or no subscription at all (reason "
+        "`gone`: the new one was refused after the old one was removed) (ADR 0124 point 8). "
+        "Nothing is delivered in the second case until a registration succeeds. No text from "
+        "the platform is kept.",
+        "`gone`: check the Service App's rights, then save the connection's card again to "
+        "register. `replaced`: the periodic check of open tasks catches up on states.",
+    ),
+    _e(
         "webhook.sighting_failed",
         _OPS,
         "warning",
