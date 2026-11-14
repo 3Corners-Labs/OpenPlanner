@@ -270,7 +270,7 @@ onjuist blijkt, verandert het hoofdstuk dat haar gebruikt.
 |---|---|---|---|
 | A-1 | Het volume blijft in de orde van 80 boekingen per werkdag met pieken van 20 per minuut, zoals het ontwerp aannam | 2.3, 7, 12 | de organisatie die inpast |
 | A-2 | Eén installatie bedient één verwerkingsverantwoordelijke; organisaties binnen die installatie delen de superuser, de database en de sleutels | 3.5, 9 | herzien op 5 november 2026 (V-13): de applicatie is multi-tenant en de hoster bepaalt de indeling; wat organisaties delen, blijft gelden |
-| A-3 | De organisatie beschikt over een OIDC-identity provider, of aanvaardt de meegeleverde Keycloak | 3.3, 8.5 | beantwoord op 5 november 2026 (V-2): standaard de meegeleverde Keycloak, daarna elke OIDC-provider per organisatie; het voorbehoud voor productie uit ADR 0125 verviel op 14 november 2026 met haar stap 2 (#850, R-17) |
+| A-3 | De organisatie beschikt over een OIDC-identity provider, of aanvaardt de meegeleverde Keycloak | 3.3, 8.5 | beantwoord op 5 november 2026 (V-2): standaard de meegeleverde Keycloak, daarna elke OIDC-provider per organisatie |
 | A-4 | Het contactcenter is Webex Contact Center, of de dienst gebruikt de eigen wachtrij; een ander platform vraagt een adapter achter ADR 0032 | 3.3, 6.2, 12 | beantwoord op 5 november 2026 (V-3): ook Genesys (O15) |
 | A-5 | De host levert versleutelde opslag, back-up en herstel buiten de applicatie om (O7) | 7, 9.3 | beantwoord voor zelf hosten op 5 november 2026 (V-7): het platformteam van de afnemer |
 | A-6 | De omgeving laat HTTPS vanaf internet toe op de deelnemerspaden en op het webhookadres. Zonder inkomende webhooks werken boeken, berichten en dispatch, maar ziet de applicatie niet wanneer een meeting begint of eindigt en wat het contactcenter met een werkitem doet | 3.3, 7.7, 12 | hosting- en netwerkbeheer |
@@ -433,7 +433,7 @@ medewerker, niet in dat van de hosting.
 | INT-01 | proxy naar `web` | HTTP 8000 op het netwerk `edge`, of HTTPS met `WEB_TLS_CERT_FILE` | Vastgelegde uitzondering op één host (ADR 0091); `web` vertrouwt doorgestuurde headers alleen van `FORWARDED_ALLOW_IPS`. De meegeleverde proxy bereikt `web` op het vaste adres `172.31.240.3:8000` (`WEB_UPSTREAM`), nooit op naam (7.7) |
 | INT-02 | `web` en `worker` naar het SQLite-bestand | bestandstoegang op volume `data` | Eén schrijver onder een schrijfslot; geen netwerkpoort, geen databaseserver |
 | INT-03 | proxy naar de meegeleverde Keycloak | HTTP 8080 op het netwerk `edge`, pad `/idp` | Vastgelegde uitzondering op één host (ADR 0125): de browser praat https met de proxy, de proxy http met Keycloak op haar vaste adres `172.31.240.4:8080` (`IDP_UPSTREAM`). Draagt wachtwoorden, eenmalige codes en de sessiecookie van het portaal. Alleen met de meegeleverde provider |
-| INT-04 | `web`, `worker` naar de meegeleverde Keycloak | HTTP 8080 op het netwerk `edge` (`http://172.31.240.4:8080/idp`) | Vastgelegde uitzondering op één host (ADR 0125): OIDC en de admin-API van de medewerkersdirectory, op het vaste adres van Keycloak. Productie aanvaardt over http alleen dit adres, en alleen met een https-`OIDC_ISSUER`; de naam `idp` weigert zij. De browser gebruikt `https://<publiek adres>/idp` |
+| INT-04 | `web`, `worker` naar de meegeleverde Keycloak | HTTP 8080 op het netwerk `edge` (`http://172.31.240.4:8080/idp`) | Vastgelegde uitzondering op één host (ADR 0125): OIDC en de admin-API van de medewerkersdirectory, op het vaste adres van Keycloak. Voor de login (`OIDC_DISCOVERY_URL`) aanvaardt productie over http alleen dit adres, en alleen met een https-`OIDC_ISSUER`; de naam `idp` weigert zij. Het adres van de directory (`KEYCLOAK_ADMIN_URL`) wordt bij de start niet gecontroleerd; het renderscript schrijft het met hetzelfde vaste adres. De browser gebruikt `https://<publiek adres>/idp` |
 | INT-05 | Keycloak naar PostgreSQL | TCP 5432 op het interne netwerk `idp-store`, zonder TLS | Vastgelegde uitzondering op één host (ADR 0125): de accounts met hun wachtwoordhashes. Alleen in productie (`idp-db`, vast adres `172.31.240.18`), op een netwerk zonder weg naar buiten waaraan alleen Keycloak en haar database hangen; niet gepubliceerd |
 | INT-06 | `web` naar volume `portal-certs`, proxy leest | bestand | Een certificaat uit het portaal; de proxy herlaadt bij een wijziging |
 | INT-07 | host-updater naar Docker en `web` | lokaal | Images trekken, controleren en starten; verzoeken lezen via de command line in `web`; gezondheid via `127.0.0.1:8000/readyz` |
@@ -986,7 +986,7 @@ Vaste eigenschappen van deze vorm:
 - Elke hop naar een andere container gaat naar een vast adres, nooit naar een naam (ADR 0125,
   stap 2): `web` op 172.31.240.3 en Keycloak op 172.31.240.4, beide op `edge`, en `idp-db` op
   172.31.240.18 op het interne netwerk `idp-store` (172.31.240.16/28), waaraan alleen Keycloak en
-  haar database hangen (7.7).
+  haar database hangen. Alleen Mailpit, de mailvanger van een lab, houdt zijn naam (7.7).
 - Containerlogs roteren (vijf bestanden van 20 MB); het `json-file`-stuurprogramma blijft, zodat
   een logagent van de host de bestanden kan lezen.
 - De private sleutel van een eigen certificaat uit het portaal leeft in het volume `portal-certs`
@@ -1160,18 +1160,13 @@ echte Docker-host: terwijl een container stilligt en een bedrieger op zijn naam 
 elke hop en krijgt de bedrieger niets. Mailpit, de mailvanger van een lab, houdt zijn naam; hij
 draait nooit in productie.
 
-Voor stap 2 zochten de containers elkaar op naam (`web`, `idp`, `idp-db`). Zolang een container
-niet draaide, gaf Docker die naam door aan de resolver van de host, en wie daar antwoordde, kreeg
-het verkeer: voor `idp` wachtwoorden, eenmalige codes, de sessiecookie van het portaal en beide
-client secrets. Een host die zo draaide, verhuist met de installer van de nieuwe release. Die
-schrijft de vaste adressen en vervangt beide client secrets, in de bestanden en in Keycloak, omdat
-wie op de naam antwoordde de oude kan hebben; tussen de start van `web` en dat moment kunnen
-medewerkers niet inloggen. Productie weigert een login die nog `idp` noemt, dus zo'n host draait
-de installer vóór de update vanuit het portaal. Tot de checkout is bijgewerkt en de installer
-heeft gedraaid, gebruikt de proxy de namen uit de oude bestanden nog en meldt dat in zijn log;
-stap 3 van ADR 0125, nog niet gebouwd, laat hem een minor later namen weigeren. Het runbook
-beschrijft de verhuizing en het herstel na een onverklaarde uitval van `idp` van vóór de
-verhuizing (`docs/runbook.md`, *Fixed addresses on the host*; R-17).
+Een host die vóór stap 2 is geïnstalleerd, verhuist met de installer van een release die deze
+stap bevat: de eerste kandidaat is `v0.6.0-rc.138`, voor productie is dat `v0.6.0`. Met de
+meegeleverde Keycloak vervangt de installer daarbij beide client secrets, omdat wie op de oude naam
+antwoordde ze kan hebben; tot Keycloak de nieuwe heeft, kunnen medewerkers niet inloggen. Een
+productiehost draait die installer vóór de update vanuit het portaal, want productie weigert een
+login die nog `idp` noemt. De volgorde, en het herstel na een onverklaarde uitval van `idp` van
+daarvoor, staan in het runbook (`docs/runbook.md`, *Fixed addresses on the host*; R-17).
 
 **Geen websockets.** OpenPlanner gebruikt geen websockets, server-sent events of andere
 langlopende verbindingen. Live pagina's vragen met een gewoon HTTP-verzoek een fragment op: de
@@ -1518,12 +1513,13 @@ beëindigen of de persoon opschorten. Een wijziging van rollen geldt bij de volg
   vorm `<naam>@<organisatie>.openplanner.internal` (`BUNDLED_IDP_LOGIN_SUFFIX`, C). De tweede
   factor is TOTP of WebAuthn.
 - `web` en `worker` bereiken de meegeleverde Keycloak binnen de host op haar vaste adres,
-  `http://172.31.240.4:8080/idp/...` (INT-04). Dat is een vastgelegde uitzondering: productie
-  aanvaardt over http alleen dit adres, en alleen met een `OIDC_ISSUER` op https, die vastgepind
-  blijft (ADR 0097, 0125). Productie weigert de naam `idp`, omdat de resolver van de host die kan
-  beantwoorden zolang de container niet draait (7.7, R-17). Kiest een host later `--idp own`, dan
-  verwijdert de installer de login, de route `/idp` en de containers van de meegeleverde provider.
-  De volumes blijven, zodat `--idp bundled` haar met haar accounts terugbrengt.
+  `http://172.31.240.4:8080/idp/...` (INT-04). Dat is een vastgelegde uitzondering: voor de login
+  aanvaardt productie over http alleen dit adres, en alleen met een `OIDC_ISSUER` op https, die
+  vastgepind blijft (ADR 0097, 0125). Productie weigert daar de naam `idp`, omdat de resolver van
+  de host die kan beantwoorden zolang de container niet draait (7.7, R-17). Kiest een host later
+  `--idp own`, dan verwijdert de installer de login, de route `/idp` en de containers van de
+  meegeleverde provider. De volumes blijven, zodat `--idp bundled` haar met haar accounts
+  terugbrengt.
 - Wie de accounts in de eigen provider van de organisatie wil houden, kan die provider registreren
   per organisatie, of de meegeleverde Keycloak laten federeren met de eigen provider. Dat laatste
   is configuratie van Keycloak en geen functie van OpenPlanner.
@@ -1872,7 +1868,7 @@ en O15 (Genesys) tellen zwaar.
 | R-14 | Inkomende webhooks vragen een adres dat vanaf internet bereikbaar is; bronnetwerken zijn standaard optioneel | Een omgeving zonder inkomend verkeer mist de status van meetings en werkitems; een te open adres krijgt ongewenst verkeer | De poort van ADR 0124 (handtekening, tijdvenster, grootte, rate limit, pauze, replay); bronnetwerken per leverancier, verplicht te maken met `WEBHOOK_SOURCE_NETWORKS_REQUIRED` (B); een eigen naam via `WEBHOOK_BASE_URL` | hosting, netwerkbeheer |
 | R-15 | Updates en de releasecheck vragen uitgaand verkeer naar GitHub, GHCR en Sigstore; een offline bundel is niet gebouwd en een uitgaande proxy is niet beproefd | Een afgesloten omgeving kan niet zonder handwerk bijwerken | ADR 0116 stap 7; een eigen register als bron; de proxyroute beproeven en documenteren | productteam, hosting |
 | R-16 | Uitdiensttreding werkt via de identity provider en de sessieduur: zonder SCIM of back-channel logout blijft een open sessie tot 60 minuten inactiviteit of 8 uur geldig | Iemand die vertrekt, kan kort na het blokkeren nog in een open sessie werken | Beheerders beëindigen sessies of schorten op; SCIM (ADR 0046) en back-channel logout zijn niet gebouwd | identity-beheer, productowner |
-| R-17 | Gesloten met stap 2 van ADR 0125 (#850), op een rest na. Op een host met Docker Compose vonden de containers elkaar op naam (`web`, `idp`, `idp-db`); draaide een container niet, dan kon de resolver van de host die naam beantwoorden. Nu gaat elke hop naar een vast adres. De rest geldt voor een host die op naam draaide, tot de installer van de nieuwe release hem verhuist | Wie voor `idp` antwoordde, kreeg wachtwoorden, eenmalige codes, de sessiecookie van het portaal en beide client secrets, en kon als superuser inloggen. Wie voor `web` antwoordde, kreeg al het verkeer van de proxy, ook bij een eigen provider. Wat bij een uitval van vóór de verhuizing is buitgemaakt, werkt daarna door | De installer verhuist een host en vervangt beide client secrets, in de bestanden en in Keycloak; productie weigert een login die `idp` noemt; `scripts/check-proxy.sh` (pass 4) toont dat elke hop dicht faalt; het runbook beschrijft het herstel na een onverklaarde uitval van vóór de verhuizing. Tot de installer heeft gedraaid, gebruikt de proxy de oude namen en meldt dat in zijn log; stap 3 van ADR 0125 laat hem een minor later namen weigeren (7.7) | hosting, productowner |
+| R-17 | Restrisico tot de installer een host heeft verhuisd (ADR 0125, stap 2). Op een host die vóór die stap is geïnstalleerd, vinden de containers elkaar nog op naam (`web`, `idp`, `idp-db`); draait een container niet, dan kan de resolver van de host die naam beantwoorden | Wie dan voor `idp` antwoordt, krijgt wachtwoorden, eenmalige codes, de sessiecookie van het portaal en beide client secrets, en kan als superuser inloggen. Wie voor `web` antwoordt, krijgt al het verkeer van de proxy, ook bij een eigen provider. Wat een eerdere uitval van `idp` blootgaf, blijft werken tot het herstel uit het runbook | Vaste adressen voor elke hop en de verhuizing met nieuwe client secrets (7.7); productie weigert een login die `idp` noemt; de proxy meldt in zijn log elke naam die hij nog gebruikt; `scripts/check-proxy.sh` (pass 4) toont dat elke hop dicht faalt; het herstel na een onverklaarde uitval staat in het runbook | hosting, productowner |
 
 ## 13. Transitie en roadmap
 
@@ -1952,7 +1948,7 @@ beantwoord (13.4); V-16 tot en met V-22 zijn de vragen aan een hostingteam; V-23
 | V-20 | Namen en certificaten | Welke publieke naam, eventueel een aparte voor webhooks; welke certificaatbron (ACME, eigen PKI)? | hosting | 7.10 |
 | V-21 | Tijd en logging | Welke tijdbron; welke logbestemmingen met welk filter; welke bewaartermijnen gelden daar? | hosting, security operations | 8.7, 8.8 |
 | V-22 | Hostingvariant | Binnen de eigen infrastructuur of bij een hoster (7.9); wie heeft toegang tot host, sleutels en de rol superuser; welke verwerkersafspraken gelden? | opdrachtgever, privacyofficer | 7.9, 8.6 |
-| V-23 | Interne namen | Vervallen op 14 november 2026. De vraag was of een productiehost live zou gaan voordat stap 2 van ADR 0125 gebouwd was, en welke zoekdomeinen de resolver van de host aanvult. Stap 2 is gebouwd (#850): geen container zoekt een andere nog op naam, dus die zoekdomeinen raken deze hops niet meer. Wel moeten de adresreeksen uit 7.10 op de host vrij zijn | hosting | 7.7, 7.10, R-17 |
+| V-23 | Interne namen | Vervallen op 14 november 2026 met stap 2 van ADR 0125 (#850) | hosting | 7.7, R-17 |
 
 ### 13.4 Antwoorden van 5 november 2026
 
@@ -1964,7 +1960,7 @@ vragen, staan als open punt O15 tot en met O18 in HANDOVER §11.
 | ID | Antwoord | Gevolg voor de architectuur |
 |---|---|---|
 | V-1 | Een link per onderwerp vanuit de keuzeboom, en daarnaast de widget op de website. | Beide routes van 3.3 blijven nodig. Een organisatie die inbedt, registreert haar toegestane origins (ADR 0035). |
-| V-2 | Standaard de meegeleverde Keycloak, waarin de organisatie medewerkers en rollen volledig zelf beheert. Daarna elke OIDC-provider per organisatie, gekozen op het domeinsuffix van gebruikersnaam of e-mailadres. Standaarden gaan boven één leverancier. | Bevestigt ADR 0083 en 0106. Claimnamen (O3) zijn alleen nodig voor een eigen provider; een koppeling voor één leverancier komt er niet. Het voorbehoud voor productie dat ADR 0125 op 14 november 2026 maakte, verviel dezelfde dag met haar stap 2 (#850, R-17). |
+| V-2 | Standaard de meegeleverde Keycloak, waarin de organisatie medewerkers en rollen volledig zelf beheert. Daarna elke OIDC-provider per organisatie, gekozen op het domeinsuffix van gebruikersnaam of e-mailadres. Standaarden gaan boven één leverancier. | Bevestigt ADR 0083 en 0106. Claimnamen (O3) zijn alleen nodig voor een eigen provider; een koppeling voor één leverancier komt er niet. |
 | V-3 | Alle vier: Webex Contact Center, Genesys Engage via GMS, de eigen wachtrij en de agenda-uitnodiging aan een teamadres. Van Genesys worden beide varianten ondersteund: nu Engage via GMS, later ook Genesys Cloud CX. | Een tweede contactcenterplatform vraagt de neutrale basis van ADR 0032, met per Genesys-variant een adapter en een eigen ADR (O15). |
 | V-4 | De bestaande Webex-site van de afnemer, met hostaccounts per dienst. | Een eigen site met afgedwongen beleid (ADR 0045) is niet nodig. Het meetingbeleid ligt bij de Webex-beheerder van de afnemer. |
 | V-5 | De SMTP-server van de afnemer. | Elke organisatie mailt vanaf haar eigen afzender; de controle van ADR 0073 laat zien of SPF, DKIM en DMARC kloppen. |
@@ -2089,4 +2085,4 @@ document. Zo'n ontwerp vult ten minste dit in:
 | 5 november 2026 | Concept 1d: elke fake staat in `tests/fakes/` (#549); paragraaf 5.4 en 11.3 volgen |
 | 14 november 2026 | Concept 2: bijgewerkt naar releasekandidaat `v0.6.0-rc.117` (ADR 0117 tot en met 0124, 37 poorten, 54 permissies, 29 taaksoorten, 224 instellingen) en de term *dienst*. Voor het hostingteam: elke datastroom met nummer, poort en richting (3.3), de ingangen met hun blootstelling (5.6), netwerk en zones zonder websockets (7.7), Docker, Kubernetes en OpenStack (7.8), de impactanalyse van hosten in de eigen infrastructuur of bij een hoster (7.9), wat het platformteam levert (7.10), OIDC met de claims en JIT (8.5), en elke bewaartermijn met haar instelling (8.6). Aannames A-6 en A-7, risico's R-14 tot en met R-16, vragen V-16 tot en met V-22 en het kader voor een ontwerp per organisatie (13.5) zijn nieuw |
 | 14 november 2026 | Concept 2a: ADR 0125 (#834) verwerkt. De hops naar de meegeleverde Keycloak en haar database zijn vastgelegde uitzonderingen (3.3, 9.1). Tot stap 2 van die ADR vinden de containers elkaar op naam (7.2, 7.7). Productie start met de meegeleverde provider, en de installer waarschuwt (7.3, 8.5). Risico R-17, vraag V-23, de roadmap en een voorbehoud bij A-3, V-2 en 13.5 zijn nieuw. Verder is de belpagina beschreven als bouwblok dat niet aan Webex hangt, met een verkenning van Cisco Meeting Server (8.2, R-3, 13.1). Cisco Meeting Server staat gestippeld op de systeemcontext (3.2) en op de platen (R-11) |
-| 14 november 2026 | Concept 2b: stap 2 van ADR 0125 (#850) verwerkt. Elke hop tussen de containers op een host gaat naar een vast adres en nooit naar een naam: `web` 172.31.240.3 en Keycloak 172.31.240.4 op `edge`, `idp-db` 172.31.240.18 op het nieuwe interne netwerk `idp-store` (3.3, 7.2, 7.7, 8.5, 9.1). Productie weigert de naam `idp`; de installer verhuist een host met nieuwe client secrets en waarschuwt niet meer (7.3). Risico R-17 is gesloten op een rest na tot de verhuizing, vraag V-23 is vervallen, het voorbehoud bij A-3, V-2 en 13.5 is weg, en de roadmap noemt stap 3 (13.1). Het platformteam houdt op de host de adresreeksen van de vaste adressen vrij (7.10) |
+| 14 november 2026 | Concept 2b: stap 2 van ADR 0125 (#850) verwerkt. Elke hop tussen de containers op een host gaat naar een vast adres en nooit naar een naam: `web` 172.31.240.3 en Keycloak 172.31.240.4 op `edge`, `idp-db` 172.31.240.18 op het nieuwe interne netwerk `idp-store` (3.3, 7.2, 7.7, 8.5, 9.1). Productie weigert voor de login de naam `idp`; de installer verhuist een host met nieuwe client secrets en waarschuwt niet meer (7.3). Risico R-17 beschrijft alleen nog het restrisico tot de verhuizing, vraag V-23 is vervallen, het voorbehoud bij A-3, V-2 en 13.5 is weg, en de roadmap noemt stap 3 (13.1). Het platformteam houdt op de host de adresreeksen van de vaste adressen vrij (7.10) |
