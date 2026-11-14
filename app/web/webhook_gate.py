@@ -43,7 +43,7 @@ for a verified event it drops, and ``app.api.webhooks`` for what came of an acce
 import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated, Any, NoReturn
 
 import structlog
@@ -64,7 +64,9 @@ from app.domain.networks import NetworkList
 from app.domain.ports import Clock
 from app.domain.security_log import WEBHOOK_REJECTED
 from app.domain.webhook_ledger import AddressKey, Delivered
+from app.domain.webhook_overlap import Match, verify_with_overlap
 from app.domain.webhook_replay import body_identity
+from app.domain.webhook_secrets import WebhookSecrets
 from app.domain.webhook_sources import ChainFault, judge_source, source_list_that_applies
 from app.web.caller import caller_of, client_address
 from app.web.protection import (
@@ -75,7 +77,8 @@ from app.web.protection import (
 )
 from app.web.request_body import read_capped
 from app.web.security_events import report
-from app.web.webhook_ledger import note_delivered, note_refused
+from app.web.webhook_ledger import note_delivered, note_previous_secret, note_refused
+from app.web.webhook_secrets import installation_secrets_of
 from app.web.webhook_sources import contact_center_networks, proxy_chain, video_networks
 
 log = structlog.get_logger()
@@ -100,7 +103,8 @@ class Address[W: InboundWebhook]:
 
     Attributes:
         inbound: How the platform's webhooks are checked and read (source, verify, parse, ...).
-        secret: The secret the signature is checked under.
+        secrets: The secrets the signature is checked under: the current one, and the previous one
+            for its overlap (ADR 0124 point 8; whether it still counts is decided per call).
         organisation_id: The organisation whose own connection this is; ``None`` for an
             address of the installation.
         organisation: That organisation's slug, public and no personal data.
@@ -111,7 +115,7 @@ class Address[W: InboundWebhook]:
     """
 
     inbound: W
-    secret: str
+    secrets: WebhookSecrets
     organisation_id: int | None = None
     organisation: str | None = None
     sources: NetworkList = NetworkList()
@@ -247,12 +251,14 @@ class _Passed:
         now: The time the checks used.
         identity: The identity of the verified body.
         inside_list: A list applies and the call passed its source check.
+        by: Which secret verified the call (the previous one only inside its overlap).
     """
 
     payload: dict[str, Any]
     now: datetime
     identity: str
     inside_list: bool
+    by: Match
 
 
 def _json_object(body: bytes) -> dict[str, Any] | None:
@@ -293,13 +299,21 @@ async def _inspect(request: Request, address: Address[InboundWebhook]) -> _Faile
         return _Failed(Refusal.TOO_LARGE, inside)
     clock: Clock = request.app.state.clock
     now = clock.now()
-    failure = address.inbound.verify(body, request.headers, address.secret, now)
-    if failure is not None:
-        return _Failed(failure, inside)
+    # Both secrets are always compared; the clock at this moment decides whether the previous
+    # one counts (ADR 0124 point 8). The overlap is the live setting, so a change applies at once.
+    overlap = timedelta(minutes=settings.webhook_secret_overlap_minutes)
+    secret_verdict = verify_with_overlap(
+        address.secrets,
+        now,
+        overlap,
+        lambda secret: address.inbound.verify(body, request.headers, secret, now),
+    )
+    if secret_verdict.refusal is not None or secret_verdict.by is None:
+        return _Failed(secret_verdict.refusal or Refusal.SIGNATURE, inside)
     payload = _json_object(body)
     if payload is None:
         return _Failed(Refusal.MALFORMED, inside)
-    return _Passed(payload, now, body_identity(body), inside)
+    return _Passed(payload, now, body_identity(body), inside, secret_verdict.by)
 
 
 GATE_MARKER = "is_webhook_gate"
@@ -347,6 +361,10 @@ def webhook_gate[W: InboundWebhook](
             )
         if not within_webhook_limit(source, bucket, caller):
             await _refuse(request, Refusal.RATE, address, inside_list=inspected.inside_list)
+        if inspected.by is Match.PREVIOUS:
+            # Accepted exactly like any other; only a count tells the card the platform has not
+            # taken up the new secret yet.
+            await note_previous_secret(request, key_of(address))
         if address.paused:
             # Verified, so a stranger cannot get a 204 this way; dropped before any handling.
             log.info("webhook.paused", source=source, organisation=organisation)
@@ -360,17 +378,13 @@ def webhook_gate[W: InboundWebhook](
 
 async def webex_address(request: Request) -> Address[InboundWebhook] | Unresolved:
     """Resolve the video platform's address; without ``WEBEX_WEBHOOK_SECRET`` it does not exist."""
-    secret = WEBEX_INBOUND.secret(request.app.state.settings)
-    if secret is None:
+    secrets = await installation_secrets_of(request, WEBEX_INBOUND)
+    if secrets is None:
         return Unresolved(WEBEX_INBOUND.source)
-    return Address(
-        WEBEX_INBOUND,
-        secret.get_secret_value(),
-        sources=video_networks(request),
-    )
+    return Address(WEBEX_INBOUND, secrets, sources=video_networks(request))
 
 
-def _installation(
+async def _installation(
     request: Request, handling: ContactCenterWebhook | None
 ) -> Address[ContactCenterWebhook] | Unresolved:
     """Resolve a contact-center address that uses the installation's secret (ADR 0032 point 11).
@@ -379,26 +393,22 @@ def _installation(
     """
     if handling is None:
         return Unresolved(UNKNOWN_SOURCE)
-    secret = handling.secret(request.app.state.settings)
-    if secret is None:
+    secrets = await installation_secrets_of(request, handling)
+    if secrets is None:
         return Unresolved(handling.source)
-    return Address(
-        handling,
-        secret.get_secret_value(),
-        sources=contact_center_networks(request),
-    )
+    return Address(handling, secrets, sources=contact_center_networks(request))
 
 
 async def installation_address(
     request: Request, kind: str
 ) -> Address[ContactCenterWebhook] | Unresolved:
     """Resolve ``/webhooks/contact-center/{kind}``."""
-    return _installation(request, inbound(kind))
+    return await _installation(request, inbound(kind))
 
 
 async def alias_address(request: Request) -> Address[ContactCenterWebhook] | Unresolved:
     """Resolve the alias of Webex Contact Center's address (ADR 0032 CC-4)."""
-    return _installation(request, WXCC_INBOUND)
+    return await _installation(request, WXCC_INBOUND)
 
 
 async def organisation_address(
@@ -414,12 +424,12 @@ async def organisation_address(
         return Unresolved(UNKNOWN_SOURCE)
     service: ContactCenterConnectionService = request.app.state.contact_center_connection_service
     target = await service.webhook_target(org, handling.kind)
-    if not target.found or target.secret is None:
+    if not target.found or target.secrets is None:
         return Unresolved(handling.source, target.organisation)
     sources = source_list_that_applies(target.allowed_networks, contact_center_networks(request))
     return Address(
         handling,
-        target.secret,
+        target.secrets,
         target.organisation_id,
         target.organisation,
         sources,

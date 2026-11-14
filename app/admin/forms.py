@@ -99,6 +99,8 @@ DONE_MESSAGES: dict[str, str] = {
     "contact_center_saved_not_ready": "admin.done.contact_center_saved_not_ready",
     "contact_center_saved": "admin.done.contact_center_saved",
     "contact_center_not_registered": "admin.done.contact_center_not_registered",
+    "contact_center_replaced": "admin.done.contact_center_replaced",
+    "contact_center_gone": "admin.done.contact_center_gone",
     "confirmed_by_staff": "admin.done.confirmed_by_staff",
     "not_pending": "admin.done.not_pending",
     "confirm_lapsed": "admin.done.confirm_lapsed",

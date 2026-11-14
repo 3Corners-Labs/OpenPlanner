@@ -64,8 +64,16 @@ EDITABLE_TOPICS = frozenset(
 """The topics of class C settings the portal changes: step 4, and mail, updates and the Webex
 Service App with their secrets from step 6 (sealed, ADR 0008). The login mapping follows."""
 
-GENERATED_SECRETS = frozenset({"webex_webhook_secret", "wxcc_webhook_secret"})
-"""Secrets the server generates and rotates with a button, never typed in (ADR 0042 inventory)."""
+GENERATED_SECRETS = frozenset(
+    {
+        "webex_webhook_secret",
+        "wxcc_webhook_secret",
+        "webex_webhook_secret_previous",
+        "wxcc_webhook_secret_previous",
+    }
+)
+"""The installation's webhook secrets and their previous values (ADR 0124 point 8): never typed
+in the portal, set in the environment (ADR 0042 inventory)."""
 
 LOG_LEVEL = "log_level"
 LOGIN_SUFFIX = "bundled_idp_login_suffix"
