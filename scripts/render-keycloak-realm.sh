@@ -26,6 +26,9 @@
 #   KC_OPENPLANNER_BASE_URL       the portal's address for the redirect URIs: PUBLIC_BASE_URL
 #                                 from .env, else http://127.0.0.1:8000
 #   KC_HOSTNAME                   the address browsers reach Keycloak on (default loopback)
+#   KC_CLIENT_SECRETS_PINNED      `true` once this script made both client secrets itself, since
+#                                 every hop has a fixed address (ADR 0125 step 2); without it the
+#                                 installer replaces them, as they may have reached the name idp
 #
 # With --database postgres (production, ADR 0106 point 4) Keycloak runs on its own PostgreSQL
 # container `idp-db`: the script also generates KC_DB_PASSWORD and writes the connection to
@@ -45,7 +48,7 @@ while (($#)); do
   case $1 in
     --dir) DIR=$2; shift 2 ;;
     --database) DATABASE=${2:-}; shift 2 ;;
-    -h|--help) sed -n '2,39p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,42p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -92,6 +95,11 @@ chmod 700 "$SECRETS_DIR"
 for key in "${KEYS[@]}"; do
   declare "$key=$(read_var "$ENV_FILE" "$key")"
 done
+# ADR 0125 step 2: a pair made here never travelled to the name idp, because every hop now has a
+# fixed address; the mark stays with the pair. A kept pair without it may have, and the installer
+# replaces it (new_client_secrets).
+KC_CLIENT_SECRETS_PINNED=$(read_var "$ENV_FILE" KC_CLIENT_SECRETS_PINNED)
+[[ -n $KC_OPENPLANNER_CLIENT_SECRET || -n $KC_DIRECTORY_CLIENT_SECRET ]] || KC_CLIENT_SECRETS_PINNED=true
 generated=()
 for key in "${GENERATED[@]}"; do
   [[ -n ${!key} ]] || { declare "$key=$(secret)"; generated+=("$key"); }
@@ -136,6 +144,7 @@ tmp=$(mktemp "$SECRETS_DIR/.keycloak.env.XXXXXX")
   printf '# Written by scripts/render-keycloak-realm.sh (ADR 0090). Holds secrets: mode 600,\n'
   printf '# never copied off this host. Re-run the script after a change to render the realm.\n'
   for key in "${KEYS[@]}"; do printf '%s=%s\n' "$key" "${!key}"; done
+  [[ $KC_CLIENT_SECRETS_PINNED != true ]] || printf 'KC_CLIENT_SECRETS_PINNED=true\n'
   if [[ $DATABASE == postgres ]]; then
     printf 'KC_DB=postgres\nKC_DB_URL_HOST=%s\nKC_DB_URL_DATABASE=keycloak\n' "$IDP_DB_ADDRESS"
     printf 'KC_DB_USERNAME=keycloak\nKC_DB_PASSWORD=%s\n' "$KC_DB_PASSWORD"

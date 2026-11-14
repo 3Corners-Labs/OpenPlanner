@@ -15,6 +15,9 @@ from pathlib import Path
 
 import pytest
 
+from app.domain.web_transport import BUNDLED_IDP_UPSTREAM
+from tests.support.compose import compose_file
+
 ENTRYPOINT = Path(__file__).parents[2] / "deploy/proxy/entrypoint.sh"
 SH = shutil.which("sh") or "/bin/sh"
 FAKE_CADDY = """#!/bin/sh
@@ -261,9 +264,9 @@ def test_operator_files_win_over_the_internal_authority(bin_dir: Path, tmp_path:
     assert outcome.logged == [f"run:tls {cert} {key}"]
 
 
-IDP_ADDRESS = "172.31.240.4:8080"
+IDP_ADDRESS = BUNDLED_IDP_UPSTREAM
 """The bundled identity provider's fixed address and port (ADR 0125 step 2)."""
-WEB_ADDRESS = "172.31.240.3:8000"
+WEB_ADDRESS = compose_file()["services"]["proxy"]["environment"]["WEB_UPSTREAM"]
 """Web's fixed address and port on edge, as ``docker-compose.yml`` hands it to the proxy."""
 ACME = {"TLS_DOMAIN": "a.example.nl", "ACME_EMAIL": "ops@example.nl"}
 COMPOSE = {**ACME, "WEB_UPSTREAM": WEB_ADDRESS}

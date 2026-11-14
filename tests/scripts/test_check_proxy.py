@@ -142,8 +142,8 @@ def test_pass_4_proves_the_addresses_a_host_gets_not_addresses_of_its_own() -> N
     [
         ("idp-db", "answers idp http://idp-db:5432/", '[ "$(fetch idp "$database")" = "refused" ]'),
         ("idp", "answers web http://idp:8080/", '[ "$(fetch web "$login")" = "refused" ]'),
-        ("idp", "wget -q -O - -T 5 http://idp:8080/", '[ "$(proxied "$idp_path")" = " 502" ]'),
-        ("web", "wget -q -O - -T 5 http://web:8000/", '[ "$(proxied /healthz)" = " 502" ]'),
+        ("idp", "answers proxy http://idp:8080/", '[ "$(proxied "$idp_path")" = " 502" ]'),
+        ("web", "answers proxy http://web:8000/", '[ "$(proxied /healthz)" = " 502" ]'),
     ],
 )
 def test_a_hop_fails_closed_only_after_an_impostor_answers_its_name(
@@ -177,3 +177,8 @@ def test_the_impostors_are_removed_before_the_networks_they_hold() -> None:
     cleanup = _body("cleanup")
 
     assert cleanup.index("impostor") < cleanup.index("compose down -v")
+
+
+def test_an_impostor_counts_only_the_hops_that_reach_it() -> None:
+    """The image's health check asks 127.0.0.1:8000, which the impostor for web answers."""
+    assert "--no-healthcheck" in _body("impostor")

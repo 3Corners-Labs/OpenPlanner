@@ -17,8 +17,12 @@ import ipaddress
 import re
 from typing import Any
 
-from app.domain.web_transport import BUNDLED_IDP_ADDRESS, BUNDLED_PROXY_ADDRESS
-from tests.support.compose import REPO, compose_file
+from app.domain.web_transport import (
+    BUNDLED_IDP_ADDRESS,
+    BUNDLED_IDP_UPSTREAM,
+    BUNDLED_PROXY_ADDRESS,
+)
+from tests.support.compose import REPO, compose_file, fixed_address
 
 COMPOSE: dict[str, Any] = compose_file()
 SERVICES: dict[str, Any] = COMPOSE["services"]
@@ -77,16 +81,11 @@ def _ipv4_pool(network: str) -> dict[str, str]:
     return next(pool for pool in pools if ipaddress.ip_network(pool["subnet"]).version == 4)
 
 
-def _fixed(service: str, network: str) -> ipaddress.IPv4Address:
-    """Return the fixed IPv4 address a service has on a network."""
-    return ipaddress.IPv4Address(SERVICES[service]["networks"][network]["ipv4_address"])
-
-
 def test_every_hop_on_the_host_has_a_fixed_address_no_container_is_handed_adr_0125() -> None:
     """Outside the dynamic range and the gateway: while its owner is down, the address is free."""
     taken: dict[ipaddress.IPv4Address, str] = {}
     for service, network in FIXED:
-        address, pool = _fixed(service, network), _ipv4_pool(network)
+        address, pool = fixed_address(service, network), _ipv4_pool(network)
         subnet = ipaddress.IPv4Network(pool["subnet"])
 
         assert SERVICES[service]["networks"][network] == {"ipv4_address": str(address)}
@@ -102,7 +101,8 @@ def test_every_hop_on_the_host_has_a_fixed_address_no_container_is_handed_adr_01
 
 def test_the_hops_name_those_addresses_wherever_they_are_written_adr_0125() -> None:
     """The compose file, the installer, the render script, the proxy and the start-up check."""
-    web, idp, database = _fixed("web", "edge"), _fixed("idp", "edge"), _fixed("idp-db", "idp-store")
+    web, idp = fixed_address("web", "edge"), fixed_address("idp", "edge")
+    database = fixed_address("idp-db", "idp-store")
     install = (REPO / "scripts/install.sh").read_text()
     render = (REPO / "scripts/render-keycloak-realm.sh").read_text()
     caddyfile = (REPO / "deploy/proxy/Caddyfile").read_text()
@@ -111,7 +111,8 @@ def test_the_hops_name_those_addresses_wherever_they_are_written_adr_0125() -> N
     assert "reverse_proxy {$WEB_UPSTREAM}" in caddyfile
     assert not re.search(r"reverse_proxy [A-Za-z]", caddyfile)  # no route to a name
     assert BUNDLED_IDP_ADDRESS == str(idp)
-    assert re.search(rf"^BUNDLED_IDP_UPSTREAM={re.escape(str(idp))}:8080$", install, re.MULTILINE)
+    assert BUNDLED_IDP_UPSTREAM == f"{idp}:8080"
+    assert re.search(rf"^BUNDLED_IDP_UPSTREAM={re.escape(BUNDLED_IDP_UPSTREAM)}$", install, re.M)
     assert re.search(rf"^IDP_ADDRESS={re.escape(str(idp))}$", render, re.MULTILINE)
     assert re.search(rf"^IDP_DB_ADDRESS={re.escape(str(database))}$", render, re.MULTILINE)
     assert not re.search(r"//idp:|idp-db:|IDP_UPSTREAM=idp", install + render)

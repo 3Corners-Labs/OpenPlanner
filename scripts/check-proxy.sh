@@ -337,7 +337,11 @@ except OSError as error:
 '
 
 fetch() { # fetch SERVICE URL: what SERVICE gets from URL, `refused` when nothing answers
-  compose exec -T "$1" python -I -c "$fetch_code" "$2"
+  if [ "$1" = proxy ]; then # Caddy's image has no Python; busybox wget does the same
+    compose exec -T proxy wget -q -O - -T 10 "$2" || echo refused
+  else
+    compose exec -T "$1" python -I -c "$fetch_code" "$2"
+  fi
 }
 
 proxied() { # proxied PATH: the body of a request through the proxy, a space, its status
@@ -346,10 +350,11 @@ proxied() { # proxied PATH: the body of a request through the proxy, a space, it
 }
 
 impostor() { # impostor NAME NETWORK PORT: stop container NAME; another answers NAME on NETWORK
+  # Without the image's own health check, which asks 127.0.0.1:8000 and would count as a request.
   docker stop "$(compose ps -q "$1")" >/dev/null
-  docker run -d --rm --name "$project-impostor-$1" --network "${project}_$2" --network-alias "$1" \
-    -v "$certs:/pebble:ro" --entrypoint python "$image" -I /pebble/responder.py "impostor $1" "$3" \
-    >/dev/null
+  docker run -d --rm --no-healthcheck --name "$project-impostor-$1" --network "${project}_$2" \
+    --network-alias "$1" -v "$certs:/pebble:ro" --entrypoint python "$image" \
+    -I /pebble/responder.py "impostor $1" "$3" >/dev/null
 }
 
 answers() { # answers SERVICE URL BODY: wait until SERVICE gets BODY from URL, the impostor's name
@@ -503,8 +508,7 @@ seen="$(requests idp-db)"
 
 impostor idp edge 8080
 answers web http://idp:8080/ "impostor idp"
-[ "$(compose exec -T proxy wget -q -O - -T 5 http://idp:8080/ 2>/dev/null || true)" = "impostor idp" ] \
-  || fail "the impostor does not answer the name idp for the proxy, so its refusal would prove nothing"
+answers proxy http://idp:8080/ "impostor idp"
 seen="$(requests idp)"
 [ "$(fetch web "$login")" = "refused" ] || fail "web's login reached something while idp was down"
 [ "$(fetch web "$directory")" = "refused" ] || fail "web's staff directory reached something while idp was down"
@@ -513,8 +517,7 @@ seen="$(requests idp)"
 [ "$(requests idp)" = "$seen" ] || fail "the impostor for idp received a hop meant for the identity provider"
 
 impostor web edge 8000
-[ "$(compose exec -T proxy wget -q -O - -T 5 http://web:8000/ 2>/dev/null || true)" = "impostor web" ] \
-  || fail "the impostor does not answer the name web for the proxy, so its refusal would prove nothing"
+answers proxy http://web:8000/ "impostor web"
 seen="$(requests web)"
 [ "$(proxied /healthz)" = " 502" ] || fail "the proxy reached something while web was down"
 [ "$(requests web)" = "$seen" ] || fail "the impostor for web received the proxy's route"

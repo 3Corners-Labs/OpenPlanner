@@ -5,6 +5,7 @@ import pytest
 from app.domain.web_transport import (
     BUNDLED_IDP_ADDRESS,
     BUNDLED_IDP_DISCOVERY_URL,
+    BUNDLED_IDP_UPSTREAM,
     BUNDLED_PROXY_ADDRESS,
     bundled_idp_hop,
     proxy_hop_unencrypted,
@@ -43,7 +44,7 @@ def test_without_an_https_issuer_the_bundled_address_is_no_exception(issuer: str
     assert bundled_idp_hop(BUNDLED_IDP_DISCOVERY_URL, issuer) is False
 
 
-PINNED = f"{BUNDLED_IDP_ADDRESS}:8080"
+PINNED = BUNDLED_IDP_UPSTREAM
 
 
 @pytest.mark.parametrize(

@@ -10,15 +10,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-import yaml
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 
 from app.adapters.bootstrap import GENERATED
 from app.config import Settings
 from app.domain.settings_registry import BY_KEY
-from app.domain.web_transport import BUNDLED_IDP_ADDRESS, BUNDLED_IDP_DISCOVERY_URL
+from app.domain.web_transport import BUNDLED_IDP_DISCOVERY_URL, BUNDLED_IDP_UPSTREAM
 from tests.fakes import updater_host
 from tests.fakes.updater_host import digest
+from tests.support.compose import compose_file, fixed_address
 
 REPO = Path(__file__).parents[2]
 BASH = shutil.which("bash") or "/bin/bash"
@@ -37,10 +37,9 @@ SYSTEM = (
     *("hostname", "install", "mkdir", "mktemp", "mv", "rm", "sed", "sort", "tail", "tr", "uniq"),
 )
 KEYS = tuple(BY_KEY[key].env for key in GENERATED)
-IDP_UPSTREAM = f"{BUNDLED_IDP_ADDRESS}:8080"
+IDP_UPSTREAM = BUNDLED_IDP_UPSTREAM
 """Where the proxy reaches the bundled provider: its fixed address (ADR 0125 step 2)."""
-COMPOSE = yaml.safe_load((REPO / "docker-compose.yml").read_text())
-IDP_DB_ADDRESS = COMPOSE["services"]["idp-db"]["networks"]["idp-store"]["ipv4_address"]
+IDP_DB_ADDRESS = str(fixed_address("idp-db", "idp-store"))
 PRODUCTION = {
     "TLS_DOMAIN": "afspraak.example.nl",
     "ACME_EMAIL": "ops@example.nl",
@@ -1097,7 +1096,7 @@ def _container_settings(host: Host) -> Settings:
     the containers read, in the order ``docker-compose.yml`` lists them (a later file wins).
     """
     values: dict[str, str] = {}
-    for entry in yaml.safe_load((REPO / "docker-compose.yml").read_text())["x-app"]["env_file"]:
+    for entry in compose_file()["x-app"]["env_file"]:
         if host.file(entry["path"]).is_file():
             values |= host.settings(entry["path"])
     return _ContainerSettings(**{key.lower(): value for key, value in values.items()})
@@ -1139,13 +1138,14 @@ def _as_before_adr_0125_step_2(host: Host) -> dict[str, str]:
     """Give an installed host the files it had before ADR 0125 step 2; return its secrets.
 
     The render script wrote the name ``idp`` into the login and the directory and ``idp-db`` as
-    Keycloak's database, and the installer ``IDP_UPSTREAM=idp:8080``. The fake's logs start
-    again, so the next run is read on its own.
+    Keycloak's database, did not mark its client secrets, and the installer wrote
+    ``IDP_UPSTREAM=idp:8080``. The fake's logs start again, so the next run is read on its own.
     """
     for name, pinned, by_name in (
         ("secrets/keycloak-app.env", IDP_UPSTREAM, "idp:8080"),
         ("proxy.env", f"IDP_UPSTREAM={IDP_UPSTREAM}", "IDP_UPSTREAM=idp:8080"),
         ("secrets/keycloak.env", f"KC_DB_URL_HOST={IDP_DB_ADDRESS}", "KC_DB_URL_HOST=idp-db"),
+        ("secrets/keycloak.env", "KC_CLIENT_SECRETS_PINNED=true\n", ""),
     ):
         path = host.file(name)
         assert pinned in path.read_text()
@@ -1243,23 +1243,67 @@ def test_a_rerun_on_the_fixed_address_keeps_the_client_secrets(host: Host) -> No
     assert "client secrets" not in again.stdout + again.stderr
 
 
-def test_a_host_back_from_its_own_provider_gets_new_client_secrets(host: Host) -> None:
-    """Its secrets waited in secrets/keycloak.env, and the realm in the volume still has them."""
-    _production_bundled(host)
-    before = _secrets(host)
+def _leave_and_return(host: Host) -> subprocess.CompletedProcess[str]:
+    """Move an installed host to its own provider (--idp own) and back to the bundled one."""
     with host.file(".env").open("a") as env:
         env.writelines(
             f"{key}='{PRODUCTION[key]}'\n" for key in ("OIDC_DISCOVERY_URL", "OIDC_CLIENT_SECRET")
         )
     assert host.run("--idp", "own", "--non-interactive").returncode == 0
+    return host.run("--idp", "bundled", "--non-interactive")
 
-    back = host.run("--idp", "bundled", "--non-interactive")
+
+def test_a_host_back_from_its_own_provider_keeps_a_pair_made_on_the_fixed_address(
+    host: Host,
+) -> None:
+    """The render script marked the pair: it never travelled to the name idp."""
+    _production_bundled(host)
+    before = _secrets(host)
+
+    back = _leave_and_return(host)
 
     assert back.returncode == 0, back.stderr
-    after = _secrets(host)
-    assert all(after[key] != before[key] for key in SECRET_KEYS)
-    assert _secrets_handed_to_keycloak(host)[-1] == [*after.values()]
+    assert _secrets(host) == before
+    assert host.settings("secrets/keycloak.env")["KC_CLIENT_SECRETS_PINNED"] == "true"
+    assert _secrets_handed_to_keycloak(host) == []
+
+
+def test_a_host_that_left_before_step_2_gets_a_new_pair_on_its_way_back(host: Host) -> None:
+    """Its unmarked pair waited in secrets/keycloak.env, and the realm in the volume has it too."""
+    _production_bundled(host)
+    old = _as_before_adr_0125_step_2(host)
+
+    back = _leave_and_return(host)
+
+    assert back.returncode == 0, back.stderr
+    new = _secrets(host)
+    assert all(new[key] != old[key] for key in SECRET_KEYS)
+    assert _secrets_handed_to_keycloak(host)[-1] == [*new.values()]
     assert not host.file(MARK).exists()
+
+
+def test_a_render_by_hand_before_the_installer_does_not_keep_the_old_pair(host: Host) -> None:
+    """System status and the runbook send operators to the render script; it keeps values."""
+    _production_bundled(host)
+    old = _as_before_adr_0125_step_2(host)
+    render = subprocess.run(  # noqa: S603 - the checkout's own script
+        [BASH, str(host.file("scripts/render-keycloak-realm.sh")), "--dir", str(host.checkout)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert render.returncode == 0, render.stderr
+    assert (
+        host.settings("secrets/keycloak-app.env")["OIDC_DISCOVERY_URL"] == BUNDLED_IDP_DISCOVERY_URL
+    )
+    assert _secrets(host) == old  # the login moved, the pair did not
+
+    result = host.run("--non-interactive")
+
+    assert result.returncode == 0, result.stderr
+    new = _secrets(host)
+    assert all(new[key] != old[key] for key in SECRET_KEYS)
+    assert _secrets_handed_to_keycloak(host) == [[*new.values()]]
 
 
 def test_a_host_that_leaves_the_bundled_keycloak_logs_in_with_its_own_provider(

@@ -29,11 +29,14 @@ addresses, so no other container is handed it while the provider is down. The pr
 ``scripts/render-keycloak-realm.sh`` writes all use it; a test keeps them equal.
 """
 
+BUNDLED_IDP_UPSTREAM = f"{BUNDLED_IDP_ADDRESS}:8080"
+"""The bundled identity provider's address and port, as the proxy's ``IDP_UPSTREAM`` names it."""
+
 BUNDLED_REALM_PATH = "/realms/openplanner/"
 """Where the bundled provider's realm sits in its addresses (ADR 0090, the realm template)."""
 
 BUNDLED_IDP_DISCOVERY_URL = (
-    f"http://{BUNDLED_IDP_ADDRESS}:8080/idp{BUNDLED_REALM_PATH.rstrip('/')}{DISCOVERY_SUFFIX}"
+    f"http://{BUNDLED_IDP_UPSTREAM}/idp{BUNDLED_REALM_PATH.rstrip('/')}{DISCOVERY_SUFFIX}"
 )
 """Where web reads the bundled provider's login on the internal network (ADR 0112 point 4).
 

@@ -75,7 +75,7 @@ CONFIG_ENV=$DIR/secrets/config.env
 # while the container is down. scripts/render-keycloak-realm.sh and app/domain/web_transport.py
 # hold the same address; a test keeps them equal.
 BUNDLED_IDP_UPSTREAM=172.31.240.4:8080
-# Written before the bundled provider's client secrets are replaced, removed once Keycloak has
+# Written once the bundled provider's old client secrets are dropped, removed once Keycloak has
 # the new ones (new_client_secrets, idp_client_secrets): a run that stops in between leaves it,
 # and the next run finishes the job with the same secrets instead of making a second pair.
 ROTATION_MARK=$DIR/secrets/keycloak-secrets.pending
@@ -759,20 +759,20 @@ render_idp() {
   log "first password of the portal user 'super': KC_SUPER_PASSWORD in $kept (changed at the first login)"
 }
 
-# ADR 0125 step 2: a kept realm whose login was not rendered on the fixed address reached the
-# provider by the name idp (or comes back from --idp own), so its two client secrets may be held by
-# whatever answered that name while the container was down; the render script keeps existing
-# values, so nothing else would replace them. They are dropped here, the render script makes new
-# ones for the files, and idp_client_secrets sets them in Keycloak once it runs. The mark goes
-# first, so a run that stops in between keeps the new pair for the next one.
+# ADR 0125 step 2: a kept pair of client secrets that the render script did not make since every
+# hop has a fixed address (no KC_CLIENT_SECRETS_PINNED) was in use while the provider was reached
+# by the name idp, so whatever answered that name while the container was down may hold it, and
+# the render script keeps existing values. The pair is dropped here, the render script makes and
+# marks a new one for the files, and idp_client_secrets sets it in Keycloak once it runs. The mark
+# goes after the drop: a run that stops before it drops again (no harm), one that stops after it
+# keeps the new pair for the next run.
 new_client_secrets() {
   local kept=$1
-  [[ -f $kept && ! -f $ROTATION_MARK ]] || return 0
-  ! grep -q "^OIDC_DISCOVERY_URL=http://$BUNDLED_IDP_UPSTREAM/" "$DIR/secrets/keycloak-app.env" 2>/dev/null \
-    || return 0
+  [[ -f $kept && ! -f $ROTATION_MARK && $(value "$kept" KC_CLIENT_SECRETS_PINNED) != true ]] || return 0
+  { sed -i.bak '/^KC_OPENPLANNER_CLIENT_SECRET=/d; /^KC_DIRECTORY_CLIENT_SECRET=/d' "$kept" \
+    && rm -f "$kept.bak"; } || die "could not drop the old client secrets from $kept"
   : >"$ROTATION_MARK"
-  sed -i.bak '/^KC_OPENPLANNER_CLIENT_SECRET=/d; /^KC_DIRECTORY_CLIENT_SECRET=/d' "$kept" && rm -f "$kept.bak"
-  log "replacing the bundled identity provider's two client secrets: its login was not on the fixed address, so whatever answered the name idp may hold them (ADR 0125)"
+  log "replacing the bundled identity provider's two client secrets: they were in use while it was reached by the name idp, which this host's DNS could answer (ADR 0125)"
 }
 
 # ADR 0125 point 6: a host that leaves the bundled provider (--idp own) drops the application's
@@ -1030,49 +1030,44 @@ idp_mail() {
     "$(json_escape "$host")" "${port:-587}" "$(json_escape "$from")" "${starttls:-true}" \
     "$([[ -n $user ]] && echo true || echo false)" \
     "$([[ -n $user ]] && printf ',"user":"%s","password":"%s"' "$(json_escape "$user")" "$(json_escape "$password")")")
-  # shellcheck disable=SC2016 # runs in the container, which expands $rc
-  printf '%s' "$json" | idp_admin '
-      cat >/tmp/op-smtp.json && /opt/keycloak/bin/kcadm.sh update realms/openplanner -f /tmp/op-smtp.json >/dev/null 2>&1
-      rc=$?; rm -f /tmp/op-smtp.json; exit $rc' \
+  idp_kcadm '/opt/keycloak/bin/kcadm.sh update realms/openplanner -f - >/dev/null 2>&1' "$json" \
     || { warn "the bundled identity provider did not take its mail server within ${HEALTH_TIMEOUT}s; set it in its console (docs/runbook.md)"; return 0; }
   log "the bundled identity provider's mail server: $host (Keycloak mails invitations and resets itself)"
 }
 
 # ADR 0125 step 2: Keycloak takes the client secrets that new_client_secrets had rendered. It
 # imports the realm only while the realm does not exist, so a new render never reaches a running
-# one: kcadm.sh sets both, with the values on stdin. Until then staff cannot log in, so a failure
-# stops the run; the mark stays, and the next run sets the same secrets.
+# one: kcadm.sh sets both, the values on stdin and never on a disk. Until then staff cannot log
+# in, so a failure stops the run; the mark stays, and the next run sets the same secrets.
 idp_client_secrets() {
   [[ $IDP == bundled && -f $ROTATION_MARK ]] || return 0
   local kept=$DIR/secrets/keycloak.env
   # shellcheck disable=SC2016 # runs in the container, which expands its own variables
-  printf '%s\n%s\n' "$(value "$kept" KC_OPENPLANNER_CLIENT_SECRET)" "$(value "$kept" KC_DIRECTORY_CLIENT_SECRET)" \
-    | idp_admin '
-      umask 077
-      read -r admin && read -r directory || exit 1
+  idp_kcadm '
+      read -r admin; read -r directory; [ -n "$admin" ] && [ -n "$directory" ] || exit 1
       secret() { # secret CLIENT VALUE: the new secret of one client in realm openplanner
         id=$(/opt/keycloak/bin/kcadm.sh get clients -r openplanner -q clientId="$1" --fields id --format csv --noquotes) \
-          && [ -n "$id" ] && printf "{\"secret\":\"%s\"}" "$2" >/tmp/op-secret.json \
-          && /opt/keycloak/bin/kcadm.sh update "clients/$id" -r openplanner -f /tmp/op-secret.json >/dev/null 2>&1
-        rc=$?; rm -f /tmp/op-secret.json; return $rc
+          && [ -n "$id" ] && printf "{\"secret\":\"%s\"}" "$2" \
+          | /opt/keycloak/bin/kcadm.sh update "clients/$id" -r openplanner -f - >/dev/null 2>&1
       }
       secret openplanner-admin "$admin" && secret openplanner-directory "$directory"' \
+    "$(printf '%s\n%s' "$(value "$kept" KC_OPENPLANNER_CLIENT_SECRET)" "$(value "$kept" KC_DIRECTORY_CLIENT_SECRET)")" \
     || die "the bundled identity provider did not take its new client secrets within ${HEALTH_TIMEOUT}s, so staff cannot log in" \
       "Check that KC_BOOTSTRAP_ADMIN_PASSWORD in secrets/keycloak.env is the password of 'admin' in realm master (the runbook's recovery after an unexplained outage changes it), then run this script again: it sets the same new secrets."
   rm -f "$ROTATION_MARK"
   log "the bundled identity provider took its new client secrets; the old ones no longer work (ADR 0125)"
 }
 
-# idp_admin SCRIPT: run SCRIPT with sh in the idp container, logged in with kcadm.sh to realm
-# master as `admin`. The password is the container's own KC_BOOTSTRAP_ADMIN_PASSWORD and reaches
-# kcadm.sh as KC_CLI_PASSWORD, never as an argument (which ps shows); this function's stdin
-# becomes SCRIPT's, so values travel the same way. Retried until it succeeds or HEALTH_TIMEOUT
-# passes, since Keycloak takes a while to start; returns 1 then.
-idp_admin() {
-  local input path deadline=$((SECONDS + HEALTH_TIMEOUT))
-  input=$(cat)
+# idp_kcadm SCRIPT [INPUT]: run SCRIPT with sh in the idp container, logged in with kcadm.sh to
+# realm master as `admin`, retrying until Keycloak answers or HEALTH_TIMEOUT passes (status 1).
+# INPUT goes to SCRIPT on stdin, so a secret in it is never an argument (which ps shows); the
+# admin password is the container's own KC_BOOTSTRAP_ADMIN_PASSWORD and reaches kcadm.sh as
+# KC_CLI_PASSWORD for the same reason.
+idp_kcadm() {
+  local path deadline=$((SECONDS + HEALTH_TIMEOUT))
   path=$(value "$DIR/secrets/keycloak.env" KC_HTTP_RELATIVE_PATH)
-  until printf '%s\n' "$input" | compose exec -T idp sh -c "
+  [[ $path =~ ^(/[A-Za-z0-9_-]+)*$ ]] || { warn "KC_HTTP_RELATIVE_PATH in secrets/keycloak.env is not a plain path"; return 1; }
+  until printf '%s\n' "${2:-}" | compose exec -T idp sh -c "
       KC_CLI_PASSWORD=\$KC_BOOTSTRAP_ADMIN_PASSWORD /opt/keycloak/bin/kcadm.sh config credentials \
         --server http://localhost:8080${path} --realm master --user admin </dev/null >/dev/null 2>&1 || exit 1
       $1" >/dev/null 2>&1; do

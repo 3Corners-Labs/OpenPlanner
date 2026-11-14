@@ -1029,16 +1029,18 @@ that address (`secrets/keycloak-app.env`); Keycloak reaches its database at `172
 (`KC_DB_URL_HOST` in `secrets/keycloak.env`) on the internal network `idp-store`, which only
 `idp` and `idp-db` join. The addresses lie outside the range Docker hands out, so while a
 container is down its address stays free and its hop fails: logging in fails, `/idp` answers
-502, and so does the portal while web restarts. Before this step the hops used the names `idp`,
+502, and so does the portal while web restarts. (Mailpit, a lab's mail catcher, keeps its name;
+it is never in production, ADR 0125 point 5.) Before this step the hops used the names `idp`,
 `idp-db` and `web`, which Docker passes to the host's resolver while the container is down.
 `scripts/check-proxy.sh` (pass 4) shows it on a real Docker host.
 
 *Moving a host.* After a portal update, bring the checkout to the same release and run the
 installer (`docs/install.md`, *Upgrading*); until then the proxy finds web by its name as before
 and says so in its log. The installer writes `IDP_UPSTREAM` with the address, renders the
-login, the directory and the database host again and, on a host whose login still named `idp`,
-replaces both client secrets (`KC_OPENPLANNER_CLIENT_SECRET`, `KC_DIRECTORY_CLIENT_SECRET`):
-whatever answered that name may hold the old ones. They change in `secrets/keycloak.env`,
+login, the directory and the database host again and replaces both client secrets
+(`KC_OPENPLANNER_CLIENT_SECRET`, `KC_DIRECTORY_CLIENT_SECRET`) unless the render script made them
+since this step (`KC_CLIENT_SECRETS_PINNED=true` in `secrets/keycloak.env`): whatever answered the
+name `idp` may hold the old ones. Running the render script by hand first does not change that. They change in `secrets/keycloak.env`,
 `secrets/keycloak-app.env` and the realm file and, once Keycloak runs, in Keycloak itself
 (`kcadm.sh`, logged in as `admin` with `KC_BOOTSTRAP_ADMIN_PASSWORD`, the values on standard
 input). Staff cannot log in between the start of web and that moment. When the installer stops
@@ -1059,7 +1061,8 @@ secrets, all of which work after the outage; it also served pages and script on 
 address. The new client secrets of the move do not replace step 2 below: an administrator planted
 in realm `master` during the outage can read them. Nothing logs whether Keycloak's console was
 used in that time (the proxy keeps no access log, Keycloak no event log here), so assume it was.
-Since the move an outage only stops the login. When the `idp` container was down before the
+Since the move an outage stops the login, the staff directory and `/idp`, and reaches nothing
+else. When the `idp` container was down before the
 move and the reason is not known (an update or a restart you did yourself is known), work through
 these steps in this order:
 

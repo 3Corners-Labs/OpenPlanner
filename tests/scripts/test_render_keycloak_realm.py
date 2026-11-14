@@ -14,16 +14,16 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import yaml
 
-from app.domain.web_transport import BUNDLED_IDP_ADDRESS, BUNDLED_IDP_DISCOVERY_URL
+from app.domain.web_transport import BUNDLED_IDP_DISCOVERY_URL, BUNDLED_IDP_UPSTREAM
+from tests.support.compose import fixed_address
 
 REPO = Path(__file__).parents[2]
 SCRIPT = REPO / "scripts/render-keycloak-realm.sh"
 TEMPLATE = REPO / "deploy/keycloak/realm.template.json"
 DEV_REALM = REPO / "dev/keycloak/openplanner-realm.json"
 BASH = shutil.which("bash") or "/bin/bash"
-INTERNAL = f"http://{BUNDLED_IDP_ADDRESS}:8080"
+INTERNAL = f"http://{BUNDLED_IDP_UPSTREAM}"
 """Where web and worker reach the provider: its fixed address, never a name (ADR 0125)."""
 FIXED = {
     "KC_BOOTSTRAP_ADMIN_PASSWORD": "fixed-admin-password-0123456789",
@@ -216,6 +216,30 @@ def test_existing_values_are_kept_on_a_second_run(tmp_path: Path) -> None:
 
     assert read_env(tmp_path / "secrets/keycloak.env") == first
     assert first["KC_SUPER_PASSWORD"] == FIXED["KC_SUPER_PASSWORD"]
+
+
+def test_a_pair_of_client_secrets_made_here_is_marked_and_stays_marked(tmp_path: Path) -> None:
+    """ADR 0125 step 2: made since every hop has a fixed address, so it never met the name idp."""
+    assert render(tmp_path).returncode == 0
+    first = read_env(tmp_path / "secrets/keycloak.env")
+
+    assert render(tmp_path).returncode == 0
+
+    again = read_env(tmp_path / "secrets/keycloak.env")
+    assert first["KC_CLIENT_SECRETS_PINNED"] == again["KC_CLIENT_SECRETS_PINNED"] == "true"
+    for key in ("KC_OPENPLANNER_CLIENT_SECRET", "KC_DIRECTORY_CLIENT_SECRET"):
+        assert again[key] == first[key]
+
+
+@pytest.mark.parametrize("kept", ["KC_OPENPLANNER_CLIENT_SECRET", "KC_DIRECTORY_CLIENT_SECRET"])
+def test_a_kept_client_secret_is_never_marked(tmp_path: Path, kept: str) -> None:
+    """A secret from an earlier file may have reached the name idp: the installer replaces it."""
+    result = render(tmp_path, f"{kept}={FIXED[kept]}\n")
+
+    assert result.returncode == 0, result.stderr
+    keycloak = read_env(tmp_path / "secrets/keycloak.env")
+    assert keycloak[kept] == FIXED[kept]
+    assert "KC_CLIENT_SECRETS_PINNED" not in keycloak
 
 
 def test_the_public_address_sets_the_redirect_uris(tmp_path: Path) -> None:
@@ -413,9 +437,7 @@ def test_postgres_gives_keycloak_its_own_database_and_a_private_password(tmp_pat
     database = read_env(tmp_path / "secrets/idp-db.env")
     assert keycloak["KC_DB"] == "postgres"
     # The database's fixed address on its internal network, never the name idp-db (ADR 0125).
-    compose = yaml.safe_load((REPO / "docker-compose.yml").read_text())
-    pinned = compose["services"]["idp-db"]["networks"]["idp-store"]["ipv4_address"]
-    assert keycloak["KC_DB_URL_HOST"] == pinned
+    assert keycloak["KC_DB_URL_HOST"] == str(fixed_address("idp-db", "idp-store"))
     assert keycloak["KC_HTTP_ENABLED"] == "true"
     assert keycloak["KC_PROXY_HEADERS"] == "xforwarded"
     assert database["POSTGRES_PASSWORD"] == keycloak["KC_DB_PASSWORD"] != ""
