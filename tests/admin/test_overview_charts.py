@@ -128,7 +128,7 @@ async def test_the_queue_widget_stays_a_table_by_default_and_for_a_pie(site: Sit
     for query in ("", "?view=pie", "?view=list"):
         text = (await site.client.get(f"/admin/overview/w/queue{query}")).text
 
-        assert 'class="widget-table"' in text, query
+        assert '<table class="widget-table' in text, query  # a table, whatever its modifiers
         assert "<svg" not in text, query
 
 
