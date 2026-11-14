@@ -515,7 +515,7 @@ impostor idp-db idp-store 5432 idp
 [ "$(fetch idp "$database")" = "refused" ] || fail "Keycloak's database hop reached something while idp-db was down"
 untouched idp-db
 
-impostor idp edge 8080 web proxy
+impostor idp edge 8080 web proxy worker
 [ "$(fetch web "$login")" = "refused" ] || fail "web's login reached something while idp was down"
 [ "$(fetch web "$directory")" = "refused" ] || fail "web's staff directory reached something while idp was down"
 [ "$(fetch worker "$directory")" = "refused" ] || fail "the worker's staff directory reached something while idp was down"

@@ -155,11 +155,15 @@ def test_an_impostor_is_reached_by_name_before_any_refusal_counts() -> None:
     assert "a refusal would prove nothing" in body
 
 
+def _impostor_blocks() -> list[str]:
+    """Return pass 4's blocks, each from its ``impostor`` line to the first blank line."""
+    starts = re.split(r"^(?=impostor )", _pass_4(), flags=re.MULTILINE)[1:]
+    return [start.split("\n\n", 1)[0] for start in starts]
+
+
 def test_every_impostor_block_ends_with_untouched_for_the_same_name() -> None:
     """What the impostor answered after its controls is a hop that followed the name."""
-    # A block runs from its `impostor` line to the first blank line.
-    starts = re.split(r"^(?=impostor )", _pass_4(), flags=re.MULTILINE)[1:]
-    blocks = [start.split("\n\n", 1)[0] for start in starts]
+    blocks = _impostor_blocks()
 
     assert [block.split()[1] for block in blocks] == ["idp-db", "idp", "web"]
     for block in blocks:
@@ -167,6 +171,19 @@ def test_every_impostor_block_ends_with_untouched_for_the_same_name() -> None:
         lines = block.strip().splitlines()
         assert lines[-1] == f"untouched {name}", block
         assert any('= "refused" ]' in line or '= " 502" ]' in line for line in lines[1:-1])
+
+
+def test_every_client_that_must_fail_reached_the_impostor_by_name_first() -> None:
+    """A refusal proves something only from a client that reached the impostor in its control."""
+    for block in _impostor_blocks():
+        head, *lines = block.splitlines()
+        clients = set(head.split()[4:])  # impostor NAME NETWORK PORT CLIENT...
+        refusing = {client for line in lines for client in re.findall(r"fetch (\w+) ", line)}
+        if any("proxied " in line for line in lines):
+            refusing.add("proxy")
+
+        assert refusing, block
+        assert refusing <= clients, block
 
 
 def test_the_stand_ins_keep_where_docker_compose_puts_them() -> None:
