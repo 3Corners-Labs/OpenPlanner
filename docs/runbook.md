@@ -2866,6 +2866,55 @@ Refused origins are logged as `widget.origin_refused` with the origin and the gr
 personal data). Many refusals from one unknown origin mean a copied tag: nothing to do, it
 cannot book.
 
+## The call page's SDK does not work (ADR 0123 step 4c)
+
+The call page (`/b/m/{ref}/call`, only while `embedded_call_enabled` is on) joins a call with the
+video supplier's SDK file, vendored under `app/web/static/vendor/webex/` and never installed. The
+supplier supports only its latest version and says an older one may stop working after about
+eighteen months, so this entry is part of running the product. Until a service chooses
+`join_client = embedded` (step 6) no participant is sent to the page; it is reached by its address,
+on a test installation.
+
+**What you see.**
+
+| Where | What it says | What it means |
+|---|---|---|
+| *Koppelingen* → Service App check, line *Call page SDK file* (also `python -m app.cli wxcc-check`) | `not placed` | the file is not in the folder: after the device check the participant gets the state "the call is not available in this page yet", with the other way and the contact details as `embedded_call_webex_option` allows, and no token is asked |
+| the same line | `no checksum of the pinned version` | the manifest's checksum is of another version than its `version`: a Renovate update moved `version` alone. The page does not offer the file |
+| the same line | `the file differs from the manifest's checksum` | the bytes are not the ones the manifest names (a partial copy, another version, a swapped file). The page does not offer the file |
+| the participant's page | "The call is not available in this page yet", at once after the device check, though the check line says the file is whole | the browser refused the file (its checksum is not the one the page named: a proxy, a cache or a half-copied file) or it did not load; trying again would not help, so the page does not try, mints no token, and offers the other way and the contact details as `embedded_call_webex_option` allows. Place the file again and clear caches in front of the application |
+| the participant's page | "We cannot connect" after the attempts | the file loads but the SDK does not register or join: the supplier's side is down or the SDK has stopped working. The sentence counts the attempts (`embedded_call_connect_attempts`, each `embedded_call_connect_seconds` long) |
+| the participant's page | "The call is not available right now" | the token endpoint answered 503: the supplier refused or could not be reached (*Koppelingen*, and *Webex or WxCC is down* below) |
+
+**What to do.**
+
+1. **A participant cannot join in our page.** Tell them to use the link in the confirmation (the
+   redirect of ADR 0075, `/join/go`) or the organisation's contact details. The redirect is a
+   separate route: it does not use the SDK and keeps working.
+2. **Switch the page off for everyone.** Set `embedded_call_enabled` off (Platform settings,
+   `settings.platform.manage`). The page and the token endpoint then answer as an address that
+   does not exist, and every group is back on the redirect. Nothing else has to change.
+3. **Offer the other way meanwhile.** An organisation can set `embedded_call_webex_option` to
+   `on_failure` (the link "join another way" in the failure state and in the not-available state) or
+   `always`. With `hidden` the participant sees the organisation's contact details instead.
+4. **The checksum finding.** Put the file back that the manifest names, or replace the file and its
+   checksum together: take the file of the pinned version from the supplier's published package
+   (`umd/meetings.min.js`), place it as `meetings.min.js`, run `shasum -a 256` on it and write
+   the version and the hash into `checksum` of `manifest.json`. The check turns green without a
+   restart (the page re-reads the file when it or the manifest changes).
+5. **Before you place a new version**, scan it: `python3 -m scripts.check_sdk_policy` lists the hosts
+   outside the page's policy, any blob worker, WebAssembly and `eval` in the file. A finding is a
+   candidate, not proof; the proof is a join into a real meeting with the browser's console open:
+   a policy violation shows there, and the call must still work.
+6. **A new version has to be tried in a real meeting** before it ships (step 2b, the ADR's point
+   18): the stand-in of the end-to-end tests proves the page's own behaviour, not the SDK's.
+7. **Yearly at least**, move to the supplier's latest version: Renovate opens the pull request (the
+   version only); the file and its checksum are replaced in the same change.
+
+The SDK file is in no image until the supplier has answered on its licence (ADR 0123 point 3, step
+2b): an installation that tries the page places the file itself, and `embedded_call_enabled` stays
+off everywhere else.
+
 ## Troubleshooting with the audit log (ADR 0031)
 
 Every admin has an audit log under **Audit log** that lists only their own level: a group admin

@@ -347,6 +347,26 @@ today for a name typed into the Webex app (ADR 0102), and a name it has already 
 stays in what they saw. The rename is a job with retries and one system event when it gives up;
 until it has run, the first name is still held at the platform.
 
+### The call itself, from the click (ADR 0123 points 5 and 16, step 4c)
+
+After the click that joins, the call page adds one script element, the vendored SDK file of the
+video supplier, with its checksum as subresource integrity, from our own origin. From that moment
+the SDK, not our server, talks to the supplier's hosts (the five of `CALL_HOSTS`): it registers this
+browser (temporarily), joins the meeting with the guest token and sends the participant's picture
+and sound. Nothing is sent before the click, and the page's own script makes no other request.
+The SDK is told not to upload its logs after the call and to register the browser as temporary
+(`autoUploadLogs` off, `device.ephemeral`).
+
+| What the supplier receives | When | Can it be switched off |
+|---|---|---|
+| The SDK's registration of the browser, and its signalling and telemetry on the call's own hosts | from the SDK's initialisation, after the click | no |
+| The guest identity (the keyed subject and the first name or the organisation's word) | at the token request of step 4a | no; renamed at the purge (step 4a) |
+| The participant's picture and sound | during the call, encrypted in transit | the participant switches either off in the page |
+| The SDK's logs | never: `autoUploadLogs` is off | it is the SDK's default and our choice to turn it off |
+
+Nothing of this is stored by OpenPlanner: not the token, not the link beyond the booking's own
+field, not the picture or the sound.
+
 ## Own queue (ADR 0043)
 
 A group with dispatch kind `openplanner_queue` sends nothing to a contact center. Its agents

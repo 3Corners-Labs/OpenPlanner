@@ -6,13 +6,19 @@ applied by ``participant_call_page``). It exists only while ``embedded_call_enab
 while it is off the route answers as an address that does not exist, so nothing about the
 feature shows on an installation that does not use it.
 
-In step 4b the page is the participant's way in up to the click that joins, with the browser
-alone: the start state (the appointment and one button), the device check and what a refused
-permission needs. It loads one script and one stylesheet of ours, asks the browser for the
-camera and the microphone only after the button of the start state, and contacts nobody else:
-the join button leads to a state that says the call is not available in this page yet, with
-what ``embedded_call_webex_option`` and the organisation's contact details allow (ADR 0123
-point 11). Joining itself is step 4c.
+Up to the click that joins (step 4b) the page works with the browser alone: the start state
+(the appointment and one button), the device check and what a refused permission needs. It loads
+one script and one stylesheet of ours, asks the browser for the camera and the microphone only
+after the button of the start state, and contacts nobody else.
+
+The click that joins (step 4c) asks ``POST /b/m/{ref}/call/token``, loads the vendored video SDK
+and connects. The server decides whether the page may do that at all: the markup names the SDK
+file, with its checksum as subresource integrity, only when the file is placed and its bytes
+equal the manifest's checksum (``app.adapters.vendored_files``). Otherwise the join button
+leads to the state that says the call is not available in this page, with what
+``embedded_call_webex_option`` and the organisation's contact details allow (ADR 0123 point 11).
+The markup also carries the two connection values (``embedded_call_connect_seconds`` and
+``embedded_call_connect_attempts``); the script reads them from there and has no number of its own.
 
     GET  /b/m/{ref}/call         the call page (404 while the feature is off)
     POST /b/m/{ref}/call/token   the guest token for the click that joins (ADR 0123 point 6)
@@ -47,6 +53,7 @@ from fastapi import APIRouter, Depends, Request
 from starlette.exceptions import HTTPException
 from starlette.responses import HTMLResponse, JSONResponse, Response
 
+from app.adapters.vendored_files import VendoredFile
 from app.api.labels import slot_label
 from app.api.link_session import authorise
 from app.api.participant import participant_call_page
@@ -69,6 +76,7 @@ from app.web.protection import (
     require_same_origin,
     within_call_token_limit,
 )
+from app.web.static_assets import ASSETS
 
 router = APIRouter(include_in_schema=False)
 
@@ -95,6 +103,14 @@ async def call_page(request: Request, public_ref: str) -> HTMLResponse:
     current = follow(request, details.group.organisation_id)
     booking, group = details.booking, details.group
     offer = OtherWayOffer.of(current.embedded_call_webex_option)
+    sdk: VendoredFile = request.app.state.call_sdk
+    sdk_file = sdk.offer()
+    sdk_src = ""
+    if sdk_file is not None:
+        try:
+            sdk_src = ASSETS.url(sdk_file.path)
+        except FileNotFoundError:
+            sdk_file = None  # gone between the check and the address: no offer, not an error
     context = {
         "group": group,
         "ref": public_ref,
@@ -107,6 +123,13 @@ async def call_page(request: Request, public_ref: str) -> HTMLResponse:
         "other_way_href": f"/b/m/{public_ref}/join/go",
         "other_way_before": shows_other_way(offer, failed=False),
         "other_way_failed": shows_other_way(offer, failed=True),
+        # The server decides whether the page may load the SDK at all: a file that is not
+        # placed, or whose bytes are not the manifest's, is never named in the markup.
+        "sdk_src": sdk_src,
+        "sdk_integrity": sdk_file.integrity if sdk_file else "",
+        "token_url": f"/b/m/{public_ref}/call/token",
+        "connect_seconds": current.embedded_call_connect_seconds,
+        "connect_attempts": current.embedded_call_connect_attempts,
     }
     return await participant_call_page(request, locale, "call.html", group, context)
 
