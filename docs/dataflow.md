@@ -366,6 +366,23 @@ The SDK is told not to upload its logs after the call and to register the browse
 Nothing of this is stored by OpenPlanner: not the token, not the link beyond the booking's own
 field, not the picture or the sound.
 
+### In the call: devices, notices, the end (ADR 0123 points 10 and 13, step 5a)
+
+Inside the call the page sends nothing of its own anywhere: no request, no storage. What it
+does is told to the SDK and shown from the SDK's events.
+
+| What happens | What leaves the browser | What comes in | Stored by us |
+|---|---|---|---|
+| The participant chooses another camera or microphone in the panel of devices | the new stream goes to the supplier's call hosts through the SDK, as the first one did; the old stream is stopped | nothing | no: the choice lives in the page's memory until the call ends |
+| The participant chooses a speaker | nothing: the browser routes the other side's sound to that output | nothing | no |
+| The meeting is recorded | nothing; the recording is made at the supplier's side by the meeting, not by this page | one event (the recording started or stopped); the page shows its own sentence and reads nothing the event carries | no |
+| The connection is interrupted, restored or lost | the SDK's own reconnection traffic to the call hosts | events (restoring, back, lost); same | no |
+| The call ends (the meeting is removed, the participant leaves, the connection is lost for good) | the SDK leaves the meeting and unregisters the browser; every stream is stopped | nothing | no; the personal data of the booking is deleted by the purge 24 hours after the end of the appointment, and the ended state says so |
+
+The recording itself, its place and its retention belong to the supplier's site settings and the
+organisation's own rules; the page only tells the participant that it runs. That is input for the
+DPIA, not something this page controls.
+
 ## Own queue (ADR 0043)
 
 A group with dispatch kind `openplanner_queue` sends nothing to a contact center. Its agents

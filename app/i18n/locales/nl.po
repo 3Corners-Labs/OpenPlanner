@@ -14171,7 +14171,7 @@ msgid "callpage.ended.heading"
 msgstr "Het gesprek is beëindigd"
 
 msgid "callpage.ended.body"
-msgstr "Het gesprek is afgelopen. U kunt dit venster sluiten of teruggaan naar uw afspraak."
+msgstr "Bedankt voor het gesprek. U kunt dit venster sluiten of teruggaan naar uw afspraak."
 
 msgid "callpage.failed.heading"
 msgstr "Het lukt niet om te verbinden"
@@ -14226,3 +14226,57 @@ msgstr "Uw browser heeft het geluid geblokkeerd. Gebruik de knop om de andere pe
 
 msgid "callpage.say.device_kept"
 msgstr "Het staat uit voor de ander, maar uw browser kan het apparaat nog als in gebruik tonen."
+
+msgid "callpage.ended.deleted"
+msgstr "De persoonsgegevens van dit gesprek worden 24 uur na het einde van uw afspraak verwijderd."
+
+msgid "callpage.control.devices"
+msgstr "Apparaten"
+
+msgid "callpage.devices.heading"
+msgstr "Uw apparaten"
+
+msgid "callpage.devices.hint"
+msgstr "Een keuze geldt direct."
+
+msgid "callpage.notice.recording.word"
+msgstr "Opname"
+
+msgid "callpage.notice.recording.body"
+msgstr "Dit gesprek wordt opgenomen. Beeld en geluid worden bewaard."
+
+msgid "callpage.notice.restoring.word"
+msgstr "Verbinding herstellen"
+
+msgid "callpage.notice.restoring.body"
+msgstr "De verbinding is onderbroken. Die wordt vanzelf hersteld. Blijf op deze pagina."
+
+msgid "callpage.say.recording_on"
+msgstr "Dit gesprek wordt opgenomen."
+
+msgid "callpage.say.recording_off"
+msgstr "De opname is gestopt."
+
+msgid "callpage.say.restoring"
+msgstr "De verbinding is onderbroken. Wij herstellen die."
+
+msgid "callpage.say.restored"
+msgstr "De verbinding is hersteld."
+
+msgid "callpage.say.device_changed"
+msgstr "Apparaat gewisseld."
+
+msgid "callpage.say.device_change_failed"
+msgstr "Dat apparaat werkte niet. Uw vorige apparaat blijft in gebruik."
+
+msgid "callpage.failed.media"
+msgstr "Beeld of geluid van het gesprek kon niet worden klaargezet. U kunt het opnieuw proberen."
+
+msgid "callpage.failed.lost"
+msgstr "De verbinding is verbroken en kon niet worden hersteld. U kunt het opnieuw proberen."
+
+msgid "callpage.control.leave_lobby"
+msgstr "De wachtkamer verlaten"
+
+msgid "callpage.control.bar"
+msgstr "Bediening van het gesprek"

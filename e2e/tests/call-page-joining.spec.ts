@@ -19,146 +19,40 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
-import { expect, test, type Page, type Request } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-import { begin, live, openCallPage, READY, said, spy, statuses } from '../call-page';
+import { begin, checkList, live, openCallPage, READY, said, spy, statuses } from '../call-page';
+import {
+  APP,
+  CONNECTING,
+  FAILED,
+  granted,
+  heading,
+  IN_CALL,
+  join,
+  joinButton,
+  LINK,
+  control,
+  NO_STAND_IN,
+  open,
+  RETRY,
+  remoteCamera,
+  saidLike,
+  sdk,
+  state,
+  stubRemoteSound,
+  stubToken,
+  timesSaid,
+  TOKEN,
+  plays,
+  WAITING,
+  type Plan,
+} from '../call-sdk';
 import { expectNoAxeViolations, tabTo } from '../helpers';
 
 test.use({ locale: 'en-US' });
 
-const TOKEN = 'guest-token-0123456789abcdef';
-const LINK = 'https://meeting.example.test/guest/abcdef';
-const APP = new URL(process.env.BASE_URL ?? 'http://127.0.0.1:8000').origin;
-const NO_STAND_IN =
-  'this stack offers no SDK file, so the joining cannot be walked: the CI stack (.github/actions/e2e-stack) ' +
-  'mounts e2e/vendor/webex/meetings.min.js and manifest.json read-only over ' +
-  '/srv/app/web/static/vendor/webex/ of the app container and sets EMBEDDED_CALL_CONNECT_SECONDS=10; ' +
-  'a local stack needs the same two -v options and that variable';
 
-type Plan = {
-  failures?: number;
-  hang?: number;
-  always?: boolean;
-  delay?: number;
-  late?: number;
-  authFailures?: number;
-  slowLeave?: number;
-  unpublishFails?: boolean;
-  slowUnpublish?: number;
-  publishFails?: boolean;
-  authFailAt?: 'create' | 'join';
-  mediaFailures?: number;
-  lobby?: boolean;
-  remote?: boolean;
-};
-type Log = {
-  calls: string[];
-  inits: { token: string; autoUploadLogs: boolean; ephemeral: boolean }[];
-  devices: { kind: string; deviceId: string }[];
-  published: string[];
-  unpublished: number[];
-  added?: string[];
-  link?: string;
-  left: boolean;
-};
-type Answer = { status: number; body?: unknown; abort?: boolean; hang?: boolean };
-
-const granted = (): Answer => ({
-  status: 200,
-  body: { token: TOKEN, expires_at: new Date(Date.now() + 6 * 3600 * 1000).toISOString(), link: LINK },
-});
-
-/** Answer the token endpoint with `answers` in turn (the last one repeats); returns the requests it saw. */
-async function stubToken(page: Page, ...answers: Answer[]): Promise<Request[]> {
-  const seen: Request[] = [];
-  await page.route('**/call/token', async (route) => {
-    const answer = answers[Math.min(seen.length, answers.length - 1)];
-    seen.push(route.request());
-    if (answer.hang) return; // never answered: the page's own time limit ends it
-    if (answer.abort) return route.abort();
-    return route.fulfill({
-      status: answer.status,
-      contentType: 'application/json',
-      headers: { 'cache-control': 'no-store' },
-      body: JSON.stringify(answer.body ?? { error: 'refused' }),
-    });
-  });
-  return seen;
-}
-
-/** The stand-in's own log: what the page asked of the SDK, in order. Empty while the SDK file has not loaded. */
-const sdk = (page: Page): Promise<Log> =>
-  page.evaluate(() => {
-    const s = (window as unknown as { __sdk?: Log }).__sdk;
-    if (!s) return { calls: [], inits: [], devices: [], published: [], unpublished: [], left: false };
-    return {
-      calls: s.calls,
-      inits: s.inits,
-      devices: s.devices,
-      published: s.published,
-      unpublished: s.unpublished,
-      added: s.added,
-      link: s.link,
-      left: s.left,
-    };
-  });
-const control = (page: Page, action: 'admit' | 'end' | 'remoteAgain'): Promise<void> =>
-  page.evaluate((what) => (window as unknown as { __sdk: Record<string, () => void> }).__sdk[what](), action);
-const remoteCamera = (page: Page, on: boolean): Promise<void> =>
-  page.evaluate((value) => (window as unknown as { __sdk: { remoteCamera: (v: boolean) => void } }).__sdk.remoteCamera(value), on);
-
-/** Open the call page with the made-up devices and the stand-in's plan; fail where the stack offers no SDK. */
-async function open(page: Page, plan: Plan = {}): Promise<void> {
-  await spy(page, { devices: 'made-up' });
-  await page.addInitScript((p) => ((window as unknown as { __sdkPlan: Plan }).__sdkPlan = p), plan);
-  await openCallPage(page);
-  const offered = await page.locator('[data-call]').getAttribute('data-call-sdk');
-  expect(offered, NO_STAND_IN).not.toBeNull();
-}
-
-const joinButton = (page: Page) => page.getByRole('button', { name: 'Join', exact: true });
-const heading = (page: Page, name: string | RegExp) => page.getByRole('heading', { level: 1, name });
-const state = (page: Page, name: string) => page.locator(`[data-call-state="${name}"]`);
-const CONNECTING = 'We are connecting you';
-const WAITING = /You are here\. The .+ will let you in shortly/;
-const IN_CALL = 'You are in the call';
-const FAILED = 'We cannot connect';
-const RETRY = 'The last attempt did not work. We are trying again. This happens by itself.';
-
-/** Through the check to the click that joins. */
-async function join(page: Page): Promise<void> {
-  await begin(page).click();
-  await said(page, READY);
-  await joinButton(page).click();
-}
-
-/**
- * The page's contract is what it does with the answer of `play()` on the other side's sound, not
- * what an engine does with a made-up stream: the stub decides for that element, in both phases
- * (`window.__blockPlay`: refuse with NotAllowedError; else resolve; `__hangPlay`: never settle), and
- * counts the calls (`__plays`). The engines' own autoplay rules are seen only in a real meeting.
- */
-async function stubRemoteSound(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    const w = window as unknown as { __blockPlay: boolean; __hangPlay: boolean; __plays: number };
-    w.__blockPlay = true;
-    w.__hangPlay = false;
-    w.__plays = 0;
-    const original = HTMLMediaElement.prototype.play;
-    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
-      if (!this.hasAttribute('data-call-remote-audio')) return original.call(this);
-      w.__plays += 1;
-      if (w.__hangPlay) return new Promise<void>(() => {});
-      return w.__blockPlay ? Promise.reject(new DOMException('blocked', 'NotAllowedError')) : Promise.resolve();
-    };
-  });
-}
-const plays = (page: Page): Promise<number> => page.evaluate(() => (window as unknown as { __plays: number }).__plays);
-
-/** The live region has said something that matches `re` (the page keeps no history, the spy does). */
-const saidLike = (page: Page, re: RegExp): Promise<void> =>
-  expect.poll(async () => (await statuses(page)).some((s) => re.test(s)), { timeout: 20_000, message: String(re) }).toBe(true);
-const timesSaid = async (page: Page, text: string): Promise<number> => (await statuses(page)).filter((s) => s === text).length;
 
 test('before the click nothing leaves the origin; the click loads the file, asks for the token once and starts the SDK', async ({ page }) => {
   const asked: string[] = [];
@@ -461,7 +355,7 @@ test('the lobby: waiting words, own picture, working toggles that give the devic
   await expect(page.getByText('There is nothing you need to do. The call starts by itself.')).toBeVisible();
   await saidLike(page, /^Waiting for the .+ to let you in\.$/);
   await expect(state(page, 'lobby').getByLabel('Your picture')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Leave the call' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Leave the waiting room' })).toBeVisible(); // not in the call yet
   // Not in the call yet: no media was added, the other side is not shown.
   expect((await sdk(page)).calls).not.toContain('addMedia');
   await expect(state(page, 'call')).toBeHidden();
@@ -669,7 +563,7 @@ test('the way out stands apart from the switches', async ({ page }) => {
   await open(page);
   await join(page);
   await expect(heading(page, IN_CALL)).toBeVisible();
-  const toggles = await page.locator('[data-call-state="call"] .call-toggles').boundingBox();
+  const toggles = await page.locator('.call-controls .call-toggles').boundingBox();
   const leave = await page.getByRole('button', { name: 'Leave the call' }).boundingBox();
   expect(toggles).not.toBeNull();
   expect(leave).not.toBeNull();
@@ -683,7 +577,7 @@ test('what the participant left off at the check stays off, and can be switched 
   await begin(page).click();
   await said(page, READY);
   await page.getByRole('button', { name: /^Camera/ }).click();
-  await page.getByLabel('Microphone', { exact: true }).selectOption('mic-2');
+  await checkList(page, 'Microphone').selectOption('mic-2');
   await said(page, 'Microphone on.');
   await joinButton(page).click();
 
@@ -713,7 +607,7 @@ test('the meeting ended by the staff member shows the plain ended state', async 
   await control(page, 'end');
 
   await expect(heading(page, 'The call has ended')).toBeFocused();
-  await saidLike(page, /^The call is over\. You can close this window, or go back to your appointment\.$/);
+  await saidLike(page, /^Thank you for the call\. You can close this window, or go back to your appointment\.$/);
   await expect(page.getByRole('link', { name: 'Back to your appointment' }).first()).toBeVisible();
   expect(await live(page)).toEqual([0, 0]);
   await expectNoAxeViolations(page);

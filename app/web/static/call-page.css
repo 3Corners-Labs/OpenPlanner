@@ -1,10 +1,34 @@
 /*
  * The participant's call page: the device check (ADR 0123 step 4b), connecting, the lobby and the
- * first moment of the call (step 4c). It builds on
+ * first moment of the call (step 4c), the notices and the panel of devices (step 5a). It builds on
  * site.css: colours, radius, spacing, font and the 44 px target all come from the --booking-*
  * tokens of the organisation's theme (ADR 0020, ADR 0041). Only the picture's own dark ground
  * is a constant of this page. No inline styles and no forced declarations; the page works from 320 px.
  */
+/* The bar is fixed at the foot of the window, so a page needs room at its end for it, and a focused
+   control is scrolled to rest above it (WCAG 2.4.11); both exist only while the bar shows. From 48 rem
+   wide the row of buttons is one line, about 4.5 rem with its frame; below that it wraps to two or
+   three rows, at most half the window and, at normal size, about 190 px: the lesser of half the window
+   and 13 rem. `body` is a plain block, so a bottom padding is the room after the footer. A browser
+   without `:has()` only loses the room at the end. */
+html:has([data-call-controls]:not([hidden])) {
+  scroll-padding-bottom: 4.5rem;
+}
+
+html:has([data-call-controls]:not([hidden])) body {
+  padding-bottom: 4.5rem;
+}
+
+@media (max-width: 48rem) {
+  html:has([data-call-controls]:not([hidden])) {
+    scroll-padding-bottom: min(50vh, 13rem);
+  }
+
+  html:has([data-call-controls]:not([hidden])) body {
+    padding-bottom: min(50vh, 13rem);
+  }
+}
+
 .call {
   --call-stage: #101214;
   --call-on-stage: #ffffff;
@@ -86,8 +110,10 @@
   margin-bottom: var(--booking-space-m);
 }
 
-/* On is a filled, solid button; off is plain with a dashed edge: the word says it too. */
-.call-toggle {
+/* On is a filled, solid button; off is plain with a dashed edge: the word says it too. The button
+   that opens the panel of devices looks the same and is solid, filled while its panel is open. */
+.call-toggle,
+.call-more {
   display: inline-flex;
   align-items: center;
   gap: var(--booking-space-s);
@@ -107,16 +133,29 @@
   background: var(--booking-color-background);
 }
 
-.call-toggle:hover {
+.call-more {
+  border-color: var(--booking-color-border-strong);
+  background: var(--booking-color-background);
+}
+
+.call-more[aria-expanded="true"] {
+  border-color: var(--booking-color-accent);
+  background: var(--booking-color-accent-subtle);
+}
+
+.call-toggle:hover,
+.call-more:hover {
   border-color: var(--booking-color-text);
 }
 
-.call-toggle:focus-visible {
+.call-toggle:focus-visible,
+.call-more:focus-visible {
   background: var(--booking-color-focus-background);
   color: var(--booking-color-text);
 }
 
-.call-toggle svg {
+.call-toggle svg,
+.call-more svg {
   width: 1.25rem;
   height: 1.25rem;
   fill: currentcolor;
@@ -237,10 +276,6 @@
   margin: 0 auto var(--booking-space-m);
 }
 
-.call-card .call-toggles {
-  justify-content: center;
-}
-
 .call-spinner {
   display: block;
   box-sizing: border-box;
@@ -267,9 +302,14 @@
   font-weight: 400;
 }
 
+/* The picture gives way, never the bar: on a low window the stage is as high as what is left
+   under the heading and the notices, and no lower than a small picture. */
 .call-stage {
   position: relative;
   aspect-ratio: 16 / 9;
+  min-height: 8rem;
+  max-height: calc(100vh - 16rem);
+  max-height: calc(100dvh - 16rem);
   overflow: hidden;
   border-radius: var(--booking-radius);
   background: var(--call-stage);
@@ -315,13 +355,95 @@
   transform: scaleX(-1);
 }
 
+/* Notices last while they hold: an icon and a word, a bar on the edge, never colour alone. */
+.call-notice {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--booking-space-xs) var(--booking-space-s);
+  margin: 0 0 var(--booking-space-s);
+  padding: var(--booking-space-s) var(--booking-space-m);
+  border: 1px solid var(--booking-color-border-strong);
+  border-left-width: 6px;
+  border-radius: var(--booking-radius);
+  background: var(--booking-color-surface);
+}
+
+.call-notice svg {
+  align-self: center;
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: currentcolor;
+}
+
+.call-notice[data-call-notice="recording"] {
+  border-left-color: var(--booking-color-error);
+}
+
+/* The one bar of the lobby and the call is fixed at the foot of the window: a sticky bar leaves the
+   foot at the end of the page, and the panel above it would leave the window. The page keeps room for
+   it at its end (above). It is the positioning context of the panel of devices. */
+.call-controls {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  margin: 0;
+  padding: var(--booking-space-s) var(--booking-space-m);
+  border-top: 1px solid var(--booking-color-border-strong);
+  background: var(--booking-color-background);
+}
+
 .call-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: var(--booking-space-m);
-  margin-top: var(--booking-space-m);
+}
+
+/* The panel of devices overlays what is above the bar and pushes nothing: it is out of flow, anchored to
+   the bar's box (`.call-controls` is fixed, so it is the positioning context; nothing between them is
+   positioned), and adds nothing to the sticky box, so the row of buttons cannot be pushed out of the
+   window. The row is at most half the window and sits at the window's foot; the panel is at most half
+   the window less 1.5 rem and has a margin of 0.5 rem (`--booking-space-s`), so its top stays at least
+   1 rem below the window's top. It stays after its button in the markup and there is no `order`: one
+   engine lets `order` change the keyboard order. A panel that does not fit scrolls inside itself. */
+.call-devices {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  left: 0;
+  box-sizing: border-box;
+  max-width: 28rem;
+  max-height: calc(50vh - 1.5rem);
+  max-height: calc(50dvh - 1.5rem);
+  margin: 0 auto var(--booking-space-s);
+  padding: var(--booking-space-m);
+  overflow: auto;
+  border: 1px solid var(--booking-color-border-strong);
+  border-radius: var(--booking-radius);
+  background: var(--booking-color-surface);
+  text-align: left;
+}
+
+/* On a window at least 640 px high the row is at most about 190 px, so the panel may take what is
+   left and need not scroll. */
+@media (min-height: 40rem) {
+  .call-devices {
+    max-height: calc(100vh - 14rem);
+    max-height: calc(100dvh - 14rem);
+  }
+}
+
+.call-devices h2 {
+  margin-top: 0;
+}
+
+.call-devices > :last-child {
+  margin-bottom: 0;
 }
 
 .call-bar .call-toggles {
@@ -338,9 +460,65 @@
   padding-left: calc(var(--booking-space-l) * 2);
 }
 
+/* On a narrow window the bar is as low as it can be: close rows, the way out in the row's middle. */
+@media (max-width: 40rem) {
+  .call-bar {
+    gap: var(--booking-space-s);
+  }
+
+  .call-bar__leave {
+    margin-left: 0;
+    padding-left: 0;
+  }
+}
+
 .call-hear {
-  display: block;
-  margin: var(--booking-space-s) auto 0;
+  position: absolute;
+  top: var(--booking-space-s);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* On a low window the bar takes at most about half of it (WCAG 1.4.4, 1.4.10): smaller buttons
+   (still above 24 by 24 pixels), closer rows, a leaner frame. The picture gives way. */
+@media (max-height: 32rem) {
+  .call-controls {
+    padding: 2px var(--booking-space-m);
+  }
+
+  .call-bar,
+  .call-bar .call-toggles {
+    gap: 4px;
+  }
+
+  .call-bar .call-toggle,
+  .call-bar .call-more,
+  .call-bar .call-leave {
+    min-height: 2rem;
+    padding: 2px var(--booking-space-s);
+  }
+
+  .call-notice {
+    margin-bottom: 4px;
+    padding: 2px var(--booking-space-s);
+  }
+}
+
+/* On a very low window the toggles keep their words ("on", "off") for assistive technology only,
+   so the row stays on two lines; the pressed edge (solid or dashed) and the icon still show it. */
+@media (max-height: 20rem) {
+  .call-bar .call-toggle {
+    position: relative;
+  }
+
+  .call-bar .call-toggle__state {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 /* --- Preferences ------------------------------------------------------------------------ */
@@ -354,8 +532,27 @@
 @media (forced-colors: active) {
   .call-card,
   .call-stage,
-  .call-self {
+  .call-self,
+  .call-devices {
     border: 1px solid CanvasText;
+  }
+
+  .call-notice {
+    border: 1px solid CanvasText;
+    border-left-width: 6px;
+  }
+
+  .call-more {
+    border-color: ButtonText;
+  }
+
+  .call-more[aria-expanded="true"] {
+    border-color: Highlight;
+    border-width: 3px;
+  }
+
+  .call-more:focus-visible {
+    outline: 3px solid Highlight;
   }
 
   .call-spinner {
@@ -406,7 +603,8 @@
 
 @media (prefers-contrast: more) {
   .call-toggle,
-  .call-toggle[aria-pressed="false"] {
+  .call-toggle[aria-pressed="false"],
+  .call-more {
     border-color: var(--booking-color-text);
   }
 }

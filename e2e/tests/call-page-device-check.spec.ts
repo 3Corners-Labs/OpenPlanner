@@ -21,6 +21,7 @@ import { expect, test } from '@playwright/test';
 
 import {
   begin,
+  checkList,
   checkHeading,
   level,
   live,
@@ -86,8 +87,8 @@ test('device choice and the toggles, with made-up devices', async ({ page }) => 
   await said(page, READY);
   expect(await live(page)).toEqual([1, 1]);
 
-  const cameras = page.getByLabel('Camera', { exact: true });
-  const microphones = page.getByLabel('Microphone', { exact: true });
+  const cameras = checkList(page, 'Camera');
+  const microphones = checkList(page, 'Microphone');
   expect(await cameras.locator('option').count()).toBeGreaterThan(1);
   expect(await microphones.locator('option').count()).toBeGreaterThan(1);
   await microphones.selectOption('mic-2');
@@ -199,8 +200,8 @@ for (const [what, heading, join, without] of [
     // The select of a device that is refused lists nothing but placeholders, so it is not shown.
     const cameraRefused = what !== 'microphone';
     const microphoneRefused = what !== 'camera';
-    expect(await page.getByLabel('Camera', { exact: true }).isVisible()).toBe(!cameraRefused);
-    expect(await page.getByLabel('Microphone', { exact: true }).isVisible()).toBe(!microphoneRefused);
+    expect(await checkList(page, 'Camera').isVisible()).toBe(!cameraRefused);
+    expect(await checkList(page, 'Microphone').isVisible()).toBe(!microphoneRefused);
     await expectNoAxeViolations(page);
   });
 }
@@ -214,8 +215,8 @@ test('no camera and no microphone found says so and offers another look', async 
   await said(page, 'No camera or microphone found. Connect one and try again.');
   await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Join without camera and microphone' })).toBeVisible();
-  await expect(page.getByLabel('Camera', { exact: true })).toBeHidden();
-  await expect(page.getByLabel('Microphone', { exact: true })).toBeHidden();
+  await expect(checkList(page, 'Camera')).toBeHidden();
+  await expect(checkList(page, 'Microphone')).toBeHidden();
   await expectNoAxeViolations(page);
 });
 
