@@ -4,7 +4,9 @@
  * Owns: the queue behind the page's single live region. It gets one sentence at a time, each kept on
  * screen for a minimum time, so a new sentence never replaces one that has not been read out: none
  * is dropped, none repeats (a sentence equal to the one waiting last is not queued twice). An empty
- * key clears region and queue. The sentence is the server's own text, read by its key out of `app.texts`.
+ * key clears region and queue. The sentence is the server's own text, read by its key out of `app.texts`;
+ * a sentence that names the staff member (`say_staff_name`) has its `{name}` filled with the name the
+ * caller hands in, as text.
  *
  * Never: it makes no request, loads no file, stores nothing, writes no text of its own and takes no
  * focus. It touches only the status element and needs nothing of any file loaded after it.
@@ -35,7 +37,7 @@
     }, SAY_MS);
   }
 
-  function say(key) {
+  function say(key, values) {
     line = line || app.$("[data-call-status]");
     if (!key) {
       window.clearTimeout(timer);
@@ -45,6 +47,7 @@
       return;
     }
     var text = app.texts[key] || "";
+    if (text && values && typeof values.name === "string") text = text.replace("{name}", values.name);
     if (text && queue[queue.length - 1] !== text) queue.push(text);
     pump();
   }

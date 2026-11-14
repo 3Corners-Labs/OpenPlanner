@@ -149,7 +149,6 @@ from app.domain.settings_service import SettingsService
 from app.domain.simulation import SimulationService
 from app.domain.skill_service import SkillService
 from app.domain.staff_directory_service import DirectorySettings, StaffDirectoryService
-from app.domain.staff_lifecycle import StaffLifecycleService
 from app.domain.staff_usage import StaffUsage
 from app.domain.system_log import SystemLog
 from app.domain.tls import public_address
@@ -176,6 +175,7 @@ from app.keys import (
 )
 from app.logging import configure_logging, set_line_tap, set_log_level, warn_loose_secret_files
 from app.service_wiring import booking_service, planner_service, request_services, request_work
+from app.staff_parts import staff_parts
 from app.web.alert_text import alert_composer
 from app.web.authz_labels import ROLE_LABELS
 from app.web.call_labels import agent_start_label
@@ -509,7 +509,7 @@ def create_app(
             ),
         )
         app.state.admin_session_service = AdminSessionService(uow, clock)
-        app.state.staff_lifecycle_service = StaffLifecycleService(uow, clock)
+        app.state.staff_lifecycle_service, app.state.staff_names = staff_parts(uow, clock, settings)
         # ADR 0049: claims become grants per request; the mode is class B, the prefix C.
         app.state.login_service = LoginService(
             uow,

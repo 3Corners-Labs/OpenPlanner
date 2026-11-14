@@ -63,10 +63,9 @@ const remote = (page: Page) => page.locator('[data-call-remote]');
 const leave = (page: Page) => page.getByRole('button', { name: /^Leave the (call|waiting room)$/ });
 const frames = (page: Page): Promise<unknown> => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
-/** The organisation's word for staff, as the page itself names the other side's picture. */
+/** The organisation's word for staff, as the page itself names the other side's picture (no name is known here). */
 async function term(page: Page): Promise<string> {
-  const label = (await remote(page).getAttribute('aria-label')) ?? '';
-  return label.replace('Picture of the ', '');
+  return (await remote(page).getAttribute('aria-label')) ?? '';
 }
 
 /** Into the call; the meeting offers captions and sharing unless the plan says otherwise. */

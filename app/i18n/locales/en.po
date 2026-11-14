@@ -5865,6 +5865,9 @@ msgstr "Suspension lifted"
 msgid "audit.event.staff_erased"
 msgstr "Staff member data erased"
 
+msgid "audit.event.staff_screen_name_changed"
+msgstr "Screen name set or cleared"
+
 msgid "admin.audit.detail.role_add"
 msgstr "role added: {value}"
 
@@ -5948,6 +5951,33 @@ msgstr "Not yet"
 
 msgid "admin.staff.dormant"
 msgstr "No recent login"
+
+msgid "admin.staff.screen_name.heading"
+msgstr "Screen name"
+
+msgid "admin.staff.screen_name.intro"
+msgstr "The participant sees this name in the call, on the staff member's picture, beside the organisation's word for staff. Without a screen name the participant sees that word alone and never the account name, unless the organisation chooses otherwise."
+
+msgid "admin.staff.screen_name.label"
+msgstr "Screen name for the participant"
+
+msgid "admin.staff.screen_name.hint"
+msgstr "What the participant sees in the call. Choose a first name or a made-up name, not the full name. Leave empty for no screen name."
+
+msgid "admin.staff.screen_name.save"
+msgstr "Save screen name"
+
+msgid "admin.staff.screen_name.none"
+msgstr "No screen name"
+
+msgid "admin.staff.screen_name.error.too_short"
+msgstr "A screen name has at least 2 characters."
+
+msgid "admin.staff.screen_name.error.too_long"
+msgstr "A screen name has at most 40 characters."
+
+msgid "admin.staff.screen_name.error.bad_character"
+msgstr "A screen name holds only letters, digits, spaces, a hyphen, an apostrophe and a full stop."
 
 msgid "admin.staff.no_role"
 msgstr "No role"
@@ -12701,6 +12731,12 @@ msgstr "The capacity pool has been archived."
 msgid "admin.done.staff_skills_saved"
 msgstr "The skills have been saved. They apply from the next request that is picked up or started."
 
+msgid "admin.done.staff_screen_name_saved"
+msgstr "The screen name has been saved."
+
+msgid "admin.done.staff_screen_name_unchanged"
+msgstr "The screen name was not changed."
+
 msgid "admin.form.error.skill_code"
 msgstr "Use only lower-case letters, digits and hyphens, starting with a letter or digit (at most 40 characters)."
 
@@ -13712,8 +13748,11 @@ msgstr "Times per hour one appointment may ask for access to the call"
 msgid "settings.field.embedded_call_display_name.label"
 msgstr "Participant's name shown to staff in the call (first name or own word)"
 
+msgid "settings.field.embedded_call_chat_poll_seconds.label"
+msgstr "Seconds between two looks of the call page at who is in the call (and later at new messages)"
+
 msgid "settings.field.embedded_call_staff_name.label"
-msgstr "Staff member's name shown to the participant in the call (account name or own word)"
+msgstr "Staff member's name shown to the participant in the call (the staff member's screen name, the account name, or the own word alone)"
 
 msgid "settings.field.webhook_source_networks_video.label"
 msgstr "Networks the video platform's webhooks may come from (CIDR, comma or line separated, at most 32; empty: any source)"
@@ -14139,8 +14178,14 @@ msgstr "There is nothing you need to do. The call starts by itself."
 msgid "callpage.call.heading"
 msgstr "You are in the call"
 
-msgid "callpage.call.remote"
-msgstr "Picture of the {agent}"
+msgid "callpage.staff.term"
+msgstr "{agent}"
+
+msgid "callpage.staff.named"
+msgstr "{name} · {agent}"
+
+msgid "callpage.say.staff_name"
+msgstr "You are talking to {name}."
 
 msgid "callpage.call.remote_off"
 msgstr "The {agent} has the camera off"

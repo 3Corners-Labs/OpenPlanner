@@ -22,6 +22,7 @@ The markup also carries the two connection values (``embedded_call_connect_secon
 
     GET  /b/m/{ref}/call         the call page (404 while the feature is off)
     POST /b/m/{ref}/call/token   the guest token for the click that joins (ADR 0123 point 6)
+    GET  /b/m/{ref}/call/staff   who the participant talks to (ADR 0123 step 5c)
 
 The token endpoint (step 4a) answers JSON with ``token``, ``expires_at`` (UTC, ISO 8601) and
 ``link`` (the meeting's guest link, never the host's). Every answer the endpoint builds carries
@@ -40,6 +41,15 @@ put in a URL, an event or a job. Answers:
     429  ``{"error": "rate_limited"}`` with ``Retry-After``, from either limit
     503  ``{"error": "unavailable"}``: the platform refused or cannot be reached
 
+
+The staff endpoint (step 5c) answers ``{"name": "..."}`` or ``{}`` and nothing else, under the same
+session, the same read limit and the same ``no-store``; it is the one place the page learns the name
+of the staff member, from our own record of who accepted the booking and never from the video
+platform. What the name is follows the organisation's ``embedded_call_staff_name`` (the screen name
+by default, ``app.domain.screen_name``). It answers ``{}`` while nobody has accepted the booking,
+for the setting ``term``, for a staff member without a screen name and after the booking's purge
+(which deletes the claim); the staff table is never scanned per request
+(``app.domain.staff_screen_names``).
 
 Until step 6 gives a service its ``join_client = embedded`` the endpoint is dark behind the
 platform switch alone: any booking of an installation that turned the switch on may ask, which
@@ -64,8 +74,9 @@ from app.domain.call_token_service import (
     CallTokenService,
     TokenRefusal,
 )
-from app.domain.guest_access import GUEST_TERM_KEY, DisplayNameMode
+from app.domain.guest_access import GUEST_TERM_KEY, DisplayNameMode, StaffNameMode
 from app.domain.services import BookingService
+from app.domain.staff_screen_names import StaffScreenNames
 from app.web.contact_labels import contact_service, contact_view
 from app.web.error_pages import refuse_rate_limited
 from app.web.locale import resolve_locale
@@ -128,6 +139,8 @@ async def call_page(request: Request, public_ref: str) -> HTMLResponse:
         "sdk_src": sdk_src,
         "sdk_integrity": sdk_file.integrity if sdk_file else "",
         "token_url": f"/b/m/{public_ref}/call/token",
+        "staff_url": f"/b/m/{public_ref}/call/staff",
+        "poll_seconds": current.embedded_call_chat_poll_seconds,
         "connect_seconds": current.embedded_call_connect_seconds,
         "connect_attempts": current.embedded_call_connect_attempts,
     }
@@ -173,6 +186,32 @@ async def call_token(request: Request, public_ref: str, _: SameOrigin) -> Respon
             {"error": outcome.value}, status_code=REFUSAL_STATUS[outcome], headers=NO_STORE
         )
     return _answer(outcome)
+
+
+@router.get("/b/m/{public_ref}/call/staff")
+@limiter.limit(read_limit)
+async def call_staff(request: Request, public_ref: str) -> JSONResponse:
+    """Tell the call page who the participant talks to: ``{"name": ...}`` or ``{}``.
+
+    Only the participant's session for this booking may ask; the answer is a name or nothing
+    (``app.domain.screen_name.staff_label``), never an identifier of the staff member.
+
+    Raises:
+        HTTPException: ``404`` while ``embedded_call_enabled`` is off, before anything about
+            the booking is looked at.
+    """
+    if not request.app.state.settings.embedded_call_enabled:
+        raise HTTPException(status_code=404)
+    ref = await authorise(request, public_ref)
+    bookings: BookingService = request.app.state.booking_service
+    details = await bookings.find(ref)
+    current = follow(request, details.group.organisation_id)
+    names: StaffScreenNames = request.app.state.staff_names
+    claim = details.booking.claim
+    label = await names.label_of(
+        claim.claimed_by if claim else None, StaffNameMode(current.embedded_call_staff_name)
+    )
+    return JSONResponse(label.as_json(), headers=NO_STORE)
 
 
 def _answer(token: CallToken) -> JSONResponse:

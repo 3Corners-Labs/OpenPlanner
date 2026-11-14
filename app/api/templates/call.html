@@ -1,7 +1,7 @@
 {#- The participant's call page (ADR 0123): the start state and the device check (step 4b), then
     connecting, the lobby, the first moment in the call, leaving and failing (step 4c), then the
     notices, the devices of the call, the ended state and the failure inside the call (step 5a), then
-    sharing a screen both ways and the captions (step 5b).
+    sharing a screen both ways and the captions (step 5b), then the staff member's name (step 5c).
     Everything the page says is rendered here, in the reader's language; call-page.js only shows
     and hides it and reads the words it needs from [data-text] (each sentence is in the markup
     once). Without the script the
@@ -118,7 +118,7 @@
 {% block title %}{{ _("call.title") }} – {{ group.name }}{% endblock %}
 {% block head_extra %}<link rel="stylesheet" href="{{ static_url('call-page.css') }}">{% endblock %}
 {% block content %}
-<div class="call" data-call data-call-token-url="{{ token_url }}" data-call-seconds="{{ connect_seconds }}" data-call-attempts="{{ connect_attempts }}"{% if sdk_src %} data-call-sdk="{{ sdk_src }}" data-call-sdk-integrity="{{ sdk_integrity }}"{% endif %}>
+<div class="call" data-call data-call-token-url="{{ token_url }}" data-call-seconds="{{ connect_seconds }}" data-call-attempts="{{ connect_attempts }}" data-call-staff-url="{{ staff_url }}" data-call-poll-seconds="{{ poll_seconds }}"{% if sdk_src %} data-call-sdk="{{ sdk_src }}" data-call-sdk-integrity="{{ sdk_integrity }}"{% endif %}>
   <p class="visually-hidden" role="status" aria-live="polite" data-call-status></p>
   {{ notices() }}
 
@@ -213,7 +213,9 @@
     <h1 class="call-quiet" id="call-call-heading" tabindex="-1">{{ _("callpage.call.heading") }}</h1>
     <div class="call-stage" data-call-stage>
       <video class="call-remote-share" playsinline autoplay muted hidden aria-label="{{ _("callpage.share.view") }}" data-call-share-view></video>
-      <video class="call-remote" playsinline autoplay muted aria-label="{{ _("callpage.call.remote") }}" data-call-remote></video>
+      <video class="call-remote" playsinline autoplay muted aria-label="{{ _("callpage.staff.term") }}" data-call-remote></video>
+      {#- Who the participant talks to: a name and the team's word for staff, or the word alone. The script sets the text; it is also the accessible name of the picture. -#}
+      <p class="call-remote__label" data-call-remote-label>{{ _("callpage.staff.term") }}</p>
       <p class="call-remote__off" data-call-remote-off hidden>{{ _("callpage.call.remote_off") }}</p>
       <audio autoplay data-call-remote-audio></audio>
       <button type="button" class="button call-hear" data-call-hear hidden>{{ _("callpage.hear.button") }}</button>
@@ -339,15 +341,19 @@
     <span data-text="say_captions_failed">{{ _("callpage.say.captions_failed") }}</span>
     <span data-text="captions_you">{{ _("callpage.captions.you") }}</span>
     <span data-text="captions_other">{{ _("callpage.captions.other") }}</span>
+    <span data-text="staff_term">{{ _("callpage.staff.term") }}</span>
+    <span data-text="staff_named">{{ _("callpage.staff.named", name="{name}") }}</span>
+    <span data-text="say_staff_name">{{ _("callpage.say.staff_name", name="{name}") }}</span>
   </div>
 
   <p data-call-back><a href="/b/m/{{ ref }}/join">{{ _("join.back") }}</a></p>
 </div>
 {% endblock %}
-{#- Ten own scripts that share one object, in this order. Each only defines when it loads, and what
+{#- Eleven own scripts that share one object, in this order. Each only defines when it loads, and what
     it needs at that moment comes from a file before it: the status line, the sound of the check, the
     devices (which make the store of chosen ids), the call, the call's media (which uses that store),
-    the captions, the other side's streams, how the call's parts look, what the meeting tells the page, then the page, which starts them. -#}
+    the captions, the other side's streams, how the call's parts look, what the meeting tells the page,
+    the one poll of our own server (who the participant talks to), then the page, which starts them. -#}
 {% block scripts %}<script src="{{ static_url('call-status.js') }}" defer></script>
 <script src="{{ static_url('call-sound.js') }}" defer></script>
 <script src="{{ static_url('call-devices.js') }}" defer></script>
@@ -357,4 +363,5 @@
 <script src="{{ static_url('call-remote.js') }}" defer></script>
 <script src="{{ static_url('call-render.js') }}" defer></script>
 <script src="{{ static_url('call-events.js') }}" defer></script>
+<script src="{{ static_url('call-poll.js') }}" defer></script>
 <script src="{{ static_url('call-page.js') }}" defer></script>{% endblock %}

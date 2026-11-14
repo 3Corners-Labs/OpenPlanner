@@ -44,6 +44,10 @@ ERASED_MANUALLY = "manual"
 ERASED_BY_RETENTION = "retention"
 """Detail of ``staff.erased`` when ``staff_retention_days`` passed without a login."""
 
+SCREEN_NAME_EVENT = "staff.screen_name_changed"
+"""Audit event of a screen name being set, changed or cleared (ADR 0123 step 5c). The row says
+that it changed and never to what: a screen name is the person's own data."""
+
 ROLE_ADDED = "role.add"
 ROLE_REMOVED = "role.remove"
 GRANT_ADDED = "grant.add"
@@ -145,6 +149,9 @@ class StaffMember:
         email: The verified ``email`` claim of the last login, ``None`` when the provider gave
             none or did not call it verified (ADR 0117 step 10b); personal data, never logged.
         email_at: When ``email`` was last read at a login (UTC).
+        screen_name: The name the participant of a call in our own page sees for this person
+            (ADR 0123 step 5c), ``None`` for none; personal data, never logged or audited by value.
+            A login keeps it; erasing the record clears it.
     """
 
     subject: str
@@ -162,6 +169,7 @@ class StaffMember:
     status_at: datetime | None = None
     email: str | None = field(default=None, repr=False)
     email_at: datetime | None = None
+    screen_name: str | None = field(default=None, repr=False)
 
     @property
     def organisations(self) -> list[str]:
@@ -185,6 +193,7 @@ class StaffMember:
             display_name="",
             email=None,
             email_at=None,
+            screen_name=None,
             roles=frozenset(),
             memberships=frozenset(),
             refused=(),
