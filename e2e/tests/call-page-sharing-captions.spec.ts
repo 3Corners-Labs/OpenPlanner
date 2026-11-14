@@ -641,17 +641,19 @@ test('a reader who scrolled back is not moved by a change that brings no line, n
 test('the box stays a tab stop while it has focus, and is none once it has not and cannot scroll', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 640 });
   await inCall(page);
-  await page.evaluate(() => (document.documentElement.style.fontSize = '200%'));
   await captionsToggle(page).click();
   await pressed(captionsToggle(page), true);
   await caption(page, [{ id: '1', text: LONG('one') }]);
   const box = captionBox(page);
+  const m0 = await box.evaluate((el) => ({ sh: el.scrollHeight, ch: el.clientHeight }));
+  expect(m0.sh > m0.ch, `long line: scroll ${m0.sh} client ${m0.ch}`).toBe(true);
   expect(await box.getAttribute('tabindex')).toBe('0');
   await box.focus();
   // Three short lines push the long one out: the box can no longer scroll, but it has focus.
   await caption(page, [{ id: '1', text: LONG('one') }, { id: '2', text: 'Two' }, { id: '3', text: 'Three' }, { id: '4', text: 'Four' }]);
   await expect(rowsOf(page)).toHaveCount(3);
-  expect(await box.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(false);
+  const m = await box.evaluate((el) => ({ sh: el.scrollHeight, ch: el.clientHeight }));
+  expect(m.sh > m.ch, `scroll ${m.sh} client ${m.ch}`).toBe(false);
   expect(await box.getAttribute('tabindex')).toBe('0');
   await expect(box).toBeFocused();
   // Focus has left: the next caption takes the tab stop away.
