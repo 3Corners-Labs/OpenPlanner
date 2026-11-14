@@ -219,6 +219,12 @@ FLOWS: dict[str, Flow] = {
         "so an attack on it (a device, a notice, an event of a call that is over) reaches no "
         "server, and there is nothing to attribute"
     ),
+    "## Flow: sharing a screen and closed captions in the call (ADR 0123 step 5b)": Flow(
+        no_event="everything in it happens in the browser: the screen goes to the video platform "
+        "and the captions come from it, the page makes no request of its own, so an attack on it "
+        "(a screen without a press, a share that outlives the call, a caption shown as markup) "
+        "reaches no server, and there is nothing to attribute"
+    ),
     "## Flow: allowed origins for embedding (ADR 0035, EM-1)": Flow(ADMIN),
     "## Flow: video meetings, work items and direct calls (WP5/WP6)": Flow(
         (PUBLIC, WEBHOOK, JOB, DENIED, CHANGE)

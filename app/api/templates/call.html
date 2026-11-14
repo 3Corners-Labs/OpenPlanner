@@ -1,6 +1,7 @@
 {#- The participant's call page (ADR 0123): the start state and the device check (step 4b), then
     connecting, the lobby, the first moment in the call, leaving and failing (step 4c), then the
-    notices, the devices of the call, the ended state and the failure inside the call (step 5a).
+    notices, the devices of the call, the ended state and the failure inside the call (step 5a), then
+    sharing a screen both ways and the captions (step 5b).
     Everything the page says is rendered here, in the reader's language; call-page.js only shows
     and hides it and reads the words it needs from [data-text] (each sentence is in the markup
     once). Without the script the
@@ -46,9 +47,10 @@
 <button type="button" class="button button--danger call-leave" data-call-leave><span data-call-leave-label="call">{{ _("callpage.control.leave") }}</span><span data-call-leave-label="lobby" hidden>{{ _("callpage.control.leave_lobby") }}</span></button>
 {%- endmacro %}
 
-{#- The two notices that last while they hold (the recording, the connection being restored): an
+{#- The notices that last while they hold (the recording, the connection being restored, the participant sharing a screen
+    with its stop button, the staff member sharing one): an
     icon and a word, never colour alone; text, not a live region (the one polite region says each
-    change once). One place for both, shown in the lobby and the call (the participant is recorded in both).
+    change once). One place for all, shown in the lobby and the call (the participant is recorded in both).
     It stands at the top of the page, before the screen's heading, because the sentences must be in the
     markup once and the two screens share it; a screen reader user is told by the one polite region when
     a notice starts and ends, and the heading takes focus on entering the screen. -#}
@@ -61,6 +63,15 @@
   <p class="call-notice" data-call-notice="restoring" hidden>
     <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 0 8 8h-2.5A5.5 5.5 0 1 1 12 6.5V10l5-4.5L12 .5V4Z"/></svg>
     <strong>{{ _("callpage.notice.restoring.word") }}</strong> <span>{{ _("callpage.notice.restoring.body") }}</span>
+  </p>
+  <p class="call-notice" data-call-notice="sharing" hidden>
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M3 4h18v12H3V4Zm9 2-4 4h3v4h2v-4h3l-4-4ZM8 18h8v2H8v-2Z"/></svg>
+    <strong>{{ _("callpage.notice.sharing.word") }}</strong> <span>{{ _("callpage.notice.sharing.body") }}</span>
+    <button type="button" class="call-more call-notice__stop" data-call-share-stop>{{ _("callpage.notice.sharing.stop") }}</button>
+  </p>
+  <p class="call-notice" data-call-notice="theirs" hidden>
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M3 4h18v12H3V4Zm2 2v8h14V6H5Zm3 12h8v2H8v-2Z"/></svg>
+    <strong>{{ _("callpage.notice.theirs.word") }}</strong> <span>{{ _("callpage.notice.theirs.body") }}</span>
   </p>
 </div>
 {%- endmacro %}
@@ -190,7 +201,8 @@
 
   <section class="call-state" aria-labelledby="call-call-heading" data-call-state="call" hidden>
     <h1 class="call-quiet" id="call-call-heading" tabindex="-1">{{ _("callpage.call.heading") }}</h1>
-    <div class="call-stage">
+    <div class="call-stage" data-call-stage>
+      <video class="call-remote-share" playsinline autoplay muted hidden aria-label="{{ _("callpage.share.view") }}" data-call-share-view></video>
       <video class="call-remote" playsinline autoplay muted aria-label="{{ _("callpage.call.remote") }}" data-call-remote></video>
       <p class="call-remote__off" data-call-remote-off hidden>{{ _("callpage.call.remote_off") }}</p>
       <audio autoplay data-call-remote-audio></audio>
@@ -199,6 +211,8 @@
         {{ own_picture("call", _("callpage.self.picture"), note=False) }}
       </div>
     </div>
+    {#- The captions: ordinary text under the picture, never a live region (a screen reader user hears the speaker). -#}
+    <div class="call-captions" role="group" aria-label="{{ _("callpage.control.captions") }}" data-call-captions hidden></div>
   </section>
 
   <section class="call-state" aria-labelledby="call-failed-heading" data-call-state="failed" hidden>
@@ -235,6 +249,16 @@
   <div class="call-controls" role="group" aria-label="{{ _("callpage.control.bar") }}" data-call-controls hidden>
     <div class="call-bar">
       {{ toggles() }}
+      <div class="call-extras" data-call-extras>
+        <button type="button" class="call-toggle" aria-pressed="false" data-call-switch="captions" hidden>
+          <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm3 5v4h2.5v-1.5H8.8v-1H9.5V10H7Zm6 0v4h2.5v-1.5h-.7v-1h.7V10H13Z"/></svg>
+          <span>{{ _("callpage.control.captions") }}</span> <span class="call-toggle__state" data-call-toggle-state>{{ _("callpage.control.off") }}</span>
+        </button>
+        <button type="button" class="call-toggle" aria-pressed="false" data-call-switch="share" hidden>
+          <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M3 4h18v12H3V4Zm9 2-4 4h3v4h2v-4h3l-4-4ZM8 18h8v2H8v-2Z"/></svg>
+          <span><span class="call-label-long">{{ _("callpage.control.share") }}</span><span class="call-label-short" aria-hidden="true">{{ _("callpage.control.share_short") }}</span></span> <span class="call-toggle__state" data-call-toggle-state>{{ _("callpage.control.off") }}</span>
+        </button>
+      </div>
       <div class="call-bar__devices">
         <button type="button" class="call-more" aria-expanded="false" aria-controls="call-devices-panel" data-call-devices-button>
           <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M4 5h16v10H4V5Zm-2 12h20v2H2v-2Zm8-9v4l4-2-4-2Z"/></svg>
@@ -300,19 +324,31 @@
     <span data-text="say_recording_off">{{ _("callpage.say.recording_off") }}</span>
     <span data-text="say_restoring">{{ _("callpage.say.restoring") }}</span>
     <span data-text="say_restored">{{ _("callpage.say.restored") }}</span>
+    <span data-text="say_share_mine">{{ _("callpage.say.share_mine") }}</span>
+    <span data-text="say_share_off">{{ _("callpage.say.share_off") }}</span>
+    <span data-text="say_share_theirs">{{ _("callpage.notice.theirs.body") }}</span>
+    <span data-text="say_share_theirs_off">{{ _("callpage.say.share_theirs_off") }}</span>
+    <span data-text="say_share_replaced">{{ _("callpage.say.share_replaced") }}</span>
+    <span data-text="say_share_failed">{{ _("callpage.say.share_failed") }}</span>
+    <span data-text="say_captions_on">{{ _("callpage.say.captions_on") }}</span>
+    <span data-text="say_captions_off">{{ _("callpage.say.captions_off") }}</span>
+    <span data-text="say_captions_failed">{{ _("callpage.say.captions_failed") }}</span>
+    <span data-text="captions_you">{{ _("callpage.captions.you") }}</span>
+    <span data-text="captions_other">{{ _("callpage.captions.other") }}</span>
   </div>
 
   <p data-call-back><a href="/b/m/{{ ref }}/join">{{ _("join.back") }}</a></p>
 </div>
 {% endblock %}
-{#- Seven own scripts that share one object, in this order. Each only defines when it loads, and what
+{#- Eight own scripts that share one object, in this order. Each only defines when it loads, and what
     it needs at that moment comes from a file before it: the status line, the sound of the check, the
     devices (which make the store of chosen ids), the call, the call's media (which uses that store),
-    what the meeting tells the page, then the page, which starts them. -#}
+    the captions, what the meeting tells the page, then the page, which starts them. -#}
 {% block scripts %}<script src="{{ static_url('call-status.js') }}" defer></script>
 <script src="{{ static_url('call-sound.js') }}" defer></script>
 <script src="{{ static_url('call-devices.js') }}" defer></script>
 <script src="{{ static_url('call-connection.js') }}" defer></script>
 <script src="{{ static_url('call-media.js') }}" defer></script>
+<script src="{{ static_url('call-captions.js') }}" defer></script>
 <script src="{{ static_url('call-events.js') }}" defer></script>
 <script src="{{ static_url('call-page.js') }}" defer></script>{% endblock %}

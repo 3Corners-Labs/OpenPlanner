@@ -1,5 +1,5 @@
 /*
- * The call of the participant's call page (ADR 0123 steps 4c and 5a).
+ * The call of the participant's call page (ADR 0123 steps 4c, 5a and 5b).
  *
  * Owns: everything that follows the click that joins, except the participant's own devices
  * (call-media.js). It loads the video SDK file (with its checksum as integrity), asks our server
@@ -23,8 +23,9 @@
 
   // What the SDK is told: its logs are never uploaded and the registration of this browser is
   // temporary (ADR 0123 point 16). The automatic link to the real-time data service is off: it
-  // carries captions, which this step does not show (step 5 turns it on when it builds them), and
-  // nothing in the prototype's notes needs it to join. The first real meeting must confirm that.
+  // carries captions and nothing else the page needs. It is asked for only when the participant
+  // switches captions on (call-captions.js), if the SDK allows that; the first real meeting must
+  // confirm it, and if the link has to exist at the join, the first real meeting decides.
   var SDK_CONFIG = {
     logger: { level: "warn" },
     device: { ephemeral: true },
@@ -50,9 +51,9 @@
   // withdraw it, and a new one for every attempt would spend three of the booking's ten an hour
   // on one failed click; "try again" asks a new one.
   var call = { epoch: 0, token: "", link: "", expires: 0, loading: null, abort: null };
-  call.client = call.meeting = call.camera = call.microphone = call.capturing = null;
+  call.client = call.meeting = call.camera = call.microphone = call.screen = call.capturing = null;
   call.joined = false;
-  call.making = { camera: null, microphone: null }; // the device being made, as a promise
+  call.making = { camera: null, microphone: null, screen: null }; // the stream being made, as a promise
   call.sent = null; // the streams that addMedia took along
   call.adding = null; // the media is being added: a device press waits for it
   app.call = call; // shared with call-media.js, which takes and releases the streams
@@ -201,7 +202,9 @@
       })
       .then(function () {
         check(epoch);
-        app.go("call", { media: "added", say: "say_admitted" });
+        app.go("call", { media: "added", can: app.events.offers(), say: "say_admitted" });
+        // The staff member may have been sharing before the participant came in.
+        if (app.state.share === "theirs") app.say("say_share_theirs");
         app.playRemote();
       });
     // A press of a toggle waits for this (call-media.js).
@@ -277,16 +280,17 @@
     var client = call.client;
     var meeting = call.meeting;
     var joined = call.joined;
-    [call.microphone, call.camera].forEach(function (stream) {
+    [call.microphone, call.camera, call.screen].forEach(function (stream) {
       if (stream) stream.stop();
     });
     call.microphone = null;
     call.camera = null;
+    call.screen = null;
     call.client = null;
     call.meeting = null;
     call.joined = false;
     call.capturing = null;
-    call.making = { camera: null, microphone: null }; // a device being made or taken out is given up with the call
+    call.making = { camera: null, microphone: null, screen: null }; // a stream being made or taken out is given up with the call
     call.sent = null;
     call.epoch += 1;
     if (call.abort) {
@@ -296,6 +300,7 @@
     app.streams.self = null;
     app.streams.remote = null;
     app.streams.audio = null;
+    app.streams.share = null;
     var leaving = joined && meeting ? giveUp(meeting.leave()) : Promise.resolve();
     return leaving.then(function () {
       if (client && client.meetings && client.meetings.registered) {

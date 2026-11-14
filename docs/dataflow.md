@@ -383,6 +383,23 @@ The recording itself, its place and its retention belong to the supplier's site 
 organisation's own rules; the page only tells the participant that it runs. That is input for the
 DPIA, not something this page controls.
 
+### Sharing a screen and closed captions (ADR 0123 points 10 and 12, step 5b)
+
+Still no request of its own, no storage. The page asks the browser for a screen only when the
+participant presses the share button; the browser's own picker is the second decision.
+
+| What happens | What leaves the browser | What comes in | Stored by us |
+|---|---|---|---|
+| The participant shares a screen | the screen's picture, encrypted in transit, to the supplier's call hosts through the SDK; never to us | nothing | no |
+| The participant stops sharing (the button, the browser's own control, the staff member, the end of the call) | the SDK takes the stream out of the meeting; the capture is stopped | one event at most | no |
+| The staff member shares a screen | nothing | their screen's picture, shown in place of their picture | no |
+| Captions are switched on | the SDK asks the meeting to start them and, at that press, for its real-time data link; the page's language is passed on; the call's sound reaches the platform as it did | text made by the platform from the sound of the call, with a speaker; the page shows the text and a word of its own for who spoke, and reads nothing else of the speaker | no: shown and not kept, not logged, not sent to us; gone when switched off or the call ends |
+
+The real-time data link is asked for at the press, not at the join (`enableAutomaticLLM` stays off,
+see step 4c); a participant who never switches captions on never opens it, if the SDK allows that
+(a first real meeting shows it). The text of a caption is personal data of the call by nature; the
+platform makes it at its side, and what it keeps is for the DPIA, not for this page to control.
+
 ## Own queue (ADR 0043)
 
 A group with dispatch kind `openplanner_queue` sends nothing to a contact center. Its agents

@@ -1049,6 +1049,51 @@ What the controls do not cover, said plainly:
 - **The SDK's own storage** (what it keeps in the browser after it starts) has not been examined
   against the real file; the end-to-end tests run a stand-in that keeps nothing.
 
+## Flow: sharing a screen and closed captions in the call (ADR 0123 step 5b)
+
+In the call the participant can share a screen (a press asks the browser's own picker; the stream is
+sent into the meeting by the SDK) and switch closed captions on (the SDK is asked to start them; the
+platform makes the text from the call's sound and hands it to the page). The staff member's screen
+arrives as a stream and takes the place of their picture. Inputs from outside: the participant's
+choice in the browser's picker, the staff member's shared screen (a stream), the events of the
+meeting (a screen started or stopped, the meeting ending the participant's share, what the meeting
+offers, a caption with its text and a speaker). No new endpoint, setting, request or storage: the
+screen goes to the video platform only, never to us; captions are shown and not kept.
+
+| Abuse case | Control | Test |
+|---|---|---|
+| A screen is captured without a press (on load, on joining, with another control, on the staff member's request) | The picker is asked for in one place, the press of the share toggle, and only where the meeting allows sharing and the toggle shows (never in the lobby); nothing else of the page asks for a display; the browser's own picker is the participant's second decision | `e2e/tests/call-page-sharing-captions.spec.ts` (`nothing is captured before the press …` counts the requests for a display and the SDK's display streams across the whole call, captions included; `the toggle is there only in the call …`) |
+| A share outlives its reason (the call is left or ends, the connection fails, the browser's own control or the staff member ends it, the staff member starts to share, the meeting stops allowing it) and the screen stays captured | One place ends a share, whoever ends it: the capture is stopped first and taking it out of the meeting follows; leaving, ending and failing stop it with every other stream; a share that cannot be sent is stopped again and said | `e2e/tests/call-page-sharing-captions.spec.ts` (`a share ends the same way from the stop button / the browser's own control / the staff member`; `leaving, the meeting ending and the connection failing each stop a share …`; `a screen … that cannot be sent …`; `a staff member who shares while the participant does …`; `a meeting that does not allow sharing … ends a share`) |
+| Two shares at once, or a share that the participant does not know is running | One state, `share`: off, asking, mine or theirs; a press while it is not off does nothing; the lasting notice with a word and an icon and a stop button shows while it runs, and the one polite region says the start and the stop once each | `e2e/tests/call-page-sharing-captions.spec.ts` (`while sharing a lasting notice … is said once`; the replacement test counts the pickers) |
+| Captions are kept after the call, or sent to our server or elsewhere | They live in the page's memory (`state.lines`) only; the script makes no request but the token, stores nothing, and the state is reset with every screen outside the call; a test scans every request, the storages and the markup | `e2e/tests/call-page-sharing-captions.spec.ts` (`captions live in the page's memory only …`), `tests/web/test_call_page_assets.py` (no network, storage or console call in any script) |
+| A caption's text is shown as markup, or as a sentence the page vouches for | It is set with `textContent` in a text node, never as markup; the page's own words (who speaks) are the server's markup | `e2e/tests/call-page-sharing-captions.spec.ts` (`captions follow the page's text size, and a caption with markup is shown as text`), `tests/web/test_call_page_assets.py` (the script writes no markup) |
+| A speaker's name from the video platform is shown (it may name the staff member, the supplier or anyone else the platform knows) | The speaker's name is never read: a line is marked as the participant's own or the other side's and the page says "You" or the team's term for staff, from its own catalogue; the staff member's own name is a later step (5c) with its own decision | `e2e/tests/call-page-sharing-captions.spec.ts` (`captions show who speaks in the page's own words, never the platform's name …`; the double's speakers carry names the page must not show) |
+| Captions are read out twice (a screen reader hears the speaker and the page) or flood the live region | The captions are not a live region (a labelled group of ordinary text); the one polite region says only that they are on, off or could not start | `e2e/tests/call-page-sharing-captions.spec.ts` (`captions are ordinary text, not a live region …`) |
+| The notice, the captions or the new buttons push the way out of the window | The bar is fixed at the foot; its row of buttons is at most half the window (the share button reads "Share" on a narrow window and keeps its full name for assistive technology); the captions have a capped height in rem and the picture gives way | `e2e/tests/call-page-sharing-captions.spec.ts` (`the one bar holds in the call with sharing, captions and every notice shown` at 1280 by 400, 768 by 600, 320 by 640, 320 by 400 and 320 by 256) |
+
+What an attack on this flow leaves in the log: nothing; the page makes no request in the call.
+
+What the controls do not cover, said plainly:
+
+- **The names of the events and calls are the prototype's, not seen in a real meeting:**
+  `createDisplayStream` and `publishStreams({ screenShare })` for the participant's screen, the
+  stream's `stream-ended` event, `meeting:startedSharingRemote`, `meeting:stoppedSharingRemote` and the
+  `remoteShare` media of `media:ready` for the staff member's, `isTranscriptionSupported`,
+  `startTranscription`, `stopTranscription`, `setCaptionLanguage`, `meeting:receiveTranscription:started`
+  and `meeting:caption-received` for the captions come from the spike's prototype.
+  `meeting:stoppedSharingLocal` (the meeting ends the participant's share), `meeting:actionsUpdate`,
+  `inMeetingActions.get().canShareDesktop` as the right to share, `updateLLMConnection` (the real-time
+  link asked for at the press) and the way a caption tells that its speaker is the participant (the
+  meeting's own member id against the speaker's id) are assumptions that the prototype does not show.
+  If a name is wrong, a toggle would not appear, a share would not end by the meeting's word, or the
+  captions would not start or would all read as the other side's; only a real meeting shows it.
+- **What the platform does with a shared screen or with the sound it makes captions from** is the
+  supplier's, at its side; the page tells the participant that a screen is being shared and stops it,
+  it does not control what the platform keeps. That is input for the DPIA (`docs/dataflow.md`).
+- **The browser's own picker** decides what a screen, a window or a tab is shared; a page cannot
+  limit it, and a participant may share more than they meant to. The notice and the stop button are
+  the control.
+
 ## Flow: widget script on host websites (ADR 0035, EM-3)
 
 Public: `GET /widget/v1/openplanner-booking.js`, loaded by host pages as a module script.

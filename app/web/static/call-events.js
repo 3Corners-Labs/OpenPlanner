@@ -1,12 +1,15 @@
 /*
- * What the meeting tells the participant's call page (ADR 0123 steps 4c and 5a).
+ * What the meeting tells the participant's call page (ADR 0123 steps 4c, 5a and 5b).
  *
  * Owns: every registration on the meeting and the client's meetings: the staff member letting the
  * participant in, the other side's picture and sound, the meeting's end, the recording starting
- * and stopping and the connection being interrupted, restored or lost for good. Each event is tied
- * to the connection that made it (the epoch of call-connection.js), so an event of a call that is
- * over changes nothing. An event only asks for a change of the page's state; what it carries is
- * never read, so no text of outside origin reaches the page.
+ * and stopping, the connection being interrupted, restored or lost for good, the staff member's
+ * screen starting and stopping, the participant's own share ended by the meeting, what the meeting
+ * offers (sharing, captions) and the captions. Each event is tied to the connection that made it
+ * (the epoch of call-connection.js), so an event of a call that is over changes nothing. An event
+ * only asks for a change of the page's state; what it carries is never read, so no text of outside
+ * origin reaches the page, with one exception: a caption's text goes to call-captions.js, which
+ * shows it as text and reads nothing else of it but who spoke.
  *
  * Never: it makes no request, loads no file, stores nothing and writes no text of its own. It
  * changes what the page shows only through `app.go` and the calls of call-connection.js and
@@ -27,6 +30,17 @@
     app.go(screen, patch);
   }
 
+  // What this meeting offers the participant now: sharing a screen if the browser can capture
+  // one and the meeting allows it, captions if it has them. Read out of the meeting each time.
+  function offers() {
+    var meeting = app.call.meeting;
+    var actions = meeting && meeting.inMeetingActions && meeting.inMeetingActions.get();
+    return {
+      share: Boolean(actions && actions.canShareDesktop && app.media.getDisplayMedia),
+      captions: app.captions.supported(meeting),
+    };
+  }
+
   function follow(client, meeting, epoch) {
     var state = app.state;
     var current = function () {
@@ -39,6 +53,31 @@
       if (!current()) return;
       if (media.type === "remoteVideo") app.setRemote("remote", media.stream);
       if (media.type === "remoteAudio") app.setRemote("audio", media.stream);
+      if (media.type === "remoteShare") {
+        app.streams.share = media.stream;
+        mark(epoch, {});
+      }
+    });
+    meeting.on("meeting:startedSharingRemote", function () {
+      if (current()) app.callMedia.staffShare(true);
+    });
+    meeting.on("meeting:stoppedSharingRemote", function () {
+      if (current()) app.callMedia.staffShare(false);
+    });
+    meeting.on("meeting:stoppedSharingLocal", function () {
+      if (current()) app.callMedia.sharedEnded();
+    });
+    meeting.on("meeting:actionsUpdate", function () {
+      if (!current() || app.state.screen !== "call") return;
+      var now = offers();
+      mark(epoch, { can: now });
+      if (!now.share && state.share === "mine") app.callMedia.share(false);
+    });
+    meeting.on("meeting:receiveTranscription:started", function () {
+      app.captions.language(epoch);
+    });
+    meeting.on("meeting:caption-received", function (payload) {
+      app.captions.received(epoch, payload);
     });
     client.meetings.on("meeting:removed", function () {
       if (current()) app.connection.ended();
@@ -62,5 +101,5 @@
     });
   }
 
-  app.events = { follow: follow };
+  app.events = { follow: follow, offers: offers };
 })();

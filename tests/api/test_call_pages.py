@@ -166,6 +166,7 @@ async def test_the_page_refers_only_to_files_of_its_own_and_has_no_inline_code(
         "call-devices.js",
         "call-connection.js",
         "call-media.js",
+        "call-captions.js",
         "call-events.js",
         "call-page.js",
     ):
@@ -192,6 +193,7 @@ async def test_the_script_is_served_with_the_page_and_nothing_else_is_loaded(
         "/static/call-devices.js",
         "/static/call-connection.js",
         "/static/call-media.js",
+        "/static/call-captions.js",
         "/static/call-events.js",
         "/static/call-page.js",
     ]

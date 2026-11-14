@@ -7,10 +7,10 @@
  */
 /* The bar is fixed at the foot of the window, so a page needs room at its end for it, and a focused
    control is scrolled to rest above it (WCAG 2.4.11); both exist only while the bar shows. From 48 rem
-   wide the row of buttons is one line, about 4.5 rem with its frame; below that it wraps to two or
-   three rows, at most half the window and, at normal size, about 190 px: the lesser of half the window
-   and 13 rem. `body` is a plain block, so a bottom padding is the room after the footer. A browser
-   without `:has()` only loses the room at the end. */
+   wide the row of buttons is one line, about 4.5 rem with its frame; the captions and sharing buttons of
+   step 5b make the row longer, so below 66 rem it wraps to two rows (8 rem is room enough) and below
+   40 rem to as many as five (the lesser of half the window and 17.5 rem). `body` is a plain block, so a
+   bottom padding is the room after the footer. A browser without `:has()` only loses the room at the end. */
 html:has([data-call-controls]:not([hidden])) {
   scroll-padding-bottom: 4.5rem;
 }
@@ -19,13 +19,23 @@ html:has([data-call-controls]:not([hidden])) body {
   padding-bottom: 4.5rem;
 }
 
-@media (max-width: 48rem) {
+@media (max-width: 66rem) {
   html:has([data-call-controls]:not([hidden])) {
-    scroll-padding-bottom: min(50vh, 13rem);
+    scroll-padding-bottom: min(50vh, 8rem);
   }
 
   html:has([data-call-controls]:not([hidden])) body {
-    padding-bottom: min(50vh, 13rem);
+    padding-bottom: min(50vh, 8rem);
+  }
+}
+
+@media (max-width: 40rem) {
+  html:has([data-call-controls]:not([hidden])) {
+    scroll-padding-bottom: min(50vh, 17.5rem);
+  }
+
+  html:has([data-call-controls]:not([hidden])) body {
+    padding-bottom: min(50vh, 17.5rem);
   }
 }
 
@@ -103,7 +113,8 @@ html:has([data-call-controls]:not([hidden])) body {
   display: none;
 }
 
-.call-toggles {
+.call-toggles,
+.call-extras {
   display: flex;
   flex-wrap: wrap;
   gap: var(--booking-space-s);
@@ -303,7 +314,8 @@ html:has([data-call-controls]:not([hidden])) body {
 }
 
 /* The picture gives way, never the bar: on a low window the stage is as high as what is left
-   under the heading and the notices, and no lower than a small picture. */
+   under the heading and the notices (and the captions, when they show), and no lower than a small
+   picture. */
 .call-stage {
   position: relative;
   aspect-ratio: 16 / 9;
@@ -321,6 +333,72 @@ html:has([data-call-controls]:not([hidden])) body {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.call:has([data-call-captions]:not([hidden])) .call-stage {
+  max-height: calc(100vh - 22rem);
+  max-height: calc(100dvh - 22rem);
+}
+
+/* The staff member's screen takes the place of their picture, which moves to a small tile at the
+   foot on the left (the participant's own tile is on the right). It is the same element, so the
+   other side's sound and its tracks go on as they were. */
+.call-remote-share {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.call-stage[data-call-share="theirs"] .call-remote {
+  position: absolute;
+  bottom: var(--booking-space-s);
+  left: var(--booking-space-s);
+  z-index: 1;
+  width: min(30%, 12rem);
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border: 2px solid var(--call-on-stage);
+  border-radius: var(--booking-radius);
+  background: var(--call-stage);
+  object-fit: cover;
+}
+
+.call-stage[data-call-share="theirs"] .call-remote__off {
+  inset: auto auto var(--booking-space-s) var(--booking-space-s);
+  z-index: 1;
+  width: min(30%, 12rem);
+  aspect-ratio: 16 / 9;
+  padding: var(--booking-space-xs);
+  font-size: 0.875rem;
+}
+
+/* The captions are ordinary text under the picture, their size the page's own (rem), the newest
+   line at the foot; what does not fit leaves at the top, so they can never take the picture's place. */
+.call-captions {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-height: 6.5rem;
+  margin: var(--booking-space-s) 0 0;
+  padding: var(--booking-space-xs) var(--booking-space-m);
+  overflow: hidden;
+  border-radius: var(--booking-radius);
+  background: var(--call-stage);
+  color: var(--call-on-stage);
+  font-size: 1.125rem;
+}
+
+.call-caption {
+  margin: 0;
+}
+
+.call-caption__who::after {
+  content: ":";
+}
+
+.call-caption--interim .call-caption__text {
+  font-style: italic;
 }
 
 .call-remote__off {
@@ -375,6 +453,15 @@ html:has([data-call-controls]:not([hidden])) body {
   width: 1.25rem;
   height: 1.25rem;
   fill: currentcolor;
+}
+
+.call-notice__stop {
+  margin-left: auto;
+}
+
+.call-notice[data-call-notice="sharing"],
+.call-notice[data-call-notice="theirs"] {
+  border-left-color: var(--booking-color-accent);
 }
 
 .call-notice[data-call-notice="recording"] {
@@ -446,8 +533,49 @@ html:has([data-call-controls]:not([hidden])) body {
   margin-bottom: 0;
 }
 
-.call-bar .call-toggles {
+.call-bar .call-toggles,
+.call-bar .call-extras {
   margin-bottom: 0;
+}
+
+/* The long name of sharing goes where room is short; assistive technology keeps it either way. */
+.call-label-short {
+  display: none;
+}
+
+.call-toggle[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+@media (max-width: 40rem) {
+  .call-bar .call-extras {
+    gap: var(--booking-space-s);
+  }
+
+  .call-bar .call-toggle {
+    position: relative;
+  }
+
+  .call-bar .call-label-long {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .call-bar .call-label-short {
+    display: inline;
+  }
+
+  .call-bar .call-toggle,
+  .call-bar .call-more,
+  .call-bar .call-leave {
+    padding-right: var(--booking-space-s);
+    padding-left: var(--booking-space-s);
+  }
 }
 
 .call-leave {
@@ -487,8 +615,14 @@ html:has([data-call-controls]:not([hidden])) body {
   }
 
   .call-bar,
-  .call-bar .call-toggles {
+  .call-bar .call-toggles,
+  .call-bar .call-extras {
     gap: 4px;
+  }
+
+  .call-captions {
+    max-height: 3.5rem;
+    font-size: 1rem;
   }
 
   .call-bar .call-toggle,
@@ -533,8 +667,18 @@ html:has([data-call-controls]:not([hidden])) body {
   .call-card,
   .call-stage,
   .call-self,
+  .call-captions,
   .call-devices {
     border: 1px solid CanvasText;
+  }
+
+  .call-stage[data-call-share="theirs"] .call-remote {
+    border-color: CanvasText;
+  }
+
+  .call-toggle[aria-disabled="true"] {
+    border-color: GrayText;
+    color: GrayText;
   }
 
   .call-notice {

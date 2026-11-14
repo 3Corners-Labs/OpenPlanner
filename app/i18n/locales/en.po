@@ -14264,3 +14264,60 @@ msgstr "Leave the waiting room"
 
 msgid "callpage.control.bar"
 msgstr "Call controls"
+
+msgid "callpage.control.captions"
+msgstr "Captions"
+
+msgid "callpage.control.share"
+msgstr "Share screen"
+
+msgid "callpage.control.share_short"
+msgstr "Share"
+
+msgid "callpage.notice.sharing.word"
+msgstr "Sharing"
+
+msgid "callpage.notice.sharing.body"
+msgstr "You are sharing your screen. The {agent} can see what you open on that screen."
+
+msgid "callpage.notice.sharing.stop"
+msgstr "Stop sharing"
+
+msgid "callpage.notice.theirs.word"
+msgstr "Screen shared"
+
+msgid "callpage.notice.theirs.body"
+msgstr "The {agent} is sharing their screen."
+
+msgid "callpage.share.view"
+msgstr "Screen shared by the {agent}"
+
+msgid "callpage.captions.you"
+msgstr "You"
+
+msgid "callpage.captions.other"
+msgstr "{Agent}"
+
+msgid "callpage.say.share_mine"
+msgstr "You are sharing your screen."
+
+msgid "callpage.say.share_off"
+msgstr "You stopped sharing your screen."
+
+msgid "callpage.say.share_theirs_off"
+msgstr "The {agent} stopped sharing their screen."
+
+msgid "callpage.say.share_replaced"
+msgstr "The {agent} started sharing their screen, so your own sharing has stopped."
+
+msgid "callpage.say.share_failed"
+msgstr "Your screen could not be shared."
+
+msgid "callpage.say.captions_on"
+msgstr "Captions are on."
+
+msgid "callpage.say.captions_off"
+msgstr "Captions are off."
+
+msgid "callpage.say.captions_failed"
+msgstr "Captions could not be started. This call may not offer them."

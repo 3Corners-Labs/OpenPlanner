@@ -1,5 +1,5 @@
 /*
- * The participant's call page: its one state and its one view (ADR 0123 steps 4b, 4c and 5a).
+ * The participant's call page: its one state and its one view (ADR 0123 steps 4b, 4c, 5a and 5b).
  *
  * Owns: the page's single `state` and the one way to change it, `go(screen, patch)`, which checks
  * the move against a table of allowed transitions, renders, moves focus to the new heading and
@@ -10,8 +10,8 @@
  * Split in files that share the one object `window.openplannerCall` (no build step): call-status.js
  * is the polite status line, call-sound.js the level meter and test sound, call-devices.js the
  * devices (the check, the lists, the choice), call-connection.js the call (token, SDK, attempts,
- * lobby, leaving), call-media.js the participant's camera and microphone in the call,
- * call-events.js what the meeting tells the page. They only define; this file, loaded last,
+ * lobby, leaving), call-media.js the participant's camera, microphone and screen in the call,
+ * call-captions.js the captions, call-events.js what the meeting tells the page. They only define; this file, loaded last,
  * starts them.
  *
  * Never: it makes no request, loads no file, stores nothing, sets no inline style and builds no
@@ -65,11 +65,11 @@
     !/Chrome|Chromium|Edg|Firefox|FxiOS|CriOS/.test(navigator.userAgent);
 
   // The pictures and the sound of the call. They are streams, not state: `render` shows them.
-  app.streams = { self: null, remote: null, audio: null };
+  app.streams = { self: null, remote: null, audio: null, share: null }; // share: the staff member's screen
 
   // ---- the one state ---------------------------------------------------------------------------
   function fresh() {
-    return {
+    return Object.assign({
       screen: "start", // start, check, connecting, lobby, call, failed, left, ended or unavailable
       refused: [], // kinds the browser refuses
       missing: [], // kinds with no device
@@ -83,9 +83,20 @@
       media: "none", // none, adding or added: the call's picture and sound go in
       remote: "unknown", // unknown, waiting, live or off: the other side's picture
       soundBlocked: false, // the browser refused to play the other side's sound
+    }, inCallParts());
+  }
+
+  // What belongs to the call alone and starts afresh with every screen outside it.
+  function inCallParts() {
+    return {
       panel: false, // the panel of devices in the call is open
       recording: "off", // off, pending (being recorded, not yet said) or on (said): the meeting is recorded
       connection: "ok", // ok, pending (being restored, not yet said) or restoring (said)
+      share: "off", // off, asking (the browser's picker is open), mine or theirs: whose screen is shared
+      captions: "off", // off, starting or on
+      lines: [], // the captions in view: their final lines (in memory only, gone with the call)
+      interim: null, // the caption being spoken, until its final text arrives
+      can: { share: false, captions: false }, // what the meeting offers this participant
     };
   }
   var state = fresh();
@@ -126,7 +137,7 @@
     // A new screen outside the lobby and the call, or a new attempt, starts the call's panel and
     // notices afresh.
     if (!inCall && (changed || fields.attempt !== undefined)) {
-      Object.assign(state, { panel: false, recording: "off", connection: "ok" });
+      Object.assign(state, inCallParts());
     }
     render();
     if (sentence !== undefined) app.say(sentence);
@@ -144,6 +155,8 @@
       target = $('[data-call-denied="' + app.deniedKind(state.refused) + '"] h2');
     } else if (focus === "devices") {
       target = $("[data-call-devices-button]");
+    } else if (focus === "share") {
+      target = $('[data-call-switch="share"]');
     } else if (focus === "state" || (changed && focus === undefined)) {
       target = $('[data-call-state="' + screen + '"] h1');
     }
@@ -255,11 +268,16 @@
     $("[data-call-remote-off]").hidden = state.remote === "live";
     $("[data-call-hear]").hidden = !(screen === "call" && state.soundBlocked);
     // Notices last while they hold; the panel of devices is a disclosure of the call's bar.
+    var holding = {
+      recording: inCall && state.recording !== "off",
+      restoring: inCall && state.connection !== "ok",
+      sharing: screen === "call" && state.share === "mine",
+      theirs: screen === "call" && state.share === "theirs",
+    };
     $$("[data-call-notice]").forEach(function (notice) {
-      var restoring = notice.dataset.callNotice === "restoring";
-      var held = restoring ? state.connection !== "ok" : state.recording !== "off";
-      notice.hidden = !(inCall && held);
+      notice.hidden = !holding[notice.dataset.callNotice];
     });
+    renderSharing(screen === "call");
     $("[data-call-controls]").hidden = !inCall;
     // The way out says what it leaves: in the lobby the participant is not in the call yet.
     $$("[data-call-leave-label]").forEach(function (label) {
@@ -269,6 +287,29 @@
     $("[data-call-devices-panel]").hidden = !open;
     $("[data-call-devices-button]").setAttribute("aria-expanded", String(open));
     $("[data-call-pick-speaker-field]").hidden = !(open && state.speaker);
+  }
+
+  // Sharing a screen both ways and the captions: the bar's two toggles (only in the call, only if the
+  // meeting offers them; the captions' stays while they run), the staff member's screen in place of their
+  // picture, and the captions' lines. One share in a meeting: while the staff member's is shown, the
+  // participant's toggle does nothing.
+  function renderSharing(inTheCall) {
+    var on = { share: state.share === "mine", captions: state.captions === "on" };
+    var offered = { share: state.can.share, captions: state.can.captions || state.captions !== "off" };
+    $$("[data-call-switch]").forEach(function (button) {
+      var kind = button.dataset.callSwitch;
+      button.hidden = !(inTheCall && offered[kind]);
+      button.setAttribute("aria-pressed", String(on[kind]));
+      button.querySelector("[data-call-toggle-state]").textContent = texts[on[kind] ? "on" : "off"];
+    });
+    $('[data-call-switch="share"]').setAttribute("aria-disabled", String(state.share === "theirs"));
+    var theirs = inTheCall && state.share === "theirs";
+    $("[data-call-stage]").dataset.callShare = theirs ? "theirs" : "off";
+    var view = $("[data-call-share-view]");
+    view.hidden = !theirs;
+    show(view, theirs ? app.streams.share : null);
+    var box = $("[data-call-captions]");
+    box.hidden = app.captions.draw(box) === 0;
   }
 
   // The other side's picture and sound play. A browser that refuses (it wants a tap first) is
@@ -412,6 +453,13 @@
     button.addEventListener("click", app.connection.leave);
   });
   $("[data-call-again]").addEventListener("click", app.connection.again);
+  $('[data-call-switch="share"]').addEventListener("click", function () {
+    app.callMedia.share(state.share === "off");
+  });
+  $("[data-call-share-stop]").addEventListener("click", function () {
+    app.callMedia.share(false);
+  });
+  $('[data-call-switch="captions"]').addEventListener("click", app.captions.press);
   $("[data-call-hear]").addEventListener("click", function () {
     pressed = true;
     playRemote();
