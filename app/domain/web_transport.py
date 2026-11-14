@@ -1,4 +1,4 @@
-"""The hops inside one Docker host that stay plain HTTP, as recorded exceptions (ADR 0091).
+"""The hops inside one Docker host that run without TLS, as recorded exceptions (ADR 0091).
 
 These hops are meant never to leave the host, so they run without TLS, as recorded exceptions:
 
@@ -6,9 +6,10 @@ These hops are meant never to leave the host, so they run without TLS, as record
   another machine crosses a real network, so web should serve TLS there (point 3);
 * to the bundled identity provider (ADR 0125): web and worker over the compose network (the
   back channel: discovery, token, keys, the staff directory), and the proxy over ``edge`` (the
-  browser's ``/idp`` route, whose leg from the browser is https). Until ADR 0125 step 2 gives
-  the provider a fixed address, both reach it by the name ``idp``, which the host's resolver
-  may answer while the container is down.
+  browser's ``/idp`` route, whose leg from the browser is https); and the provider to its
+  database. Until ADR 0125 step 2 pins their addresses, they find each other by name
+  (``idp``, ``idp-db``, and ``web`` for the proxy), which the host's resolver may answer while
+  a container is not running.
 
 Pure Python: the settings arrive as plain values.
 """

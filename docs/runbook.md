@@ -1018,36 +1018,42 @@ render and a restart of `idp` and `web`.
 **After an unexplained outage of the bundled provider (ADR 0125 point 8).** Until ADR 0125
 step 2, web, worker and the proxy reach Keycloak by the name `idp`. While its container is
 down, this host's DNS may answer that name, and whoever answered may hold staff passwords and
-one-time codes, the portal's session cookie, Keycloak's own session cookies and both client
-secrets, and all of these work after the outage too. When the `idp` container was down and the
-reason is not known (an update or a restart you did yourself is known):
+one-time codes, the portal's session cookie, Keycloak's own session cookies (of the console too)
+and both client secrets, and all of these work after the outage. When the `idp` container was
+down and the reason is not known (an update or a restart you did yourself is known), work
+through these steps in this order:
 
-1. In Keycloak's admin console (realm `openplanner` → *Clients* → `openplanner-admin`, then
-   `openplanner-directory` → *Credentials* → *Regenerate*), give both clients a new secret.
-   The old secrets stop working at once.
-2. Replace the values of `KC_OPENPLANNER_CLIENT_SECRET` and `KC_DIRECTORY_CLIENT_SECRET` in
+1. **Keycloak's console first**, if anyone opened it (`/idp/admin/`) during or after the
+   outage: give `admin` (realm `master`) a new password, using only `A-Z a-z 0-9 _ . : / -`;
+   write it as `KC_BOOTSTRAP_ADMIN_PASSWORD` in `secrets/keycloak.env` with an editor (the
+   installer logs in with it to set the realm's mail server); and sign out every session of realm
+   `master` (*Sessions* → *Sign out all active sessions*). Otherwise a stolen console session can
+   read the new client secrets of the next step.
+2. **New client secrets.** In realm `openplanner` → *Clients* → `openplanner-admin`, then
+   `openplanner-directory` → *Credentials* → *Regenerate*. The old secrets stop working at once.
+   Replace the values of `KC_OPENPLANNER_CLIENT_SECRET` and `KC_DIRECTORY_CLIENT_SECRET` in
    `secrets/keycloak.env` with the new ones, in an editor on the host (never on a command line,
    and do not add second lines: the render script reads the first), and run
    `scripts/render-keycloak-realm.sh`, which writes `secrets/keycloak-app.env` from them.
-3. Sign everyone out, of both:
-   - Keycloak: realm `openplanner` → *Sessions* → *Sign out all active sessions*. If anyone
-     typed the console password of `admin` (realm `master`) at `/idp/admin/` in that time,
-     give `admin` a new one too.
-   - The portal: restart web and worker, then end every admin session:
+3. **Check and disable before anyone is signed out**, so nothing planted logs in again:
+   - realm `openplanner`: its accounts and roles against the invitations and grants in the
+     portal's audit log (not against *Manage › Staff*, which reads the realm), and each
+     account's *Credentials* dates (a password reset or a removed authenticator nobody asked
+     for); disable what nobody can explain;
+   - Keycloak itself, which keeps no event log here: other administrators in realm `master`,
+     clients with `realm-management` roles, identity providers, authentication flows (the
+     browser flow must still ask for the second factor) and mappers, in both realms, against
+     `deploy/keycloak/realm.template.json`.
+4. **Sign everyone out**: in Keycloak, realm `openplanner` → *Sessions* → *Sign out all active
+   sessions*; in the portal, restart web and worker and end every admin session:
 
-     ```sh
-     docker compose --env-file .env.update up -d web worker
-     docker compose --env-file .env.update exec web python -m app.cli sessions end-all --reason cli
-     ```
-4. Check what a forged superuser could have left, from the start of the outage until step 3
-   was done (stolen cookies and secrets work after the outage):
-   - the realm's accounts and roles against the invitations and grants in the audit log (not
-     against *Manage › Staff*, which reads the realm), and each account's *Credentials* dates
-     in Keycloak (a password reset or a removed authenticator nobody asked for);
-   - the audit log for logins, staff changes, API clients created or rotated, configuration
-     exports and changes to integrations.
-
-   Staff whose password or authenticator may have been used then reset it and register their
+   ```sh
+   docker compose --env-file .env.update up -d web worker
+   docker compose --env-file .env.update exec web python -m app.cli sessions end-all --reason cli
+   ```
+5. **Read the audit log** from the start of the outage until step 4 was done: logins, staff
+   changes, API clients created or rotated, configuration exports and changes to integrations.
+   Staff whose password or authenticator may have been used reset it and register their
    authenticator again.
 
 ## Webex meetings and Webex Contact Center

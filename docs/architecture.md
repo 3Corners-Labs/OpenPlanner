@@ -178,9 +178,10 @@ flowchart TB
   Keycloak under `/idp` on the same https address.
 - **Every hop with personal data is encrypted, or a recorded exception (ADR 0091).** The
   exceptions are all on one host: the bundled proxy to `web` on the `edge` network (ADR 0091),
-  and the hops to the bundled Keycloak as `idp:8080`, from `web` and `worker` and from the proxy
-  (ADR 0125; the browser reaches the proxy over https, and production accepts no other http
-  login; until its step 2 the name `idp` can leave the host while the container is down). An own reverse proxy
+  and the hops to the bundled Keycloak as `idp:8080`, from `web` and `worker` and from the proxy,
+  and from Keycloak to its database `idp-db` (ADR 0125; the browser reaches the proxy over
+  https, and production accepts no other http login; until its step 2 these names, and `web`,
+  can leave the host while their container is not running). An own reverse proxy
   on another machine gets HTTPS from uvicorn (`WEB_TLS_CERT_FILE`, `WEB_TLS_KEY_FILE`, class B;
   the image's healthcheck follows), and *System status* warns while `FORWARDED_ALLOW_IPS` names
   another proxy and web serves no TLS. All outbound connections are listed in `docs/dataflow.md`

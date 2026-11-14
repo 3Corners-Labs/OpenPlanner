@@ -1135,10 +1135,15 @@ def test_a_host_that_leaves_the_bundled_keycloak_logs_in_with_its_own_provider(
     assert host.file("secrets/keycloak.env").is_file()  # the way back to --idp bundled
     assert "removed secrets/keycloak-app.env" in result.stderr + result.stdout
     assert "IDP_UPSTREAM" not in host.settings("proxy.env")  # no /idp route to the name idp
-    # After web and worker are healthy without it; `compose rm` never removes the named volumes
-    # idp-data and idp-db-data, which the fake docker cannot show.
-    assert host.ran("--profile idp --profile idp-db rm --stop --force idp idp-db")
-    assert "stopped the bundled identity provider" in result.stderr + result.stdout
+    # Only once the new proxy, web and worker run without it (`up -d`, then ready): stopped
+    # earlier, the name idp would reach the host's resolver while they still use it. `compose rm`
+    # never removes the named volumes idp-data and idp-db-data, which the fake docker cannot show.
+    commands = host.commands()
+    retired = max(i for i, c in enumerate(commands) if "rm --stop --force idp idp-db" in c)
+    started = max(i for i, c in enumerate(commands) if c.endswith(" up -d"))
+    ready = max(i for i, c in enumerate(commands) if "/readyz" in c)
+    assert started < ready < retired
+    assert "containers (idp, idp-db) are removed" in result.stderr + result.stdout
     assert "until ADR 0125 step 2" not in result.stderr
     settings = _container_settings(host)
     assert settings.oidc_discovery_url == own["OIDC_DISCOVERY_URL"]

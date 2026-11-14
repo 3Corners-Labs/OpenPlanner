@@ -969,7 +969,7 @@ start() {
 retire_bundled_provider() {
   [[ $IDP != bundled && -f $DIR/secrets/keycloak.env ]] || return 0
   if compose --profile idp --profile idp-db rm --stop --force idp idp-db >/dev/null 2>&1; then
-    log "stopped the bundled identity provider (idp, idp-db); its volumes and secrets/keycloak.env stay"
+    log "the bundled identity provider's containers (idp, idp-db) are removed; its volumes and secrets/keycloak.env stay"
   else
     warn "could not remove the bundled identity provider's containers; run: docker compose --env-file .env.update --profile idp --profile idp-db rm --stop --force idp idp-db"
   fi

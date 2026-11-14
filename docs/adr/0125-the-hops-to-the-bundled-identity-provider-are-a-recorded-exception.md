@@ -29,8 +29,8 @@ such as docker01 do not run in production mode, so there the check only listed t
 System status as something production would refuse.
 
 ADR 0091 says that every hop that carries personal data is encrypted, or a recorded
-exception, and point 2 records one: the bundled proxy to web on one host. Two hops to the
-bundled provider carry personal data in plain HTTP and are recorded nowhere:
+exception, and point 2 records one: the bundled proxy to web on one host. Three hops of the
+bundled provider carry personal data without TLS and are recorded nowhere:
 
 - **web and worker to `idp:8080`** on the compose network: the client secret, the
   authorisation code and the ID token with a staff member's name and e-mail address; the staff
@@ -39,7 +39,9 @@ bundled provider carry personal data in plain HTTP and are recorded nowhere:
 - **the proxy to `idp:8080`** on the `edge` network (`IDP_UPSTREAM`, ADR 0112): everything a
   browser sends to `https://<host>/idp/`, which is staff passwords, one-time codes and
   Keycloak's cookies, and also the portal's session cookie, because `__Host-op_admin` has
-  `Path=/` on the same host name.
+  `Path=/` on the same host name;
+- **the provider to its database** (`idp-db:5432` on the compose network, production only, ADR
+  0106 point 4): the staff accounts with their password hashes, and the database login.
 
 **The name `idp` is not pinned.** Docker's own resolver answers `idp` only while the container
 is attached to the network. When it is not (stopped, being recreated, or held back by an
@@ -59,8 +61,10 @@ the host's search domains. Whatever answers there receives both hops' traffic:
   superuser in the genuine realm afterwards.
 
 Test and lab installations have carried this since ADR 0112; production was spared only because
-it did not start. The proxy's route to web (`web:8000`, ADR 0091 point 2) resolves its name in
-the same way, for the seconds web is recreated on an update.
+it did not start. Keycloak finds its database by the name `idp-db` in the same way. And the
+proxy's route to web (`web:8000`, ADR 0091 point 2) resolves its name in the same way while web
+is not running: recreated on an update, stopped by the updater for a restore, or restarting.
+That one applies to every installation, `--idp own` included.
 
 Two other ways out were weighed:
 
@@ -80,10 +84,10 @@ Two other ways out were weighed:
    exception** next to the one of ADR 0091 point 2, for the same reasons: the networks hold
    this installation's containers only, the hops are meant never to leave the host, and whoever
    can read those networks has the host, with the secrets files and the provider's database. It
-   covers two hops: web and worker to the provider (the login's discovery document, token
-   endpoint and key set, and the staff directory's admin API), and the proxy to the provider
-   (the browser's `/idp` route). Point 5 makes "never leaves the host" hold also while the
-   container is down.
+   covers three hops: web and worker to the provider (the login's discovery document, token
+   endpoint and key set, and the staff directory's admin API), the proxy to the provider (the
+   browser's `/idp` route), and the provider to its database. Point 5 makes "never leaves the
+   host" hold also while a container is down.
 2. **Keyed on the bundled provider, never on plain http as such.** In production the start-up
    check accepts an http `OIDC_DISCOVERY_URL` only when it is exactly the bundled provider's
    internal address behind the proxy,
@@ -108,7 +112,9 @@ Two other ways out were weighed:
    moves an existing host over and gives it new client secrets, since a host that ran on the
    name may have handed the old ones out; and a check on a real Docker host
    (`scripts/check-proxy.sh`) shows that both hops fail closed while the container is down.
-   The proxy's route to web is pinned the same way, so no hop on the host is resolved by name.
+   Keycloak's connection to `idp-db` and the proxy's route to web are pinned the same way, so
+   none of these hops is resolved by name. (Mailpit, a lab's mail catcher, is never in
+   production and stays as it is.)
 6. **Leaving the bundled provider removes it.** With `--idp own` the installer deletes
    `secrets/keycloak-app.env` (Compose reads it after `.env`, so its login and directory would
    otherwise override the ones the operator chose, now that production accepts that login),
@@ -119,10 +125,11 @@ Two other ways out were weighed:
    production with the bundled provider, and names this ADR and `--idp own`; the install guide
    says the same.
 8. **A recovery for a host that ran on the name.** The runbook says what to do after an
-   unexplained outage of the `idp` container on such a host: give both clients new secrets,
-   sign everyone out of Keycloak and of the portal, and check the realm's accounts and
-   credentials and the portal's audit log from the start of the outage until then, because
-   what was taken keeps working after it.
+   unexplained outage of the `idp` container on such a host, in an order that leaves nothing
+   behind: secure Keycloak's console, give both clients new secrets, check and disable what
+   nobody can explain in the realm and in Keycloak's own configuration, sign everyone out of
+   Keycloak and of the portal, and read the portal's audit log from the start of the outage
+   until the end of the recovery, because what was taken keeps working after it.
 
 ## Settings
 
@@ -137,7 +144,7 @@ want the hops chooses `--idp own`.
 |---|---|---|---|
 | 0 | ADR | #834 | merged |
 | 1 | `bundled_idp_hop` in the start-up check; the files a production install writes tested against it (`tests/scripts/test_install.py`), the render script tied to the same address; `--idp own` removes the bundled login, route and containers (point 6); the installer's warning (point 7); the recovery in the runbook (point 8); data flow, threat model, ASVS, architecture, runbook, install guide and the System status text (nl, en) | #834 | merged |
-| 2 | A fixed address for the bundled provider, used by the login, the staff directory, the exception and the proxy route, and the proxy's route to web pinned the same way; the installer moves a host over with new client secrets; the real-Docker check (point 5) | | planned |
+| 2 | A fixed address for the bundled provider, used by the login, the staff directory, the exception and the proxy route; Keycloak's connection to `idp-db` and the proxy's route to web pinned the same way; the installer moves a host over with new client secrets; the real-Docker check (point 5) | | planned |
 
 ## Consequences
 
