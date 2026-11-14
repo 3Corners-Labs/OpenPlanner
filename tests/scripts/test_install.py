@@ -1245,6 +1245,46 @@ def test_a_file_the_installer_cannot_read_is_never_emptied(host: Host) -> None:
     assert kept.read_text() == before  # not empty, not half written
 
 
+def test_a_rewrite_of_env_that_cannot_finish_stops_the_run_and_keeps_the_file(
+    tmp_path: Path,
+) -> None:
+    """rewrite_env stops inside its command substitution; its callers must carry that out."""
+    source = (REPO / "scripts" / "install.sh").read_text()
+    functions = [
+        re.search(rf"^{name}\(\) {{.*?^}}$", source, re.MULTILINE | re.DOTALL)
+        for name in ("die", "write_private", "rewrite_env")
+    ]
+    assert all(functions)
+    env = tmp_path / ".env"
+    env.write_text("A=1\nA=2\n")
+    script = "\n".join(
+        [
+            "set -Eeuo pipefail",
+            f"ENV_FILE={env}",
+            *(match.group(0) for match in functions if match),
+            "backup=$(rewrite_env '{ print }')",
+            "echo continued",
+        ]
+    )
+    env.chmod(0)
+    try:
+        result = subprocess.run(  # noqa: S603 - fixed argv, the installer's own functions
+            [BASH, "-c", script], capture_output=True, text=True, check=False
+        )
+    finally:
+        env.chmod(0o600)
+
+    assert result.returncode == 1
+    assert "continued" not in result.stdout
+    assert f"could not back up {env}" in result.stderr
+    assert env.read_text() == "A=1\nA=2\n"
+    # Every caller is a plain assignment, which errexit stops; `local x=$(...)` or a condition
+    # would swallow the failure and go on without the rewrite.
+    calls = [line.strip() for line in source.splitlines() if "$(rewrite_env" in line]
+    assert calls
+    assert all(line.startswith("backup=$(rewrite_env ") for line in calls), calls
+
+
 def test_a_rerun_on_the_fixed_address_keeps_the_client_secrets(host: Host) -> None:
     _production_bundled(host)
     before = _secrets(host)

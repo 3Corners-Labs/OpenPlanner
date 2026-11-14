@@ -512,7 +512,8 @@ login_value() {
 rewrite_env() {
   local backup
   backup=$ENV_FILE.bak.$(date -u +%Y%m%dT%H%M%SZ)
-  [[ -f $backup ]] || { cp "$ENV_FILE" "$backup" && chmod 600 "$backup"; }
+  [[ -f $backup ]] || { cp "$ENV_FILE" "$backup" && chmod 600 "$backup"; } \
+    || die "could not back up $ENV_FILE to $backup; it is as it was"
   write_private "$ENV_FILE" awk "$@" "$ENV_FILE" || die "could not rewrite $ENV_FILE; it is as it was (backup: $backup)"
   printf '%s' "$backup"
 }
