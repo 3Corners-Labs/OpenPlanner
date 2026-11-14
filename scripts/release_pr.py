@@ -6,24 +6,22 @@ number is here and tested in ``tests/scripts/test_release_pr.py``:
 
 - ``plan [--version X.Y.Z] [--base release/X.Y]``: the number (given, or what
   ``scripts/release_plan.py`` gives; on a maintenance line always a patch of that line, ADR
-  0116 point 3), the previous release, the PR's base, branch and title, and whether the
-  release needs the audit of ADR 0078 (a minor or major version, ``X.Y.0``). Printed as
+  0116 point 3), the previous release, the PR's base, branch and title. Printed as
   ``key=value`` lines for ``$GITHUB_OUTPUT``.
 - ``prepare --version X.Y.Z --body FILE [--base release/X.Y]``: sets the version in
   ``pyproject.toml`` and ``uv.lock``, the version and the date in ``publiccode.yml`` (ADR 0054),
   moves *Unreleased* in ``CHANGELOG.md`` under ``## X.Y.Z (date)``, takes over the released
   sections of every maintenance line on ``origin`` that ``main`` lacks, and writes the pull
   request body, the PR template filled in, to ``FILE``.
-- ``audit --body FILE --findings FILE``: puts the audit's findings into the body under
-  ``## Release audit``, ending with ``Verdict: open``. Changing that line to ``Verdict: pass``
-  stays the product owner's act (ADR 0078 point 4).
 - ``tag-check --version X.Y.Z [--ref release/X.Y]``: finds the squash-merged release PR on
   ``origin/main`` (or on the version's own line), checks that
   ``pyproject.toml`` at that commit says the version and that the tag does not exist yet, and
   prints ``commit=``, ``number=`` and the tag ``message=`` (who dispatched, when) for the tag
   step (ADR 0052 points 3 and 4).
 
-Nothing here pushes, opens or tags; every subcommand can be run on a laptop as well.
+Nothing here pushes, opens or tags; every subcommand can be run on a laptop as well. An
+independent audit by a second model is optional and gates nothing (ADR 0128); whoever runs one
+adds its findings to the release PR by hand.
 """
 
 import argparse
@@ -51,18 +49,7 @@ _LOCK_VERSION = re.compile(r'(\[\[package\]\]\nname = "openplanner"\nversion = "
 _UNRELEASED = re.compile(r"^## Unreleased\n", re.M)
 _PUBLICCODE_VERSION = re.compile(r'^(softwareVersion: ")[^"]+(")$', re.M)
 _PUBLICCODE_DATE = re.compile(r'^(releaseDate: ")[^"]+(")$', re.M)
-_AUDIT_SECTION = re.compile(r"^## Release audit\n.*?(?=^## |\Z)", re.M | re.S)
-_HEADING = re.compile(r"^#+\s+(.*)$", re.M)
 _SECTION = re.compile(r"^## (\d+\.\d+\.\d+) \([^)]*\)\n", re.M)
-
-AUDIT_HEADING = "## Release audit"
-VERDICT_OPEN = "Verdict: open"
-"""The audit section's last line until the product owner changes it to ``Verdict: pass``."""
-
-
-def needs_audit(version: str) -> bool:
-    """Return whether ``version`` is a minor or major release, which needs the audit of ADR 0078."""
-    return parse_version(version)[2] == 0
 
 
 def plan(
@@ -232,18 +219,7 @@ def pr_body(
         adrs: The ADR section of :func:`adr_progress`; empty when the overview at the last
             release could not be read.
     """
-    audit = needs_audit(version)
     listed = "\n".join(f"- {subject}" for subject in subjects) or "- (none)"
-    audit_section = (
-        f"{AUDIT_HEADING}\n\n"
-        "Pending: the `audit` job of the release workflow runs `scripts/release-audit.sh` "
-        "(the Codex CLI over everything since the last release, ADR 0078 point 4) and writes "
-        "its findings here. The product owner reads them and changes the verdict on the last "
-        "line from *open* to *pass*; `main.yml` refuses the tag until then.\n\n"
-        f"{VERDICT_OPEN}\n\n"
-        if audit
-        else ""
-    )
     return (
         "## What\n\n"
         f"Release v{version}: `pyproject.toml`, `uv.lock` and `publiccode.yml` say `{version}`, "
@@ -272,10 +248,10 @@ def pr_body(
         "6. **Which settings does this add or change?** None; no tunable value.\n"
         "7. **Which admin screen or setting is new or moved?** None.\n\n"
         "## Security review\n\n"
-        "Not applicable: four files change, each by a tested edit; the independent audit "
-        + ("is the section below.\n\n" if audit else "is not needed for a patch release.\n\n")
-        + audit_section
-        + "## How tested\n\n"
+        "Not applicable: four files change, each by a tested edit. An independent audit by a "
+        "second model is optional and gates nothing (ADR 0128); when one was run, its findings "
+        "are added here under `## Release audit`.\n\n"
+        "## How tested\n\n"
         "CI on this PR (`make check` in the fast lane, the full lane in the merge queue); the "
         "release workflow's own tests in `tests/scripts/`.\n\n"
         "## Checklist\n"
@@ -293,20 +269,6 @@ def pr_body(
         "- [x] ADR build status: ADR 0079 (the release workflow) says what runs\n\n"
         "🤖 Generated with the `release` workflow (`.github/workflows/release.yml`)\n"
     )
-
-
-def with_audit(body: str, findings: str) -> str:
-    """Return ``body`` with ``findings`` under ``## Release audit``, ending with ``Verdict: open``.
-
-    An existing section is replaced; headings inside the findings become bold lines, so the
-    section stays one section and a second run replaces it whole.
-    """
-    text = _HEADING.sub(r"**\1**", findings.strip()) or "The audit produced no output."
-    section = f"{AUDIT_HEADING}\n\n{text}\n\n{VERDICT_OPEN}\n\n"
-    body, count = _AUDIT_SECTION.subn(lambda _: section, body, count=1)
-    if count == 0:
-        body = body.rstrip("\n") + "\n\n" + section
-    return body
 
 
 def tag_message(version: str, actor: str, date: str) -> str:
@@ -357,7 +319,6 @@ def _plan(args: argparse.Namespace) -> None:
         ("base", target.branch if target.line else args.base),
         ("branch", f"release/v{version}"),
         ("title", f"chore(release): v{version}"),
-        ("audit", "true" if needs_audit(version) else "false"),
     ):
         sys.stdout.write(f"{key}={value}\n")
 
@@ -410,12 +371,6 @@ def _line_changelogs(target: Target) -> list[str]:
     return [git("show", f"{ref}:CHANGELOG.md") for ref in refs.split() if Target.from_ref(ref).line]
 
 
-def _audit(args: argparse.Namespace) -> None:
-    body = Path(args.body)
-    body.write_text(with_audit(body.read_text(), Path(args.findings).read_text()))
-    sys.stdout.write(f"audit section written to {args.body}; {VERDICT_OPEN}\n")
-
-
 def _tag_check(args: argparse.Namespace) -> None:
     version = args.version
     parse_version(version)
@@ -433,7 +388,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run one subcommand; print the reason and return 1 when the release cannot go ahead."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     commands = parser.add_subparsers(dest="command", required=True)
-    plan_parser = commands.add_parser("plan", help="the number, branch, title and audit need")
+    plan_parser = commands.add_parser("plan", help="the number, branch and title")
     plan_parser.add_argument("--version", default="", help="X.Y.Z; empty for the rules")
     plan_parser.add_argument(
         "--base", default="main", help="where the release PR goes: main or a line release/X.Y"
@@ -446,9 +401,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     prepare.add_argument("--body", required=True, help="where to write the PR body")
     prepare.add_argument("--actor", default="the product owner", help="who dispatched")
     prepare.add_argument("--date", default="", help="YYYY-MM-DD; default today (UTC)")
-    audit = commands.add_parser("audit", help="put the findings into the PR body")
-    audit.add_argument("--body", required=True)
-    audit.add_argument("--findings", required=True, help="the audit's output")
     tag_check = commands.add_parser("tag-check", help="find and check the merged release")
     tag_check.add_argument("--version", required=True)
     tag_check.add_argument(
@@ -458,9 +410,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     tag_check.add_argument("--date", default="", help="YYYY-MM-DD; default today (UTC)")
     args = parser.parse_args(argv)
     try:
-        {"plan": _plan, "prepare": _prepare, "audit": _audit, "tag-check": _tag_check}[
-            args.command
-        ](args)
+        {"plan": _plan, "prepare": _prepare, "tag-check": _tag_check}[args.command](args)
     except ValueError as error:
         sys.stderr.write(f"::error::{error}\n")
         return 1
