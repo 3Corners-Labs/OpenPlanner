@@ -29,9 +29,9 @@ from app.cli import (
 )
 from app.config import Settings
 from app.domain.authorization import Scope
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.tokens import ACCESS_TOKEN
 from tests.support.database import migrated_database
+from tests.support.seed_rows import seed_group
 
 ORG = "11111111-2222-3333-4444-555555555555"
 
@@ -626,9 +626,9 @@ async def test_tls_check_of_another_host_reports_the_certificate_and_stores_noth
 async def test_purge_overdue_counts_per_group_and_purges(migrated: Settings) -> None:
     from app.cli import _purge_overdue
     from app.domain.services import BookingService
-    from tests.adapters.db.conftest import seed_group
     from tests.fakes.clock import FixedClock
     from tests.support.domain import NOW, SLOT_0900, TEST_TOKEN_KEY, book
+    from tests.support.seed_rows import seed_group
 
     engine = create_engine(migrated.database_url)
     try:

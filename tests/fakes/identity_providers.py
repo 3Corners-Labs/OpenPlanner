@@ -1,10 +1,11 @@
-"""Fakes for the organisation identity providers (ADR 0083): discovery and key generation."""
+"""Fakes for the organisation identity providers (ADR 0083): discovery, keys and the registry."""
 
 from collections.abc import Mapping
 from typing import Any
 
 from app.domain.identity_providers import GeneratedKey
 from app.domain.ports import IdentityError
+from tests.fakes.identity import FakeIdentityProvider
 
 ISSUER = "https://login.org-a.example"
 DISCOVERY_URL = f"{ISSUER}/.well-known/openid-configuration"
@@ -57,3 +58,17 @@ class FakeSigningKeys:
             {"kty": "EC", "crv": "P-256", "x": f"x{n}", "y": f"y{n}", "use": "sig", "alg": "ES256"},
             f"-----BEGIN PRIVATE KEY-----\nprivate-{n}\n-----END PRIVATE KEY-----\n",
         )
+
+
+class FakeOrganisationProviders:
+    """The registry of organisation provider adapters (ADR 0083): one fake per key."""
+
+    def __init__(self) -> None:
+        self.adapters: dict[str, FakeIdentityProvider] = {}
+        self.invalidated: list[str] = []
+
+    async def provider(self, key: str) -> FakeIdentityProvider | None:
+        return self.adapters.get(key)
+
+    def invalidate(self, key: str) -> None:
+        self.invalidated.append(key)

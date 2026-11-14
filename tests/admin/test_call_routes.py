@@ -6,7 +6,6 @@ import pytest
 
 from app.adapters.db.jobs import SqlJobQueue
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
-from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.registrations import (
     Listing,
     ListingError,
@@ -30,22 +29,22 @@ from app.domain.ports import RequestRecord
 from app.domain.request_log import RequestEvents
 from app.domain.scheduling import DispatchFallback, DispatchKind
 from app.domain.services import BookingService, ContactInput
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AUDITOR,
     GROUP_ADMIN,
     OUTSIDER,
     SAME_ORIGIN,
     SUPER,
     Site,
-    _running_site,
+    audit_log,
+    running_site,
+    site_uow,
 )
-from tests.support.admin_site import audit_log, site_uow
 from tests.support.domain import ADA, FRIDAY_0900, TEST_TOKEN_KEY, book_confirmed
 
 
 async def _book(site: Site, slug: str, contact: ContactInput = ADA) -> int:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    uow = SqlUnitOfWork(app.state.engine)
+    uow = site_uow(site)
     receipt = await book_confirmed(
         BookingService(uow, site.clock, TEST_TOKEN_KEY, treatment_buffer=0),
         group_slug=slug,
@@ -100,8 +99,7 @@ async def test_the_booking_links_back_to_its_day_in_the_agenda(site: Site) -> No
 
 async def test_a_failed_meeting_explains_what_to_check(site: Site) -> None:
     booking_id = await _book(site, "demo")
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    uow = SqlUnitOfWork(app.state.engine)
+    uow = site_uow(site)
     integration = IntegrationService(uow, site.clock, AdminService(uow, site.clock))
     await integration.record(
         booking_id,
@@ -190,7 +188,7 @@ async def test_integrations_page_shows_status_without_secrets(site: Site) -> Non
 
 
 async def test_integrations_page_shows_the_webhook_base_url(site: Site) -> None:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     app.state.settings = app.state.settings.model_copy(
         update={"webhook_base_url": "https://abc.trycloudflare.com"}
     )
@@ -212,7 +210,7 @@ async def test_integrations_page_says_when_nothing_was_checked_yet(site: Site) -
 
 
 async def test_integrations_page_shows_the_last_checks_read_only(site: Site) -> None:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     reports = ReportStore(app.state.engine)
     tunnel = "https://old.trycloudflare.com"
     listing = Listing(
@@ -267,8 +265,7 @@ async def test_integrations_page_shows_the_last_checks_read_only(site: Site) -> 
 
 async def test_timeline_explains_a_work_item_that_could_not_be_ended(site: Site) -> None:
     booking_id = await _book(site, "demo")
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    uow = SqlUnitOfWork(app.state.engine)
+    uow = site_uow(site)
     integration = IntegrationService(uow, site.clock, AdminService(uow, site.clock))
     await integration.record(booking_id, EventKind.END_NOT_POSSIBLE, detail="rejected_403")
     await integration.record(booking_id, EventKind.TASK_MARKED_CANCELLED)
@@ -284,8 +281,8 @@ async def test_timeline_explains_a_work_item_that_could_not_be_ended(site: Site)
 
 async def _failed_meeting(site: Site) -> int:
     """A booking of ``demo`` (with a Webex host) whose meeting job failed on an older version."""
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    uow = SqlUnitOfWork(app.state.engine)
+    app = site.app
+    uow = site_uow(site)
     async with uow.locked() as tx:
         demo = await tx.get_group("demo")
         assert demo is not None
@@ -355,7 +352,7 @@ async def test_a_retry_counts_toward_the_planners_alert_with_its_platform_settin
 ) -> None:
     """ADR 0044: a retried call is a change; past ``planner_changes_alert_per_hour``, a warning."""
     limited = settings.model_copy(update={"planner_changes_alert_per_hour": 5})
-    async with _running_site(limited, admin_db) as site:
+    async with running_site(limited, admin_db) as site:
         booking_id = await _failed_meeting(site)
         await site.login_as(GROUP_ADMIN)
         url = f"/admin/groups/demo/bookings/{booking_id}/retry"
@@ -373,8 +370,7 @@ async def test_a_retry_counts_toward_the_planners_alert_with_its_platform_settin
 
 async def _in_fallback(site: Site, slug: str) -> None:
     """Put the group in fallback to its own queue, as the worker does when the center is down."""
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+    async with site_uow(site).locked() as tx:
         group = await tx.get_group(slug)
         assert group is not None
         fallback = DispatchFallback.OWN_QUEUE
@@ -388,7 +384,7 @@ async def test_ending_a_fallback_by_hand_counts_toward_the_planners_alert(
 ) -> None:
     """ADR 0044: ending a fallback by hand is a change, counted with the retries before it."""
     limited = settings.model_copy(update={"planner_changes_alert_per_hour": 5})
-    async with _running_site(limited, admin_db) as site:
+    async with running_site(limited, admin_db) as site:
         booking_id = await _failed_meeting(site)
         await site.login_as(GROUP_ADMIN)
         retry = f"/admin/groups/demo/bookings/{booking_id}/retry"
@@ -404,8 +400,7 @@ async def test_ending_a_fallback_by_hand_counts_toward_the_planners_alert(
 
 async def _with_meeting(site: Site, booking_id: int, meeting_id: str) -> None:
     """Give the booking the Webex meeting ``meeting_id``, as the worker would."""
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    async with SqlUnitOfWork(app.state.engine).locked() as tx:
+    async with site_uow(site).locked() as tx:
         await tx.save_meeting(booking_id, MeetingRef(meeting_id, "https://site.webex.com/m/1"))
 
 
@@ -473,7 +468,7 @@ async def test_the_alert_on_many_requests_follows_the_platform_setting(
 ) -> None:
     """ADR 0044 §2: past ``contact_reveals_alert_per_hour`` requests, one system event."""
     limited = settings.model_copy(update={"contact_reveals_alert_per_hour": 5})
-    async with _running_site(limited, admin_db) as site:
+    async with running_site(limited, admin_db) as site:
         booking_id = await _book(site, "demo")
         await site.login_as(GROUP_ADMIN)
         page = f"/admin/groups/demo/bookings/{booking_id}"

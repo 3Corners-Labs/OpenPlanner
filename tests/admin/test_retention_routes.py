@@ -1,20 +1,16 @@
 """The retention overview page (ADR 0039): counts per group, never personal data."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
-from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.services import BookingService
-from tests.admin.conftest import AUDITOR, ORG_ADMIN, OUTSIDER, SUPER, Site
-from tests.support.domain import ADA, TEST_TOKEN_KEY
-
-FRIDAY_0900 = datetime(2026, 1, 2, 8, 0, tzinfo=UTC)  # demo group: open weekdays
+from tests.support.admin_site import AUDITOR, ORG_ADMIN, OUTSIDER, SUPER, Site, site_uow
+from tests.support.domain import ADA, FRIDAY_0900, TEST_TOKEN_KEY
 
 
 async def _book(site: Site) -> None:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    await BookingService(
-        SqlUnitOfWork(app.state.engine), site.clock, TEST_TOKEN_KEY, treatment_buffer=0
-    ).book(group_slug="demo", start=FRIDAY_0900, contact=ADA, locale="nl")
+    await BookingService(site_uow(site), site.clock, TEST_TOKEN_KEY, treatment_buffer=0).book(
+        group_slug="demo", start=FRIDAY_0900, contact=ADA, locale="nl"
+    )
 
 
 async def test_a_booking_past_its_purge_moment_needs_attention(site: Site) -> None:

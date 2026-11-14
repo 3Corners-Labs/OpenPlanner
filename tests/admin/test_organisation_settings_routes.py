@@ -2,7 +2,7 @@
 
 import re
 
-from tests.admin.conftest import AUDITOR, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import AUDITOR, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
 
 URL = "/admin/organisations/demo/settings"
 
@@ -73,7 +73,7 @@ async def test_another_organisations_admin_and_the_auditor_may_not_change_it(sit
 
 async def test_the_superuser_sets_the_platform_default_on_advanced_settings(site: Site) -> None:
     await site.login_as(SUPER)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
 
     response = await site.client.post(
         "/admin/settings/shortfall_horizon_days", data={"value": "21"}, headers=SAME_ORIGIN

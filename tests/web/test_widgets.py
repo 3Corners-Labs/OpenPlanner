@@ -20,7 +20,7 @@ from app.web.widgets import (
     resolve_view,
     widget,
 )
-from tests.admin.conftest import AGENT, AUDITOR, GROUP_ADMIN, SUPER
+from tests.support.admin_site import AGENT, AUDITOR, GROUP_ADMIN, SUPER
 from tests.support.principals import principal
 from tests.support.routes import all_routes
 

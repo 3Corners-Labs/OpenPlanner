@@ -2,14 +2,12 @@
 
 import re
 from datetime import timedelta
-from typing import Any
 
 from app.domain.admin import AdminService
-from app.domain.authorization import Scope
 from app.domain.calls import EventKind
 from app.domain.integration import IntegrationService
 from app.web.static_assets import ASSETS
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AGENT,
     AUDITOR,
     GROUP_ADMIN,
@@ -18,6 +16,7 @@ from tests.admin.conftest import (
     SAME_ORIGIN,
     SUPER,
     Site,
+    audit_log,
 )
 from tests.support.admin_site import site_uow as _uow
 from tests.support.queue import own_queue as _own_queue
@@ -39,7 +38,7 @@ async def _alert_after(site: Site, minutes: int) -> None:
     path = "/admin/organisations/demo/settings/reporting_wallboard_wait_alert_minutes"
     response = await site.client.post(path, data={"value": str(minutes)}, headers=SAME_ORIGIN)
     assert response.status_code == 303
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     await app.state.live_settings.refresh()
 
 
@@ -133,9 +132,7 @@ async def test_a_refusal_is_audited_and_the_menu_link_is_not_offered(site: Site)
 
     nav = volume.split('class="report-views"', 1)[1].split("</nav>", 1)[0]
     assert "view=wallboard" not in nav
-    async with _uow(site).read() as tx:
-        events = await tx.list_audit_events(Scope(everything=True), limit=5)
-    assert any(e.event.action == "reports.wallboard.view" for e in events)
+    assert any(e.action == "reports.wallboard.view" for e in await audit_log(site, limit=5))
 
 
 async def test_the_organisation_board_covers_its_groups(site: Site) -> None:

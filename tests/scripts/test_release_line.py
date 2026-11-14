@@ -18,16 +18,9 @@ from scripts.release_line import (
 )
 from scripts.release_plan import MAIN, LineError, Target
 from tests.fakes.gh import FakeGh
-from tests.scripts.conftest import (
-    Git,
-    commit_all,
-    cut_line,
-    fake_program,
-    run_step,
-    script_path,
-    workflow_events,
-    workflow_step,
-)
+from tests.support.fake_programs import fake_program, script_path
+from tests.support.git_repository import Git, commit_all, cut_line
+from tests.support.workflows import run_step, workflow_events, workflow_step
 
 BACKPORT = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "backport.yml"
 

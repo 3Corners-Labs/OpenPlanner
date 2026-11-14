@@ -9,8 +9,14 @@ import re
 
 import httpx
 
-from tests.admin.conftest import GROUP_ADMIN, OUTSIDER, SAME_ORIGIN, Site
-from tests.support.admin_site import audit_events, post_form
+from tests.support.admin_site import (
+    GROUP_ADMIN,
+    OUTSIDER,
+    SAME_ORIGIN,
+    Site,
+    audit_events,
+    post_form,
+)
 from tests.support.closure_pages import CLOSURE, UNTIL_SATURDAY
 from tests.support.images import SECRET, jpeg, png
 

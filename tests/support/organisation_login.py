@@ -1,6 +1,6 @@
 """The *Login* sub-tab of organisation demo in the admin portal (ADR 0083 step 2)."""
 
-from tests.admin.conftest import SAME_ORIGIN, Site
+from tests.support.admin_site import SAME_ORIGIN, Site
 from tests.support.organisation_providers import NEW_PROVIDER
 
 LOGIN = "/admin/organisations/demo/login"

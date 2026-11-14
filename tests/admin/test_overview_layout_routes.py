@@ -2,7 +2,7 @@
 
 import re
 
-from tests.admin.conftest import AGENT, GROUP_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import AGENT, GROUP_ADMIN, SAME_ORIGIN, SUPER, Site
 
 ADD = "/admin/overview/add"
 EDIT = "/admin/overview/edit"

@@ -1,6 +1,6 @@
 """Reminder and message-text screens (ADR 0022): rules per group, texts per locale."""
 
-from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, Site
+from tests.support.admin_site import GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, Site
 
 REMINDERS = "/admin/groups/demo/reminders"
 TEXTS = "/admin/groups/demo/messages"

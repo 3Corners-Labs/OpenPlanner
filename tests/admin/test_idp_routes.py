@@ -13,10 +13,17 @@ import pytest
 from app.domain.audit import Outcome
 from app.domain.identity_provider_service import TEST_LOGIN_EVENT
 from app.domain.ports import LoginTestReport
-from tests.admin.conftest import AUDITOR, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
 from tests.fakes.identity import FakeIdentityProvider
 from tests.fakes.identity_providers import DISCOVERY_URL, discovery_document
-from tests.support.admin_site import audit_events
+from tests.support.admin_site import (
+    AUDITOR,
+    ORG_ADMIN,
+    OUTSIDER,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+    audit_events,
+)
 from tests.support.organisation_login import LOGIN, register
 from tests.support.organisation_providers import NEW_PROVIDER, organisation_claims
 

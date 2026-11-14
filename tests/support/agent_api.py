@@ -21,6 +21,7 @@ from app.domain.api_clients import ApiCaller, ApiClient, ClientDraft, IssuedSecr
 from app.domain.authorization import ApiScope, Role
 from app.main import create_app
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import served
 from tests.support.domain import NOW
 from tests.support.principals import principal
 
@@ -80,12 +81,7 @@ async def agent_api(settings: Settings, *, enabled: bool) -> AsyncIterator[Agent
     await seed_demo(engine)
     await engine.dispose()
     app = create_app(settings, FixedClock(NOW))
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
-        ) as client,
-    ):
+    async with served(app) as client:
         service: ApiAccessService = app.state.api_access
         if enabled:
             await service.save_settings(SUPER, enabled=True, docs_public=False)

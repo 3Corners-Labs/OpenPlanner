@@ -20,7 +20,7 @@ from scripts.guardrail_audit import (
     unexpected_bypasses,
 )
 from tests.fakes.gh import FakeGh
-from tests.scripts.conftest import workflow_events
+from tests.support.workflows import workflow_events
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github" / "workflows"

@@ -16,8 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.db.models import SlotRow
 from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import app_client
 from tests.support.domain import NOW
 from tests.support.flows import booking_rows, engine_of, slot_count
 from tests.support.participant import ADA, FRIDAY_0900, SAME_ORIGIN, book, booked, open_link

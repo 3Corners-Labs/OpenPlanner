@@ -2,9 +2,7 @@
 
 from datetime import timedelta
 
-from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.authorization import Scope
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AUDITOR,
     GROUP_ADMIN,
     ORG_ADMIN,
@@ -12,6 +10,7 @@ from tests.admin.conftest import (
     SAME_ORIGIN,
     SUPER,
     Site,
+    audit_log,
 )
 
 
@@ -36,19 +35,9 @@ async def _device(site: Site, principal: object) -> str:
 
 
 async def _audit(site: Site) -> list[tuple[str, str, str, str, str | None, str]]:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    async with SqlUnitOfWork(app.state.engine).read() as tx:
-        events = await tx.list_audit_events(Scope(everything=True), limit=300)
     return [
-        (
-            e.event.actor,
-            e.event.action,
-            e.event.outcome.value,
-            e.event.reason,
-            e.event.organisation,
-            e.event.detail,
-        )
-        for e in events
+        (e.actor, e.action, e.outcome.value, e.reason, e.organisation, e.detail)
+        for e in reversed(await audit_log(site, limit=300))
     ]
 
 

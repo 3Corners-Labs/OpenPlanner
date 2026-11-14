@@ -5,10 +5,10 @@
 saved and audited with the routing's other attributes, under the same permission.
 """
 
-from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.authorization import Scope
+import httpx
+
 from app.domain.contact_center import TaskKind
-from tests.admin.conftest import OUTSIDER, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import OUTSIDER, SUPER, Site, audit_log, post_form, site_uow
 from tests.support.group_settings import SETTINGS_FORM
 
 GROUP = "/admin/groups/demo"
@@ -17,17 +17,16 @@ FIELD = "contact_center_task_kind"
 
 def _switch(site: Site, *, on: bool) -> None:
     """Set the platform switch the way the portal's value would reach the running process."""
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     app.state.settings = app.state.settings.model_copy(update={"embedded_call_enabled": on})
 
 
-async def _post(site: Site, data: dict[str, str]) -> object:
-    return await site.client.post(f"{GROUP}/settings", data=data, headers=SAME_ORIGIN)
+async def _post(site: Site, data: dict[str, str]) -> httpx.Response:
+    return await post_form(site, f"{GROUP}/settings", data)
 
 
 async def _stored(site: Site) -> TaskKind | None:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    async with SqlUnitOfWork(app.state.engine).read() as tx:
+    async with site_uow(site).read() as tx:
         group = await tx.get_group("demo")
     assert group is not None
     return group.contact_center.task_kind if group.contact_center else None
@@ -62,8 +61,8 @@ async def test_a_conversation_submitted_while_the_switch_is_off_is_refused(site:
 
     response = await _post(site, {**SETTINGS_FORM, "name": "X", FIELD: "conversation"})
 
-    assert response.status_code == 422  # type: ignore[attr-defined]
-    assert f'<a href="#{FIELD}">' in response.text  # type: ignore[attr-defined]
+    assert response.status_code == 422
+    assert f'<a href="#{FIELD}">' in response.text
     assert await _stored(site) is TaskKind.FORM  # nothing saved
 
 
@@ -82,8 +81,8 @@ async def test_a_kind_that_is_no_kind_is_refused(site: Site) -> None:
 
     response = await _post(site, {**SETTINGS_FORM, FIELD: "chat"})
 
-    assert response.status_code == 422  # type: ignore[attr-defined]
-    assert f'<a href="#{FIELD}">' in response.text  # type: ignore[attr-defined]
+    assert response.status_code == 422
+    assert f'<a href="#{FIELD}">' in response.text
 
 
 async def test_the_conversation_is_saved_audited_and_shown_while_the_switch_is_on(
@@ -94,14 +93,11 @@ async def test_the_conversation_is_saved_audited_and_shown_while_the_switch_is_o
 
     saved = await _post(site, {**SETTINGS_FORM, FIELD: "conversation"})
 
-    assert saved.headers["location"] == f"{GROUP}/settings?done=saved"  # type: ignore[attr-defined]
+    assert saved.headers["location"] == f"{GROUP}/settings?done=saved"
     assert await _stored(site) is TaskKind.CONVERSATION
     page = (await site.client.get(f"{GROUP}/settings")).text
     assert '<option value="conversation" selected' in page
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    async with SqlUnitOfWork(app.state.engine).read() as tx:
-        events = await tx.list_audit_events(Scope(everything=True), limit=5)
-    assert "contact_center" in events[0].event.detail
+    assert "contact_center" in (await audit_log(site, limit=5))[-1].detail
 
 
 async def test_a_conversation_already_held_survives_the_switch_going_off(site: Site) -> None:
@@ -117,7 +113,7 @@ async def test_a_conversation_already_held_survives_the_switch_going_off(site: S
     assert "maakt hij werkitems" in page  # the note: in force only with the switch
     saved = await _post(site, {**SETTINGS_FORM, "name": "Y", FIELD: "conversation"})
 
-    assert saved.headers["location"] == f"{GROUP}/settings?done=saved"  # type: ignore[attr-defined]
+    assert saved.headers["location"] == f"{GROUP}/settings?done=saved"
     assert await _stored(site) is TaskKind.CONVERSATION
 
 
@@ -138,5 +134,5 @@ async def test_a_user_without_group_edit_cannot_change_it(site: Site) -> None:
 
     response = await _post(site, {**SETTINGS_FORM, FIELD: "conversation"})
 
-    assert response.status_code in (302, 303, 403, 404)  # type: ignore[attr-defined]
+    assert response.status_code in (302, 303, 403, 404)
     assert await _stored(site) is not TaskKind.CONVERSATION

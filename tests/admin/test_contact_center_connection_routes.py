@@ -11,8 +11,7 @@ from app.domain.contact_center import ContactCenterKind, Registration
 from app.domain.integration import EventOutcome
 from app.domain.networks import NetworkList
 from app.web.protection import RateLimits, configure_rate_limits
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
-from tests.support.admin_site import site_app
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.support.contact_center_site import (
     FORM,
     PAGE,
@@ -32,7 +31,7 @@ from tests.support.contact_center_site import (
 
 def _credentials(site: Site) -> CredentialStore:
     """The sealed store the connections live in, as the application builds it."""
-    state = site_app(site).state
+    state = site.app.state
     store = sealed_store(state.engine, state.settings)
     assert store is not None
     return store
@@ -153,7 +152,7 @@ async def test_a_refusal_at_an_organisations_address_names_the_organisation_and_
     )
     assert (refused.status_code, refused.content) == (415, b"")
 
-    log = await site_app(site).state.admin_service.audit_log(SUPER)
+    log = await site.app.state.admin_service.audit_log(SUPER)
     refusals = sorted(
         (
             e.event.reason,
@@ -207,7 +206,7 @@ async def test_forged_calls_to_an_organisation_never_lock_its_signed_calls_out(s
 
 
 async def _webhook_refusals(site: Site) -> list[tuple[str, str]]:
-    log = await site_app(site).state.admin_service.audit_log(SUPER)
+    log = await site.app.state.admin_service.audit_log(SUPER)
     return sorted(
         (
             e.event.reason,
@@ -246,7 +245,7 @@ async def test_changing_the_networks_alone_keeps_the_webhook_secret_and_register
     assert "done=contact_center_saved" in saved.headers["location"]
     assert registrar.registered == []
     assert await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC) == before
-    audit = await site_app(site).state.admin_service.audit_log(SUPER)
+    audit = await site.app.state.admin_service.audit_log(SUPER)
     saves = [
         e.event.detail for e in audit if e.event.detail.startswith("contact_center_connection.save")
     ]
@@ -457,7 +456,7 @@ class _Handler:
 
 def _handler(site: Site) -> _Handler:
     handler = _Handler()
-    site_app(site).state.integration_service = handler
+    site.app.state.integration_service = handler
     return handler
 
 
@@ -499,7 +498,7 @@ async def test_pausing_keeps_the_secret_registers_nothing_and_is_audited_by_name
     assert not stored.inbound_enabled
     assert registrar.registered == []
     assert await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC) == before
-    audit = await site_app(site).state.admin_service.audit_log(SUPER)
+    audit = await site.app.state.admin_service.audit_log(SUPER)
     details = [e.event.detail for e in audit if e.event.detail.startswith("contact_center")]
     assert details[:2] == [  # newest first
         "contact_center_connection.resume",

@@ -17,12 +17,8 @@ from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import AUDITOR, GROUP_ADMIN, OTHER_TEAM, OUTSIDER, two_organisations
-from tests.support.domain import NOW, TEST_TOKEN_KEY, book, webex_routing, window
-
-WIRED = {
-    "video_host_email": "host@example.nl",
-    "contact_center": webex_routing("openplanner@example.biz", "openplanner-video"),
-}
+from tests.support.call_jobs import WIRED
+from tests.support.domain import NOW, TEST_TOKEN_KEY, book, window
 
 
 async def _setup(alert_per_hour: int = 50) -> tuple[InMemoryUnitOfWork, CallRetryService, int]:

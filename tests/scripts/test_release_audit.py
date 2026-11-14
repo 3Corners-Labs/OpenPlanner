@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from tests.scripts.conftest import Git, commit_all, fake_program, script_path
+from tests.support.fake_programs import fake_program, script_path
+from tests.support.git_repository import Git, commit_all
 
 ROOT = Path(__file__).resolve().parents[2]
 AUDIT = ROOT / "scripts" / "release-audit.sh"

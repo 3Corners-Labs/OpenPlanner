@@ -15,10 +15,10 @@ from app.config import Settings
 from app.domain.services import BookingService
 from app.domain.simulation import SIMULATED_LINK
 from app.main import create_app
-from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, Site
 from tests.fakes.clock import FixedClock
 from tests.fakes.identity import FakeIdentityProvider
-from tests.support.admin_site import audit_events
+from tests.support.admin_site import GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, Site, audit_events
+from tests.support.app_client import served
 from tests.support.domain import ADA, FRIDAY_0900, NOW, TEST_TOKEN_KEY, book_confirmed
 from tests.support.participant import open_link
 
@@ -63,13 +63,10 @@ async def _site(settings: Settings) -> AsyncIterator[Booked]:
     await engine.dispose()
     idp = FakeIdentityProvider()
     app = create_app(settings, clock, idp)
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
-        ) as client,
-    ):
-        yield Booked(Site(client, idp, clock), receipt.booking.id or 0, receipt.management_token)
+    async with served(app) as client:
+        yield Booked(
+            Site(app, client, idp, clock), receipt.booking.id or 0, receipt.management_token
+        )
 
 
 @pytest.fixture

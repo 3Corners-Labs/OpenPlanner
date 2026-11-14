@@ -18,8 +18,8 @@ import pytest
 from app.adapters.vendored_files import VendoredFile
 from app.config import Settings
 from app.web.static_assets import StaticAssets
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import app_client
 from tests.support.call_page import Page
 from tests.support.domain import NOW
 from tests.support.participant import booked, open_link

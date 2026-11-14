@@ -11,7 +11,6 @@ from app.domain.booking_changes import ProposalTiming
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.reschedule_proposal import DEFAULT_PROPOSAL_HOURS, ProposalOutcome
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import (
     ADA,
@@ -22,6 +21,7 @@ from tests.support.domain import (
     book_pending,
     participant,
 )
+from tests.support.seed_rows import seed_group
 
 NEXT_0900 = SLOT_0900 + timedelta(days=7)
 TIMING = ProposalTiming(rebook_days=14, rebook_reminder_days=3, hours=DEFAULT_PROPOSAL_HOURS)

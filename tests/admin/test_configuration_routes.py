@@ -4,7 +4,7 @@ import json
 import re
 from datetime import timedelta
 
-from tests.admin.conftest import ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
 
 PLATFORM = "/admin/settings/configuration"
 ORGANISATION = "/admin/organisations/demo/configuration"

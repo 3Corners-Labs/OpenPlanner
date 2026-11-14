@@ -14,9 +14,9 @@ from app.domain.job_plan import JobCounts, JobStatus, JobType
 from app.domain.request_log import REQUEST_EVENT
 from app.domain.services import BookingService
 from app.domain.worker_check import WorkerHeartbeat
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW, TEST_TOKEN_KEY, book
+from tests.support.seed_rows import seed_group
 
 
 async def _booked(engine: AsyncEngine) -> tuple[int, int]:

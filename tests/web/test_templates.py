@@ -15,7 +15,7 @@ from starlette.requests import Request
 
 from app.web.protection import require_same_origin
 from app.web.templates import switch_href
-from tests.web.conftest import RenderSource
+from tests.support.template_source import RenderSource
 
 
 def _guarded(_: Annotated[None, Depends(require_same_origin)]) -> None:

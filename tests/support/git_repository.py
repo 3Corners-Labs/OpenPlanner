@@ -1,7 +1,7 @@
 """A throw-away git repository per test, for the scripts and skill scripts that run against git.
 
 The ``git`` fixture in ``tests/conftest.py`` makes one; tests stage and commit with
-``commit_all``.
+``commit_all``, and ``cut_line`` cuts a release line from a tag (ADR 0116).
 """
 
 import shutil
@@ -36,3 +36,15 @@ def commit_all(git: Git, message: str) -> None:
     """Stage everything and commit it."""
     git("add", "-A")
     git("commit", "-q", "-m", message)
+
+
+def cut_line(git: Git, root: Path, line: str, tag: str) -> None:
+    """Cut ``release/<line>`` from ``tag`` with one fix on it, as on ``origin`` (ADR 0116).
+
+    ``origin/main`` is the current ``main`` and ``origin/release/<line>`` the line's head.
+    """
+    git("update-ref", "refs/remotes/origin/main", "main")
+    git("switch", "-q", "-c", f"release/{line}", tag)
+    (root / "fix.txt").write_text("fix\n")
+    commit_all(git, "fix: the security fix (#21)")
+    git("update-ref", f"refs/remotes/origin/release/{line}", "HEAD")

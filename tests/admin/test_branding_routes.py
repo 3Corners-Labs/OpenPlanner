@@ -2,12 +2,9 @@
 
 import httpx
 
-from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.authorization import Scope
 from app.domain.branding import Branding
-from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
 from tests.fakes.woff2 import make_woff2
-from tests.support.admin_site import audit_events
+from tests.support.admin_site import SAME_ORIGIN, SUPER, Site, audit_events, audit_log
 
 PAGE = "/admin/organisations/demo/branding"
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
@@ -116,12 +113,8 @@ WOFF2 = make_woff2()
 
 
 async def _last_change(site: Site) -> str | None:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    async with SqlUnitOfWork(app.state.engine).read() as tx:
-        events = await tx.list_audit_events(Scope(everything=True), limit=50)
-    return next(
-        e.event.detail for e in events if e.event.action == "branding.manage" and e.event.detail
-    )
+    events = reversed(await audit_log(site))
+    return next(e.detail for e in events if e.action == "branding.manage" and e.detail)
 
 
 async def _upload(site: Site, path: str, name: str, data: bytes) -> httpx.Response:

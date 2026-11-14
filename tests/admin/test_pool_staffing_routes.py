@@ -3,13 +3,11 @@
 import re
 from datetime import timedelta
 
-import httpx
-
 from app.domain.audit import Outcome
 from app.domain.authorization import Scope
 from app.domain.booking import BookingKind, Slot
 from app.domain.capacity import CapacityPool, PoolMode
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AUDITOR,
     GROUP_ADMIN,
     NO_ROLE,
@@ -18,8 +16,10 @@ from tests.admin.conftest import (
     SAME_ORIGIN,
     SUPER,
     Site,
+    audit_log,
+    post_form,
+    site_uow,
 )
-from tests.support.admin_site import audit_log, site_uow
 from tests.support.closures import confirmed_booking
 from tests.support.domain import SLOT_0900
 from tests.support.skill_seed import add_pool, archive_pool
@@ -33,14 +33,9 @@ async def staffed(site: Site, name: str = "Loket", zone: str = "Europe/Amsterdam
     """Add a counted pool, choose its time zone as the organisation admin, return its path."""
     pool = await add_pool(site, name)
     await site.login_as(ORG_ADMIN)
-    response = await post(site, f"{ORG}/{pool}/timezone", {"timezone": zone})
+    response = await post_form(site, f"{ORG}/{pool}/timezone", {"timezone": zone})
     assert response.status_code == 303
     return f"{ORG}/{pool}"
-
-
-async def post(site: Site, path: str, data: dict[str, str] | None = None) -> httpx.Response:
-    """Post a same-origin form."""
-    return await site.client.post(path, data=data or {}, headers=SAME_ORIGIN)
 
 
 async def details(site: Site) -> list[str]:
@@ -77,7 +72,7 @@ async def test_the_page_asks_for_a_time_zone_first_and_nothing_can_be_entered_be
     path = f"{ORG}/{pool}"
 
     page = (await site.client.get(f"{path}/staffing")).text
-    refused = await post(site, f"{path}/staffing", BLOCK)
+    refused = await post_form(site, f"{path}/staffing", BLOCK)
     exceptions = (await site.client.get(f"{path}/exceptions")).text
 
     assert "Kies eerst de tijdzone" in page
@@ -94,9 +89,9 @@ async def test_the_zone_is_saved_and_confirmed_and_a_wrong_zone_is_refused(site:
     await site.login_as(ORG_ADMIN)
     path = f"{ORG}/{pool}"
 
-    saved = await post(site, f"{path}/timezone", {"timezone": "Europe/Amsterdam"})
-    again = await post(site, f"{path}/timezone", {"timezone": "Europe/Amsterdam"})
-    wrong = await post(site, f"{path}/timezone", {"timezone": "Mars/Olympus"})
+    saved = await post_form(site, f"{path}/timezone", {"timezone": "Europe/Amsterdam"})
+    again = await post_form(site, f"{path}/timezone", {"timezone": "Europe/Amsterdam"})
+    wrong = await post_form(site, f"{path}/timezone", {"timezone": "Mars/Olympus"})
     page = (await site.client.get(saved.headers["location"])).text
 
     assert saved.headers["location"] == f"{path}/staffing?done=saved"
@@ -115,22 +110,22 @@ async def test_the_zone_is_saved_and_confirmed_and_a_wrong_zone_is_refused(site:
 async def test_a_block_is_added_listed_changed_split_and_removed(site: Site) -> None:
     path = await staffed(site)
 
-    added = await post(site, f"{path}/staffing", {**BLOCK, "label": "Balie", "offer": "both"})
+    added = await post_form(site, f"{path}/staffing", {**BLOCK, "label": "Balie", "offer": "both"})
     page = (await site.client.get(f"{path}/staffing")).text
     (block,) = ids(page, "staffing")
     form = (await site.client.get(f"{path}/staffing/{block}")).text
-    changed = await post(
+    changed = await post_form(
         site, f"{path}/staffing/{block}", {**BLOCK, "capacity": "3", "expected": token(form)}
     )
     split_form = (await site.client.get(f"{path}/staffing/{block}/split")).text
-    splitted = await post(
+    splitted = await post_form(
         site,
         f"{path}/staffing/{block}/split",
         {"split_at": "11:00", "capacity": "0", "expected": token(split_form)},
     )
     after = (await site.client.get(f"{path}/staffing")).text
     second = ids(after, "staffing")[-1]
-    removed = await post(
+    removed = await post_form(
         site,
         f"{path}/staffing/{second}/delete",
         {"expected": token(after, f"/staffing/{second}/delete")},
@@ -163,11 +158,15 @@ async def test_an_overlapping_block_and_a_bad_form_are_refused_with_the_inputs_k
     site: Site,
 ) -> None:
     path = await staffed(site)
-    await post(site, f"{path}/staffing", BLOCK)
+    await post_form(site, f"{path}/staffing", BLOCK)
 
-    overlap = await post(site, f"{path}/staffing", {**BLOCK, "opens": "11:00", "closes": "13:00"})
-    bad = await post(site, f"{path}/staffing", {**BLOCK, "opens": "elf uur", "capacity": "-1"})
-    backwards = await post(site, f"{path}/staffing", {**BLOCK, "opens": "12:00", "closes": "09:00"})
+    overlap = await post_form(
+        site, f"{path}/staffing", {**BLOCK, "opens": "11:00", "closes": "13:00"}
+    )
+    bad = await post_form(site, f"{path}/staffing", {**BLOCK, "opens": "elf uur", "capacity": "-1"})
+    backwards = await post_form(
+        site, f"{path}/staffing", {**BLOCK, "opens": "12:00", "closes": "09:00"}
+    )
 
     for response in (overlap, bad, backwards):
         assert response.status_code == 422
@@ -182,8 +181,8 @@ async def test_exceptions_are_added_listed_changed_and_removed_and_not_in_the_pa
 ) -> None:
     path = await staffed(site)
 
-    closed = await post(site, f"{path}/exceptions", {"day": "12-01-2026", "kind": "closed"})
-    own = await post(
+    closed = await post_form(site, f"{path}/exceptions", {"day": "12-01-2026", "kind": "closed"})
+    own = await post_form(
         site,
         f"{path}/exceptions",
         {
@@ -194,16 +193,16 @@ async def test_exceptions_are_added_listed_changed_and_removed_and_not_in_the_pa
             "capacity": "1",
         },
     )
-    past = await post(site, f"{path}/exceptions", {"day": "31-12-2025", "kind": "closed"})
+    past = await post_form(site, f"{path}/exceptions", {"day": "31-12-2025", "kind": "closed"})
     page = (await site.client.get(f"{path}/exceptions")).text
     first, second = ids(page, "exceptions")
     form = (await site.client.get(f"{path}/exceptions/{first}")).text
-    changed = await post(
+    changed = await post_form(
         site,
         f"{path}/exceptions/{first}",
         {"day": "14-01-2026", "kind": "closed", "expected": token(form)},
     )
-    removed = await post(
+    removed = await post_form(
         site,
         f"{path}/exceptions/{second}/delete",
         {"expected": token(page, f"/exceptions/{second}/delete")},
@@ -259,7 +258,7 @@ async def add_shortage(site: Site, pool_id: int, places: int = 2) -> None:
 
 async def test_a_shortfall_is_listed_with_the_words_that_appointments_stay(site: Site) -> None:
     path = await staffed(site)
-    await post(site, f"{path}/staffing", {**BLOCK, "capacity": "1"})
+    await post_form(site, f"{path}/staffing", {**BLOCK, "capacity": "1"})
     await add_shortage(site, int(path.rsplit("/", 1)[1]))
 
     page = (await site.client.get(f"{path}/staffing")).text
@@ -277,7 +276,7 @@ async def test_without_a_shortfall_the_page_says_so_and_raising_the_staffing_cle
     site: Site,
 ) -> None:
     path = await staffed(site)
-    await post(site, f"{path}/staffing", {**BLOCK, "capacity": "1"})
+    await post_form(site, f"{path}/staffing", {**BLOCK, "capacity": "1"})
     assert (
         "Geen tekorten in de komende 14 dagen." in (await site.client.get(f"{path}/staffing")).text
     )
@@ -286,7 +285,7 @@ async def test_without_a_shortfall_the_page_says_so_and_raising_the_staffing_cle
 
     (block,) = ids((await site.client.get(f"{path}/staffing")).text, "staffing")
     form = (await site.client.get(f"{path}/staffing/{block}")).text
-    await post(
+    await post_form(
         site, f"{path}/staffing/{block}", {**BLOCK, "capacity": "2", "expected": token(form)}
     )
 
@@ -295,7 +294,7 @@ async def test_without_a_shortfall_the_page_says_so_and_raising_the_staffing_cle
 
 async def test_the_double_counting_notice_is_on_every_staffing_page(site: Site) -> None:
     path = await staffed(site)
-    await post(site, f"{path}/staffing", BLOCK)
+    await post_form(site, f"{path}/staffing", BLOCK)
     (block,) = ids((await site.client.get(f"{path}/staffing")).text, "staffing")
 
     for page in (
@@ -328,8 +327,8 @@ async def snapshot(site: Site, path: str) -> tuple[list[int], list[int], str]:
 
 async def test_every_page_and_change_needs_capacity_manage(site: Site) -> None:
     path = await staffed(site)
-    await post(site, f"{path}/staffing", BLOCK)
-    await post(site, f"{path}/exceptions", {"day": "12-01-2026", "kind": "closed"})
+    await post_form(site, f"{path}/staffing", BLOCK)
+    await post_form(site, f"{path}/exceptions", {"day": "12-01-2026", "kind": "closed"})
     block = ids((await site.client.get(f"{path}/staffing")).text, "staffing")[0]
     exception = ids((await site.client.get(f"{path}/exceptions")).text, "exceptions")[0]
     routes = (
@@ -421,7 +420,7 @@ async def test_another_organisations_archived_and_legacy_pools_have_no_staffing_
 async def test_a_block_of_another_pool_is_not_found_by_its_id(site: Site) -> None:
     mine = await staffed(site)
     other = await staffed(site, "Advies")
-    await post(site, f"{other}/staffing", BLOCK)
+    await post_form(site, f"{other}/staffing", BLOCK)
     theirs = ids((await site.client.get(f"{other}/staffing")).text, "staffing")[0]
 
     for method, suffix in (
@@ -453,7 +452,7 @@ async def test_the_pages_speak_english(site: Site) -> None:
 
 async def test_the_week_is_a_region_free_list_and_every_input_has_a_label(site: Site) -> None:
     path = await staffed(site)
-    await post(site, f"{path}/staffing", BLOCK)
+    await post_form(site, f"{path}/staffing", BLOCK)
 
     page = (await site.client.get(f"{path}/staffing")).text
 
@@ -468,8 +467,8 @@ async def test_the_week_is_a_region_free_list_and_every_input_has_a_label(site: 
 
 async def test_a_stale_form_shows_the_stored_values_and_writes_nothing(site: Site) -> None:
     path = await staffed(site)
-    await post(site, f"{path}/staffing", BLOCK)
-    await post(site, f"{path}/exceptions", {"day": "12-01-2026", "kind": "closed"})
+    await post_form(site, f"{path}/staffing", BLOCK)
+    await post_form(site, f"{path}/exceptions", {"day": "12-01-2026", "kind": "closed"})
     page = (await site.client.get(f"{path}/staffing")).text
     (block,) = ids(page, "staffing")
     loaded_change = (await site.client.get(f"{path}/staffing/{block}")).text
@@ -478,44 +477,44 @@ async def test_a_stale_form_shows_the_stored_values_and_writes_nothing(site: Sit
     (day,) = ids(exceptions, "exceptions")
     loaded_day = (await site.client.get(f"{path}/exceptions/{day}")).text
     # Admin B saves both between the loads and the saves of admin A.
-    fresh = await post(
+    fresh = await post_form(
         site,
         f"{path}/staffing/{block}",
         {**BLOCK, "capacity": "5", "expected": token(loaded_change)},
     )
-    await post(
+    await post_form(
         site,
         f"{path}/exceptions/{day}",
         {"day": "13-01-2026", "kind": "closed", "expected": token(loaded_day)},
     )
     assert fresh.status_code == 303
 
-    mine = await post(
+    mine = await post_form(
         site,
         f"{path}/staffing/{block}",
         {**BLOCK, "capacity": "1", "expected": token(loaded_change)},
     )
-    split = await post(
+    split = await post_form(
         site,
         f"{path}/staffing/{block}/split",
         {"split_at": "11:00", "capacity": "0", "expected": token(loaded_split)},
     )
-    removed = await post(
+    removed = await post_form(
         site,
         f"{path}/staffing/{block}/delete",
         {"expected": token(page, f"/staffing/{block}/delete")},
     )
-    day_changed = await post(
+    day_changed = await post_form(
         site,
         f"{path}/exceptions/{day}",
         {"day": "14-01-2026", "kind": "closed", "expected": token(loaded_day)},
     )
-    day_removed = await post(
+    day_removed = await post_form(
         site,
         f"{path}/exceptions/{day}/delete",
         {"expected": token(exceptions, f"/exceptions/{day}/delete")},
     )
-    no_token = await post(site, f"{path}/staffing/{block}/delete")
+    no_token = await post_form(site, f"{path}/staffing/{block}/delete")
 
     for response in (mine, split, removed, day_changed, day_removed, no_token):
         assert response.status_code == 409
@@ -532,7 +531,7 @@ async def test_the_exception_list_scrolls_in_a_labelled_region(
     site: Site,
 ) -> None:
     path = await staffed(site)
-    await post(site, f"{path}/exceptions", {"day": "12-01-2026", "kind": "closed"})
+    await post_form(site, f"{path}/exceptions", {"day": "12-01-2026", "kind": "closed"})
 
     page = (await site.client.get(f"{path}/exceptions")).text
 
@@ -543,11 +542,11 @@ async def test_the_waiting_limit_is_saved_cleared_and_a_wrong_one_refused(site: 
     """ADR 0121 step 7: the limit of people without an appointment, on the pool's page."""
     path = await staffed(site)
 
-    saved = await post(site, f"{path}/waiting", {"max_waiting": "12"})
+    saved = await post_form(site, f"{path}/waiting", {"max_waiting": "12"})
     page = (await site.client.get(saved.headers["location"])).text
-    wrong = await post(site, f"{path}/waiting", {"max_waiting": "twelve"})
-    too_many = await post(site, f"{path}/waiting", {"max_waiting": "1001"})
-    cleared = await post(site, f"{path}/waiting", {"max_waiting": ""})
+    wrong = await post_form(site, f"{path}/waiting", {"max_waiting": "twelve"})
+    too_many = await post_form(site, f"{path}/waiting", {"max_waiting": "1001"})
+    cleared = await post_form(site, f"{path}/waiting", {"max_waiting": ""})
 
     assert saved.headers["location"] == f"{path}/staffing?done=saved"
     assert 'name="max_waiting"' in page

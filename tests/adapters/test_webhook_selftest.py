@@ -18,6 +18,7 @@ from app.adapters.webhook_selftest import (
 from app.config import Settings
 from app.main import create_app
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import served
 from tests.support.database import migrated_database
 from tests.support.domain import NOW
 
@@ -41,10 +42,7 @@ async def _against_app(
 ) -> list[Delivery]:
     """Run the self-test against the real application in-process."""
     app = create_app(settings, FixedClock(NOW))
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(transport=httpx.ASGITransport(app=app)) as http,
-    ):
+    async with served(app) as http:  # the self-test sends absolute addresses on BASE
         return await self_test(
             http, BASE, webex_secret=webex_secret, wxcc_secret=wxcc_secret, now=NOW
         )

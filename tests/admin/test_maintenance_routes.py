@@ -12,7 +12,7 @@ import pytest
 from app.config import Settings
 from app.domain.maintenance import MaintenanceReason
 from app.domain.maintenance_service import MaintenanceService
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 
 BAR = 'id="maintenance-bar"'
 
@@ -24,7 +24,7 @@ def settings(settings: Settings, request: pytest.FixtureRequest) -> Settings:
 
 
 def maintenance(site: Site) -> MaintenanceService:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     found: MaintenanceService = app.state.maintenance_service
     return found
 

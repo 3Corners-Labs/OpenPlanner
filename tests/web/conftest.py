@@ -1,44 +1,17 @@
-"""The admin site's fixtures, for the pages shared by the portal and the participant pages, and
-a renderer for one template written in the test."""
+"""A renderer for one template written in the test.
 
-from collections.abc import Callable, Mapping
+The admin site (``site``) that the pages shared by the portal and the participant pages use is
+in ``tests/conftest.py``.
+"""
+
 from pathlib import Path
-from typing import Any
 
 import pytest
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
-from starlette.requests import Request
 
-from app.i18n import Translator, load_catalogues
-from app.web.locale import RequestLocale
-from app.web.templates import create_templates, render
-from tests.admin.conftest import admin_db, site  # noqa: F401 - re-exported fixtures
-
-__all__ = ["admin_db", "render_source", "site"]
-
-RenderSource = Callable[..., HTMLResponse]
-"""``(source, context, frame=None, **options)``: render a template written in the test; the
-options (``kind``) go to ``render``."""
+from tests.support.template_source import RenderSource, source_renderer
 
 
 @pytest.fixture
 def render_source(tmp_path: Path) -> RenderSource:
     """Return a function that renders template ``source`` with ``context`` (and ``frame``)."""
-    translator = Translator(load_catalogues())
-    locale = RequestLocale(translator.bind("nl"), remember=False, translator=translator)
-    request = Request(
-        {"type": "http", "app": FastAPI(), "headers": [], "query_string": b"", "path": "/x"}
-    )
-
-    def rendered(
-        source: str,
-        context: Mapping[str, object],
-        frame: Mapping[str, object] | None = None,
-        **options: Any,  # noqa: ANN401 - ``kind`` of ``render``, passed through
-    ) -> HTMLResponse:
-        (tmp_path / "page.html").write_text(source)
-        templates = create_templates([tmp_path])
-        return render(templates, request, "page.html", locale, context, frame=frame, **options)
-
-    return rendered
+    return source_renderer(tmp_path)

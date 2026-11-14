@@ -1,15 +1,21 @@
 """The Team view of the usage page: off by default, organisation admin only, no export (point 9)."""
 
 from datetime import UTC, datetime
-from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import GroupRow, StaffRow
-from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.usage_staff import StaffCell
-from tests.admin.conftest import AUDITOR, GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import (
+    AUDITOR,
+    GROUP_ADMIN,
+    ORG_ADMIN,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+    site_uow,
+)
 
 RANGE = "from=2025-12-26&to=2026-01-01"
 HOUR = datetime(2025, 12, 31, 8, tzinfo=UTC)
@@ -17,33 +23,28 @@ ORG_USAGE = "/admin/organisations/demo/usage"
 SETTING = "/admin/organisations/demo/settings/reporting_staff_view_enabled"
 
 
-def _engine(site: Site) -> Any:
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    return app.state.engine
-
-
 async def _switch_on(site: Site) -> None:
     response = await site.client.post(SETTING, data={"value": "true"}, headers=SAME_ORIGIN)
     assert response.status_code == 303
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     await app.state.live_settings.refresh()  # the worker's loop does this every few seconds
 
 
 async def _put(site: Site, calls: int, staff_id: int | None) -> None:
     """Write ``calls`` handled calls for ``staff_id`` in the demo group."""
-    async with AsyncSession(_engine(site)) as session:
+    async with AsyncSession(site.app.state.engine) as session:
         group = (
             await session.execute(select(GroupRow).where(GroupRow.slug == "demo"))
         ).scalar_one()
     cell = StaffCell(
         HOUR, group.organisation_id, group.id, staff_id, "S1c", calls, 600 * calls, 600
     )
-    async with SqlUnitOfWork(_engine(site)).locked() as tx:
+    async with site_uow(site).locked() as tx:
         await tx.add_staff_cells([cell])
 
 
 async def _staff_id(site: Site, subject: str) -> int:
-    async with AsyncSession(_engine(site)) as session:
+    async with AsyncSession(site.app.state.engine) as session:
         row = (
             await session.execute(select(StaffRow).where(StaffRow.subject == subject))
         ).scalar_one()

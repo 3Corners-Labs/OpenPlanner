@@ -9,9 +9,10 @@ import pytest
 from app.admin.session import session_cookie_for
 from app.config import Settings
 from app.main import create_app
-from tests.admin.conftest import SUPER, Site
 from tests.fakes.clock import FixedClock
 from tests.fakes.identity import FakeIdentityProvider
+from tests.support.admin_site import SUPER, Site
+from tests.support.app_client import served
 from tests.support.domain import NOW
 
 APP_ROOT = Path(__file__).resolve().parents[2] / "app"
@@ -37,12 +38,7 @@ def _login_cookie_headers(response: httpx.Response) -> list[str]:
 async def _login_set_cookie(settings: Settings, **updates: str) -> str:
     """Start a login on a fresh app and return the ``Set-Cookie`` line of the session."""
     app = create_app(settings.model_copy(update=updates), FixedClock(NOW), FakeIdentityProvider())
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="https://testserver"
-        ) as client,
-    ):
+    async with served(app, "https://testserver") as client:
         response = await client.get("/admin/login", follow_redirects=False)
     lines = _login_cookie_headers(response)
     assert len(lines) == 1

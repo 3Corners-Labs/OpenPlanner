@@ -13,9 +13,8 @@ import httpx
 from app.adapters.contact_center_connections import SealedConnections
 from app.adapters.webhooks import sign_wxcc
 from app.domain.contact_center import ContactCenterKind, Registration
-from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
 from tests.fakes.integrations import FakeOrganisationDispatchers
-from tests.support.admin_site import site_app
+from tests.support.admin_site import SAME_ORIGIN, SUPER, Site
 
 PAGE = "/admin/organisations/demo/channels"
 
@@ -30,7 +29,7 @@ FORM = {
 
 
 def _connections(site: Site) -> SealedConnections:
-    connections: SealedConnections = site_app(site).state.contact_center_connections
+    connections: SealedConnections = site.app.state.contact_center_connections
     return connections
 
 
@@ -39,7 +38,7 @@ def _registrar(
 ) -> FakeOrganisationDispatchers:
     """Put a fake in place of the platform: no test talks to a real contact center."""
     registrar = FakeOrganisationDispatchers(outcome=outcome)
-    state = site_app(site).state
+    state = site.app.state
     state.integrations = replace(state.integrations, organisations=registrar)
     return registrar
 
@@ -91,13 +90,12 @@ async def _call_from(site: Site, address: str, secret: str | None = None) -> htt
     assert secret is not None
     stamp = int(site.clock.now().timestamp() * 1000)
     body = _event(stamp)
-    transport = httpx.ASGITransport(app=site_app(site), client=(address, 4711))
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
+    async with site.browser(address).client as c:
         return await c.post(ADDRESS, content=body, headers=sign_wxcc(body, secret, stamp))
 
 
 def _set_settings(site: Site, **update: object) -> None:
-    state = site_app(site).state
+    state = site.app.state
     state.settings = state.settings.model_copy(update=update)
 
 

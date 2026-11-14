@@ -5,8 +5,16 @@ import re
 
 import httpx
 
-from tests.admin.conftest import AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
-from tests.support.admin_site import audit_events
+from tests.support.admin_site import (
+    AUDITOR,
+    GROUP_ADMIN,
+    ORG_ADMIN,
+    OUTSIDER,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+    audit_events,
+)
 
 LIST = "/admin/organisations"
 

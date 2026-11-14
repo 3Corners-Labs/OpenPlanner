@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from app.web.static_assets import ASSETS, STATIC_DIR, StaticAssets
-from tests.admin.conftest import SUPER, Site
+from tests.support.admin_site import SUPER, Site
 
 IMMUTABLE = "public, max-age=31536000, immutable"
 REVALIDATE = "no-cache"

@@ -13,9 +13,9 @@ from app.adapters.db.models import AuditEventRow, ClosureNoticeRow, ClosureRow
 from app.cli import CLI_ACTOR, _closure_lift, _closure_start, _oidc_check, main
 from app.config import Settings
 from app.domain.authorization import Grant
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.oidc_provider import oidc_provider
 from tests.support.database import migrated_database
+from tests.support.seed_rows import seed_group
 
 NOTICES = {"nl": "Storing bij de aanbieder.", "en": "Outage at our provider."}
 

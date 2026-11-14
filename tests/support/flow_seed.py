@@ -19,8 +19,7 @@ from app.domain.service_flows import (
     IntakeMode,
     InteractionKind,
 )
-from tests.admin.conftest import SUPER, Site
-from tests.support.admin_site import site_app
+from tests.support.admin_site import SUPER, Site
 
 LABELS = {"nl": "Balie 7", "en": "Desk 7"}
 
@@ -54,14 +53,14 @@ async def add_flow(
     **changes: Any,
 ) -> None:
     """Create the draft flow ``code`` in service ``group`` through the flow service."""
-    await site_app(site).state.flow_service.create(by, group, code, draft(pool_id, **changes))
+    await site.app.state.flow_service.create(by, group, code, draft(pool_id, **changes))
 
 
 async def publish_flow(
     site: Site, code: str = "advies", *, group: str = "demo", by: Principal = SUPER
 ) -> None:
     """Publish the draft of flow ``code`` (the administrator has logged in, so has a record)."""
-    await site_app(site).state.flow_service.publish(by, group, code)
+    await site.app.state.flow_service.publish(by, group, code)
 
 
 async def add_subjects(
@@ -70,4 +69,4 @@ async def add_subjects(
     """Give the service the subjects ``codes`` (code to Dutch label; English is the same)."""
     for code, label in codes.items():
         subject = Subject.create(code, {"nl": label, "en": label})
-        await site_app(site).state.routing_service.add_subject(by, group, subject)
+        await site.app.state.routing_service.add_subject(by, group, subject)

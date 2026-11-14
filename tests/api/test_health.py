@@ -3,7 +3,7 @@ from pathlib import Path
 import httpx
 
 from app.config import Settings
-from tests.conftest import app_client
+from tests.support.app_client import app_client
 
 
 async def test_liveness_is_ok(client: httpx.AsyncClient) -> None:

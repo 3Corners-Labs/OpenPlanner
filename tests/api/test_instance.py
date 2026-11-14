@@ -14,6 +14,7 @@ from app.domain.public_address import EVENT, nonce_hash
 from app.main import create_app
 from tests.fakes.clock import FixedClock
 from tests.support.admin import SUPER
+from tests.support.app_client import served
 from tests.support.domain import NOW
 
 PROXY = "172.18.0.1"
@@ -37,13 +38,7 @@ class Site:
 
 async def open_site(settings: Settings, peer: str) -> AsyncIterator[Site]:
     app = create_app(settings, FixedClock(NOW))
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app, client=(peer, 4711)),
-            base_url="http://testserver",
-        ) as client,
-    ):
+    async with served(app, peer=peer) as client:
         yield Site(client, app)
 
 

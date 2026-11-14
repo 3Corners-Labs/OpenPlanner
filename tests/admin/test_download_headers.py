@@ -15,7 +15,7 @@ import pytest
 
 from app.config import Settings
 from app.domain.configuration_document import document_filename
-from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import SAME_ORIGIN, SUPER, Site
 from tests.support.downloads import DOWNLOAD_MODULES
 
 SAFE_FILENAME = re.compile(r"^[a-z0-9.-]+$")

@@ -26,7 +26,7 @@ from scripts.decision_gate import (
     reasons,
     unbuilt,
 )
-from tests.scripts.conftest import Git, commit_all
+from tests.support.git_repository import Git, commit_all
 
 
 def with_first_step(text: str) -> str:

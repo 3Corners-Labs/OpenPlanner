@@ -11,12 +11,12 @@ from app.domain.images import ImageFile, ImageText
 from app.domain.scenarios import ClosureScenario
 from app.domain.scheduling import Group
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import count_images, seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.closures import NOTICES
 from tests.support.domain import NOW, TEST_TOKEN_KEY
 from tests.support.images import png
 from tests.support.principals import principal
+from tests.support.seed_rows import count_images, seed_group
 
 EVERYTHING = Scope(everything=True)
 ADMIN = principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())

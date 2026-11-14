@@ -46,11 +46,6 @@ RELEASE = Release(V2, "https://github.com/acme/openplanner/releases/tag/v1.4.0")
 
 
 @pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
-
-
-@pytest.fixture
 def uow() -> InMemoryUnitOfWork:
     return InMemoryUnitOfWork()
 

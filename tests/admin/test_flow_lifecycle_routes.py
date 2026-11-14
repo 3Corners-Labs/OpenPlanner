@@ -19,8 +19,7 @@ from app.admin.forms import MAX_FORM_BYTES
 from app.domain import service_flows
 from app.domain.authorization import Scope
 from app.domain.routing import GroupRouting, Subject
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
-from tests.support.admin_site import audit_log, site_app, site_uow
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site, audit_log, site_uow
 from tests.support.domain import NOW
 from tests.support.flow_pages import BASE, act, create, create_ready, form_data, save
 from tests.support.flow_seed import add_subjects
@@ -335,7 +334,7 @@ async def test_activation_has_no_disabled_button_but_says_why_not_and_a_refusal_
     unpublished = (await site.client.get(f"{BASE}/advies")).text
     await act(site, "publish")
     await act(site, "publish", "leeg")
-    async with AsyncSession(site_app(site).state.engine) as session, session.begin():
+    async with AsyncSession(site.app.state.engine) as session, session.begin():
         await session.execute(
             update(CapacityPoolRow)
             .where(CapacityPoolRow.code == "pool-leeg")
@@ -468,7 +467,7 @@ async def test_an_active_flow_is_not_deleted_and_the_page_says_archive(
 async def test_a_flow_a_booking_refers_to_is_not_deleted(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
     await create(site)
-    async with AsyncSession(site_app(site).state.engine) as session, session.begin():
+    async with AsyncSession(site.app.state.engine) as session, session.begin():
         flow = await session.scalar(select(ServiceFlowRow).where(ServiceFlowRow.code == "advies"))
         group = await session.scalar(select(GroupRow).where(GroupRow.slug == "demo"))
         assert flow is not None
@@ -680,7 +679,7 @@ async def test_two_flows_with_arbitrary_names_and_one_configuration_read_the_sam
         )
 
     async def judged(code: str) -> tuple[object, object]:
-        page = await site_app(site).state.flow_service.page(SUPER, "demo", code)
+        page = await site.app.state.flow_service.page(SUPER, "demo", code)
         saved = page.flow.working
         return (
             page.items,
@@ -799,7 +798,7 @@ async def test_a_flow_with_an_archived_skill_keeps_it_shown_and_untickable(site:
 
 async def archive_directly(site: Site, pool_id: int) -> None:
     """Archive a pool behind the service's back: it refuses while a flow draws on the pool."""
-    async with AsyncSession(site_app(site).state.engine) as session, session.begin():
+    async with AsyncSession(site.app.state.engine) as session, session.begin():
         await session.execute(
             update(CapacityPoolRow).where(CapacityPoolRow.id == pool_id).values(archived_at=NOW)
         )
@@ -869,7 +868,7 @@ async def test_the_main_form_with_the_most_subjects_stays_far_below_the_size_lim
 
 async def remove_subject(site: Site, code: str) -> None:
     """Remove the subject ``code`` from the service ``demo`` through the routing service."""
-    await site_app(site).state.routing_service.remove_subject(SUPER, "demo", code)
+    await site.app.state.routing_service.remove_subject(SUPER, "demo", code)
 
 
 async def test_a_subject_the_service_dropped_is_not_found_not_listed_and_dropped_on_save(

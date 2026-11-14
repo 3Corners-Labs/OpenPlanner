@@ -2,7 +2,7 @@
 
 import httpx
 
-from tests.admin.conftest import SAME_ORIGIN, Site
+from tests.support.admin_site import SAME_ORIGIN, Site
 from tests.support.skill_seed import add_pool
 
 BASE = "/admin/groups/demo/flows"

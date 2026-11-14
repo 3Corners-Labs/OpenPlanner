@@ -7,9 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.booking import Claim
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW, TEST_TOKEN_KEY, book
+from tests.support.seed_rows import seed_group
 
 
 async def _booking_id(engine: AsyncEngine) -> int:

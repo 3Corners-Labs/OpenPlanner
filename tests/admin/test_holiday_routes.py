@@ -5,15 +5,22 @@ from html import unescape
 
 import httpx
 
-from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
-from tests.support.admin_site import audit_events
+from tests.support.admin_site import (
+    GROUP_ADMIN,
+    ORG_ADMIN,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+    audit_events,
+    post_form,
+)
 
 CALENDAR = "/admin/holidays/nationaal"
 GROUP = "/admin/groups/demo/holidays"
 
 
 async def _post(site: Site, path: str, **data: str) -> httpx.Response:
-    return await site.client.post(path, data=data, headers=SAME_ORIGIN)
+    return await post_form(site, path, data)
 
 
 async def _calendar_id(site: Site) -> str:

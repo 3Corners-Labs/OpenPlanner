@@ -6,11 +6,15 @@ and uses the organisation's, read-only. "Start closure" picks a scenario and cop
 
 import re
 
-import httpx
-
-from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.authorization import Scope
-from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, Site
+from tests.support.admin_site import (
+    GROUP_ADMIN,
+    ORG_ADMIN,
+    OUTSIDER,
+    SAME_ORIGIN,
+    Site,
+    audit_log,
+    post_form,
+)
 from tests.support.closure_pages import CLOSURE
 from tests.support.images import SECRET, jpeg, png
 from tests.support.participant import booked_page
@@ -33,19 +37,12 @@ CONTACTS = {"contact_1_kind": "phone", "contact_1_value": "012 345 6789"}
 
 async def _details(site: Site) -> list[str]:
     """Return the detail of every audit event, oldest first."""
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    async with SqlUnitOfWork(app.state.engine).read() as tx:
-        events = await tx.list_audit_events(Scope(everything=True), limit=50)
-    return [e.event.detail for e in reversed(events)]
-
-
-async def _post(site: Site, path: str, data: dict[str, str] | None = None) -> httpx.Response:
-    return await site.client.post(path, data=data or {}, headers=SAME_ORIGIN)
+    return [e.detail for e in await audit_log(site)]
 
 
 async def _create(site: Site, base: str, data: dict[str, str]) -> str:
     """Create a scenario and return its page."""
-    response = await _post(site, base, data)
+    response = await post_form(site, base, data)
     assert response.status_code == 303, response.text
     match = re.match(
         rf"({re.escape(base)}/\d+)\?done=scenario_created", response.headers["location"]
@@ -60,7 +57,7 @@ async def test_organisation_admin_prepares_a_scenario_with_contacts_and_image(
     await site.login_as(ORG_ADMIN)
     page = await _create(site, ORG, STRIKE)
 
-    contacts = await _post(site, f"{page}/contacts", CONTACTS)
+    contacts = await post_form(site, f"{page}/contacts", CONTACTS)
     image = await site.client.post(
         f"{page}/image",
         data={"alt_nl": "Gesloten deur", "alt_en": "Closed door"},
@@ -114,10 +111,10 @@ async def test_a_group_admin_uses_but_cannot_change_an_organisation_scenario(
 
     listed = (await site.client.get(GROUP)).text
     view = await site.client.get(f"{GROUP}/{scenario_id}")
-    change = await _post(site, f"{GROUP}/{scenario_id}", OUTAGE)
-    delete = await _post(site, f"{GROUP}/{scenario_id}/delete")
+    change = await post_form(site, f"{GROUP}/{scenario_id}", OUTAGE)
+    delete = await post_form(site, f"{GROUP}/{scenario_id}/delete")
     contacts = await site.client.get(f"{GROUP}/{scenario_id}/contacts")
-    via_organisation = await _post(site, f"{ORG}/{scenario_id}", OUTAGE)
+    via_organisation = await post_form(site, f"{ORG}/{scenario_id}", OUTAGE)
 
     assert "Staking" in listed
     assert view.status_code == 200
@@ -134,20 +131,20 @@ async def test_start_closure_picks_a_scenario_and_copies_it(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
     page = await _create(site, GROUP, STRIKE)
     scenario_id = page.rsplit("/", 1)[1]
-    await _post(site, f"{page}/contacts", CONTACTS)
+    await post_form(site, f"{page}/contacts", CONTACTS)
 
     form = (await site.client.get(CLOSURE, params={"scenario": scenario_id})).text
     assert f'<input type="hidden" name="scenario_id" value="{scenario_id}">' in form
     assert "Wegens een staking zijn wij gesloten.</textarea>" in form
-    started = await _post(
+    started = await post_form(
         site,
         CLOSURE,
         {**STRIKE, "notice_nl": "Vandaag staking.", "scenario_id": scenario_id},
     )
     assert started.status_code == 303
     # Later edits of the scenario leave the running closure alone.
-    await _post(site, page, OUTAGE)
-    await _post(site, f"{page}/contacts", {})
+    await post_form(site, page, OUTAGE)
+    await post_form(site, f"{page}/contacts", {})
 
     public = (await site.client.get("/g/demo")).text
     assert "Vandaag staking." in public
@@ -165,7 +162,7 @@ async def test_an_unknown_or_foreign_scenario_cannot_start_a_closure(site: Site)
     await site.login_as(GROUP_ADMIN)
 
     picked = await site.client.get(CLOSURE, params={"scenario": foreign_id})
-    started = await _post(site, CLOSURE, {**OUTAGE, "scenario_id": foreign_id})
+    started = await post_form(site, CLOSURE, {**OUTAGE, "scenario_id": foreign_id})
 
     assert picked.status_code == 404
     assert started.status_code == 404
@@ -180,7 +177,7 @@ async def test_the_organisation_closes_every_group_with_one_scenario(site: Site)
     form = (
         await site.client.get("/admin/organisations/demo/closure", params={"scenario": scenario_id})
     ).text
-    closed = await _post(
+    closed = await post_form(
         site, "/admin/organisations/demo/closure", {**STRIKE, "scenario_id": scenario_id}
     )
 
@@ -192,9 +189,9 @@ async def test_the_organisation_closes_every_group_with_one_scenario(site: Site)
 async def test_scenario_errors_are_linked_to_their_fields(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
 
-    missing = await _post(site, GROUP, {"scenario_name": "", "notice_nl": "Dicht"})
+    missing = await post_form(site, GROUP, {"scenario_name": "", "notice_nl": "Dicht"})
     page = await _create(site, GROUP, OUTAGE)
-    bad_link = await _post(
+    bad_link = await post_form(
         site, f"{page}/contacts", {"contact_1_kind": "website", "contact_1_value": "http://x.nl"}
     )
     svg = await site.client.post(
@@ -222,9 +219,9 @@ async def test_deleting_a_scenario_keeps_a_running_closure(site: Site) -> None:
         files={"image": ("x.png", png(), "image/png")},
         headers=SAME_ORIGIN,
     )
-    await _post(site, CLOSURE, {**STRIKE, "scenario_id": scenario_id})
+    await post_form(site, CLOSURE, {**STRIKE, "scenario_id": scenario_id})
 
-    deleted = await _post(site, f"{page}/delete")
+    deleted = await post_form(site, f"{page}/delete")
 
     assert deleted.headers["location"] == f"{GROUP}?done=scenario_deleted"
     assert (await site.client.get(page)).status_code == 404

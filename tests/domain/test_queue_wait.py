@@ -17,7 +17,6 @@ from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.domain import (
     ADA,
-    NOW,
     SLOT_0900,
     TEST_TOKEN_KEY,
     book_confirmed,
@@ -26,11 +25,6 @@ from tests.support.domain import (
 )
 
 THRESHOLD = timedelta(minutes=8)
-
-
-@pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
 
 
 @pytest.fixture

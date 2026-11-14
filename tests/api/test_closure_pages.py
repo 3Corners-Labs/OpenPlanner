@@ -13,8 +13,8 @@ import pytest
 from app.adapters.db.engine import create_engine
 from app.adapters.db.seed import EXAMPLE_PARTICIPANT, ClosureExamples, seed_closure_examples
 from app.config import Settings
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import app_client
 from tests.support.domain import NOW
 
 CLOSED = "/g/demo-gesloten"
