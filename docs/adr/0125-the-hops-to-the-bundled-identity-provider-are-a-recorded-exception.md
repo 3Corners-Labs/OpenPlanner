@@ -1,10 +1,10 @@
 # 0125. The hops to the bundled identity provider are a recorded exception
 
-Status: accepted, partly built (2026-11-14), found while documenting the application
-architecture: a production installation with the installer's default identity provider refuses
-to start. Amends ADR 0091 point 2 (two more recorded exceptions) and brings the start-up check in
-line with ADR 0112 point 4 and ADR 0106 points 1 and 4. Step 1 is built in the pull request that
-adds it; step 2 (a fixed address, point 5) is planned; see *Build status*.
+Status: accepted, built (2026-11-14), found while documenting the application architecture: a
+production installation with the installer's default identity provider refuses to start. Amends
+ADR 0091 point 2 (two more recorded exceptions) and brings the start-up check in line with ADR
+0112 point 4 and ADR 0106 points 1 and 4. Step 1 is built in the pull request that adds it, step 2
+(the fixed addresses of point 5) in #PRNUMBER; see *Build status*.
 
 ## Context
 
@@ -146,7 +146,7 @@ want the hops chooses `--idp own`.
 |---|---|---|---|
 | 0 | ADR | #834 | merged |
 | 1 | `bundled_idp_hop` in the start-up check; the files a production install writes tested against it (`tests/scripts/test_install.py`), the render script tied to the same address; `--idp own` removes the bundled login, route and containers (point 6); the installer's warning (point 7); the recovery in the runbook (point 8); data flow, threat model, ASVS, architecture, runbook, install guide and the System status text (nl, en) | #834 | merged |
-| 2 | A fixed address for the bundled provider, used by the login, the staff directory, the exception and the proxy route; Keycloak's connection to `idp-db` and the proxy's route to web pinned the same way; the installer moves a host over with new client secrets; the real-Docker check (point 5) | | planned |
+| 2 | A fixed address for the bundled provider, used by the login, the staff directory, the exception and the proxy route; Keycloak's connection to `idp-db` and the proxy's route to web pinned the same way; the installer moves a host over with new client secrets; the real-Docker check (point 5): `docker-compose.yml` (`idp` and `web` at fixed addresses on `edge`, the worker on `edge`, `idp-db` alone with `idp` on the internal network `idp-store`), `WEB_UPSTREAM` and `IDP_UPSTREAM` in `deploy/proxy/entrypoint.sh` and the `Caddyfile`, the render script, `BUNDLED_IDP_ADDRESS` in `app/domain/web_transport.py`, the installer's move with both client secrets replaced in the files and set in Keycloak with `kcadm.sh`, `scripts/check-proxy.sh` pass 4 | #PRNUMBER | merged |
 
 ## Consequences
 

@@ -121,23 +121,25 @@ flowchart TB
         mailpit["mailpit<br/>dev profile only"]
         keycloak["keycloak (profile idp)<br/>bundled identity provider,<br/>ADR 0090 and 0106"]
         idpdata[("idp-data volume")]
+        idpdb[("idp-db (profile idp-db)<br/>PostgreSQL, production")]
     end
 
     smtp[Mail provider]
     github[GitHub releases<br/>GHCR images]
     updater["host updater<br/>systemd timer, cosign"]
 
-    browser -- "https :443" --> proxy -- "http, edge network, one host (recorded exception)" --> web
+    browser -- "https :443" --> proxy -- "http, edge network, web's fixed address (recorded exception)" --> web
     browser -- https --> ownproxy -- "https when WEB_TLS_CERT_FILE is set (ADR 0091)" --> web
     proxy -. "ACME, renewal" .-> acme
     web <--> volume
     worker <--> volume
     worker -- "SMTP, STARTTLS or TLS" --> smtp
     web -- "OIDC, https" --> idp
-    web -- "OIDC and directory API (ADR 0095), http, one host (recorded exception, ADR 0125)" --> keycloak
-    worker -- "directory API, http, one host (ADR 0125)" --> keycloak
+    web -- "OIDC and directory API (ADR 0095), http, fixed address on edge (recorded exception, ADR 0125)" --> keycloak
+    worker -- "directory API, http, fixed address on edge (ADR 0125)" --> keycloak
     keycloak <--> idpdata
-    proxy -- "/idp route (ADR 0112), http, one host (ADR 0125)" --> keycloak
+    keycloak -- "PostgreSQL, internal network idp-store, fixed address (ADR 0125)" --> idpdb
+    proxy -- "/idp route (ADR 0112), http, fixed address on edge (ADR 0125)" --> keycloak
     web -- https --> cisco
     worker -- https --> cisco
     web -- "syslog+tls or https" --> logs
@@ -178,10 +180,11 @@ flowchart TB
   Keycloak under `/idp` on the same https address.
 - **Every hop with personal data is encrypted, or a recorded exception (ADR 0091).** The
   exceptions are all on one host: the bundled proxy to `web` on the `edge` network (ADR 0091),
-  and the hops to the bundled Keycloak as `idp:8080`, from `web` and `worker` and from the proxy,
-  and from Keycloak to its database `idp-db` (ADR 0125; the browser reaches the proxy over
-  https, and production accepts no other http login; until its step 2 these names, and `web`,
-  can leave the host while their container is not running). An own reverse proxy
+  and the hops to the bundled Keycloak from `web` and `worker` and from the proxy, and from
+  Keycloak to its database `idp-db` (ADR 0125; the browser reaches the proxy over https, and
+  production accepts no other http login). Each of them goes to a fixed address, on `edge` or on
+  the internal network `idp-store` that only Keycloak and its database join, never to a name
+  the host's resolver could answer while a container is down (ADR 0125 step 2). An own reverse proxy
   on another machine gets HTTPS from uvicorn (`WEB_TLS_CERT_FILE`, `WEB_TLS_KEY_FILE`, class B;
   the image's healthcheck follows), and *System status* warns while `FORWARDED_ALLOW_IPS` names
   another proxy and web serves no TLS. All outbound connections are listed in `docs/dataflow.md`
