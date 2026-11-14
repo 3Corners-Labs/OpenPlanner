@@ -98,6 +98,10 @@ de stappen: back-up maken, de database terugzetten en starten. Elke stap is *nog
 of *klaar*. Gaat er iets mis, dan voegt de updater een stap toe om terug te draaien naar de
 vorige versie en de back-up.
 
+Meldt de updater bij een opgepakt verzoek 120 minuten geen stap (de instelling *Minuten voordat
+een stille update wordt beëindigd*, bijvoorbeeld door een volle schijf), dan beëindigt de
+applicatie het verzoek als *Mislukt*, zodat de volgende update kan starten.
+
 De lijst werkt zichzelf bij: de updater kijkt elke minuut of er een verzoek is en meldt elke
 stap, en de pagina neemt dat over zonder dat u hoeft te herladen. De pagina kondigt de huidige
 stap aan voor schermlezers. Zonder scripts laadt **Stand bijwerken** de pagina opnieuw.

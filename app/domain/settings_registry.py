@@ -1953,6 +1953,18 @@ REGISTRY: tuple[SettingSpec, ...] = (
         minimum=5,
         maximum=1440,
     ),
+    S(
+        "update_stalled_minutes",
+        K.INT,
+        120,
+        _C,
+        T.UPDATES,
+        "Minutes a request the host updater claimed may stay silent (no step reported) before "
+        "the application ends it as failed (`updater_stalled`), so it stops blocking later "
+        "updates.",
+        minimum=15,
+        maximum=1440,
+    ),
     # D. Organisation: the value per organisation; the superuser's or the environment's value
     # is the default for organisations without one.
     S(
