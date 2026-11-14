@@ -32,6 +32,12 @@ verified event dropped: the answer is 204, the route is not called and nothing i
 redelivery after resuming is handled; a call that would be refused is refused as for any address.
 The caller's address is the one the server derived (``--proxy-headers``), counted by its /64 when
 it is IPv6 (``caller_of``); nothing is read from a forwarded header here.
+
+The delivery ledger (``app.domain.webhook_ledger``, point 10) is told at the places an outcome is
+decided and decides nothing itself: ``_refuse`` for every refusal (with whether the call came from
+inside the connection's own list of networks and the per-call fault of the proxy chain), the pause
+for a verified event it drops, and ``app.api.webhooks`` for what came of an accepted event
+(accepted, a duplicate, unknown work). Telling it, or writing its alert, never changes the answer.
 """
 
 import json
@@ -57,8 +63,9 @@ from app.domain.inbound_gate import MAX_BODY_BYTES, Refusal, accepts_content_typ
 from app.domain.networks import NetworkList
 from app.domain.ports import Clock
 from app.domain.security_log import WEBHOOK_REJECTED
+from app.domain.webhook_ledger import AddressKey, Delivered
 from app.domain.webhook_replay import body_identity
-from app.domain.webhook_sources import check_source, source_list_that_applies
+from app.domain.webhook_sources import ChainFault, judge_source, source_list_that_applies
 from app.web.caller import caller_of, client_address
 from app.web.protection import (
     webhook_retry_after,
@@ -68,6 +75,7 @@ from app.web.protection import (
 )
 from app.web.request_body import read_capped
 from app.web.security_events import report
+from app.web.webhook_ledger import note_delivered, note_refused
 from app.web.webhook_sources import contact_center_networks, proxy_chain, video_networks
 
 log = structlog.get_logger()
@@ -171,20 +179,80 @@ async def webhook_refused_response(request: Request, exc: Exception) -> Response
     return Response(status_code=reason.status, headers=headers)
 
 
+def key_of(address: Address[InboundWebhook] | Unresolved) -> AddressKey:
+    """Return the ledger's key of an address: the platform and the organisation's slug.
+
+    An address that does not exist is counted under its platform only, never under a slug the
+    caller made up (ADR 0124 point 10).
+    """
+    if isinstance(address, Unresolved):
+        return AddressKey(address.source, unknown=True)
+    return AddressKey(address.inbound.source, address.organisation)
+
+
 async def _refuse(
-    request: Request, reason: Refusal, source: str, organisation: str | None = None
+    request: Request,
+    reason: Refusal,
+    address: Address[InboundWebhook] | Unresolved,
+    *,
+    inside_list: bool = False,
+    fault: ChainFault | None = None,
 ) -> NoReturn:
-    """Leave the trace of a refusal, then refuse.
+    """Leave the trace of a refusal, then refuse: the one place a refusal is decided.
 
     The event carries the reason, the platform's code and the organisation's slug, and the
-    caller's pseudonym; never the body, a header, the signature or the address. A failure to
-    write it is logged by ``report`` and does not change the answer.
+    caller's pseudonym; never the body, a header, the signature or the address. The delivery
+    ledger is told the same, with whether the call came from inside the connection's own list of
+    networks and the per-call fault of the proxy chain. A failure to write either is logged and
+    does not change the answer.
+
+    Args:
+        request: The refused call.
+        reason: Why, from the closed list.
+        address: The address it was for.
+        inside_list: A list applies and the call passed its source check.
+        fault: The fault of this call's proxy chain behind ``source_unknown``.
     """
+    source = address.source if isinstance(address, Unresolved) else address.inbound.source
+    organisation = address.organisation
     if reason not in FLOOD_REASONS:
         log.warning("webhook.rejected", source=source, reason=reason.value)
     detail = f"source:{source}" + (f",organisation:{organisation}" if organisation else "")
     await report(request, WEBHOOK_REJECTED, reason.value, detail=detail)
+    await note_refused(request, key_of(address), reason, inside_list=inside_list, fault=fault)
     raise WebhookRefused(reason)
+
+
+@dataclass(frozen=True)
+class _Failed:
+    """The first check a call failed.
+
+    Attributes:
+        reason: Why it is refused.
+        inside_list: A list applies and the call passed its source check, so it came from inside.
+        fault: The fault of this call's proxy chain, for ``source_unknown``.
+    """
+
+    reason: Refusal
+    inside_list: bool = False
+    fault: ChainFault | None = None
+
+
+@dataclass(frozen=True)
+class _Passed:
+    """A call that passed every check up to the shape.
+
+    Attributes:
+        payload: The body as a JSON object.
+        now: The time the checks used.
+        identity: The identity of the verified body.
+        inside_list: A list applies and the call passed its source check.
+    """
+
+    payload: dict[str, Any]
+    now: datetime
+    identity: str
+    inside_list: bool
 
 
 def _json_object(body: bytes) -> dict[str, Any] | None:
@@ -196,9 +264,7 @@ def _json_object(body: bytes) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
-async def _inspect(
-    request: Request, address: Address[InboundWebhook]
-) -> Refusal | tuple[dict[str, Any], datetime, str]:
+async def _inspect(request: Request, address: Address[InboundWebhook]) -> _Failed | _Passed:
     """Run the checks of an address that exists, up to the shape; no limit is counted here.
 
     The source network comes first (ADR 0124 point 3): a caller from outside the list, or whose
@@ -206,32 +272,34 @@ async def _inspect(
     alike, and no forwarded header is read here: the address is the one the server derived.
 
     Returns:
-        The reason of the first check that fails, else the payload, the time used and the
-        identity of the verified body.
+        The first check that fails (its reason, whether the call came from inside the list and
+        the fault of its proxy chain), else the verified payload with the time used, the identity
+        of the body and whether the call came from inside the list.
     """
     settings: Settings = request.app.state.settings
-    source = check_source(
+    verdict = judge_source(
         client_address(request),
         address.sources,
         required=settings.webhook_source_networks_required,
         chain=proxy_chain(request),
     )
-    if source is not None:
-        return source
+    if verdict.refusal is not None:
+        return _Failed(verdict.refusal, fault=verdict.fault)
+    inside = verdict.inside_list
     if not accepts_content_type(request.headers.get("content-type")):
-        return Refusal.CONTENT_TYPE
+        return _Failed(Refusal.CONTENT_TYPE, inside)
     body = await read_capped(request, MAX_BODY_BYTES)
     if body is None:
-        return Refusal.TOO_LARGE
+        return _Failed(Refusal.TOO_LARGE, inside)
     clock: Clock = request.app.state.clock
     now = clock.now()
     failure = address.inbound.verify(body, request.headers, address.secret, now)
     if failure is not None:
-        return failure
+        return _Failed(failure, inside)
     payload = _json_object(body)
     if payload is None:
-        return Refusal.MALFORMED
-    return payload, now, body_identity(body)
+        return _Failed(Refusal.MALFORMED, inside)
+    return _Passed(payload, now, body_identity(body), inside)
 
 
 GATE_MARKER = "is_webhook_gate"
@@ -261,24 +329,30 @@ def webhook_gate[W: InboundWebhook](
         if isinstance(found, Unresolved):
             # Only an address that does not exist counts here: it never touches one that does.
             if not within_unknown_address_limit(caller):
-                await _refuse(request, Refusal.RATE, found.source)
-            await _refuse(request, Refusal.UNKNOWN_ADDRESS, found.source, found.organisation)
+                await _refuse(request, Refusal.RATE, found)
+            await _refuse(request, Refusal.UNKNOWN_ADDRESS, found)
         address = found
         source, organisation = address.inbound.source, address.organisation
         bucket = organisation or INSTALLATION
         inspected = await _inspect(request, address)
-        if isinstance(inspected, Refusal):
+        if isinstance(inspected, _Failed):
             if not within_refused_limit(source, bucket, caller):
-                await _refuse(request, Refusal.RATE, source, organisation)
-            await _refuse(request, inspected, source, organisation)
+                await _refuse(request, Refusal.RATE, address, inside_list=inspected.inside_list)
+            await _refuse(
+                request,
+                inspected.reason,
+                address,
+                inside_list=inspected.inside_list,
+                fault=inspected.fault,
+            )
         if not within_webhook_limit(source, bucket, caller):
-            await _refuse(request, Refusal.RATE, source, organisation)
-        payload, now, identity = inspected
+            await _refuse(request, Refusal.RATE, address, inside_list=inspected.inside_list)
         if address.paused:
             # Verified, so a stranger cannot get a 204 this way; dropped before any handling.
             log.info("webhook.paused", source=source, organisation=organisation)
+            await note_delivered(request, key_of(address), Delivered.PAUSED)
             raise WebhookPaused
-        return Delivery(address, payload, now, identity)
+        return Delivery(address, inspected.payload, inspected.now, inspected.identity)
 
     setattr(gate, GATE_MARKER, True)
     return gate

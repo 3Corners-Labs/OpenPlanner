@@ -41,6 +41,15 @@ def open_gate(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("app.domain.service_flows.ROLLBACK_SAFE", True)
 
 
+def shut_gate(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Shut the rollback gate ``ROLLBACK_SAFE`` for one test, whatever its default.
+
+    A test of the shut gate states it, so it keeps proving the shut behaviour once the product
+    owner opens the gate (checklist item G10) and a rollback image runs with it shut.
+    """
+    monkeypatch.setattr("app.domain.service_flows.ROLLBACK_SAFE", False)
+
+
 def block(
     weekday: int = 0,
     opens: str = "09:00",

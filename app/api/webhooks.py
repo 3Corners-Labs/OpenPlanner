@@ -12,7 +12,8 @@ an adapter is a 404 too. Unknown meetings, tasks and event types, and events see
 (replays: per platform and organisation, by the event's identifier or else by the hash of its
 verified body, ADR 0124 point 7), are acknowledged and ignored, so the platforms do not retry. A
 verified event at a paused address is dropped by the gate with the same 204 (point 9) and not
-noted. Every other verified webhook is noted as its platform's latest inbound event, for
+noted. Every other verified webhook is told to the delivery ledger (accepted, a duplicate or
+unknown work, points 10 and 12) and noted as its platform's latest inbound event, for
 *Koppelingen* and *System status* (ADR 0082 point 5).
 
     POST /webhooks/webex                   meetings started/ended, participants joined/left
@@ -43,10 +44,12 @@ from app.web.webhook_gate import (
     Delivery,
     alias_address,
     installation_address,
+    key_of,
     organisation_address,
     webex_address,
     webhook_gate,
 )
+from app.web.webhook_ledger import note_outcome
 
 router = APIRouter(include_in_schema=False)
 log = structlog.get_logger()
@@ -88,7 +91,7 @@ async def webex(request: Request, delivery: WebexDelivery) -> Response:
             outcome=outcome.value,
             meeting_id=event.target_id.split("_I_", 1)[0],
         )
-    await _note(request, inbound, delivery.payload, outcome)
+    await _note(request, delivery, outcome)
     return Response(status_code=204)
 
 
@@ -151,20 +154,25 @@ async def _record_task_event(
             kind=event.kind.value,
             outcome=outcome.value,
         )
-    await _note(request, inbound, delivery.payload, outcome)
+    await _note(request, delivery, outcome)
     return Response(status_code=204)
 
 
-async def _note(
-    request: Request, inbound: InboundWebhook, payload: dict[str, Any], outcome: EventOutcome
-) -> None:
-    """Note a verified webhook as its platform's latest (ADR 0082 point 5); never fails it."""
+async def _note(request: Request, delivery: Delivery[Any], outcome: EventOutcome) -> None:
+    """Note a verified webhook: tell the delivery ledger, then record it as its platform's latest.
+
+    The ledger is told what came of it (accepted, a duplicate or unknown work, ADR 0124 points 10
+    and 12) and the health service notes it as its platform's latest (ADR 0082 point 5). Neither
+    ever fails the event.
+    """
+    await note_outcome(request, key_of(delivery.address), outcome)
+    inbound: InboundWebhook = delivery.address.inbound
     health: IntegrationHealthService = request.app.state.health_service
     clock: Clock = request.app.state.clock
     platform: Platform = inbound.platform
     try:
         await health.note_inbound(
-            InboundEvent(platform, clock.now(), inbound.event_type(payload), outcome.value)
+            InboundEvent(platform, clock.now(), inbound.event_type(delivery.payload), outcome.value)
         )
     except Exception as exc:  # the event is recorded; its note must not turn into a 500
         log.warning("webhook.note_failed", source=platform.value, error=type(exc).__name__)

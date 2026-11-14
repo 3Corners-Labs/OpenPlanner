@@ -53,6 +53,7 @@ from app.adapters.releases import update_service
 from app.adapters.senders import ConfiguredSenders, fallback_mail, fallback_sender
 from app.adapters.signing_keys import EcSigningKeys
 from app.adapters.staff_addresses import StoredAddresses
+from app.adapters.vendored_files import STATIC_VENDOR, VendoredFile
 from app.admin.display_routes import router as display_router
 from app.admin.reviewed_documents import ReviewedDocuments
 from app.admin.routes import register_admin
@@ -88,6 +89,7 @@ from app.domain.api_access import ApiAccessService
 from app.domain.branding_service import BrandingService
 from app.domain.call_retry import CallRetryService
 from app.domain.call_service import CallService
+from app.domain.call_token_service import CallTokenService
 from app.domain.capacity_service import CapacityService
 from app.domain.change_request_service import ChangePolicy, ChangeRequestService
 from app.domain.channel_service import ChannelSettingsService
@@ -167,6 +169,7 @@ from app.keys import (
     agent_pseudonym_key,
     agent_pseudonym_key_previous,
     client_pseudonym_key,
+    guest_pseudonym_keys,
     management_token_key,
     management_token_key_previous,
     session_secret,
@@ -184,6 +187,7 @@ from app.web.protection import RateLimits, configure_rate_limits, limiter, set_r
 from app.web.proxy_headers import ProxyHeaderMiddleware
 from app.web.public_links import PublicRedirectMiddleware
 from app.web.static_assets import ASSETS, VersionedStaticFiles
+from app.web.webhook_ledger import install_webhook_ledger
 from app.web.widgets import WIDGETS
 
 
@@ -368,6 +372,14 @@ def create_app(
             app.state.trial_call_service = TrialCallService(
                 uow, wired.video, app.state.integration_service, clock
             )
+            # ADR 0123 point 6: the call page's guest token; rebuilt with the video provider.
+            app.state.call_token_service = CallTokenService(
+                uow,
+                wired.video,
+                app.state.integration_service,
+                clock,
+                lambda: guest_pseudonym_keys(settings),
+            )
             app.state.integration_check_service = IntegrationCheckService(
                 uow,
                 clock,
@@ -417,6 +429,7 @@ def create_app(
             lambda: timedelta(minutes=live().security_event_window_minutes),
             max_sources=lambda: live().security_event_max_sources,
         )
+        install_webhook_ledger(app, uow, clock, live)  # ADR 0124 point 10: the gate's ledger
         app.state.booking_service = booking_service(uow, clock, settings, app.state.live_settings)
         # ADR 0023 step 2: a bot's change request, confirmed by the participant.
         previous_key = management_token_key_previous(settings)
@@ -925,6 +938,9 @@ def create_app(
     app.state.settings = settings
     app.state.clock = clock
     app.state.limiter = limiter
+    # ADR 0123 point 3: the call page offers its vendored SDK only while the file is the one the
+    # manifest names; the verdict is cached until the file or the manifest changes.
+    app.state.call_sdk = VendoredFile(STATIC_VENDOR / "webex")
     # ADR 0053: security events name callers by pseudonym, never by address.
     app.state.client_pseudonyms = ClientPseudonyms(client_pseudonym_key(settings))
     app.state.identity_provider = identity_provider or oidc_provider(

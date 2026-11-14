@@ -13,6 +13,7 @@ import httpx
 
 from app.adapters.db.reports import ReportStore
 from app.adapters.diagnostics import CheckResult, passed, probes, run_checks
+from app.adapters.vendored_files import STATIC_VENDOR, FileTrust, VendoredFile
 from app.adapters.webex_auth import WebexTokens
 from app.adapters.wxcc_config import region_check
 from app.domain.ports import Clock
@@ -27,6 +28,34 @@ NOT_CONFIGURED = CheckResult(
 )
 """The one line of a check without a Service App."""
 
+SDK_FILE_CHECK = "Call page SDK file"
+"""The name of the line that reports whether the call page may offer its SDK file."""
+
+SDK_HINTS = {
+    FileTrust.TRUSTED: "ok",
+    FileTrust.NOT_PLACED: (
+        "not placed: participants get the 'not available in this page' state after the device "
+        "check; place the file (docs/runbook.md, the call page's SDK) or switch "
+        "EMBEDDED_CALL_ENABLED off"
+    ),
+    FileTrust.NO_CHECKSUM: (
+        "the manifest has no checksum of the pinned version: the call page does not offer the "
+        "file; replace the file and its checksum together (docs/runbook.md)"
+    ),
+    FileTrust.DIFFERS: (
+        "the file differs from the manifest's checksum: the call page does not offer it; "
+        "place the file the manifest names again (docs/runbook.md)"
+    ),
+}
+"""What an operator reads for each verdict on the SDK file (no path, no hash)."""
+
+
+def sdk_file_result(trust: FileTrust) -> CheckResult:
+    """Return the check's line for the vendored SDK file's ``trust`` (ADR 0123 point 3)."""
+    return CheckResult(
+        SDK_FILE_CHECK, None, trust is FileTrust.TRUSTED, SDK_HINTS[trust], code=f"sdk.{trust}"
+    )
+
 
 async def service_app_check(
     http: httpx.AsyncClient,
@@ -36,14 +65,18 @@ async def service_app_check(
     clock: Clock,
     *,
     embedded_call_enabled: bool = False,
+    sdk: VendoredFile | None = None,
 ) -> list[CheckResult]:
     """Run every probe, then the WxCC region check when the token works.
 
     With ``embedded_call_enabled`` the guest token probe is added and required (ADR 0123
-    point 17); without it nothing is asked of the guest endpoint.
+    point 17), and so is the line for the vendored SDK file: whether the call page may offer it
+    (placed, checksum of the pinned version, bytes equal to it; point 3). ``sdk`` is the file
+    to judge (the application's own by default). Without the switch nothing is asked of the
+    guest endpoint and the file is not judged.
     """
     if tokens is None:
-        return [NOT_CONFIGURED]
+        return [NOT_CONFIGURED, *_sdk_lines(embedded_call_enabled, sdk)]
     results = await run_checks(
         http,
         tokens,
@@ -53,7 +86,14 @@ async def service_app_check(
     if wxcc_base_url and results[0].ok:
         token = await tokens.access_token()
         results.append((await region_check(http, token, wxcc_base_url))[0])
-    return results
+    return [*results, *_sdk_lines(embedded_call_enabled, sdk)]
+
+
+def _sdk_lines(embedded_call_enabled: bool, sdk: VendoredFile | None) -> list[CheckResult]:
+    """Return the SDK file's line, or none while the embedded call is off."""
+    if not embedded_call_enabled:
+        return []
+    return [sdk_file_result((sdk or VendoredFile(STATIC_VENDOR / "webex")).trust())]
 
 
 def report_body(results: list[CheckResult], wxcc_checked: bool) -> dict[str, Any]:

@@ -24,7 +24,19 @@ runs:
         # organisation's own identity provider (ADR 0083); until it does, logins are unchanged.
         # The journey spec (tests/video-journey.spec.ts) plays Webex and WxCC events with the
         # simulator (docs/runbook.md, section 10); the secrets sign them for the endpoints.
+        # EMBEDDED_CALL_ENABLED: the call page of tests/call-page-device-check.spec.ts (ADR 0123
+        # step 4b) exists only while the platform switch is on.
+        # The two read-only mounts below (ADR 0123 step 4c) place the test double of the video SDK
+        # and a manifest with its checksum over the vendored folder of this one container:
+        # tests/call-page-joining.spec.ts joins a meeting that is not there. The image holds
+        # neither (.dockerignore keeps e2e/ and the SDK file out of every build context), and
+        # no other job or compose file mounts them: tests/web/test_vendor_stand_in.py.
+        # EMBEDDED_CALL_CONNECT_SECONDS is the setting's lowest value, so that a registration
+        # that never answers is given up on after 10 seconds, not 30.
         scripts/run-app-container.sh openplanner:e2e -e RATE_LIMIT_BOOKINGS=100/hour \
+          -v "$PWD/e2e/vendor/webex/meetings.min.js:/srv/app/web/static/vendor/webex/meetings.min.js:ro" \
+          -v "$PWD/e2e/vendor/webex/manifest.json:/srv/app/web/static/vendor/webex/manifest.json:ro" \
+          -e EMBEDDED_CALL_CONNECT_SECONDS=10 \
           -e RATE_LIMIT_READS=300/minute \
           --network "$network" \
           -e OIDC_DISCOVERY_URL=http://keycloak:8080/realms/openplanner/.well-known/openid-configuration \
@@ -33,6 +45,7 @@ runs:
           -e OIDC_CLIENT_SECRET=dev-only-openplanner-admin-secret \
           -e ORGANISATION_IDPS_ENABLED=true \
           -e SIMULATOR_ENABLED=true \
+          -e EMBEDDED_CALL_ENABLED=true \
           -e WEBEX_WEBHOOK_SECRET=dev-only-webex-webhook-secret \
           -e WXCC_WEBHOOK_SECRET=dev-only-wxcc-webhook-secret
         docker exec app alembic upgrade head

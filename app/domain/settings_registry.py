@@ -18,6 +18,7 @@ from enum import StrEnum
 import phonenumbers
 
 from app.domain.authorization import Permission
+from app.domain.call_page import OtherWayOffer
 from app.domain.guest_access import DisplayNameMode, StaffNameMode
 
 
@@ -1531,6 +1532,20 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "off from the portal (ADR 0124 point 3).",
     ),
     S(
+        "webhook_refusal_alert_count",
+        K.INT,
+        20,
+        _C,
+        T.RATE_LIMITS,
+        "Refusals of the kinds a passer-by cannot cause alone (a stale delivery, a refusal from "
+        "inside a connection's own list of networks, a refusal for the network after a "
+        "delivery, an event about work the connection did not create) at one webhook address "
+        "inside the event window, above which one system event for the organisation says so "
+        "(ADR 0124 point 10).",
+        minimum=5,
+        maximum=1000,
+    ),
+    S(
         "rate_limit_agent_tokens",
         K.RATE,
         "10/minute",
@@ -1953,6 +1968,18 @@ REGISTRY: tuple[SettingSpec, ...] = (
         minimum=5,
         maximum=1440,
     ),
+    S(
+        "update_stalled_minutes",
+        K.INT,
+        120,
+        _C,
+        T.UPDATES,
+        "Minutes a request the host updater claimed may stay silent (no step reported) before "
+        "the application ends it as failed (`updater_stalled`), so it stops blocking later "
+        "updates.",
+        minimum=15,
+        maximum=1440,
+    ),
     # D. Organisation: the value per organisation; the superuser's or the environment's value
     # is the default for organisations without one.
     S(
@@ -2373,6 +2400,17 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=5,
     ),
     S(
+        "embedded_call_token_per_booking_per_hour",
+        K.INT,
+        10,
+        _C,
+        T.WEBEX,
+        "Guest tokens one booking may ask for in an hour on the call page; per address the "
+        "common read limit applies (ADR 0123 point 6).",
+        minimum=5,
+        maximum=30,
+    ),
+    S(
         "embedded_call_display_name",
         K.ENUM,
         "first_name",
@@ -2391,6 +2429,16 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "How the call page names the staff member to the participant: the name of their "
         "account, or the organisation's word for staff (ADR 0123).",
         choices=tuple(m.value for m in StaffNameMode),
+    ),
+    S(
+        "embedded_call_webex_option",
+        K.ENUM,
+        "hidden",
+        _D,
+        T.DISPLAY,
+        "Whether the call page shows the participant a way into the video platform's own app: "
+        "never, only when the page cannot give the call, or always (ADR 0123 point 11).",
+        choices=tuple(m.value for m in OtherWayOffer),
     ),
 )
 """Every setting of the service, in the order of ``docs/settings.md``."""

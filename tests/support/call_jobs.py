@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 from app.domain.admin import AdminService
 from app.domain.calls import EventKind
+from app.domain.guest_access import GuestKeys
 from app.domain.integration import IntegrationService
 from app.domain.scheduling import ScheduleRule
 from app.domain.services import BookingService
@@ -47,11 +48,13 @@ class Setup:
         *,
         translator: Translator | None = None,
         conversation_enabled: Callable[[], bool] | None = None,
+        guest_keys: GuestKeys | None = None,
     ) -> JobRunner:
         """Return a job runner that takes its jobs from ``queue`` and calls the fakes.
 
         ``translator`` replaces the catalogue and ``conversation_enabled`` is the platform
-        switch of ADR 0123 step 7a (off when not given).
+        switch of ADR 0123 step 7a (off when not given). ``guest_keys`` are the keys of the guest
+        subjects now in force (ADR 0123 point 7); without them a rename has no subject to work out.
         """
         composer = MessageComposer(
             translator or Translator(load_catalogues()), TEST_TOKEN_KEY, "http://x"
@@ -66,6 +69,7 @@ class Setup:
             dispatchers=webex_cc(self.dispatcher),
             integration=self.integration,
             conversation_enabled=conversation_enabled,
+            guest_keys=guest_keys,
         )
 
     async def booking(self) -> int:

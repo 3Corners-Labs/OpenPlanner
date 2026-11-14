@@ -36,5 +36,6 @@ JOB_TYPE_LABELS: dict[JobType, str] = {
     JobType.EXPIRE_PROPOSAL: "audit.job.expire_proposal",
     JobType.SEND_PROPOSAL_RELEASED: "audit.job.send_proposal_released",
     JobType.SEND_CHANGE_REQUEST: "audit.job.send_change_request",
+    JobType.RENAME_GUEST: "audit.job.rename_guest",
 }
 """One label per job type; a test fails when a type is missing."""

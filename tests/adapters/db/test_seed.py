@@ -192,3 +192,17 @@ async def test_the_demo_agenda_holds_every_planner_action_whatever_the_day(
     assert all(planner_may_change(b, group, now) for b in pending)
     assert len(confirmed) == 1
     assert all(planner_may_request_rebook(b, group, now) for b in confirmed)
+
+
+async def test_the_call_page_example_is_a_confirmed_booking_reached_by_its_link(
+    engine: AsyncEngine,
+) -> None:
+    await seed_demo(engine)
+
+    examples = await seed_closure_examples(engine, NOW, KEY)
+
+    assert examples.call_page.startswith("/b/")
+    assert examples.call_page.endswith("/call")
+    async with SqlUnitOfWork(engine).read() as tx:
+        booking = await _by_link(tx, examples.call_page)
+    assert booking.status is BookingStatus.CONFIRMED

@@ -59,8 +59,14 @@ plus scan), `make mutation` (mutmut on `app/domain`, score ≥ 80%), `make e2e` 
 axe-core and Lighthouse against a running app; pages listed in `e2e/pages.json`; the closure
 pages need `docker compose exec web python -m app.cli seed-closures > e2e/fixtures.json` first,
 which writes the link of the example booking on hold and the bookings of the participant's
-journey; that journey spec also needs `SIMULATOR_ENABLED=true` and the two webhook secrets in
-`.env`, as CI sets them). Where the
+journey, and the demonstration of ADR 0121 on `demo` (also on its own: `seed-demonstration`);
+that journey spec also needs `SIMULATOR_ENABLED=true` and the two webhook secrets in
+`.env`, as CI sets them; the call page of `e2e/pages.json` answers 404 on a stack without
+`EMBEDDED_CALL_ENABLED=true`, which CI sets; `tests/call-page-joining.spec.ts` also needs the test
+double of the video SDK: CI mounts `e2e/vendor/webex/meetings.min.js` and `manifest.json`
+read-only over `/srv/app/web/static/vendor/webex/` of the container and sets
+`EMBEDDED_CALL_CONNECT_SECONDS=10`, and a local stack does the same with two `-v` options and the
+variable; without them the spec skips itself, and the stand-in is never part of an image). Where the
 Playwright browser download is blocked, use an installed Chrome:
 `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome npx playwright test --project=chromium` and
 `CHROME_PATH=/path/to/chrome npm run lighthouse`. CI additionally runs gitleaks, hadolint, trivy, schemathesis, SBOM + grype, and on

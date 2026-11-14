@@ -39,6 +39,7 @@ from tests.support.admin import (
 )
 from tests.support.domain import NOW
 from tests.support.flow_seed import draft
+from tests.support.pool_flows import shut_gate
 
 EVERYTHING = Scope(everything=True)
 
@@ -294,8 +295,9 @@ async def test_deleting_is_refused_for_an_unknown_flow_and_audited_for_a_denied_
 
 
 async def test_activation_is_refused_with_the_checklist_while_the_gate_is_shut(
-    service: FlowService, uow: InMemoryUnitOfWork
+    service: FlowService, uow: InMemoryUnitOfWork, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     await person(uow, ORG_ADMIN.subject)
     _, pool = await seed(uow)
     await service.create(ORG_ADMIN, "demo", "advies", draft(pool))
@@ -464,8 +466,9 @@ async def test_an_incomplete_draft_is_refused_whether_or_not_the_flow_is_active(
 
 
 async def test_a_draft_with_only_the_point_that_follows_open_is_published(
-    service: FlowService, uow: InMemoryUnitOfWork
+    service: FlowService, uow: InMemoryUnitOfWork, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     await person(uow, ORG_ADMIN.subject)
     _, pool = await seed(uow)
     await service.create(ORG_ADMIN, "demo", "advies", draft(pool))
@@ -801,8 +804,9 @@ async def test_publishing_needs_a_person_with_a_staff_record(
 
 
 async def test_the_page_judges_the_draft_and_the_activation_the_current_revision(
-    service: FlowService, uow: InMemoryUnitOfWork
+    service: FlowService, uow: InMemoryUnitOfWork, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    shut_gate(monkeypatch)  # explicitly: the default opens with G10
     await person(uow, ORG_ADMIN.subject)
     _, pool = await seed(uow)
     await service.create(ORG_ADMIN, "demo", "advies", draft(pool))

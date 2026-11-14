@@ -25,13 +25,13 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from app.domain.booking import BookingStatus
+from app.domain.booking import Booking, BookingStatus
 from app.domain.closure_retention import (
     ClosureRetention,
     ClosureRetentionOf,
     suspended_purge_moment,
 )
-from app.domain.job_plan import PURGE_AFTER
+from app.domain.job_plan import PURGE_AFTER, JobType, PlannedJob
 from app.domain.scheduling import GroupSummary
 from app.domain.service_requests import ServiceRequest, data_deletion_at
 
@@ -254,3 +254,20 @@ def summarise(
             for counts in facts.groups
         ),
     )
+
+
+def jobs_after_purge(booking: Booking | None, now: datetime) -> list[PlannedJob]:
+    """Return the jobs a purge of ``booking`` adds, decided on the booking *before* the purge.
+
+    A guest was minted for the booking at the video platform (``guest_minted_at``) and the
+    booking still holds its contact, so it was not purged before: one ``rename_guest`` job, which
+    mints the guest again under the neutral word (ADR 0123 point 7). Nothing else follows a
+    purge. A booking purged twice, or one without a guest, adds nothing.
+
+    Args:
+        booking: The booking as it is before the purge; ``None`` when it does not exist.
+        now: The moment of the purge.
+    """
+    if booking is None or booking.guest_minted_at is None or booking.contact is None:
+        return []
+    return [PlannedJob(JobType.RENAME_GUEST, now, None)]

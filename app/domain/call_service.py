@@ -30,6 +30,7 @@ from app.domain.contact_center import TaskKind
 from app.domain.contact_center_dispatch import DispatcherChoice
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.fallback import FallbackService
+from app.domain.guest_access import NEUTRAL_TERM, GuestKeys, guest_subject
 from app.domain.integration import IntegrationService
 from app.domain.interaction import InteractionKind
 from app.domain.job_plan import JobType
@@ -70,6 +71,8 @@ class CallService:
             it a conversation task cannot be built and is refused as not ready.
         conversation_enabled: Whether the platform switch is on; a routing's conversation is in
             force only while it is (``task_kind_in_force``). Without it, never.
+        guest_keys: The keys a guest's subject may have been derived under, the current one
+            first (ADR 0123 point 7); only the worker's rename of a guest needs them.
     """
 
     def __init__(
@@ -83,6 +86,7 @@ class CallService:
         organisations: OrganisationDispatchers | None = None,
         opening: OpeningText | None = None,
         conversation_enabled: ConversationEnabled | None = None,
+        guest_keys: GuestKeys | None = None,
     ) -> None:
         """Store the collaborators; ``fallback`` diverts dispatches to the own queue (ADR 0082).
 
@@ -97,6 +101,7 @@ class CallService:
         self._fallback = fallback
         self._opening = opening
         self._conversation_enabled = conversation_enabled or (lambda: False)
+        self._guest_keys = guest_keys
 
     @property
     def video_available(self) -> bool:
@@ -343,6 +348,29 @@ class CallService:
         async with self._uow.locked() as tx:
             await tx.clear_trial_call(booking_id)
         await self._integration.record(booking_id, EventKind.TRIAL_DELETED)
+
+    async def rename_guest(self, booking: Booking) -> bool:
+        """Mint the booking's guest again under the neutral term, so its name is no first name.
+
+        The subject is worked out again from the booking and each key in force (the current one
+        and, during a rotation, the previous one), so the guest is renamed whichever key it was
+        minted under. The token that comes back is dropped unread. Nothing of the booking is
+        sent but the subject and the neutral word (ADR 0123 point 7).
+
+        Returns:
+            Whether anything was done: ``False`` without a video provider or without keys.
+
+        Raises:
+            IntegrationError: The provider refuses or cannot be reached; the job is retried when
+                the error is retryable. Every subject is minted again on a retry, which names
+                the same guest and changes nothing.
+        """
+        keys = self._guest_keys() if self._guest_keys is not None else ()
+        if self._video is None or not keys:
+            return False
+        for key in dict.fromkeys(keys):
+            await self._video.guest_access(guest_subject(_id(booking), key), NEUTRAL_TERM)
+        return True
 
     async def record_failure(
         self, booking_id: int, code: str, kind: EventKind, message: str = ""

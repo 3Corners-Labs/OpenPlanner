@@ -37,6 +37,8 @@ from app.domain.updates import (
     HISTORY_ACTIONS,
     HISTORY_DETAILS,
     HOST_ACTOR,
+    STALLED_AFTER,
+    STALLED_REASON,
     VERSION_ACTION,
     ListedRelease,
     Release,
@@ -60,6 +62,7 @@ from app.domain.updates import (
     progressed,
     recent_outcome,
     restore_candidate,
+    stalled,
     unclaimed,
     version_changed,
 )
@@ -162,6 +165,8 @@ class UpdateService:
             a value or a callable, as ``channel``.
         interval: How often the worker checks for releases (``update_check_minutes``); a
             value or a callable, as ``channel``.
+        stalled_after: How long a running request may stay silent before the application ends
+            it as ``failed`` (``update_stalled_minutes``); a value or a callable, as ``channel``.
         line: ``update_line`` (ADR 0116 point 9): ``X.Y`` offers that minor's patches only;
             empty offers everything on the channel. A value or a callable, as ``channel``.
         window: ``update_window`` in the installation's zone: when the worker requests and
@@ -182,6 +187,7 @@ class UpdateService:
         channel: UpdateChannel | Callable[[], UpdateChannel] = UpdateChannel.RELEASE,
         auto_apply: bool | Callable[[], bool] = False,
         interval: timedelta | Callable[[], timedelta] = CHECK_INTERVAL,
+        stalled_after: timedelta | Callable[[], timedelta] = STALLED_AFTER,
         line: str | Callable[[], str] = "",
         window: UpdateWindow | Callable[[], UpdateWindow] = ANY_TIME,
         production: bool = False,
@@ -196,6 +202,7 @@ class UpdateService:
         self._channel = channel if callable(channel) else _constant(channel)
         self._auto_apply = auto_apply if callable(auto_apply) else _constant(auto_apply)
         self._interval = interval if callable(interval) else _constant(interval)
+        self._stalled_after = stalled_after if callable(stalled_after) else _constant(stalled_after)
         self._line = line if callable(line) else _constant(line)
         self._window = window if callable(window) else _constant(window)
         self._production = production
@@ -215,6 +222,7 @@ class UpdateService:
         known. With ``auto_apply``, a newer version becomes an update request at once (actor
         ``system``, audited), unless a request is already open (ADR 0059 point 6).
         """
+        await self.end_stalled()
         if self._releases is None:
             return False
         now = self._clock.now()
@@ -243,6 +251,33 @@ class UpdateService:
                 if open_request(await tx.get_update_requests()) is None:
                     await self._add(tx, None, UpdateAction.UPDATE, release.version)
         return True
+
+    async def end_stalled(self) -> UpdateRequest | None:
+        """End a running request whose updater went silent, as ``failed`` (``updater_stalled``).
+
+        A request the host updater claimed but never finished (the disk was full, the host
+        restarted) stays ``running`` and blocks every later request, so no update arrives any
+        more. The worker and the updater's claim call this; a request that is still being
+        carried out reports a step well within ``update_stalled_minutes``. Returns the ended
+        request, or ``None`` when nothing was stalled.
+        """
+        now = self._clock.now()
+        limit = self._stalled_after()
+        async with self._uow.read() as tx:
+            running = next(
+                (r for r in await tx.get_update_requests() if stalled(r, now, limit)), None
+            )
+        if running is None:
+            return None
+        async with self._uow.locked() as tx:
+            # Looked at again under the write lock: the updater may have reported meanwhile.
+            current = next((r for r in await tx.get_update_requests() if r.id == running.id), None)
+            if current is None or not stalled(current, now, limit):
+                return None
+            ended = finished(current, UpdateStatus.FAILED, STALLED_REASON, now)
+            await tx.save_update_request(ended)
+            await _audit_updater(tx, ended, Outcome.FAILURE, f"{ended.action}.{ended.status}")
+        return ended
 
     async def _support(
         self, known: tuple[SupportLine, ...] | None
@@ -557,6 +592,7 @@ class UpdateService:
         A request waits for its ``apply_after``, and one the worker made itself for the
         window (ADR 0116 point 9, ``update_policy.claimable``).
         """
+        await self.end_stalled()
         now = self._clock.now()
         window = self._window()
         async with self._uow.locked() as tx:

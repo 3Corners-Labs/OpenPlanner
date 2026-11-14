@@ -1681,6 +1681,9 @@ msgstr "Uw videogesprek"
 msgid "call.unavailable"
 msgstr "Het gesprek in deze pagina is nog niet beschikbaar. Ga met de link hieronder terug naar uw afspraak."
 
+msgid "call.guest.term"
+msgstr "Deelnemer"
+
 msgid "error.direct_call_unavailable"
 msgstr "Nu een gesprek starten kan op dit moment niet. Maak een afspraak."
 
@@ -4380,6 +4383,9 @@ msgstr "Na de update draait niet de gevraagde versie."
 msgid "admin.updates.reason.updater_error"
 msgstr "Onverwachte fout in de updater. Bekijk het log van de updater op de server."
 
+msgid "admin.updates.reason.updater_stalled"
+msgstr "De updater meldde niets meer (bijvoorbeeld door een volle schijf); het verzoek is beëindigd zodat de volgende update kan starten."
+
 msgid "admin.updates.reason.other"
 msgstr "De updater meldde een onbekende reden."
 
@@ -6357,6 +6363,9 @@ msgstr "Tokenaanvragen machine-API per client"
 msgid "settings.field.rate_limit_webhook_per_minute.label"
 msgstr "Binnenkomende webhooks per minuut, per koppeling en bronadres"
 
+msgid "settings.field.webhook_refusal_alert_count.label"
+msgstr "Geweigerde of onbekende webhookmeldingen op één adres, binnen het gebeurtenisvenster, waarboven een systeemgebeurtenis waarschuwt"
+
 msgid "settings.field.rate_limit_agent_calls.label"
 msgstr "Aanroepen machine-API per client"
 
@@ -6449,6 +6458,9 @@ msgstr "Automatisch bijwerken"
 
 msgid "settings.field.update_check_minutes.label"
 msgstr "Minuten tussen twee versiecontroles"
+
+msgid "settings.field.update_stalled_minutes.label"
+msgstr "Minuten voordat een stille update wordt beëindigd"
 
 msgid "settings.field.update_line.label"
 msgstr "Alleen één minorversie volgen (X.Y)"
@@ -7073,6 +7085,9 @@ msgstr "Onbevestigde afspraak laten vervallen"
 
 msgid "audit.job.send_unconfirmed_lapsed"
 msgstr "Melding vervallen afspraak sturen"
+
+msgid "audit.job.rename_guest"
+msgstr "Gastnaam in het gesprek vervangen door een neutraal woord"
 
 msgid "audit.job.send_refusal"
 msgstr "Melding geweigerde afspraak sturen"
@@ -13701,6 +13716,9 @@ msgstr "Wachttijd per poging om het gesprek te verbinden (seconden)"
 msgid "settings.field.embedded_call_connect_attempts.label"
 msgstr "Aantal pogingen om het gesprek te verbinden"
 
+msgid "settings.field.embedded_call_token_per_booking_per_hour.label"
+msgstr "Aantal keer per uur dat één afspraak toegang tot het gesprek mag vragen"
+
 msgid "settings.field.embedded_call_display_name.label"
 msgstr "Naam van de deelnemer voor de medewerker in het gesprek (voornaam of eigen woord)"
 
@@ -13813,7 +13831,121 @@ msgid "admin.source.paused_chip"
 msgstr "Gepauzeerd"
 
 msgid "admin.source.paused_text"
-msgstr "Dit adres is gepauzeerd: bezorgingen worden geaccepteerd en weggegooid, en het platform houdt zijn aanmelding. De laatste gebeurtenis op de statusschermen staat stil zolang het duurt. Hervat om gebeurtenissen weer te verwerken; de periodieke controle van de taken haalt gemiste toestanden daarna in."
+msgstr "Dit adres is gepauzeerd: bezorgingen worden geaccepteerd en weggegooid, en het platform houdt zijn aanmelding. De laatste gebeurtenis op de statusschermen staat stil zolang het duurt, en ze tonen het adres als gepauzeerd. Hervat om gebeurtenissen weer te verwerken; de periodieke controle van de taken haalt gemiste toestanden daarna in."
+
+msgid "admin.delivery.title"
+msgstr "Geziene bezorgingen"
+
+msgid "admin.delivery.process_note"
+msgstr "Deze aantallen zijn van het draaiende webproces sinds het venster begon. Een herstart maakt ze leeg, en elk proces telt voor zichzelf."
+
+msgid "admin.delivery.last_accepted"
+msgstr "Laatst geaccepteerd"
+
+msgid "admin.delivery.last_refused"
+msgstr "Laatst geweigerd"
+
+msgid "admin.delivery.window"
+msgstr "Telvenster"
+
+msgid "admin.delivery.window_since"
+msgstr "Sinds {time}"
+
+msgid "admin.delivery.paused_dropped"
+msgstr "Gebeurtenissen weggegooid tijdens de pauze"
+
+msgid "admin.delivery.none_seen"
+msgstr "Geen gezien sinds dit proces startte"
+
+msgid "admin.delivery.last_refused_at"
+msgstr "{time}: {reason}"
+
+msgid "admin.delivery.counts"
+msgstr "Aanroepen in dit venster per uitkomst"
+
+msgid "admin.delivery.col.what"
+msgstr "Uitkomst"
+
+msgid "admin.delivery.col.calls"
+msgstr "Aanroepen"
+
+msgid "admin.delivery.col.fault"
+msgstr "Fout bij de aanroep"
+
+msgid "admin.delivery.no_calls"
+msgstr "Geen aanroepen in dit venster."
+
+msgid "admin.delivery.inside_list"
+msgstr "{count} van de geweigerde aanroepen kwam van binnen de eigen netwerklijst van deze koppeling."
+
+msgid "admin.delivery.faults"
+msgstr "Aanroepen waarvan het bronadres niet te vertrouwen was, per fout"
+
+msgid "admin.delivery.outcome.accepted"
+msgstr "Geaccepteerd en verwerkt"
+
+msgid "admin.delivery.outcome.duplicate"
+msgstr "Geaccepteerd, al eerder gezien (opnieuw bezorgd)"
+
+msgid "admin.delivery.outcome.paused"
+msgstr "Gecontroleerd, weggegooid tijdens de pauze"
+
+msgid "admin.delivery.outcome.unknown_work"
+msgstr "Gecontroleerd, over werk dat deze koppeling niet heeft aangemaakt"
+
+msgid "admin.delivery.reason.unknown_address"
+msgstr "Geweigerd: dat adres bestaat niet"
+
+msgid "admin.delivery.reason.network"
+msgstr "Geweigerd: aanroeper buiten de toegestane netwerken"
+
+msgid "admin.delivery.reason.source_unknown"
+msgstr "Geweigerd: het adres van de aanroeper was niet te vertrouwen"
+
+msgid "admin.delivery.reason.rate"
+msgstr "Geweigerd: te veel aanroepen"
+
+msgid "admin.delivery.reason.content_type"
+msgstr "Geweigerd: geen JSON-aanroep"
+
+msgid "admin.delivery.reason.too_large"
+msgstr "Geweigerd: inhoud te groot"
+
+msgid "admin.delivery.reason.invalid_signature"
+msgstr "Geweigerd: handtekening klopt niet"
+
+msgid "admin.delivery.reason.stale"
+msgstr "Geweigerd: getekende tijd te ver van nu"
+
+msgid "admin.delivery.reason.malformed"
+msgstr "Geweigerd: inhoud heeft niet de verwachte vorm"
+
+msgid "admin.delivery.fault.wide_trust"
+msgstr "Het vertrouwen in de proxy is ruimer dan losse hosts"
+
+msgid "admin.delivery.fault.unreadable_trust"
+msgstr "Een regel van het proxyvertrouwen is niet te lezen"
+
+msgid "admin.delivery.fault.untrusted_hop"
+msgstr "De aanroep had doorgestuurde headers van een afzender die niet wordt vertrouwd"
+
+msgid "admin.delivery.fault.caller_is_proxy"
+msgstr "De aanroeper was de proxy zelf, die de aanroeper niet doorgaf"
+
+msgid "admin.delivery.fault.hop_not_handed_on"
+msgstr "Een schakel onderweg gaf het adres van de aanroeper niet door"
+
+msgid "admin.delivery.fault.no_address"
+msgstr "De aanroep had geen adres"
+
+msgid "admin.overview.widget.status.paused"
+msgstr "{count} adres(sen) gepauzeerd"
+
+msgid "admin.integrations.paused"
+msgstr "Gepauzeerde adressen"
+
+msgid "admin.integrations.paused_lead"
+msgstr "Deze organisaties pauzeerden hun contactcenteradres. Het platform krijgt nog zijn 204 en houdt zijn aanmelding, maar gecontroleerde gebeurtenissen worden weggegooid, dus de laatste gebeurtenis hierboven staat stil. Dit is geen gezonde en ook geen rustige koppeling."
 
 msgid "admin.channels.cc_pause_title"
 msgstr "Bezorgingen"
@@ -13832,3 +13964,262 @@ msgstr "De bezorgingen zijn gepauzeerd."
 
 msgid "admin.done.contact_center_resumed"
 msgstr "De bezorgingen zijn hervat."
+
+#. The participant's call page before the click that joins (ADR 0123 step 4b). No text names the video platform.
+
+msgid "settings.field.embedded_call_webex_option.label"
+msgstr "Weg naar de eigen app van het videoplatform naast het gesprek (nooit, alleen als de pagina het gesprek niet kan geven, of altijd)"
+
+msgid "callpage.start.body"
+msgstr "U voert het gesprek hier, in deze pagina. U hoeft niets te installeren."
+
+msgid "callpage.start.button"
+msgstr "Camera en microfoon testen"
+
+msgid "callpage.needs"
+msgstr "Voor het gesprek hebt u een browser nodig met JavaScript, een camera en een microfoon. Zet JavaScript aan of open deze pagina in een andere browser."
+
+msgid "callpage.other_way"
+msgstr "Op een andere manier deelnemen aan dit gesprek"
+
+msgid "callpage.unavailable.heading"
+msgstr "Het gesprek is in deze pagina nog niet beschikbaar"
+
+msgid "callpage.check.heading"
+msgstr "Controleer beeld en geluid"
+
+msgid "callpage.check.body"
+msgstr "Ziet u uzelf en beweegt de balk als u praat? Dan kunt u deelnemen."
+
+msgid "callpage.check.preview"
+msgstr "Voorbeeld van uw camera"
+
+msgid "callpage.check.camera_off"
+msgstr "Uw camera staat uit"
+
+msgid "callpage.check.toggles"
+msgstr "Microfoon en camera"
+
+msgid "callpage.check.level"
+msgstr "Geluid van uw microfoon"
+
+msgid "callpage.check.level_heard"
+msgstr "We horen u."
+
+msgid "callpage.check.level_silent"
+msgstr "We horen u nog niet. Zeg iets."
+
+msgid "callpage.check.level_off"
+msgstr "Uw microfoon staat uit, dus we horen u niet."
+
+msgid "callpage.check.camera"
+msgstr "Camera"
+
+msgid "callpage.check.microphone"
+msgstr "Microfoon"
+
+msgid "callpage.check.speaker"
+msgstr "Luidspreker"
+
+msgid "callpage.check.test_sound"
+msgstr "Testgeluid afspelen"
+
+msgid "callpage.check.test_sound_playing"
+msgstr "U hoort nu twee tonen. Hoort u niets? Kies een andere luidspreker of zet het geluid harder."
+
+msgid "callpage.check.no_camera"
+msgstr "Geen camera gevonden. U kunt zonder beeld deelnemen."
+
+msgid "callpage.check.no_microphone"
+msgstr "Geen microfoon gevonden. U kunt zonder geluid deelnemen."
+
+msgid "callpage.check.external"
+msgstr "Een externe videodienst verzorgt dit videogesprek."
+
+msgid "callpage.check.join"
+msgstr "Deelnemen"
+
+msgid "callpage.check.join_camera"
+msgstr "Deelnemen zonder camera"
+
+msgid "callpage.check.join_microphone"
+msgstr "Deelnemen zonder microfoon"
+
+msgid "callpage.check.join_both"
+msgstr "Deelnemen zonder camera en microfoon"
+
+msgid "callpage.control.microphone"
+msgstr "Microfoon"
+
+msgid "callpage.control.camera"
+msgstr "Camera"
+
+msgid "callpage.control.on"
+msgstr "aan"
+
+msgid "callpage.control.off"
+msgstr "uit"
+
+msgid "callpage.denied.here"
+msgstr "Klik hier"
+
+msgid "callpage.denied.step_address_bar"
+msgstr "Klik in de adresbalk op het pictogram links van het webadres."
+
+msgid "callpage.denied.step_safari"
+msgstr "Kies in het menu Safari voor Instellingen voor deze website."
+
+msgid "callpage.denied.step_retry"
+msgstr "Klik daarna hieronder op Opnieuw proberen."
+
+msgid "callpage.denied.retry"
+msgstr "Opnieuw proberen"
+
+msgid "callpage.denied.camera.heading"
+msgstr "Uw browser staat de camera niet toe"
+
+msgid "callpage.denied.camera.step"
+msgstr "Zet de camera op Toestaan."
+
+msgid "callpage.denied.camera.without"
+msgstr "U kunt ook zonder camera deelnemen."
+
+msgid "callpage.denied.microphone.heading"
+msgstr "Uw browser staat de microfoon niet toe"
+
+msgid "callpage.denied.microphone.step"
+msgstr "Zet de microfoon op Toestaan."
+
+msgid "callpage.denied.microphone.without"
+msgstr "U kunt ook zonder microfoon deelnemen. U hoort de andere kant dan wel, maar zij horen u niet."
+
+msgid "callpage.denied.both.heading"
+msgstr "Uw browser staat de camera en de microfoon niet toe"
+
+msgid "callpage.denied.both.step"
+msgstr "Zet de camera en de microfoon op Toestaan."
+
+msgid "callpage.denied.both.without"
+msgstr "U kunt ook zonder camera en microfoon deelnemen. U ziet en hoort de andere kant dan wel, maar zij zien en horen u niet."
+
+msgid "callpage.say.checking"
+msgstr "We controleren uw camera en microfoon."
+
+msgid "callpage.say.ready"
+msgstr "Uw camera en microfoon zijn klaar."
+
+msgid "callpage.say.no_devices"
+msgstr "Geen camera of microfoon gevonden. Sluit er een aan en probeer het opnieuw."
+
+msgid "callpage.say.sound"
+msgstr "Het testgeluid wordt afgespeeld."
+
+msgid "callpage.say.camera_on"
+msgstr "Camera aan."
+
+msgid "callpage.say.camera_off"
+msgstr "Camera uit."
+
+msgid "callpage.say.microphone_on"
+msgstr "Microfoon aan."
+
+msgid "callpage.say.microphone_off"
+msgstr "Microfoon uit."
+
+#. The participant's call page from the click that joins (ADR 0123 step 4c). No text names the video platform.
+
+msgid "callpage.connecting.heading"
+msgstr "Wij verbinden u"
+
+msgid "callpage.connecting.body"
+msgstr "Een ogenblik. Uw gesprek wordt klaargezet. U hoeft niets te doen."
+
+msgid "callpage.connecting.retry"
+msgstr "De vorige poging is niet gelukt. Wij proberen het opnieuw. Dat gaat vanzelf."
+
+msgid "callpage.connecting.attempt"
+msgstr "Poging {n} van {total}"
+
+msgid "callpage.lobby.heading"
+msgstr "U bent er. Uw {agent} laat u zo binnen"
+
+msgid "callpage.lobby.body"
+msgstr "U hoeft niets te doen. Het gesprek begint vanzelf."
+
+msgid "callpage.call.heading"
+msgstr "U bent in gesprek"
+
+msgid "callpage.call.remote"
+msgstr "Beeld van uw {agent}"
+
+msgid "callpage.call.remote_off"
+msgstr "Uw {agent} heeft de camera uit"
+
+msgid "callpage.control.leave"
+msgstr "Gesprek verlaten"
+
+msgid "callpage.left.heading"
+msgstr "U hebt het gesprek verlaten"
+
+msgid "callpage.left.body"
+msgstr "U kunt dit venster sluiten of teruggaan naar uw afspraak."
+
+msgid "callpage.ended.heading"
+msgstr "Het gesprek is beëindigd"
+
+msgid "callpage.ended.body"
+msgstr "Het gesprek is afgelopen. U kunt dit venster sluiten of teruggaan naar uw afspraak."
+
+msgid "callpage.failed.heading"
+msgstr "Het lukt niet om te verbinden"
+
+msgid "callpage.failed.attempts"
+msgstr "Het beeldgesprek kon niet worden klaargezet. Wij hebben het {total} keer geprobeerd. U kunt het opnieuw proberen."
+
+msgid "callpage.failed.generic"
+msgstr "Het beeldgesprek kon niet worden klaargezet. U kunt het opnieuw proberen."
+
+msgid "callpage.failed.not_open"
+msgstr "Het gesprek is nog niet geopend, of het is niet meer geopend. Controleer de tijd van uw afspraak en probeer het dan opnieuw."
+
+msgid "callpage.failed.rate_limited"
+msgstr "U hebt in korte tijd te vaak geprobeerd. Wacht enkele minuten en probeer het opnieuw."
+
+msgid "callpage.failed.unavailable"
+msgstr "Het gesprek is nu niet beschikbaar. Probeer het over enkele ogenblikken opnieuw."
+
+msgid "callpage.failed.retry"
+msgstr "Opnieuw proberen"
+
+msgid "callpage.say.connecting"
+msgstr "Uw gesprek wordt klaargezet."
+
+msgid "callpage.say.waiting"
+msgstr "Wachten tot uw {agent} u binnenlaat."
+
+msgid "callpage.say.admitted"
+msgstr "Uw {agent} heeft u binnengelaten. Het gesprek is begonnen."
+
+msgid "callpage.say.device_failed"
+msgstr "Dat is niet gelukt. Controleer uw camera of microfoon en probeer het opnieuw."
+
+msgid "callpage.self.picture"
+msgstr "Uw beeld"
+
+msgid "callpage.contact.none"
+msgstr "Neem contact op met de organisatie."
+
+msgid "callpage.hear.button"
+msgstr "Tik om de andere persoon te horen"
+
+msgid "callpage.say.remote_on"
+msgstr "Uw {agent} heeft de camera aangezet."
+
+msgid "callpage.say.remote_off"
+msgstr "Uw {agent} heeft de camera uitgezet."
+
+msgid "callpage.say.sound_blocked"
+msgstr "Uw browser heeft het geluid geblokkeerd. Gebruik de knop om de andere persoon te horen."
+
+msgid "callpage.say.device_kept"
+msgstr "Het staat uit voor de ander, maar uw browser kan het apparaat nog als in gebruik tonen."

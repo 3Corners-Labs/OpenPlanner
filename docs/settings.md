@@ -158,6 +158,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `RATE_LIMIT_WEBHOOK_PER_MINUTE` | int | `600` | 60–6000 | `settings.platform.manage` | Inbound webhook calls per minute, per platform, organisation and source address (ADR 0124 point 5); the off switch stays RATE_LIMIT_ENABLED. |
 | `WEBHOOK_SOURCE_NETWORKS_VIDEO` | string | `""` | — | `settings.platform.manage` | The networks (CIDR, comma or line separated, at most 32) the video platform's webhooks may come from. Empty means any source, shown as a finding; a defence in depth, the signature is what stops a stranger (ADR 0124 point 3). |
 | `WEBHOOK_SOURCE_NETWORKS_CONTACT_CENTER` | string | `""` | — | `settings.platform.manage` | The default networks (CIDR, comma or line separated, at most 32) contact-center webhooks may come from; a connection's own list replaces it. Empty means any source, shown as a finding (ADR 0124 point 3). |
+| `WEBHOOK_REFUSAL_ALERT_COUNT` | int | `20` | 5–1000 | `settings.platform.manage` | Refusals of the kinds a passer-by cannot cause alone (a stale delivery, a refusal from inside a connection's own list of networks, a refusal for the network after a delivery, an event about work the connection did not create) at one webhook address inside the event window, above which one system event for the organisation says so (ADR 0124 point 10). |
 | `RATE_LIMIT_AGENT_TOKENS` | rate | `10/minute` | 1–30 per minute | `settings.platform.manage` | Machine API token requests per client. |
 | `RATE_LIMIT_AGENT_CALLS` | rate | `120/minute` | 10–600 per minute | `settings.platform.manage` | Machine API calls per client. |
 | `AGENT_CHANGE_REQUESTS_PER_HOUR` | int | `20` | 1–120 | `settings.platform.manage` | Change requests per API client per hour, next to the machine API's call limit (ADR 0023 step 2); the off switch stays RATE_LIMIT_ENABLED. |
@@ -201,6 +202,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `UPDATE_LINE` | string | `""` | — | `settings.platform.manage` | Follow the patches of one minor `X.Y` only (ADR 0116 point 9); empty follows everything the channel offers. |
 | `UPDATE_WINDOW` | string | `""` | — | `settings.platform.manage` | When automatic updates happen, in `admin_timezone`: up to 7 ranges such as `mon 02:00-04:00, sat 01:00-05:00`, each at least 30 minutes (ADR 0116 point 9); empty is any time. A superuser's click is immediate. |
 | `UPDATE_CHECK_MINUTES` | int | `60` | 5–1440 | `settings.platform.manage` | Minutes between two release checks by the worker (ADR 0067); "Check now" on the updates page asks for one ahead of time. |
+| `UPDATE_STALLED_MINUTES` | int | `120` | 15–1440 | `settings.platform.manage` | Minutes a request the host updater claimed may stay silent (no step reported) before the application ends it as failed (`updater_stalled`), so it stops blocking later updates. |
 | `PLANNER_CHANGES_ALERT_PER_HOUR` | int | `50` | 5–1000 | `settings.platform.manage` | Changes by one planner per hour above which a system event warns (ADR 0044). |
 | `CONTACT_REVEALS_ALERT_PER_HOUR` | int | `20` | 5–500 | `settings.platform.manage` | Requests for participants' contact details by one person per hour above which a system event warns (ADR 0044 §2). |
 | `QUEUE_REFRESH_SECONDS` | int | `10` | 5–60 | `settings.platform.manage` | Seconds between two refreshes of the own queue, a claimed booking and the participant's waiting page (ADR 0072). |
@@ -218,6 +220,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `EMBEDDED_CALL_ENABLED` | bool | `false` | — | `settings.platform.manage` | Whether groups on this installation may let participants join the call in the organisation's own page instead of the Webex app; off until the conditions of ADR 0123 point 18 are met. |
 | `EMBEDDED_CALL_CONNECT_SECONDS` | int | `30` | 10–90 | `settings.platform.manage` | Seconds the call page waits for one attempt at registering or joining before it tries again (ADR 0123). |
 | `EMBEDDED_CALL_CONNECT_ATTEMPTS` | int | `3` | 1–5 | `settings.platform.manage` | Attempts the call page makes before it says it cannot connect (ADR 0123). |
+| `EMBEDDED_CALL_TOKEN_PER_BOOKING_PER_HOUR` | int | `10` | 5–30 | `settings.platform.manage` | Guest tokens one booking may ask for in an hour on the call page; per address the common read limit applies (ADR 0123 point 6). |
 
 ## D. Organisation (portal, organisation settings; lockable by env)
 
@@ -259,3 +262,4 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `BOOKING_CONFIRM_REMINDERS` | int | `1` | 0–3 | `settings.organisation.manage` | Reminders to confirm, spread evenly over the time to confirm (ADR 0056). |
 | `EMBEDDED_CALL_DISPLAY_NAME` | enum | `first_name` | first_name, term | `settings.organisation.manage` | What staff see as the participant's name in the call page's meeting: the first name, or the organisation's word for a participant (ADR 0123). |
 | `EMBEDDED_CALL_STAFF_NAME` | enum | `name` | name, term | `settings.organisation.manage` | How the call page names the staff member to the participant: the name of their account, or the organisation's word for staff (ADR 0123). |
+| `EMBEDDED_CALL_WEBEX_OPTION` | enum | `hidden` | hidden, on_failure, always | `settings.organisation.manage` | Whether the call page shows the participant a way into the video platform's own app: never, only when the page cannot give the call, or always (ADR 0123 point 11). |

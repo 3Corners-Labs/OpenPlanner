@@ -87,6 +87,21 @@
   {% else %}
   <p class="empty-state">{{ _("admin.integrations.inbound_none") }}</p>
   {% endif %}
+  {% if health.paused %}
+  <h3 id="paused-heading">{{ _("admin.integrations.paused") }}</h3>
+  <p><span class="chip chip--warning">{{ _("admin.source.paused_chip") }}</span> {{ _("admin.integrations.paused_lead") }}</p>
+  <div class="table-scroll" role="region" aria-labelledby="paused-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("admin.integrations.paused") }}</caption>
+    <thead><tr><th scope="col">{{ _("admin.integrations.col.organisation") }}</th><th scope="col">{{ _("admin.delivery.paused_dropped") }}</th></tr></thead>
+    <tbody>
+      {% for row in health.paused %}
+      <tr><th scope="row"><a href="/admin/organisations/{{ row.organisation }}/channels#contact-center">{{ row.organisation }}</a></th><td>{{ row.dropped }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
   <h3>{{ _("admin.integrations.health_states") }}</h3>
   {% if health.rows %}
   <div class="table-scroll">
@@ -98,7 +113,7 @@
       <tr>
         <th scope="row">{{ row.organisation }}</th>
         <td>{{ row.platform }}</td>
-        <td><span class="chip{% if row.tone %} chip--{{ row.tone }}{% endif %}">{{ row.state }}</span></td>
+        <td><span class="chip{% if row.tone %} chip--{{ row.tone }}{% endif %}">{{ row.state }}</span>{% if row.paused %} <span class="chip chip--warning">{{ _("admin.source.paused_chip") }}</span>{% endif %}</td>
         <td>{{ row.since }}</td>
         <td>{{ _("admin.integrations.failures_of", failures=row.failures, requests=row.requests) }}</td>
       </tr>

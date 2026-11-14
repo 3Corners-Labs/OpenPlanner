@@ -4,13 +4,16 @@
  */
 import { expect, test } from '@playwright/test';
 
-import { expectNoAxeViolations } from '../helpers';
+import { expectNoAxeViolations, holdCookie } from '../helpers';
 import { pageVariants } from '../pages';
 
 for (const variant of pageVariants()) {
-  test(`axe: ${variant.title}`, async ({ page }) => {
+  test(`axe: ${variant.title}`, async ({ page, baseURL }) => {
+    await holdCookie(page, variant, baseURL);
     // networkidle: the widget pages render after their API calls (ADR 0035).
-    await page.goto(variant.path, { waitUntil: 'networkidle' });
+    const response = await page.goto(variant.path, { waitUntil: 'networkidle' });
+    // A page behind a cookie (pages.json `cookie`) must be the page itself, not the refusal.
+    if (variant.cookie) expect(response?.status()).toBe(200);
     // ADR 0093: the link from an email trades its token for a cookie and ends on a page whose
     // address holds no credential: the confirm, trial and join pages included.
     if (/^\/b\/[^/?]+(\/(confirm|test|join))?(\?|$)/.test(variant.path)) {

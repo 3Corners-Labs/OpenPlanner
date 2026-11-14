@@ -33,8 +33,9 @@ from app.domain.closure_retention import (
     default_closure_retention,
     is_capped,
 )
-from app.domain.job_plan import PURGE_AFTER, JobType
+from app.domain.job_plan import PURGE_AFTER
 from app.domain.ports import Clock, UnitOfWork
+from app.domain.purge import delete_jobs_of_purged, purge_booking
 from app.domain.retention import (
     BACKLOG_AGE,
     DueBooking,
@@ -231,8 +232,8 @@ class RetentionSweep:
                     or booking.cancelled_at != candidate.cancelled_at
                 ):
                     return _CHANGED
-                await tx.purge_personal_data(due.booking_id, self._clock.now())
-                await tx.delete_pending_jobs(due.booking_id, set(JobType))
+                await purge_booking(tx, due.booking_id, self._clock.now())
+                await delete_jobs_of_purged(tx, due.booking_id)
         except Exception as exc:  # one booking must not stop the others; the event reports it
             return type(exc).__name__
         return _PURGED

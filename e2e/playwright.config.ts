@@ -8,6 +8,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
+  // ADR 0121 gate item G06: the immediate request pages need a request and a claim first.
+  globalSetup: './requests.ts',
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: process.env.CI ? [['github'], ['list']] : 'list',
@@ -25,7 +27,13 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'], channel: process.env.PLAYWRIGHT_CHROMIUM_CHANNEL },
+      use: {
+        ...devices['Desktop Chrome'],
+        channel: process.env.PLAYWRIGHT_CHROMIUM_CHANNEL,
+        // The browser's own fake camera and microphone, with the permission prompt answered: the call
+        // page's device check (tests/call-page-device-check.spec.ts) needs devices; no other spec asks.
+        launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] },
+      },
     },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },

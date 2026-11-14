@@ -1681,6 +1681,9 @@ msgstr "Your video call"
 msgid "call.unavailable"
 msgstr "The call in this page is not available yet. Use the link below to go back to the appointment."
 
+msgid "call.guest.term"
+msgstr "Participant"
+
 msgid "error.direct_call_unavailable"
 msgstr "Starting a call is not possible right now. Please book an appointment."
 
@@ -4380,6 +4383,9 @@ msgstr "After the update, the requested version is not running."
 msgid "admin.updates.reason.updater_error"
 msgstr "Unexpected error in the updater. Check the updater's log on the server."
 
+msgid "admin.updates.reason.updater_stalled"
+msgstr "The updater stopped reporting (for example a full disk), so the request was ended and the next update can start."
+
 msgid "admin.updates.reason.other"
 msgstr "The updater reported an unknown reason."
 
@@ -6357,6 +6363,9 @@ msgstr "Machine API token requests per client"
 msgid "settings.field.rate_limit_webhook_per_minute.label"
 msgstr "Inbound webhooks per minute, per platform, organisation and source address"
 
+msgid "settings.field.webhook_refusal_alert_count.label"
+msgstr "Refused or unmatched webhook deliveries at one address, inside the event window, above which a system event warns"
+
 msgid "settings.field.rate_limit_agent_calls.label"
 msgstr "Machine API calls per client"
 
@@ -6449,6 +6458,9 @@ msgstr "Update automatically"
 
 msgid "settings.field.update_check_minutes.label"
 msgstr "Minutes between two version checks"
+
+msgid "settings.field.update_stalled_minutes.label"
+msgstr "Minutes before a silent update is ended"
 
 msgid "settings.field.update_line.label"
 msgstr "Follow one minor only (X.Y)"
@@ -7060,6 +7072,9 @@ msgstr "Expire unconfirmed booking"
 
 msgid "audit.job.send_unconfirmed_lapsed"
 msgstr "Send notice of an expired booking"
+
+msgid "audit.job.rename_guest"
+msgstr "Replace the guest's name in the call with a neutral word"
 
 msgid "audit.job.send_refusal"
 msgstr "Send notice of a refused booking"
@@ -13688,6 +13703,9 @@ msgstr "Wait per attempt to connect the call (seconds)"
 msgid "settings.field.embedded_call_connect_attempts.label"
 msgstr "Attempts to connect the call"
 
+msgid "settings.field.embedded_call_token_per_booking_per_hour.label"
+msgstr "Times per hour one appointment may ask for access to the call"
+
 msgid "settings.field.embedded_call_display_name.label"
 msgstr "Participant's name shown to staff in the call (first name or own word)"
 
@@ -13800,7 +13818,121 @@ msgid "admin.source.paused_chip"
 msgstr "Paused"
 
 msgid "admin.source.paused_text"
-msgstr "This address is paused: deliveries are accepted and dropped, and the platform keeps its subscription. The last event on the status screens stands still while it lasts. Resume to handle events again; the periodic check of the tasks then catches up on missed states."
+msgstr "This address is paused: deliveries are accepted and dropped, and the platform keeps its subscription. The last event on the status screens stands still while it lasts, and they show the address as paused. Resume to handle events again; the periodic check of the tasks then catches up on missed states."
+
+msgid "admin.delivery.title"
+msgstr "Deliveries seen"
+
+msgid "admin.delivery.process_note"
+msgstr "These numbers are of the running web process since the window began. A restart empties them, and each process counts for itself."
+
+msgid "admin.delivery.last_accepted"
+msgstr "Last accepted"
+
+msgid "admin.delivery.last_refused"
+msgstr "Last refused"
+
+msgid "admin.delivery.window"
+msgstr "Counting window"
+
+msgid "admin.delivery.window_since"
+msgstr "Since {time}"
+
+msgid "admin.delivery.paused_dropped"
+msgstr "Events dropped while paused"
+
+msgid "admin.delivery.none_seen"
+msgstr "None seen since this process started"
+
+msgid "admin.delivery.last_refused_at"
+msgstr "{time}: {reason}"
+
+msgid "admin.delivery.counts"
+msgstr "Calls in this window by outcome"
+
+msgid "admin.delivery.col.what"
+msgstr "Outcome"
+
+msgid "admin.delivery.col.calls"
+msgstr "Calls"
+
+msgid "admin.delivery.col.fault"
+msgstr "Fault of the call"
+
+msgid "admin.delivery.no_calls"
+msgstr "No calls in this window."
+
+msgid "admin.delivery.inside_list"
+msgstr "{count} of the refused calls came from inside this connection's own list of networks."
+
+msgid "admin.delivery.faults"
+msgstr "Calls whose source address could not be trusted, by fault"
+
+msgid "admin.delivery.outcome.accepted"
+msgstr "Accepted and handled"
+
+msgid "admin.delivery.outcome.duplicate"
+msgstr "Accepted, already seen (delivered again)"
+
+msgid "admin.delivery.outcome.paused"
+msgstr "Verified, dropped while paused"
+
+msgid "admin.delivery.outcome.unknown_work"
+msgstr "Verified, about work this connection did not create"
+
+msgid "admin.delivery.reason.unknown_address"
+msgstr "Refused: no such address"
+
+msgid "admin.delivery.reason.network"
+msgstr "Refused: caller outside the allowed networks"
+
+msgid "admin.delivery.reason.source_unknown"
+msgstr "Refused: the caller's address could not be trusted"
+
+msgid "admin.delivery.reason.rate"
+msgstr "Refused: too many calls"
+
+msgid "admin.delivery.reason.content_type"
+msgstr "Refused: not a JSON call"
+
+msgid "admin.delivery.reason.too_large"
+msgstr "Refused: body too large"
+
+msgid "admin.delivery.reason.invalid_signature"
+msgstr "Refused: signature does not match"
+
+msgid "admin.delivery.reason.stale"
+msgstr "Refused: signed time too far from now"
+
+msgid "admin.delivery.reason.malformed"
+msgstr "Refused: body not of the expected shape"
+
+msgid "admin.delivery.fault.wide_trust"
+msgstr "The proxy trust is wider than single hosts"
+
+msgid "admin.delivery.fault.unreadable_trust"
+msgstr "An entry of the proxy trust cannot be read"
+
+msgid "admin.delivery.fault.untrusted_hop"
+msgstr "The call carried forwarded headers from a sender that is not trusted"
+
+msgid "admin.delivery.fault.caller_is_proxy"
+msgstr "The caller was the proxy itself, which did not hand the caller on"
+
+msgid "admin.delivery.fault.hop_not_handed_on"
+msgstr "A hop on the way did not hand the caller's address on"
+
+msgid "admin.delivery.fault.no_address"
+msgstr "The call had no address"
+
+msgid "admin.overview.widget.status.paused"
+msgstr "{count} address(es) paused"
+
+msgid "admin.integrations.paused"
+msgstr "Paused addresses"
+
+msgid "admin.integrations.paused_lead"
+msgstr "These organisations paused their contact-center address. The platform still gets its 204 and keeps its subscription, but verified events are dropped, so the last event above stands still. This is not a healthy connection and not a quiet one."
 
 msgid "admin.channels.cc_pause_title"
 msgstr "Deliveries"
@@ -13819,3 +13951,262 @@ msgstr "Deliveries are paused."
 
 msgid "admin.done.contact_center_resumed"
 msgstr "Deliveries are resumed."
+
+#. The participant's call page before the click that joins (ADR 0123 step 4b). No text names the video platform.
+
+msgid "settings.field.embedded_call_webex_option.label"
+msgstr "Way into the video platform's own app next to the call (never, only when the page cannot give the call, or always)"
+
+msgid "callpage.start.body"
+msgstr "You have the call here, in this page. There is nothing to install."
+
+msgid "callpage.start.button"
+msgstr "Test camera and microphone"
+
+msgid "callpage.needs"
+msgstr "The call needs a browser with JavaScript, a camera and a microphone. Turn JavaScript on, or open this page in another browser."
+
+msgid "callpage.other_way"
+msgstr "Join this call another way"
+
+msgid "callpage.unavailable.heading"
+msgstr "The call is not available in this page yet"
+
+msgid "callpage.check.heading"
+msgstr "Check picture and sound"
+
+msgid "callpage.check.body"
+msgstr "Can you see yourself, and does the bar move when you talk? Then you can join."
+
+msgid "callpage.check.preview"
+msgstr "Preview of your camera"
+
+msgid "callpage.check.camera_off"
+msgstr "Your camera is off"
+
+msgid "callpage.check.toggles"
+msgstr "Microphone and camera"
+
+msgid "callpage.check.level"
+msgstr "Sound from your microphone"
+
+msgid "callpage.check.level_heard"
+msgstr "We hear you."
+
+msgid "callpage.check.level_silent"
+msgstr "We do not hear you yet. Say something."
+
+msgid "callpage.check.level_off"
+msgstr "Your microphone is off, so we do not hear you."
+
+msgid "callpage.check.camera"
+msgstr "Camera"
+
+msgid "callpage.check.microphone"
+msgstr "Microphone"
+
+msgid "callpage.check.speaker"
+msgstr "Speaker"
+
+msgid "callpage.check.test_sound"
+msgstr "Play a test sound"
+
+msgid "callpage.check.test_sound_playing"
+msgstr "You now hear two tones. Do you hear nothing? Choose another speaker or turn the volume up."
+
+msgid "callpage.check.no_camera"
+msgstr "No camera found. You can join without a picture."
+
+msgid "callpage.check.no_microphone"
+msgstr "No microphone found. You can join without sound."
+
+msgid "callpage.check.external"
+msgstr "An external video service carries this video call."
+
+msgid "callpage.check.join"
+msgstr "Join"
+
+msgid "callpage.check.join_camera"
+msgstr "Join without camera"
+
+msgid "callpage.check.join_microphone"
+msgstr "Join without microphone"
+
+msgid "callpage.check.join_both"
+msgstr "Join without camera and microphone"
+
+msgid "callpage.control.microphone"
+msgstr "Microphone"
+
+msgid "callpage.control.camera"
+msgstr "Camera"
+
+msgid "callpage.control.on"
+msgstr "on"
+
+msgid "callpage.control.off"
+msgstr "off"
+
+msgid "callpage.denied.here"
+msgstr "Click here"
+
+msgid "callpage.denied.step_address_bar"
+msgstr "In the address bar, click the icon left of the web address."
+
+msgid "callpage.denied.step_safari"
+msgstr "In the Safari menu, choose Settings for This Website."
+
+msgid "callpage.denied.step_retry"
+msgstr "Then click Try again below."
+
+msgid "callpage.denied.retry"
+msgstr "Try again"
+
+msgid "callpage.denied.camera.heading"
+msgstr "Your browser does not allow the camera"
+
+msgid "callpage.denied.camera.step"
+msgstr "Set the camera to Allow."
+
+msgid "callpage.denied.camera.without"
+msgstr "You can also join without a camera."
+
+msgid "callpage.denied.microphone.heading"
+msgstr "Your browser does not allow the microphone"
+
+msgid "callpage.denied.microphone.step"
+msgstr "Set the microphone to Allow."
+
+msgid "callpage.denied.microphone.without"
+msgstr "You can also join without a microphone. You then hear the other side, but they do not hear you."
+
+msgid "callpage.denied.both.heading"
+msgstr "Your browser does not allow the camera and the microphone"
+
+msgid "callpage.denied.both.step"
+msgstr "Set the camera and the microphone to Allow."
+
+msgid "callpage.denied.both.without"
+msgstr "You can also join without a camera and microphone. You then see and hear the other side, but they do not see or hear you."
+
+msgid "callpage.say.checking"
+msgstr "Checking your camera and microphone."
+
+msgid "callpage.say.ready"
+msgstr "Your camera and microphone are ready."
+
+msgid "callpage.say.no_devices"
+msgstr "No camera or microphone found. Connect one and try again."
+
+msgid "callpage.say.sound"
+msgstr "Playing the test sound."
+
+msgid "callpage.say.camera_on"
+msgstr "Camera on."
+
+msgid "callpage.say.camera_off"
+msgstr "Camera off."
+
+msgid "callpage.say.microphone_on"
+msgstr "Microphone on."
+
+msgid "callpage.say.microphone_off"
+msgstr "Microphone off."
+
+#. The participant's call page from the click that joins (ADR 0123 step 4c). No text names the video platform.
+
+msgid "callpage.connecting.heading"
+msgstr "We are connecting you"
+
+msgid "callpage.connecting.body"
+msgstr "One moment. Your call is being set up. There is nothing you need to do."
+
+msgid "callpage.connecting.retry"
+msgstr "The last attempt did not work. We are trying again. This happens by itself."
+
+msgid "callpage.connecting.attempt"
+msgstr "Attempt {n} of {total}"
+
+msgid "callpage.lobby.heading"
+msgstr "You are here. The {agent} will let you in shortly"
+
+msgid "callpage.lobby.body"
+msgstr "There is nothing you need to do. The call starts by itself."
+
+msgid "callpage.call.heading"
+msgstr "You are in the call"
+
+msgid "callpage.call.remote"
+msgstr "Picture of the {agent}"
+
+msgid "callpage.call.remote_off"
+msgstr "The {agent} has the camera off"
+
+msgid "callpage.control.leave"
+msgstr "Leave the call"
+
+msgid "callpage.left.heading"
+msgstr "You left the call"
+
+msgid "callpage.left.body"
+msgstr "You can close this window, or go back to your appointment."
+
+msgid "callpage.ended.heading"
+msgstr "The call has ended"
+
+msgid "callpage.ended.body"
+msgstr "The call is over. You can close this window, or go back to your appointment."
+
+msgid "callpage.failed.heading"
+msgstr "We cannot connect"
+
+msgid "callpage.failed.attempts"
+msgstr "The video call could not be set up. We tried {total} times. You can try again."
+
+msgid "callpage.failed.generic"
+msgstr "The video call could not be set up. You can try again."
+
+msgid "callpage.failed.not_open"
+msgstr "The call is not open yet, or it is no longer open. Check the time of your appointment and try again then."
+
+msgid "callpage.failed.rate_limited"
+msgstr "You tried too many times in a short while. Wait a few minutes and try again."
+
+msgid "callpage.failed.unavailable"
+msgstr "The call is not available right now. Try again in a moment."
+
+msgid "callpage.failed.retry"
+msgstr "Try again"
+
+msgid "callpage.say.connecting"
+msgstr "Setting up your call."
+
+msgid "callpage.say.waiting"
+msgstr "Waiting for the {agent} to let you in."
+
+msgid "callpage.say.admitted"
+msgstr "The {agent} let you in. The call has started."
+
+msgid "callpage.say.device_failed"
+msgstr "That did not work. Check your camera or microphone and try again."
+
+msgid "callpage.self.picture"
+msgstr "Your picture"
+
+msgid "callpage.contact.none"
+msgstr "Get in touch with the organisation."
+
+msgid "callpage.hear.button"
+msgstr "Tap to hear the other person"
+
+msgid "callpage.say.remote_on"
+msgstr "The {agent} turned the camera on."
+
+msgid "callpage.say.remote_off"
+msgstr "The {agent} turned the camera off."
+
+msgid "callpage.say.sound_blocked"
+msgstr "Your browser blocked the sound. Use the button to hear the other person."
+
+msgid "callpage.say.device_kept"
+msgstr "It is off for the other side, but your browser may still show the device as in use."
