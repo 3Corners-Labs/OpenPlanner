@@ -59,10 +59,17 @@ def test_the_register_names_only_existing_routes(settings: Settings) -> None:
     assert declared - _page_routes(settings) == set()
 
 
-def test_a_form_that_answers_on_a_page_takes_that_pages_home() -> None:
+def test_a_form_that_answers_on_a_page_takes_that_pages_home(settings: Settings) -> None:
+    app_routes = all_routes(create_app(settings).routes)
+    posts = {r.path for r in app_routes if "POST" in r.methods}
+    registered = {path for _, screen in screens() for path in screen.routes}
+
     for post, page in ANSWERS_ON.items():
-        assert home_of(page) is not None
-        assert home_of(post) == home_of(page)
+        assert post in posts, f"{post} is no POST route of the app"
+        assert post not in registered, f"{post} is a page of the register itself"
+        assert page in _page_routes(settings), f"{page} is no registered GET page"
+        assert page in registered
+        assert home_of(post) == home_of(page) is not None
 
 
 def test_no_route_has_two_homes() -> None:

@@ -45,7 +45,7 @@ rebuild is found at the first miss once the last rebuild is older than the floor
 matches nobody (a booking dispatched to the contact center, a pseudonym of a key that is gone)
 may thus make the directory be scanned once a minute at most."""
 
-OWN_RECORD = Scope(everything=True)
+_OWN_RECORD = Scope(everything=True)
 """The scope of a person's write to their own record (step 5d), found by the session's subject.
 
 It is no reach of its own and grants nothing: it only decides where the audit event is written
@@ -160,7 +160,7 @@ class StaffScreenNames:
             member = await tx.get_staff(principal.subject)
             if member is None:
                 return ScreenNameResult.NO_RECORD
-            return await _store(tx, principal.subject, member, OWN_RECORD, name, now)
+            return await _store(tx, principal.subject, member, _OWN_RECORD, name, now)
 
     async def label_of(self, claimed_by: str | None, mode: StaffNameMode) -> StaffLabel:
         """Return what the participant is told of who accepted a booking.

@@ -824,11 +824,16 @@ _HOMES = _homes()
 ANSWERS_ON: dict[str, str] = {
     "/admin/rights/profile/screen-name": "/admin/rights/profile",
     "/admin/staff/{member_id}/screen-name": "/admin/staff/{member_id}",
+    "/admin/staff/{member_id}/skills/{org}": "/admin/staff/{member_id}",
 }
-"""POST-only routes that answer a refused form with a page (422), and the page they answer on.
+"""POST routes that answer a refused form with a page (422) at an address that is not the page's.
 
 The register declares pages (GET routes) only, so such a response has no home of its own; it
 takes the home of the page it re-shows, and so keeps its side-navigation entry and its tab row.
+Belongs here: a form whose address differs from the page it answers on. Does not: a form that
+posts to its page's own address (it has the page's home already), or one that only redirects.
+Each key must be a POST route that is no page of the register, each value a registered page
+(``tests/web/test_navigation.py``).
 """
 
 
