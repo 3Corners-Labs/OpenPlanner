@@ -107,8 +107,10 @@ form above; **Resume deliveries** puts it back. A paused address still checks ev
 before (network, signature, time): a call that would be refused is refused. A call that checks out
 gets the usual `204`, so the platform keeps its subscription and does not switch it off, but its
 event is dropped: nothing is recorded on the booking and nothing is remembered, so the platform's
-redelivery after you resume is handled. The card shows a *Paused* note while it lasts, and the *last
-event* on the status screens stands still. Pausing or resuming changes neither the webhook secret
+redelivery after you resume is handled. The card shows a *Paused* note while it lasts and counts the
+events it dropped, and the status screens (*Integrations* and the overview's status widget) show the
+address as paused: the *last event* there stands still, which is neither a healthy nor a quiet
+connection. Pausing or resuming changes neither the webhook secret
 nor the registration at the platform.
 
 Resuming does not replay what was dropped. The states of the open tasks are brought back by the
@@ -150,8 +152,31 @@ A network that covers a whole address family (`0.0.0.0/0` or `::/0`, or an IPv6 
 If the stored list cannot be read, the card says so and the address accepts no call until you
 save the list again.
 
-**After you set a list, send a test delivery** and check that it is accepted. The card does not
-yet show refused calls, so a list that locks the supplier out is not visible here.
+**After you set a list, send a test delivery** and check on the card, under *Deliveries seen*, that
+it is accepted. A list that locks the supplier out shows there as a refusal for the network.
+
+### Deliveries seen
+
+Under the pause the card shows what OpenPlanner saw at this address: *Last accepted*, *Last refused*
+with its reason in words, the number of calls in the current window per outcome (accepted, accepted
+but already seen, verified and dropped while paused, verified but about work this connection did
+not create, and each reason for a refusal), the faults of single calls whose source address could
+not be trusted, by kind, and how many refusals came from inside your own list of networks. Use it
+to see whether the supplier gets through and why a call was refused.
+
+These numbers are of the running web process since the window began (the security-event window, a
+setting of the platform administrator). A restart empties them and each process counts for itself,
+so a quiet card after a restart means nothing. The last times stay while the process runs.
+
+There are two alerts, each at most once per window, so one cannot hide the other. When more than
+the platform's *refusal alert* number (20 by default) of the following happen at this address
+inside the window, one system event tells you. Group *signed*: a delivery that was signed but is
+too old, a refusal for a call from inside your own list of networks, or an event about work this
+connection did not create (the subscription may point at the wrong address); a stranger cannot
+cause these alone (when your list is a range the supplier shares with others, a caller inside it who is not the supplier can also raise this alert; the signature still refuses them). Group *list*: refusals for the network after a delivery was accepted, which
+means your list may be out of date. A stranger who knows the address can also cause the *list*
+alert while real deliveries arrive: it costs one event per window and hides nothing. Other calls
+from strangers that fail are counted on the card and raise nothing.
 
 ## What is recorded
 

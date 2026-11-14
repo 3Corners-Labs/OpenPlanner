@@ -384,6 +384,14 @@ twice pauses and never toggles. Resuming does not replay what was dropped: the p
 (`task_reconcile_interval_minutes`, ADR 0082) catches up on states a missed event left behind.
 The installation-wide addresses have no connection and no pause.
 
+A paused address reads as paused on the status screens (step 3b): the card counts the events it
+dropped (*Deliveries seen*, below), *Koppelingen* lists the paused organisations with that count
+and marks their health row, and the overview's status widget says how many addresses of the
+platform are paused and shows the row as a warning, however healthy the connection otherwise is.
+The platform's *last event* stands still while a pause lasts, which is neither health nor silence.
+The check of the registrations (`webhooks-list`) and the service-app check are about the
+registration and the outbound calls, which a pause does not touch, so they are unchanged.
+
 ### Source networks (`network`, `source_unknown`)
 
 A connection can carry a list of allowed source networks (IPv4 and IPv6, CIDR, at most 32), edited
@@ -449,8 +457,8 @@ request.
 An address without a list is not affected by any of this. System status (*Address and proxy*) and
 the connection card show the first (a standing fact of the installation's settings) while a list
 applies; System status with what to repair, the card (for the organisation) only that deliveries
-are refused because of the installation's proxy setting and whom to ask. The per-call faults show as
-refusals in the events and nowhere else until the card shows *last refused* (a later step).
+are refused because of the installation's proxy setting and whom to ask. The per-call faults are counted by kind
+on the card (*Deliveries seen*, below) and in the events.
 
 **Three set-ups cannot use a list today.** They are refused, not passed, and the fix is not in
 the list:
@@ -464,9 +472,9 @@ the list:
 3. *A supplier that calls a public name from a private address* (split DNS): the caller is then
    private while the public address is public, so a call is refused as `source_unknown`.
 
-After you set a list, send a test delivery (`webhooks-health`) and read the events: the card does
-not yet show refused calls, so a list that locks the supplier out is found in the events, not on
-the card.
+After you set a list, send a test delivery (`webhooks-health`) and read the card: *Last accepted*
+shows that a delivery came through, and a refusal for the network shows as *Last refused* with
+its reason in words, so a list that locks the supplier out is seen there, as well as in the events.
 
 A list is **defence in depth and no more**: the supplier's ranges are shared by all its customers,
 so a caller inside the list may be another customer of the same supplier; the signature (and the
@@ -484,6 +492,61 @@ and no personal data; it is written only for an organisation that exists, so a s
 caller never becomes a value. The caller is the pseudonym of ADR 0053; no body, header value,
 signature or address is stored. A flood is one event per reason, address and caller per window.
 `docs/audit-events.md` and `docs/logging.md` list the event.
+
+### What the gate saw: the card, the ledger and the alert (ADR 0124 points 3, 9, 10, 12)
+
+The connection's card (*Kanalen*, contact center) and System status (*Address and proxy*, for the
+installation-wide addresses) show **Deliveries seen**, server-rendered, without script:
+
+- *Last accepted* (when a delivery was last accepted) and *Last refused* (when, and the reason in
+  words, never the code);
+- the calls of the current window per outcome: accepted and handled, accepted but already seen,
+  verified and dropped while paused, verified but about work this connection did not create,
+  and each refusal reason;
+- the faults decided for single calls, by kind: the proxy trust is wider than single hosts or has
+  an entry that cannot be read, the call carried forwarded headers from a sender that is not
+  trusted, the caller was the proxy itself, a hop did not hand the caller on, the call had no
+  address;
+- how many of the refusals came from inside the connection's own list of networks, and how many
+  events were dropped while paused.
+
+**The ledger is in memory, in the web process** (`app/domain/webhook_ledger.py`), like the security
+log and the rate limiter. What the card shows is what *this* process has seen since the window began
+(`security_event_window_minutes`; the same window as the security events): a restart empties it, and
+each process keeps its own. The last times stay across windows, the counts start again. It holds
+only codes from closed lists, counts and times: no body, header, signature, address or pseudonym.
+It is bounded: only addresses that exist have an entry, calls to an address that does not exist
+count under their platform and never per guessed slug, and at most `security_event_max_sources`
+entries are kept (windows that ended are dropped first, then the oldest). A refused call writes
+nothing to the database for the ledger: a stranger cannot make the platform write.
+
+**The alerts: two groups, one event each per address and window.** What the alert counts is split
+in two groups, each with the threshold `webhook_refusal_alert_count` (class C, default 20, 5 to
+1000, read live) and at most one system event `webhook.refusal_alert` per address and window,
+written for the organisation (reason `too_many_refusals`, detail
+`platform:<code>,group:<list|signed>,count:<n>,reasons:<codes>`, nothing else). So noise cannot
+hide a signal: one group spending its alert leaves the other its own. A failure to write an event
+changes no answer, and the event is tried again by a counted outcome of its group, not before 60 seconds have passed (a constant, so a locked database is not asked to write on every counted call).
+
+| Group | Counted | Why |
+|---|---|---|
+| `signed` | `stale` | It was signed: a replay, or a clock that is off |
+| `signed` | any refusal from inside the connection's own list of networks, for a connection that has one | The caller is the supplier or someone inside its range, and still fails |
+| `signed` | a verified event about work this connection did not create (organisation addresses only) | Usually a subscription that points at the wrong address (point 12) |
+| `list` | `network` while a delivery was verified earlier in the same window | The supplier's ranges may have changed and the list gone stale (point 3) |
+
+A passer-by cannot cause the `signed` group alone. It counts refusals from inside the connection's own list, so when the list is a range the supplier shares with others, a caller inside that range who is not the supplier can also raise it; the signature still refuses them. **The `list` alert can be raised by a stranger**
+who knows the address while real deliveries arrive: it costs one event per window and cannot hide
+the `signed` alert. It says only that the list should be looked at, and changes nothing. Not
+counted at all, however many: refusals from strangers (`invalid_signature`, `content_type`,
+`too_large`, `rate`, `unknown_address`, `source_unknown`) and `network` before any delivery in the
+window. An address of the installation is shared by every tenant of the platform, so work that is
+not ours is routine there and never counts; its alert, if it comes, names no organisation and
+only the superuser sees it.
+
+If the ledger is full (every entry inside its window and alerted) a new address is not recorded and
+the log line `webhook.ledger_full` names the platform, once per platform and window; making room otherwise drops entries whose
+window ended, then the oldest that has not alerted, so a live alert state is never erased.
 
 ## Inbound: Webex webhooks (`POST /webhooks/webex`)
 

@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from scripts.vendor import MANIFEST, VENDOR_DIRECTORY, load, manifests
+from app.adapters.vendored_files import MANIFEST, load
+from scripts.vendor import VENDOR_DIRECTORY, manifests
 from scripts.vendor_sbom import add_vendored, main
 
 DATA = b"console.log(1);"

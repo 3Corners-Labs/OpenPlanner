@@ -246,6 +246,9 @@ class FakeSecrets:
     async def get(self, name: str) -> dict[str, object] | None:
         return self.values.get(name)
 
+    async def get_many(self, names: Sequence[str]) -> dict[str, dict[str, object]]:
+        return {name: self.values[name] for name in names if name in self.values}
+
     async def put(self, name: str, value: dict[str, object], now: datetime) -> None:
         self.values[name] = value
 
@@ -302,6 +305,13 @@ class FakeContactCenterConnections:
 
     async def delete(self, organisation_id: int) -> None:
         self.connections.pop(organisation_id, None)
+
+    async def paused(self, organisation_ids: Sequence[int]) -> dict[int, ContactCenterKind]:
+        return {
+            i: c.kind
+            for i in organisation_ids
+            if (c := self.connections.get(i)) is not None and not c.inbound_enabled
+        }
 
     async def webhook_secret(self, organisation_id: int, kind: ContactCenterKind) -> str | None:
         shown = self.connections.get(organisation_id)

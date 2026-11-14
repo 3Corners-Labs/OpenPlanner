@@ -102,6 +102,7 @@ from app.admin.authz import (
     session_principal,
     session_service,
 )
+from app.admin.delivery_status import paused_addresses
 from app.admin.forms import Field, read_form
 from app.admin.idp_mapping_routes import reason_label
 from app.admin.idp_routes import JWKS_PATH
@@ -815,6 +816,7 @@ async def integrations(
         locale.gettext,
         lambda at: admin_moment(request, locale, at),
         lambda organisation: reach.contains(organisation, None),
+        await paused_addresses(request, context.principal),
     )
     return _page(
         request,

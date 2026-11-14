@@ -6,7 +6,7 @@ adds one component per vendored manifest to the SBOM that syft wrote, with three
 
 - the file is absent: nothing is added and the script says so (exit 0). This is the state today;
 - the file is placed and its bytes are the ones the manifest's checksum of the pinned version
-  names (``scripts.vendor.file_matches``): the component is added;
+  names (``app.adapters.vendored_files.file_matches``): the component is added;
 - the file is placed but anything differs (no checksum, a checksum of another version, other
   bytes): the SBOM is left as it was and the script FAILS (exit 1) with the reason. A wrong file
   in a build context is not passed over.
@@ -26,7 +26,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from scripts.vendor import ROOT, Manifest, file_matches, manifests
+from app.adapters.vendored_files import Manifest, file_matches
+from scripts.vendor import ROOT, manifests
 
 REGISTRY = "https://registry.npmjs.org"
 

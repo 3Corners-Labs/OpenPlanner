@@ -209,6 +209,11 @@ FLOWS: dict[str, Flow] = {
     ),
     "## Flow: the call page as a third kind of page (ADR 0123 step 2)": Flow((PUBLIC,)),
     "## Flow: the guest token of the call page (ADR 0123 step 4a)": Flow((PUBLIC, JOB)),
+    "## Flow: joining from the call page (ADR 0123 step 4c)": Flow(
+        no_event="every request of the page is one of the guest token flow above, and the SDK "
+        "file, the policy and the test double are defects of the build or the installation, found "
+        "by tests and the service-app check; there is no request of its own to attribute"
+    ),
     "## Flow: allowed origins for embedding (ADR 0035, EM-1)": Flow(ADMIN),
     "## Flow: video meetings, work items and direct calls (WP5/WP6)": Flow(
         (PUBLIC, WEBHOOK, JOB, DENIED, CHANGE)
