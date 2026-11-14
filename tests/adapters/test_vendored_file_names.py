@@ -67,3 +67,25 @@ def test_the_manifest_is_read_again_only_when_it_changes(
     os.utime(path, ns=(2, 2))
     assert file.trust() is FileTrust.TRUSTED
     assert len(reads) == 2
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "[]",
+        '"text"',
+        "null",
+        '{"name": "x", "version": "1", "source": "s", "file": "f.js", "checksum": "abc"}',
+        '{"name": "x", "version": "1", "source": "s", "file": ["f.js"]}',
+        '{"name": "x", "version": "1", "source": "s", "file": 3}',
+    ],
+)
+def test_a_manifest_of_the_wrong_shape_is_no_offer_and_no_error(
+    tmp_path: Path, content: str
+) -> None:
+    (tmp_path / "manifest.json").write_text(content)
+    (tmp_path / "f.js").write_bytes(b"x")
+    file = VendoredFile(tmp_path)
+
+    assert file.trust() is FileTrust.NOT_PLACED
+    assert file.offer() is None

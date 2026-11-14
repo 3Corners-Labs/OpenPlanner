@@ -173,7 +173,7 @@
       <video class="call-remote" playsinline autoplay aria-label="{{ _("callpage.call.remote") }}" data-call-remote></video>
       <p class="call-remote__off" data-call-remote-off hidden>{{ _("callpage.call.remote_off") }}</p>
       <audio autoplay data-call-remote-audio></audio>
-      <p class="call-hear" data-call-hear-note><button type="button" class="button" data-call-hear hidden>{{ _("callpage.hear.button") }}</button></p>
+      <button type="button" class="button call-hear" data-call-hear hidden>{{ _("callpage.hear.button") }}</button>
       <div class="call-self">
         {{ own_picture("call", _("callpage.self.picture"), note=False) }}
       </div>
@@ -241,13 +241,17 @@
     <span data-text="say_remote_on">{{ _("callpage.say.remote_on") }}</span>
     <span data-text="say_remote_off">{{ _("callpage.say.remote_off") }}</span>
     <span data-text="say_sound_blocked">{{ _("callpage.say.sound_blocked") }}</span>
+    <span data-text="say_device_kept">{{ _("callpage.say.device_kept") }}</span>
     <span data-text="say_device_failed">{{ _("callpage.say.device_failed") }}</span>
   </div>
 
   <p data-call-back><a href="/b/m/{{ ref }}/join">{{ _("join.back") }}</a></p>
 </div>
 {% endblock %}
-{#- Three own scripts that share one object, in this order: the two that only define, then the page, which starts them. -#}
+{#- Four own scripts that share one object, in this order: the three that only define (the call's
+    media is taken and released by the file loaded after the connection it works on), then the page,
+    which starts them. -#}
 {% block scripts %}<script src="{{ static_url('call-devices.js') }}" defer></script>
 <script src="{{ static_url('call-connection.js') }}" defer></script>
+<script src="{{ static_url('call-media.js') }}" defer></script>
 <script src="{{ static_url('call-page.js') }}" defer></script>{% endblock %}

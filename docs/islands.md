@@ -174,9 +174,9 @@ subresource integrity (entry below).
 
 ### `call-page.js`
 
-The call page's script is three files that share one object, `window.openplannerCall` (no build step,
+The call page's script is four files that share one object, `window.openplannerCall` (no build step,
 each under 500 lines, each with a header that says what it owns and never does). The page loads them
-in this order: `call-devices.js` and `call-connection.js` only define, `call-page.js` starts them.
+in this order: `call-devices.js`, `call-connection.js` and `call-media.js` only define, `call-page.js` starts them.
 
 - **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (build steps 4b and 4c). Not an island: the call page is a kind of page
   of its own (above), and the scripts are the page's, loaded by no other.
@@ -223,22 +223,30 @@ in this order: `call-devices.js` and `call-connection.js` only define, `call-pag
   with JavaScript, a camera and a microphone, the organisation's contact details (or one plain sentence
   when it has none) and, where the organisation allows it, the link to join another way.
 - **Used by:** the call page only (`call.html`, with `call-page.css`).
-- **Size:** about 4.6 KB, 5.3 KB and 5.2 KB gzipped (`call-devices.js`, `call-connection.js`,
+- **Size:** about 4.5, 4.8, 1.8 and 5.2 KB gzipped (`call-devices.js`, `call-connection.js`, `call-media.js`,
   `call-page.js`), about 2.2 KB gzipped (styles). Step 5 and the chat of 7c add to the same state and
   `render`; the connection part is the file that will grow, and splitting it again is a decision for then.
 
 ### `call-devices.js`
 
-- **ADR:** 0123 point 10 (steps 4b and 4c). The device check of the call page; one of the three files described under
+- **ADR:** 0123 point 10 (steps 4b and 4c). The device check of the call page; one of the four files described under
   `call-page.js` (what it owns and never does is in its header). Loaded before `call-page.js`, which starts it.
-- **Used by:** the call page only. **Size:** about 4.6 KB gzipped.
+- **Used by:** the call page only. **Size:** about 4.5 KB gzipped.
+
+### `call-media.js`
+
+- **ADR:** 0123 points 10 and 16 (steps 4c and 5). The camera and the microphone of the call: taking the
+  streams, switching them on and off in the lobby and the call, giving a device back when it is off (a
+  device that cannot be taken out of the meeting is only muted, and the page says so); one of the four
+  files described under `call-page.js`. Loaded after `call-connection.js`, whose `call` object it works on.
+- **Used by:** the call page only. **Size:** about 1.8 KB gzipped.
 
 ### `call-connection.js`
 
 - **ADR:** 0123 points 3, 5, 6, 10, 11 and 16 (step 4c). The call of the call page (token, SDK, attempts,
-  lobby, leaving); one of the three files described under `call-page.js` (what it owns and never does is in
+  lobby, leaving); one of the four files described under `call-page.js` (what it owns and never does is in
   its header). Loaded before `call-page.js`, which starts it.
-- **Used by:** the call page only. **Size:** about 5.3 KB gzipped.
+- **Used by:** the call page only. **Size:** about 4.8 KB gzipped.
 
 ### `vendor/webex/meetings.min.js`
 

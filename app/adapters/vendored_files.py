@@ -163,7 +163,7 @@ class VendoredFile:
         if self._manifest is None or self._manifest[0] != stamp:
             try:
                 manifest: Manifest | None = load(self._folder / MANIFEST)
-            except (OSError, KeyError, ValueError):
+            except (OSError, KeyError, ValueError, TypeError, AttributeError):
                 manifest = None
             self._manifest = (stamp, manifest)
         return self._manifest[1]

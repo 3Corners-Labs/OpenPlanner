@@ -41,6 +41,9 @@ type Plan = {
   always?: boolean;
   delay?: number;
   late?: number;
+  authFailures?: number;
+  slowLeave?: number;
+  unpublishFails?: boolean;
   mediaFailures?: number;
   lobby?: boolean;
   remote?: boolean;
@@ -156,7 +159,7 @@ test('before the click nothing leaves the origin; the click loads the file, asks
   expect(strangers()).toEqual([]);
 });
 
-test('the SDK file comes first and the token second: a file the browser refuses costs no token', async ({ page }) => {
+test('the SDK file comes first and the token second: a file the browser refuses costs no token and ends the joining at once', async ({ page }) => {
   const tokens = await stubToken(page, granted());
   // The server names the file with a checksum; a swapped file in the browser's hands is refused.
   await page.route('**/static/vendor/webex/meetings.min.js*', (route) =>
@@ -165,8 +168,8 @@ test('the SDK file comes first and the token second: a file the browser refuses 
   await open(page);
   await join(page);
 
-  await expect(heading(page, FAILED)).toBeFocused({ timeout: 40_000 });
-  await expect(page.getByText('We tried 3 times').first()).toBeVisible();
+  await expect(heading(page, 'The call is not available in this page yet')).toBeFocused();
+  await expect(page.getByText('We tried 3 times').first()).toBeHidden();
   expect(tokens).toHaveLength(0);
 });
 
@@ -208,7 +211,7 @@ test('the token and the link are nowhere in the page, an address, a storage or a
   }
 });
 
-test('connecting is visible and says so, once, when it tries again by itself; a new token is asked for each attempt', async ({ page }) => {
+test('connecting is visible and says so, once, when it tries again by itself; one token serves the attempts of a click', async ({ page }) => {
   const tokens = await stubToken(page, granted());
   // Two attempts fail at once; the third takes a moment, so the page can be looked at while it runs.
   await open(page, { failures: 2, delay: 3000 });
@@ -225,8 +228,8 @@ test('connecting is visible and says so, once, when it tries again by itself; a 
   expect(log.calls.filter((c) => c === 'register')).toHaveLength(3);
   // The count stays on the page for every retry, the sentence is said once per joining.
   expect(await timesSaid(page, RETRY)).toBe(1);
-  // A token the platform did not take is not asked for again with the same value.
-  expect(tokens).toHaveLength(3);
+  // Forgetting a token in the page does not withdraw it: the three attempts of one click use one.
+  expect(tokens).toHaveLength(1);
   // No countdown and no clock on the page.
   await expect(state(page, 'connecting').getByText(/\b\d+ ?(s|sec|seconds)\b/)).toHaveCount(0);
 });
@@ -299,7 +302,7 @@ test('after the last attempt the failure state says so, without the other way, a
   await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
   await expectNoAxeViolations(page);
 
-  // The token of the failed attempts is forgotten: the next try asks for a new one.
+  // The failure state forgot the token: "try again" asks for a new one.
   const before = tokens.length;
   await page.evaluate(() => ((window as unknown as { __sdkPlan: Plan }).__sdkPlan.always = false));
   await page.getByRole('button', { name: 'Try again' }).click();
@@ -371,13 +374,48 @@ for (const [status, body, sentence, retry] of [
   });
 }
 
-test('a token request that does not arrive ends in the plain failure sentence', async ({ page }) => {
-  await stubToken(page, { status: 0, abort: true });
+test('a token request that does not arrive is retried like any failed step, and spends the attempts', async ({ page }) => {
+  const tokens = await stubToken(page, { status: 0, abort: true });
   await open(page);
   await join(page);
-  await expect(heading(page, FAILED)).toBeFocused();
-  await expect(state(page, 'failed').getByText('The video call could not be set up. You can try again.')).toBeVisible();
+  await expect(heading(page, FAILED)).toBeFocused({ timeout: 30_000 });
+  await expect(state(page, 'failed').getByText('We tried 3 times').first()).toBeVisible();
+  expect(tokens).toHaveLength(3);
 });
+
+test('a token the platform refuses at registration is forgotten and a new one is asked for', async ({ page }) => {
+  const tokens = await stubToken(page, granted());
+  await open(page, { authFailures: 1 });
+  await join(page);
+  await expect(heading(page, IN_CALL)).toBeFocused();
+  expect(tokens).toHaveLength(2);
+  expect((await sdk(page)).inits).toHaveLength(2);
+});
+
+for (const [event, restored] of [['pagehide', false], ['pageshow', true]] as const) {
+  test(`after a failed attempt, a ${event} during the wait starts nothing again`, async ({ page }) => {
+    const tokens = await stubToken(page, granted());
+    await open(page, { mediaFailures: 1, slowLeave: 1500 });
+    await join(page);
+    // The first attempt failed after joining: it is being undone (the leaving takes a moment).
+    await expect.poll(async () => (await sdk(page)).calls.includes('leave')).toBe(true);
+    await page.evaluate(
+      (name) =>
+        window.dispatchEvent(
+          name === 'pageshow' ? new PageTransitionEvent('pageshow', { persisted: true }) : new Event('pagehide'),
+        ),
+      event,
+    );
+    // The undoing finishes (unregistered); then nothing may start: no second registration, no token.
+    await expect.poll(async () => (await sdk(page)).calls.includes('unregister'), { timeout: 15_000 }).toBe(true);
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const { calls } = await sdk(page);
+    expect(calls.filter((c) => c === 'init')).toHaveLength(1);
+    expect(calls.filter((c) => c === 'register')).toHaveLength(1);
+    expect(tokens).toHaveLength(1);
+    if (restored) await expect(heading(page, 'Your video call')).toBeVisible();
+  });
+}
 
 test('the real endpoint answers an appointment outside the join window as not open', async ({ page }) => {
   await open(page);
@@ -504,7 +542,23 @@ test('a browser that blocks the sound gets a button and one message, and the but
   await page.evaluate(() => ((window as unknown as { __blockPlay: boolean }).__blockPlay = false));
   await hear.click();
   await expect(hear).toBeHidden();
+  // The button went: focus goes to the call's heading, not nowhere, and the message is not said again.
+  await expect(heading(page, IN_CALL)).toBeFocused();
+  expect(await timesSaid(page, 'Your browser blocked the sound. Use the button to hear the other person.')).toBe(1);
   await expectNoAxeViolations(page);
+});
+
+test('a device that cannot be taken out of the meeting is only muted, and the page says so', async ({ page }) => {
+  await stubToken(page, granted());
+  await open(page, { unpublishFails: true });
+  await join(page);
+  await expect(heading(page, IN_CALL)).toBeFocused();
+  const microphone = page.getByRole('button', { name: /^Microphone/ });
+  await microphone.click();
+  await expect(microphone).toHaveAttribute('aria-pressed', 'false');
+  await saidLike(page, /may still show the device as in use/);
+  // Kept (muted), not stopped: the browser still holds it.
+  expect(await live(page)).toEqual([1, 1]);
 });
 
 test('the way out stands apart from the switches', async ({ page }) => {

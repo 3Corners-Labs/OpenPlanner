@@ -339,8 +339,8 @@
 }
 
 .call-hear {
-  margin: var(--booking-space-s) 0 0;
-  text-align: center;
+  display: block;
+  margin: var(--booking-space-s) auto 0;
 }
 
 /* --- Preferences ------------------------------------------------------------------------ */

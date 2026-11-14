@@ -16,7 +16,6 @@
   "use strict";
 
   var app = (window.openplannerCall = window.openplannerCall || {});
-  var KINDS = ["camera", "microphone"];
 
   var media;
   var preview;
@@ -50,11 +49,6 @@
 
   function hasNow() {
     return { camera: tracksOf("camera").length > 0, microphone: tracksOf("microphone").length > 0 };
-  }
-
-  function deniedKind(refused) {
-    if (refused.length === 2) return "both";
-    return refused.length === 1 ? refused[0] : "";
   }
 
   function constraint(kind) {
@@ -120,7 +114,7 @@
   // trouble: refused (the browser says no) or missing (nothing found, or in use elsewhere).
   function open() {
     var wish = app.state.wish;
-    var wanted = KINDS.filter(function (kind) {
+    var wanted = app.KINDS.filter(function (kind) {
       return wish[kind];
     });
     if (!wanted.length) return Promise.resolve({ tracks: [], errors: {} });
@@ -179,7 +173,7 @@
       stream = outcome.tracks.length ? new MediaStream(outcome.tracks) : null;
       var refused = [];
       var missing = [];
-      KINDS.forEach(function (kind) {
+      app.KINDS.forEach(function (kind) {
         var error = outcome.errors[kind];
         if (error) (refusal(error) ? refused : missing).push(kind);
       });
@@ -187,7 +181,7 @@
         track.enabled = true;
       });
       showPreview();
-      var denied = deniedKind(refused);
+      var denied = app.deniedKind(refused);
       var say = denied ? "say_without_" + denied : stream ? "say_ready" : "say_no_devices";
       var wish = app.state.wish;
       if (!outcome.tracks.length && !wish.camera && !wish.microphone) say = "";
@@ -241,7 +235,7 @@
       }
       showPreview();
       var found = problems(kind, one.error);
-      var denied = deniedKind(found.refused);
+      var denied = app.deniedKind(found.refused);
       var say = denied ? "say_without_" + denied : one.stream ? "say_" + kind + "_on" : "say_no_devices";
       set({
         wish: copy(app.state.wish, kind, true),

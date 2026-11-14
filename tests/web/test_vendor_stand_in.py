@@ -7,6 +7,11 @@ other place the application could serve it from: the guard reads every tracked f
 place a file (workflows, compose files, Dockerfiles, charts, scripts, the Makefile), not a list
 of the ones that exist today. Prose (``*.md``), the tests and ``e2e/``'s own sources are left
 out because they describe the stand-in and place nothing.
+
+It is a tripwire for the obvious ways, not a proof: a path built at run time or a placement in a
+form nobody wrote down gets past it. The real protection is ``.dockerignore`` (no build context
+holds ``e2e/``, tested below) and the exact-mounts test (the one action mounts the two files
+read-only into one throw-away container).
 """
 
 import json
@@ -31,7 +36,9 @@ OTHER_PLACEMENT_OF_E2E = re.compile(
     r"""|\bcp\s[^|\n]*\be2e/?(?:\s|$)"""
     r"""|\brsync\b[^\n]*\be2e/?(?:\s|$)"""
     r"""|^\s*-\s*["']?\.?/?e2e/?:"""
-    r"""|\bsource:\s*["']?\.?/?e2e/?["']?\s*$""",
+    r"""|\bsource:\s*["']?\.?/?e2e/?["']?\s*$"""
+    r"""|--mount[ =][^\n]*\b(?:src|source)=["']?\.?/?[^\s,"']*\be2e/?(?=[,\s"']|$)"""
+    r"""(?![^\n]*\b(?:dst|target)=/e2e(?:[,\s"']|$))""",
     re.MULTILINE,
 )
 """A copy of ``e2e/`` as a whole by a Dockerfile, ``cp``, ``rsync`` or a compose volume."""
@@ -132,6 +139,11 @@ def test_no_other_tracked_file_places_the_stand_in_or_the_whole_of_e2e_in_the_ap
         '        source: "./e2e"',
         'docker run -v "$PWD/e2e:/srv/app/web/static/vendor/webex" openplanner',
         "docker run --volume ./e2e/:/app/x img",
+        "docker run --mount type=bind,src=./e2e,dst=/srv/app/web/static/vendor img",
+        "docker run --mount type=bind,source=e2e/,target=/srv img",
+        "docker cp e2e app:/srv/e2e",
+        "docker cp ./e2e/ app:/srv/",
+        "cp -r e2e/ /srv/",
         "cp e2e/vendor/webex/meetings.min.js app/web/static/vendor/webex/",
     ],
 )
@@ -146,6 +158,7 @@ def test_the_guard_sees_each_way_of_placing_it(text: str) -> None:
         "working-directory: e2e",
         "cd e2e && npx playwright test",
         "COPY e2e-notes.txt .",
+        "docker run --mount type=bind,src=./e2e,dst=/e2e img",
     ],
 )
 def test_the_guard_leaves_the_test_runner_and_ordinary_use_alone(text: str) -> None:

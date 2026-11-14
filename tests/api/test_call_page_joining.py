@@ -88,8 +88,8 @@ async def test_a_whole_sdk_file_is_named_in_an_attribute_and_never_as_a_tag(
     digest = base64.b64encode(hashlib.sha256(CONTENT).digest()).decode()
     assert str(root["data-call-sdk"]).startswith("/static/vendor/webex/meetings.min.js?v=")
     assert root["data-call-sdk-integrity"] == f"sha256-{digest}"
-    # Nothing the browser would fetch or run before the click: our three scripts, no SDK.
-    assert len(page.script_sources) == 3  # our own, never the SDK
+    # Nothing the browser would fetch or run before the click: our four scripts, no SDK.
+    assert len(page.script_sources) == 4  # our own, never the SDK
     assert not any("vendor" in url for url in page.references)
 
 

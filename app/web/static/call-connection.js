@@ -18,7 +18,6 @@
   "use strict";
 
   var app = (window.openplannerCall = window.openplannerCall || {});
-  var KINDS = ["camera", "microphone"];
 
   // What the SDK is told: its logs are never uploaded and the registration of this browser is
   // temporary (ADR 0123 point 16). The automatic link to the real-time data service is off: it
@@ -34,7 +33,6 @@
       autoUploadLogs: false,
     },
   };
-  var PICTURE = { width: 1280, height: 720 }; // the size the picture is asked for
   var TOKEN_MARGIN_MS = 60000; // a token that expires within this is not reused
   var GIVE_UP_MS = 5000; // how long leaving and unregistering may take before the page goes on
   var STALE = { stale: true }; // a step of a connection that something else has taken over
@@ -42,14 +40,21 @@
   var tokenUrl = "", sdkSource = "", sdkIntegrity = ""; // read out of the markup in `init`
   var attemptsMax = 0, attemptMs = 0;
   var choice = { cameraId: "", microphoneId: "" };
+  app.choice = choice; // the devices the participant chose in the check, for call-media.js
 
   // `epoch` moves whenever a connection starts, ends or is taken over; every step and every
-  // event of the SDK checks it, so nothing of an old attempt reaches the page. The token is
-  // kept here, in memory, until the call ends or an attempt fails.
+  // event of the SDK checks it, so nothing of an old attempt reaches the page. The token is kept
+  // here, in memory: one token per click, reused by every attempt of that joining while it is
+  // valid, and forgotten when the joining ends (the call's end, leaving, the failure state) or
+  // when the platform refuses it at registration. Forgetting a token in the page does not
+  // withdraw it, and a new one for every attempt would spend three of the booking's ten an hour
+  // on one failed click; "try again" asks a new one.
   var call = { epoch: 0, token: "", link: "", expires: 0, loading: null, abort: null };
   call.client = call.meeting = call.camera = call.microphone = call.capturing = null;
   call.joined = false;
   call.making = { camera: false, microphone: false };
+  call.adding = null; // the media is being added: a device press waits for it
+  app.call = call; // shared with call-media.js, which takes and releases the streams
 
   function noop() {}
 
@@ -103,10 +108,12 @@
     if (!call.loading) {
       call.loading = new Promise(function (resolve, reject) {
         var script = document.createElement("script");
+        // The browser refuses a file that is not the one its checksum names, and it does not say why
+        // a file did not load: trying again will not make it better, so this ends the joining.
         var failed = function () {
           script.remove();
           call.loading = null;
-          reject(new Error("sdk"));
+          reject({ unavailable: true });
         };
         script.src = sdkSource;
         script.integrity = sdkIntegrity;
@@ -142,7 +149,9 @@
         var refused = { 409: "not_open", 429: "rate_limited", 503: "unavailable" }[response.status];
         if (refused) throw turnedAway(refused);
         if (!response.ok) throw turnedAway("generic");
-        return response.json();
+        return response.json().then(null, function () {
+          throw turnedAway("generic");
+        });
       })
       .then(function (body) {
         check(epoch);
@@ -157,124 +166,16 @@
         settle();
         if (error === STALE || (error && error.refusal)) throw error;
         if (epoch !== call.epoch) throw STALE;
-        // Too slow is a failed attempt, like the SDK being slow; anything else is plain failure.
-        throw controller.signal.aborted ? new Error("timeout") : turnedAway("generic");
+        // Too slow, or no answer at all, is a failed attempt like the SDK being slow: it is tried
+        // again. Only the endpoint's own answers end the joining at once.
+        throw new Error(controller.signal.aborted ? "timeout" : "network");
       });
-  }
-
-  // ---- the devices of the call ---------------------------------------------------------------
-  function createStream(kind) {
-    var helpers = call.client.meetings.mediaHelpers;
-    if (kind === "microphone") {
-      var sound = { echoCancellation: true, noiseSuppression: true };
-      if (choice.microphoneId) sound.deviceId = choice.microphoneId;
-      return helpers.createMicrophoneStream(sound);
-    }
-    var picture = { width: PICTURE.width, height: PICTURE.height };
-    if (choice.cameraId) picture.deviceId = choice.cameraId;
-    return helpers.createCameraStream(picture);
-  }
-
-  function showSelf() {
-    app.streams.self = call.camera ? call.camera.outputStream : null;
-  }
-
-  // The devices the participant left on. One that cannot be taken is left out, and said. The
-  // lobby and an admission that comes at the same moment share one capture, never two.
-  function capture() {
-    if (call.capturing) return call.capturing;
-    var epoch = call.epoch;
-    var failed = [];
-    call.capturing = Promise.all(
-      KINDS.map(function (kind) {
-        if (!app.state.live[kind] || call[kind]) return null;
-        return createStream(kind).then(
-          function (stream) {
-            if (epoch !== call.epoch) stream.stop();
-            else call[kind] = stream;
-          },
-          function () {
-            failed.push(kind);
-          },
-        );
-      }),
-    ).then(function () {
-      if (epoch !== call.epoch) return;
-      call.capturing = null;
-      showSelf();
-      if (failed.length) {
-        var live = Object.assign({}, app.state.live);
-        failed.forEach(function (kind) {
-          live[kind] = false;
-        });
-        app.go(app.state.screen, { live: live, say: "say_device_failed" });
-      }
-    });
-    return call.capturing;
-  }
-
-  function switched(kind, on) {
-    var live = Object.assign({}, app.state.live);
-    live[kind] = on;
-    app.go(app.state.screen, { live: live, say: "say_" + kind + (on ? "_on" : "_off") });
-  }
-
-  // One device of the call switched on or off. Off gives the device back, as in the check: in
-  // the call the stream is taken out of the meeting and stopped (the camera light goes out), and
-  // switching on takes a new one and sends it. If the SDK refuses to take it out, it is only
-  // muted and kept. Before the media is in (the lobby) the device is simply stopped or taken.
-  function setLive(kind, on) {
-    var epoch = call.epoch;
-    var stream = call[kind];
-    var sent = app.state.media === "added";
-    var drop = function () {
-      stream.stop();
-      call[kind] = null;
-      showSelf();
-      switched(kind, false);
-    };
-    var mute = function () {
-      stream.setUserMuted(true);
-      switched(kind, false);
-    };
-    if (!on) {
-      if (!stream) switched(kind, false);
-      else if (sent) return call.meeting.unpublishStreams([stream]).then(drop, mute);
-      else drop();
-      return Promise.resolve();
-    }
-    if (stream) {
-      stream.setUserMuted(false);
-      switched(kind, true);
-      return Promise.resolve();
-    }
-    if (call.making[kind]) return Promise.resolve();
-    call.making[kind] = true;
-    return createStream(kind)
-      .then(function (created) {
-        call.making[kind] = false;
-        if (epoch !== call.epoch) return created.stop();
-        call[kind] = created;
-        showSelf();
-        var published = {};
-        published[kind] = created;
-        return sent ? call.meeting.publishStreams(published) : null;
-      })
-      .then(
-        function () {
-          if (epoch === call.epoch && call[kind]) switched(kind, true);
-        },
-        function () {
-          call.making[kind] = false;
-          app.go(app.state.screen, { say: "say_device_failed" });
-        },
-      );
   }
 
   // ---- the attempts ----------------------------------------------------------------------------
   // The lobby: the participant is in the meeting and waits to be let in; the own picture shows.
   function lobby(epoch) {
-    return capture().then(function () {
+    return app.callMedia.capture().then(function () {
       check(epoch);
       app.go("lobby", { say: "say_waiting" });
     });
@@ -284,7 +185,8 @@
   function enter(epoch) {
     if (app.state.media !== "none") return Promise.resolve();
     app.go(app.state.screen, { media: "adding" });
-    return capture()
+    var adding = app.callMedia
+      .capture()
       .then(function () {
         check(epoch);
         var local = {};
@@ -297,6 +199,13 @@
         app.go("call", { media: "added", say: "say_admitted" });
         app.playRemote();
       });
+    // A press of a toggle waits for this (call-media.js).
+    var done = function () {
+      if (call.adding === adding) call.adding = null;
+    };
+    call.adding = adding;
+    adding.then(done, done);
+    return adding;
   }
 
   // What the meeting tells the page, for this connection only.
@@ -410,20 +319,30 @@
     });
   }
 
+  // The platform refused the token itself (an authorisation error at registration).
+  function tokenRefused(error) {
+    var code = error && (error.statusCode || error.code);
+    return code === 401 || code === 403;
+  }
+
   function attempt(number) {
     var epoch = (call.epoch += 1);
     // The count is shown for every retry; it is said once, at the first.
     if (number > 1) {
       var retry = { attempt: number, media: "none" };
       if (number === 2) retry.say = "say_retry";
-      app.go("connecting", retry);
+      if (!app.go("connecting", retry)) return;
     }
     setUp(epoch).then(null, function (error) {
       if (error === STALE || epoch !== call.epoch) return null;
+      if (error && error.unavailable) return unavailable();
       if (error && error.refusal) return fail(error.refusal);
-      // A token the platform did not take is not asked for again with the same value.
-      forget();
-      return abandon().then(function () {
+      if (tokenRefused(error)) forget();
+      var gone = abandon();
+      var mine = call.epoch;
+      return gone.then(function () {
+        // The page was left or reset while the attempt was being undone: nothing starts again.
+        if (mine !== call.epoch) return;
         if (number < attemptsMax) attempt(number + 1);
         else fail("attempts");
       });
@@ -434,6 +353,13 @@
     forget();
     abandon();
     app.go("failed", { failure: reason, media: "none", say: "say_failed_" + reason });
+  }
+
+  // The SDK file is refused: the page says the call is not available in it, at once.
+  function unavailable() {
+    forget();
+    abandon();
+    app.go("unavailable", { media: "none", say: "" });
   }
 
   // The call is over, by the participant's own leaving ("left") or the meeting's end ("ended").
@@ -449,7 +375,7 @@
       choice.cameraId = picked.cameraId;
       choice.microphoneId = picked.microphoneId;
     }
-    app.go("connecting", {
+    var moved = app.go("connecting", {
       attempt: 1,
       failure: "",
       media: "none",
@@ -458,7 +384,7 @@
       live: picked ? { camera: picked.camera, microphone: picked.microphone } : app.state.live,
       say: "say_connecting",
     });
-    attempt(1);
+    if (moved) attempt(1);
   }
 
   function again() {
@@ -493,6 +419,8 @@
     again: again,
     leave: leave,
     hangUp: hangUp,
-    setLive: setLive,
+    setLive: function (kind, on) {
+      return app.callMedia.setLive(kind, on);
+    },
   };
 })();

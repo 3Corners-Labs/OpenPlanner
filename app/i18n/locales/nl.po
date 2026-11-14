@@ -14103,3 +14103,6 @@ msgstr "Uw {agent} heeft de camera uitgezet."
 
 msgid "callpage.say.sound_blocked"
 msgstr "Uw browser heeft het geluid geblokkeerd. Gebruik de knop om de andere persoon te horen."
+
+msgid "callpage.say.device_kept"
+msgstr "Het staat uit voor de ander, maar uw browser kan het apparaat nog als in gebruik tonen."

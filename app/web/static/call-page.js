@@ -92,7 +92,7 @@
   var ALLOWED = {
     start: ["check", "unavailable"],
     check: ["connecting", "unavailable"],
-    connecting: ["lobby", "call", "failed", "left", "ended"],
+    connecting: ["lobby", "call", "failed", "unavailable", "left", "ended"],
     lobby: ["call", "failed", "left", "ended"],
     call: ["failed", "left", "ended"],
     failed: ["connecting"],
@@ -156,7 +156,7 @@
     if (sentence !== undefined) say(sentence);
     var target = null;
     if (focus === "denied") {
-      target = $('[data-call-denied="' + deniedKind() + '"] h2');
+      target = $('[data-call-denied="' + app.deniedKind(state.refused) + '"] h2');
     } else if (focus === "state" || (changed && focus === undefined)) {
       target = $('[data-call-state="' + screen + '"] h1');
     }
@@ -176,10 +176,11 @@
     say("");
   }
 
-  function deniedKind() {
-    if (state.refused.length === 2) return "both";
-    return state.refused.length === 1 ? state.refused[0] : "";
-  }
+  // Which panel of a refused permission is shown: one kind, both, or none.
+  app.deniedKind = function (refused) {
+    if (refused.length === 2) return "both";
+    return refused.length === 1 ? refused[0] : "";
+  };
 
   function joinLabel() {
     var absent = state.refused.concat(state.missing);
@@ -199,7 +200,7 @@
     var screen = state.screen;
     var checking = screen === "check";
     var inCall = screen === "lobby" || screen === "call";
-    var denied = deniedKind();
+    var denied = app.deniedKind(state.refused);
     $$("[data-call-state]").forEach(function (section) {
       section.hidden = section.dataset.callState !== screen;
     });
@@ -270,9 +271,14 @@
 
   // The other side's picture and sound play. A browser that refuses (it wants a tap first) is
   // answered with a button and one message; the button calls this again.
-  var playing = false; // one try at a time: two answers must not both say that the sound is blocked
+  var playing = false; // one try at a time; a stream that comes meanwhile is tried after it
+  var again = false;
   function playRemote() {
-    if (playing || state.screen !== "call") return Promise.resolve();
+    if (state.screen !== "call") return Promise.resolve();
+    if (playing) {
+      again = true;
+      return Promise.resolve();
+    }
     playing = true;
     var plays = [remoteAudio, remoteVideo].map(function (element) {
       if (!element.srcObject) return Promise.resolve(true);
@@ -288,8 +294,13 @@
     return Promise.all(plays).then(function (played) {
       playing = false;
       var blocked = played.indexOf(false) !== -1;
-      if (state.screen !== "call" || blocked === state.soundBlocked) return;
-      go("call", blocked ? { soundBlocked: true, say: "say_sound_blocked" } : { soundBlocked: false });
+      // Said once per blocked start; when the button goes, focus goes to the heading, not nowhere.
+      if (state.screen === "call" && blocked !== state.soundBlocked) {
+        go("call", blocked ? { soundBlocked: true, say: "say_sound_blocked" } : { soundBlocked: false, focus: "state" });
+      }
+      if (!again) return;
+      again = false;
+      return playRemote();
     });
   }
   app.playRemote = playRemote;

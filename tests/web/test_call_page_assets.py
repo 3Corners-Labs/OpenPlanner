@@ -14,8 +14,8 @@ from pathlib import Path
 from app.i18n import CATALOGUE_DIR, load_catalogues
 
 STATIC = Path("app/web/static")
-SCRIPT_FILES = ("call-devices.js", "call-connection.js", "call-page.js")
-"""In the order the page loads them: the two that only define, then the page that starts them."""
+SCRIPT_FILES = ("call-devices.js", "call-connection.js", "call-media.js", "call-page.js")
+"""In the order the page loads them: the three that only define, then the page that starts them."""
 SOURCES = {name: (STATIC / name).read_text() for name in SCRIPT_FILES}
 SCRIPT = "\n".join(SOURCES.values())
 STYLES = (STATIC / "call-page.css").read_text()
@@ -62,9 +62,7 @@ def test_each_script_has_a_header_and_stays_under_500_lines() -> None:
         assert "Never:" in header, name
 
 
-def test_the_page_loads_the_three_scripts_in_the_order_that_lets_the_last_start_the_others() -> (
-    None
-):
+def test_the_page_loads_the_scripts_in_the_order_that_lets_the_last_start_the_others() -> None:
     order = re.findall(r"static_url\('(call-[a-z]+\.js)'\)", TEMPLATE)
 
     assert order == list(SCRIPT_FILES)
@@ -137,15 +135,14 @@ def test_neither_the_template_nor_the_styles_name_the_supplier() -> None:
 
 def test_the_script_names_the_supplier_only_as_the_one_global_the_sdk_file_defines() -> None:
     # Code, not a text: the SDK file puts one object on the window and the script must reach it.
-    # No comment, string or identifier besides that one line says the supplier's name.
-    found = {
-        (name, line.strip())
+    # The name occurs once, in call-connection.js, and nowhere else; no other supplier word does.
+    counts = {
+        (name, word): source.lower().count(word)
         for name, source in SOURCES.items()
-        for line in source.splitlines()
-        if any(n in line.lower() for n in SUPPLIER)
+        for word in SUPPLIER
     }
 
-    assert found == {("call-connection.js", "return window.Webex;")}
+    assert {key: n for key, n in counts.items() if n} == {("call-connection.js", "webex"): 1}
 
 
 def test_no_text_of_the_page_names_the_supplier_in_any_locale() -> None:
