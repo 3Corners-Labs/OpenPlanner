@@ -32,7 +32,8 @@
 #                      mode (--idp bundled): the realm is rendered with generated secrets
 #                      (scripts/render-keycloak-realm.sh), the proxy serves it under /idp, and its
 #                      mail server is set at the first start. --idp own asks for the login of
-#                      your own provider, as before. Production runs Keycloak in production
+#                      your own provider, as before, and removes the bundled login a host had
+#                      (secrets/keycloak-app.env, ADR 0125). Production runs Keycloak in production
 #                      mode on its own PostgreSQL container (idp-db, ADR 0106 point 4), and a
 #                      host that already has a login in .env keeps it
 #   4. .env.update     pull <image>:<version> -> digest -> cosign verify -> pin digest, profiles
@@ -726,7 +727,10 @@ settings() {
 # (secrets/keycloak-app.env: the directory and the login) are rendered from the public address
 # with generated secrets; a changed public address replaces the one the earlier run kept.
 render_idp() {
-  [[ $IDP == bundled ]] || return 0
+  if [[ $IDP != bundled ]]; then
+    retire_bundled_login
+    return 0
+  fi
   local address database=h2 kept=$DIR/secrets/keycloak.env
   # Production: Keycloak's production mode on its own PostgreSQL (ADR 0106 point 4).
   [[ $MODE != production ]] || database=postgres
@@ -739,6 +743,17 @@ render_idp() {
   "$BASH" "$DIR/scripts/render-keycloak-realm.sh" --dir "$DIR" --database "$database" || die "the realm could not be rendered"
   ((TLS)) || warn "the bundled identity provider without the HTTPS proxy answers on this host only (127.0.0.1:8080); logging in from another machine needs --tls-domain"
   log "first password of the portal user 'super': KC_SUPER_PASSWORD in $kept (changed at the first login)"
+}
+
+# ADR 0125 point 6: a host that leaves the bundled provider (--idp own) drops the application's
+# half of it. Compose reads secrets/keycloak-app.env after .env, so its login and directory would
+# override the ones the operator chose. Nothing is lost: the render script writes the file again
+# from secrets/keycloak.env when the host returns to --idp bundled.
+retire_bundled_login() {
+  local app_env=$DIR/secrets/keycloak-app.env
+  [[ -f $app_env ]] || return 0
+  rm -f "$app_env"
+  log "removed secrets/keycloak-app.env: with --idp own the login comes from .env (the bundled realm and its secrets stay in secrets/keycloak.env)"
 }
 
 # ADR 0064: the proxy's own file. ACME by default; --own-certificate names the files in certs/.

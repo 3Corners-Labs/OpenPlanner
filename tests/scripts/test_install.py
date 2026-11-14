@@ -1,6 +1,7 @@
 """The host installer (docs/install.md), run against fake docker, cosign, curl, sudo and systemd."""
 
 import json
+import os
 import re
 import shutil
 import stat
@@ -1065,25 +1066,55 @@ def test_production_runs_the_bundled_keycloak_on_its_own_database(host: Host) ->
     assert host.settings(".env")["ADMIN_MFA_REQUIRED"] == "true"
 
 
-def test_web_and_worker_start_on_what_a_production_install_with_the_bundled_keycloak_wrote(
-    host: Host,
-) -> None:
-    """ADR 0125: the login is the bundled provider's internal hop, which production accepts.
+def _container_settings(host: Host, monkeypatch: pytest.MonkeyPatch) -> Settings:
+    """Build the settings web and worker would start with on this host.
 
-    The fake compose never runs the image, so the start-up check is run here on the env files
-    the containers read, in the order ``docker-compose.yml`` lists them (a later file wins).
+    The fake compose never runs the image, so the start-up check runs here: on the env files
+    the containers read, in the order ``docker-compose.yml`` lists them (a later file wins),
+    and on nothing from the environment of the test run itself.
     """
-    _production_bundled(host)
-
+    for name in list(os.environ):
+        if name.lower().removesuffix("_file") in Settings.model_fields:
+            monkeypatch.delenv(name)
     values: dict[str, str] = {}
     for entry in yaml.safe_load((REPO / "docker-compose.yml").read_text())["x-app"]["env_file"]:
         if host.file(entry["path"]).is_file():
             values |= host.settings(entry["path"])
-    settings = Settings(**{key.lower(): value for key, value in values.items()})
+    return Settings(**{key.lower(): value for key, value in values.items()})
+
+
+def test_web_and_worker_start_on_what_a_production_install_with_the_bundled_keycloak_wrote(
+    host: Host, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR 0125: the login is the bundled provider's internal hop, which production accepts."""
+    _production_bundled(host)
+
+    settings = _container_settings(host, monkeypatch)
 
     assert settings.environment == "prod"
     assert settings.oidc_discovery_url == BUNDLED_IDP_DISCOVERY_URL
     assert settings.oidc_issuer == "https://afspraak.example.nl/idp/realms/openplanner"
+    assert settings.production_problems() == []
+
+
+def test_a_host_that_leaves_the_bundled_keycloak_logs_in_with_its_own_provider(
+    host: Host, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR 0125 point 6: the rendered login, read after .env, must not outvote the own one."""
+    _production_bundled(host)
+    own = {key: PRODUCTION[key] for key in ("OIDC_DISCOVERY_URL", "OIDC_CLIENT_SECRET")}
+    with host.file(".env").open("a") as env:
+        env.writelines(f"{key}='{value}'\n" for key, value in own.items())
+
+    result = host.run("--idp", "own", "--non-interactive")
+
+    assert result.returncode == 0, result.stderr
+    assert not host.file("secrets/keycloak-app.env").exists()
+    assert host.file("secrets/keycloak.env").is_file()  # the way back to --idp bundled
+    assert "removed secrets/keycloak-app.env" in result.stderr + result.stdout
+    settings = _container_settings(host, monkeypatch)
+    assert settings.oidc_discovery_url == own["OIDC_DISCOVERY_URL"]
+    assert settings.keycloak_admin_url is None
     assert settings.production_problems() == []
 
 

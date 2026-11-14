@@ -642,7 +642,10 @@ In production also set `SESSION_SECRET` (at least 32 random bytes); the image re
 without it, and with an `http` discovery URL or without `OIDC_CLIENT_SECRET` (ADR 0013). The one
 http discovery URL production accepts is the bundled identity provider's internal address,
 `http://idp:8080/idp/realms/openplanner/...` with an https `OIDC_ISSUER`, as
-`scripts/render-keycloak-realm.sh` writes it (a recorded exception, ADR 0125).
+`scripts/render-keycloak-realm.sh` writes it (a recorded exception, ADR 0125). A host that
+leaves the bundled provider runs the installer with `--idp own`, which deletes
+`secrets/keycloak-app.env`: Compose reads that file after `.env`, so its login would otherwise
+win over yours.
 
 In PingFederate, create an OIDC client:
 

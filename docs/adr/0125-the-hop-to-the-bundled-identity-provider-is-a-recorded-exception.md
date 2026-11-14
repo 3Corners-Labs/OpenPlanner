@@ -1,10 +1,10 @@
 # 0125. The hop from web and worker to the bundled identity provider is a recorded exception
 
-Status: accepted (2026-11-14), found while documenting the application architecture: a
-production installation with the installer's default identity provider refuses to start.
-Amends ADR 0091 point 2 (a second recorded exception) and brings the start-up check in line
-with ADR 0112 point 4 and ADR 0106 points 1 and 4. Built in the pull request that adds it; see
-*Build status*.
+Status: accepted, partly built (2026-11-14), found while documenting the application
+architecture: a production installation with the installer's default identity provider refuses
+to start. Amends ADR 0091 point 2 (a second recorded exception) and brings the start-up check in
+line with ADR 0112 point 4 and ADR 0106 points 1 and 4. Step 1 is built in the pull request that
+adds it; step 2 (a fixed address, point 5) is planned; see *Build status*.
 
 ## Context
 
@@ -32,8 +32,21 @@ ADR 0091 says that every hop that carries personal data is encrypted, or a recor
 exception, and point 2 records one: the bundled proxy to web on one host. The hop to the
 bundled provider carries the client secret, the authorisation code and the ID token with a
 staff member's name and e-mail address; the staff directory (`KEYCLOAK_ADMIN_URL`, ADR 0095)
-takes the same hop with the staff list. ADR 0112 built that hop but did not record it, and
-`docs/dataflow.md` still says that production refuses an http discovery URL.
+takes the same hop with the staff list and its own client secret. ADR 0112 built that hop but
+did not record it, and `docs/dataflow.md` still says that production refuses an http discovery
+URL.
+
+**The name `idp` is not pinned.** Docker's own resolver answers `idp` only while the container
+is attached to the network. When it is not (stopped, being recreated, or held back by an
+unhealthy `idp-db`), Docker passes the name to the host's resolver, which may complete it with
+the host's search domains. Whatever answers there receives the plain-HTTP requests meant for the
+provider. Because the key set is fetched from the same name, an impostor can sign an ID token
+that carries the pinned issuer (a public string) and any roles, and so log in as a superuser;
+it also receives the platform's client secret and the staff directory's secret, and once the
+cached metadata expires (an hour) browsers are sent to the authorisation endpoint it names. The
+proxy's `/idp` route (`IDP_UPSTREAM=idp:8080`) resolves the same name, in every mode, and test
+and lab installations have used this login since ADR 0112; production was spared only because
+it did not start.
 
 Two other ways out were weighed:
 
@@ -44,33 +57,47 @@ Two other ways out were weighed:
   internal authority of ADR 0112, is not in web's trust store. A login that works on one
   network and not on the next is worse than the exception, and it reverses ADR 0112 point 4.
 - **TLS on the internal hop**: Keycloak serving https on the compose network, with a second
-  certificate, its authority and its renewal, for a hop that never leaves the host.
+  certificate, its authority and its renewal, for a hop that is meant never to leave the host.
 
 ## Decision
 
 1. **The hop from web and worker to the bundled identity provider stays plain HTTP on one
    host, as a recorded exception** next to the one of ADR 0091 point 2, for the same reasons:
-   the compose network holds this installation's containers only, the hop never leaves the
-   host, and whoever can read that network has the host, with the secrets files and the
-   provider's database. It covers the back channel only: the login's discovery document,
-   token endpoint and key set, and the staff directory's admin API.
+   the compose network holds this installation's containers only, the hop is meant never to
+   leave the host, and whoever can read that network has the host, with the secrets files and
+   the provider's database. It covers the back channel only: the login's discovery document,
+   token endpoint and key set, and the staff directory's admin API. Point 5 makes "never leaves
+   the host" hold also while the container is down.
 2. **Keyed on the bundled provider, never on plain http as such.** In production the start-up
    check accepts an http `OIDC_DISCOVERY_URL` only when it is exactly the bundled provider's
    internal address behind the proxy,
    `http://idp:8080/idp/realms/openplanner/.well-known/openid-configuration` (the compose
    service on its fixed port, the `/idp` path ADR 0112 fixes, the realm of the template),
-   **and** `OIDC_ISSUER` is set and starts with `https://`. The issuer is the address the
-   browser is sent to, where the password and the one-time code travel, so the exception never
-   reaches the browser's hop. Every other http discovery URL, and this one with an http or a
-   derived issuer, is refused as before. The rule is `bundled_idp_hop` in
-   `app/domain/web_transport.py`, beside the proxy hop of ADR 0091.
+   **and** `OIDC_ISSUER` is set and starts with `https://`. The genuine provider derives the
+   issuer and the endpoints it sends browsers to from one host name (`KC_HOSTNAME`), so with an
+   https issuer the password and the one-time code travel over https. Every other http
+   discovery URL, and this one with an http or a derived issuer, is refused as before. The rule
+   is `bundled_idp_hop` in `app/domain/web_transport.py`, beside the proxy hop of ADR 0091.
 3. **The pinned issuer stays as ADR 0097 decided.** The discovery document and every ID token
    must carry `OIDC_ISSUER` exactly. Because the exception requires `OIDC_ISSUER`, the issuer
    of the bundled login is never derived from the internal address.
 4. **Recorded where the first exception is**: the outbound connections of `docs/dataflow.md`
-   (with the staff directory's row, which was missing), `docs/threat-model.md`, the runbook,
-   and the text of `oidc_incomplete` on System status. `oidc-check` already reports the
-   internal back channel as expected (ADR 0112).
+   (with the staff directory's row, which was missing), `docs/threat-model.md`, `docs/asvs.md`
+   (V12.3.3), the runbook, and the text of `oidc_incomplete` on System status. `oidc-check`
+   already reports the internal back channel as expected (ADR 0112).
+5. **The provider is reached at a fixed address, never through a name the host could answer.**
+   The bundled provider gets a fixed address on an internal network that web, worker and the
+   proxy share, as the proxy has on `edge` (ADR 0091 point 2). The rendered login, the staff
+   directory, the exception of point 2 and the proxy's route use that address, the installer
+   moves an existing host over, and a check on a real Docker host (`scripts/check-proxy.sh`)
+   shows that the hop fails closed while the container is down. Until this is built, the risk
+   in the Context holds in production too; a production host that does not accept it runs
+   `--idp own`.
+6. **Leaving the bundled provider removes its login.** With `--idp own` the installer deletes
+   `secrets/keycloak-app.env`: Compose reads it after `.env`, so its login and directory would
+   otherwise override the ones the operator chose, now that production accepts that login.
+   Nothing is lost: the render script writes the file again from `secrets/keycloak.env` when
+   the host returns to `--idp bundled`.
 
 ## Settings
 
@@ -84,20 +111,18 @@ want the hop chooses `--idp own`.
 | Step | What | PR | State |
 |---|---|---|---|
 | 0 | ADR | #833 | merged |
-| 1 | `bundled_idp_hop` in the start-up check; the files a production install writes tested against it (`tests/scripts/test_install.py`), the render script tied to the same address; data flow, threat model, runbook and the System status text (nl, en) | #833 | merged |
+| 1 | `bundled_idp_hop` in the start-up check; the files a production install writes tested against it (`tests/scripts/test_install.py`), the render script tied to the same address; `--idp own` deletes `secrets/keycloak-app.env` (point 6); data flow, threat model, ASVS, runbook and the System status text (nl, en) | #833 | merged |
+| 2 | A fixed address for the bundled provider, used by the login, the staff directory, the exception and the proxy route; the installer moves a host over; the real-Docker check (point 5) | | planned |
 
 ## Consequences
 
-- A production installation with the installer's default starts; one with `--idp own` is
-  unchanged.
+- A production installation with the installer's default starts. One with `--idp own` keeps
+  its own login, also when it ran the bundled provider before.
 - A test or lab installation with the bundled provider behind the proxy no longer lists
   `oidc_incomplete` on System status, because production would accept it.
-- The exception assumes that the name `idp` is this installation's compose service. While that
-  container is down, Docker passes the name to the host's resolver, which may complete it with
-  the host's search domains. The login then fails on the discovery document or on the pinned
-  issuer, unless someone controls that name in the host's DNS. The same was already true for
-  test and lab installations and for the staff directory in every mode; closing it (for
-  example by checking that the name resolves on the compose network) is not part of this
-  decision.
+- Until step 2, production carries the risk in the Context: while the `idp` container is down,
+  whoever answers for that name through the host's resolver can log in as a superuser. The
+  product owner weighs that against production not starting at all with the default.
 - `KEYCLOAK_ADMIN_URL` is still not checked at start-up: the staff directory exists only for
-  the bundled provider (ADR 0095), and the render script writes its internal address.
+  the bundled provider (ADR 0095), and the render script writes its internal address. Step 2
+  moves it to the fixed address with the login.

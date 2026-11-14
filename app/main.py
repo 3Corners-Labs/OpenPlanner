@@ -160,6 +160,7 @@ from app.domain.usage_report_service import UsageReportService
 from app.domain.wallboard_link import parse_networks
 from app.domain.wallboard_link_service import WallboardLinkService
 from app.domain.wallboard_service import WallboardService
+from app.domain.web_transport import BUNDLED_REALM_PATH
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
 from app.keys import (
@@ -238,10 +239,6 @@ def _change_policy(settings: Settings) -> ChangePolicy:
 def _keycloak_directory(settings: Settings) -> StaffDirectory | None:
     """Return the staff directory of the bundled Keycloak, or ``None`` without its settings."""
     return directory_from_settings(settings)
-
-
-BUNDLED_REALM_PATH = "/realms/openplanner/"
-"""Where the bundled provider's realm sits in its discovery URL (ADR 0090, the realm template)."""
 
 
 def _directory_missing(settings: Settings) -> tuple[str, ...]:
