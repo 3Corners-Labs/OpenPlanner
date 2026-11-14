@@ -41,6 +41,11 @@ judge only whether the change uses them the way the rest of the code does.
 
 ## Checks
 
+0. **Unused code.** Does the change leave a function, class, constant, setting or template
+   without a caller or registration? Check with `graphify_callers` and a text search by name.
+   Name it and ask for its deletion with its tests (ADR 0127). `make deadcode` already fails on
+   the certain cases; this is the rest.
+
 To find an existing home or a near-copy, ask the Graphify MCP first (`graphify_find`,
 `query_graph`, `graphify_callers`); it describes the indexed commit, so read the file for
 anything changed in this scope.

@@ -61,6 +61,8 @@ jobs:
         run: make lint
       - name: shellcheck (host scripts, updater)
         run: make shellcheck
+      - name: dead code (vulture, ADR 0127)
+        run: make deadcode
       - name: mypy --strict
         run: make type
       - name: import-linter

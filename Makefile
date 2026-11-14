@@ -1,4 +1,4 @@
-.PHONY: setup fast check matrix pins fmt lint shellcheck type imports test security audit lock licenses migrations semgrep duplication mutation release-plan release-audit e2e proxy-check diagrams site up down
+.PHONY: setup fast check matrix pins fmt lint shellcheck deadcode type imports test security audit lock licenses migrations semgrep duplication mutation release-plan release-audit e2e proxy-check diagrams site up down
 
 UV := uv run
 
@@ -15,7 +15,7 @@ setup:
 
 # ADR 0058: `fast` is the pull request's fast lane, for trying an idea; `check` is everything the
 # merge queue runs that can run without Docker, so run it before asking for review.
-fast: lint shellcheck type imports test security ## The fast lane: about two minutes
+fast: lint shellcheck deadcode type imports test security ## The fast lane: about two minutes
 check: fast matrix audit lock pins duplication ## Everything a PR must pass locally
 
 fmt:
@@ -38,6 +38,13 @@ SHELLCHECK_VERSION := 0.11.0.1
 shellcheck:
 	set -- .claude/skills/*/scripts/*.sh; [ -e "$$1" ] || [ -L "$$1" ] || set --; \
 	uvx --from shellcheck-py==$(SHELLCHECK_VERSION) shellcheck scripts/*.sh scripts/updater/*.sh deploy/proxy/*.sh .githooks/* "$$@"
+
+# ADR 0127: no unused code in app/. vulture runs from PyPI like shellcheck, pinned, never installed
+# in the project; its settings are [tool.vulture] in pyproject.toml.
+# renovate: datasource=pypi depName=vulture
+VULTURE_VERSION := 2.14
+deadcode:
+	uvx --from vulture==$(VULTURE_VERSION) vulture
 
 type:
 	$(UV) mypy

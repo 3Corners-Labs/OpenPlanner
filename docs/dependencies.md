@@ -67,7 +67,7 @@ adds no Python package.
 All kept current by Renovate (ADR 0051): GitHub Actions pinned by SHA, tool versions with a
 `# renovate:` line. renovate (AGPL-3.0) runs only as `renovate-config-validator` through `npx`
 in `make pins` and as the hosted Renovate app; it is never installed in the project or the
-image. jscpd (MIT), shellcheck (GPL-3.0, run as a separate binary through `shellcheck-py` (MIT) and
+image. jscpd (MIT), vulture (MIT, run through `uvx` from `make deadcode`, never installed; ADR 0127), shellcheck (GPL-3.0, run as a separate binary through `shellcheck-py` (MIT) and
 `uvx`, never linked),
 gitleaks (MIT), semgrep (LGPL-2.1, CI container) likewise. publiccode-parser
 (`publiccodeyml/libpubliccode`, EUPL-1.2, CI container) validates `publiccode.yml` (ADR 0054); it
