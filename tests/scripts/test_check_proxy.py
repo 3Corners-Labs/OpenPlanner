@@ -149,6 +149,7 @@ def test_an_impostor_is_reached_by_name_before_any_refusal_counts() -> None:
     """The control runs inside ``impostor``, so no refusal can come before it."""
     body = _body("impostor")
 
+    assert body.index("[ $# -gt 0 ] || fail") < body.index('for client in "$@"')
     assert body.index('for client in "$@"') < body.index('requests "$impostor_name" >')
     assert 'fetch "$client" "$impostor_url"' in body
     assert "a refusal would prove nothing" in body

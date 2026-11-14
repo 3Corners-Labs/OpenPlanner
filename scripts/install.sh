@@ -406,10 +406,27 @@ write_private() {
   mv "$tmp" "$target"
 }
 
+# filter_private FILE COMMAND...: replace FILE, mode 600, with what `COMMAND... FILE` prints. The
+# file is replaced only when the command succeeded, so a filter that cannot read it (a file left
+# to root by a render under sudo) never empties it; status 1 then, with FILE as it was.
+filter_private() {
+  local target=$1 tmp
+  shift
+  tmp=$(mktemp "$target.XXXXXX")
+  chmod 600 "$tmp"
+  if "$@" "$target" >"$tmp"; then
+    mv "$tmp" "$target"
+  else
+    rm -f "$tmp"
+    return 1
+  fi
+}
+
 # drop_lines FILE PATTERN: rewrite FILE without the lines that match the extended regular
-# expression PATTERN, mode 600 like every file write_private writes; the run stops if that fails.
+# expression PATTERN (filter_private); the run stops if that fails, with FILE as it was.
 drop_lines() {
-  { grep -Ev -- "$2" "$1" || [[ $? == 1 ]]; } | write_private "$1" || die "could not rewrite $1"
+  # shellcheck disable=SC2016 # an awk program
+  filter_private "$1" awk -v pattern="$2" '$0 !~ pattern' || die "could not rewrite $1"
 }
 
 # public_address HINT DEFAULT: with the HTTPS proxy the address follows the host name.
@@ -501,7 +518,7 @@ rewrite_env() {
   local backup
   backup=$ENV_FILE.bak.$(date -u +%Y%m%dT%H%M%SZ)
   [[ -f $backup ]] || { cp "$ENV_FILE" "$backup" && chmod 600 "$backup"; }
-  awk "$@" "$ENV_FILE" | write_private "$ENV_FILE"
+  filter_private "$ENV_FILE" awk "$@" || die "could not rewrite $ENV_FILE; it is as it was (backup: $backup)"
   printf '%s' "$backup"
 }
 

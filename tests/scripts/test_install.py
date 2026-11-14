@@ -1229,6 +1229,25 @@ def test_a_refused_secret_change_stops_the_run_and_the_next_run_sets_the_same_pa
     assert not host.file(MARK).exists()
 
 
+def test_a_file_the_installer_cannot_read_is_never_emptied(host: Host) -> None:
+    """Dropping lines replaces a file only when it was read: the secrets in it must survive."""
+    _production_bundled(host)
+    kept = host.file("secrets/keycloak.env")
+    before = kept.read_text()
+    _as_before_adr_0125_step_2(host)
+    unpinned = kept.read_text()
+    assert unpinned != before
+    kept.chmod(0)
+    try:
+        result = host.run("--non-interactive")
+    finally:
+        kept.chmod(0o600)
+
+    assert result.returncode == 1
+    assert f"could not rewrite {kept}" in result.stderr
+    assert kept.read_text() == unpinned  # not empty, not half written
+
+
 def test_a_rerun_on_the_fixed_address_keeps_the_client_secrets(host: Host) -> None:
     _production_bundled(host)
     before = _secrets(host)

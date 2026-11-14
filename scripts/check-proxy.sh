@@ -363,6 +363,7 @@ impostor() { # impostor NAME NETWORK PORT CLIENT...: stop container NAME, let an
     --network-alias "$1" -v "$certs:/pebble:ro" --entrypoint python "$image" \
     -I /pebble/responder.py "impostor $1" "$3" >/dev/null
   shift 3
+  [ $# -gt 0 ] || fail "impostor $impostor_name names no client, so nothing would prove the name first"
   for client in "$@"; do
     tries=0
     until [ "$(fetch "$client" "$impostor_url" 2>/dev/null)" = "impostor $impostor_name" ]; do
