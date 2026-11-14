@@ -103,6 +103,9 @@ def test_the_hops_name_those_addresses_wherever_they_are_written_adr_0125() -> N
     """The compose file, the installer, the render script, the proxy and the start-up check."""
     web, idp = fixed_address("web", "edge"), fixed_address("idp", "edge")
     database = fixed_address("idp-db", "idp-store")
+    shell = dict(
+        re.findall(r"^(\w+)=(\S+)$", (REPO / "scripts/fixed-addresses.sh").read_text(), re.M)
+    )
     install = (REPO / "scripts/install.sh").read_text()
     render = (REPO / "scripts/render-keycloak-realm.sh").read_text()
     caddyfile = (REPO / "deploy/proxy/Caddyfile").read_text()
@@ -110,11 +113,13 @@ def test_the_hops_name_those_addresses_wherever_they_are_written_adr_0125() -> N
     assert SERVICES["proxy"]["environment"]["WEB_UPSTREAM"] == f"{web}:8000"
     assert "reverse_proxy {$WEB_UPSTREAM}" in caddyfile
     assert not re.search(r"reverse_proxy [A-Za-z]", caddyfile)  # no route to a name
-    assert BUNDLED_IDP_ADDRESS == str(idp)
-    assert BUNDLED_IDP_UPSTREAM == f"{idp}:8080"
-    assert re.search(rf"^BUNDLED_IDP_UPSTREAM={re.escape(BUNDLED_IDP_UPSTREAM)}$", install, re.M)
-    assert re.search(rf"^IDP_ADDRESS={re.escape(str(idp))}$", render, re.MULTILINE)
-    assert re.search(rf"^IDP_DB_ADDRESS={re.escape(str(database))}$", render, re.MULTILINE)
+    assert BUNDLED_IDP_ADDRESS == shell["BUNDLED_IDP_ADDRESS"] == str(idp)
+    assert BUNDLED_IDP_UPSTREAM == f"{idp}:{shell['BUNDLED_IDP_PORT']}"
+    assert shell["BUNDLED_IDP_DB_ADDRESS"] == str(database)
+    # The shell scripts read the file; none spells an address or a name of its own.
+    for script in (install, render):
+        assert "fixed-addresses.sh" in script
+        assert "172.31.240." not in script
     assert not re.search(r"//idp:|idp-db:|IDP_UPSTREAM=idp", install + render)
 
 

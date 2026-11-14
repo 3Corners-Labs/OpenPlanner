@@ -349,24 +349,33 @@ proxied() { # proxied PATH: the body of a request through the proxy, a space, it
   curl -sk $resolve -w ' %{http_code}' "https://booking.test:18443$1"
 }
 
-impostor() { # impostor NAME NETWORK PORT: stop container NAME; another answers NAME on NETWORK
-  # Without the image's own health check, which asks 127.0.0.1:8000 and would count as a request.
+requests() { # requests NAME: how many requests the impostor for NAME has answered
+  docker logs "$project-impostor-$1" 2>/dev/null | grep -c '^request$' || true
+}
+
+impostor() { # impostor NAME NETWORK PORT CLIENT...: stop container NAME, let another answer NAME
+  # on NETWORK as this host's DNS could, and make each CLIENT reach it by that name first (the
+  # control: with nobody answering, a refusal would prove nothing). What it answered so far is
+  # kept for `untouched`. Without the image's own health check, which asks 127.0.0.1:8000.
+  impostor_name=$1 impostor_url="http://$1:$3/"
   docker stop "$(compose ps -q "$1")" >/dev/null
   docker run -d --rm --no-healthcheck --name "$project-impostor-$1" --network "${project}_$2" \
     --network-alias "$1" -v "$certs:/pebble:ro" --entrypoint python "$image" \
     -I /pebble/responder.py "impostor $1" "$3" >/dev/null
-}
-
-answers() { # answers SERVICE URL BODY: wait until SERVICE gets BODY from URL, the impostor's name
-  for _ in $(seq 1 15); do
-    [ "$(fetch "$1" "$2" 2>/dev/null)" = "$3" ] && return 0
-    sleep 1
+  shift 3
+  for client in "$@"; do
+    tries=0
+    until [ "$(fetch "$client" "$impostor_url" 2>/dev/null)" = "impostor $impostor_name" ]; do
+      tries=$((tries + 1))
+      [ "$tries" -lt 15 ] || fail "nothing answers $impostor_url for $client, so a refusal would prove nothing"
+      sleep 1
+    done
   done
-  fail "the impostor does not answer $2 for $1, so a refusal would prove nothing"
+  requests "$impostor_name" >"$certs/seen-$impostor_name"
 }
 
-requests() { # requests NAME: how many requests the impostor for NAME has answered
-  docker logs "$project-impostor-$1" 2>/dev/null | grep -c '^request$' || true
+untouched() { # untouched NAME: the impostor for NAME answered nothing since its controls
+  [ "$(requests "$1")" = "$(cat "$certs/seen-$1")" ] || fail "the impostor for $1 received a hop meant for $1"
 }
 
 # Pass 1: ACME against Pebble.
@@ -481,10 +490,11 @@ bash scripts/render-keycloak-realm.sh --dir "$render" --database postgres >/dev/
 login="$(sed -n 's/^OIDC_DISCOVERY_URL=//p' "$render/secrets/keycloak-app.env")"
 directory="$(sed -n 's/^KEYCLOAK_ADMIN_URL=//p' "$render/secrets/keycloak-app.env")"
 database="http://$(sed -n 's/^KC_DB_URL_HOST=//p' "$render/secrets/keycloak.env"):5432/"
-PROXY_IDP_UPSTREAM="$(sed -n 's/^BUNDLED_IDP_UPSTREAM=//p' scripts/install.sh)"
-export PROXY_IDP_UPSTREAM
-[ -n "$login" ] && [ -n "$directory" ] && [ -n "$PROXY_IDP_UPSTREAM" ] \
-  || fail "the render script or the installer named no address"
+# The route the installer writes: the address both share (scripts/fixed-addresses.sh).
+# shellcheck source=scripts/fixed-addresses.sh
+. scripts/fixed-addresses.sh
+export PROXY_IDP_UPSTREAM="$BUNDLED_IDP_ADDRESS:$BUNDLED_IDP_PORT"
+[ -n "$login" ] && [ -n "$directory" ] || fail "the render script named no address"
 # The worker too: no other pass starts it, and it reads the staff directory.
 compose up -d --wait idp-db idp worker
 compose up -d --force-recreate --wait proxy
@@ -500,27 +510,20 @@ idp_path=/idp/realms/openplanner/.well-known/openid-configuration
 [ "$(proxied "$idp_path")" = "stand-in idp 200" ] || fail "/idp does not reach $PROXY_IDP_UPSTREAM"
 [ "$(status_of https://booking.test:18443/healthz)" = "200" ] || fail "the proxy does not reach web"
 
-impostor idp-db idp-store 5432
-answers idp http://idp-db:5432/ "impostor idp-db"
-seen="$(requests idp-db)"
+impostor idp-db idp-store 5432 idp
 [ "$(fetch idp "$database")" = "refused" ] || fail "Keycloak's database hop reached something while idp-db was down"
-[ "$(requests idp-db)" = "$seen" ] || fail "the impostor for idp-db received Keycloak's database hop"
+untouched idp-db
 
-impostor idp edge 8080
-answers web http://idp:8080/ "impostor idp"
-answers proxy http://idp:8080/ "impostor idp"
-seen="$(requests idp)"
+impostor idp edge 8080 web proxy
 [ "$(fetch web "$login")" = "refused" ] || fail "web's login reached something while idp was down"
 [ "$(fetch web "$directory")" = "refused" ] || fail "web's staff directory reached something while idp was down"
 [ "$(fetch worker "$directory")" = "refused" ] || fail "the worker's staff directory reached something while idp was down"
 [ "$(proxied "$idp_path")" = " 502" ] || fail "/idp answered while idp was down"
-[ "$(requests idp)" = "$seen" ] || fail "the impostor for idp received a hop meant for the identity provider"
+untouched idp
 
-impostor web edge 8000
-answers proxy http://web:8000/ "impostor web"
-seen="$(requests web)"
+impostor web edge 8000 proxy
 [ "$(proxied /healthz)" = " 502" ] || fail "the proxy reached something while web was down"
-[ "$(requests web)" = "$seen" ] || fail "the impostor for web received the proxy's route"
+untouched web
 
 for name in idp idp-db web; do docker rm -f "$project-impostor-$name" >/dev/null; done
 compose up -d --wait web idp-db idp

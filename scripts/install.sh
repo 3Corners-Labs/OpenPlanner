@@ -71,11 +71,11 @@ SECRETS_FILE=$DIR/secrets/secrets.env
 # The login from a configuration package (ADR 0089 point 8); Compose reads it before .env.
 CONFIG_ENV=$DIR/secrets/config.env
 # ADR 0125 step 2: the proxy reaches the bundled identity provider at its fixed address on the
-# edge network (docker-compose.yml), never by the name idp, which this host's DNS could answer
-# while the container is down. scripts/render-keycloak-realm.sh and app/domain/web_transport.py
-# hold the same address; a test keeps them equal.
-# not a pin: a fixed IPv4 address and port on the edge network, not a version
-BUNDLED_IDP_UPSTREAM=172.31.240.4:8080
+# edge network, never by the name idp, which this host's DNS could answer while the container is
+# down. The address lives in scripts/fixed-addresses.sh, with the render script's.
+# shellcheck source=scripts/fixed-addresses.sh
+. "$DIR/scripts/fixed-addresses.sh"
+BUNDLED_IDP_UPSTREAM=$BUNDLED_IDP_ADDRESS:$BUNDLED_IDP_PORT
 # Written once the bundled provider's old client secrets are dropped, removed once Keycloak has
 # the new ones (new_client_secrets, idp_client_secrets): a run that stops in between leaves it,
 # and the next run finishes the job with the same secrets instead of making a second pair.
@@ -404,6 +404,12 @@ write_private() {
   chmod 600 "$tmp"
   cat >"$tmp"
   mv "$tmp" "$target"
+}
+
+# drop_lines FILE PATTERN: rewrite FILE without the lines that match the extended regular
+# expression PATTERN, mode 600 like every file write_private writes; the run stops if that fails.
+drop_lines() {
+  { grep -Ev -- "$2" "$1" || [[ $? == 1 ]]; } | write_private "$1" || die "could not rewrite $1"
 }
 
 # public_address HINT DEFAULT: with the HTTPS proxy the address follows the host name.
@@ -750,7 +756,7 @@ render_idp() {
   [[ $MODE != production ]] || database=postgres
   address=$(value "$ENV_FILE" PUBLIC_BASE_URL)
   if [[ -f $kept && -n $address && $(value "$kept" KC_OPENPLANNER_BASE_URL) != "${address%/}" ]]; then
-    sed -i.bak "/^KC_OPENPLANNER_BASE_URL=/d; /^KC_HOSTNAME=/d" "$kept" && rm -f "$kept.bak"
+    drop_lines "$kept" '^(KC_OPENPLANNER_BASE_URL|KC_HOSTNAME)='
   fi
   new_client_secrets "$kept"
   [[ -f $DIR/scripts/render-keycloak-realm.sh ]] || die "scripts/render-keycloak-realm.sh is missing from $DIR"
@@ -770,8 +776,7 @@ render_idp() {
 new_client_secrets() {
   local kept=$1
   [[ -f $kept && ! -f $ROTATION_MARK && $(value "$kept" KC_CLIENT_SECRETS_PINNED) != true ]] || return 0
-  { sed -i.bak '/^KC_OPENPLANNER_CLIENT_SECRET=/d; /^KC_DIRECTORY_CLIENT_SECRET=/d' "$kept" \
-    && rm -f "$kept.bak"; } || die "could not drop the old client secrets from $kept"
+  drop_lines "$kept" '^(KC_OPENPLANNER_CLIENT_SECRET|KC_DIRECTORY_CLIENT_SECRET)='
   : >"$ROTATION_MARK"
   log "replacing the bundled identity provider's two client secrets: they were in use while it was reached by the name idp, which this host's DNS could answer (ADR 0125)"
 }
@@ -819,18 +824,20 @@ proxy_settings() {
       fi
     } | write_private "$PROXY_ENV"
   fi
-  # ADR 0112: the proxy serves the bundled Keycloak under /idp, at its fixed address (ADR 0125
-  # step 2); a host whose route named something else, the name idp before step 2, is moved over.
-  # A host that leaves it (--idp own, ADR 0125 point 6) drops the route.
-  local upstream
+  # ADR 0112: with --idp bundled the proxy serves Keycloak under /idp, at its fixed address (ADR
+  # 0125 step 2): a route that names anything else, such as the name idp before that step, is
+  # replaced. With --idp own (ADR 0125 point 6) the route goes.
+  local wanted='' upstream
+  [[ $IDP != bundled ]] || wanted=$BUNDLED_IDP_UPSTREAM
   upstream=$(value "$PROXY_ENV" IDP_UPSTREAM)
-  if [[ $IDP == bundled && $upstream != "$BUNDLED_IDP_UPSTREAM" ]]; then
-    sed -i.bak '/^# The bundled identity provider, under \/idp/d; /^IDP_UPSTREAM=/d' "$PROXY_ENV" && rm -f "$PROXY_ENV.bak"
-    printf '# The bundled identity provider, under /idp on this host name (ADR 0112), at its fixed address (ADR 0125).\nIDP_UPSTREAM=%s\n' "$BUNDLED_IDP_UPSTREAM" >>"$PROXY_ENV"
-    [[ -z $upstream ]] || log "IDP_UPSTREAM in $PROXY_ENV: the bundled provider's fixed address $BUNDLED_IDP_UPSTREAM instead of $upstream (ADR 0125)"
-  elif [[ $IDP != bundled && -n $upstream ]]; then
-    sed -i.bak '/^# The bundled identity provider, under \/idp/d; /^IDP_UPSTREAM=/d' "$PROXY_ENV" && rm -f "$PROXY_ENV.bak"
-    log "removed IDP_UPSTREAM from $PROXY_ENV: with --idp own the proxy serves no /idp route"
+  if [[ $upstream != "$wanted" ]]; then
+    drop_lines "$PROXY_ENV" '^(# The bundled identity provider, under /idp|IDP_UPSTREAM=)'
+    if [[ -n $wanted ]]; then
+      printf '# The bundled identity provider, under /idp on this host name (ADR 0112), at its fixed address (ADR 0125).\nIDP_UPSTREAM=%s\n' "$wanted" >>"$PROXY_ENV"
+      [[ -z $upstream ]] || log "IDP_UPSTREAM in $PROXY_ENV: the bundled provider's fixed address $wanted instead of $upstream (ADR 0125)"
+    else
+      log "removed IDP_UPSTREAM from $PROXY_ENV: with --idp own the proxy serves no /idp route"
+    fi
   fi
   [[ -n $TLS_DOMAIN ]] || die "$PROXY_ENV needs TLS_DOMAIN"
   [[ -n $(value "$PROXY_ENV" ACME_EMAIL) || -n $(value "$PROXY_ENV" TLS_CERT_FILE) \

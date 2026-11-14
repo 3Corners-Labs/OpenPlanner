@@ -22,6 +22,18 @@ FORUM_MINIMUM_HSTS_SECONDS = 31536000
 """One year, the Forum Standaardisatie minimum the script asserts."""
 
 
+def _program(name: str) -> str:
+    """Return the Python program the script keeps in the shell variable ``NAME_code``."""
+    match = re.search(rf"^{name}_code='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
+    assert match, f"{name}_code is not in check-proxy.sh"
+    return match.group(1)
+
+
+@pytest.mark.parametrize("name", ["sniffer", "ipv6_client", "responder", "fetch"])
+def test_every_program_the_script_runs_in_a_container_compiles(name: str) -> None:
+    compile(_program(name), name, "exec")
+
+
 def _body(name: str) -> str:
     """Return the body of the shell function ``name``."""
     match = re.search(rf"^{name}\(\) \{{.*?^\}}$", SCRIPT, re.MULTILINE | re.DOTALL)
@@ -87,11 +99,8 @@ def test_every_pass_sends_a_forged_forwarded_header_and_looks_at_the_wire() -> N
 
 def test_the_sniffer_prints_only_the_forwarded_headers() -> None:
     """The wire is read for ``X-Forwarded-*`` lines and nothing else (no paths, no tokens)."""
-    match = re.search(r"^sniffer_code='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
-    assert match, "the sniffer program is not in the script"
-    code = match.group(1)
+    code = _program("sniffer")
 
-    compile(code, "sniffer", "exec")
     assert 'startswith(b"x-forwarded-")' in code
     assert "print(line" in code
 
@@ -111,9 +120,6 @@ def test_a_visitor_over_ipv6_must_reach_web_with_their_own_address() -> None:
     assert "enable_ip_masquerade=false" in SCRIPT
     overlay = (REPO / "deploy/proxy/compose.pebble.yml").read_text()
     assert '"[${PROBE6_ADDRESS:?set by scripts/check-proxy.sh}]:18444:8443"' in overlay
-    match = re.search(r"^ipv6_client_code='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
-    assert match, "the IPv6 client program is not in the script"
-    compile(match.group(1), "ipv6 client", "exec")
 
 
 def _pass_4() -> str:
@@ -123,38 +129,43 @@ def _pass_4() -> str:
 
 
 def test_pass_4_proves_the_addresses_a_host_gets_not_addresses_of_its_own() -> None:
-    """The login, directory and database host from the render script, the route from install.sh."""
+    """The login, directory and database host from the render script, the /idp route from the
+    address file the installer reads too."""
     text = _pass_4()
 
     assert "bash scripts/render-keycloak-realm.sh" in text
     assert "--database postgres" in text
     for key in ("OIDC_DISCOVERY_URL", "KEYCLOAK_ADMIN_URL", "KC_DB_URL_HOST"):
         assert f"s/^{key}=//p" in text
-    assert "s/^BUNDLED_IDP_UPSTREAM=//p' scripts/install.sh" in text
+    assert ". scripts/fixed-addresses.sh" in text
+    assert '. "$DIR/scripts/fixed-addresses.sh"' in (REPO / "scripts/install.sh").read_text()
     assert "172.31.240." not in text
     # Every hop answers while its container runs: a refusal later is then the container's absence.
     for hop in ('fetch web "$login"', 'fetch worker "$directory"', 'fetch idp "$database"'):
         assert text.index(hop) < text.index("impostor idp-db idp-store 5432")
 
 
-@pytest.mark.parametrize(
-    ("name", "control", "refusal"),
-    [
-        ("idp-db", "answers idp http://idp-db:5432/", '[ "$(fetch idp "$database")" = "refused" ]'),
-        ("idp", "answers web http://idp:8080/", '[ "$(fetch web "$login")" = "refused" ]'),
-        ("idp", "answers proxy http://idp:8080/", '[ "$(proxied "$idp_path")" = " 502" ]'),
-        ("web", "answers proxy http://web:8000/", '[ "$(proxied /healthz)" = " 502" ]'),
-    ],
-)
-def test_a_hop_fails_closed_only_after_an_impostor_answers_its_name(
-    name: str, control: str, refusal: str
-) -> None:
-    """A control first: with nobody answering the name, a refusal would prove nothing."""
-    text = _pass_4()
-    started = text.index(f"impostor {name} ")
-    counted = text.index(f'[ "$(requests {name})" = "$seen" ]', started)
+def test_an_impostor_is_reached_by_name_before_any_refusal_counts() -> None:
+    """The control runs inside ``impostor``, so no refusal can come before it."""
+    body = _body("impostor")
 
-    assert started < text.index(control, started) < text.index(refusal, started) < counted
+    assert body.index('for client in "$@"') < body.index('requests "$impostor_name" >')
+    assert 'fetch "$client" "$impostor_url"' in body
+    assert "a refusal would prove nothing" in body
+
+
+def test_every_impostor_block_ends_with_untouched_for_the_same_name() -> None:
+    """What the impostor answered after its controls is a hop that followed the name."""
+    # A block runs from its `impostor` line to the first blank line.
+    starts = re.split(r"^(?=impostor )", _pass_4(), flags=re.MULTILINE)[1:]
+    blocks = [start.split("\n\n", 1)[0] for start in starts]
+
+    assert [block.split()[1] for block in blocks] == ["idp-db", "idp", "web"]
+    for block in blocks:
+        name = block.split()[1]
+        lines = block.strip().splitlines()
+        assert lines[-1] == f"untouched {name}", block
+        assert any('= "refused" ]' in line or '= " 502" ]' in line for line in lines[1:-1])
 
 
 def test_the_stand_ins_keep_where_docker_compose_puts_them() -> None:
@@ -167,10 +178,13 @@ def test_the_stand_ins_keep_where_docker_compose_puts_them() -> None:
         assert check[name].get("ports", []) == []
         assert base[name]["networks"]
     assert "/pebble/responder.py" in check["idp"]["command"]
-    match = re.search(r"^responder_code='(.*?)'$", SCRIPT, re.MULTILINE | re.DOTALL)
-    assert match, "the responder is not in the script"
-    compile(match.group(1), "responder", "exec")
-    assert 'print("request"' in match.group(1)  # one line per request, never what it carried
+
+
+def test_the_responder_prints_one_line_per_request_and_nothing_it_carried() -> None:
+    code = _program("responder")
+
+    assert 'print("request", flush=True)' in code
+    assert "def log_message" in code  # http.server's own access log, with paths, stays silent
 
 
 def test_the_impostors_are_removed_before_the_networks_they_hold() -> None:

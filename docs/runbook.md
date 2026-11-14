@@ -1027,7 +1027,9 @@ host goes to a fixed address, never to a name: the proxy reaches web at `172.31.
 (`IDP_UPSTREAM` in `proxy.env`); web and worker reach the provider's login and staff directory at
 that address (`secrets/keycloak-app.env`); Keycloak reaches its database at `172.31.240.18:5432`
 (`KC_DB_URL_HOST` in `secrets/keycloak.env`) on the internal network `idp-store`, which only
-`idp` and `idp-db` join. The addresses lie outside the range Docker hands out, so while a
+`idp` and `idp-db` join. The addresses are in `scripts/fixed-addresses.sh`, which the installer,
+the render script and `scripts/check-proxy.sh` read, and in `docker-compose.yml`; a test keeps
+them equal. They lie outside the range Docker hands out, so while a
 container is down its address stays free and its hop fails: logging in fails, `/idp` answers
 502, and so does the portal while web restarts. (Mailpit, a lab's mail catcher, keeps its name;
 it is never in production, ADR 0125 point 5.) Before this step the hops used the names `idp`,

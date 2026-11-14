@@ -105,6 +105,10 @@ container is down (ADR 0125 step 2; runbook, *Fixed addresses on the host*).
 - With an `AAAA` record: Docker Engine 27 or newer with `ip6tables` on (its default), so that
   visitors over IPv6 keep their address; the script warns otherwise (runbook, *Visitors over
   IPv6*). The host needs no IPv6 address for the rest; a kernel without IPv6 is fine too.
+- Two address ranges free on the host, for the containers' fixed addresses (ADR 0125):
+  `172.31.240.0/28` (the network `edge`) and `172.31.240.16/28` (`idp-store`, between the
+  bundled identity provider and its database), and `fdf2:d3f5:96ab::/64` for `edge`'s IPv6. A
+  Docker network or VPN route of the host that holds one of them stops `docker compose up`.
 
 Everything else the script installs or brings up to date:
 

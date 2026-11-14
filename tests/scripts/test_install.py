@@ -133,11 +133,10 @@ def host(tmp_path: Path) -> Host:
         (tmp_path / directory).mkdir(parents=True)
     shutil.copytree(REPO / "scripts" / "updater", host.checkout / "scripts" / "updater")
     shutil.copy(REPO / "scripts" / "install.sh", host.checkout / "scripts" / "install.sh")
-    # The bundled identity provider is rendered on the host (ADR 0106 step 5).
-    shutil.copy(
-        REPO / "scripts" / "render-keycloak-realm.sh",
-        host.checkout / "scripts" / "render-keycloak-realm.sh",
-    )
+    # The bundled identity provider is rendered on the host (ADR 0106 step 5), at the fixed
+    # addresses both scripts read (ADR 0125 step 2).
+    for script in ("render-keycloak-realm.sh", "fixed-addresses.sh"):
+        shutil.copy(REPO / "scripts" / script, host.checkout / "scripts" / script)
     (host.checkout / "deploy" / "keycloak").mkdir(parents=True)
     shutil.copy(
         REPO / "deploy" / "keycloak" / "realm.template.json",

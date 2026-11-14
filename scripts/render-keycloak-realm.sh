@@ -62,14 +62,12 @@ REALM_FILE=$SECRETS_DIR/keycloak-realm.json
 APP_ENV_FILE=$SECRETS_DIR/keycloak-app.env
 # ADR 0125 step 2: web and worker reach Keycloak, and Keycloak its database, at the fixed
 # addresses docker-compose.yml gives them on its internal networks, never by a name this host's
-# DNS could answer while the container is down. scripts/install.sh (IDP_UPSTREAM) and
-# app/domain/web_transport.py hold the same address; a test keeps them equal.
-# not a pin: the provider's fixed IPv4 address on edge, not a version
-IDP_ADDRESS=172.31.240.4
-# not a pin: its database's fixed IPv4 address on idp-store, not a version
-IDP_DB_ADDRESS=172.31.240.18
+# DNS could answer while the container is down (scripts/fixed-addresses.sh, beside this script).
+# shellcheck source=scripts/fixed-addresses.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fixed-addresses.sh"
+INTERNAL=http://$BUNDLED_IDP_ADDRESS:$BUNDLED_IDP_PORT
 # How web and worker reach the realm's admin API.
-ADMIN_URL=http://$IDP_ADDRESS:8080/admin/realms/openplanner
+ADMIN_URL=$INTERNAL/admin/realms/openplanner
 GENERATED=(KC_BOOTSTRAP_ADMIN_PASSWORD KC_OPENPLANNER_CLIENT_SECRET KC_DIRECTORY_CLIENT_SECRET KC_SUPER_PASSWORD)
 KEYS=("${GENERATED[@]}" KC_OPENPLANNER_BASE_URL KC_HOSTNAME)
 DB_FILE=$SECRETS_DIR/idp-db.env
@@ -126,11 +124,11 @@ KC_OPENPLANNER_BASE_URL=${KC_OPENPLANNER_BASE_URL%/}
 if [[ $KC_OPENPLANNER_BASE_URL == https://* ]]; then
   HTTPS=1
   KC_HOSTNAME=$KC_OPENPLANNER_BASE_URL/idp
-  ADMIN_URL=http://$IDP_ADDRESS:8080/idp/admin/realms/openplanner
-  DISCOVERY_URL=http://$IDP_ADDRESS:8080/idp/realms/openplanner/.well-known/openid-configuration
+  ADMIN_URL=$INTERNAL/idp/admin/realms/openplanner
+  DISCOVERY_URL=$INTERNAL/idp/realms/openplanner/.well-known/openid-configuration
 else
   HTTPS=0
-  DISCOVERY_URL=http://$IDP_ADDRESS:8080/realms/openplanner/.well-known/openid-configuration
+  DISCOVERY_URL=$INTERNAL/realms/openplanner/.well-known/openid-configuration
 fi
 
 # A value goes into a JSON string through sed: only characters that need no escaping in either.
@@ -148,7 +146,7 @@ tmp=$(mktemp "$SECRETS_DIR/.keycloak.env.XXXXXX")
   for key in "${KEYS[@]}"; do printf '%s=%s\n' "$key" "${!key}"; done
   [[ $KC_CLIENT_SECRETS_PINNED != true ]] || printf 'KC_CLIENT_SECRETS_PINNED=true\n'
   if [[ $DATABASE == postgres ]]; then
-    printf 'KC_DB=postgres\nKC_DB_URL_HOST=%s\nKC_DB_URL_DATABASE=keycloak\n' "$IDP_DB_ADDRESS"
+    printf 'KC_DB=postgres\nKC_DB_URL_HOST=%s\nKC_DB_URL_DATABASE=keycloak\n' "$BUNDLED_IDP_DB_ADDRESS"
     printf 'KC_DB_USERNAME=keycloak\nKC_DB_PASSWORD=%s\n' "$KC_DB_PASSWORD"
     # `start` refuses plain http unless told; TLS ends at the proxy, which sets the headers.
     printf 'KC_HTTP_ENABLED=true\n'
