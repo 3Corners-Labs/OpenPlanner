@@ -1,7 +1,7 @@
 # 0128. The independent release audit is optional
 
 Status: accepted (2026-11-14), decided by the product owner in the conversation of 2026-11-14.
-Built in the pull request that adds it (#PRNUM); see *Build status*. Supersedes ADR 0078 point 4
+Built in the pull request that adds it (#861); see *Build status*. Supersedes ADR 0078 point 4
 in part (a minor or major release no longer needs an audit, and no tag waits for a verdict) and
 ADR 0079 point 3 (the `audit` job) with the audit parts of its points 4, 6 and 7 and its
 setting `OPENAI_API_KEY`. Amends ADR 0078 point 1 (the audit scripts are no longer a gate, so no
@@ -77,8 +77,8 @@ secret `OPENAI_API_KEY` of ADR 0079 (class A, repository admin) is retired.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR | #PRNUM | merged |
-| 1 | The `audit` job and `openai/codex-action` out of `release.yml`; the audit check out of the `tag` job and `main.yml`; `scripts/check-release-audit.sh` deleted; `scripts/release_pr.py` without the audit section and subcommand; the public release notes claim no audit; `scripts/decision_gate.py` without the audit scripts; `tests/scripts/test_release_audit.py::test_no_workflow_runs_the_audit_or_waits_for_it`; CLAUDE.md, runbook, release checklist, `docs/skills.md`, threat model, architecture document and the Status lines of ADR 0078 and 0079 | #PRNUM | merged |
+| 0 | ADR | #861 | merged |
+| 1 | The `audit` job and `openai/codex-action` out of `release.yml`; the audit check out of the `tag` job and `main.yml`; `scripts/check-release-audit.sh` deleted; `scripts/release_pr.py` without the audit section and subcommand; the public release notes claim no audit; `scripts/decision_gate.py` without the audit scripts; `tests/scripts/test_release_audit.py::test_no_workflow_runs_the_audit_or_waits_for_it`; CLAUDE.md, runbook, release checklist, `docs/skills.md`, threat model, architecture document and the Status lines of ADR 0078 and 0079 | #861 | merged |
 
 ## Consequences
 

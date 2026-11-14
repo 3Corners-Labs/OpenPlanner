@@ -1,4 +1,4 @@
-"""The optional release audit runs Codex against the last release, and nothing waits for it (ADR 0128)."""
+"""The optional release audit runs Codex on the last release; nothing waits for it (ADR 0128)."""
 
 import os
 import subprocess
