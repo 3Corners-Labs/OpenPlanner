@@ -74,11 +74,17 @@ in both directions. Measured on Keycloak 26.8.1 behind the bundled proxy (2026-1
      `/idp/` becomes `/idp/` (the browser then refuses a `__Host-` name, so no answer can
      replace the portal's session) and `Domain` is dropped;
    - drops `Service-Worker-Allowed`, `Clear-Site-Data`, `Alt-Svc`, `NEL`, `Report-To`,
-     `Reporting-Endpoints`, `Accept-CH` and `Critical-CH`, and sets HSTS to the portal's own
-     value (`app/api/security_headers.py`);
+     `Reporting-Endpoints`, `Accept-CH` and `Critical-CH`, and sets HSTS and `Permissions-Policy`
+     to the portal's own values (`app/api/security_headers.py`, `app/web/security_policy.py`): a
+     grant for camera or microphone belongs to the origin, and the call page asks for both (ADR
+     0123), so no page under `/idp` may use one;
    - sets `Cross-Origin-Opener-Policy: same-origin-allow-popups`, never the portal's
      `same-origin`, so a portal window opened from a provider page lands in a browsing context
      group of its own and the page cannot reach into it;
+   - keeps Keycloak's own framing rule (`X-Frame-Options: SAMEORIGIN`, `frame-ancestors 'self'`),
+     an exception to `DENY` on every response: Keycloak's account console frames Keycloak's own
+     pages, every page of the portal refuses to be framed, and no page of the portal frames one
+     of Keycloak's;
    - adds a policy next to the provider's own `Content-Security-Policy` (a browser enforces
      both): `connect-src` and `form-action` only under `/idp/`, and `worker-src 'none'`. A
      browser ignores the path after a redirect, so the login's return to `/admin/callback`
@@ -107,9 +113,10 @@ None, after checking. Every value below is a fixed security rule or follows from
 
 - The public paths (`/idp/realms/openplanner/*`, `/idp/resources/*`): the realm name is fixed
   by the template (ADR 0090), and a setting would let a host publish the console again.
-- The removed cookies (`__Host-*`, `lang`), the dropped headers, the HSTS value, the
-  `Cross-Origin-Opener-Policy` value and the added policy: security rules; a test ties the
-  HSTS value and the cookie names to the application's own.
+- The removed cookies (`__Host-*`, `lang`), the dropped headers, the HSTS and
+  `Permissions-Policy` values, the `Cross-Origin-Opener-Policy` value and the added policy:
+  security rules; tests tie the HSTS and `Permissions-Policy` values and the cookie names to the
+  application's own.
 - The console's loopback address: the port the compose service `idp` publishes on
   `127.0.0.1`, read by the installer from `docker port`.
 

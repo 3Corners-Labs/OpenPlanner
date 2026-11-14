@@ -530,12 +530,13 @@ Moving docker01 from plain http to this took these steps, all without root, beca
 5. `secrets/keycloak.env`: set `KC_OPENPLANNER_BASE_URL=https://<host>` (an existing value wins
    over `PUBLIC_BASE_URL`), run `scripts/render-keycloak-realm.sh`, and recreate `idp`.
 6. An existing realm is not re-imported: set the redirect URI, web origin and post-logout URI of
-   client `openplanner-admin` to the https address with `kcadm.sh` (against
-   `http://localhost:8080/idp`).
+   client `openplanner-admin` to the https address with `kcadm.sh` (today through the helper of
+   *Opening the admin console*, which logs in on `http://localhost:8080/idp` itself).
 7. `docker compose --env-file .env.update up -d --force-recreate web worker proxy`.
 8. Verify with `oidc-check`, `tls-check` and `address-check` from `web`.
-9. Since ADR 0126 (with the release that brings it): run the command of *Opening the admin
-   console*, check that `docker port $(docker compose --env-file .env.update ps -q idp)` lists
+9. Since ADR 0126 (with the release that brings it): update the checkout and recreate `idp`
+   (`docker compose --env-file .env.update up -d idp`, for the helper's mount), run the command of
+   *Opening the admin console*, check that `docker port $(docker compose --env-file .env.update ps -q idp)` lists
    `127.0.0.1` (or `[::1]`) only, nothing on 8780 or `0.0.0.0`, and that
    `https://<host>/idp/admin/` answers 404 from another machine.
 
@@ -567,8 +568,9 @@ two paths, remove the `Cookie` pairs whose name starts with `__Host-` and the on
 rewrite a `Set-Cookie` path outside `/idp/` to `/idp/` and drop its `Domain`, drop
 `Service-Worker-Allowed`, `Clear-Site-Data`, `Alt-Svc`, `NEL`, `Report-To`,
 `Reporting-Endpoints`, `Accept-CH` and `Critical-CH`, send the portal's own
-`Strict-Transport-Security`, `Cross-Origin-Opener-Policy: same-origin-allow-popups` and the
-added `Content-Security-Policy`, and refuse a request with a `Service-Worker` header.
+`Strict-Transport-Security` and `Permissions-Policy`,
+`Cross-Origin-Opener-Policy: same-origin-allow-popups` and the added `Content-Security-Policy`,
+and refuse a request with a `Service-Worker` header.
 `deploy/proxy/idp.caddy` is the reference.
 
 ### Test the certificate flow end to end (ADR 0064)
@@ -963,22 +965,27 @@ address, or its login form sends the browser to the public address, where the pr
 it. The installer sets it after every start (run it again after updating the checkout, as for
 every release that changes the host side); it sets nothing while any port of `idp` is published
 beyond the loopback, and says so. On a host set up by hand, check that
-`docker port $(docker compose --env-file .env.update ps -q idp)` lists `127.0.0.1` only, and run
-once, with the port it lists for `8080/tcp` (`127.0.0.1:8080` by default):
+`docker port $(docker compose --env-file .env.update ps -q idp)` lists `127.0.0.1` only, recreate
+`idp` once after updating the checkout (`docker compose --env-file .env.update up -d idp`: the
+container must have the helper's mount), and run once, with the port listed for `8080/tcp`
+(`127.0.0.1:8080` by default):
 
 ```bash
 docker compose --env-file .env.update exec -T idp sh /opt/openplanner/kcadm-as-admin.sh update realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp
 ```
 
 `deploy/keycloak/kcadm-as-admin.sh` logs `kcadm.sh` in as `admin` inside the container with the
-container's own password, so no secret is typed. Realm `openplanner` keeps its public address and
-issuer; the staff directory and the login are unaffected. Every step below that names the console
-uses this one; `kcadm.sh` inside the container works without it.
+container's own password, so no secret is typed or shown in a process list, and the login is
+gone when the command ends. Every `kcadm.sh` step against `idp` in this runbook goes through it:
+`kcadm-as-admin.sh ARGS` below stands for
+`docker compose --env-file .env.update exec -T idp sh /opt/openplanner/kcadm-as-admin.sh ARGS`.
+Realm `openplanner` keeps its public address and issuer; the staff directory and the login are
+unaffected. Every step below that names the console uses this one.
 
 **Mail from Keycloak.** Invitations and password resets of the Staff screen are sent by
 Keycloak itself, not by OpenPlanner. The rendered realm has no mail server yet; set one in the
-admin console (realm `openplanner` → *Realm settings* → *Email*) or with `kcadm.sh update
-realms/openplanner -s 'smtpServer={"host":"…","port":"…","from":"…"}'`. On a lab with the `dev`
+admin console (realm `openplanner` → *Realm settings* → *Email*) or through the helper:
+`kcadm-as-admin.sh update realms/openplanner -s 'smtpServer={"host":"…","port":"…","from":"…"}'`. On a lab with the `dev`
 profile, Mailpit (`mailpit:1025`, no authentication) catches them. Without it an invitation
 creates the person but reports that the mail failed.
 
@@ -986,7 +993,8 @@ creates the person but reports that the mail failed.
 docker01 on 2026-11-02, without root:
 
 1. Back up `.env`, `docker-compose.override.yml` and the old realm file, and export the users
-   with their entitlements (`kcadm.sh get users -r openplanner -q briefRepresentation=false`);
+   with their entitlements (through the helper: `kcadm-as-admin.sh get users -r openplanner -q
+   briefRepresentation=false`);
    their passwords do not move.
 2. Bring the checkout to the running release (`git merge --ff-only v<version>`), so compose
    has the `idp` service.
@@ -1013,15 +1021,16 @@ Manage › Staff: invite, add or remove a role, disable, send a password reset (
 actions appear only when `web` has the three `KEYCLOAK_*` values above; restart `web` and
 `worker` after a render (`docker compose --profile idp up -d web worker`). A realm imported
 before ADR 0095 (such as an older lab realm) has no `openplanner-directory` client; add it with
-Keycloak's own CLI and put its secret in `secrets/keycloak-app.env` by hand:
+Keycloak's own CLI, through the helper of *Opening the admin console*, and put its secret in
+`secrets/keycloak-app.env` by hand:
 
 ```sh
-docker compose exec idp /opt/keycloak/bin/kcadm.sh config credentials \
-  --server http://localhost:8080 --realm master --user admin   # asks for the admin password
-docker compose exec idp /opt/keycloak/bin/kcadm.sh create clients -r openplanner \
+docker compose --env-file .env.update exec -T idp sh /opt/openplanner/kcadm-as-admin.sh \
+  create clients -r openplanner \
   -s clientId=openplanner-directory -s serviceAccountsEnabled=true -s publicClient=false \
   -s standardFlowEnabled=false -s directAccessGrantsEnabled=false
-docker compose exec idp /opt/keycloak/bin/kcadm.sh add-roles -r openplanner \
+docker compose --env-file .env.update exec -T idp sh /opt/openplanner/kcadm-as-admin.sh \
+  add-roles -r openplanner \
   --uusername service-account-openplanner-directory --cclientid realm-management \
   --rolename manage-users --rolename view-realm
 ```

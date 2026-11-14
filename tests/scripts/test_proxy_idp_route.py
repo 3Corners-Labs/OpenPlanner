@@ -20,6 +20,7 @@ from app.api.link_session import COOKIE_BASE as LINK_COOKIE
 from app.api.security_headers import SECURITY_HEADERS
 from app.web.cookies import cookie_for
 from app.web.locale import LANG_PARAM
+from app.web.security_policy import DEFAULT_PERMISSIONS_POLICY
 
 REPO = Path(__file__).parents[2]
 ROUTE = (REPO / "deploy/proxy/idp.caddy").read_text()
@@ -186,6 +187,12 @@ def test_the_headers_that_act_on_the_whole_origin_are_dropped() -> None:
         "Accept-CH",
         "Critical-CH",
     }
+
+
+def test_no_page_of_the_provider_may_use_the_camera_or_microphone_of_the_origin() -> None:
+    """A grant belongs to the origin, and the call page asks for both (ADR 0123)."""
+    assert _header_value("Permissions-Policy") == DEFAULT_PERMISSIONS_POLICY
+    assert "publickey-credentials" not in DEFAULT_PERMISSIONS_POLICY  # WebAuthn stays usable
 
 
 def test_hsts_is_the_portals_own_and_the_opener_policy_never_is() -> None:

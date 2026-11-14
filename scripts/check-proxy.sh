@@ -295,6 +295,7 @@ FORGED = [
     ("Set-Cookie", "tossed=1; Path =/admin; Domain = booking.test"),
     ("Set-Cookie", "KC_PROBE=1; Path=/idp/realms/openplanner/; Secure"),
     ("Strict-Transport-Security", "max-age=0"),
+    ("Permissions-Policy", "camera=*, microphone=*, display-capture=*"),
     ("Cross-Origin-Opener-Policy", "same-origin"),
     ("Content-Security-Policy", "frame-ancestors https://booking.test"),
     ("Service-Worker-Allowed", "/"),
@@ -337,13 +338,15 @@ for name, value in answer.headers.items():
     print(name + ": " + value)
 '
 
-# The staff directory (ADR 0095) through web's own adapter, with the address and secret the render
-# script wrote for web (secrets/keycloak-app.env): prints whether one listing works, nothing else.
+# The staff directory (ADR 0095) as web builds it: its own settings, given the values the render
+# script wrote for web (secrets/keycloak-app.env), and its own adapter. Prints whether one listing
+# works, nothing else.
 directory_code='
-import asyncio, os
-from app.adapters.keycloak_directory import KeycloakDirectory
-directory = KeycloakDirectory(os.environ["ADMIN_URL"], os.environ["CLIENT_ID"], os.environ["CLIENT_SECRET"])
-print("reachable" if asyncio.run(directory.reachable()) else "unreachable")
+import asyncio
+from app.adapters.keycloak_directory import directory_from_settings
+from app.config import Settings
+directory = directory_from_settings(Settings())
+print("reachable" if directory and asyncio.run(directory.reachable()) else "unreachable")
 '
 
 # The headers the route drops, read from where they are written (deploy/proxy/idp.caddy).
@@ -392,7 +395,9 @@ idp_route_checks() { # pass 3: the route of ADR 0126 in front of a provider that
   # shellcheck disable=SC2086
   head="$(curl -sk $resolve -D - -o /dev/null "$base/healthz" | tr -d '\r')"
   portal_hsts="$(values_of strict-transport-security)"
-  [ -n "$portal_hsts" ] || fail "the portal sends no HSTS, so the one on /idp has nothing to equal"
+  portal_permissions="$(values_of permissions-policy)"
+  [ -n "$portal_hsts" ] && [ -n "$portal_permissions" ] \
+    || fail "the portal sends no HSTS or Permissions-Policy, so the ones on /idp have nothing to equal"
   # shellcheck disable=SC2086
   head="$(curl -sk $resolve -D - -o /dev/null "$base/idp/realms/openplanner/x" | tr -d '\r')"
   [ -n "$dropped_headers" ] || fail "no dropped header found in deploy/proxy/idp.caddy"
@@ -404,10 +409,12 @@ idp_route_checks() { # pass 3: the route of ADR 0126 in front of a provider that
   [ "$(echo "$cookies" | grep -c .)" = "3" ] || fail "the provider's three cookies do not all arrive ($cookies)"
   # Every Path attribute as a browser reads it (it uses the last), not only the first.
   outside="$(echo "$cookies" | tr ';' '\n' | sed -n 's/^[[:space:]]*[Pp][Aa][Tt][Hh][[:space:]]*=[[:space:]]*//p' \
-    | grep -v '^/idp/' || true)"
+    | grep -v -e '^/idp/' -e '^/idp[[:space:]]*$' || true)"
   [ -z "$outside" ] || fail "a cookie of the provider keeps a path outside /idp/ ($cookies)"
   ! echo "$cookies" | grep -qi 'domain *=' || fail "a cookie of the provider keeps its Domain ($cookies)"
   [ "$(values_of strict-transport-security)" = "$portal_hsts" ] || fail "HSTS on /idp is not the portal's own"
+  [ "$(values_of permissions-policy)" = "$portal_permissions" ] \
+    || fail "the Permissions-Policy on /idp is not the portal's own, so a page there may use the origin's camera"
   [ "$(values_of cross-origin-opener-policy)" = "same-origin-allow-popups" ] \
     || fail "the opener policy on /idp is not same-origin-allow-popups alone"
   values_of content-security-policy | grep -qx 'frame-ancestors https://booking.test' \
@@ -486,9 +493,9 @@ keycloak_checks() { # pass 4: what a browser needs passes the route, the admin c
   echo "$console" | grep -q "\"adminBaseUrl\": \"$loopback/idp\"" || fail "the console does not call its API on the loopback"
   ! echo "$console" | grep -q 'booking.test' || fail "the console on the loopback names the public address"
   app="$keycloak_dir/secrets/keycloak-app.env"
-  [ "$(compose exec -T -e ADMIN_URL="$(sed -n 's/^KEYCLOAK_ADMIN_URL=//p' "$app")" \
-    -e CLIENT_ID="$(sed -n 's/^KEYCLOAK_DIRECTORY_CLIENT_ID=//p' "$app")" \
-    -e CLIENT_SECRET="$(sed -n 's/^KEYCLOAK_DIRECTORY_CLIENT_SECRET=//p' "$app")" \
+  [ "$(compose exec -T -e KEYCLOAK_ADMIN_URL="$(sed -n 's/^KEYCLOAK_ADMIN_URL=//p' "$app")" \
+    -e KEYCLOAK_DIRECTORY_CLIENT_ID="$(sed -n 's/^KEYCLOAK_DIRECTORY_CLIENT_ID=//p' "$app")" \
+    -e KEYCLOAK_DIRECTORY_CLIENT_SECRET="$(sed -n 's/^KEYCLOAK_DIRECTORY_CLIENT_SECRET=//p' "$app")" \
     web python -c "$directory_code" | tr -d '\r')" = "reachable" ] \
     || fail "the staff directory cannot use the provider on the internal network"
 }

@@ -43,8 +43,14 @@ handle @idp {
 			header_down -Accept-CH
 			header_down -Critical-CH
 			header_down Strict-Transport-Security "max-age=63072000; includeSubDomains"
+			# The portal's own default (app/web/security_policy.py): a grant for camera or
+			# microphone belongs to the origin, and the call page asks for both (ADR 0123), so a
+			# page here must not use one. WebAuthn's own features stay as the browser has them.
+			header_down Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=(), interest-cohort=()"
 			# Never the portal's `same-origin`: a window this page opens on the portal gets a
-			# browsing context group of its own, so a script here cannot reach into it.
+			# browsing context group of its own, so a script here cannot reach into it. Framing
+			# stays as Keycloak sets it (SAMEORIGIN): its account console frames its own pages,
+			# and every page of the portal refuses to be framed (ADR 0126 point 4).
 			header_down Cross-Origin-Opener-Policy same-origin-allow-popups
 			# ADR 0126 point 3: a policy next to the provider's own (a browser enforces both). A
 			# page here may fetch and post only under /idp/, and may start no worker. After a

@@ -119,16 +119,19 @@ def test_pass_three_puts_a_hostile_provider_behind_the_route() -> None:
     probe = _program("idp_probe_code")
     body = _body("idp_route_checks")
 
-    # The dropped headers come from the route itself; each must come from the probe (checked at
-    # run time, so a header added to idp.caddy without the probe sending it fails the pass).
-    assert 'dropped_headers="$(sed -n ' in SCRIPT
-    assert 'deploy/proxy/idp.caddy)"' in SCRIPT
+    # Every header the route drops or replaces, the probe sends: checked here in the pull
+    # request's lane, and again at run time, where the probe is asked directly first.
+    route = (REPO / "deploy/proxy/idp.caddy").read_text()
+    changed = set(re.findall(r"^\s*header_down [-+]?([A-Za-z-]+)\b", route, re.MULTILINE))
+    for name in changed - {"Set-Cookie"}:
+        assert f'("{name}", ' in probe, f"the probe does not send {name}"
     assert body.index("so its absence would prove nothing") < body.index("the proxy passes $header")
     assert '"__Host-op_admin=forged; Path=/;' in probe  # would replace the portal's session
     assert '"Strict-Transport-Security", "max-age=0"' in probe
     assert '"Cross-Origin-Opener-Policy", "same-origin"' in probe
-    # HSTS on /idp must equal what the same proxy returns for the portal itself.
+    # HSTS and the permissions on /idp must equal what the same proxy returns for the portal.
     assert body.index('"$base/healthz"') < body.index("portal_hsts=")
+    assert body.index('"$base/healthz"') < body.index("portal_permissions=")
     assert re.search(
         r"^start_idp_probe\nexport PROXY_INTERNAL=true PROXY_IDP_UPSTREAM=idp-probe:8080$",
         SCRIPT,
@@ -165,8 +168,8 @@ def test_pass_four_proves_each_refusal_against_the_loopback_and_the_console_afte
     assert body.index(change) < body.index("does not stay on the loopback")
     assert 'assets_load "$page" "the login page"' in body
     assert "the account console" in body
-    # The staff directory through web's own adapter, with what the render script wrote for web.
+    # The staff directory as web builds it, from the values the render script wrote for web.
     directory = _program("directory_code")
-    assert "KeycloakDirectory(" in directory
+    assert "directory_from_settings(Settings())" in directory
     assert ".reachable()" in directory
     assert "secrets/keycloak-app.env" in body

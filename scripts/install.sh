@@ -737,7 +737,7 @@ render_idp() {
   [[ -f $DIR/scripts/render-keycloak-realm.sh ]] || die "scripts/render-keycloak-realm.sh is missing from $DIR"
   log "rendering the bundled identity provider's realm"
   "$BASH" "$DIR/scripts/render-keycloak-realm.sh" --dir "$DIR" --database "$database" || die "the realm could not be rendered"
-  ((TLS)) || warn "the bundled identity provider without the HTTPS proxy answers on this host only (127.0.0.1:8080); logging in from another machine needs --tls-domain"
+  ((TLS)) || warn "the bundled identity provider without the HTTPS proxy is for this host only (published on the loopback, checked after the start); logging in from another machine needs --tls-domain"
   log "first password of the portal user 'super': KC_SUPER_PASSWORD in $kept (changed at the first login)"
 }
 
@@ -935,21 +935,20 @@ start() {
   compose up -d
   healthy || die "not healthy within ${HEALTH_TIMEOUT}s; see: docker compose --env-file .env.update logs web worker"
   log "web and worker are healthy"
+  IDP_DEADLINE=$((SECONDS + HEALTH_TIMEOUT)) # one wait for every step on the provider below
   idp_mail
   idp_console
 }
 
 # idp_kcadm INPUT ARGS...: kcadm.sh ARGS as realm master's admin in the idp container, through
-# deploy/keycloak/kcadm-as-admin.sh (ADR 0126), retried until Keycloak answers or HEALTH_TIMEOUT
-# passes (status 1). INPUT goes to it on stdin, for a body read with `-f -`, so a secret in it is
-# never an argument. Once Keycloak has not answered in time, later calls give up at once.
-IDP_SILENT=0
+# deploy/keycloak/kcadm-as-admin.sh (ADR 0126), retried until Keycloak answers or IDP_DEADLINE
+# passes (status 1); the steps share that one wait. INPUT goes to it on stdin, for a body read with
+# `-f -`, so a secret in it is never an argument.
 idp_kcadm() {
-  local input=$1 deadline=$((SECONDS + HEALTH_TIMEOUT))
+  local input=$1
   shift
-  ((!IDP_SILENT)) || return 1
   until printf '%s' "$input" | compose exec -T idp sh /opt/openplanner/kcadm-as-admin.sh "$@" >/dev/null 2>&1; do
-    ((SECONDS < deadline)) || { IDP_SILENT=1; return 1; }
+    ((SECONDS < IDP_DEADLINE)) || return 1
     sleep 5
   done
 }
@@ -982,27 +981,28 @@ idp_mail() {
   log "the bundled identity provider's mail server: $host (Keycloak mails invitations and resets itself)"
 }
 
-# ADR 0126: behind the proxy only the login of the bundled identity provider is public, and its
-# admin console is opened on the host's loopback. Realm master gets that loopback address as its
-# frontend URL, or its login form would send the browser to the public address, where the proxy
-# refuses it. Every port Docker publishes for the container must be on the loopback: one more on
-# the network (an override's 8780, say) would leave realm master and the console there over plain
-# http. Without the proxy Keycloak's own address is the loopback already.
+# ADR 0126: Keycloak's own port is for this host alone: every port Docker publishes for the
+# container must be on the loopback, with or without the proxy, or Keycloak, realm master and its
+# admin console are on the network over plain http (an override's 8780, say). Behind the proxy only
+# the login is public and the console is opened on the loopback: realm master then gets that
+# address as its frontend URL, or its login form would send the browser to the public address,
+# where the proxy refuses it.
 idp_console() {
   [[ $IDP == bundled ]] || return 0
-  local path container bindings outside published console
-  path=$(value "$DIR/secrets/keycloak.env" KC_HTTP_RELATIVE_PATH)
-  [[ -n $path ]] || return 0
+  local container bindings outside published path console
   container=$(compose ps -q idp 2>/dev/null) || container=
   bindings=$([[ -z $container ]] || docker port "$container" 2>/dev/null) || bindings=
   outside=$(printf '%s\n' "$bindings" | grep -E -v -e '-> (127\.0\.0\.1|\[::1\]):[0-9]+$' -e '^$' || true)
   if [[ -n $outside ]]; then
-    warn "the bundled identity provider is published beyond the loopback (${outside//$'\n'/, }): its admin console and realm master are on the network; publish 127.0.0.1 only (docs/runbook.md, Opening the admin console)"
+    warn "the bundled identity provider is published beyond the loopback (${outside//$'\n'/, }): Keycloak, realm master and its admin console are on the network; publish 127.0.0.1 only (docs/runbook.md, Opening the admin console)"
     return 0
   fi
-  published=$(printf '%s\n' "$bindings" | sed -n 's/^8080\/tcp -> \(127\.0\.0\.1:[0-9][0-9]*\)$/\1/p' | head -n 1)
+  path=$(value "$DIR/secrets/keycloak.env" KC_HTTP_RELATIVE_PATH)
+  [[ -n $path ]] || return 0 # without the proxy Keycloak's own address is the loopback already
+  published=$(printf '%s\n' "$bindings" | sed -n -E 's/^8080\/tcp -> (127\.0\.0\.1:[0-9]+)$/\1/p' | head -n 1)
+  [[ -n $published ]] || published=$(printf '%s\n' "$bindings" | sed -n -E 's/^8080\/tcp -> (\[::1\]:[0-9]+)$/\1/p' | head -n 1)
   if [[ -z $published ]]; then
-    warn "the bundled identity provider publishes no port on 127.0.0.1, or is not running: its admin console is not set up for the loopback (docs/runbook.md, Opening the admin console)"
+    warn "the bundled identity provider publishes no port on the loopback, or is not running: its admin console is not set up for the loopback (docs/runbook.md, Opening the admin console)"
     return 0
   fi
   console=http://$published$path

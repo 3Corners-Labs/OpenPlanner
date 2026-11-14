@@ -1034,6 +1034,26 @@ def test_a_provider_on_both_loopbacks_gets_the_ipv4_one(host: Host) -> None:
     assert host.ran("realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp")
 
 
+def test_a_provider_on_the_ipv6_loopback_only_gets_that_address(host: Host) -> None:
+    host.given("idp-ports", "8080/tcp -> [::1]:8080\n")
+
+    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
+
+    assert result.returncode == 0, result.stderr
+    assert host.ran("realms/master -s attributes.frontendUrl=http://[::1]:8080/idp")
+
+
+def test_a_provider_without_the_proxy_is_also_held_to_the_loopback(host: Host) -> None:
+    """Without the proxy Keycloak and realm master answer on the port itself: never the network."""
+    host.given("idp-ports", "8080/tcp -> 127.0.0.1:8080\n8080/tcp -> 0.0.0.0:8780\n")
+
+    result = host.run("--mode", "lab", "--version", "1.4.0", "--non-interactive")
+
+    assert result.returncode == 0, result.stderr
+    assert "published beyond the loopback (8080/tcp -> 0.0.0.0:8780)" in result.stderr
+    assert not host.ran("frontendUrl")
+
+
 def test_a_provider_that_is_not_running_is_named_as_such(host: Host) -> None:
     """No container, so nothing published: say so, not that a port is wrong."""
     host.given("idp-container", "\n")
@@ -1042,18 +1062,18 @@ def test_a_provider_that_is_not_running_is_named_as_such(host: Host) -> None:
 
     assert result.returncode == 0, result.stderr
     assert not host.ran("frontendUrl")
-    assert "publishes no port on 127.0.0.1, or is not running" in result.stderr
+    assert "publishes no port on the loopback, or is not running" in result.stderr
 
 
 def test_a_provider_that_never_answers_is_waited_for_once(host: Host) -> None:
-    """After the mail server's attempt runs out of time, the console's gives up at once."""
+    """The steps on the provider share one wait: after the mail server's, the console tries once."""
     host.given("fail", "idp-exec\n")
 
     result = host.run("--mode", "test", "--non-interactive", HEALTH_TIMEOUT="5", **HOST_SETTINGS)
 
     assert result.returncode == 0, result.stderr
     assert host.ran(f"{KCADM} update realms/openplanner")
-    assert not host.ran("realms/master")
+    assert sum("realms/master" in command for command in host.commands()) == 1
     assert "did not take its mail server" in result.stderr
     assert "did not take the loopback address of its admin console" in result.stderr
 
