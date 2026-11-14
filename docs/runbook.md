@@ -985,8 +985,11 @@ unaffected. Every step below that names the console uses this one.
 
 **Mail from Keycloak.** Invitations and password resets of the Staff screen are sent by
 Keycloak itself, not by OpenPlanner. The rendered realm has no mail server yet; set one in the
-admin console (realm `openplanner` → *Realm settings* → *Email*) or through the helper:
-`kcadm-as-admin.sh update realms/openplanner -s 'smtpServer={"host":"…","port":"…","from":"…"}'`. On a lab with the `dev`
+admin console (realm `openplanner` → *Realm settings* → *Email*) or through the helper, with the
+body on stdin so a password in it never reaches a process list or the shell history:
+`kcadm-as-admin.sh update realms/openplanner -f - < smtp.json`, where `smtp.json` holds
+`{"smtpServer":{"host":"…","port":"…","from":"…"}}` (and `"auth":"true"`, `"user"`, `"password"`
+for a server with a login; delete the file afterwards). The installer does the same. On a lab with the `dev`
 profile, Mailpit (`mailpit:1025`, no authentication) catches them. Without it an invitation
 creates the person but reports that the mail failed.
 

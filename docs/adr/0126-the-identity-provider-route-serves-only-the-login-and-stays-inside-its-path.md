@@ -77,7 +77,8 @@ in both directions. Measured on Keycloak 26.8.1 behind the bundled proxy (2026-1
      `Reporting-Endpoints`, `Accept-CH` and `Critical-CH`, and sets HSTS and `Permissions-Policy`
      to the portal's own values (`app/api/security_headers.py`, `app/web/security_policy.py`): a
      grant for camera or microphone belongs to the origin, and the call page asks for both (ADR
-     0123), so no page under `/idp` may use one;
+     0123), so a page under `/idp` may not use one in a browser that honours the header
+     (Chromium-based; Firefox and Safari ignore it, see *Consequences*);
    - sets `Cross-Origin-Opener-Policy: same-origin-allow-popups`, never the portal's
      `same-origin`, so a portal window opened from a provider page lands in a browsing context
      group of its own and the page cannot reach into it;
@@ -149,9 +150,13 @@ None, after checking. Every value below is a fixed security rule or follows from
   - the portal's `script-src 'self'` admits every script under `/idp/resources/`, a gadget for an
     injection in a portal page;
   - the provider's own scripts are not restricted (its themes use inline scripts), and it can
-    show any page under `/idp`.
+    show any page under `/idp`;
+  - in Firefox and Safari, which ignore `Permissions-Policy`, and in a window such a script
+    opens, it can still use the camera or microphone grant the origin holds from the call page
+    (ADR 0123), or ask for one under the portal's name.
 
-  A host name of its own (point 5) removes all of them.
+  A host name of its own (point 5) removes all of them. The product owner accepts them with this
+  decision, or decides on that host name instead.
 - A reverse proxy of the operator's own in front of the bundled provider must do the same; the
   runbook lists what.
 - Updated with this decision: `docs/runbook.md`, `docs/threat-model.md`, `docs/dataflow.md`,
