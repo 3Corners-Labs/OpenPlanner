@@ -11,12 +11,12 @@ from app.domain.closure import Closure
 from app.domain.closure_service import ClosureInput, ClosureService
 from app.domain.images import ImageFile, ImageText
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import count_images, seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.closures import NOTICES
 from tests.support.domain import NOW, TEST_TOKEN_KEY
 from tests.support.images import jpeg, png
 from tests.support.principals import principal
+from tests.support.seed_rows import count_images, seed_group
 
 ADMIN = principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 TEXT = ImageText({"nl": "Gesloten deur", "en": "Closed door"})

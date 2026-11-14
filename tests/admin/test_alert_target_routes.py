@@ -2,11 +2,11 @@
 
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 
 
 async def _details(site: Site) -> list[str]:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with SqlUnitOfWork(app.state.engine).read() as tx:
         events = await tx.list_audit_events(Scope(everything=True), limit=50)
     return [e.event.detail for e in reversed(events) if e.event.detail.startswith("alert_")]

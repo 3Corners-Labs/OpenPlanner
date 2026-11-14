@@ -4,14 +4,14 @@ from typing import Any
 
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
-from tests.admin.conftest import AUDITOR, GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, Site
+from tests.support.admin_site import AUDITOR, GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, Site
 
 PAGE = "/admin/organisations/demo/usage"
 FORM = {**SAME_ORIGIN, "content-type": "application/x-www-form-urlencoded"}
 
 
 async def _staff_id(site: Site, subject: str) -> int:
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app: Any = site.app
     async with SqlUnitOfWork(app.state.engine).read() as tx:
         member = await tx.get_staff(subject)
     assert member is not None
@@ -49,7 +49,7 @@ async def test_a_subscription_is_added_listed_audited_and_deleted(site: Site) ->
         site, f"group=demo&period=weekly&weekday=2&month_day=1&recipient={gina}"
     )
     page = (await site.client.get(PAGE)).text
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app: Any = site.app
     async with SqlUnitOfWork(app.state.engine).read() as tx:
         sub = (await tx.list_subscriptions(Scope(everything=True)))[0]
         events = await tx.list_audit_events(Scope(everything=True))

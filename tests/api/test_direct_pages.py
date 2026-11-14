@@ -21,16 +21,14 @@ from app.domain.job_plan import JobStatus, JobType
 from app.domain.ports import IntegrationError
 from app.domain.scheduling import DispatchKind
 from app.web.static_assets import ASSETS
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo, webex_cc
-from tests.support.domain import NOW, webex_routing
+from tests.support.app_client import app_client
+from tests.support.call_jobs import WIRED
+from tests.support.domain import NOW
 from tests.support.flows import engine_of, flow_columns, flow_ids, offer_direct_calls
-from tests.support.participant import confirm_newest, open_link
+from tests.support.participant import ADA, SAME_ORIGIN, confirm_newest, open_link
 from tests.support.webhooks import WXCC
-
-SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
-ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org", "phone": ""}
 
 
 async def _configure(database_url: str, **changes: object) -> None:
@@ -42,12 +40,6 @@ async def _configure(database_url: str, **changes: object) -> None:
         await tx.save_group(replace(group, **changes))
     await offer_direct_calls(engine)
     await engine.dispose()
-
-
-WIRED = {
-    "video_host_email": "host@example.nl",
-    "contact_center": webex_routing("openplanner@example.biz", "openplanner-video"),
-}
 
 
 class Site:

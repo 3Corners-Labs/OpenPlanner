@@ -17,10 +17,10 @@ from app.adapters.db.seed import seed_demo
 from app.config import Settings
 from app.domain.tls import Certificate, ProbeResult, Trust
 from app.main import create_app
-from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.fakes.clock import FixedClock
 from tests.fakes.identity import FakeIdentityProvider
 from tests.fakes.tls import FakeCertificateProbe
+from tests.support.admin_site import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.support.certificates import make_pair
 from tests.support.domain import NOW
 
@@ -65,7 +65,7 @@ async def site(
         app.router.lifespan_context(app),
         httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=f"https://{HOST}") as c,
     ):
-        yield Site(c, idp, clock)
+        yield Site(app, c, idp, clock)
 
 
 def files(chain: bytes, key: bytes | None = None) -> dict[str, tuple[str, bytes, str]]:
@@ -88,7 +88,7 @@ async def choose(site: Site, source: str) -> httpx.Response:
 
 
 async def audit_details(site: Site) -> list[str]:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with AsyncSession(app.state.engine) as session:
         rows = await session.scalars(select(AuditEventRow).order_by(AuditEventRow.id))
     return [row.detail for row in rows if row.detail]
@@ -173,7 +173,7 @@ async def test_the_default_path_request_issue_place_switch_and_back(
     assert (volume / "privkey.pem").exists()
     assert not (volume / "pending.key").exists()
     assert not (volume / "serial").exists()  # not served: the source is still acme
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with AsyncSession(app.state.engine) as session:
         row = (await session.scalars(select(OwnCertificateRow))).one()
     assert (volume / "privkey.pem").read_text() not in page
@@ -209,7 +209,7 @@ async def test_migrating_an_existing_pair_puts_the_key_on_the_volume_only(
 
     assert response.status_code == 303
     assert (volume / "privkey.pem").read_bytes() == pair.key
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with AsyncSession(app.state.engine) as session:
         row = (await session.scalars(select(OwnCertificateRow))).one()
     assert pair.key.decode() not in row.chain_pem

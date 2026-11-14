@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tests.scripts.conftest import run_step, workflow_step
+from tests.support.workflows import run_step, workflow_step
 
 REPO = Path(__file__).parents[2]
 BASH = shutil.which("bash") or "/bin/bash"

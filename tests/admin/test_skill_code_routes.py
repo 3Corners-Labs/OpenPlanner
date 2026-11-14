@@ -8,8 +8,7 @@ code that is no code is refused at the input; a blank code takes the mapping awa
 import httpx
 
 from app.domain.authorization import Scope
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, Site
-from tests.support.admin_site import audit_log, site_uow
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, Site, audit_log, site_uow
 from tests.support.skill_seed import add_skill
 
 PAGE = "/admin/organisations/demo/skills"

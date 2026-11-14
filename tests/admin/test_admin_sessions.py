@@ -9,7 +9,7 @@ import structlog
 
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, Site
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, Site
 
 
 def _cookie_value(site: Site) -> str:
@@ -34,7 +34,7 @@ def _decode(value: str) -> dict[str, object]:
 
 
 async def _audit(site: Site) -> list[tuple[str, str, str]]:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with SqlUnitOfWork(app.state.engine).read() as tx:
         events = await tx.list_audit_events(Scope(everything=True), limit=100)
     return [(e.event.actor, e.event.action, e.event.reason) for e in events]
@@ -111,7 +111,7 @@ async def test_the_reference_is_never_logged_or_audited(site: Site) -> None:
 
 
 async def test_more_sessions_than_the_limit_end_the_one_idle_longest(site: Site) -> None:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     app.state.settings = app.state.settings.model_copy(update={"admin_max_sessions_per_person": 2})
     cookies = []
     for _ in range(3):
@@ -130,7 +130,7 @@ async def test_more_sessions_than_the_limit_end_the_one_idle_longest(site: Site)
 
 async def test_an_unreadable_register_gives_no_access(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
 
     async def broken(*_: object, **__: object) -> None:
         raise RuntimeError("database unavailable")
@@ -169,7 +169,7 @@ async def test_the_logout_post_itself_sends_no_clear_site_data(site: Site) -> No
 
 async def test_logout_without_a_provider_logout_url_ends_at_the_same_page(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     app.state.identity_provider = None
 
     out = await site.client.post("/admin/logout", headers=SAME_ORIGIN)
@@ -213,7 +213,7 @@ async def test_the_cache_directive_is_left_out_on_purpose(site: Site) -> None:
 
 async def test_a_session_whose_provider_rejects_it_ends_for_good(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     service = app.state.login_service
     live = service.principal_for
 

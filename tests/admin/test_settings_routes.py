@@ -28,7 +28,7 @@ from app.domain.authorization import Principal
 from app.domain.privacy import PII_FIELDS
 from app.domain.tokens import derive_token, hash_token
 from app.web.protection import booking_limit, unknown_link_limit
-from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site, _running_site
+from tests.support.admin_site import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site, running_site
 from tests.support.configuration_package import PACKAGE_PASSPHRASE
 from tests.support.legacy_package import package_of
 from tests.support.principals import principal
@@ -38,7 +38,7 @@ NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
 
 async def _store(site: Site, **values: str) -> None:
     """Store portal values as step 4 will, and move the version counter."""
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with AsyncSession(app.state.engine) as session, session.begin():
         session.add_all(
             PlatformSettingRow(key=k, value=v, updated_at=NOW) for k, v in values.items()
@@ -110,7 +110,7 @@ async def test_a_stored_portal_value_applies_without_a_restart(site: Site) -> No
     await site.login_as(SUPER)
 
     text = (await site.client.get("/admin/settings/values")).text
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
 
     assert "Beheerportaal" in text  # the portal as source
     assert app.state.settings.admin_session_hours == 4
@@ -130,7 +130,7 @@ async def test_an_environment_lock_names_its_variable(site: Site) -> None:
     await site.login_as(SUPER)
 
     text = (await site.client.get("/admin/settings/values")).text
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
 
     assert "Vastgezet door de beheerder van de server: <code>ADMIN_SESSION_HOURS</code>" in text
     assert app.state.settings.admin_session_hours == 6  # the environment wins over the portal
@@ -147,7 +147,7 @@ async def test_an_org_admin_may_not_see_the_platform_settings(site: Site) -> Non
 
 async def test_the_superuser_changes_a_setting_and_it_applies_at_once(site: Site) -> None:
     await site.login_as(SUPER)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
 
     response = await site.client.post(
         "/admin/settings/admin_session_hours", data={"value": "4"}, headers=SAME_ORIGIN
@@ -174,7 +174,7 @@ async def test_a_value_outside_the_bounds_is_refused_at_its_row(site: Site) -> N
 
 async def test_reset_brings_back_the_default(site: Site) -> None:
     await site.login_as(SUPER)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     await site.client.post(
         "/admin/settings/admin_session_hours", data={"value": "4"}, headers=SAME_ORIGIN
     )
@@ -242,7 +242,7 @@ SECRET = "never-shown-anywhere"  # noqa: S105 - test value
 
 async def test_a_secret_is_written_but_never_shown(site: Site) -> None:
     await site.login_as(SUPER)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
 
     response = await site.client.post(
         "/admin/settings/smtp_password", data={"value": SECRET}, headers=SAME_ORIGIN
@@ -257,7 +257,7 @@ async def test_a_secret_is_written_but_never_shown(site: Site) -> None:
 
 async def test_an_empty_secret_keeps_the_current_one(site: Site) -> None:
     await site.login_as(SUPER)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     await site.client.post(
         "/admin/settings/smtp_password", data={"value": SECRET}, headers=SAME_ORIGIN
     )
@@ -323,7 +323,7 @@ async def test_a_mapping_that_keeps_the_superuser_is_saved_after_a_fresh_login(
     site: Site,
 ) -> None:
     await site.login_as(SUPER)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
 
     location = await _try(site, SUPER)
 
@@ -335,7 +335,7 @@ async def test_a_mapping_that_keeps_the_superuser_is_saved_after_a_fresh_login(
 
 async def test_a_mapping_that_would_lock_out_is_not_saved(site: Site) -> None:
     await site.login_as(SUPER)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     nobody = principal("sub-super", "Sanne Super", frozenset(), frozenset(), frozenset())
 
     location = await _try(site, nobody)
@@ -372,7 +372,7 @@ async def test_only_the_superuser_sees_and_posts_the_login_mapping(site: Site) -
 
 async def test_a_proposal_older_than_the_reauth_limit_is_dropped(site: Site) -> None:
     await site.login_as(SUPER)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     response = await site.client.post(
         "/admin/settings/login/test", data=LOGIN_FORM, headers=SAME_ORIGIN
     )
@@ -389,7 +389,7 @@ async def test_a_proposal_older_than_the_reauth_limit_is_dropped(site: Site) -> 
 
 async def test_a_webex_service_app_set_in_the_portal_wires_the_integrations(site: Site) -> None:
     await site.login_as(SUPER)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     assert app.state.integrations.video is None
 
     for key, value in (
@@ -438,7 +438,7 @@ async def test_system_status_shows_the_latest_certificate_check(site: Site) -> N
     from app.adapters.db.uow import SqlUnitOfWork
     from app.domain.tls import Certificate, CertificateCheck, Finding, Trust
 
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     certificate = Certificate(
         "afspraak.example.nl",
         "Let's Encrypt (R11)",
@@ -494,7 +494,7 @@ async def test_each_topic_is_one_form_with_one_save(site: Site) -> None:
 
 async def test_the_topic_form_saves_only_what_differs(site: Site) -> None:
     await site.login_as(SUPER)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
 
     response = await site.client.post(
         "/admin/settings/topic/admin_session",
@@ -515,7 +515,7 @@ async def test_the_topic_form_saves_only_what_differs(site: Site) -> None:
 
 async def test_the_topic_form_with_nothing_new_changes_nothing(site: Site) -> None:
     await site.login_as(SUPER)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
 
     response = await site.client.post(
         "/admin/settings/topic/admin_session",
@@ -530,7 +530,7 @@ async def test_the_topic_form_with_nothing_new_changes_nothing(site: Site) -> No
 
 async def test_the_topic_form_stops_at_the_first_refusal(site: Site) -> None:
     await site.login_as(SUPER)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
 
     response = await site.client.post(
         "/admin/settings/topic/admin_session",
@@ -547,7 +547,7 @@ async def test_the_topic_form_sets_a_boolean_and_an_empty_secret_keeps_the_curre
     site: Site,
 ) -> None:
     await site.login_as(SUPER)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     await site.client.post(
         "/admin/settings/smtp_password", data={"value": SECRET}, headers=SAME_ORIGIN
     )
@@ -569,7 +569,7 @@ async def test_the_topic_form_sets_a_boolean_and_an_empty_secret_keeps_the_curre
 
 def _legacy_package(site: Site, tmp_path: Path) -> bytes:
     """Return a SQLite package of the site, as the old export wrote it."""
-    settings: Settings = site.client._transport.app.state.settings  # type: ignore[attr-defined]  # noqa: SLF001
+    settings: Settings = site.app.state.settings
     return package_of(settings, site.clock.now(), PACKAGE_PASSPHRASE, tmp_path)
 
 
@@ -610,7 +610,7 @@ async def test_the_superuser_applies_an_old_package_as_a_replacing_document(
     )
     page = (await site.client.get(response.headers["location"])).text
     assert "Het configuratiepakket is als document toegepast: 2 organisatie(s)." in page
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with AsyncSession(app.state.engine) as session:
         rows = list(await session.scalars(select(AuditEventRow).order_by(AuditEventRow.id)))
     details = [row.detail for row in rows if row.detail.startswith("configuration.")]
@@ -626,7 +626,7 @@ async def test_an_old_package_that_would_delete_what_is_in_use_is_refused_in_wor
 ) -> None:
     await site.login_as(SUPER)
     package = _legacy_package(site, tmp_path)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     # The installation now has a group the package does not know, with an active closure.
     async with AsyncSession(app.state.engine) as session, session.begin():
         original = await session.scalar(select(GroupRow).order_by(GroupRow.id).limit(1))
@@ -735,7 +735,7 @@ async def test_system_status_counts_what_is_still_under_the_previous_key(
         }
     )
 
-    async with _running_site(rotating, admin_db) as running:
+    async with running_site(rotating, admin_db) as running:
         await running.login_as(SUPER)
         text = (await running.client.get("/admin/settings")).text
 
@@ -747,7 +747,7 @@ async def test_system_status_counts_what_is_still_under_the_previous_key(
         assert OLD_SETTINGS_KEY not in text
         assert NEW_SETTINGS_KEY not in text
 
-        app = running.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+        app = running.app
         await CredentialStore(app.state.engine, installation_box(rotating)).put(
             "webex_service_app", {"access_token": "secret-value"}, NOW
         )
@@ -769,8 +769,8 @@ async def test_system_status_counts_open_bookings_on_the_previous_token_key(
         }
     )
 
-    async with _running_site(rotating, admin_db) as running:
-        app = running.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    async with running_site(rotating, admin_db) as running:
+        app = running.app
         async with AsyncSession(app.state.engine) as session:
             group = (await session.scalars(select(GroupRow.id).limit(1))).one()
         # A separate write transaction: a read that turns into a write can be refused as busy.
@@ -814,7 +814,7 @@ async def test_the_internal_root_is_offered_only_when_the_proxy_published_it(
 ) -> None:
     """ADR 0112: a public certificate to download; no file, no link, 404."""
     root = tmp_path / "root.crt"
-    async with _running_site(
+    async with running_site(
         settings.model_copy(update={"tls_internal_ca_file": root}), admin_db
     ) as site:
         await site.login_as(SUPER)

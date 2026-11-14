@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from tests.scripts.conftest import Git
+from tests.support.git_repository import Git
 
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "deploy-site.sh"
 

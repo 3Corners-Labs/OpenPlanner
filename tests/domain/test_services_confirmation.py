@@ -42,11 +42,6 @@ def uow() -> InMemoryUnitOfWork:
 
 
 @pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
-
-
-@pytest.fixture
 def service(uow: InMemoryUnitOfWork, clock: FixedClock) -> BookingService:
     return BookingService(uow, clock, TEST_TOKEN_KEY, treatment_buffer=0)
 

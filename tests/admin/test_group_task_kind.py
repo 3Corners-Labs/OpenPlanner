@@ -8,7 +8,7 @@ saved and audited with the routing's other attributes, under the same permission
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
 from app.domain.contact_center import TaskKind
-from tests.admin.conftest import OUTSIDER, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import OUTSIDER, SUPER, Site, post_form
 from tests.support.group_settings import SETTINGS_FORM
 
 GROUP = "/admin/groups/demo"
@@ -17,16 +17,16 @@ FIELD = "contact_center_task_kind"
 
 def _switch(site: Site, *, on: bool) -> None:
     """Set the platform switch the way the portal's value would reach the running process."""
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     app.state.settings = app.state.settings.model_copy(update={"embedded_call_enabled": on})
 
 
 async def _post(site: Site, data: dict[str, str]) -> object:
-    return await site.client.post(f"{GROUP}/settings", data=data, headers=SAME_ORIGIN)
+    return await post_form(site, f"{GROUP}/settings", data)
 
 
 async def _stored(site: Site) -> TaskKind | None:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with SqlUnitOfWork(app.state.engine).read() as tx:
         group = await tx.get_group("demo")
     assert group is not None
@@ -98,7 +98,7 @@ async def test_the_conversation_is_saved_audited_and_shown_while_the_switch_is_o
     assert await _stored(site) is TaskKind.CONVERSATION
     page = (await site.client.get(f"{GROUP}/settings")).text
     assert '<option value="conversation" selected' in page
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with SqlUnitOfWork(app.state.engine).read() as tx:
         events = await tx.list_audit_events(Scope(everything=True), limit=5)
     assert "contact_center" in events[0].event.detail

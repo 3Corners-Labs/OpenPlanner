@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.db.models import GroupRow, StaffRow
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.usage_staff import StaffCell
-from tests.admin.conftest import AUDITOR, GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import AUDITOR, GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 
 RANGE = "from=2025-12-26&to=2026-01-01"
 HOUR = datetime(2025, 12, 31, 8, tzinfo=UTC)
@@ -18,14 +18,14 @@ SETTING = "/admin/organisations/demo/settings/reporting_staff_view_enabled"
 
 
 def _engine(site: Site) -> Any:
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app: Any = site.app
     return app.state.engine
 
 
 async def _switch_on(site: Site) -> None:
     response = await site.client.post(SETTING, data={"value": "true"}, headers=SAME_ORIGIN)
     assert response.status_code == 303
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app: Any = site.app
     await app.state.live_settings.refresh()  # the worker's loop does this every few seconds
 
 

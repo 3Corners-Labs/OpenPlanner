@@ -30,9 +30,9 @@ from app.domain.ports import IntegrationError
 from app.domain.settings_registry import BY_KEY
 from app.keys import guest_pseudonym_key
 from app.logging import set_line_tap
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import GUEST_EXPIRES, FakeDispatcher, FakeVideo, webex_cc
+from tests.support.app_client import app_client
 from tests.support.domain import NOW
 from tests.support.participant import (
     FRIDAY_0900,

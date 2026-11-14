@@ -14,11 +14,11 @@ from app.domain.closure_service import ClosureInput, ClosureService
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.job_plan import JobType, plan_closure_update, plan_purge
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.closures import NOTICES
 from tests.support.domain import MONDAY, NOW, SLOT_0900, TEST_TOKEN_KEY, book
 from tests.support.principals import principal
+from tests.support.seed_rows import seed_group
 
 ADMIN = principal("s-1", "S", frozenset({Role.SUPERUSER}), frozenset(), frozenset())
 UNTIL = SLOT_0900 + timedelta(days=1)

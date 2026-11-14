@@ -20,11 +20,11 @@ from app.domain.calls import CallState, TaskState
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.services import BookingService
 from app.domain.webhook_replay import body_identity, replay_key, scope_of
-from tests.adapters.db.conftest import seed_group
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import app_client
 from tests.support.database import migrated_database
 from tests.support.domain import NOW, TEST_TOKEN_KEY, book
+from tests.support.seed_rows import seed_group
 from tests.support.webhooks import SECRET, sign, timestamp, wxcc_body
 
 

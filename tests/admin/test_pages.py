@@ -3,7 +3,7 @@
 import re
 
 from app.web.navigation import BOTTOM_BAR_ENTRIES
-from tests.admin.conftest import AGENT, GROUP_ADMIN, NO_ROLE, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import AGENT, GROUP_ADMIN, NO_ROLE, SAME_ORIGIN, SUPER, Site
 
 
 def _current_links(page: str) -> list[str]:

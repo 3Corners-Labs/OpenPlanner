@@ -18,9 +18,9 @@ from app.domain.booking_rollup_service import BookingRowRollup
 from app.domain.calls import BookingEvent, EventKind
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW, SLOT_0900, SLOT_0930, TEST_TOKEN_KEY, book
+from tests.support.seed_rows import seed_group
 
 DAY = timedelta(days=1)
 TERM = timedelta(days=730)

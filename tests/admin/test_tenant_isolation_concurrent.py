@@ -42,9 +42,9 @@ from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
 from app.keys import management_token_key
 from app.web.organisation_settings import follow_group_from_path
-from tests.admin.conftest import ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
 from tests.fakes.messaging import SmtpRecorder
 from tests.fakes.woff2 import make_woff2
+from tests.support.admin_site import ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
 
 MIN_REQUESTS = 200
 BACKGROUND_PATH = "/__probe/{slug}/background"
@@ -168,7 +168,7 @@ def other(org: Org) -> Org:
 @pytest.fixture
 async def proof(site: Site) -> Site:
     """The app with both organisations configured, and the background probe route added."""
-    app: FastAPI = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app: FastAPI = site.app
     await _configure(site, app)
 
     async def background(request: Request, slug: str) -> dict[str, str]:
@@ -267,8 +267,7 @@ async def _configure(site: Site, app: FastAPI) -> None:
 async def public_client(site: Site) -> httpx.AsyncClient:
     """Return a client without cookies, as one more visitor."""
     return httpx.AsyncClient(
-        transport=site.client._transport,  # type: ignore[attr-defined]  # noqa: SLF001
-        base_url="http://testserver",
+        transport=httpx.ASGITransport(app=site.app), base_url="http://testserver"
     )
 
 
@@ -277,7 +276,7 @@ async def admin_clients(site: Site) -> dict[str, httpx.AsyncClient]:
     clients: dict[str, httpx.AsyncClient] = {}
     for org in ORGS:
         client = await public_client(site)
-        await Site(client, site.idp, site.clock, site.dns).login_as(org.admin)
+        await Site(site.app, client, site.idp, site.clock, site.dns).login_as(org.admin)
         clients[org.slug] = client
     return clients
 
@@ -451,7 +450,7 @@ def slot_starts(org: Org) -> list[datetime]:
 async def test_the_worker_renders_both_organisations_mails_at_once(
     proof: Site, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    app: FastAPI = proof.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app: FastAPI = proof.app
     recorder = SmtpRecorder()
     monkeypatch.setattr(senders_module, "SmtpMailSender", recorder)
     service = app.state.booking_service

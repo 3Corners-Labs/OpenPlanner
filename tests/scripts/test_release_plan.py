@@ -13,7 +13,7 @@ from scripts.release_plan import (
     project_version,
     superseded_by,
 )
-from tests.scripts.conftest import Git, commit_all
+from tests.support.git_repository import Git, commit_all
 
 
 @pytest.mark.parametrize(

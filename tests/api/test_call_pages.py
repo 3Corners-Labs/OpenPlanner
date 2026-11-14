@@ -16,8 +16,8 @@ from app.web.security_policy import (
     HTML_CSP,
     SCRIPT_CSP,
 )
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import app_client
 from tests.support.call_page import Page
 from tests.support.domain import NOW
 from tests.support.participant import booked, open_link

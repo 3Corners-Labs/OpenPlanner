@@ -20,7 +20,7 @@ from app.domain.updates import (
     Version,
 )
 from app.web.static_assets import ASSETS
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.support.domain import NOW
 
 RELEASE = Release(Version(1, 4, 0), "https://github.com/acme/openplanner/releases/tag/v1.4.0")
@@ -75,7 +75,7 @@ async def listed(admin_db: str) -> None:
 
 
 def updates(site: Site) -> UpdateService:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     found: UpdateService = app.state.update_service
     return found
 

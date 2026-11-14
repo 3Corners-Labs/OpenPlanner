@@ -10,8 +10,7 @@ from app.domain.authorization import Scope
 from app.domain.flow_resolution import FlowRef
 from app.domain.immediate_intake import new_access
 from app.domain.service_requests import RequestPersonalData, on_demand_request
-from tests.admin.conftest import AGENT, SAME_ORIGIN, Site
-from tests.support.admin_site import site_uow
+from tests.support.admin_site import AGENT, SAME_ORIGIN, Site, site_uow
 from tests.support.queue import own_queue, request_work, staffed_pool_flow
 
 QUEUE = "/admin/groups/demo/queue"

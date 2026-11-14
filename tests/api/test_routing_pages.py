@@ -16,8 +16,8 @@ from app.adapters.db.models import BookingRow, GroupRow, ScheduleRuleRow
 from app.adapters.db.routing_json import routing_json
 from app.config import Settings
 from app.domain.routing import Attribute, GroupRouting, Subject
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import app_client
 from tests.support.domain import NOW
 from tests.support.widget import SITE, embed
 

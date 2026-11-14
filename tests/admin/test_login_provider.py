@@ -8,8 +8,7 @@ from app.admin.session import pop_login_start, save_login_start
 from app.domain.audit import Outcome
 from app.domain.identity import PLATFORM
 from app.domain.ports import LoginStart
-from tests.admin.conftest import GROUP_ADMIN, Site
-from tests.support.admin_site import audit_events
+from tests.support.admin_site import GROUP_ADMIN, Site, audit_events
 
 START = LoginStart("https://idp.test/authorize", "state-1", "nonce-1", "verifier-1")
 

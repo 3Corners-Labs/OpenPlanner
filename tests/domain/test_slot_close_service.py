@@ -29,11 +29,6 @@ INTERVAL = timedelta(minutes=15)
 
 
 @pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
-
-
-@pytest.fixture
 def uow() -> InMemoryUnitOfWork:
     return InMemoryUnitOfWork(three_groups())
 

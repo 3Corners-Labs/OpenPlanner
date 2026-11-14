@@ -8,17 +8,21 @@ import pytest
 from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.wxcc import DESCRIPTOR
 from app.domain.authorization import Scope
-from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
-from tests.support.admin_site import audit_events
+from tests.support.admin_site import (
+    GROUP_ADMIN,
+    ORG_ADMIN,
+    OUTSIDER,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+    audit_events,
+    post_form,
+)
 from tests.support.group_settings import SETTINGS_FORM
 from tests.support.participant import SAME_ORIGIN as PARTICIPANT
 from tests.support.participant import confirm_newest
 
 GROUP = "/admin/groups/demo"
-
-
-async def _post(site: Site, path: str, data: dict[str, str]) -> object:
-    return await site.client.post(path, data=data, headers=SAME_ORIGIN)
 
 
 async def test_org_admin_creates_a_group_and_lands_on_it(site: Site) -> None:
@@ -94,7 +98,7 @@ async def test_settings_preselect_the_group_time_zone(site: Site) -> None:
 async def test_new_group_rejects_an_unknown_time_zone(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
-    response = await _post(
+    response = await post_form(
         site,
         "/admin/groups",
         {
@@ -135,7 +139,7 @@ async def test_new_group_errors_are_linked_to_their_fields(site: Site) -> None:
 async def test_an_empty_web_address_is_made_from_the_name(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
-    response = await _post(
+    response = await post_form(
         site,
         "/admin/groups",
         {
@@ -154,7 +158,7 @@ async def test_an_empty_web_address_is_made_from_the_name(site: Site) -> None:
 async def test_a_typed_web_address_is_tidied_to_the_rules(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
-    response = await _post(
+    response = await post_form(
         site,
         "/admin/groups",
         {
@@ -173,7 +177,7 @@ async def test_a_typed_web_address_is_tidied_to_the_rules(site: Site) -> None:
 async def test_a_refused_form_shows_the_web_address_that_was_tried(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
-    response = await _post(
+    response = await post_form(
         site,
         "/admin/groups",
         {
@@ -213,8 +217,8 @@ async def test_settings_are_saved_and_unchanged_saves_say_so(site: Site) -> None
     await site.login_as(ORG_ADMIN)
     form = dict(SETTINGS_FORM)
 
-    saved = await _post(site, f"{GROUP}/settings", form)
-    again = await _post(site, f"{GROUP}/settings", form)
+    saved = await post_form(site, f"{GROUP}/settings", form)
+    again = await post_form(site, f"{GROUP}/settings", form)
 
     assert saved.headers["location"] == f"{GROUP}/settings?done=saved"  # type: ignore[attr-defined]
     assert again.headers["location"] == f"{GROUP}/settings?done=unchanged"  # type: ignore[attr-defined]
@@ -260,7 +264,7 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
         "not_picked_up_minutes": "10",
     }
 
-    saved = await _post(site, f"{GROUP}/settings", form)
+    saved = await post_form(site, f"{GROUP}/settings", form)
 
     assert 'name="dispatch_kind"' in page
     assert "Eigen wachtrij van OpenPlanner" in page
@@ -270,7 +274,7 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
     assert 'name="participant_change_lead_minutes" type="number" value="120"' in after
     overview = (await site.client.get(GROUP)).text
     assert "team-demo@example.nl" in overview
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with SqlUnitOfWork(app.state.engine).read() as tx:
         events = await tx.list_audit_events(Scope(everything=True), limit=5)
     assert "dispatch_kind" in events[0].event.detail
@@ -320,7 +324,7 @@ async def test_dispatch_fields_are_checked(site: Site, kind: str, minutes: str, 
         "not_picked_up_minutes": "10",
     }
 
-    response = await _post(site, f"{GROUP}/settings", form)
+    response = await post_form(site, f"{GROUP}/settings", form)
 
     assert response.status_code == 422  # type: ignore[attr-defined]
     assert error in response.text  # type: ignore[attr-defined]
@@ -329,7 +333,7 @@ async def test_dispatch_fields_are_checked(site: Site, kind: str, minutes: str, 
 async def test_invalid_settings_show_the_field_error(site: Site) -> None:
     await site.login_as(SUPER)
 
-    response = await _post(
+    response = await post_form(
         site,
         f"{GROUP}/settings",
         {
@@ -367,7 +371,7 @@ async def test_invalid_settings_show_the_field_error(site: Site) -> None:
 async def test_group_admin_adds_and_removes_opening_hours(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
 
-    added = await _post(
+    added = await post_form(
         site,
         f"{GROUP}/staffing",
         {"weekday": "5", "opens": "10:00", "closes": "12:00", "capacity": "3"},
@@ -393,7 +397,7 @@ async def test_group_admin_adds_and_removes_opening_hours(site: Site) -> None:
 async def _saturday_window(site: Site) -> tuple[str, str]:
     """Add Saturday 10:00–12:00 as a group admin; return the week page and its change link."""
     await site.login_as(GROUP_ADMIN)
-    await _post(
+    await post_form(
         site,
         f"{GROUP}/staffing",
         {"weekday": "5", "opens": "10:00", "closes": "12:00", "capacity": "3"},
@@ -411,7 +415,7 @@ async def test_group_admin_changes_existing_opening_hours(site: Site) -> None:
     assert 'id="opens" name="opens" type="text" inputmode="numeric" value="10:00"' in form
     assert 'id="capacity" name="capacity" type="number" value="3"' in form
 
-    saved = await _post(
+    saved = await post_form(
         site, link, {"weekday": "5", "opens": "09:00", "closes": "12:00", "capacity": "4"}
     )
     assert saved.headers["location"] == f"{GROUP}/staffing?done=saved"  # type: ignore[attr-defined]
@@ -424,7 +428,7 @@ async def test_group_admin_changes_existing_opening_hours(site: Site) -> None:
 async def test_changed_hours_are_validated_like_new_ones(site: Site) -> None:
     _, link = await _saturday_window(site)
 
-    response = await _post(
+    response = await post_form(
         site, link, {"weekday": "5", "opens": "10:00", "closes": "12:00", "capacity": "1001"}
     )
 
@@ -440,7 +444,7 @@ async def test_a_block_without_agents_gets_a_label(site: Site) -> None:
     assert 'min="0"' in form
     assert 'id="label" name="label" type="text" value=""' in form
 
-    added = await _post(
+    added = await post_form(
         site,
         f"{GROUP}/staffing",
         {"weekday": "5", "opens": "12:00", "closes": "12:30", "capacity": "0", "label": "Lunch"},
@@ -459,7 +463,7 @@ async def test_a_block_without_agents_gets_a_label(site: Site) -> None:
 async def test_an_invalid_label_is_explained(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
 
-    response = await _post(
+    response = await post_form(
         site,
         f"{GROUP}/staffing",
         {"weekday": "5", "opens": "12:00", "closes": "12:30", "capacity": "0", "label": "x" * 51},
@@ -486,7 +490,7 @@ async def test_every_day_links_to_the_form_with_that_day_chosen(site: Site) -> N
 async def test_overlapping_hours_are_explained(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
 
-    response = await _post(
+    response = await post_form(
         site,
         f"{GROUP}/staffing",
         {"weekday": "0", "opens": "10:00", "closes": "11:00", "capacity": "1"},
@@ -501,8 +505,8 @@ async def test_exceptions_close_a_day_or_change_hours(site: Site) -> None:
     day = (site.clock.now() + timedelta(days=3)).strftime("%d-%m-%Y")  # as typed by an admin
     other = (site.clock.now() + timedelta(days=4)).date().isoformat()
 
-    closed = await _post(site, f"{GROUP}/exceptions", {"day": day, "kind": "closed"})
-    hours = await _post(
+    closed = await post_form(site, f"{GROUP}/exceptions", {"day": day, "kind": "closed"})
+    hours = await post_form(
         site,
         f"{GROUP}/exceptions",
         {"day": other, "kind": "hours", "opens": "13:00", "closes": "14:00", "capacity": "1"},
@@ -521,7 +525,7 @@ async def test_an_exception_may_have_no_agents_and_a_label(site: Site) -> None:
     form = (await site.client.get(f"{GROUP}/exceptions")).text
     assert 'id="label" name="label" type="text"' in form
 
-    response = await _post(
+    response = await post_form(
         site,
         f"{GROUP}/exceptions",
         {
@@ -542,7 +546,7 @@ async def test_exception_in_the_past_is_refused(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
     yesterday = (site.clock.now() - timedelta(days=1)).date().isoformat()
 
-    response = await _post(site, f"{GROUP}/exceptions", {"day": yesterday, "kind": "closed"})
+    response = await post_form(site, f"{GROUP}/exceptions", {"day": yesterday, "kind": "closed"})
 
     assert response.status_code == 422  # type: ignore[attr-defined]
     assert '<a href="#day">Kies een datum vanaf vandaag' in response.text  # type: ignore[attr-defined]
@@ -664,12 +668,12 @@ async def test_overview_shows_week_preview_and_exceptions(site: Site) -> None:
 
 async def test_audit_log_says_what_changed(site: Site) -> None:
     await site.login_as(SUPER)
-    await _post(
+    await post_form(
         site,
         f"{GROUP}/staffing",
         {"weekday": "5", "opens": "10:00", "closes": "11:00", "capacity": "1"},
     )
-    await _post(
+    await post_form(
         site,
         f"{GROUP}/settings",
         {
@@ -744,11 +748,13 @@ async def test_the_direct_call_cap_is_optional(site: Site) -> None:
     }
     field = 'id="direct_call_max_concurrent" name="direct_call_max_concurrent" type="number"'
 
-    capped = await _post(site, f"{GROUP}/settings", {**form, "direct_call_max_concurrent": "4"})
+    capped = await post_form(site, f"{GROUP}/settings", {**form, "direct_call_max_concurrent": "4"})
     page = (await site.client.get(f"{GROUP}/settings")).text
-    zero = await _post(site, f"{GROUP}/settings", {**form, "direct_call_max_concurrent": "0"})
-    text = await _post(site, f"{GROUP}/settings", {**form, "direct_call_max_concurrent": "veel"})
-    cleared = await _post(site, f"{GROUP}/settings", {**form, "direct_call_max_concurrent": ""})
+    zero = await post_form(site, f"{GROUP}/settings", {**form, "direct_call_max_concurrent": "0"})
+    text = await post_form(
+        site, f"{GROUP}/settings", {**form, "direct_call_max_concurrent": "veel"}
+    )
+    cleared = await post_form(site, f"{GROUP}/settings", {**form, "direct_call_max_concurrent": ""})
 
     assert capped.headers["location"] == f"{GROUP}/settings?done=saved"  # type: ignore[attr-defined]
     assert f'{field} value="4"' in page
@@ -778,7 +784,7 @@ async def test_week_shows_labels_and_marks_blocks_without_agents_in_text(site: S
         ("12:00", "12:30", "0", "Lunch"),
         ("12:30", "17:00", "3", ""),
     ):
-        await _post(
+        await post_form(
             site,
             f"{GROUP}/staffing",
             {
@@ -807,7 +813,7 @@ async def test_week_shows_labels_and_marks_blocks_without_agents_in_text(site: S
 
 async def test_group_admin_splits_a_block_for_lunch(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
-    await _post(
+    await post_form(
         site,
         f"{GROUP}/staffing",
         {"weekday": "5", "opens": "09:00", "closes": "17:00", "capacity": "3", "label": "Dag"},
@@ -820,7 +826,7 @@ async def test_group_admin_splits_a_block_for_lunch(site: Site) -> None:
     assert "Tijdblok splitsen" in form
     assert "zaterdag 09:00–17:00 · 3 medewerkers · Dag" in form
     assert 'id="split_at" name="split_at"' in form
-    split = await _post(site, link, {"split_at": "12:00", "capacity": "0", "label": "Lunch"})
+    split = await post_form(site, link, {"split_at": "12:00", "capacity": "0", "label": "Lunch"})
 
     assert split.headers["location"] == f"{GROUP}/staffing?done=saved"  # type: ignore[attr-defined]
     page = (await site.client.get(f"{GROUP}/staffing")).text
@@ -837,8 +843,8 @@ async def test_a_split_outside_the_block_is_explained(site: Site) -> None:
     week, _ = await _saturday_window(site)
     link = week.split("10:00–12:00", 1)[1].split('href="', 2)[2].split('"', 1)[0]
 
-    response = await _post(site, link, {"split_at": "13:00", "capacity": "1", "label": ""})
-    garbage = await _post(site, link, {"split_at": "later", "capacity": "-1", "label": ""})
+    response = await post_form(site, link, {"split_at": "13:00", "capacity": "1", "label": ""})
+    garbage = await post_form(site, link, {"split_at": "later", "capacity": "-1", "label": ""})
 
     assert response.status_code == 422  # type: ignore[attr-defined]
     assert '<a href="#split_at">' in response.text  # type: ignore[attr-defined]
@@ -856,7 +862,7 @@ async def test_trial_call_fields_are_checked(site: Site, field: str, value: str)
     await site.login_as(SUPER)
     form = {**SETTINGS_FORM, field: value}
 
-    response = await _post(site, f"{GROUP}/settings", form)
+    response = await post_form(site, f"{GROUP}/settings", form)
 
     assert response.status_code == 422
     assert f'<a href="#{field}">' in response.text
@@ -875,10 +881,12 @@ async def test_a_refused_routing_value_is_linked_to_its_input_and_nothing_is_sav
 ) -> None:
     """ADR 0032: the routing's refusal (``contact_center.<attribute>``) points at the input."""
     await site.login_as(SUPER)
-    await _post(site, f"{GROUP}/settings", dict(SETTINGS_FORM))
+    await post_form(site, f"{GROUP}/settings", dict(SETTINGS_FORM))
     before = (await site.client.get(f"{GROUP}/settings")).text
 
-    response = await _post(site, f"{GROUP}/settings", {**SETTINGS_FORM, "name": "X", field: value})
+    response = await post_form(
+        site, f"{GROUP}/settings", {**SETTINGS_FORM, "name": "X", field: value}
+    )
 
     assert response.status_code == 422
     assert f'<a href="#{field}">' in response.text
@@ -894,7 +902,7 @@ async def test_the_trial_call_switch_and_limits_are_saved(site: Site) -> None:
         "trial_calls_per_booking": "5",
     }
 
-    saved = await _post(site, f"{GROUP}/settings", form)
+    saved = await post_form(site, f"{GROUP}/settings", form)
     after = (await site.client.get(f"{GROUP}/settings")).text
 
     assert saved.headers["location"] == f"{GROUP}/settings?done=saved"  # type: ignore[attr-defined]
@@ -907,7 +915,7 @@ async def test_the_join_client_is_saved_and_shown(site: Site) -> None:
     await site.login_as(SUPER)
 
     default = (await site.client.get(f"{GROUP}/settings")).text
-    saved = await _post(site, f"{GROUP}/settings", {**SETTINGS_FORM, "join_client": "choice"})
+    saved = await post_form(site, f"{GROUP}/settings", {**SETTINGS_FORM, "join_client": "choice"})
     after = (await site.client.get(f"{GROUP}/settings")).text
 
     assert '<option value="browser" selected' in default
@@ -918,7 +926,7 @@ async def test_the_join_client_is_saved_and_shown(site: Site) -> None:
 async def test_an_unknown_join_client_is_refused_and_nothing_changes(site: Site) -> None:
     await site.login_as(SUPER)
 
-    refused = await _post(site, f"{GROUP}/settings", {**SETTINGS_FORM, "join_client": "app"})
+    refused = await post_form(site, f"{GROUP}/settings", {**SETTINGS_FORM, "join_client": "app"})
     after = (await site.client.get(f"{GROUP}/settings")).text
 
     assert refused.status_code == 422
@@ -946,7 +954,7 @@ async def test_the_settings_offer_archiving_to_those_who_may(site: Site) -> None
 async def test_a_wrong_name_keeps_the_group(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
-    refused = await _post(site, f"{GROUP}/settings/archive", {"confirmation": "Demo-team"})
+    refused = await post_form(site, f"{GROUP}/settings/archive", {"confirmation": "Demo-team"})
 
     assert refused.status_code == 422  # type: ignore[attr-defined]
     assert "Typ de naam precies zo over" in refused.text  # type: ignore[attr-defined]
@@ -959,7 +967,9 @@ async def test_archiving_removes_the_public_page_and_makes_the_group_read_only(
 ) -> None:
     await site.login_as(ORG_ADMIN)
 
-    done = await _post(site, f"{GROUP}/settings/archive", {"confirmation": " demo: VIDEOGESPREK "})
+    done = await post_form(
+        site, f"{GROUP}/settings/archive", {"confirmation": " demo: VIDEOGESPREK "}
+    )
 
     assert done.headers["location"] == "/admin/groups?done=archived"  # type: ignore[attr-defined]
     listing = (await site.client.get("/admin/groups?done=archived")).text
@@ -973,10 +983,12 @@ async def test_archiving_removes_the_public_page_and_makes_the_group_read_only(
     overview = await site.client.get(GROUP)
     assert overview.status_code == 200
     assert "Deze dienst is gearchiveerd" in overview.text
-    refused = await _post(site, f"{GROUP}/settings", dict(SETTINGS_FORM))
+    refused = await post_form(site, f"{GROUP}/settings", dict(SETTINGS_FORM))
     assert refused.status_code == 409  # type: ignore[attr-defined]
     assert "gearchiveerd en kan niet meer worden gewijzigd" in refused.text  # type: ignore[attr-defined]
-    again = await _post(site, f"{GROUP}/settings/archive", {"confirmation": "Demo: videogesprek"})
+    again = await post_form(
+        site, f"{GROUP}/settings/archive", {"confirmation": "Demo: videogesprek"}
+    )
     assert again.status_code == 409  # type: ignore[attr-defined]
 
     assert ("sub-org", "group.delete", "success", "") in [
@@ -1002,7 +1014,9 @@ async def test_archiving_is_refused_while_bookings_lie_ahead(site: Site) -> None
     await site.login_as(SUPER)
 
     page = (await site.client.get(f"{GROUP}/settings/archive")).text
-    refused = await _post(site, f"{GROUP}/settings/archive", {"confirmation": "Demo: videogesprek"})
+    refused = await post_form(
+        site, f"{GROUP}/settings/archive", {"confirmation": "Demo: videogesprek"}
+    )
 
     assert "afspraken in de toekomst" in page
     assert refused.status_code == 422  # type: ignore[attr-defined]
@@ -1015,19 +1029,19 @@ async def test_archiving_is_refused_while_bookings_lie_ahead(site: Site) -> None
 async def test_an_exception_is_changed_from_its_own_page(site: Site) -> None:
     await site.login_as(GROUP_ADMIN)
     day = (site.clock.now() + timedelta(days=3)).date().isoformat()
-    await _post(site, f"{GROUP}/exceptions", {"day": day, "kind": "closed"})
+    await post_form(site, f"{GROUP}/exceptions", {"day": day, "kind": "closed"})
     listing = (await site.client.get(f"{GROUP}/exceptions")).text
     link = re.search(rf'href="({GROUP}/exceptions/\d+)"', listing)
     assert link, "the list links each exception to its change page"
 
     form = (await site.client.get(link.group(1))).text
     assert 'id="kind-closed" name="kind" value="closed" checked' in form
-    changed = await _post(
+    changed = await post_form(
         site,
         link.group(1),
         {"day": day, "kind": "hours", "opens": "13:00", "closes": "14:00", "capacity": "2"},
     )
-    again = await _post(
+    again = await post_form(
         site,
         link.group(1),
         {"day": day, "kind": "hours", "opens": "13:00", "closes": "14:00", "capacity": "2"},
@@ -1044,13 +1058,13 @@ async def test_a_changed_exception_in_the_past_or_of_another_group_is_refused(si
     await site.login_as(GROUP_ADMIN)
     day = (site.clock.now() + timedelta(days=3)).date().isoformat()
     yesterday = (site.clock.now() - timedelta(days=1)).date().isoformat()
-    await _post(site, f"{GROUP}/exceptions", {"day": day, "kind": "closed"})
+    await post_form(site, f"{GROUP}/exceptions", {"day": day, "kind": "closed"})
     link = re.search(
         rf'href="({GROUP}/exceptions/\d+)"', (await site.client.get(f"{GROUP}/exceptions")).text
     )
     assert link
 
-    past = await _post(site, link.group(1), {"day": yesterday, "kind": "closed"})
+    past = await post_form(site, link.group(1), {"day": yesterday, "kind": "closed"})
     elsewhere = await site.client.get("/admin/groups/andere-team/exceptions/1")
 
     assert past.status_code == 422  # type: ignore[attr-defined]

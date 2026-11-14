@@ -10,8 +10,7 @@ from sqlalchemy.exc import OperationalError
 
 from app.adapters.db.uow import SqlTransaction
 from app.domain.audit import Outcome
-from tests.admin.conftest import GROUP_ADMIN, Site
-from tests.support.admin_site import audit_events
+from tests.support.admin_site import GROUP_ADMIN, Site, audit_events
 
 
 async def _is_signed_in(site: Site) -> bool:

@@ -8,9 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.change_requests import ChangeRequest
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import ADA, NOW, SLOT_0900, SLOT_0930, TEST_TOKEN_KEY, book
+from tests.support.seed_rows import seed_group
 
 
 async def test_a_request_is_stored_found_replaced_and_pruned(engine: AsyncEngine) -> None:

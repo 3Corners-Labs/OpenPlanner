@@ -13,9 +13,9 @@ from app.domain.privacy import PURGED_FIELDS
 from app.domain.services import BookingService
 from app.domain.usage import FactKind
 from app.domain.usage_backfill_service import UsageBackfill
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW, SLOT_0900, SLOT_0930, TEST_TOKEN_KEY, book
+from tests.support.seed_rows import seed_group
 
 
 async def _facts(engine: AsyncEngine) -> list[UsageEventRow]:

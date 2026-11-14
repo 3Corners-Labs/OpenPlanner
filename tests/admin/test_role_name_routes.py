@@ -1,6 +1,6 @@
 """The names an organisation gives its organisation admin and group admin (ADR 0077)."""
 
-from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
 
 TEXTS = "/admin/organisations/demo/texts/nl"
 ORG_KEY = "authz.role.org_admin"

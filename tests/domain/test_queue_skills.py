@@ -45,11 +45,6 @@ LEGACY_FLOW = FlowRef(51, 1)
 
 
 @pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
-
-
-@pytest.fixture
 def uow() -> InMemoryUnitOfWork:
     state = State(
         organisation_slugs={1: "demo"}, organisations={1: Organisation(1, "Demo", "demo")}

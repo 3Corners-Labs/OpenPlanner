@@ -9,13 +9,13 @@ from app.domain.admin import AdminService
 from app.domain.planning import PlanningService
 from app.domain.scheduling import ScheduleOverride, TimeWindow
 from app.domain.services import BookingService
-from tests.admin.conftest import AUDITOR, GROUP_ADMIN, OUTSIDER, SUPER, Site
+from tests.support.admin_site import AUDITOR, GROUP_ADMIN, OUTSIDER, SUPER, Site
 from tests.support.domain import FRIDAY, FRIDAY_0900, TEST_TOKEN_KEY, book_confirmed, participant
 
 
 async def _short_friday(site: Site) -> None:
     """Book 09:00 on Friday twice, then staff Friday 09:00-10:00 with one agent."""
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     uow = SqlUnitOfWork(app.state.engine)
     bookings = BookingService(uow, site.clock, TEST_TOKEN_KEY, treatment_buffer=0)
     for number in range(2):

@@ -8,9 +8,9 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.booking import Contact
 from app.domain.scheduling import PhoneMode
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW, TEST_TOKEN_KEY, book
+from tests.support.seed_rows import seed_group
 
 
 async def test_a_correction_keeps_the_email_status_and_routing(engine: AsyncEngine) -> None:

@@ -15,8 +15,7 @@ from app.domain.authorization import Scope
 from app.domain.booking import MeetingRef
 from app.domain.scheduling import DispatchKind, Offer, ScheduleRule, TimeWindow
 from app.domain.services import BookingService
-from tests.admin.conftest import SUPER, Site
-from tests.support.admin_site import site_uow
+from tests.support.admin_site import SUPER, Site, site_uow
 from tests.support.domain import ADA, FRIDAY_0900, TEST_TOKEN_KEY, book_confirmed
 from tests.support.flow_seed import add_flow, publish_flow
 from tests.support.flows import engine_of, flow_ids

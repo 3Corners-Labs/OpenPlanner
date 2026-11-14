@@ -12,9 +12,9 @@ from app.domain.authorization import Scope
 from app.domain.booking import BookingStatus
 from app.domain.scheduling import Group, PhoneMode, ScheduleOverride, ScheduleRule, TimeWindow
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW, SLOT_0900, TEST_TOKEN_KEY, book, window
+from tests.support.seed_rows import seed_group
 
 EVERYTHING = Scope(everything=True)
 

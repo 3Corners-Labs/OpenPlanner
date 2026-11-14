@@ -12,11 +12,10 @@ from app.adapters.integrations import Integrations
 from app.config import Settings
 from app.domain.checks import CheckArea, CheckStatus, Finding
 from app.main import create_app
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.fakes.clock import FixedClock
 from tests.fakes.identity import FakeIdentityProvider
 from tests.fakes.integrations import FakeChecker
-from tests.support.admin_site import audit_events
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site, audit_events
 from tests.support.domain import NOW
 from tests.support.group_settings import SETTINGS_FORM
 
@@ -59,7 +58,7 @@ async def _site(settings: Settings, admin_db: str, checker: FakeChecker) -> Asyn
             transport=httpx.ASGITransport(app=app), base_url="http://testserver"
         ) as client,
     ):
-        yield Site(client, idp, FixedClock(NOW))
+        yield Site(app, client, idp, FixedClock(NOW))
 
 
 @pytest.fixture

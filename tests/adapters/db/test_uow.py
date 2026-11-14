@@ -15,7 +15,6 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import JobType
 from app.domain.privacy import PII_FIELDS
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import close_day, seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import (
     MONDAY,
@@ -28,6 +27,7 @@ from tests.support.domain import (
     book_pending,
     participant,
 )
+from tests.support.seed_rows import close_day, seed_group
 
 
 @pytest.fixture

@@ -17,8 +17,8 @@ from app.config import Settings
 from app.domain.booking import ChangeReason
 from app.domain.booking_changes import ProposalTiming
 from app.domain.reschedule_proposal import DEFAULT_PROPOSAL_HOURS
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import app_client
 from tests.support.domain import NOW
 from tests.support.participant import SAME_ORIGIN, booked, open_link
 

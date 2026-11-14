@@ -13,7 +13,15 @@ import httpx
 import pytest
 
 from app.domain.authorization import Scope
-from tests.admin.conftest import AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import (
+    AUDITOR,
+    GROUP_ADMIN,
+    ORG_ADMIN,
+    OUTSIDER,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+)
 from tests.support.admin_site import site_uow as _uow
 from tests.support.routes import all_routes
 
@@ -29,7 +37,7 @@ async def _set(site: Site, key: str, value: str) -> None:
         f"{SETTING}/{key}", data={"value": value}, headers=SAME_ORIGIN
     )
     assert response.status_code == 303, key
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app: Any = site.app
     await app.state.live_settings.refresh()
 
 
@@ -39,7 +47,7 @@ async def _switch_on(site: Site) -> None:
 
 def _screen(site: Site, address: str = "10.20.4.31") -> httpx.AsyncClient:
     """A browser on a screen: no admin session, its own cookie jar, its own address."""
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app: Any = site.app
     transport = httpx.ASGITransport(app=app, client=(address, 4711))
     return httpx.AsyncClient(transport=transport, base_url="http://testserver")
 
@@ -383,7 +391,7 @@ async def test_the_screen_cookie_means_nothing_to_an_admin_route(site: Site) -> 
 
 
 async def test_the_screen_side_has_exactly_three_routes_and_no_other_admin_page(site: Site) -> None:
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app: Any = site.app
     paths = sorted(r.path for r in all_routes(app.routes) if r.path.startswith("/display"))
 
     assert paths == ["/display", "/display/live", "/display/start/{token}"]

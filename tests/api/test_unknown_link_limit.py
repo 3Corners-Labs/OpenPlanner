@@ -18,10 +18,8 @@ from app.main import create_app
 from tests.fakes.clock import FixedClock
 from tests.support.admin import SUPER
 from tests.support.domain import NOW
-from tests.support.participant import SAME_ORIGIN, confirm_newest
+from tests.support.participant import ADA, FRIDAY_0900, SAME_ORIGIN, confirm_newest
 
-FRIDAY_0900 = "2026-01-02T08:00:00Z"
-ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org", "phone": ""}
 BOUND = 3
 ROUTES = [
     ("GET", ""),

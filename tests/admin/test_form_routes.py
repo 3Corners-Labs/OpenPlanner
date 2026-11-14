@@ -1,18 +1,14 @@
 """Booking form screen (ADR 0055): add, edit, move and retire custom fields; answers shown."""
 
 from dataclasses import replace
-from datetime import UTC, datetime
-
-import httpx
 
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
 from app.domain.services import BookingService
-from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, Site
-from tests.support.domain import ADA, TEST_TOKEN_KEY
+from tests.support.admin_site import GROUP_ADMIN, ORG_ADMIN, Site, post_form
+from tests.support.domain import ADA, FRIDAY_0900, TEST_TOKEN_KEY
 
 PAGE = "/admin/groups/demo/settings/form"
-FRIDAY_0900 = datetime(2026, 1, 2, 8, 0, tzinfo=UTC)
 TOPIC = {
     "key": "topic",
     "type": "choice",
@@ -33,14 +29,10 @@ CUSTOMER = {
 
 
 async def _details(site: Site) -> list[str]:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with SqlUnitOfWork(app.state.engine).read() as tx:
         events = await tx.list_audit_events(Scope(everything=True), limit=50)
     return [e.event.detail for e in reversed(events) if e.event.action == "group.edit"]
-
-
-async def _post(site: Site, url: str, data: dict[str, str]) -> httpx.Response:
-    return await site.client.post(url, data=data, headers=SAME_ORIGIN)
 
 
 async def test_the_settings_link_to_the_booking_form(site: Site) -> None:
@@ -59,7 +51,7 @@ async def test_the_settings_card_summarises_the_booking_form(site: Site) -> None
     await site.login_as(ORG_ADMIN)
 
     card = (await site.client.get("/admin/groups/demo/settings")).text
-    await _post(site, PAGE, CUSTOMER)
+    await post_form(site, PAGE, CUSTOMER)
     after = (await site.client.get("/admin/groups/demo/settings")).text
 
     assert "Waar gaat uw vraag over?" in card  # the questions are named on the card
@@ -85,8 +77,8 @@ async def test_the_group_settings_list_their_topics_by_right(site: Site) -> None
 async def test_fields_are_added_listed_and_audited_by_key(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
-    added = await _post(site, PAGE, CUSTOMER)
-    await _post(site, PAGE, TOPIC)
+    added = await post_form(site, PAGE, CUSTOMER)
+    await post_form(site, PAGE, TOPIC)
 
     assert added.headers["location"] == f"{PAGE}?done=created"
     page = (await site.client.get(PAGE)).text
@@ -104,8 +96,8 @@ async def test_the_key_is_made_from_the_question_when_left_empty(site: Site) -> 
     await site.login_as(ORG_ADMIN)
     without_key = {k: v for k, v in CUSTOMER.items() if k != "key"}
 
-    first = await _post(site, PAGE, without_key)
-    second = await _post(site, PAGE, without_key)
+    first = await post_form(site, PAGE, without_key)
+    second = await post_form(site, PAGE, without_key)
 
     assert first.headers["location"] == f"{PAGE}?done=created"
     assert second.headers["location"] == f"{PAGE}?done=created"
@@ -118,7 +110,7 @@ async def test_the_key_is_made_from_the_question_when_left_empty(site: Site) -> 
 async def test_a_forbidden_question_without_a_key_is_refused_at_the_question(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
-    refused = await _post(
+    refused = await post_form(
         site, PAGE, {**CUSTOMER, "key": "", "label_nl": "Social security number", "label_en": "SSN"}
     )
 
@@ -170,7 +162,7 @@ async def test_a_proposed_not_personal_data_is_still_confirmed_by_the_administra
 ) -> None:
     await site.login_as(ORG_ADMIN)
 
-    refused = await _post(site, PAGE, {**TOPIC, "confirm_not_pii": ""})
+    refused = await post_form(site, PAGE, {**TOPIC, "confirm_not_pii": ""})
 
     assert refused.status_code == 422
     assert 'id="options"' in refused.text  # the form of the chosen kind stays
@@ -186,7 +178,7 @@ async def test_an_always_personal_kind_is_added_without_a_classification(site: S
         "label_en": "Partner email",
     }
 
-    created = await _post(site, PAGE, contact)
+    created = await post_form(site, PAGE, contact)
 
     assert created.headers["location"] == f"{PAGE}?done=created"
     row = (await site.client.get(PAGE)).text.split("Mailadres van de partner")[1].split("</tr>")[0]
@@ -196,10 +188,10 @@ async def test_an_always_personal_kind_is_added_without_a_classification(site: S
 async def test_refusals_are_linked_to_their_inputs(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
 
-    no_confirm = await _post(site, PAGE, {**TOPIC, "confirm_not_pii": ""})
-    forbidden = await _post(site, PAGE, {**CUSTOMER, "key": "ssn"})
-    bad_options = await _post(site, PAGE, {**TOPIC, "options": "rent; Huur"})
-    no_english = await _post(site, PAGE, {**CUSTOMER, "label_en": ""})
+    no_confirm = await post_form(site, PAGE, {**TOPIC, "confirm_not_pii": ""})
+    forbidden = await post_form(site, PAGE, {**CUSTOMER, "key": "ssn"})
+    bad_options = await post_form(site, PAGE, {**TOPIC, "options": "rent; Huur"})
+    no_english = await post_form(site, PAGE, {**CUSTOMER, "label_en": ""})
 
     assert {r.status_code for r in (no_confirm, forbidden, bad_options, no_english)} == {422}
     assert '<a href="#confirm_not_pii">Bevestig' in no_confirm.text
@@ -211,28 +203,28 @@ async def test_refusals_are_linked_to_their_inputs(site: Site) -> None:
 
 async def test_a_field_is_edited_moved_and_retired(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
-    await _post(site, PAGE, CUSTOMER)
-    await _post(site, PAGE, TOPIC)
+    await post_form(site, PAGE, CUSTOMER)
+    await post_form(site, PAGE, TOPIC)
 
     edit = (await site.client.get(f"{PAGE}/topic")).text
     assert "rent; Huur; Rent\ncare; Zorg; Care</textarea>" in edit
     assert 'name="type"' not in edit  # key and type are fixed
-    saved = await _post(site, f"{PAGE}/topic", {**TOPIC, "label_nl": "Waarover?"})
+    saved = await post_form(site, f"{PAGE}/topic", {**TOPIC, "label_nl": "Waarover?"})
     assert saved.headers["location"] == f"{PAGE}?done=saved"
-    unchanged = await _post(site, f"{PAGE}/topic", {**TOPIC, "label_nl": "Waarover?"})
+    unchanged = await post_form(site, f"{PAGE}/topic", {**TOPIC, "label_nl": "Waarover?"})
     assert unchanged.headers["location"] == f"{PAGE}?done=unchanged"
-    refused = await _post(site, f"{PAGE}/topic", {**TOPIC, "label_en": ""})
+    refused = await post_form(site, f"{PAGE}/topic", {**TOPIC, "label_en": ""})
     assert refused.status_code == 422
 
-    await _post(site, f"{PAGE}/topic/move", {"direction": "up"})
+    await post_form(site, f"{PAGE}/topic/move", {"direction": "up"})
     page = (await site.client.get(PAGE)).text
     assert page.index("Waarover?") < page.index("Klantnummer")
 
-    retired = await _post(site, f"{PAGE}/customer_no/retire", {})
+    retired = await post_form(site, f"{PAGE}/customer_no/retire", {})
     assert retired.headers["location"] == f"{PAGE}?done=field_retired#fields"
     page = (await site.client.get(PAGE)).text
     assert "Uitgezet (alleen nog bij eerdere afspraken): Klantnummer" in page
-    again = await _post(site, PAGE, CUSTOMER)
+    again = await post_form(site, PAGE, CUSTOMER)
     assert '<a href="#key">Kies een sleutel' in again.text
 
 
@@ -244,9 +236,9 @@ async def test_a_group_admin_cannot_open_the_form(site: Site) -> None:
 
 async def test_the_booking_page_shows_the_answers_with_their_labels(site: Site) -> None:
     await site.login_as(ORG_ADMIN)
-    await _post(site, PAGE, CUSTOMER)
-    await _post(site, PAGE, TOPIC)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    await post_form(site, PAGE, CUSTOMER)
+    await post_form(site, PAGE, TOPIC)
+    app = site.app
     receipt = await BookingService(
         SqlUnitOfWork(app.state.engine), site.clock, TEST_TOKEN_KEY, treatment_buffer=0
     ).book(

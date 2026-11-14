@@ -17,7 +17,7 @@ from app.domain.authorization import Principal
 from app.domain.maintenance import MaintenanceReason
 from app.domain.maintenance_service import MaintenanceService
 from app.web.route_dependencies import guards
-from tests.admin.conftest import SAME_ORIGIN, Site
+from tests.support.admin_site import SAME_ORIGIN, Site
 from tests.support.authorization_matrix import EXPECTED, ROLES
 from tests.support.routes import all_routes, scoped_routes
 
@@ -143,7 +143,7 @@ def test_the_maintenance_sweep_covers_every_endpoint_and_every_allowed_change() 
 
 async def maintenance_on(site: Site) -> None:
     """Switch maintenance on as the host would (``python -m app.cli maintenance on``)."""
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     service: MaintenanceService = app.state.maintenance_service
     await service.switch_on_host("host-cli", MaintenanceReason.OTHER)
 
@@ -161,7 +161,7 @@ async def test_anonymous_visitors_are_sent_to_the_login(site: Site, path: str) -
 
 
 def test_every_admin_route_declares_one_permission_and_is_in_the_table(site: Site) -> None:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     routes = [r for r in all_routes(app.routes) if r.path.startswith("/admin")]
     protected = {
         f"{method} {r.path}": r
@@ -235,7 +235,7 @@ def refuses_the_other_organisation(by_path: dict[str, dict[str, int]]) -> bool:
 
 
 def test_every_route_with_an_organisation_or_group_is_in_the_matrix_sweep(site: Site) -> None:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     scoped = scoped_routes(all_routes(app.routes))
 
     admin = {k for k in scoped if k.split(" ", 1)[1].startswith("/admin")}

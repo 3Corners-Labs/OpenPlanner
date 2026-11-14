@@ -1,6 +1,6 @@
 """The environment bar on admin pages (ENVIRONMENT=test in the test suite)."""
 
-from tests.admin.conftest import ORG_ADMIN, Site
+from tests.support.admin_site import ORG_ADMIN, Site
 
 
 async def test_every_admin_page_shows_the_bar_in_test(site: Site) -> None:

@@ -23,8 +23,8 @@ from app.adapters.db.seed import seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
 from app.domain.service_flows import FlowState, IntakeMode
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import app_client
 from tests.support.domain import NOW
 from tests.support.participant import ADA, SAME_ORIGIN
 from tests.support.pool_flows import open_gate, shut_gate

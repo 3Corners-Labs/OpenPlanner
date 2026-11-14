@@ -16,8 +16,8 @@ from app.config import Settings
 from app.domain.authorization import Scope
 from app.main import create_app
 from app.web.protection import limiter
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import app_client
 from tests.support.database import migrated_database
 from tests.support.domain import NOW
 from tests.support.webhooks import SECRET, sign, timestamp, wxcc_body

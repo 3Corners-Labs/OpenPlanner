@@ -8,8 +8,7 @@ the superuser.
 
 from app.domain.capacity_service import CapacityService
 from app.domain.skill_service import SkillService
-from tests.admin.conftest import SUPER, Site
-from tests.support.admin_site import site_app, site_uow
+from tests.support.admin_site import SUPER, Site, site_uow
 from tests.support.pool_code import derive_pool_code
 
 
@@ -21,14 +20,14 @@ async def add_skill(
     organisation: str = "demo",
 ) -> int:
     """Add a skill to ``organisation`` and return its id."""
-    skill = await site_app(site).state.skill_service.create(SUPER, organisation, code, nl, en)
+    skill = await site.app.state.skill_service.create(SUPER, organisation, code, nl, en)
     assert skill.id is not None
     return int(skill.id)
 
 
 async def archive_skill(site: Site, skill_id: int, organisation: str = "demo") -> None:
     """Archive a skill of ``organisation``."""
-    await site_app(site).state.skill_service.archive(SUPER, organisation, skill_id)
+    await site.app.state.skill_service.archive(SUPER, organisation, skill_id)
 
 
 async def add_pool(
@@ -42,7 +41,7 @@ async def add_pool(
 
     The code is the name's (``derive_pool_code``) unless given.
     """
-    pool = await site_app(site).state.capacity_service.create(
+    pool = await site.app.state.capacity_service.create(
         SUPER, organisation, code or derive_pool_code(name), name, skills
     )
     assert pool.id is not None
@@ -51,7 +50,7 @@ async def add_pool(
 
 async def archive_pool(site: Site, pool_id: int, organisation: str = "demo") -> None:
     """Archive a counted pool of ``organisation``."""
-    await site_app(site).state.capacity_service.archive(SUPER, organisation, pool_id)
+    await site.app.state.capacity_service.archive(SUPER, organisation, pool_id)
 
 
 async def staff_id(site: Site, subject: str) -> int:
@@ -66,7 +65,7 @@ async def staff_id(site: Site, subject: str) -> int:
 def limit(site: Site, skills: int | None = None, pools: int | None = None) -> None:
     """Replace the application's services by ones with a smaller limit (the live setting is
     bounded below at 10 skills and 5 pools, which would take many requests to reach)."""
-    app = site_app(site)
+    app = site.app
     state = app.state
     if skills is not None:
         state.skill_service = SkillService(site_uow(site), state.clock, state.admin_service, skills)

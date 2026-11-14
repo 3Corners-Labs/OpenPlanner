@@ -9,9 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.adapters.db.maintenance import checkpoint_wal
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import ADA, NOW, SLOT_0900, TEST_TOKEN_KEY, book
+from tests.support.seed_rows import seed_group
 
 MARKER = "zzmarker-purge-check"
 """Appears in the first name, the last name and the email of the booking under test."""

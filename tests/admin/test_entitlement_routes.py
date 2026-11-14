@@ -11,8 +11,8 @@ from app.config import Settings
 from app.domain.audit import Outcome
 from app.domain.authorization import Role, Scope
 from app.domain.entitlements import LoginClaims
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site, _running_site
 from tests.fakes.staff_directory import FakeStaffDirectory
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site, running_site
 
 SUPERUSER = LoginClaims("sub-root", "Root", entitlements=frozenset({"openplanner:superuser"}))
 TEAM_LEAD = LoginClaims(
@@ -28,7 +28,7 @@ MIXED = LoginClaims(
 @asynccontextmanager
 async def mode_site(settings: Settings, admin_db: str, mode: str) -> AsyncIterator[Site]:
     """The app with ``OIDC_CLAIM_MODE`` set to ``mode``."""
-    async with _running_site(
+    async with running_site(
         settings.model_copy(update={"oidc_claim_mode": mode}), admin_db
     ) as running:
         yield running
@@ -47,7 +47,7 @@ async def shadow(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
 
 
 async def events(site: Site) -> list[tuple[str, str, Outcome, str, str | None, str]]:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     uow = SqlUnitOfWork(app.state.engine)
     async with uow.read() as tx:
         found = await tx.list_audit_events(Scope(everything=True), limit=100)
@@ -66,7 +66,7 @@ async def events(site: Site) -> list[tuple[str, str, Outcome, str, str | None, s
 
 async def second_client(site: Site) -> httpx.AsyncClient:
     """Another browser on the same app, for a second session next to ``site.client``."""
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://testserver")
 
 
@@ -335,7 +335,7 @@ async def test_the_mapping_page_names_the_own_identity_provider(
     settings: Settings, admin_db: str
 ) -> None:
     configured = settings.model_copy(update={"oidc_discovery_url": DISCOVERY})
-    async with _running_site(configured, admin_db) as running:
+    async with running_site(configured, admin_db) as running:
         await running.login_as(SUPER)
 
         text = (await running.client.get("/admin/idp-mapping")).text
@@ -354,7 +354,7 @@ async def test_the_mapping_page_names_the_bundled_identity_provider(
             "keycloak_admin_url": "http://kc.test/admin/realms/x",
         }
     )
-    async with _running_site(configured, admin_db, directory=FakeStaffDirectory()) as running:
+    async with running_site(configured, admin_db, directory=FakeStaffDirectory()) as running:
         await running.login_as(SUPER)
 
         text = (await running.client.get("/admin/idp-mapping")).text

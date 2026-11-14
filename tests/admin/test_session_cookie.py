@@ -9,9 +9,9 @@ import pytest
 from app.admin.session import session_cookie_for
 from app.config import Settings
 from app.main import create_app
-from tests.admin.conftest import SUPER, Site
 from tests.fakes.clock import FixedClock
 from tests.fakes.identity import FakeIdentityProvider
+from tests.support.admin_site import SUPER, Site
 from tests.support.domain import NOW
 
 APP_ROOT = Path(__file__).resolve().parents[2] / "app"

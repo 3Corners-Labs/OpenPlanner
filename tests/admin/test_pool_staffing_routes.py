@@ -9,7 +9,7 @@ from app.domain.audit import Outcome
 from app.domain.authorization import Scope
 from app.domain.booking import BookingKind, Slot
 from app.domain.capacity import CapacityPool, PoolMode
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AUDITOR,
     GROUP_ADMIN,
     NO_ROLE,
@@ -18,8 +18,9 @@ from tests.admin.conftest import (
     SAME_ORIGIN,
     SUPER,
     Site,
+    audit_log,
+    site_uow,
 )
-from tests.support.admin_site import audit_log, site_uow
 from tests.support.closures import confirmed_booking
 from tests.support.domain import SLOT_0900
 from tests.support.skill_seed import add_pool, archive_pool

@@ -2,15 +2,10 @@
 
 from typing import Any
 
-from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.public_address import AddressCheck, AddressFinding, AddressKind, Forwarded
-from tests.admin.conftest import AUDITOR, SUPER, Site
+from tests.support.admin_site import AUDITOR, SUPER, Site, site_uow
 
 PUBLIC = "https://afspraak.example.nl"
-
-
-def _app(site: Site) -> Any:
-    return site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
 
 
 async def _save(site: Site, **update: Any) -> None:
@@ -18,12 +13,12 @@ async def _save(site: Site, **update: Any) -> None:
         AddressKind.PUBLIC, site.clock.now(), PUBLIC, AddressFinding.OK, "https", Forwarded.HONOURED
     )
     check = AddressCheck(**{**base.__dict__, **update})
-    async with SqlUnitOfWork(_app(site).state.engine).locked() as tx:
+    async with site_uow(site).locked() as tx:
         await tx.save_address_check(check)
 
 
 def _settings(site: Site, **update: Any) -> None:
-    app = _app(site)
+    app = site.app
     app.state.settings = app.state.settings.model_copy(update={"public_base_url": PUBLIC, **update})
 
 
@@ -121,7 +116,7 @@ async def test_forwarded_headers_that_were_ignored_are_shown_by_category_and_cou
     site: Site,
 ) -> None:
     _settings(site)
-    watch = _app(site).state.proxy_watch
+    watch = site.app.state.proxy_watch
     for peer in ("172.18.0.1", "172.18.0.1", "8.8.4.4"):
         watch.observe(peer)
     await site.login_as(SUPER)
@@ -136,7 +131,7 @@ async def test_forwarded_headers_that_were_ignored_are_shown_by_category_and_cou
 
 async def test_a_private_proxy_address_is_shown_because_it_is_the_proxy(site: Site) -> None:
     _settings(site)
-    _app(site).state.proxy_watch.observe("172.18.0.1")
+    site.app.state.proxy_watch.observe("172.18.0.1")
     await site.login_as(SUPER)
 
     assert "van 172.18.0.1" in await _part(site)
@@ -162,7 +157,7 @@ async def test_the_overview_has_one_proxy_row_for_the_worst_problem(site: Site) 
     await site.login_as(SUPER)
 
     finding = (await site.client.get("/admin/overview/w/status")).text
-    _app(site).state.proxy_watch.observe("172.18.0.1")
+    site.app.state.proxy_watch.observe("172.18.0.1")
     untrusted = (await site.client.get("/admin/overview/w/status")).text
 
     assert finding.count("Proxy</") == 1
@@ -223,7 +218,7 @@ async def test_a_list_that_the_gate_would_refuse_says_what_to_repair(site: Site)
     wide = await _part(site)
     _settings(site, forwarded_allow_ips="10.0.0.5", **lists)
     sound = await _part(site)
-    _app(site).state.proxy_watch.observe("10.0.0.9")
+    site.app.state.proxy_watch.observe("10.0.0.9")
     sighted = await _part(site)
 
     assert (

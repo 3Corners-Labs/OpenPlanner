@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.scripts.conftest import fake_program
+from tests.support.fake_programs import fake_program
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "guardrail-fetch.sh"

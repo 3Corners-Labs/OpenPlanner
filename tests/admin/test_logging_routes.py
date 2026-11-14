@@ -12,8 +12,15 @@ import pytest
 from app.config import Settings
 from app.domain.audit import Outcome
 from app.domain.log_destinations import Reason
-from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site, _running_site
-from tests.support.admin_site import audit_events
+from tests.support.admin_site import (
+    AUDITOR,
+    ORG_ADMIN,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+    audit_events,
+    running_site,
+)
 
 LOGGING = "/admin/logging"
 TOKEN = "hec-token-0123456789"
@@ -92,7 +99,7 @@ async def test_nothing_secret_reaches_any_page_or_the_audit_log(superuser: Site)
         text = (await superuser.client.get(path)).text
         assert TOKEN not in text
         assert "rotated-token-9876" not in text
-    app = superuser.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = superuser.app
     from app.adapters.db.uow import SqlUnitOfWork  # noqa: PLC0415
     from app.domain.authorization import Scope  # noqa: PLC0415
 
@@ -224,7 +231,7 @@ async def test_the_status_of_each_process_is_shown_without_any_platform_text(
 ) -> None:
     url = await create(superuser)
     destination_id = int(url.rsplit("/", 1)[1])
-    app = superuser.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = superuser.app
     from app.adapters.db.uow import SqlUnitOfWork  # noqa: PLC0415
     from app.domain.log_destinations import DestinationStatus, State  # noqa: PLC0415
 
@@ -271,7 +278,7 @@ async def test_system_status_summarises_the_destinations_for_those_who_may_see_t
 
 @pytest.fixture
 async def switched_off(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
-    async with _running_site(
+    async with running_site(
         settings.model_copy(update={"log_shipping_enabled": False}), admin_db
     ) as s:
         yield s

@@ -24,7 +24,7 @@ from scripts.release_pr import (
     tag_message,
     with_audit,
 )
-from tests.scripts.conftest import Git, commit_all, cut_line
+from tests.support.git_repository import Git, commit_all, cut_line
 
 ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE = ROOT / ".github" / "pull_request_template.md"

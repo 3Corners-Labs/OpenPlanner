@@ -36,8 +36,7 @@ from app.domain.staff import StaffFilter
 from app.domain.storage import FREE_SPACE_CRITICAL, STORAGE_EVENT
 from app.web.route_dependencies import dependants
 from app.web.widgets import OVERVIEW_PATH, WIDGETS
-from tests.admin.conftest import SAME_ORIGIN, Site
-from tests.support.admin_site import AuditRow, audit_events, post_form, site_app, site_uow
+from tests.support.admin_site import SAME_ORIGIN, AuditRow, Site, audit_events, post_form, site_uow
 from tests.support.downloads import AUDITED_DOWNLOADS, address
 from tests.support.privacy_sweep import (
     IMMEDIATE_ITEM,
@@ -238,7 +237,7 @@ from ``Fixture``."""
 
 def _get_routes(site: Site) -> list[APIRoute]:
     """Every admin GET route that an admin can open."""
-    app = site_app(site)
+    app = site.app
     return [
         route
         for route in all_routes(app.routes)  # type: ignore[attr-defined]
@@ -365,7 +364,7 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
         "/admin/organisations/demo/settings/reporting_wallboard_display_links_enabled",
         {"value": "true"},
     )
-    links_app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    links_app: Any = site.app
     await links_app.state.live_settings.refresh()
     refused_screen = await site.client.get("/display")
     assert refused_screen.status_code == 403
@@ -383,7 +382,7 @@ async def test_no_marker_leaves_the_allowed_pages_and_every_template_is_swept(
         "/admin/organisations/demo/settings/reporting_staff_view_enabled",
         {"value": "true"},
     )
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app: Any = site.app
     await app.state.live_settings.refresh()
     team = await site.client.get("/admin/organisations/demo/usage?view=team")
     assert team.status_code == 200

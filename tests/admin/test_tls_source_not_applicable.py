@@ -1,6 +1,6 @@
 """Without the bundled proxy the certificate source does not apply (ADR 0070)."""
 
-from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import SAME_ORIGIN, SUPER, Site
 from tests.support.certificates import make_pair
 
 URL = "/admin/settings"

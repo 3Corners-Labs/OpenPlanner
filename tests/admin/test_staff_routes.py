@@ -3,7 +3,7 @@
 from dataclasses import replace
 from datetime import timedelta
 
-from tests.admin.conftest import AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
+from tests.support.admin_site import AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
 from tests.support.principals import legacy_claims
 
 

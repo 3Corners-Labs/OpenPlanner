@@ -40,11 +40,6 @@ PROVIDER = OrganisationProvider(
 
 
 @pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
-
-
-@pytest.fixture
 def dns() -> FakeTxtResolver:
     return FakeTxtResolver({NAME: (VALUE,)})
 

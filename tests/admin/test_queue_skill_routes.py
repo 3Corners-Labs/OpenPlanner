@@ -9,8 +9,7 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import BookingRow
-from tests.admin.conftest import AGENT, SAME_ORIGIN, SUPER, Site
-from tests.support.admin_site import site_app
+from tests.support.admin_site import AGENT, SAME_ORIGIN, SUPER, Site
 from tests.support.flow_seed import add_flow, publish_flow
 from tests.support.flows import engine_of, flow_ids
 from tests.support.queue import own_queue
@@ -42,7 +41,7 @@ async def _booking_needing_german(site: Site) -> tuple[int, int]:
 async def _grant(site: Site, *skills: int) -> None:
     """Give the agent (who has logged in) exactly ``skills`` in the organisation."""
     member = await staff_id(site, AGENT.subject)
-    await site_app(site).state.skill_service.grant(SUPER, "demo", member, skills)
+    await site.app.state.skill_service.grant(SUPER, "demo", member, skills)
 
 
 async def test_work_the_agent_lacks_a_skill_for_is_shown_but_cannot_be_claimed(

@@ -19,7 +19,7 @@ from app.domain.diagnostics import DiagnosticLog
 from app.domain.event_context import TRACE_ID
 from app.domain.event_schema import rfc3339
 from app.logging import configure_logging
-from tests.admin.conftest import AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
+from tests.support.admin_site import AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
 from tests.support.domain import NOW
 
 GLOBAL_FAILURE = AuditEvent(
@@ -67,7 +67,7 @@ OTHER_GROUP = AuditEvent(
 
 @pytest.fixture
 async def logged(site: Site) -> Site:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with SqlUnitOfWork(app.state.engine).locked() as tx:
         for event in (GLOBAL_FAILURE, ORG_CHANGE, GROUP_RETRY, OTHER_GROUP):
             await tx.add_audit_event(event)
@@ -77,7 +77,7 @@ async def logged(site: Site) -> Site:
 @pytest.fixture
 async def traced(site: Site) -> Site:
     """The four events of ``logged``; the group's retry has a trace id."""
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with SqlUnitOfWork(app.state.engine).locked() as tx:
         for event in (GLOBAL_FAILURE, ORG_CHANGE, OTHER_GROUP):
             await tx.add_audit_event(event)
@@ -144,7 +144,7 @@ async def test_events_of_a_request_carry_its_trace_and_show_utc(site: Site) -> N
     await site.login_as(GROUP_ADMIN)
     await site.client.get("/admin/groups/andere-team")
     await site.client.get("/admin/groups/andere-team")
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with SqlUnitOfWork(app.state.engine).read() as tx:
         entries = await tx.list_audit_events(Scope(everything=True))
 
@@ -195,7 +195,7 @@ async def test_a_filter_cannot_reach_outside_the_scope(logged: Site) -> None:
 
 async def test_a_storage_event_explains_itself_to_the_superuser_only(site: Site) -> None:
     # ADR 0040: the storage watch writes global events.
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with SqlUnitOfWork(app.state.engine).locked() as tx:
         await tx.add_audit_event(
             AuditEvent(
@@ -222,7 +222,7 @@ async def test_a_storage_event_explains_itself_to_the_superuser_only(site: Site)
 
 async def test_a_security_event_explains_itself_to_the_superuser_only(site: Site) -> None:
     # ADR 0034, AU-4: rejected webhooks are global, with the number held back.
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with SqlUnitOfWork(app.state.engine).locked() as tx:
         await tx.add_audit_event(
             AuditEvent(
@@ -250,7 +250,7 @@ async def test_a_security_event_explains_itself_to_the_superuser_only(site: Site
 
 async def test_a_webhook_refusal_reason_is_explained_under_its_own_action_only(site: Site) -> None:
     # ADR 0124: ``rate`` and ``network`` mean something under ``webhook.rejected`` only.
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with SqlUnitOfWork(app.state.engine).locked() as tx:
         for action, category in (
             ("webhook.rejected", Category.SECURITY),
@@ -453,7 +453,7 @@ async def test_the_superuser_switches_diagnostic_mode_and_the_group_sees_its_deb
     assert "De diagnosemodus staat aan." in page
     assert 'name="target" value="group:demo"' in page
 
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     log = DiagnosticLog(SqlUnitOfWork(app.state.engine), app.state.clock)
     assert await log.debug("job.run", "demo", "demo", detail="type:send_reminder")
 

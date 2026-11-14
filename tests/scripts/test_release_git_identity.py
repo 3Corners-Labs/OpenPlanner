@@ -11,7 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from tests.scripts.conftest import Git, fake_program, script_path
+from tests.support.fake_programs import fake_program, script_path
+from tests.support.git_repository import Git
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "release-git-identity.sh"

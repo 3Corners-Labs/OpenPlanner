@@ -6,10 +6,10 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
 from app.domain.flow_resolution import FlowRef
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import ADA, NOW, SLOT_0900, SLOT_0930, TEST_TOKEN_KEY
 from tests.support.flows import booking_flow
+from tests.support.seed_rows import seed_group
 
 
 async def test_a_service_without_flow_rows_books_with_null_columns(engine: AsyncEngine) -> None:

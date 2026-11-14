@@ -34,11 +34,6 @@ def uow() -> InMemoryUnitOfWork:
 
 
 @pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
-
-
-@pytest.fixture
 def probe() -> FakeInstanceProbe:
     return FakeInstanceProbe(healthy(ID))
 

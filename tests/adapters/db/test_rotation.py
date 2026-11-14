@@ -9,8 +9,8 @@ from app.adapters.db.credentials import CredentialStore
 from app.adapters.db.models import BookingRow, SlotRow
 from app.adapters.db.rotation import open_booking_credentials, records_not_current
 from app.domain.tokens import derive_token, hash_token
-from tests.adapters.db.conftest import seed_group
 from tests.support.domain import NOW
+from tests.support.seed_rows import seed_group
 
 OLD = b"o" * 32
 NEW = b"n" * 32

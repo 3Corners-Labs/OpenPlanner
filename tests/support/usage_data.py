@@ -11,7 +11,7 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.ports import Clock
 from app.domain.usage import FactKind, UsageFact, UsageOutcome, hour_of
 from app.domain.usage_rollup_service import UsageRollup
-from tests.admin.conftest import Site
+from tests.support.admin_site import Site
 
 DAY = "2026-01-01"
 HOUR = datetime(2026, 1, 1, 8, tzinfo=UTC)
@@ -19,7 +19,7 @@ HOUR = datetime(2026, 1, 1, 8, tzinfo=UTC)
 
 async def fill(site: Site, slug: str, count: int) -> None:
     """Write ``count`` bookings created and cancelled for a group, and roll them up."""
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app: Any = site.app
     await fill_app(app, site.clock, slug, count)
 
 

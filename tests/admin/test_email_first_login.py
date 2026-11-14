@@ -13,8 +13,8 @@ import pytest
 
 from app.config import Settings
 from app.domain.entitlements import LoginClaims
-from tests.admin.conftest import SAME_ORIGIN, SUPER, Site, _running_site
 from tests.fakes.identity import FakeIdentityProvider
+from tests.support.admin_site import SAME_ORIGIN, SUPER, Site, running_site
 from tests.support.organisation_login import register
 
 P = "openplanner"
@@ -54,7 +54,7 @@ def _organisation_adapter(site: Site, email: str = ADDRESS) -> FakeIdentityProvi
 @pytest.fixture
 async def routed(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
     switched_on = settings.model_copy(update={"organisation_idps_enabled": True})
-    async with _running_site(switched_on, admin_db) as running:
+    async with running_site(switched_on, admin_db) as running:
         running.page_url = await _route_domain(running)  # type: ignore[attr-defined]
         yield running
 

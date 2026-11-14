@@ -10,7 +10,7 @@ from app.adapters.db.models import JobRow
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.calls import CallStatus
 from app.web.security_policy import HTML_CSP, SCRIPT_CSP
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AGENT,
     AUDITOR,
     GROUP_ADMIN,
@@ -19,8 +19,8 @@ from tests.admin.conftest import (
     SAME_ORIGIN,
     SUPER,
     Site,
+    site_uow,
 )
-from tests.support.admin_site import site_uow
 from tests.support.queue import own_queue
 
 WIDGET = re.compile(r'<section class="widget[^"]*" data-widget="([a-z-]+)"')
@@ -120,7 +120,7 @@ async def test_the_bookings_widget_shows_a_count_per_group(site: Site) -> None:
 
 
 async def test_the_changes_widget_lists_only_successful_changes_in_scope(site: Site) -> None:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     uow = app.state.admin_service._uow  # noqa: SLF001
     now = site.clock.now()
     async with uow.locked() as tx:
@@ -228,7 +228,7 @@ async def test_the_tasks_widget_lists_running_and_failed_jobs_without_their_book
     async with site_uow(site).locked() as tx:
         jobs = await tx.active_jobs(5)
     assert jobs.total == 0
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with AsyncSession(app.state.engine) as session, session.begin():
         await session.execute(
             update(JobRow)
@@ -281,7 +281,7 @@ async def test_the_status_widget_names_the_environment_in_words(site: Site) -> N
 async def test_the_status_widget_shows_maintenance_and_a_fresh_worker_heartbeat(
     site: Site,
 ) -> None:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     heartbeat = app.state.settings.worker_heartbeat_path
     heartbeat.parent.mkdir(parents=True, exist_ok=True)
     heartbeat.write_text(site.clock.now().isoformat())
@@ -296,7 +296,7 @@ async def test_the_status_widget_shows_maintenance_and_a_fresh_worker_heartbeat(
 async def test_the_status_widget_reports_mail_without_tls_in_production_adr_0091(
     site: Site,
 ) -> None:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     current = app.state.settings
     await site.login_as(SUPER)
     plain = {"environment": "prod", "smtp_host": "relay.demo.nl", "smtp_starttls": False}
@@ -316,7 +316,7 @@ async def test_the_status_widget_reports_mail_without_tls_in_production_adr_0091
 async def test_the_status_widget_warns_about_a_proxy_hop_without_tls_adr_0091(
     site: Site,
 ) -> None:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     current = app.state.settings
     await site.login_as(SUPER)
     warning = "zonder TLS naar web"
@@ -338,7 +338,7 @@ async def test_the_status_widget_shows_the_connection_health_and_last_event(site
     from app.adapters.db.uow import SqlUnitOfWork
     from app.domain.connection_health import HealthEntry, HealthState, InboundEvent, Platform
 
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     now = site.clock.now()
     async with SqlUnitOfWork(app.state.engine).locked() as tx:
         await tx.save_health(

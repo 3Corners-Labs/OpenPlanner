@@ -1,7 +1,7 @@
 """The agent term in the portal (ADR 0077): what the organisation and the group call the person
 who takes the call, where it is edited, and where it shows."""
 
-from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, Site
+from tests.support.admin_site import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, Site
 
 ORG_TEXTS = "/admin/organisations/demo/texts/nl"
 GROUP_TEXTS = "/admin/groups/demo/messages/nl"

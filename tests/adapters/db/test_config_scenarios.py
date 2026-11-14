@@ -10,10 +10,10 @@ from app.domain.configuration_changes import Change, ChangeAction
 from app.domain.configuration_tree import Entity
 from app.domain.configuration_values import Binary, Value
 from app.domain.errors import DomainError, ErrorCode
-from tests.adapters.db.conftest import seed_group
 from tests.support.config_changes import apply_changes, planned
 from tests.support.config_roundtrip import document_of, organisations, plan_against
 from tests.support.images import png
+from tests.support.seed_rows import seed_group
 
 ORG, GROUP = "org-balie", "balie"
 NOTICES = {"nl": "Wegens een storing zijn wij gesloten.", "en": "Closed because of an outage."}

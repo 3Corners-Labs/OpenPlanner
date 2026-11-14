@@ -14,7 +14,7 @@ from app.adapters.db.models import BookingRow
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
 from app.domain.request_watch import RequestWatch
-from tests.admin.conftest import AGENT, GROUP_ADMIN, SAME_ORIGIN, Site
+from tests.support.admin_site import AGENT, GROUP_ADMIN, SAME_ORIGIN, Site
 from tests.support.flows import engine_of
 from tests.support.queue import request_work
 

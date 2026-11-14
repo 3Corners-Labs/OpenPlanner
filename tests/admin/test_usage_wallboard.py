@@ -9,7 +9,7 @@ from app.domain.authorization import Scope
 from app.domain.calls import EventKind
 from app.domain.integration import IntegrationService
 from app.web.static_assets import ASSETS
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AGENT,
     AUDITOR,
     GROUP_ADMIN,
@@ -39,7 +39,7 @@ async def _alert_after(site: Site, minutes: int) -> None:
     path = "/admin/organisations/demo/settings/reporting_wallboard_wait_alert_minutes"
     response = await site.client.post(path, data={"value": str(minutes)}, headers=SAME_ORIGIN)
     assert response.status_code == 303
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app: Any = site.app
     await app.state.live_settings.refresh()
 
 

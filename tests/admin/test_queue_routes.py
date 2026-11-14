@@ -7,7 +7,7 @@ from app.domain.authorization import Role, Scope
 from app.domain.calls import EventKind
 from app.domain.integration import IntegrationService
 from app.web.static_assets import ASSETS
-from tests.admin.conftest import AGENT, GROUP_ADMIN, SAME_ORIGIN, Site
+from tests.support.admin_site import AGENT, GROUP_ADMIN, SAME_ORIGIN, Site
 from tests.support.admin_site import site_uow as _uow
 from tests.support.principals import principal
 from tests.support.queue import own_queue as _own_queue
