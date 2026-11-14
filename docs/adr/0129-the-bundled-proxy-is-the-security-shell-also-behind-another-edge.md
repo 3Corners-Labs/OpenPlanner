@@ -133,8 +133,8 @@ These protect the visitor's address and the tokens in paths, and are not tuning.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR | #NNN | merged |
-| 1 | `PROXY_TRUSTED_NETWORKS`, read strictly right to left, with one address handed to `web` and to the bundled identity provider. Also: the entrypoint's validation, the installer's `--trusted-proxies`, a pass of `scripts/check-proxy.sh` with a trusted peer, and the install guide, runbook and threat model | #NNN | merged |
+| 0 | ADR | #865 | merged |
+| 1 | `PROXY_TRUSTED_NETWORKS`, read strictly right to left, with one address handed to `web` and to the bundled identity provider. Also: the entrypoint's validation, the installer's `--trusted-proxies`, a pass of `scripts/check-proxy.sh` with a trusted peer, and the install guide, runbook and threat model | #865 | merged |
 | 2 | Proxy settings and the certificate in the portal: the document on the shared volume, the watcher's render and reload with the last good configuration kept, floors and locks in `proxy.env`, an advanced sub-page under the same address; the PROXY protocol for load balancers at layer 4 | | planned |
 | 3 | The proxy's log lines through OpenPlanner's logging, masked, at the log destinations and on System status | | planned |
 | 4 | The WAF: Coraza and the Core Rule Set in the image, the modes, exclusions, the audit log off, findings through step 3 | | planned |
