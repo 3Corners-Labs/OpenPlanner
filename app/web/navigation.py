@@ -269,6 +269,14 @@ SECTIONS = (
                         Permission.RIGHTS_VIEW,
                         "lock",
                     ),
+                    # ADR 0123 step 5d: the own screen name, the name a participant sees.
+                    Screen(
+                        "manage.rights.profile",
+                        "admin.nav.my_profile",
+                        "/admin/rights/profile",
+                        Permission.RIGHTS_VIEW,
+                        "people",
+                    ),
                 ),
             ),
             Screen(

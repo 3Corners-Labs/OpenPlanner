@@ -14372,3 +14372,30 @@ msgstr "Captions are off."
 
 msgid "callpage.say.captions_failed"
 msgstr "Captions could not be started. This call may not offer them."
+
+msgid "admin.nav.my_profile"
+msgstr "My profile"
+
+msgid "admin.profile.my_profile"
+msgstr "My profile"
+
+msgid "admin.profile.title"
+msgstr "My profile"
+
+msgid "admin.profile.intro"
+msgstr "Here you set the name a participant sees for you in a call."
+
+msgid "admin.profile.account.heading"
+msgstr "Account name"
+
+msgid "admin.profile.account.note"
+msgstr "This name comes from your organisation's login and is not changed here. It is not the name participants see."
+
+msgid "admin.profile.screen_name.where"
+msgstr "Participants see your screen name on the call page, next to the organisation's word for staff. A manager who may manage staff can change your screen name too."
+
+msgid "admin.profile.screen_name.no_record"
+msgstr "You can set your screen name once your login has been recorded. Log out and in again to have that done."
+
+msgid "admin.profile.screen_name.erased"
+msgstr "Your data has been deleted. You can set a screen name again after your next login."

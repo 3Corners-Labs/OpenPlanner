@@ -53,8 +53,10 @@ from app.admin.audit_routes import audit_views
 from app.admin.authz import AdminContext, RequirePermission, admin_service, skill_service
 from app.admin.forms import Field, FormData, Option, done_message, read_form, redirect_done
 from app.admin.idp_mapping_routes import reason_label
-from app.admin.pages import Locale, SameOrigin, admin_moment, with_manual
+from app.admin.pages import Locale, SameOrigin, admin_moment
 from app.admin.pages import page as _page
+from app.admin.screen_name_form import DONE as SCREEN_NAME_DONE
+from app.admin.screen_name_form import screen_name_field
 from app.admin.skill_inputs import (
     SkillChoice,
     choices,
@@ -74,7 +76,6 @@ from app.domain.errors import DomainError, ErrorCode
 from app.domain.guest_access import StaffNameMode
 from app.domain.identity import PLATFORM
 from app.domain.scheduling import GroupSummary
-from app.domain.screen_name import MAX_LENGTH as SCREEN_NAME_MAX
 from app.domain.staff import StaffFilter, StaffMember, StaffStatus
 from app.web.authz_labels import ROLE_LABELS
 from app.web.locale import RequestLocale
@@ -484,10 +485,6 @@ async def member_page(
     return response
 
 
-SCREEN_NAME_DONE = ("staff_screen_name_saved", "staff_screen_name_unchanged")
-"""The confirmations of a save of the screen name, shown in that section of the page."""
-
-
 def _screen_name_field(
     request: Request,
     locale: RequestLocale,
@@ -503,17 +500,7 @@ def _screen_name_field(
         return None
     if scope_for(context.principal, Permission.STAFF_MANAGE).is_empty:
         return None
-    _ = locale.gettext
-    field = Field(
-        "screen_name",
-        _("admin.staff.screen_name.label"),
-        value=form.text("screen_name") if form is not None else member.screen_name or "",
-        hint=_("admin.staff.screen_name.hint"),
-        error=form.error_for("screen_name") if form is not None else None,
-        required=False,
-        attributes={"maxlength": str(SCREEN_NAME_MAX), "autocomplete": "off"},
-    )
-    return with_manual(request, locale, [field])[0]
+    return screen_name_field(request, locale, member.screen_name, form)
 
 
 @router.get("/staff/{member_id}", response_class=HTMLResponse)

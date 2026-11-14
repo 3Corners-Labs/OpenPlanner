@@ -324,6 +324,15 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/rights/sessions/end-others": {
         "/admin/rights/sessions/end-others": statuses(303, 303, 303, 303, 303, 303, 403)
     },
+    # ADR 0123 step 5d: every admin sets their own screen name (rights.view); the empty form
+    # clears an empty name, which is "unchanged" and goes back to the page. No number is in the
+    # path.
+    "GET /admin/rights/profile": {
+        "/admin/rights/profile": statuses(200, 200, 200, 200, 200, 200, 403)
+    },
+    "POST /admin/rights/profile/screen-name": {
+        "/admin/rights/profile/screen-name": statuses(303, 303, 303, 303, 303, 303, 403)
+    },
     # ADR 0098 point 9b: an organisation admin (and the superuser) ends a person's sessions.
     # Outside the scope the answer is 403, an unknown number too; only the superuser, who sees
     # everyone, gets a 404. The group admin, auditor and agent do not hold the permission.

@@ -7,8 +7,10 @@
 
 The first half is the write: who may set a screen name is ``staff.manage`` inside the staff
 overview's scope (the person must be one the administrator sees, SQL-filtered by the same scope as
-the list), and an erased record keeps no name. Audit events carry the person's subject and a reason
-code (``set`` or ``cleared``), never the name.
+the list), or the person themselves on *My profile* (step 5d, ``set_own_screen_name``, found from
+the session's own subject, ``rights.view``); an erased record keeps no name. Audit events carry
+the person's subject and a reason code (``set`` or ``cleared``), never the name; an own change is
+the one whose actor equals the subject.
 
 The second half is what the participant's call page asks of our own server. A booking's claim names
 who accepted it only by a pseudonym (``tokens.agent_pseudonym``), a keyed hash that cannot be turned
@@ -27,7 +29,7 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 
 from app.domain.audit import AuditEvent, Outcome
-from app.domain.authorization import Permission, Principal, Scope, scope_for
+from app.domain.authorization import Permission, Principal, Scope, Target, decide, scope_for
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.guest_access import StaffNameMode
 from app.domain.ports import Clock, Transaction, UnitOfWork
@@ -55,6 +57,8 @@ class ScreenNameResult(StrEnum):
     UNCHANGED = "unchanged"
     OUT_OF_SCOPE = "out_of_scope"
     ERASED = "erased"
+    NO_RECORD = "no_record"
+    """Only for the person's own write: the login has no staff record (step 5d)."""
 
 
 @dataclass(frozen=True)
@@ -110,14 +114,43 @@ class StaffScreenNames:
                     )
                 )
                 return ScreenNameResult.OUT_OF_SCOPE
-            member = found[0]
-            if member.status is StaffStatus.ERASED:
-                return ScreenNameResult.ERASED
-            if member.screen_name == name:
-                return ScreenNameResult.UNCHANGED
-            await tx.set_staff_screen_name(member.subject, name)
-            await _audit(tx, principal.subject, member, scope, now, SET if name else CLEARED)
-        return ScreenNameResult.DONE
+            return await _store(tx, principal.subject, found[0], scope, name, now)
+
+    async def own(self, subject: str) -> StaffMember | None:
+        """Return the staff record of ``subject`` for their own *My profile* page, or ``None``.
+
+        The record is written at every login, so ``None`` is only a person whose login was never
+        recorded (a session that outlived a restored database, say).
+        """
+        async with self._uow.read() as tx:
+            return await tx.get_staff(subject)
+
+    async def set_own_screen_name(self, principal: Principal, text: str) -> ScreenNameResult:
+        """Set the logged-in person's own screen name, or clear it with an empty text (step 5d).
+
+        The record is found from ``principal.subject`` and nothing else: there is no member
+        number to choose. The right is ``rights.view``, which every admin holds, as for *My
+        sessions*. The rule, the erasure check and the audit event are those of the manager's
+        write; the event's actor and subject are the same person, in every organisation of
+        the person (the scope of the write is the person's own record, not a viewer's).
+
+        Returns:
+            ``NO_RECORD`` when the login has no staff record, else as ``set_screen_name``
+            (never ``OUT_OF_SCOPE``).
+
+        Raises:
+            DomainError: ``not_permitted`` without ``rights.view``, and
+                ``invalid_configuration`` for a text that is not a screen name.
+        """
+        if not decide(principal, Permission.RIGHTS_VIEW, Target.everything()).allowed:
+            raise DomainError(ErrorCode.NOT_PERMITTED)
+        name = parse_screen_name(text)
+        now = self._clock.now()
+        async with self._uow.locked() as tx:
+            member = await tx.get_staff(principal.subject)
+            if member is None:
+                return ScreenNameResult.NO_RECORD
+            return await _store(tx, principal.subject, member, Scope(everything=True), name, now)
 
     async def label_of(self, claimed_by: str | None, mode: StaffNameMode) -> StaffLabel:
         """Return what the participant is told of who accepted a booking.
@@ -153,6 +186,28 @@ class StaffScreenNames:
         found = staff_ids_by_pseudonym(self._keys, ((m.id, m.subject) for m in members))
         self._index = _Index(found, now)
         return self._index.ids.get(pseudonym)
+
+
+async def _store(
+    tx: Transaction,
+    actor: str,
+    member: StaffMember,
+    scope: Scope,
+    name: str | None,
+    now: datetime,
+) -> ScreenNameResult:
+    """Write ``name`` on ``member`` unless erased or unchanged, and audit it (both ways in).
+
+    ``scope`` decides in which organisations the event is written: those of the person that the
+    writer sees (a manager) or all of them (the person themselves).
+    """
+    if member.status is StaffStatus.ERASED:
+        return ScreenNameResult.ERASED
+    if member.screen_name == name:
+        return ScreenNameResult.UNCHANGED
+    await tx.set_staff_screen_name(member.subject, name)
+    await _audit(tx, actor, member, scope, now, SET if name else CLEARED)
+    return ScreenNameResult.DONE
 
 
 async def _audit(

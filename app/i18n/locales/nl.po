@@ -14385,3 +14385,30 @@ msgstr "Ondertitels staan uit."
 
 msgid "callpage.say.captions_failed"
 msgstr "De ondertitels konden niet worden gestart. Dit gesprek biedt ze misschien niet aan."
+
+msgid "admin.nav.my_profile"
+msgstr "Mijn profiel"
+
+msgid "admin.profile.my_profile"
+msgstr "Mijn profiel"
+
+msgid "admin.profile.title"
+msgstr "Mijn profiel"
+
+msgid "admin.profile.intro"
+msgstr "Hier stelt u in met welke naam een deelnemer u ziet in een gesprek."
+
+msgid "admin.profile.account.heading"
+msgstr "Accountnaam"
+
+msgid "admin.profile.account.note"
+msgstr "Deze naam komt uit het login van uw organisatie en wordt hier niet gewijzigd. Het is niet de naam die deelnemers zien."
+
+msgid "admin.profile.screen_name.where"
+msgstr "Deelnemers zien uw schermnaam op de gesprekspagina, naast het woord van de organisatie voor medewerkers. Een beheerder met het recht om medewerkers te beheren kan uw schermnaam ook wijzigen."
+
+msgid "admin.profile.screen_name.no_record"
+msgstr "Uw schermnaam kunt u instellen zodra uw login is vastgelegd. Log uit en opnieuw in om dat te laten gebeuren."
+
+msgid "admin.profile.screen_name.erased"
+msgstr "Uw gegevens zijn gewist. Een schermnaam kunt u weer instellen na uw volgende login."
