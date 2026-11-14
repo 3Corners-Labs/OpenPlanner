@@ -110,19 +110,32 @@
   // arrived it scrolls to the start of that line (or to its foot when the line is short); on any
   // other change the reader place is kept. It takes focus only when it can scroll, and keeps it
   // while it has focus.
+  var drawnLines = null;
+
   function captions(state) {
     var box = app.$("[data-call-captions]");
     var lines = app.captions.shown(state);
+    // The page draws again on every change of state. Lines that are the same as the drawn ones are
+    // left alone: drawing them again would stop a key's scroll that is still on its way (Home or End
+    // in WebKit, which scrolls over a few frames) at the place it had reached.
+    var who = speaker(app.state);
+    var drawn = JSON.stringify([who, lines.map(function (line) {
+      return [Boolean(line.own), Boolean(line.interim), line.key, line.text];
+    })]);
+    var same = drawnLines === drawn; // kept in memory, never in an attribute: it holds caption text
     var kept = box.scrollTop;
-    box.replaceChildren.apply(box, lines.map(row));
+    if (!same) box.replaceChildren.apply(box, lines.map(row));
     box.hidden = lines.length === 0;
     if (!lines.length) {
       delete box.dataset.newest;
+      drawnLines = null;
       box.removeAttribute("tabindex");
       return;
     }
     if (box.scrollHeight > box.clientHeight) box.setAttribute("tabindex", "0");
     else if (document.activeElement !== box) box.removeAttribute("tabindex");
+    if (same) return;
+    drawnLines = drawn;
     var last = lines[lines.length - 1];
     var newest = last.interim ? "interim:" + last.own : last.key; // an interim line that grows is not a new line
     var arrived = box.dataset.newest !== newest;
