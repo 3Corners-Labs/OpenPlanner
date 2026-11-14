@@ -6,6 +6,12 @@
  * one deliberate exit and only after a click, which this test never makes.
  * The CSP check proves the same from the policy: it names no source but 'self', 'none' and
  * the two origins above, so a future template change cannot add one unseen.
+ *
+ * The call page (`{call_page}` of pages.json: the emailed link of a booking, which sets the
+ * participant's cookie, so the page is reached behind a session like every `/b/m/` page) is in
+ * the loop below as every other page: before the click that joins it makes no request to any
+ * origin but its own, whatever its policy allows. Its policy is the one recorded exception, and
+ * exactly that one: the five host sources of ADR 0123 point 4 in `connect-src` and nothing else.
  */
 import { expect, test, type Page } from '@playwright/test';
 
@@ -16,15 +22,23 @@ const APP = new URL(process.env.BASE_URL ?? 'http://127.0.0.1:8000').origin;
 /**
  * The one recorded exception (ADR 0123 point 5): the call page (`/b/m/{ref}/call`, the route that
  * is served with CALL_CSP) may contact these hosts AFTER the click that joins, never before it.
- * Every other page, and the call page before the click, stays under the rule above. Nothing uses
- * the allowance yet: the step-2 page makes no request at all, and it is not in `pages.json` (it
- * needs a booking session, like the other `/b/m/` pages). The step that builds the click (step 4)
- * uses `mayContact(origin, AFTER_JOIN_CLICK)` in its own test and nowhere else.
+ * Every other page, and the call page before the click, stays under the rule above. The call page
+ * is in `pages.json`, so the loop at the end of this file holds it to the rule before any click;
+ * `mayContact(origin, AFTER_JOIN_CLICK)` documents what the policy allows after it, and the real
+ * SDK's own contact with these hosts can only be seen in a run against a real meeting.
  */
 const CALL_HOST_PATTERNS = [
   /^(https|wss):\/\/[^/]+\.wbx2\.com$/,
   /^(https|wss):\/\/[^/]+\.webex\.com$/,
   /^https:\/\/[^/]+\.ciscospark\.com$/,
+];
+/** The `connect-src` sources of the call page's policy beyond 'self' (`CALL_HOSTS` in app/web/security_policy.py). */
+const CALL_SOURCES = [
+  'https://*.wbx2.com',
+  'wss://*.wbx2.com',
+  'https://*.webex.com',
+  'wss://*.webex.com',
+  'https://*.ciscospark.com',
 ];
 type Phase = 'every-page' | 'call-page-before-click' | 'call-page-after-click';
 const AFTER_JOIN_CLICK: Phase = 'call-page-after-click';
@@ -83,6 +97,8 @@ for (const variant of pageVariants()) {
       .flatMap((directive) => directive.trim().split(/\s+/).slice(1))
       .filter((source) => source !== '');
     const foreign = sources.filter((source) => source !== "'self'" && source !== "'none'" && !allowed.has(source));
-    expect(foreign).toEqual([]);
+    // The call page's policy names exactly the five hosts of ADR 0123 point 4; every other page none.
+    const isCallPage = new URL(variant.path, APP).pathname.endsWith('/call');
+    expect(foreign).toEqual(isCallPage ? CALL_SOURCES : []);
   });
 }
