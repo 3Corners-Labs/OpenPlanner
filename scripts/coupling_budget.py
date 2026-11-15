@@ -102,8 +102,9 @@ def efferent(root: Path, entry: Entry) -> int:
     """
     tree = ast.parse((root / entry.path).read_text(encoding="utf-8"))
     for node in ast.walk(tree):
-        is_def = isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef)
-        if is_def and node.name == entry.symbol:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef) and (
+            node.name == entry.symbol
+        ):
             called: set[str] = set()
             for inner in ast.walk(node):
                 if isinstance(inner, ast.Call):
