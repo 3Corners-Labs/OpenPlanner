@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.adapters.db.gated_records import write_gated_records
 from app.adapters.db.seed import seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.booking import BookingStatus
+from app.domain.booking import BookingStatus, Claim
 from app.domain.service_requests import HandlingState, WorkChannel, WorkItemState
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
@@ -31,6 +31,7 @@ async def test_one_record_of_each_gated_kind_is_written(engine: AsyncEngine) -> 
         working = await tx.get_active_work_item(records.started_request)
         attempt = await tx.get_active_work_item(records.attempt_request)
         immediate = await tx.get_service_request(records.immediate_request)
+        legacy = await tx.get_booking(records.legacy_booking)
     assert booking is not None
     assert booking.status is BookingStatus.CONFIRMED
     assert booking.flow is not None
@@ -47,6 +48,8 @@ async def test_one_record_of_each_gated_kind_is_written(engine: AsyncEngine) -> 
     assert immediate is not None
     assert immediate.handling is HandlingState.QUEUED
     assert immediate.booking_id is None
+    assert legacy is not None  # the shape the previous image writes: confirmed, no flow, no claim
+    assert (legacy.status, legacy.flow, legacy.claim) == (BookingStatus.CONFIRMED, None, None)
 
 
 async def test_with_the_gate_shut_demo_books_at_the_time_the_pool_bookings_hold(
@@ -74,3 +77,25 @@ async def test_with_the_gate_shut_demo_books_at_the_time_the_pool_bookings_hold(
     assert legacy is not None
     assert legacy.id != held.slot_id  # its own slot, beside the pool's
     assert legacy.capacity_pool_id is None
+
+
+async def test_the_started_booking_carries_the_booking_claim_the_previous_image_checks(
+    engine: AsyncEngine,
+) -> None:
+    """The gated claim writes the booking's claim as the own queue does (G43).
+
+    The previous image knows only the booking's claim (``claimed_at``, ``claimed_by``): a claim
+    it makes is one conditional update on an unclaimed booking. A started record without that
+    claim would let the previous image claim work the current code already holds.
+    """
+    await seed_demo(engine)
+    records = await write_gated_records(engine, NOW, TEST_TOKEN_KEY)
+
+    async with SqlUnitOfWork(engine).locked() as tx:
+        taken = await tx.claim_booking(records.pool_booking, Claim(NOW, "previous-image"))
+        held = await tx.get_booking(records.pool_booking)
+
+    assert taken is False
+    assert held is not None
+    assert held.claim is not None
+    assert held.claim.claimed_by != "previous-image"

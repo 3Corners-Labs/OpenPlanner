@@ -483,6 +483,7 @@ async def test_seed_gated_records_reports_the_ids_and_refuses_production(
         "started_request",
         "attempt_request",
         "immediate_request",
+        "legacy_booking",
         "day",
     }
     assert refused == (

@@ -13,7 +13,9 @@ in the service's time zone:
 * its request, claimed and started: work in treatment that occupies a unit of the pool;
 * a second booking on the pool whose request has an open contact-center attempt (the shape of
   the record only: no flow of the fixture dispatches to the contact center yet, G13 to G15);
-* an immediate request of the document review with its request-level personal data.
+* an immediate request of the document review with its request-level personal data;
+* a confirmed, unclaimed booking in the shape the previous image writes, a week later, for the
+  claim half of the proof (G43).
 
 Written through the ``Transaction`` port and the pure rules the gated paths use
 (``service_requests``, ``contact_center_attempts``, ``immediate_intake``), without their gate:
@@ -42,7 +44,7 @@ from app.adapters.db.seed import (
 )
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain import contact_center_attempts as attempts
-from app.domain.booking import Booking, BookingKind, BookingStatus, Slot
+from app.domain.booking import Booking, BookingKind, BookingStatus, Claim, Slot
 from app.domain.flow_resolution import FlowRef
 from app.domain.immediate_intake import new_access, new_intake_key
 from app.domain.ports import Transaction
@@ -63,6 +65,8 @@ AT = time(10)
 """Local start of the pool bookings: inside the shared pool's staffing and the demo's hours."""
 LENGTH = timedelta(minutes=30)
 """The in-person flow's length (``demonstration.FLOWS``)."""
+LEGACY_AFTER = timedelta(days=7)
+"""How long after the pool bookings the previous image's own-shape booking starts."""
 AGENT = "gated-records"
 """The pseudonymous agent of the started work; no staff member stands behind it."""
 
@@ -90,6 +94,8 @@ class GatedRecords:
         started_request: Its request.
         attempt_request: The request of the second pool booking, with a contact-center attempt.
         immediate_request: The immediate request of the document review.
+        legacy_booking: A confirmed, unclaimed booking in the shape the previous image writes
+            (a slot of the service's own, no flow): what the previous image's claim can take.
         day: The local date of the pool bookings (ISO), where the previous image books.
     """
 
@@ -97,6 +103,7 @@ class GatedRecords:
     started_request: int
     attempt_request: int
     immediate_request: int
+    legacy_booking: int
     day: str
 
 
@@ -117,8 +124,9 @@ async def write_gated_records(engine: AsyncEngine, now: datetime, token_key: byt
         second = await _pool_booking(tx, demo, ids, begin + LENGTH, now, token_key)
         attempt = await _attempt(tx, demo, ids, second, now)
         immediate = await _immediate(tx, demo, ids, now)
+        legacy = await _legacy_booking(tx, demo, begin + LEGACY_AFTER, now, token_key)
     day = begin.astimezone(demo.tz).date().isoformat()
-    return GatedRecords(first.id or 0, started, attempt, immediate, day)
+    return GatedRecords(first.id or 0, started, attempt, immediate, legacy.id or 0, day)
 
 
 def _next_weekday_at(group: Group, now: datetime) -> datetime:
@@ -161,6 +169,35 @@ async def _pool_booking(
     )
 
 
+async def _legacy_booking(
+    tx: Transaction, group: Group, begin: datetime, now: datetime, token_key: bytes
+) -> Booking:
+    """Store a confirmed booking on the service's own slot with the columns of the previous image.
+
+    No pool, no flow, no request and no claim: the claim half of the rollback proof (G43) has the
+    previous image claim it and this checkout read the claim back. A week after the pool
+    bookings, so no time the previous image books on the pool day changes.
+    """
+    end = begin + LENGTH
+    slot = await tx.add_slot(Slot(None, group.id, begin, end, 1, BookingKind.SCHEDULED))
+    salt = new_token_salt()
+    return await tx.add_booking(
+        Booking(
+            id=None,
+            group_id=group.id,
+            slot_id=slot.id or 0,
+            start=begin,
+            end=end,
+            status=BookingStatus.CONFIRMED,
+            contact=EXAMPLE_PARTICIPANT,
+            locale="nl",
+            token_hash=hash_token(derive_token(token_key, salt)),
+            created_at=now,
+            token_salt=salt,
+        )
+    )
+
+
 async def _request(
     tx: Transaction, group: Group, ids: Demonstration, booking: Booking, now: datetime
 ) -> ServiceRequest:
@@ -181,7 +218,15 @@ async def _request(
 async def _started(
     tx: Transaction, group: Group, ids: Demonstration, booking: Booking, now: datetime
 ) -> int:
-    """Claim and start the booking's request: work in treatment on a unit of the pool."""
+    """Claim and start the booking's request: work in treatment on a unit of the pool.
+
+    The booking is claimed first, as ``QueueService`` does before it opens the work: the claim
+    of the booking is what the previous image checks, so a booking whose work is held must carry
+    it (G43). The attempt's booking carries none: a contact-center attempt is not an own-queue
+    claim.
+    """
+    if not await tx.claim_booking(booking.id or 0, Claim(now, AGENT)):  # pragma: no cover
+        raise ValueError("the booking was claimed already")
     request = await _request(tx, group, ids, booking, now)
     assigned, item = claim(request, None, now=now, agent=AGENT, lease_minutes=LEASE_MINUTES)
     await write_work(tx, request, None, assigned, None)
