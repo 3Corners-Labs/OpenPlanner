@@ -1028,7 +1028,9 @@ def test_the_admin_console_is_put_on_the_loopback_after_the_start_adr_0126(host:
     assert host.after_start("update realms/master")
     assert not host.ran("rm --stop --force idp idp-db")  # a bundled install keeps its provider
     output = result.stderr + result.stdout
-    assert "admin console: http://127.0.0.1:8080/idp/admin/ on this host only" in output
+    assert (
+        "admin console: http://127.0.0.1:8080/idp/admin/master/console/ on this host only" in output
+    )
 
 
 @pytest.mark.parametrize(
