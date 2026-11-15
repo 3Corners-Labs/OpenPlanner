@@ -70,6 +70,11 @@ because those protect the people who try it.
    use the SMTP relay of a mail provider on port 587.
 5. Check: `docker compose --env-file .env.update exec web python -m app.cli address-check`,
    *System status* in the portal, and one test booking from another network.
+6. Subscribe the beta to its update channel as the superuser on `/admin/updates`: channel `rc`
+   (every merge to `main` becomes a signed candidate) and, if you want it to follow without a
+   click, auto-apply. A `--mode test` host trusts images signed on `main`, which is why this is
+   possible here and refused in production (`docs/install.md`, *Update channel*). A production
+   installation stays on `release`, applied by a superuser's click, or inside an update window.
 
 What the beta leaves out on purpose: the volume is the server's own disk (STACKIT does not
 encrypt ephemeral disks), there is no backup, and a lost server means a new installation. So
