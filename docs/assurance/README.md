@@ -15,6 +15,7 @@ such requirement is in exactly one checklist, and a test keeps it that way
 | `cisco.md` | The client's integration administrator, who asks Cisco | Media and signalling requirements, what Cisco receives, settings to confirm in Control Hub |
 | `dpia-input.md` | The controller and its data protection officer | Pointer to the retention matrix, decisions on retention and installations, the processor template per recipient |
 | `pentest-scope.md` | The penetration tester | What to test; not a checklist |
+| `pre-pentest-beta.md` | The supplier and the hosting party | The own-team exercise on an externally hosted trial or beta before the external test: rules, adversary steps, areas, bounded availability tests, and what must be seen |
 
 ## How to use a checklist
 
