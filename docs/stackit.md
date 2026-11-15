@@ -42,6 +42,38 @@ writes its findings at the end.
 5. **Test a restore from a snapshot on a second server** before go-live: make a volume from the
    snapshot, attach it, follow *Restoring a copy by hand*. Write down how long it took.
 
+## Minimal beta (beta.openplanner.nl)
+
+For a beta with **test data only**, no real participants and no restore requirement, the setup
+shrinks to this. It drops the snapshot, backup and restore steps above; it keeps the rest,
+because those protect the people who try it.
+
+1. One server (2 vCPU, 4 GB; Ubuntu 24.04), one public IP, and the security group: inbound 80
+   and 443 from anywhere, 22 from your own address only.
+2. DNS: an `A` record `beta.openplanner.nl` to the public IP (at the registrar of the zone; a
+   `CAA` record, if any, must allow `letsencrypt.org`).
+3. Install with the bundled login and the HTTPS proxy:
+
+   ```sh
+   git clone --branch vX.Y.Z https://github.com/3Corners-Labs/OpenPlanner.git ~/openplanner
+   cd ~/openplanner
+   ./scripts/install.sh --mode test --tls-domain beta.openplanner.nl --acme-staging
+   ```
+
+   Run it first with `--acme-staging`, check `address-check`, then run it again without the
+   option for the real certificate (`docs/runbook.md`, *HTTPS certificate*).
+4. A mail server for the confirmation mails (`SMTP_HOST` and the rest, asked by the installer):
+   testers must receive the confirmation and management links. A `lab` installation would keep
+   all mail in Mailpit, so it is no use for end users. If STACKIT blocks the mail ports,
+   use the SMTP relay of a mail provider on port 587.
+5. Check: `docker compose --env-file .env.update exec web python -m app.cli address-check`,
+   *System status* in the portal, and one test booking from another network.
+
+What the beta leaves out on purpose: the volume is the server's own disk (STACKIT does not
+encrypt ephemeral disks), there is no backup, and a lost server means a new installation. So
+**no real personal data in it**: testers use made-up names and addresses. Before real
+participants, follow the full setup above (block volume, backup, a tested restore) on a new server.
+
 ## Findings of the first run
 
 To be written by the person who runs it:
