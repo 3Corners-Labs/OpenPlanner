@@ -3,8 +3,8 @@
 Status: accepted, partly built (2026-11-14), requested by the product owner: the Graphify code
 graph must be a fixed part of how we build and keep improving, quality and reuse must stay high,
 and unused routines must be removed as part of the build. Extends ADR 0005 (one home per
-concern) and ADR 0058 (the fast lane). Step 1 is built in the pull request that adds it; steps 2
-and 3 are planned; see *Build status*.
+concern) and ADR 0058 (the fast lane). Steps 1 and 3 are built in the pull requests that
+add them; steps 2 and 4 are planned; see *Build status*.
 
 ## Context
 
@@ -41,10 +41,16 @@ from, so a CI gate cannot depend on it, and it never replaces reading the code.
    (route, template, job kind, setting key, i18n key, entry point; found with a text search) is
    deleted together with its tests, in its own `refactor:` pull request. A candidate that stays
    is named in the pull request with the reason.
-5. **Hotspots are watched.** At each minor release the release pull request lists the ten
-   symbols with the highest coupling in the Graphify review (callers plus callees), and names
-   those that grew since the last release, as the input for a refactor decision. Graphify's pull
-   request review stays advisory.
+5. **Hotspots are watched.** The most coupled symbols are held under ceilings in
+   `scripts/coupling_budget.json`, which `make coupling` checks in `make fast` and in CI. A
+   symbol is measured on the checked-out code, by files that name it (afferent) or by the names
+   its own body calls (efferent); the numbers are not Graphify's, whose review picks the
+   candidates. A ceiling is raised only by editing that file in the pull request that needs it,
+   with its reason, so growth is a decision a reviewer sees; a measure well under its ceiling is
+   reported so the ceiling can be lowered. At each minor release the release pull request also
+   lists the ten symbols with the highest coupling in the Graphify review and names those that
+   grew since the last release, as the input for a refactor decision. Graphify's pull request
+   review stays advisory.
 6. **The process improves.** A session that finds the graph wrong, stale or missing a fact
    records it in the pull request, and the skills and CLAUDE.md are changed in the pull request
    that found it, not left as a lesson.
@@ -76,4 +82,5 @@ framework entry points; a higher one would miss unused variables.
 | 0 | ADR | #855 | merged |
 | 1 | `make deadcode` and `[tool.vulture]`, in `make fast` and the CI `python` job, pinned and tracked by Renovate; the points of the process in CLAUDE.md, `docs/skills.md`, `pre-pr-review` and `code-quality-review` (reuse list, unused code) | #855 | merged |
 | 2 | The first graph sweep of the 60% candidates, deleted in `refactor:` pull requests | | planned |
-| 3 | The hotspot list in the release pull request (`scripts/release_pr.py`) | | planned |
+| 3 | `make coupling` and `scripts/coupling_budget.json` (`scripts/coupling_budget.py`, `tests/scripts/test_coupling_budget.py`), in `make fast` and the CI `python` job; the measurement method and first numbers in `docs/graph-measurement.md` | #882 | merged |
+| 4 | The hotspot list in the release pull request (`scripts/release_pr.py`) | | planned |

@@ -1,4 +1,4 @@
-.PHONY: setup fast check matrix pins fmt lint shellcheck deadcode type imports test security audit lock licenses migrations semgrep duplication mutation release-plan release-audit e2e proxy-check diagrams site up down
+.PHONY: setup fast check matrix pins fmt lint shellcheck deadcode coupling type imports test security audit lock licenses migrations semgrep duplication mutation release-plan release-audit e2e proxy-check diagrams site up down
 
 UV := uv run
 
@@ -15,7 +15,7 @@ setup:
 
 # ADR 0058: `fast` is the pull request's fast lane, for trying an idea; `check` is everything the
 # merge queue runs that can run without Docker, so run it before asking for review.
-fast: lint shellcheck deadcode type imports test security ## The fast lane: about two minutes
+fast: lint shellcheck deadcode coupling type imports test security ## The fast lane: about two minutes
 check: fast matrix audit lock pins duplication ## Everything a PR must pass locally
 
 fmt:
@@ -46,6 +46,11 @@ shellcheck:
 VULTURE_VERSION := 2.14
 deadcode:
 	uvx --from vulture==$(VULTURE_VERSION) vulture
+
+# ADR 0127 step 3: the most coupled symbols of app/ stay under the ceilings of
+# scripts/coupling_budget.json; raising one is a reviewed edit with a reason.
+coupling:
+	$(UV) python -m scripts.coupling_budget
 
 type:
 	$(UV) mypy
