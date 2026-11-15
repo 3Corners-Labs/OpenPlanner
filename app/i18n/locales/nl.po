@@ -1229,7 +1229,7 @@ msgid "admin.field.join_client"
 msgstr "Hoe de deelnemer in het gesprek komt"
 
 msgid "admin.field.join_client_hint"
-msgstr "Hoe de deelnemer in het gesprek komt. 'Direct in de browser': de deelnemer gaat naar Webex en het gesprek opent in de webversie. 'Webex laat de deelnemer kiezen': de deelnemer gaat naar Webex en kiest daar zelf tussen de app en de browser. 'In de eigen pagina van de organisatie': het gesprek loopt in onze eigen pagina. Het proefgesprek opent altijd in Webex."
+msgstr "Hoe de deelnemer in het gesprek komt. 'Direct in de browser': de deelnemer gaat naar Webex en het gesprek opent in de webversie. 'Webex laat de deelnemer kiezen': de deelnemer gaat naar Webex en kiest daar zelf tussen de app en de browser. 'In de eigen pagina van de organisatie': het gesprek loopt in onze eigen pagina. Het proefgesprek opent in de eigen pagina als die gekozen is, anders in Webex."
 
 msgid "admin.group.join_client_browser"
 msgstr "Direct in de browser"
@@ -14211,7 +14211,7 @@ msgstr "De bezorgingen zijn hervat."
 #. The participant's call page before the click that joins (ADR 0123 step 4b). No text names the video platform.
 
 msgid "settings.field.embedded_call_webex_option.label"
-msgstr "Weg naar de eigen app van het videoplatform naast het gesprek (nooit, alleen als de pagina het gesprek niet kan geven, of altijd). Geldt voor elk team dat er zelf geen koos; een team kiest het onder Groep, Instellingen, Video"
+msgstr "Weg naar de eigen app van het videoplatform naast het gesprek (nooit, alleen als de pagina het gesprek niet kan geven, of altijd). Geldt voor elk team dat zelf niets koos; een team kiest het onder Groep, Instellingen, Video"
 
 msgid "settings.field.privacy_statement_url.label"
 msgstr "Adres van de privacyverklaring van de organisatie (https)"
