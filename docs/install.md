@@ -60,6 +60,13 @@ says a load balancer of your own does TLS; a `lab` runs it when `--tls-domain <h
 public DNS name. The script remembers the mode and that choice in `.env.update`, so later runs
 need neither.
 
+When reverse proxies, WAFs or load balancers of your own sit in front of the bundled proxy, name
+their addresses with `--trusted-proxies '10.20.30.0/28, 192.0.2.10'` (ADR 0129). The proxy then
+reads the visitor's address out of their `X-Forwarded-For`, right to left, so the rate limits,
+pseudonyms and webhook source networks see the visitor and not your edge. List only the edge's own
+addresses: anything in a trusted range can claim any address. The value goes to `proxy.env`
+(`PROXY_TRUSTED_NETWORKS`); a later run keeps it, and `--trusted-proxies ''` removes it.
+
 ## The identity provider (ADR 0106 step 5)
 
 `--idp bundled|own` decides who the staff log in with. **`bundled`** (the default in every mode) runs the Keycloak of ADR 0090: the installer renders its realm with generated secrets

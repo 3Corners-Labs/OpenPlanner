@@ -26,6 +26,8 @@ handle @idp {
 	@login path /idp/realms/openplanner/* /idp/resources/*
 	handle @login {
 		reverse_proxy {$IDP_UPSTREAM} {
+			# Exactly one address, the visitor's, as web gets it (ADR 0129).
+			header_up X-Forwarded-For {client_ip}
 			# ADR 0126 point 2: none of the portal's cookies reaches the provider. On https every
 			# cookie of the portal is a `__Host-` cookie (app/web/cookies.py), besides `lang`
 			# (app/web/locale.py); a provider's cookie can never be one, its path is /idp/....

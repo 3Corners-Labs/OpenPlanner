@@ -1,10 +1,13 @@
 """Configuration packages (ADR 0089): what an installation's configuration is, and its rules.
 
 A package is a copy of the database with every *state* table emptied and the secrets sealed
-again under a passphrase. This module is the one place that says which table is which, what
-a passphrase must be and which environment values travel with a package. The SQLite work is
-the adapter's (``app/adapters/db/configuration_package``); the rules of an export and an
-import are ``ConfigurationPackageService`` (``app.domain.configuration_service``).
+again under a passphrase, an organisation's contact-center record without what a rotation
+left (the previous webhook secret, the registration outcome and, with a previous secret, the
+rotation time: ADR 0124 point 8, ``without_rotation_state`` in the adapter). This module is the
+one place that says which table is which, what a passphrase must be and which environment
+values travel with a package. The SQLite work is the adapter's
+(``app/adapters/db/configuration_package``); the rules of an export and an import are
+``ConfigurationPackageService`` (``app.domain.configuration_service``).
 """
 
 from dataclasses import dataclass, field
@@ -121,6 +124,7 @@ STATE_TABLES = frozenset(
         "usage_rollup_state",
         "usage_staff_hour",
         "webhook_events",
+        "webhook_secret_sightings",  # this host's first sightings of its webhook secrets (ADR 0124)
         "work_items",  # requests and their work: what happened, like bookings (ADR 0121 step 5)
     }
 )

@@ -1313,6 +1313,67 @@ _OPERATIONS = (
         _CHECK_HOST,
     ),
     _e(
+        "webhook.subscription_gap",
+        _SYS,
+        "outcome",
+        "",
+        "A contact-center subscription left a gap or none for the organisation.",
+        "Setting a new webhook secret at the contact center left a gap in the deliveries "
+        "(reason `replaced`: the old subscription had to be removed before the new one could be "
+        "made, so events in between may have been missed) or no subscription at all (reason "
+        "`gone`: the new one was refused after the old one was removed) (ADR 0124 point 8). "
+        "Nothing is delivered in the second case until a registration succeeds. No text from "
+        "the platform is kept.",
+        "`gone`: check the Service App's rights, then save the connection's card again to "
+        "register. `replaced`: the periodic check of open tasks catches up on states.",
+    ),
+    _e(
+        "webhook.renewal_interrupted",
+        _OPS,
+        "warning",
+        "stage error",
+        "Renewing the contact-center subscription was interrupted at {stage}: {error}.",
+        "While a new webhook secret was being given to the contact center (ADR 0124 point 8) the "
+        "platform failed after an old subscription had been removed (stage `delete` or `create`), "
+        "or while the old ones were being cleaned up after the new one was made (stage "
+        "`cleanup`). The first two leave the connection card on `gone`, with its system event; "
+        "the third leaves a duplicate subscription. Only the platform's status code is logged.",
+        "`create` or `delete`: save the connection's card again to register. `cleanup`: remove "
+        "the old subscription at the platform.",
+    ),
+    _e(
+        "webhook.sighting_failed",
+        _OPS,
+        "warning",
+        "source error",
+        "The first sighting of the {source} webhook secret could not be read or kept: {error}.",
+        "The moment the application first saw the installation's webhook secret is kept in the "
+        "database (ADR 0124 point 8) and could not be read or written. A previous value of the "
+        "secret in the environment is not used while that is so: an overlap that cannot be "
+        "measured is never granted. The current secret is unaffected.",
+        _CHECK_HOST,
+    ),
+    _e(
+        "webhook.previous_secrets_removed",
+        _SYS,
+        "info",
+        "connections",
+        "The previous webhook secret of {connections} connections was removed.",
+        "Housekeeping removed sealed previous webhook secrets whose overlap had ended (ADR 0124 "
+        "point 8). They no longer verified anything: the clock decides that at each delivery.",
+    ),
+    _e(
+        "webhook.previous_secrets_failed",
+        _SYS,
+        "warning",
+        "error",
+        "Removing previous webhook secrets failed: {error}.",
+        "The hourly sweep of previous webhook secrets whose overlap had ended did not finish "
+        "(ADR 0124 point 8). Nothing is refused or accepted differently: the clock decides, and "
+        "the next round tries again.",
+        _CHECK_HOST,
+    ),
+    _e(
         "webhook.paused",
         _OPS,
         "info",

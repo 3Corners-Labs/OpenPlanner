@@ -183,14 +183,17 @@ None, after checking. Every value below is a fixed security rule or follows from
   management link's token (`/b/<token>`; measured on 2026-11-15 without the block, at error
   level), and while the identity provider restarts, a Keycloak action token from an invitation
   or a reset mail (`/idp/realms/openplanner/login-actions/action-token?key=…`). The proxy's log
-  then says nothing about such a 502; web's and the updater's logs say why web was down. One
-  line at the default level still carries the URI and the request's headers, `Referer` among
-  them, from before this decision: `reverse_proxy` warns when an answer breaks off after its
-  headers (the browser leaves, the upstream dies mid-body). Long enough to break off are
-  Keycloak's action-token pages, a management link's page during maintenance or after a 429,
-  and an asset fetched from such a page, whose `Referer` holds the page's address. Read in
-  Caddy's source by the review, not reproduced; a log filter that drops the URI and `Referer`
-  would close it, a follow-up outside this decision.
+  then says nothing about such a 502; the logs of web, the updater or the provider say why the
+  container was down. One line at the default level still carries the URI and the request's
+  headers, `Referer` among them, from before this decision: `reverse_proxy` warns when an
+  answer breaks off after its headers (the browser leaves, the upstream dies mid-body). Long
+  enough to break off are Keycloak's action-token pages; the maintenance page on a management
+  link's sub-paths (`/b/<token>/proposal`, `/b/<token>/test`; `/b/<token>` itself stays open and
+  answers an empty redirect) and on the one-time display link (`/display/start/<token>`); the
+  page after a 429 on either; and an asset fetched from such a portal page, whose `Referer`
+  holds the page's address (Keycloak's own pages send none). Read in Caddy's source by the
+  review, not reproduced; a log filter that drops the URI and `Referer` would close it, a
+  follow-up outside this decision.
 - A reverse proxy of the operator's own in front of the bundled provider must do the same; the
   runbook lists what.
 - Updated with this decision: `docs/runbook.md`, `docs/threat-model.md`, `docs/dataflow.md`,

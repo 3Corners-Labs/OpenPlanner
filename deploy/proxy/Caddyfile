@@ -23,6 +23,10 @@
 			write 60s
 			idle 2m
 		}
+		# The reverse proxies, WAFs and load balancers in front of this one (PROXY_TRUSTED_NETWORKS,
+		# ADR 0129): from them the visitor's address is read out of X-Forwarded-For, right to left.
+		# entrypoint.sh renders the directive; empty, nobody is trusted and the peer is the visitor.
+		{$TRUSTED_PROXIES_DIRECTIVE}
 	}
 }
 
@@ -60,8 +64,10 @@ http://{$TLS_DOMAIN}:8080 {
 	request_body @other {
 		max_size 1MB
 	}
-	# Caddy sets X-Forwarded-For to the visitor's address and drops any value the client sent
-	# (no trusted_proxies), so rate limits in the app see the real IP.
+	# Every upstream gets exactly one address in X-Forwarded-For: the visitor's ({client_ip}).
+	# Without trusted networks that is the peer, and any value the client sent is dropped; from a
+	# trusted edge it is the first untrusted address, right to left (ADR 0129). Rate limits,
+	# pseudonyms and webhook source networks in the app therefore see the real visitor.
 	# The bundled identity provider (ADR 0112) is served under /idp when IDP_UPSTREAM is set:
 	# entrypoint.sh renders IDP_DIRECTIVE as `import /etc/caddy/idp.caddy` (ADR 0126: only the
 	# login, none of the portal's cookies, nothing that acts on the whole origin), empty otherwise.
@@ -69,7 +75,9 @@ http://{$TLS_DOMAIN}:8080 {
 	# Everything else goes to web at its fixed address on edge (WEB_UPSTREAM, docker-compose.yml),
 	# never to a name this host's DNS could answer while web is down (ADR 0125 step 2).
 	handle {
-		reverse_proxy {$WEB_UPSTREAM}
+		reverse_proxy {$WEB_UPSTREAM} {
+			header_up X-Forwarded-For {client_ip}
+		}
 	}
 	# Every answer the proxy makes itself (a refusal under /idp, a body over its limit, a 502
 	# while web restarts) is a page of the portal's own origin. It gets the portal's deny-by-

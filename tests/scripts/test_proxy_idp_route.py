@@ -250,10 +250,19 @@ def test_the_proxy_logs_no_request() -> None:
     for text in (CADDYFILE, ROUTE):
         assert not re.search(r"^\s*(log|debug)\b", text, re.MULTILINE)
     https = CADDYFILE.index("\n{$TLS_DOMAIN}:8443 {")
-    assert CADDYFILE.count("handle_errors {") == 1
+    # One error route, in the Caddyfile: idp.caddy is imported into the https site.
+    assert len(re.findall(r"^\s*handle_errors\b", CADDYFILE, re.MULTILINE)) == 1
+    assert not re.search(r"^\s*handle_errors\b", ROUTE, re.MULTILINE)
     assert https < CADDYFILE.index("handle_errors {") < CADDYFILE.index("\n}", https)
     # Headers only: a handler in it that can fail makes Caddy log the first error at error level.
     assert re.search(r"handle_errors \{\s*header \{[^{}]*\}\s*\}", CADDYFILE)
+
+
+def test_the_provider_gets_the_visitors_address_alone_as_web_does() -> None:
+    """ADR 0129: every upstream gets exactly one address in X-Forwarded-For, the visitor's."""
+    rule = "header_up X-Forwarded-For {client_ip}"
+    assert re.search(rf"^\s*{re.escape(rule)}$", ROUTE, re.MULTILINE)
+    assert re.search(rf"reverse_proxy \{{\$WEB_UPSTREAM\}} \{{\s*{re.escape(rule)}", CADDYFILE)
 
 
 def test_every_answer_the_proxy_makes_itself_carries_the_portals_own_headers() -> None:

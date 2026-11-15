@@ -1645,3 +1645,27 @@ def test_a_passphrase_file_alone_is_refused(host: Host) -> None:
 
     assert alone.returncode == 1
     assert "--configuration and --passphrase-file go together" in alone.stderr
+
+
+def test_trusted_proxies_are_written_kept_on_a_rerun_and_cleared(host: Host) -> None:
+    """ADR 0129: the edge in front of the proxy goes to proxy.env; an empty list removes it."""
+    args = ("--mode", "test", "--idp", "own", "--non-interactive")
+
+    first = host.run(*args, "--trusted-proxies", "10.20.0.0/16, 192.0.2.10", **PRODUCTION)
+    trusted = host.settings("proxy.env").get("PROXY_TRUSTED_NETWORKS")
+    rerun = host.run(*args, **PRODUCTION)
+    kept = host.settings("proxy.env").get("PROXY_TRUSTED_NETWORKS")
+    cleared = host.run(*args, "--trusted-proxies", "", **PRODUCTION)
+
+    assert first.returncode == rerun.returncode == cleared.returncode == 0, cleared.stderr
+    assert trusted == kept == "10.20.0.0/16, 192.0.2.10"
+    assert "PROXY_TRUSTED_NETWORKS" not in host.settings("proxy.env")
+
+
+def test_trusted_proxies_refuse_anything_but_addresses(host: Host) -> None:
+    result = host.run(
+        "--mode", "test", "--non-interactive", "--trusted-proxies", "edge.example.nl", **PRODUCTION
+    )
+
+    assert result.returncode != 0
+    assert "--trusted-proxies takes IP addresses and CIDR ranges" in result.stderr

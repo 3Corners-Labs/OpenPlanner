@@ -6,7 +6,9 @@
 # standards of ADR 0086 hold (TLS 1.2 and 1.3 only with AEAD suites, HSTS of at least a year and
 # none on port 80, and the app's round trip through the proxy is `ok`, or `proxy_not_trusted` with
 # a wrong FORWARDED_ALLOW_IPS); a forged X-Forwarded-For/-Proto/-Host from the visitor is replaced
-# by the proxy before it reaches web (ASVS V4.1.3, V15.3.4; read from the wire); a visitor over
+# by the proxy before it reaches web (ASVS V4.1.3, V15.3.4; read from the wire), and from a trusted
+# edge (PROXY_TRUSTED_NETWORKS, ADR 0129) web gets the visitor's address, read right to left, even
+# when the visitor added one of their own; a visitor over
 # IPv6 reaches web with their own address, not one the whole of IPv6 shares (the dual-stack edge
 # network of docker-compose.yml); a
 # pair handed over through the portal-certs volume is served within the poll interval and ACME
@@ -251,6 +253,38 @@ forged_header_check() { # a forged X-Forwarded-* is replaced at the edge (ASVS V
   ! echo "$seen" | grep -qi 'forged.example' || fail "web receives the X-Forwarded-Host the visitor forged"
 }
 
+trusted_request() { # an edge in front hands on the visitor 203.0.113.7
+  # shellcheck disable=SC2086
+  curl -sk $resolve -o /dev/null -H 'X-Forwarded-For: 203.0.113.7' https://booking.test:18443/healthz
+}
+
+chained_request() { # the visitor wrote 198.51.100.66 themselves; the edge added their address
+  # shellcheck disable=SC2086
+  curl -sk $resolve -o /dev/null -H 'X-Forwarded-For: 198.51.100.66, 203.0.113.7' \
+    https://booking.test:18443/healthz
+}
+
+trusted_edge_check() { # ADR 0129: from a trusted edge, web gets the visitor's address and only it
+  # This host plays the edge: the proxy trusts exactly the address it sees this host as, which the
+  # forged request shows on the wire. The proxy is started again without it afterwards.
+  peer="$(on_the_wire forged_request | grep -i '^x-forwarded-for:' | sed 's/^[^:]*: *//' | head -n 1)"
+  [ -n "$peer" ] || fail "the sniffer did not show the address the proxy sees this host as"
+  export PROXY_TRUSTED_NETWORKS="$peer"
+  compose up -d --force-recreate --wait proxy
+  wait_for_proxy
+  seen="$(on_the_wire trusted_request)"
+  echo "$seen" | sed 's/^/  from a trusted edge, to web: /'
+  echo "$seen" | grep -qi '^x-forwarded-for: 203\.0\.113\.7$' \
+    || fail "from a trusted edge web does not get the visitor's address alone"
+  seen="$(on_the_wire chained_request)"
+  echo "$seen" | sed 's/^/  a visitor who added an address, to web: /'
+  echo "$seen" | grep -qi '^x-forwarded-for: 203\.0\.113\.7$' \
+    || fail "a visitor who adds an address in front of the edge's chooses their own (not read right to left)"
+  unset PROXY_TRUSTED_NETWORKS
+  compose up -d --force-recreate --wait proxy
+  wait_for_proxy
+}
+
 # One request to the proxy from the address given as the first argument, port 18444. Only the
 # proxy's answer matters here, not its certificate.
 ipv6_client_code='
@@ -298,9 +332,10 @@ edge_checks() { # redirect, machine paths, body limit, non-root, standards: the 
   forged_header_check
 }
 
-# The provider of pass 3 (ADR 0126): it answers every request with 200 and the Cookie header it was
-# given, sets every header an answer must not get through to the browser, and prints each path it
-# serves. It runs in web's image on the edge network as idp-probe:8080.
+# The provider of pass 3 (ADR 0126): it answers every request with 200 and the Cookie and
+# X-Forwarded-For headers it was given (ADR 0129), sets every header an answer must not get
+# through to the browser, and prints each path it serves. It runs in web's image on the edge
+# network as idp-probe:8080.
 idp_probe_code='
 import http.server, json
 FORGED = [
@@ -325,7 +360,8 @@ FORGED = [
 class Probe(http.server.BaseHTTPRequestHandler):
     def answer(self):
         print(self.path, flush=True)
-        body = json.dumps({"cookie": self.headers.get_all("Cookie") or []}).encode()
+        fields = {"cookie": "Cookie", "forwarded_for": "X-Forwarded-For"}
+        body = json.dumps({key: self.headers.get_all(name) or [] for key, name in fields.items()}).encode()
         self.send_response(200)
         for name, value in FORGED:
             self.send_header(name, value)
@@ -412,12 +448,16 @@ idp_route_checks() { # pass 3: the route of ADR 0126 in front of a provider that
   ! probe_saw '%2[Ff]|%5[cC]|;' || fail "a detour reached the provider"
   # shellcheck disable=SC2086
   given="$(curl -sk $resolve -H 'Cookie: __Host-op_admin=s1; KC_RESTART=k1; lang=nl; __Host-op_link=s2; AUTH_SESSION_ID=a1' \
+    -H 'X-Forwarded-For: 203.0.113.9' \
     "$base/idp/realms/openplanner/x")"
   echo "  the provider was given: $given"
   for kept in KC_RESTART=k1 AUTH_SESSION_ID=a1; do
     echo "$given" | grep -q "$kept" || fail "the provider's own cookie $kept does not reach it ($given)"
   done
   ! echo "$given" | grep -q -e '__Host-' -e 'lang=' || fail "a cookie of the portal reaches the provider ($given)"
+  # ADR 0129: the provider gets one address, the visitor's, never one the visitor wrote.
+  echo "$given" | grep -q '"forwarded_for": \["[^",]*"\]' || fail "the provider is not given exactly one address ($given)"
+  ! echo "$given" | grep -q '203\.0\.113\.9' || fail "the provider is given the address the visitor forged ($given)"
   direct="$(compose exec -T web python -I -c "$probe_direct_code" | tr -d '\r')"
   head="$(head_of "$base/healthz")"
   portal_hsts="$(values_of strict-transport-security)"
@@ -637,9 +677,10 @@ wait_for_proxy
 issuer | grep -q 'Pebble' || fail "no certificate from the ACME CA ($(issuer))"
 edge_checks
 ipv6_client_check
+trusted_edge_check
 round_trip ok pebble
 tls_check untrusted Pebble
-echo "pass 1 ok: certificate obtained over ACME, redirect, body limit, non-root, TLS versions, HSTS, a visitor's IPv6 address, round trip, tls-check"
+echo "pass 1 ok: certificate obtained over ACME, redirect, body limit, non-root, TLS versions, HSTS, a visitor's IPv6 address, a trusted edge, round trip, tls-check"
 
 # A proxy address the app does not trust: the app must say so, not report ok (ADR 0086 point 2).
 # In a subshell: an assignment in front of a shell function would outlive the call.

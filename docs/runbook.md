@@ -153,7 +153,9 @@ section; the installer's default) nothing else is needed. Behind a reverse proxy
 - A request body limit on the proxy (for example 64 KB for `/g/*` and `/b/*`).
 - No access log on the proxy, and no request line in its error log: paths carry management
   tokens. nginx, for one, writes `request: "GET /b/<token> …"` and the upstream's URL with the
-  path at level `error` when the upstream is down, so set its `error_log` to `crit`.
+  path at level `error` when the upstream is down, so set its `error_log` to `crit`; that keeps
+  out the usual lines, while a rare `crit` line written during a request (a connection refused
+  by SELinux, a temporary file that cannot be written) still carries both.
 - Answer plain `http://` requests for `/api/*` and `/webhooks/*` with `403` and no `Location`
   header, and redirect only the browser paths. A redirect makes a bot or Webex Connect flow that
   was configured with `http://` repeat its POST, with the client secret or webhook body, in
@@ -163,6 +165,16 @@ section; the installer's default) nothing else is needed. Behind a reverse proxy
   do not serve `/static/` from the proxy itself. `scripts/check-proxy.sh` shows what to expect.
 
 ### Address and proxy (ADR 0086)
+
+**Behind another edge (ADR 0129).** A reverse proxy, WAF or load balancer of the organisation may
+sit in front of the bundled proxy. Without more, every visitor then arrives with the edge's
+address: one rate-limit bucket for everyone, one caller pseudonym, and webhook source networks
+that see the edge. Name the edge's own addresses in `PROXY_TRUSTED_NETWORKS` (`proxy.env`, or
+`--trusted-proxies` of the installer) and restart the proxy. It then takes the visitor's address
+from the edge's `X-Forwarded-For`, read right to left (`trusted_proxies_strict`), and hands web
+exactly that one address. The proxy's log says at start which networks it trusts; a range of
+length 0, a name or more than 32 entries stop it. The edge must send `X-Forwarded-For` and
+`X-Forwarded-Proto`, and speak https to the bundled proxy.
 
 *Advanced settings* → *System status* → **Address and proxy** shows what the installation
 believes about its own address: the shape (bundled proxy, own reverse proxy, no proxy), the
@@ -885,7 +897,7 @@ domain every `idp_domain_recheck_hours`; a record that disappears raises the sys
 `idp.domain_check` and, after `idp_domain_grace_days`, the domain stops routing.
 
 **Registering an organisation's provider.**
-1. In the portal: Organisations › *organisation* › Overview › Login › *Add*. Enter the
+1. In the portal: Organisations › *organisation* › Overview › Authentication › *Add*. Enter the
    discovery URL and the client id, and choose the client authentication:
    - `private_key_jwt` (default): give the organisation's IdP team the JWKS address shown on
      the provider's page;
@@ -2687,6 +2699,54 @@ again. Each sealed value carries the id of the key that sealed it. In this order
 
 A configuration package (ADR 0089) can be exported and imported during a rotation: the
 installation opens its secrets under either key.
+
+**Rotating a webhook secret (ADR 0124 point 8)** keeps the old secret verifying for
+`webhook_secret_overlap_minutes` (class C, default 60, 0 to 1440, *Advanced settings*), so no event
+is refused while the platform takes up the new one.
+
+*An organisation's secret*: on the organisation's *Kanalen* page press *Make a new webhook secret*.
+The server makes the secret and tells the platform (the card says what came of it). The card then
+says until when the previous secret still works. A rotation inside that time stops the previous
+secret at once, together with the one before it. In *Deliveries seen* the count *Verified with the
+previous secret* goes to zero once the platform has taken the new one up. **If the old secret
+leaked**, an organisation's administrator rotates twice in a row: the first rotation keeps the old
+secret valid until the time shown, the second ends it at once. The superuser can instead set the
+overlap to 0 first (*Advanced settings*) and rotate once. Either way events already on their way may be
+refused. **If the card says registering did not succeed** (a gap, no subscription, or the platform not
+told), nothing retries it by itself: check the Service App's rights and press *Save* on the card to
+register again; the card says until when the old secret is still accepted. Removal of the
+sealed previous secret is housekeeping (an hourly sweep, and any write of the record after 24 hours);
+what counts is the clock at each delivery.
+
+*The installation's own secrets* (`WEBEX_WEBHOOK_SECRET`, `WXCC_WEBHOOK_SECRET`) come from the
+environment, which the application cannot write:
+
+1. Make the new value (at least 32 random characters; WxCC wants 32 to 256).
+2. Set the **new** value as `WEBEX_WEBHOOK_SECRET` (or `WXCC_WEBHOOK_SECRET`) and the **old** value
+   as `WEBEX_WEBHOOK_SECRET_PREVIOUS` (or `WXCC_WEBHOOK_SECRET_PREVIOUS`). Like `WEBEX_WEBHOOK_SECRET`
+   and `WXCC_WEBHOOK_SECRET` they are class C and take no `_FILE`; set them in the environment.
+3. Restart `web` and `worker`. The previous value verifies for the overlap counted from the moment
+   the application first saw the new secret (it is kept in the database as a fingerprint, so a later
+   restart does not start it again).
+4. Tell the platform the new secret straight away, inside the overlap:
+   `docker compose exec web python -m app.cli register-webhooks --update-secret`. The video
+   platform's webhooks are updated in place; the WxCC subscription is made again before the old one is
+   removed (a report line says when the old one had to be removed first, with a gap, or when
+   there is no subscription now: run it again). The report never holds a secret.
+5. After the overlap, **remove the `_PREVIOUS` variable** and restart. System status (*Address and
+   proxy*) shows a finding for a previous value that is still set after its overlap, and for one that
+   equals the current secret. A restart with only the new secret set and no previous value refuses the old
+   secret at once.
+
+If the database cannot be read when the application first sees a secret, the previous value is not
+used until it can: an overlap that cannot be measured is never granted.
+
+**After a restore of the database, or on another host** (a new installation from a backup, a
+standby taking over): the first sightings are in the database table `webhook_secret_sightings`. A
+restore from before the rotation, or a host with an empty database, has no sighting of the current
+secret, so a `_PREVIOUS` value that is still in the environment gets a new overlap, counted from
+the first call at the new place. Remove the `_PREVIOUS` variables before such a move once their
+overlap has ended; a configuration package neither carries the table nor a previous secret.
 
 **Rotating `MANAGEMENT_TOKEN_KEY`** keeps every link working while the previous key is set
 (ADR 0094 point 4):

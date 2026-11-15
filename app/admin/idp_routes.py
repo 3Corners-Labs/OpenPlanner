@@ -8,10 +8,16 @@ one (ADR 0008). A private key is never shown; the page shows the key id and the 
 address the IdP team registers. ``IdentityProviderService`` authorises again, validates,
 checks discovery and audits.
 
+The page opens with the steps still to do, the warnings about a set-up that never routes and
+a check that says where an e-mail address would log in (``POST .../login/_check``; the address
+is never stored, logged or put in a URL, and the answer names its domain only). The path
+cannot clash with a provider key, which starts with a letter or digit.
+
 The guided test login (point 9) sends the superuser to the provider and shows what came back
 on the callback (``routes.callback``) without starting a session.
 
     GET  /admin/organisations/{org}/login                          identity_providers.view
+    POST /admin/organisations/{org}/login/_check                   identity_providers.view
     GET  /admin/organisations/{org}/login/new                      identity_providers.manage
     POST /admin/organisations/{org}/login                          identity_providers.manage
     GET  /admin/organisations/{org}/login/{idp_key}                identity_providers.view
@@ -60,6 +66,15 @@ from app.domain.identity_providers import (
     ClientAuth,
     OrganisationProvider,
     ProviderDraft,
+)
+from app.domain.idp_setup import (
+    RouteCheck,
+    RouteReason,
+    SetupStep,
+    SetupWarning,
+    StepState,
+    setup_steps,
+    setup_warnings,
 )
 from app.domain.login_domains import DomainClaim, DomainState
 from app.domain.mfa import MfaPolicy
@@ -423,13 +438,139 @@ def _test_failure(request: Request, locale: RequestLocale) -> str | None:
     return locale.gettext(TEST_FAILURES.get(code, "admin.idp.test_failed.generic"))
 
 
-@router.get("/organisations/{org}/login", response_class=HTMLResponse)
-async def organisation_login(
-    request: Request, locale: Locale, org: str, context: View
+STEP_LABELS: dict[StepState, tuple[str, str]] = {
+    StepState.DONE: ("admin.idp.steps.state.done", " chip--success"),
+    StepState.TODO: ("admin.idp.steps.state.todo", " chip--warning"),
+    StepState.BLOCKED: ("admin.idp.steps.state.blocked", ""),
+}
+"""Label and chip per step state; the state is also written out, never colour alone."""
+
+STEP_TEXTS: dict[str, tuple[str, str]] = {
+    "host_switch": ("admin.idp.steps.host_switch", "admin.idp.steps.host_switch.hint"),
+    "register": ("admin.idp.steps.register", "admin.idp.steps.register.hint"),
+    "enable": ("admin.idp.steps.enable", "admin.idp.steps.enable.hint"),
+    "domain": ("admin.idp.steps.domain", "admin.idp.steps.domain.hint"),
+    "verify": ("admin.idp.steps.verify", "admin.idp.steps.verify.hint"),
+}
+"""Title and hint per step key; a test checks every step has both."""
+
+WARNING_TEXTS: dict[str, str] = {
+    "enabled_without_domain": "admin.idp.warning.enabled_without_domain",
+    "domain_provider_off": "admin.idp.warning.domain_provider_off",
+    "domain_pending": "admin.idp.warning.domain_pending",
+    "domain_failing": "admin.idp.warning.domain_failing",
+    "domain_lapsed": "admin.idp.warning.domain_lapsed",
+}
+"""Sentence per warning code."""
+
+CHECK_TEXTS: dict[RouteReason, str] = {
+    RouteReason.PROVIDER: "admin.idp.check.provider",
+    RouteReason.NO_DOMAIN: "admin.idp.check.no_domain",
+    RouteReason.RESERVED_SUFFIX: "admin.idp.check.reserved_suffix",
+    RouteReason.NO_DOMAIN_MATCH: "admin.idp.check.no_domain_match",
+    RouteReason.DOMAIN_NOT_VERIFIED: "admin.idp.check.domain_not_verified",
+    RouteReason.PROVIDER_OFF: "admin.idp.check.provider_off",
+    RouteReason.HOST_SWITCH_OFF: "admin.idp.check.host_switch_off",
+}
+"""Sentence per route reason; a test checks every reason has one."""
+
+FOREIGN_CHECK_TEXT = "admin.idp.check.foreign"
+"""The sentence without a provider name, for a domain that goes to another organisation (B11)."""
+
+CHECK_ADDRESS_MAX = 320
+"""The longest e-mail address (RFC 5321); a longer entry is refused, as at the login page."""
+
+
+@dataclass(frozen=True)
+class StepView:
+    """A set-up step as the page shows it."""
+
+    number: int
+    title: str
+    hint: str
+    state: str
+    chip: str
+    done: bool
+
+
+@dataclass(frozen=True)
+class CheckView:
+    """The answer of the route check: a sentence and the domain, never the address."""
+
+    domain: str
+    platform: bool
+    message: str
+    error: bool = False
+
+
+def _steps(locale: RequestLocale, steps: list[SetupStep]) -> list[StepView]:
+    """Translate the steps; the hints name where each one is done."""
+    views = []
+    for number, step in enumerate(steps, start=1):
+        label, chip = STEP_LABELS[step.state]
+        views.append(
+            StepView(
+                number,
+                locale.gettext(STEP_TEXTS[step.key][0]),
+                locale.gettext(STEP_TEXTS[step.key][1]),
+                locale.gettext(label),
+                chip,
+                step.state is StepState.DONE,
+            )
+        )
+    return views
+
+
+def _warnings(
+    locale: RequestLocale, warnings: list[SetupWarning], names: dict[str, str]
+) -> list[str]:
+    """Translate the warnings, each naming its provider and, where it applies, its domain."""
+    return [
+        locale.gettext(
+            WARNING_TEXTS[w.code],
+            provider=names.get(w.provider, w.provider),
+            domain=w.domain,
+        )
+        for w in warnings
+    ]
+
+
+def _check_view(locale: RequestLocale, found: RouteCheck, names: dict[str, str]) -> CheckView:
+    """Say in one sentence where the address goes and why; a foreign provider stays unnamed."""
+    provider = "" if found.foreign else names.get(found.provider, "")
+    key = FOREIGN_CHECK_TEXT if found.foreign else CHECK_TEXTS[found.reason]
+    text = locale.gettext(key, domain=found.domain, provider=provider)
+    return CheckView(found.domain, found.target == "", text)
+
+
+def _check_fields(locale: RequestLocale, typed: str = "") -> list[Field]:
+    """The one input of the route check; autocomplete is off, the value is not kept."""
+    return [
+        Field(
+            "address",
+            locale.gettext("admin.idp.check.label"),
+            value=typed,
+            hint=locale.gettext("admin.idp.check.hint"),
+            attributes={"autocomplete": "off", "spellcheck": "false", "inputmode": "email"},
+        )
+    ]
+
+
+async def _login_page(
+    request: Request,
+    locale: RequestLocale,
+    org: str,
+    context: AdminContext,
+    check: RouteCheck | None = None,
+    *,
+    refused: bool = False,
 ) -> HTMLResponse:
-    """Show the organisation's providers and their status."""
+    """Render the organisation's authentication page with its steps, warnings and check."""
     overview = await service(request).overview(context.principal, org)
     organisation = overview.organisation
+    routing = overview.routing
+    names = {p.key: p.name for p in overview.providers}
+    steps = setup_steps(routing=routing, providers=overview.providers, claims=overview.claims)
     return _page(
         request,
         locale,
@@ -444,9 +585,43 @@ async def organisation_login(
             "limit": overview.limit,
             "room": len(overview.providers) < overview.limit,
             "done": done_message(request, locale.gettext),
-            "routing_off": routing_off(request),
+            "routing_off": not routing,
+            "steps": _steps(locale, steps),
+            "all_done": all(step.state is StepState.DONE for step in steps),
+            "warnings": _warnings(
+                locale, setup_warnings(overview.providers, overview.claims), names
+            ),
+            "check_fields": _check_fields(locale),
+            "check": (
+                CheckView("", True, locale.gettext("admin.idp.check.refused"), error=True)
+                if refused
+                else _check_view(locale, check, names)
+                if check
+                else None
+            ),
         },
     )
+
+
+@router.get("/organisations/{org}/login", response_class=HTMLResponse)
+async def organisation_login(
+    request: Request, locale: Locale, org: str, context: View
+) -> HTMLResponse:
+    """Show the steps, warnings, check and providers of the organisation's authentication."""
+    return await _login_page(request, locale, org, context)
+
+
+@router.post("/organisations/{org}/login/_check", response_class=HTMLResponse)
+async def check_login_route(
+    request: Request, locale: Locale, org: str, _: SameOrigin, context: View
+) -> HTMLResponse:
+    """Say where an e-mail address would log in; nothing of the address is kept."""
+    form = await read_form(request, locale)
+    address = form.text("address").strip()
+    if not address or len(address) > CHECK_ADDRESS_MAX:
+        return await _login_page(request, locale, org, context, refused=True)
+    found = await service(request).check_route(context.principal, org, address)
+    return await _login_page(request, locale, org, context, found)
 
 
 def routing_off(request: Request) -> bool:

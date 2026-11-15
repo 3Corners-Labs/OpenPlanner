@@ -43,6 +43,8 @@ services:
       # fixed address (ADR 0125), then to the bundled Keycloak itself at that address.
       TLS_INTERNAL: ${PROXY_INTERNAL:-}
       IDP_UPSTREAM: ${PROXY_IDP_UPSTREAM:-}
+      # First pass, once: this host as a trusted edge in front of the proxy (ADR 0129).
+      PROXY_TRUSTED_NETWORKS: ${PROXY_TRUSTED_NETWORKS:-}
     volumes:
       - ${PEBBLE_CERTS:?set by scripts/check-proxy.sh}:/pebble:ro
     depends_on:

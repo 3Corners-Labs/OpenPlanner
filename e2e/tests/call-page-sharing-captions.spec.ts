@@ -632,11 +632,14 @@ test('a reader who scrolled back is not moved by a change that brings no line, n
   expect(middle).toBeGreaterThan(0);
   expect(middle).toBeLessThan(await box.evaluate((el) => el.scrollHeight - el.clientHeight));
 
+  await box.evaluate((el) => ((el.lastElementChild as HTMLElement & { drawnBefore?: boolean }).drawnBefore = true));
   await page.getByRole('button', { name: /^Microphone/ }).click(); // a change that brings no line
   await pressed(page.getByRole('button', { name: /^Microphone/ }), false);
   await recording(page, true); // and another
   await expect(notice(page, 'recording')).toBeVisible();
   expect(await top()).toBe(middle);
+  // The lines are not drawn again either: a draw would stop a key's scroll still on its way.
+  expect(await box.evaluate((el) => (el.lastElementChild as HTMLElement & { drawnBefore?: boolean }).drawnBefore)).toBe(true);
   for (const growing of ['a b', 'a b c', 'a b c d']) {
     await caption(page, [first, second], [{ text: growing }]); // the interim line grows
     await expect(rowsOf(page).last().locator('.call-caption__text')).toHaveText(growing);

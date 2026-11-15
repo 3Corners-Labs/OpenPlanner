@@ -6,7 +6,7 @@
 #   ./scripts/install.sh --mode production|test|lab [--version X.Y.Z] [--repository owner/name]
 #                        [--non-interactive] [--no-tls | --tls-domain HOST] [--own-certificate | --internal-ca]
 #                        [--idp bundled|own] [--acme-staging] [--no-updater] [--upgrade-docker] [--no-packages]
-#                        [--configuration FILE [--passphrase-file PATH]]
+#                        [--configuration FILE [--passphrase-file PATH]] [--trusted-proxies 'CIDR,...']
 #
 #   0. host packages   Ubuntu/Debian: curl, flock, Compose plugin and cosign at their newest
 #                      version on every run; Docker Engine from Docker's own repository when
@@ -111,6 +111,7 @@ MODE='' VERSION='' REPOSITORY='' INTERACTIVE=1 ACME_STAGING=0 UPDATER=1 PACKAGES
 TLS='' OWN_CERT=0 INTERNAL_CA=0
 # ADR 0106 step 5: bundled | own; empty decides by the pin file, then the mode.
 IDP=''
+TRUSTED_PROXIES='' TRUSTED_SET=0 # --trusted-proxies: the edge in front of the proxy (ADR 0129)
 CERTS_DIR=$DIR/certs
 # --configuration FILE --passphrase-file PATH (ADR 0089 point 8, ADR 0099); PACKAGE_DIR is the
 # readable copy made for the containers, removed on exit. CONFIG_KIND is what FILE is, found by
@@ -150,6 +151,7 @@ parse_args() {
       --own-certificate) OWN_CERT=1 ;;
       --internal-ca) INTERNAL_CA=1 ;;
       --idp) IDP=${2:?--idp needs bundled or own} && shift ;;
+      --trusted-proxies) TRUSTED_PROXIES=${2?--trusted-proxies needs a list (an empty one clears it)} TRUSTED_SET=1 && shift ;;
       --no-updater) UPDATER=0 ;;
       --no-packages) PACKAGES=0 ;;
       --upgrade-docker) UPGRADE_DOCKER=1 ;;
@@ -852,6 +854,23 @@ proxy_settings() {
       [[ -z $upstream ]] || log "IDP_UPSTREAM in $PROXY_ENV: the bundled provider's fixed address $wanted instead of $upstream (ADR 0125)"
     else
       log "removed IDP_UPSTREAM from $PROXY_ENV: with --idp own the proxy serves no /idp route"
+    fi
+  fi
+  # ADR 0129: the reverse proxies, WAFs or load balancers in front of this proxy, whose
+  # X-Forwarded-For names the visitor (read right to left by the proxy, which also checks the
+  # list). A rerun without --trusted-proxies keeps what is there; an empty list removes it.
+  if ((TRUSTED_SET)); then
+    [[ $TRUSTED_PROXIES =~ ^[0-9A-Fa-f.:/,\ ]*$ ]] \
+      || die "--trusted-proxies takes IP addresses and CIDR ranges, comma or space separated"
+    drop_lines "$PROXY_ENV" '^(# The reverse proxies, WAFs or load balancers in front|PROXY_TRUSTED_NETWORKS=)'
+    if [[ -n ${TRUSTED_PROXIES// /} ]]; then
+      {
+        printf '# The reverse proxies, WAFs or load balancers in front of this proxy (ADR 0129).\n'
+        put PROXY_TRUSTED_NETWORKS "$TRUSTED_PROXIES"
+      } >>"$PROXY_ENV"
+      log "PROXY_TRUSTED_NETWORKS in $PROXY_ENV: the visitor's address comes from $TRUSTED_PROXIES"
+    else
+      log "removed PROXY_TRUSTED_NETWORKS from $PROXY_ENV: no proxy in front is trusted"
     fi
   fi
   [[ -n $TLS_DOMAIN ]] || die "$PROXY_ENV needs TLS_DOMAIN"
