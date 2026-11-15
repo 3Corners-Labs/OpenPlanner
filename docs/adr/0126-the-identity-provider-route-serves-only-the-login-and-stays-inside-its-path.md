@@ -178,6 +178,11 @@ None, after checking. Every value below is a fixed security rule or follows from
   reaches the admin REST API over the public route. The threat model says so; the runbook's
   recovery, for an outage before that move, keeps the whole list; ADR 0125 itself stays as
   recorded.
+- Caddy logs an error that `handle_errors` handled at debug level, below what the proxy logs.
+  A 502 while web restarts therefore no longer writes the request's URI to the proxy's log,
+  where it carried a management link's token (`/b/<token>`; measured on 2026-11-15 without the
+  block, at error level). The proxy's log then says nothing about such a 502; web's and the
+  updater's logs say why web was down.
 - A reverse proxy of the operator's own in front of the bundled provider must do the same; the
   runbook lists what.
 - Updated with this decision: `docs/runbook.md`, `docs/threat-model.md`, `docs/dataflow.md`,

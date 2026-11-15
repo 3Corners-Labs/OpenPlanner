@@ -40,11 +40,16 @@ def test_every_program_the_script_runs_in_a_container_compiles(name: str) -> Non
     compile(_program(name), name, "exec")
 
 
-def _body(name: str) -> str:
-    """Return the body of the shell function ``name``."""
-    match = re.search(rf"^{name}\(\) \{{.*?^\}}$", SCRIPT, re.MULTILINE | re.DOTALL)
-    assert match, f"{name} is not defined in check-proxy.sh"
+def _body_of(script: str, name: str) -> str:
+    """Return the body of the shell function ``name`` in ``script``."""
+    match = re.search(rf"^{name}\(\) \{{.*?^\}}$", script, re.MULTILINE | re.DOTALL)
+    assert match, f"{name} is not defined"
     return match.group(0)
+
+
+def _body(name: str) -> str:
+    """Return the body of the shell function ``name`` in check-proxy.sh."""
+    return _body_of(SCRIPT, name)
 
 
 def test_every_pass_runs_the_standards_through_edge_checks() -> None:
@@ -178,6 +183,48 @@ def test_pass_five_runs_the_pinned_keycloak_as_compose_defines_it() -> None:
     assert 'export PROXY_IDP_UPSTREAM="$BUNDLED_IDP_ADDRESS:$BUNDLED_IDP_PORT"' in _pass(4)
     assert "PROXY_IDP_UPSTREAM" not in text
     assert "--profile idp" in _body("compose")
+
+
+def test_pass_five_sets_the_console_address_as_the_installer_and_the_runbook_do() -> None:
+    """One rule in three places (ADR 0126 point 2): realm master's frontend URL is the loopback
+    address Docker publishes Keycloak on and Keycloak's relative path, set through the one helper.
+    Pass 5 proves the installer's setting only while all three write it the same way."""
+    helper = "sh /opt/openplanner/kcadm-as-admin.sh"
+    installer = (REPO / "scripts/install.sh").read_text()
+    runbook = (REPO / "docs/runbook.md").read_text()
+    render = (REPO / "scripts/render-keycloak-realm.sh").read_text()
+    check = compose_file("deploy/proxy/compose.pebble.yml")["services"]["idp"]["ports"]
+    base = compose_file()["services"]["idp"]["ports"]
+    path = "/idp"
+
+    assert f"KC_HTTP_RELATIVE_PATH={path}" in render
+    # The installer: the published loopback binding, then the relative path, through the helper.
+    assert f'compose exec -T idp {helper} "$@"' in _body_of(installer, "idp_kcadm")
+    console = _body_of(installer, "idp_console")
+    assert "console=http://$published$path" in console
+    assert 'update realms/master -s "attributes.frontendUrl=$console"' in console
+    # Pass 5 and the runbook fill in that shape for the port they publish.
+    for written, ports in ((_body("keycloak_checks"), check), (runbook, base)):
+        address = ports[0].rsplit(":", 1)[0]  # 127.0.0.1:PORT of "127.0.0.1:PORT:8080"
+        pattern = rf"{helper} update realms/master\s+(\\\n\s+)?-s attributes\.frontendUrl="
+        assert re.search(pattern + re.escape(f"http://{address}{path}") + r"\s", written), address
+
+
+def test_cleanup_reaches_every_service_a_pass_starts() -> None:
+    """`compose down -v` leaves a container whose profile is not active, and its network with it:
+    every service a pass starts needs its profile in ``compose``."""
+    services = compose_file()["services"]
+    started = {
+        word
+        for line in re.findall(r"^\s*compose up (.*)$", SCRIPT, re.MULTILINE)
+        for word in line.split()
+        if word in services
+    }
+    active = set(re.findall(r"--profile (\S+)", _body("compose")))
+
+    assert {"proxy", "idp", "idp-db", "worker"} <= started
+    for name in started:
+        assert set(services[name].get("profiles", [])) <= active, name
 
 
 def test_the_stand_ins_are_layered_in_pass_4_only() -> None:

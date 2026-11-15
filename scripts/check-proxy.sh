@@ -33,10 +33,12 @@ probe6_subnet=fdf2:d3f5:96ab:1::/64
 probe6=fdf2:d3f5:96ab:1::1
 standins="" # pass 4 layers deploy/proxy/compose.standins.yml: stand-ins for idp and idp-db
 compose() {
+  # Both profiles of the bundled provider: `compose down -v` (cleanup) leaves a service whose
+  # profile is not active, and pass 4 starts idp-db, pass 5 Keycloak.
   # shellcheck disable=SC2086 # the overlay's option and path are two words, or none
   PEBBLE_CERTS="$certs" PROBE6_ADDRESS="$probe6" KEYCLOAK_CHECK_DIR="$keycloak_dir" docker compose \
     -p "$project" -f docker-compose.yml -f deploy/proxy/compose.pebble.yml \
-    ${standins:+-f $standins} --profile tls --profile idp "$@"
+    ${standins:+-f $standins} --profile tls --profile idp --profile idp-db "$@"
 }
 cleanup() {
   # The probe of pass 3 and the impostors of pass 4 first: a network with a container attached

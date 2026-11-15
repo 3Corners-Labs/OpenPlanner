@@ -1,7 +1,8 @@
 #!/bin/sh
 # Run Keycloak's kcadm.sh as realm master's `admin`, inside the bundled identity provider's own
-# container (ADR 0126): the one place that logs kcadm.sh in for the installer (the realm's mail
-# server, realm master's loopback address), for scripts/check-proxy.sh and for the runbook.
+# container (ADR 0126): the one place that logs kcadm.sh in for the installer (the client secrets
+# it replaces, ADR 0125 step 2; the realm's mail server; realm master's loopback address), for
+# scripts/check-proxy.sh and for the runbook.
 #
 # docker-compose.yml mounts this file read-only at /opt/openplanner/kcadm-as-admin.sh; run it as
 #   docker compose exec -T idp sh /opt/openplanner/kcadm-as-admin.sh ARGS...

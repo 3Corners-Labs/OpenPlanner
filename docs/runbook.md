@@ -567,7 +567,8 @@ not pass the proxy.
 A reverse proxy of your own in front of the bundled Keycloak must do the same: pass only those
 two paths, and refuse a path that is one of them only once decoded or resolved (an encoded slash,
 dot or backslash, a dot segment, a `;`), remove the `Cookie` pairs whose name starts with `__Host-` and the one named `lang`,
-rewrite a `Set-Cookie` path outside `/idp/` to `/idp/` and drop its `Domain`, drop
+rewrite every `Path` attribute of a `Set-Cookie` that lies outside `/idp/` to `/idp/` (a
+browser uses the last one) and drop its `Domain`, drop
 `Service-Worker-Allowed`, `Clear-Site-Data`, `Alt-Svc`, `NEL`, `Report-To`,
 `Reporting-Endpoints`, `Accept-CH` and `Critical-CH`, send the portal's own
 `Strict-Transport-Security` and `Permissions-Policy`,

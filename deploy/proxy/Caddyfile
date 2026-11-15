@@ -75,6 +75,8 @@ http://{$TLS_DOMAIN}:8080 {
 	# while web restarts) is a page of the portal's own origin. It gets the portal's deny-by-
 	# default headers (app/api/security_headers.py, tied by a test), so no script can frame or open
 	# it and act from there with the portal's cookies (ADR 0126 point 4). The body stays empty.
+	# Caddy logs an error this route handled at debug level, below the proxy's log: a 502 no
+	# longer writes the request's URI, with a management token (/b/{token}), to the log.
 	handle_errors {
 		header {
 			Content-Security-Policy "default-src 'none'; base-uri 'none'; frame-ancestors 'none'"

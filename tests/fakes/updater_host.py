@@ -17,7 +17,7 @@ Behaviour is set through files in ``FAKE_HOST_DIR``:
 - ``edge-ipv6``: whether the project's ``edge`` network has IPv6, as ``docker network inspect``
   says (default ``true``).
 - ``latest``: the tag of the latest GitHub release (default none: the API call fails).
-- ``idp-container``: what ``docker compose ps -q idp`` prints (default ``IDP``); an empty line
+- ``idp-container``: what ``docker compose ps -q idp`` prints (default ``IDP``); an empty file
   is a provider that is not running (ADR 0126).
 - ``idp-ports``: what ``docker port`` prints for that container, one binding per line (default
   ``IDP_PORT``, the loopback of docker-compose.yml).
@@ -91,6 +91,11 @@ def _host() -> Path:
 def _lines(name: str) -> list[str]:
     path = _host() / name
     return path.read_text().splitlines() if path.exists() else []
+
+
+def _given(name: str, default: list[str]) -> list[str]:
+    """Return the lines of switch ``name``, or ``default`` while the test has not written it."""
+    return _lines(name) if (_host() / name).exists() else default
 
 
 def _pin(key: str) -> str:
@@ -199,7 +204,8 @@ def _compose(args: list[str]) -> int:
     elif command == ["ps", "-q", "proxy"]:
         print(PROXY)
     elif command == ["ps", "-q", "idp"]:
-        print(next(iter(_lines("idp-container")), IDP))
+        for line in _given("idp-container", [IDP]):
+            print(line)
     elif command[:2] == ["alembic", "current"]:
         print(f"{(_host() / 'revision').read_text().strip()} (head)")
     elif command[:2] == ["alembic", "downgrade"]:
@@ -239,7 +245,7 @@ def _docker(args: list[str]) -> int:
     elif args[0] == "info":
         return _failing("docker-info")
     elif args[:2] == ["port", IDP]:  # every address the bundled provider is published on
-        for line in _lines("idp-ports") if (_host() / "idp-ports").exists() else [IDP_PORT]:
+        for line in _given("idp-ports", [IDP_PORT]):
             print(line)
     elif args[0] == "version":
         print(next(iter(_lines("engine-version")), "29.1.3"))

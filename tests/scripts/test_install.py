@@ -1072,7 +1072,7 @@ def test_the_console_address_is_the_loopback_the_provider_is_published_on(
 
 def test_a_provider_that_is_not_running_is_named_as_such(host: Host) -> None:
     """No container, so nothing published: say so, not that a port is wrong."""
-    host.given("idp-container", "\n")
+    host.given("idp-container", "")
 
     result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
 
