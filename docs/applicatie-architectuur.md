@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Betreft | OpenPlanner 0.6.0, releasekandidaat `v0.6.0-rc.140` (commit `cd8c99d3` op `main`, 14 november 2026). De laatst uitgebrachte release is `v0.5.1` van 7 november 2026. Wat deze kandidaat meer heeft, komt in productie met `v0.6.0`: een productie-installatie weigert een kandidaat (7.3) |
-| Stand | Concept 2c van 14 november 2026, beschreven tegen de code van `v0.6.0-rc.140` en `docs/adr-status.md` in die stand (elke bouwstap werkt zijn rij bij; de laatste volledige afstemming was op 8 november 2026 onder ADR 0119). Concept 2 beschreef `v0.6.0-rc.117` en concept 1 `v0.4.0`; wat sindsdien veranderde, staat in bijlage B |
+| Stand | Concept 2d van 15 november 2026, beschreven tegen de code van `v0.6.0-rc.140` en `docs/adr-status.md` in die stand (elke bouwstap werkt zijn rij bij; de laatste volledige afstemming was op 8 november 2026 onder ADR 0119). Concept 2 beschreef `v0.6.0-rc.117` en concept 1 `v0.4.0`; wat sindsdien veranderde, staat in bijlage B |
 | Taal | Nederlands, als stakeholderdocument naast `docs/HANDOVER.md`. Code, ADR's en de overige documentatie zijn Engels |
 | Lezers | Architecten en ontwikkelaars van een organisatie die OpenPlanner in haar landschap inpast; het team dat de applicatie host op een container- of cloudplatform; identity-, netwerk-, security- en privacybeheer; het productteam |
 | Bron van waarheid | De code op `main`, de ADR's en `docs/adr-status.md`. Dit document beschrijft en verwijst; het beslist niets |
@@ -1620,6 +1620,28 @@ leverancier; het verslag van een gesprekstaak bewaart het contactcenter zelf, bu
 van de verwijdering. Een melding in een Webex-ruimte en een agenda-uitnodiging aan een teamadres
 vallen buiten de verwijdering (`docs/dataflow.md`).
 
+**Wat Webex van de deelnemer krijgt: belpagina tegenover de link.** Met de gewone link typt de
+deelnemer op de joinpagina van Webex zelf een naam en een e-mailadres. Soms opent de eigen
+Webex-app met het eigen account. Wat Cisco dan krijgt, bepaalt de deelnemer, en de verwijdering
+van OpenPlanner raakt het niet. De belpagina van ADR 0123 keert dat om: OpenPlanner bepaalt wat
+Cisco krijgt, en dat is zo weinig mogelijk. Dit is privacy en security by design.
+
+| Wat Cisco krijgt | Gewone link | Belpagina (ADR 0123) |
+|---|---|---|
+| E-mailadres | Wat de deelnemer intypt, meestal het echte adres | Geen: de deelnemer typt niets bij Cisco |
+| Naam | Wat de deelnemer intypt, vaak de volledige naam | De voornaam, of het woord van de organisatie voor een deelnemer (`embedded_call_display_name`, D) |
+| Identiteit | Een gast per invoer, of het eigen Webex-account | Eén gast per afspraak onder een pseudoniem: een HMAC van de afspraak onder een serversleutel, zonder betekenis buiten OpenPlanner; twee afspraken van dezelfde persoon zijn niet te koppelen |
+| Na de verwijdering | Blijft zoals ingetypt | De gast krijgt een neutrale naam (`rename_guest`); verwijderen kan Cisco niet |
+| Contact met Cisco | Vanaf het openen van de link | Pas na een klik van de deelnemer; de pagina zelf laadt niets van Cisco |
+| Logs en telemetrie | Die van de Webex-client | De automatische upload van logs (`autoUploadLogs`) staat uit; telemetrie gaat naar dezelfde servers als het gesprek |
+| IP-adres en browsergegevens | Ja: beeld en geluid lopen rechtstreeks met Webex | Ja, om dezelfde reden |
+| Huisstijl en teksten | Die van Webex | Die van de organisatie, in haar taal |
+
+Wat overblijft, hoort in de DPIA: Cisco houdt de gastidentiteit (hernoemd, niet verwijderd), en
+IP-adres en telemetrie gaan in beide gevallen naar Cisco. ADR 0123 stelt zes voorwaarden voordat
+een dienst de belpagina in productie gebruikt. Daaronder vallen het schriftelijke antwoord van
+Cisco over het verwijderen van gasten en over telemetrie, en een bijgewerkte DPIA.
+
 **Back-ups.** De terugdraaikopie van een update is de enige back-up die de applicatie maakt. Een
 back-up voor herstel na een ramp is van de host (O7). De eisen daaraan staan in
 `docs/runbook.md`: versleuteld, een vaste termijn, benoemde toegang, vernietiging met verslag en
@@ -2118,3 +2140,4 @@ document. Zo'n ontwerp vult ten minste dit in:
 | 14 november 2026 | Concept 2a: ADR 0125 (#834) verwerkt. De hops naar de meegeleverde Keycloak en haar database zijn vastgelegde uitzonderingen (3.3, 9.1). Tot stap 2 van die ADR vinden de containers elkaar op naam (7.2, 7.7). Productie start met de meegeleverde provider, en de installer waarschuwt (7.3, 8.5). Risico R-17, vraag V-23, de roadmap en een voorbehoud bij A-3, V-2 en 13.5 zijn nieuw. Verder is de belpagina beschreven als bouwblok dat niet aan Webex hangt, met een verkenning van Cisco Meeting Server (8.2, R-3, 13.1). Cisco Meeting Server staat gestippeld op de systeemcontext (3.2) en op de platen (R-11) |
 | 14 november 2026 | Concept 2b: stap 2 van ADR 0125 (#850) verwerkt. Elke hop tussen de containers op een host gaat naar een vast adres en nooit naar een naam: `web` 172.31.240.3 en Keycloak 172.31.240.4 op `edge`, `idp-db` 172.31.240.18 op het nieuwe interne netwerk `idp-store` (3.3, 7.2, 7.7, 8.5, 9.1). Productie weigert voor de login de naam `idp`; de installer verhuist een host met nieuwe client secrets en waarschuwt niet meer (7.3). Risico R-17 beschrijft alleen nog het restrisico tot de verhuizing, vraag V-23 is vervallen, het voorbehoud bij A-3, V-2 en 13.5 is weg, en de roadmap noemt stap 3 (13.1). Het platformteam houdt op de host de adresreeksen van de vaste adressen vrij (7.10) |
 | 14 november 2026 | Concept 2c: bijgewerkt naar releasekandidaat `v0.6.0-rc.140` (ADR 0125 en 0128, 126 ADR's, 37 poorten, 54 permissies, 30 taaksoorten, 229 instellingen). De belpagina van ADR 0123 is gebouwd tot en met het gesprek, met het gasttoken, de taak `rename_guest` en de schermnaam van de medewerker (stap 4a tot en met 5d), en nog niet in gebruik; 8.2 zegt waarom, de andere hoofdstukken verwijzen ernaar (3.3, 5, 6.3, 8.5, 8.6, 9.1). Het contactcenter kent een gesprekstaak (stap 7a; 3.3, 6.2). De webhookpoort meldt weigeringen (ADR 0124, stap 3b; 6.5, 7.6), en een stille host-updater houdt geen updates meer tegen (#831; 6.5). Voor de flows noemt 13.1 alleen nog wat na ADR 0121 rij 32a, 33a en 37 openstaat. ADR 0128 staat in 10.2, de browsertests draaien per browser (11.2) en de platen tonen de belpagina (5.1). Risico R-18 en vraag V-24 zijn nieuw |
+| 15 november 2026 | Concept 2d: 8.6 vergelijkt wat Cisco van de deelnemer krijgt bij de gewone link en bij de belpagina van ADR 0123: geen e-mailadres, alleen de voornaam of het woord van de organisatie, een pseudoniem per afspraak, hernoemen bij de verwijdering, en wat overblijft voor de DPIA |
