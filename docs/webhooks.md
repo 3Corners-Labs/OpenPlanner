@@ -674,6 +674,17 @@ confirmed booking with a meeting between 15 minutes before its start and 30 minu
 end. The poll sets absolute values and adds timeline events only for transitions, marked
 `polled`; it needs the same participant scope as the webhooks.
 
+## Inbound: the messages of a conversation (ADR 0123 point 8, ADR 0124 point 15, step 7b)
+
+A conversation task (above) is read through two inbound paths of an organisation's own connection, both through the gate of ADR 0124 (source networks, content type, size, signature, signed time within 300 s, limits, replay memory) and both matched to the booking that owns the task, in that organisation's bookings only.
+
+| Address | Secret | Carries |
+|---|---|---|
+| `POST /webhooks/contact-center/webex_cc/{org}/messages` | the connection's *message secret*, made in the portal and shown once (`POST /admin/organisations/{org}/channels/contact-center/message-secret`); a new one overlaps the old for `webhook_secret_overlap_minutes`; the address does not exist (404) until one is made | every message the flow or a staff member sends: `task-message:appended`, `messageDirection: OUTBOUND`, `senderType` `agent` or `system`; the administrator pastes the address and the secret into the messaging asset in the platform's console |
+| `POST /webhooks/contact-center/webex_cc/{org}` (the subscription above) | the connection's webhook secret | `task-message:appended` (INBOUND: confirms a message we appended; OUTBOUND from a staff member is stored too if the subscription reports it) and `task-message:append-failed` (a message accepted after the end was refused) |
+
+Signature and time are the platform's own: `X-WebexCC-Signature` (hex HMAC-SHA256 of the raw body) and `X-WebExCC-Timestamp` equal to the body's `comciscotimestamp`, as for the events. What is read: `data.taskId`, `messageDirection`, `senderType`, `channelParams.message.aliasId`, `.text` and `.timestamp` (else `createdTime`); a body without `type` or `data` is read as an appended message at the message address (assumption of step 7b, measured shape on the lab tenant). The staff member's identifier (`senderId`), the origin and attachments are never read or kept; a message of the flow (`senderType: system`) is dropped, a staff message is stored as `delivered`, a confirmation turns our `sent` message into `delivered` and a refusal (which names the task and not the message) turns every message still `sent` into `refused`. Idempotence: the replay memory (by a digest of task, direction and message id) and a unique key per booking and message id. Every answer is an empty 204 (or the gate's refusal); the text is in no log line, event or refusal.
+
 ## Inbound: WxCC subscription (`POST /webhooks/contact-center/webex_cc`, alias `/webhooks/wxcc`)
 
 Registered with `POST /v2/subscriptions` (`name`, `eventTypes`, `resourceVersion: task:1.0.0` (required in v2; current versions in `GET /v2/event-types`), `destinationUrl`, `secret` of 32 to 256 characters).

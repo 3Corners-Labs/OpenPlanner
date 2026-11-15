@@ -186,6 +186,30 @@ means your list may be out of date. A stranger who knows the address can also ca
 alert while real deliveries arrive: it costs one event per window and hides nothing. Other calls
 from strangers that fail are counted on the card and raise nothing.
 
+### Chat messages
+
+For a service whose participant gets a chat beside the call, the contact center delivers the
+messages of the conversation to a second address on the card, **Chat messages**, which ends in
+`/messages`. It has a secret of its own, separate from the webhook secret.
+
+1. Choose **Make a secret for this address**. The next page shows the address and the secret
+   **once**; OpenPlanner keeps the secret sealed and cannot show it again.
+2. In the contact center's console, set the address as the webhook address of the messaging
+   asset and the secret as its secret.
+3. Lost it? Make a new one. The secret that worked until then keeps working for the overlap the
+   platform administrator set (60 minutes by default), so no message is lost while you paste the
+   new one; the card says until when.
+
+Until a secret is made the address does not exist and every call to it is answered as an unknown
+address. The pause and the allowed source networks of the card apply to this address too. If the
+address cannot be reached, the contact center's flow fails at its first message step and the task
+ends before a staff member sees it.
+
+The staff member's messages are kept with the appointment and deleted with it, 24 hours after the
+appointment, like the participant's details. The contact center keeps its own transcript of the
+conversation; OpenPlanner's deletion does not reach it. The meeting's own chat is switched off for
+these services, so staff answer in the contact center's desktop only.
+
 ## What is recorded
 
 Every change goes to the audit log with the names of the changed fields, never the values. Of

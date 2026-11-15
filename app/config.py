@@ -458,6 +458,10 @@ class Settings(BaseSettings):
     # ADR 0123 step 5c: how often the call page asks who is in the call (and, from step 7c, for the
     # chat's new messages), in seconds. One poll for the page. Class C.
     embedded_call_chat_poll_seconds: int = Field(default=3, ge=2, le=10)
+    # ADR 0123 step 7b: how many chat messages one participant may send in a minute (class C,
+    # platform) and the longest one (class D, organisation).
+    embedded_call_chat_per_minute: int = Field(default=20, ge=5, le=60)
+    embedded_call_chat_max_chars: int = Field(default=1000, ge=200, le=4000)
     # ADR 0046, staff directory. An admin's "last seen" is written at most once per this many
     # seconds (class C, platform; ADR 0042 registry).
     staff_last_seen_interval_seconds: int = Field(default=300, ge=60, le=3600)

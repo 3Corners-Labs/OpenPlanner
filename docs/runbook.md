@@ -1466,6 +1466,23 @@ a quick tunnel that does not do that cannot be used with a list. Do not set
 | `end_not_possible` `rejected_403` | End Task v1 refused: no `cjp:user` | the task was marked cancelled through v2; end it in Agent Desktop, or add `cjp:user` (section 1) |
 | `end_not_possible` other code | WxCC refused End Task (e.g. the task already ended) | check the task in Agent Desktop |
 
+#### Chat messages of a conversation task (ADR 0123 step 7b)
+
+A service with a conversation task needs the contact center to deliver the staff member's
+messages to OpenPlanner. In the portal, on the organisation's *Channels* page, card *Contact
+center*, section *Chat messages*: **Make a secret for this address**; the next page shows the
+address (`{WEBHOOK_BASE_URL}/webhooks/contact-center/webex_cc/{org}/messages`) and the secret
+once. Set both as the webhook address and secret of the messaging asset in Control Hub. The task
+events (including `task-message:appended` and `task-message:append-failed`) keep arriving through
+the subscription of this section. If messages do not show: the address does not exist until a
+secret is made (the platform gets a 404); a refused call is a `webhook.rejected` event with its
+reason (`invalid_signature` after a secret was changed in only one of the two places, `stale`
+when a clock is off by more than 300 seconds); a paused connection answers 204 and drops the
+message; and an unreachable address ends the task in the flow before a staff member sees it.
+Rotating the message secret keeps the old one valid for `webhook_secret_overlap_minutes`. Backups
+hold the chat text of appointments that are not yet purged; restoring a database that predates
+the migration `0121` loses nothing it knew, and a downgrade to before it drops the table.
+
 ### 6. Checking the Service App (`wxcc-check`)
 
 After creating the Service App, after changing its scopes or authorisation in Control Hub, and

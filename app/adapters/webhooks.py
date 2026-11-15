@@ -17,14 +17,16 @@ import hashlib
 import hmac
 import json
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Any
 
 from pydantic import SecretStr
 
+from app.adapters.wxcc_chat import parse_wxcc_chat
 from app.config import Settings
 from app.domain.booking import booking_id_of
+from app.domain.call_chat import ChatEvent
 from app.domain.calls import EventKind
 from app.domain.connection_health import Platform
 from app.domain.contact_center import ContactCenterKind
@@ -261,10 +263,22 @@ class ContactCenterWebhook(InboundWebhook):
         kind: The platform.
         alias: An older address that still works and where OpenPlanner still registers, until
             the subscriptions move (CC-4); ``None`` for a platform without one.
+        chat: Reads the platform's message events of a conversation task (ADR 0123 step 7b):
+            ``(payload, assume_appended)`` → the chat event, or ``None``; ``None`` for a platform
+            that has no conversation task.
     """
 
     kind: ContactCenterKind
     alias: str | None = None
+    chat: Callable[..., ChatEvent | None] | None = None
+
+    def messages_path(self, organisation: str) -> str:
+        """Return the address of an organisation's message deliveries (ADR 0124 point 15)."""
+        return f"{self.organisation_path(organisation)}{MESSAGES_SUFFIX}"
+
+    def messages_url(self, base: str, organisation: str) -> str:
+        """Return an organisation's message address at ``base`` (``Settings.webhook_base``)."""
+        return f"{base}{self.messages_path(organisation)}"
 
     @property
     def path(self) -> str:
@@ -295,6 +309,11 @@ WEBEX_PATH = "/webhooks/webex"
 
 CONTACT_CENTER_PATH = "/webhooks/contact-center"
 """The prefix of every contact-center platform's webhook address (ADR 0032 point 6)."""
+
+MESSAGES_SUFFIX = "/messages"
+"""What follows an organisation's address for the deliveries of a conversation's messages: the
+address the administrator pastes into the platform's console, with a secret of its own (ADR 0124
+point 15)."""
 
 
 def _verify_wxcc_headers(
@@ -335,8 +354,31 @@ WXCC_INBOUND = ContactCenterWebhook(
     parse=parse_wxcc,
     event_type=_wxcc_type,
     alias="/webhooks/wxcc",
+    chat=parse_wxcc_chat,
 )
 """Webex Contact Center's webhooks: ``/webhooks/contact-center/webex_cc`` and ``/webhooks/wxcc``."""
+
+
+def _no_secret(settings: Settings) -> SecretStr | None:
+    """Return nothing: the message address has a secret per connection, never the installation's."""
+    return None
+
+
+def _no_event(payload: dict[str, Any]) -> ParsedEvent | None:
+    """Read no task event: the message address carries chat events only (``chat``)."""
+    return None
+
+
+WXCC_MESSAGES = replace(
+    WXCC_INBOUND,
+    alias=None,
+    secret=_no_secret,
+    previous=_no_secret,
+    parse=_no_event,
+)
+"""The deliveries of a conversation's messages: ``/webhooks/contact-center/webex_cc/{org}/messages``
+(ADR 0124 point 15). The signature is WxCC's own, as for the events; the secret is the connection's
+message secret. It exists only per organisation and reads chat events, never task events."""
 
 
 def _webex_type(payload: dict[str, Any]) -> str:

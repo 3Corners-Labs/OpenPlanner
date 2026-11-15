@@ -1293,6 +1293,15 @@ _OPERATIONS = (
         "A verified webhook of a contact-center platform was processed (ADR 0032).",
     ),
     _e(
+        "webhook.chat",
+        _OPS,
+        "info",
+        "platform kind outcome",
+        "Contact center {platform} reported a chat event ({kind}): {outcome}.",
+        "A verified message event of a conversation task was processed (ADR 0123 step 7b); "
+        "codes only, never the text of a message.",
+    ),
+    _e(
         "webhook.alert_failed",
         _OPS,
         "warning",

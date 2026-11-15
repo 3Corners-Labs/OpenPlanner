@@ -11,7 +11,7 @@ from datetime import timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Request
-from starlette.responses import Response
+from starlette.responses import HTMLResponse, Response
 
 from app.adapters.contact_centers import DESCRIPTORS, INBOUND
 from app.admin import forms
@@ -20,6 +20,7 @@ from app.admin.channel_fields import Manage, channels_url, secret_field, value_o
 from app.admin.delivery_status import delivery_view
 from app.admin.forms import Field, FormData, moment_label
 from app.admin.pages import Locale, SameOrigin
+from app.admin.pages import page as _page
 from app.admin.source_findings import card_finding
 from app.domain.contact_center import ContactCenterKind, OrganisationConnection, Registration
 from app.domain.contact_center_connection import ContactCenterConnectionService
@@ -167,6 +168,11 @@ async def connection_view(
     # The card never sees a secret: the placeholders stand in so that the one rule answers.
     shape = WebhookSecrets("", "-" if stored and stored.has_previous_webhook_secret else None, made)
     until = shape.previous_valid_until(request.app.state.clock.now(), overlap)
+    messages_made = stored.message_secret_at if stored else None
+    message_shape = WebhookSecrets(
+        "", "-" if stored and stored.has_previous_message_secret else None, messages_made
+    )
+    message_until = message_shape.previous_valid_until(request.app.state.clock.now(), overlap)
     own = stored.allowed_networks if stored else NetworkList()
     sources = card_finding(
         _,
@@ -181,6 +187,15 @@ async def connection_view(
         "fields": _connection_fields(form, stored, _),
         "webhook": INBOUND[stored.kind].organisation_url(base, org) if stored else "",
         "secret_made": moment_label(made, tz, locale.code) if made else "",
+        "messages_webhook": (
+            INBOUND[stored.kind].messages_url(base, org)
+            if stored and stored.kind in INBOUND
+            else ""
+        ),
+        "message_made": moment_label(messages_made, tz, locale.code) if messages_made else "",
+        "message_previous_until": (
+            moment_label(message_until, tz, locale.code) if message_until else ""
+        ),
         "previous_until": moment_label(until, tz, locale.code) if until else "",
         "overlap_minutes": settings.webhook_secret_overlap_minutes,
         "registration": stored.registration.value if stored and stored.registration else "",
@@ -207,6 +222,36 @@ async def rotate_contact_center_secret(
         forms.raise_refusal(error)
         return _back(org, "contact_center_refused")
     return _back(org, ROTATED_DONE[outcome])
+
+
+@router.post(
+    "/organisations/{org}/channels/contact-center/message-secret", response_class=HTMLResponse
+)
+async def make_message_secret(
+    request: Request, locale: Locale, org: str, _: SameOrigin, context: Manage
+) -> Response:
+    """Make the secret of the address for message deliveries and show it once (ADR 0124 point 15).
+
+    The page is never stored by the browser (``render`` sets no-store) and the value is in no
+    event, log, address or job; a lost secret is made again, and the one that was valid keeps
+    verifying for the overlap.
+    """
+    service = connection_service(request)
+    try:
+        secret = await service.make_message_secret(context.principal, org)
+        stored = await service.view(context.principal, org)
+    except DomainError as error:
+        forms.raise_refusal(error)
+        return _back(org, "contact_center_refused")
+    base = request.app.state.settings.webhook_base
+    address = INBOUND[stored.kind].messages_url(base, org) if stored else ""
+    return _page(
+        request,
+        locale,
+        "admin/message_secret.html",
+        context.principal,
+        {"secret": secret, "address": address, "back_url": channels_url(org)},
+    )
 
 
 @router.post("/organisations/{org}/channels/contact-center/inbound")

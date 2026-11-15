@@ -41,6 +41,19 @@
     {% if cc.previous_until %}<p id="cc-rotate-again">{{ _("admin.channels.cc_rotate_again") }}</p>{% endif %}
     <button type="submit" class="button button--secondary" aria-describedby="cc-rotate-lead{% if cc.previous_until %} cc-rotate-again{% endif %}">{{ _("admin.channels.cc_rotate") }}</button>
   </form>
+  <h3 id="contact-center-messages-heading">{{ _("admin.channels.cc_messages_title") }}</h3>
+  <p>{{ _("admin.channels.cc_messages_lead") }}</p>
+  <p><code>{{ cc.messages_webhook }}</code></p>
+  {% if cc.message_made %}
+  <p class="hint">{{ _("admin.channels.cc_messages_made", at=cc.message_made) }}</p>
+  {% if cc.message_previous_until %}<p class="hint">{{ _("admin.channels.cc_messages_previous", at=cc.message_previous_until) }}</p>{% endif %}
+  {% else %}
+  <p class="hint">{{ _("admin.channels.cc_messages_none") }}</p>
+  {% endif %}
+  <form method="post" action="/admin/organisations/{{ organisation.slug }}/channels/contact-center/message-secret" aria-labelledby="contact-center-messages-heading">
+    <p id="cc-messages-lead">{% if cc.overlap_minutes %}{{ _("admin.channels.cc_messages_make_lead", minutes=cc.overlap_minutes) }}{% else %}{{ _("admin.channels.cc_messages_make_lead_now") }}{% endif %}</p>
+    <button type="submit" class="button button--secondary" aria-describedby="cc-messages-lead">{{ _("admin.channels.cc_messages_make") }}</button>
+  </form>
   <form method="post" action="/admin/organisations/{{ organisation.slug }}/channels/contact-center/delete">
     <p>{{ _("admin.channels.cc_remove_lead") }}</p>
     <button type="submit" class="button button--secondary">{{ _("admin.channels.cc_remove") }}</button>

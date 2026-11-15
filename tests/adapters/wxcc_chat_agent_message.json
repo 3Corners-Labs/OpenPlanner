@@ -1,0 +1,26 @@
+{
+  "id": "6f1d3c0e-0000-4000-8000-000000000001",
+  "specversion": "1.0",
+  "type": "task-message:appended",
+  "comciscotimestamp": 1767600005000,
+  "data": {
+    "taskId": "task-1",
+    "origin": {"id": "OP-000123", "name": "Zoë"},
+    "destination": {"id": "demo-address", "type": "businessAddress"},
+    "channel": "demo-channel",
+    "channelType": "customMessaging",
+    "messageDirection": "OUTBOUND",
+    "senderType": "agent",
+    "senderId": "agent-identifier-0001",
+    "channelParams": {
+      "type": "text",
+      "message": {
+        "aliasId": "m-agent-1",
+        "text": "Goedemiddag, waarmee kan ik helpen?",
+        "timestamp": 1767600004000,
+        "attachments": []
+      }
+    },
+    "createdTime": 1767600004500
+  }
+}

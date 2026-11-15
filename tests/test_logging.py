@@ -55,7 +55,7 @@ def test_pii_fields_cover_the_booking_pii_columns() -> None:
     # ADR 0055: the split name and the answers to custom fields.
     assert {"first_name", "last_name", "form_answers", "answers"} <= PII_FIELDS
     # ADR 0063: one home for the list; the mask adds only the other names the data travels by.
-    assert PII_FIELDS == PII_COLUMNS | ALIASES | {"username", "screen_name"}
+    assert PII_FIELDS == PII_COLUMNS | ALIASES | {"username", "screen_name", "message_text"}
 
 
 def test_the_staff_user_name_is_masked() -> None:
@@ -107,6 +107,22 @@ def test_the_screen_name_of_a_staff_member_is_masked_wherever_a_call_puts_it(
     output = stream.getvalue()
     assert all(name not in output for name in ("Sanne", "Tom", "Bound"))
     assert _records(stream)[0]["screen_name"] == MASK
+
+
+def test_the_text_of_a_chat_message_is_masked_wherever_a_call_puts_it(
+    stream: io.StringIO,
+) -> None:
+    """ADR 0123 step 7b: a participant's free text is personal data from the step that stores it."""
+    structlog.get_logger().info(
+        "chat", message_text="mijn-persoonlijke-vraag", rows=[{"message_text": "tweede-vraag"}]
+    )
+    structlog.get_logger().bind(message_text="gebonden-vraag").info("bound")
+
+    output = stream.getvalue()
+    assert all(
+        text not in output for text in ("persoonlijke-vraag", "tweede-vraag", "gebonden-vraag")
+    )
+    assert _records(stream)[0]["message_text"] == MASK
 
 
 def test_masks_pii_bound_to_logger_context(stream: io.StringIO) -> None:

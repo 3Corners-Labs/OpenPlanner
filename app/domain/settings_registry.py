@@ -2460,6 +2460,27 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=10,
     ),
     S(
+        "embedded_call_chat_per_minute",
+        K.INT,
+        20,
+        _C,
+        T.WEBEX,
+        "Chat messages one participant may send in a minute on the call page (ADR 0123 step 7b).",
+        minimum=5,
+        maximum=60,
+    ),
+    S(
+        "embedded_call_chat_max_chars",
+        K.INT,
+        1000,
+        _D,
+        T.DISPLAY,
+        "Longest chat message a participant may send on the call page, in characters "
+        "(ADR 0123 step 7b).",
+        minimum=200,
+        maximum=4000,
+    ),
+    S(
         "embedded_call_display_name",
         K.ENUM,
         "first_name",

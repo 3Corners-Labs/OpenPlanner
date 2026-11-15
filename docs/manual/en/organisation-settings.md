@@ -52,6 +52,11 @@ page* at the top jumps to a topic; one *Save* button saves all topics together.
   2,048 characters, with a host name (not an IP address and not `localhost`). The call page links to it from the line that an external video service carries
   the call (the link opens in a new tab). The statement says which service that is: the page itself
   does not name it. Empty: the page shows the line without a link.
+- **Longest chat message a participant may send on the call page, in characters** (200 to 4,000,
+  default 1,000): the most characters of one message that a participant may send in the chat
+  beside the call. The chat exists only for a service that uses the call page and whose
+  contact-center task is a conversation. A message the staff member sends is not cut by this
+  number. The platform administrator sets how many messages a participant may send in a minute.
 
 ## Changing a setting
 

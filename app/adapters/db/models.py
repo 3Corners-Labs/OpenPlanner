@@ -1572,6 +1572,32 @@ class WebhookSecretSightingRow(Base):
     first_seen: Mapped[datetime] = mapped_column(UTCDateTime())
 
 
+class CallMessageRow(Base):
+    """One message of the chat beside a booking's call (ADR 0123 point 8, step 7b).
+
+    ``message_text`` is the one personal column (``privacy.CHAT_FIELDS``); the booking's purge
+    deletes the rows. ``author`` is a kind, never a name; ``provider_message_id`` is unique per
+    booking, so a delivery that comes twice is one row.
+    """
+
+    __tablename__ = "call_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    booking_id: Mapped[int] = mapped_column(ForeignKey("bookings.id", ondelete="CASCADE"))
+    author: Mapped[str] = mapped_column(String(16))
+    message_text: Mapped[str] = mapped_column(Text)
+    at: Mapped[datetime] = mapped_column(UTCDateTime())
+    state: Mapped[str] = mapped_column(String(16))
+    provider_message_id: Mapped[str] = mapped_column(String(128))
+
+    __table_args__ = (
+        CheckConstraint("author IN ('participant', 'staff')", name="author"),
+        CheckConstraint("state IN ('sent', 'delivered', 'refused')", name="state"),
+        UniqueConstraint("booking_id", "provider_message_id"),
+        Index("ix_call_messages_booking_id_at", "booking_id", "at"),
+    )
+
+
 class PlatformSettingRow(Base):
     """The portal value of one class C setting (ADR 0042 §4), as JSON; never a secret."""
 

@@ -110,6 +110,7 @@ def test_every_webhook_route_goes_through_the_gate(settings: Settings) -> None:
         "/webhooks/wxcc",
         "/webhooks/contact-center/{kind}",
         "/webhooks/contact-center/{kind}/{org}",
+        "/webhooks/contact-center/{kind}/{org}/messages",
     }
     for route in routes:
         gates = [call for call in dependency_calls(route) if is_webhook_gate(call)]
