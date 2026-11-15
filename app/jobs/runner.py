@@ -37,6 +37,7 @@ from app.adapters.db.jobs import ClaimedJob
 from app.domain import booking_changes
 from app.domain.audit import Outcome
 from app.domain.booking import Booking
+from app.domain.call_client import UsesCallPage
 from app.domain.call_service import CallService
 from app.domain.change_request_service import request_still_open
 from app.domain.channels import ChannelKind
@@ -156,10 +157,9 @@ class JobRunner:
         request_work: The request work of new flows (ADR 0121 step 6b); with it, a dispatch
             job of request work goes to ``RequestDispatch`` and ``requests`` fences attempts.
         reconcile_minutes: ``contact_center_reconcile_minutes`` (class C), read when called.
-        call_page_enabled: ``embedded_call_enabled`` (class C), read when called: the kill
-            switch of ``uses_call_page``; a meeting is created without the platform's chat and a
-            routing's conversation task is made only for a service that uses the call page
-            (ADR 0123 steps 6b and 7a).
+        uses_page: Whether a service's participant gets the call page now (``call_page_rule``, the
+            platform switch included); a meeting is created without the platform's chat and a
+            routing's conversation task is made only for such a service (ADR 0123 steps 6b, 7a).
         guest_keys: The keys of the guest subjects now in force, the current one first (ADR 0123
             point 7); with them a ``rename_guest`` job can run.
         after_purge: Called once after a round that ran ``purge_pii`` jobs (the worker passes
@@ -186,7 +186,7 @@ class JobRunner:
         organisations: OrganisationDispatchers | None = None,
         request_work: RequestWork | None = None,
         reconcile_minutes: Callable[[], int] | None = None,
-        call_page_enabled: Callable[[], bool] | None = None,
+        uses_page: UsesCallPage | None = None,
         guest_keys: GuestKeys | None = None,
     ) -> None:
         """Store the collaborators and decide which job types this worker can handle."""
@@ -216,7 +216,7 @@ class JobRunner:
                 fallback,
                 organisations,
                 partial(conversation_opening, composer.translator),
-                call_page_enabled,
+                uses_page,
                 guest_keys,
             )
             if integration is not None

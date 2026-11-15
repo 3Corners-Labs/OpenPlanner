@@ -14,7 +14,8 @@ LONG = "https://voorbeeld.nl/" + "a" * (MAX_LENGTH - len("https://voorbeeld.nl/"
     [
         "https://voorbeeld.nl/privacy",
         "https://www.voorbeeld.nl:8443/privacy?taal=nl#gegevens",
-        "https://[2001:db8::1]/privacy",
+        "https://bücher.example/privacy",  # an internationalised name stays allowed
+        "https://xn--bcher-kva.example/privacy",
         LONG,
         "",  # the setting is optional: no link
     ],
@@ -42,6 +43,16 @@ def test_an_https_address_is_valid(value: str) -> None:
         "https://voorbeeld.nl:abc/",
         "https://[::1/privacy",  # an unparsable authority
         LONG + "a",  # one over the limit
+        # A privacy statement is published under a name: never an address or localhost.
+        "https://127.0.0.1/privacy",
+        "https://10.0.0.5/privacy",
+        "https://[2001:db8::1]/privacy",
+        "https://[::1]/privacy",
+        "https://localhost/privacy",
+        "https://LOCALHOST./privacy",
+        "https://intranet.localhost/privacy",
+        "https://2130706433/privacy",  # the decimal form of 127.0.0.1
+        "https://0x7f.0.0.1/privacy",
     ],
 )
 def test_anything_else_is_refused(value: str) -> None:

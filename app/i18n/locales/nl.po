@@ -494,6 +494,21 @@ msgstr "Het proefgesprek opent in deze browser; er is niets te installeren."
 msgid "trial.page.until"
 msgstr "Open tot"
 
+msgid "trial.page.back"
+msgstr "Terug naar de proefgesprekpagina"
+
+msgid "trial.page.not_open"
+msgstr "Het proefgesprek is niet meer geopend. Ga terug naar de proefgesprekpagina om een nieuw proefgesprek te openen."
+
+msgid "trial.page.left_body"
+msgstr "U kunt dit venster sluiten of teruggaan naar de proefgesprekpagina."
+
+msgid "trial.page.ended_body"
+msgstr "Bedankt voor het proefgesprek. U kunt dit venster sluiten of teruggaan naar de proefgesprekpagina."
+
+msgid "trial.page.ended_deleted"
+msgstr "De gegevens van dit proefgesprek worden samen met de rest van uw afspraak verwijderd, 24 uur na het einde ervan."
+
 msgid "trial.open_hint"
 msgstr "Het proefgesprek blijft {minutes} minuten open."
 
@@ -1899,6 +1914,9 @@ msgstr "Het contactcenter heeft voor deze afspraak al een open gesprek. Sluit he
 
 msgid "call.hint.integration.other"
 msgstr "Webex weigerde een aanroep. Het antwoord van Webex staat erbij als Webex er een gaf; het worker-log heeft bij integration.refused ook een trackingId."
+
+msgid "call.hint.integration.chat_options_refused"
+msgstr "Waarschuwing, geen storing: het videoplatform weigerde de meeting zonder eigen chat. De meeting is daarna met chat gemaakt en de deelnemer heeft zijn link. Staf kan in het chatpaneel van het videoplatform schrijven terwijl de deelnemer dat niet ziet. Controleer de chatinstellingen van de site."
 
 msgid "call.hint.unauthorized"
 msgstr "Webex accepteerde het token van de Service App niet. Bekijk de status onder Koppelingen en zet zo nodig een nieuw refresh-token in WEBEX_REFRESH_TOKEN."
@@ -4873,19 +4891,19 @@ msgid "admin.check.webex.guest_refused"
 msgstr "Het videoplatform weigerde een gast aan te maken ({error}): de Service App heeft de gastrechten nodig, dus deelnemers kunnen niet in onze pagina meedoen."
 
 msgid "admin.check.webex.captions_ok"
-msgstr "De site van het videoplatform houdt ondertitels aan: een deelnemer van de gesprekspagina kan ze aanzetten."
+msgstr "De site van het videoplatform heeft de ondertitelingsoptie (closed captions) aan voor meetings. Dit zegt niet dat live ondertiteling in de gesprekspagina werkt: probeer dat in een echt gesprek."
 
 msgid "admin.check.webex.captions_off"
-msgstr "De site van het videoplatform houdt ondertitels niet aan voor deze meeting: de gesprekspagina heeft dan geen ondertitels om te tonen. Zet ze aan in de instellingen van de site (Control Hub)."
+msgstr "De site van het videoplatform heeft de ondertitelingsoptie (closed captions) niet aan voor deze meeting. Zet haar aan in de instellingen van de site (Control Hub). Dit zegt niets over live ondertiteling in de gesprekspagina."
 
 msgid "admin.check.webex.captions_unknown"
-msgstr "Het videoplatform zegt niet of ondertitels aanstaan op de site: of de gesprekspagina ondertitels kan tonen is niet vast te stellen. Probeer het in een echt gesprek."
+msgstr "Het videoplatform zegt niet of de ondertitelingsoptie (closed captions) op de site aanstaat. Of live ondertiteling in de gesprekspagina werkt, is hiermee niet vast te stellen: probeer het in een echt gesprek."
 
 msgid "admin.check.webex.captions_refused"
-msgstr "Het videoplatform weigerde de proefmeeting voor de ondertitels ({error}) voor host {host}: of de gesprekspagina ondertitels kan tonen is niet vast te stellen."
+msgstr "Het videoplatform weigerde de proefmeeting voor de ondertitelingsoptie ({error}) voor host {host}. De ondertitelingsoptie van de site is daarom niet vast te stellen."
 
 msgid "admin.check.webex.captions_left"
-msgstr "De proefmeeting {meeting} voor de ondertitels van host {host} is gepland maar kon niet worden verwijderd ({error}); verwijder hem in Webex."
+msgstr "De proefmeeting {meeting} voor de ondertitelingsoptie van host {host} is gepland maar kon niet worden verwijderd ({error}). Verwijder haar in Webex."
 
 msgid "admin.check.webex.trial_left"
 msgstr "De proefgesprek-meeting {meeting} voor host {host} is gepland maar kon niet worden verwijderd ({error}); verwijder hem in Webex."
@@ -14148,7 +14166,7 @@ msgid "settings.field.embedded_call_webex_option.label"
 msgstr "Weg naar de eigen app van het videoplatform naast het gesprek (nooit, alleen als de pagina het gesprek niet kan geven, of altijd). Geldt voor elk team dat er zelf geen koos; een team kiest het onder Groep, Instellingen, Video"
 
 msgid "settings.field.privacy_statement_url.label"
-msgstr "Adres van de privacyverklaring van de organisatie (https, hoogstens 2.048 tekens); de gesprekspagina linkt ernaar bij de regel over de externe videodienst. Leeg: geen link"
+msgstr "Adres van de privacyverklaring van de organisatie (https)"
 
 msgid "callpage.privacy.link"
 msgstr "Privacyverklaring van de organisatie (opent in een nieuw tabblad)"

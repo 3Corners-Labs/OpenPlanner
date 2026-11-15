@@ -29,6 +29,7 @@ from pydantic_settings import (
 from app.domain.connection_health import HealthPolicy
 from app.domain.event_schema import Envelope
 from app.domain.login_mapping import LOGIN_KEYS
+from app.domain.privacy_statement import valid_privacy_url
 from app.domain.settings_registry import PHONE_REGIONS, REGISTRY, SettingClass
 from app.domain.source_networks import MAX_WEBHOOK_NETWORKS, valid_source_networks
 from app.domain.staff_directory import ADMIN_URL_PATTERN
@@ -764,6 +765,22 @@ class Settings(BaseSettings):
         """Refuse an ``UPDATE_LINE`` that is neither empty nor ``X.Y`` (ADR 0116)."""
         if not valid_line(value):
             raise ValueError("UPDATE_LINE must be empty or a minor such as 1.4")
+        return value
+
+    @field_validator("privacy_statement_url")
+    @classmethod
+    def _valid_privacy_url(cls, value: str | None) -> str | None:
+        """Refuse a ``PRIVACY_STATEMENT_URL`` that is no https address (ADR 0123 step 6b).
+
+        Empty means no link and is kept as ``None``; the rule is ``app.domain.privacy_statement``.
+        """
+        if not value:
+            return None
+        if not valid_privacy_url(value):
+            raise ValueError(
+                "PRIVACY_STATEMENT_URL must be empty or an https address of a host name, at "
+                "most 2,048 characters"
+            )
         return value
 
     @field_validator("min_upgrade_from")

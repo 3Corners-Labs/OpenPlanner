@@ -2407,9 +2407,19 @@ organisation's value is never touched.
 
 **Call page, step 6b (ADR 0123).** A service that uses the call page has its meetings made
 without the video platform's chat, also its trial call; a meeting made before this step keeps its
-chat. The group check ("Koppeling controleren") shows a captions finding for such a service:
-*off* or *unknown* means the site does not keep closed captions for the meeting (switch them on in
-the site's settings at the video platform); it never blocks the call. The conversation task is
+chat. If the platform refuses the options that turn the chat off (a `400`), the booking's meeting
+is created once more with the chat on and the timeline carries the warning *Integration failed*
+with the code `chat_options_refused` (check the site's chat settings; no participant is left
+without a link). The group check ("Koppeling controleren") shows a captions finding for such a
+service: it reports the site's *closed-captions option* (captions entered by a captioner), not
+whether live captions work in the call page (that is tried in a real call, step 8). *Off* or
+*unknown* means the site does not keep the option for the meeting (switch it on in the site's
+settings at the video platform); it never blocks the call. The captions probe is one more
+(deleted) meeting at the platform per group check of a call-page group, and none when the base
+probe was refused. A group is checked by the worker every `integration_check_interval_hours`
+(24 by default, at least 1), once after its host address changes, and by hand by whoever holds
+`group.edit` for it, limited per address (`check_limit`); so the cost is at most one extra
+meeting per check, bounded by those limits. The conversation task is
 made only for a service that uses the page: a service that holds *Conversation* but not the page
 makes work items again (the form says so); to stop conversations everywhere switch
 `embedded_call_enabled` off. The organisation's privacy statement address is set on the

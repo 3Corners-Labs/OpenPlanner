@@ -494,6 +494,21 @@ msgstr "The trial call opens in this browser; there is nothing to install."
 msgid "trial.page.until"
 msgstr "Open until"
 
+msgid "trial.page.back"
+msgstr "Back to the trial call page"
+
+msgid "trial.page.not_open"
+msgstr "The trial call is no longer open. Go back to the trial call page to open a new one."
+
+msgid "trial.page.left_body"
+msgstr "You can close this window, or go back to the trial call page."
+
+msgid "trial.page.ended_body"
+msgstr "Thank you for the trial call. You can close this window, or go back to the trial call page."
+
+msgid "trial.page.ended_deleted"
+msgstr "The data of this trial call is deleted together with the rest of your appointment, 24 hours after it ends."
+
 msgid "trial.open_hint"
 msgstr "The trial call stays open for {minutes} minutes."
 
@@ -1899,6 +1914,9 @@ msgstr "The contact center already has an open conversation for this appointment
 
 msgid "call.hint.integration.other"
 msgstr "Webex refused a request. Webex's answer is shown when Webex gave one; the worker log also has a trackingId at integration.refused."
+
+msgid "call.hint.integration.chat_options_refused"
+msgstr "A warning, not an outage: the video platform refused the meeting without its own chat. The meeting was then created with chat and the participant has their link. Staff can write in the platform's chat panel, which the participant does not see. Check the site's chat settings."
 
 msgid "call.hint.unauthorized"
 msgstr "Webex did not accept the Service App's token. Check the status under Integrations and, if needed, put a new refresh token in WEBEX_REFRESH_TOKEN."
@@ -4873,19 +4891,19 @@ msgid "admin.check.webex.guest_refused"
 msgstr "The video platform refused to create a guest ({error}): the Service App needs the guest scopes, so participants cannot join in our page."
 
 msgid "admin.check.webex.captions_ok"
-msgstr "The video platform's site keeps closed captions: a participant of the call page can switch them on."
+msgstr "The video platform's site has its closed-captions option on for meetings. This does not say that live captions work in the call page: try that in a real call."
 
 msgid "admin.check.webex.captions_off"
-msgstr "The video platform's site does not keep closed captions for this meeting, so the call page has no captions to show. Switch them on in the site's settings (Control Hub)."
+msgstr "The video platform's site does not have its closed-captions option on for this meeting. Switch it on in the site's settings (Control Hub). This says nothing about live captions in the call page."
 
 msgid "admin.check.webex.captions_unknown"
-msgstr "The video platform does not say whether closed captions are on for the site, so whether the call page can show captions cannot be established. Try it in a real call."
+msgstr "The video platform does not say whether the site's closed-captions option is on. Whether live captions work in the call page cannot be established this way: try it in a real call."
 
 msgid "admin.check.webex.captions_refused"
-msgstr "The video platform refused the captions probe meeting ({error}) for host {host}: whether the call page can show captions cannot be established."
+msgstr "The video platform refused the probe meeting for the closed-captions option ({error}) for host {host}, so the site's option cannot be established."
 
 msgid "admin.check.webex.captions_left"
-msgstr "The captions probe meeting {meeting} for host {host} was scheduled but could not be deleted ({error}); delete it in Webex."
+msgstr "The probe meeting {meeting} for the closed-captions option of host {host} was scheduled but could not be deleted ({error}). Delete it in Webex."
 
 msgid "admin.check.webex.trial_left"
 msgstr "The trial-call meeting {meeting} for host {host} was scheduled but could not be deleted ({error}); delete it in Webex."
@@ -14135,7 +14153,7 @@ msgid "settings.field.embedded_call_webex_option.label"
 msgstr "Way into the video platform's own app next to the call (never, only when the page cannot give the call, or always). It holds for every team that has not chosen its own; a team chooses it under Group, Settings, Video"
 
 msgid "settings.field.privacy_statement_url.label"
-msgstr "Address of the organisation's privacy statement (https, at most 2,048 characters); the call page links to it from the line about the external video service. Empty: no link"
+msgstr "Address of the organisation's privacy statement (https)"
 
 msgid "callpage.privacy.link"
 msgstr "The organisation's privacy statement (opens in a new tab)"

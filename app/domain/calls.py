@@ -533,7 +533,7 @@ def contact_center_task(
     start_label: str,
     skills: tuple[str, ...] = (),
     interaction: InteractionKind = InteractionKind.VIDEO,
-    conversation_enabled: bool,
+    uses_call_page: bool,
 ) -> ContactCenterTask:
     """Return the contact-center task to dispatch for ``booking``.
 
@@ -547,12 +547,12 @@ def contact_center_task(
             ``meeting`` or ``contact``) or what the group's platform cannot carry
             (``interaction_kind``, ``skill_codes`` or ``task_kind``, ADR 0121 step 6, ADR 0123
             step 7a). The task is of the routing's kind in force (``task_kind_in_force``: a
-            conversation only while ``conversation_enabled``, which the caller sets from the one
-            question "does this booking's service use the call page", ADR 0123 step 6b); a
-            conversation still lacks its ``first_message``, which the caller composes.
+            conversation only while ``uses_call_page``: the one question "does this booking's
+            service use the call page", ADR 0123 step 6b); a conversation still lacks its
+            ``first_message``, which the caller composes.
     """
     routing = _complete_routing(group)
-    task_kind = task_kind_in_force(routing.task_kind, conversation_enabled)
+    task_kind = task_kind_in_force(routing.task_kind, uses_call_page)
     gap = uncarried(routing.descriptor.capabilities, interaction, bool(skills), task_kind)
     if gap is not None:
         raise DomainError(ErrorCode.INTEGRATION_NOT_READY, gap)

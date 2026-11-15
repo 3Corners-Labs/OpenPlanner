@@ -1,8 +1,7 @@
 """The job runner on fake video and contact-centre adapters, for the call job tests (ADR 0018)."""
 
-from collections.abc import Callable
-
 from app.domain.admin import AdminService
+from app.domain.call_client import UsesCallPage
 from app.domain.calls import EventKind
 from app.domain.guest_access import GuestKeys
 from app.domain.integration import IntegrationService
@@ -47,13 +46,13 @@ class Setup:
         queue: FakeQueue,
         *,
         translator: Translator | None = None,
-        call_page_enabled: Callable[[], bool] | None = None,
+        uses_page: UsesCallPage | None = None,
         guest_keys: GuestKeys | None = None,
     ) -> JobRunner:
         """Return a job runner that takes its jobs from ``queue`` and calls the fakes.
 
-        ``translator`` replaces the catalogue and ``call_page_enabled`` is the platform
-        switch of ADR 0123 (off when not given). ``guest_keys`` are the keys of the guest
+        ``translator`` replaces the catalogue and ``uses_page`` is the call-page rule
+        of ADR 0123 step 6b (never when not given). ``guest_keys`` are the keys of the guest
         subjects now in force (ADR 0123 point 7); without them a rename has no subject to work out.
         """
         composer = MessageComposer(
@@ -68,7 +67,7 @@ class Setup:
             video=self.video,
             dispatchers=webex_cc(self.dispatcher),
             integration=self.integration,
-            call_page_enabled=call_page_enabled,
+            uses_page=uses_page,
             guest_keys=guest_keys,
         )
 

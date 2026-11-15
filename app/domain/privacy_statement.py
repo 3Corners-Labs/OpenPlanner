@@ -12,6 +12,7 @@ The page checks the stored value again where it renders it, so a value that got 
 database some other way (an older version, a hand edit) never becomes a link. Pure Python.
 """
 
+import ipaddress
 from urllib.parse import urlsplit
 
 MAX_LENGTH = 2048
@@ -43,7 +44,31 @@ def valid_privacy_url(value: str) -> bool:
         _ = parts.port  # raises for a port that is no number or out of range
     except ValueError:  # an unparsable authority or port
         return False
-    return parts.scheme == "https" and bool(host) and "@" not in parts.netloc
+    if parts.scheme != "https" or not host or "@" in parts.netloc:
+        return False
+    return not _is_address(host)
+
+
+def _is_address(host: str) -> bool:
+    """Return whether ``host`` is ``localhost`` or an IP address: never a privacy statement's.
+
+    A statement is published under a name; an address (``127.0.0.1``, ``[::1]``, a decimal or hex
+    form that a browser still reads as one) or ``localhost`` points at the participant's own
+    network. Internationalised names stay allowed.
+    """
+    name = host.rstrip(".").lower()
+    if name == "localhost" or name.endswith(".localhost"):
+        return True
+    try:
+        ipaddress.ip_address(name)
+    except ValueError:
+        pass
+    else:
+        return True
+    # The last label of a name is never all digits or a hex number; a browser reads ``0x7f.1``,
+    # ``017700000001`` and ``2130706433`` as addresses.
+    last = name.rsplit(".", 1)[-1]
+    return last.isdigit() or last.startswith("0x")
 
 
 def privacy_link(value: str | None) -> str | None:

@@ -430,8 +430,9 @@ choice between app and browser anyway, set it to **Webex lets the participant ch
 
 A service that uses the call page gets meetings without the video platform's own chat (the trial
 call too), because the chat beside the page is our own. The trial call of such a service opens on
-the call page. The integration check also reports for such a service whether the site keeps closed
-captions (a warning when it does not). *Conversation* as the kind of task can be chosen only for a
+the call page. The integration check also reports for such a service whether the site's closed-captions
+option is on (a warning when it is not). That does not say that live captions work in the call
+page: try that in a real call. *Conversation* as the kind of task can be chosen only for a
 service that uses the call page; as long as the service does not use it, it makes work items.
 
 <!-- field: embedded_call_webex_option -->

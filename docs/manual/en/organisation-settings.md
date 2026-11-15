@@ -49,7 +49,7 @@ page* at the top jumps to a topic; one *Save* button saves all topics together.
   reached an appointment, the participant gets no new message for that appointment during this
   period, even if the bot asks again. Cannot be switched off.
 - **Privacy statement (address)**: the https address of the organisation's privacy statement, at most
-  2,048 characters. The call page links to it from the line that an external video service carries
+  2,048 characters, with a host name (not an IP address and not `localhost`). The call page links to it from the line that an external video service carries
   the call (the link opens in a new tab). The statement says which service that is: the page itself
   does not name it. Empty: the page shows the line without a link.
 

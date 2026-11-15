@@ -46,8 +46,11 @@ page is our own, step 7) and staff must not write into a panel nobody answers. E
 
 CAPTIONS_OPTION = "enabledClosedCaptions"
 """The key of ``meetingOptions`` that asks the site for closed captions and that its answer
-carries back (the group check's captions probe, ADR 0123 point 17). Taken from the Meetings API's
-meeting object; its answer on the lab site is checked in the first real meeting (step 8)."""
+carries back (the group check's captions probe, ADR 0123 point 17). It is the site's closed-captions
+option (ADR 0045: captions entered by a captioner), not the live captions that the call page shows
+from the host's meeting (open decision O8): the finding reports the option, never that live
+captions work in the page. Taken from the Meetings API's meeting object; a recorded real answer
+comes with the first real meeting (step 8)."""
 
 TRIAL_OPTIONS: dict[str, Any] = {
     "enabledJoinBeforeHost": True,

@@ -217,3 +217,25 @@ async def test_a_user_without_group_edit_cannot_change_it(site: Site) -> None:
 
     assert response.status_code in (302, 303, 403, 404)  # type: ignore[attr-defined]
     assert await _stored(site) is not TaskKind.CONVERSATION
+
+
+async def test_a_refused_form_shows_the_task_kind_for_the_client_that_was_posted(
+    site: Site,
+) -> None:
+    """The two selects agree on a form that is shown again with errors (ADR 0123 step 6b)."""
+    await site.login_as(SUPER)
+    _switch(site, on=True)
+
+    # Posted: the call page (offered, since the switch is on), refused until the guest check
+    # passed. The task kind's select follows the posted client, not the stored one.
+    toward = await _post(site, {**EMBEDDED_FORM, FIELD: "conversation"})
+    assert toward.status_code == 422  # type: ignore[attr-defined]
+    assert _options(toward.text) == ["form", "conversation"]  # type: ignore[attr-defined]
+    assert 'value="embedded" selected' in toward.text  # type: ignore[attr-defined]
+
+    # And the other way round: stored on the page, posted away from it, refused for its name.
+    await _use_the_page(site)
+    away = await _post(site, {**SETTINGS_FORM, "name": "", FIELD: "form"})
+    assert away.status_code == 422  # type: ignore[attr-defined]
+    assert _options(away.text) == ["form"]  # type: ignore[attr-defined]
+    assert 'value="browser" selected' in away.text  # type: ignore[attr-defined]

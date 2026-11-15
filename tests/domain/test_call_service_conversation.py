@@ -14,8 +14,9 @@ import pytest
 
 from app.domain.admin import AdminService
 from app.domain.booking import MeetingRef
+from app.domain.call_client import call_page_rule
 from app.domain.call_service import CallService
-from app.domain.calls import ContactCenterTask, OpeningTextError
+from app.domain.calls import ContactCenterTask, EventKind, MeetingRequest, OpeningTextError
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef, TaskKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import IntegrationService
@@ -69,7 +70,7 @@ async def _service(  # type: ignore[no-untyped-def]
         webex_cc(dispatcher),
         lambda b, g: "label",
         opening=opening,
-        call_page_enabled=lambda: enabled,
+        uses_page=call_page_rule(lambda: enabled),
     )
     return uow, calls, booking
 
@@ -281,7 +282,7 @@ async def test_the_meeting_is_created_without_the_platforms_chat_only_for_the_ca
         video,
         webex_cc(dispatcher),
         lambda b, g: "label",
-        call_page_enabled=lambda: enabled,
+        uses_page=call_page_rule(lambda: enabled),
     )
 
     await calls.ensure_meeting(replace(booking, meeting=None), group)
@@ -291,3 +292,86 @@ async def test_the_meeting_is_created_without_the_platforms_chat_only_for_the_ca
         "Videogesprek Balie",
         "host@example.nl",
     )
+
+
+async def test_a_refused_meeting_without_chat_still_gives_the_participant_a_link() -> None:
+    """ADR 0123 step 6b: the three chat options are refused (a 400): one retry with the chat on and
+    a warning on the timeline with a code and nothing else, so the booking has its meeting."""
+    dispatcher = FakeDispatcher()
+    uow, calls, booking = await _service(dispatcher)
+    refusing = FakeVideoRefusingNoChat()
+    calls = CallService(
+        uow,
+        calls._integration,
+        refusing,
+        webex_cc(dispatcher),
+        lambda b, g: "label",
+        uses_page=call_page_rule(lambda: True),
+    )
+
+    done = await calls.ensure_meeting(replace(booking, meeting=None), CONVERSATION_GROUP)
+
+    assert done.meeting is not None
+    assert [r.chat_enabled for r in refusing.attempts] == [False, True]  # one retry, no more
+    events = uow.state.booking_events[booking.id or 0]
+    warning = [e for e in events if e.kind is EventKind.INTEGRATION_ERROR]
+    assert [(e.detail, e.message) for e in warning] == [("chat_options_refused", "")]
+    assert EventKind.MEETING_CREATED in [e.kind for e in events]
+
+
+async def test_any_other_refusal_of_the_meeting_is_not_retried() -> None:
+    dispatcher = FakeDispatcher()
+    uow, calls, booking = await _service(dispatcher)
+    other = FakeVideoRefusingNoChat(code="rejected_403")
+    calls = CallService(
+        uow,
+        calls._integration,
+        other,
+        webex_cc(dispatcher),
+        lambda b, g: "label",
+        uses_page=call_page_rule(lambda: True),
+    )
+
+    with pytest.raises(IntegrationError):
+        await calls.ensure_meeting(replace(booking, meeting=None), CONVERSATION_GROUP)
+
+    assert len(other.attempts) == 1  # a 403 is not about the chat options
+    assert EventKind.INTEGRATION_ERROR not in [
+        e.kind for e in uow.state.booking_events.get(booking.id or 0, [])
+    ]
+
+
+async def test_a_meeting_with_the_chat_on_that_is_refused_is_not_retried() -> None:
+    """A service that does not use the page asked for no change, so a 400 is a real refusal."""
+    group = replace(CONVERSATION_GROUP, join_client=JoinClient.BROWSER)
+    dispatcher = FakeDispatcher()
+    uow, calls, booking = await _service(dispatcher, group=group)
+    video = FakeVideoRefusingNoChat(refuse_all=True)
+    calls = CallService(
+        uow,
+        calls._integration,
+        video,
+        webex_cc(dispatcher),
+        lambda b, g: "label",
+        uses_page=call_page_rule(lambda: True),
+    )
+
+    with pytest.raises(IntegrationError):
+        await calls.ensure_meeting(replace(booking, meeting=None), group)
+
+    assert len(video.attempts) == 1
+
+
+class FakeVideoRefusingNoChat(FakeVideo):
+    """A video fake that answers a 400 to a request without chat (or to every one)."""
+
+    def __init__(self, code: str = "rejected_400", *, refuse_all: bool = False) -> None:
+        super().__init__()
+        self.attempts: list[MeetingRequest] = []
+        self._code, self._all = code, refuse_all
+
+    async def create_meeting(self, request: MeetingRequest) -> MeetingRef:
+        self.attempts.append(request)
+        if self._all or not request.chat_enabled:
+            raise IntegrationError(self._code, retryable=False)
+        return await super().create_meeting(request)

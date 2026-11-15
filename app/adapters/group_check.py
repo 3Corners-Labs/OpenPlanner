@@ -56,7 +56,7 @@ from app.adapters.webhook_selftest import self_test
 from app.adapters.webhooks import WXCC_INBOUND
 from app.adapters.wxcc import channel_and_address
 from app.adapters.wxcc_config import GroupRouting, check_group, fetch_config, region_check
-from app.domain.call_client import call_client, uses_call_page
+from app.domain.call_client import UsesCallPage, chosen_client
 from app.domain.calls import (
     BROWSER_LINK_PARAMS,
     EventKind,
@@ -105,9 +105,6 @@ class CheckerConfig:
     webhook_base: str
     webex_secret: str | None
     wxcc_secret: str | None
-    call_page_enabled: bool = False
-    """Whether ``embedded_call_enabled`` is on (ADR 0123 point 17): only then does a group that
-    uses the call page get the guest finding."""
 
 
 def _status(result: CheckResult) -> CheckStatus:
@@ -146,6 +143,8 @@ class PlatformChecker:
         probes: Where the probe's webhook events arrive; ``None`` skips the probe work item.
         probe_timeout: How long to wait for the probe's events
             (``integration_probe_timeout_seconds``).
+        uses_page: Whether a group's participant gets the call page now
+            (``app.domain.call_client.call_page_rule``, ADR 0123 point 17); without it, never.
         sleep: Waits between looks at the registry (tests pass one that does not wait).
     """
 
@@ -161,6 +160,7 @@ class PlatformChecker:
         probes: ProbeRegistry | None = None,
         probe_timeout: Callable[[], timedelta] = lambda: PROBE_TIMEOUT,
         sleep: Sleep = asyncio.sleep,
+        uses_page: UsesCallPage | None = None,
     ) -> None:
         """Store the collaborators."""
         self._http = http
@@ -173,6 +173,7 @@ class PlatformChecker:
         self._probes = probes
         self._probe_timeout = probe_timeout
         self._sleep = sleep
+        self._uses_page = uses_page or (lambda group: False)
 
     async def check_group(self, group: Group, peers: Sequence[Group]) -> list[Finding]:
         """Return the findings for ``group``, in the order of the chain."""
@@ -180,7 +181,7 @@ class PlatformChecker:
         return [
             *webex,
             *await self._guest(group),
-            *await self._captions(group),
+            *await self._captions(group, link),
             *await self._wxcc(group, peers, link),
             *await self._webhooks(group),
         ]
@@ -201,7 +202,7 @@ class PlatformChecker:
             start + PROBE_LENGTH,
             group.timezone,
             host,
-            chat_enabled=not self._call_page(group),
+            chat_enabled=not self._uses_page(group),
         )
         try:
             probe = await meetings.create_meeting(request)
@@ -230,7 +231,7 @@ class PlatformChecker:
         switch is on; the subject is fixed, so repeating the check makes no further guest. No
         participant data is sent, and no token is kept or shown.
         """
-        if not self._call_page(group):
+        if not self._uses_page(group):
             return []
         meetings = WebexMeetings(self._client, self._config.webex_base_url, self._clock)
         try:
@@ -246,11 +247,7 @@ class PlatformChecker:
             ]
         return [Finding(CheckArea.WEBEX, "webex.guest_ok", CheckStatus.OK)]
 
-    def _call_page(self, group: Group) -> bool:
-        """Return whether ``group`` uses the call page now (the one question of ``call_client``)."""
-        return uses_call_page(group, platform_enabled=self._config.call_page_enabled)
-
-    async def _captions(self, group: Group) -> list[Finding]:
+    async def _captions(self, group: Group, probe_link: str | None) -> list[Finding]:
         """Report whether the site keeps closed captions, for a group that uses the call page.
 
         The call page shows captions only when the meeting offers them, which is the
@@ -260,8 +257,8 @@ class PlatformChecker:
         is deleted at once; nothing of a participant is sent.
         """
         host = group.video_host_email
-        if not host or not self._call_page(group):
-            return []  # no host: ``webex.no_host`` already says so
+        if not host or probe_link is None or not self._uses_page(group):
+            return []  # no host or no probe meeting: the finding of the base probe says why
         meetings = WebexMeetings(self._client, self._config.webex_base_url, self._clock)
         start = self._clock.now().replace(second=0, microsecond=0) + PROBE_AHEAD
         request = MeetingRequest(
@@ -304,7 +301,7 @@ class PlatformChecker:
                 start + PROBE_LENGTH,
                 group.timezone,
                 host,
-                chat_enabled=not self._call_page(group),
+                chat_enabled=not self._uses_page(group),
             ),
             join_before_host=True,
         )
@@ -332,9 +329,8 @@ class PlatformChecker:
         its join page, and that redirect must still contain ``launchApp=true``. A warning, never
         a failure: without the parameter the participant gets Webex's own choice page.
         """
-        client = call_client(group, platform_enabled=self._config.call_page_enabled)
-        if client is not JoinClient.BROWSER:
-            return []  # choice has no parameter to lose; embedded has no link of this kind
+        if self._uses_page(group) or chosen_client(group) is JoinClient.CHOICE:
+            return []  # choice has no parameter to lose; the call page has no link of this kind
         url = join_link(link, RedirectClient.BROWSER)
         if url is None:  # not an https link: never visited
             return [_browser_finding("webex.browser_link_lost", (("status", "-"),))]

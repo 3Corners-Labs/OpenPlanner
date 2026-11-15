@@ -79,7 +79,7 @@ def test_a_task_is_of_the_routings_kind() -> None:
         group,
         start_label="x",
         interaction=InteractionKind.NONE,
-        conversation_enabled=True,
+        uses_call_page=True,
     )
 
     assert task.task_kind is TaskKind.CONVERSATION
@@ -89,7 +89,7 @@ def test_a_task_is_of_the_routings_kind() -> None:
         replace(group, contact_center=webex_routing()),
         start_label="x",
         interaction=InteractionKind.NONE,
-        conversation_enabled=False,
+        uses_call_page=False,
     )
     assert form.task_kind is TaskKind.FORM
 
@@ -188,7 +188,7 @@ def test_a_task_is_built_as_the_kind_in_force() -> None:
             group,
             start_label="x",
             interaction=InteractionKind.NONE,
-            conversation_enabled=enabled,
+            uses_call_page=enabled,
         )
         assert task.task_kind is expected
 

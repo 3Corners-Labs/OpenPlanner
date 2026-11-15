@@ -7,6 +7,7 @@ import pytest
 
 from app.domain.admin import AdminService
 from app.domain.booking import BookingStatus, MeetingRef
+from app.domain.call_client import call_page_rule
 from app.domain.calls import EventKind
 from app.domain.errors import DomainError
 from app.domain.integration import IntegrationService
@@ -278,7 +279,7 @@ def _with_page(setup: Setup, *, enabled: bool = True) -> Setup:
     """Return ``setup`` with a trial service that knows the platform switch."""
     integration = IntegrationService(setup.uow, setup.clock, AdminService(setup.uow, setup.clock))
     setup.service = TrialCallService(
-        setup.uow, setup.video, integration, setup.clock, lambda: enabled
+        setup.uow, setup.video, integration, setup.clock, call_page_rule(lambda: enabled)
     )
     return setup
 

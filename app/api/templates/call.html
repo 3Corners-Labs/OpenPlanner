@@ -92,7 +92,7 @@
   <p data-text="say_{{ name }}">{{ body }}</p>
   {%- if note %}
   <p>{{ note }}</p>{% endif %}
-  <p><a class="button button--secondary" href="{{ back_href }}">{{ _("join.back") }}</a></p>
+  <p><a class="button button--secondary" href="{{ back_href }}">{{ _(back_text) }}</a></p>
 </section>
 {%- endmacro %}
 
@@ -239,7 +239,7 @@
       <p data-call-failure="generic" data-text="say_failed_generic" hidden>{{ _("callpage.failed.generic") }}</p>
       <p data-call-failure="media" data-text="say_failed_media" hidden>{{ _("callpage.failed.media") }}</p>
       <p data-call-failure="lost" data-text="say_failed_lost" hidden>{{ _("callpage.failed.lost") }}</p>
-      <p data-call-failure="not_open" data-text="say_failed_not_open" hidden>{{ _("callpage.failed.not_open") }}</p>
+      <p data-call-failure="not_open" data-text="say_failed_not_open" hidden>{{ _("trial.page.not_open" if trial_until is not none else "callpage.failed.not_open") }}</p>
       <p data-call-failure="rate_limited" data-text="say_failed_rate_limited" hidden>{{ _("callpage.failed.rate_limited") }}</p>
       <p data-call-failure="unavailable" data-text="say_failed_unavailable" hidden>{{ _("callpage.failed.unavailable") }}</p>
     </div>
@@ -250,8 +250,9 @@
     <div data-call-failed-contacts>{{ contact("call-failed-contacts") }}</div>
   </section>
 
-  {{ over("left", _("callpage.left.heading"), _("callpage.left.body")) }}
-  {{ over("ended", _("callpage.ended.heading"), _("callpage.ended.body"), _("callpage.ended.deleted")) }}
+  {{ over("left", _("callpage.left.heading"), _("trial.page.left_body" if trial_until is not none else "callpage.left.body")) }}
+  {#- A trial call says so in the states it can end in (ADR 0123 point 9): it has no appointment time and no "your appointment" to go back to. -#}
+  {{ over("ended", _("callpage.ended.heading"), _("trial.page.ended_body" if trial_until is not none else "callpage.ended.body"), _("trial.page.ended_deleted" if trial_until is not none else "callpage.ended.deleted")) }}
 
   <section class="call-state" aria-labelledby="call-unavailable-heading" data-call-state="unavailable" hidden>
     <h1 id="call-unavailable-heading" tabindex="-1">{{ _("callpage.unavailable.heading") }}</h1>
@@ -350,7 +351,7 @@
     <span data-text="say_staff_name">{{ _("callpage.say.staff_name", name="{name}") }}</span>
   </div>
 
-  <p data-call-back><a href="{{ back_href }}">{{ _("join.back") }}</a></p>
+  <p data-call-back><a href="{{ back_href }}">{{ _(back_text) }}</a></p>
 </div>
 {% endblock %}
 {#- Eleven own scripts that share one object, in this order. Each only defines when it loads, and what

@@ -348,7 +348,10 @@ What constrains the answer:
     guest token. The check uses one fixed subject, so it creates one guest and no more. While
     `embedded_call_enabled` is off no check calls the guest endpoint: an installation that does
     not use the call page creates no guest at the supplier and sees no finding about it. The
-    group check also reports whether the site offers captions.
+    group check also reports the site's closed-captions option (ADR 0045: captions entered by a
+    captioner) with a probe meeting that asks for it and reads the answer back, as a warning
+    only; it does not say that live captions work in the page (open decision O8), which is
+    tried in a real meeting (step 8).
     For the conversation task of point 8 the check is part of the portal, on the screens where
     the connection and the group are configured, and walks the whole chain in the contact center
     and reports each link in plain words (product owner, 2026-11-12: these integrations are too

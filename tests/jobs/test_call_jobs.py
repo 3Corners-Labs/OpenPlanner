@@ -370,7 +370,7 @@ async def test_a_bad_opening_text_fails_the_dispatch_once_with_its_code() -> Non
     await setup.runner(FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])).run_due()
     queue = FakeQueue([job(bid, JobType.DISPATCH_CONTACT_CENTER_TASK)])
 
-    await setup.runner(queue, translator=broken, call_page_enabled=lambda: True).run_due()
+    await setup.runner(queue, translator=broken, uses_page=lambda group: True).run_due()
 
     assert queue.failed == [(1, "integration_not_ready")]
     assert queue.retried == []

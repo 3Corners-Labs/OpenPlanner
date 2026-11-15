@@ -31,6 +31,7 @@ from app.adapters.db.models import (
 )
 from app.domain.branding import FontFile, FontRole, Logo
 from app.domain.configuration_changes import Change, ChangeAction, RuleContext, Usage
+from app.domain.configuration_checks import setting_value
 from app.domain.configuration_document import Document, Mode, Scope, parse_document, to_json
 from app.domain.configuration_plan import plan_document
 from app.domain.configuration_tree import Entity
@@ -38,6 +39,7 @@ from app.domain.configuration_v1 import FORMATS, V1
 from app.domain.configuration_values import Binary, Value
 from app.domain.contacts import ContactBlock, ContactKind, ContactOption
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.settings_registry import BY_KEY
 from tests.fakes.woff2 import make_woff2
 from tests.support.config_changes import planned
 from tests.support.configuration import allow
@@ -441,6 +443,50 @@ async def test_settings_are_set_replaced_and_removed(session: AsyncSession) -> N
         )
     )
     assert stamp is not None
+
+
+async def test_the_privacy_statement_address_travels_with_and_without_a_value(
+    session: AsyncSession,
+) -> None:
+    """ADR 0123 step 6b: like the other organisation settings, set, read back, removed."""
+    await seed(session)
+    address = ("acme", "privacy_statement_url")
+    value = "https://voorbeeld.nl/privacy"
+
+    async def stated() -> dict[str, object]:
+        return {
+            e.key[0]: e.fields["value"]
+            for e in (await read_organisations(session, None))["acme"].children["settings"]
+        }
+
+    assert "privacy_statement_url" not in await stated()  # without a value: nothing is exported
+    await apply(
+        session,
+        change(
+            "organisation_setting",
+            ChangeAction.CREATE,
+            ("privacy_statement_url",),
+            address,
+            {"value": value},
+        ),
+    )
+    assert (await stated())["privacy_statement_url"] == value  # with a value: it comes back
+    await apply(
+        session,
+        change(
+            "organisation_setting", ChangeAction.DELETE, ("privacy_statement_url",), address, {}
+        ),
+    )
+    assert "privacy_statement_url" not in await stated()
+
+
+def test_a_document_may_not_carry_an_address_the_portal_refuses() -> None:
+    spec = BY_KEY["privacy_statement_url"]
+
+    assert setting_value(spec, "https://voorbeeld.nl/privacy") == "https://voorbeeld.nl/privacy"
+    for bad in ("http://voorbeeld.nl/privacy", "https://127.0.0.1/privacy", "javascript:alert(1)"):
+        with pytest.raises(DomainError):
+            setting_value(spec, bad)
 
 
 async def test_texts_are_set_replaced_and_removed(session: AsyncSession) -> None:

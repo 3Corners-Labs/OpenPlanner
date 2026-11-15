@@ -18,7 +18,7 @@ from datetime import datetime
 
 from app.domain.authorization import Scope
 from app.domain.booking import Booking
-from app.domain.call_client import uses_call_page
+from app.domain.call_client import UsesCallPage
 from app.domain.calls import (
     ContactCenterTask,
     EventKind,
@@ -53,9 +53,11 @@ OpeningText = Callable[[str | None, ContactCenterTask], str]
 (``None`` when it cannot be read: the edge applies the installation's default) and the task
 (ADR 0123 step 7a); the catalogue and the translator are the edge's, so the domain is handed
 the function."""
-CallPageEnabled = Callable[[], bool]
-"""Whether the platform switch ``embedded_call_enabled`` is on now; read at the edge, class C. It
-is the kill switch of ``uses_call_page`` (ADR 0123 step 6b), no longer the rule itself."""
+CHAT_OPTIONS_REFUSED = "rejected_400"
+"""The ``IntegrationError`` code of a request the platform did not accept (HTTP 400)."""
+CHAT_KEPT = "chat_options_refused"
+"""The timeline warning's detail: the meeting for the call page was created with the platform's
+chat because the platform refused the options that turn it off (a warning, not a failure)."""
 OPENING_MESSAGE = "opening_message"
 """What a refusal names when a conversation task cannot be given its first message."""
 
@@ -71,10 +73,11 @@ class CallService:
         start_label: Formats the start time for agents.
         opening: Composes the first message of a conversation task (ADR 0123 step 7a); without
             it a conversation task cannot be built and is refused as not ready.
-        call_page_enabled: Whether the platform switch is on. A booking's meeting is created
-            without the platform's own chat, and a routing's conversation is in force, only for
-            a service that uses the call page (``uses_call_page``: its client is ``embedded``
-            and this switch is on, ADR 0123 step 6b). Without it, never.
+        uses_page: Whether a service's participant gets the call page now
+            (``app.domain.call_client.call_page_rule``, the platform switch included). A
+            booking's meeting is created without the platform's own chat, and a routing's
+            conversation is in force, only for such a service (ADR 0123 step 6b). Without it,
+            never.
         guest_keys: The keys a guest's subject may have been derived under, the current one
             first (ADR 0123 point 7); only the worker's rename of a guest needs them.
     """
@@ -89,7 +92,7 @@ class CallService:
         fallback: FallbackService | None = None,
         organisations: OrganisationDispatchers | None = None,
         opening: OpeningText | None = None,
-        call_page_enabled: CallPageEnabled | None = None,
+        uses_page: UsesCallPage | None = None,
         guest_keys: GuestKeys | None = None,
     ) -> None:
         """Store the collaborators; ``fallback`` diverts dispatches to the own queue (ADR 0082).
@@ -104,7 +107,7 @@ class CallService:
         self._start_label = start_label
         self._fallback = fallback
         self._opening = opening
-        self._call_page_enabled = call_page_enabled or (lambda: False)
+        self._uses_page = uses_page or (lambda group: False)
         self._guest_keys = guest_keys
 
     @property
@@ -117,21 +120,25 @@ class CallService:
         """Whether tasks can be created (needs video for the meeting link)."""
         return self._video is not None and self._dispatchers.configured
 
-    def uses_call_page(self, group: Group) -> bool:
-        """Return whether a booking of ``group`` has the call page of our own (ADR 0123 step 6b).
-
-        The one question of ``app.domain.call_client.uses_call_page`` with the platform switch
-        read now: it decides the meeting's options and whether a conversation task may be made.
-        """
-        return uses_call_page(group, platform_enabled=self._call_page_enabled())
-
     async def ensure_meeting(self, booking: Booking, group: Group) -> Booking:
         """Create the booking's meeting if the group has video and it has none yet."""
         if self._video is None or not group.video_enabled or booking.meeting is not None:
             return booking
-        request = meeting_request(booking, group, call_page=self.uses_call_page(group))
-        meeting = await self._video.create_meeting(request)
+        request = meeting_request(booking, group, call_page=self._uses_page(group))
         booking_id = _id(booking)
+        try:
+            meeting = await self._video.create_meeting(request)
+        except IntegrationError as error:
+            if request.chat_enabled or error.code != CHAT_OPTIONS_REFUSED:
+                raise
+            # The platform refused the meeting without its own chat (ADR 0123 step 6b). The
+            # adapter's error does not name the options, so any ``400`` of such a request is read
+            # as this refusal: one retry with the chat on, so the participant has a link, and a
+            # warning on the timeline (a code, no provider text, no personal data).
+            await self._integration.record(
+                booking_id, EventKind.INTEGRATION_ERROR, detail=CHAT_KEPT
+            )
+            meeting = await self._video.create_meeting(replace(request, chat_enabled=True))
         async with self._uow.locked() as tx:
             await tx.save_meeting(booking_id, meeting)
         await self._integration.record(booking_id, EventKind.MEETING_CREATED)
@@ -184,7 +191,7 @@ class CallService:
             start_label=self._start_label(booking, group),
             skills=skills,
             interaction=interaction,
-            conversation_enabled=self.uses_call_page(group),
+            uses_call_page=self._uses_page(group),
         )
         if task.task_kind is not TaskKind.CONVERSATION:
             return task

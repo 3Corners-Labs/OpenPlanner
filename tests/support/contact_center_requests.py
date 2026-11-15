@@ -73,13 +73,13 @@ def desk(
     clock: FixedClock,
     own_connections: frozenset[int] = frozenset(),
     *,
-    conversation_enabled: bool = False,
+    uses_call_page: bool = False,
 ) -> Desk:
     """Return the request dispatch of ``uow`` wired as the worker wires it.
 
     ``own_connections`` are the organisations with a contact-center connection of their own;
-    ``conversation_enabled`` is the platform switch of ADR 0123 (a conversation also needs the
-    group's client to be ``embedded``, step 6b).
+    ``uses_call_page`` is the answer of the call-page rule of ADR 0123 step 6b, which the worker
+    builds with ``call_page_rule``.
     """
     work = RequestWork(
         PoolBookings(clock, treatment_buffer=5), lease_minutes=5, unresolved_hours=24
@@ -105,7 +105,7 @@ def desk(
         webex_cc(dispatcher),
         lambda b, g: "x",
         opening=lambda locale, task: f"opening {task.reference}",
-        call_page_enabled=lambda: conversation_enabled,
+        uses_page=lambda group: uses_call_page,
     )
     dispatch = RequestDispatch(
         uow,

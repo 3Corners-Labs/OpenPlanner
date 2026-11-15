@@ -88,11 +88,11 @@ from app.domain.call_token_service import (
     TokenRefusal,
 )
 from app.domain.guest_access import GUEST_TERM_KEY, DisplayNameMode, StaffNameMode
+from app.domain.participant_links import PublicRef
 from app.domain.privacy_statement import privacy_link
 from app.domain.scheduling import Group
 from app.domain.services import BookingDetails, BookingService
 from app.domain.staff_screen_names import StaffScreenNames
-from app.domain.trial_call import TrialState
 from app.domain.trial_call_service import TrialCallService, TrialView
 from app.i18n.dates import format_clock
 from app.web.contact_labels import contact_service, contact_view
@@ -152,13 +152,15 @@ async def _page_context(
     staff_url: str,
     other_way_href: str,
     back_href: str,
+    back_text: str = "join.back",
     trial_until: str | None = None,
 ) -> dict[str, object]:
     """Return what ``call.html`` needs for the appointment's page or the trial call's page.
 
     The two pages are the same page (ADR 0123 point 9); only the addresses differ: the token and
     the staff address (none for a trial call: nobody is waiting in it), where "join another way"
-    and "back" lead, and ``trial_until`` (when the trial call closes), which turns the start
+    and "back" lead (``back_text`` is the catalogue key of the back link's words, which must
+    say where it leads), and ``trial_until`` (when the trial call closes), which turns the start
     state's line about the time into the trial's. Everything the browser may see is decided here.
     """
     offer = other_way_offer(group, current.embedded_call_webex_option)
@@ -182,6 +184,7 @@ async def _page_context(
         # The server decides what the browser may see: no link at all unless the setting allows.
         "other_way_href": other_way_href,
         "back_href": back_href,
+        "back_text": back_text,
         "other_way_before": shows_other_way(offer, failed=False),
         "other_way_failed": shows_other_way(offer, failed=True),
         # The organisation's privacy statement, linked from the line about the external service
@@ -305,13 +308,11 @@ async def call_staff(request: Request, public_ref: str) -> Response:
     return JSONResponse(label.as_json(), headers=NO_STORE)
 
 
-async def _open_trial(request: Request, public_ref: str, *, enter: bool) -> TrialView | None:
-    """Return the view of the participant's open trial call for a service that uses the page.
+async def _trial_view(request: Request, public_ref: str) -> tuple[TrialView, PublicRef]:
+    """Return the view of the participant's trial call for a service that uses the page.
 
     The same order of refusals as the appointment's routes: the switch, then the participant's
-    session, then the service's choice. ``enter`` records that the page was opened (the page, not
-    the token endpoint). ``None`` when no trial call is open: the caller sends the participant
-    back to the trial page, which says why.
+    session, then the service's choice.
 
     Raises:
         HTTPException: ``404`` while the switch is off or for a service that did not choose the
@@ -323,7 +324,7 @@ async def _open_trial(request: Request, public_ref: str, *, enter: bool) -> Tria
     view = await trials.view(ref)
     if not view.call_page:
         raise HTTPException(status_code=404)
-    return await trials.enter_page(ref) if enter else view
+    return view, ref
 
 
 @router.get("/b/m/{public_ref}/test/call", response_class=HTMLResponse)
@@ -333,11 +334,13 @@ async def trial_call_page(request: Request, public_ref: str) -> Response:
 
     Raises:
         HTTPException: ``404`` while ``embedded_call_enabled`` is off and for a booking of a
-            service that did not choose the page; ``303`` back to the trial page when no trial
-            call is open.
+            service that did not choose the page. A trial call that is not open sends the
+            participant back to the trial page (``303``).
     """
-    view = await _open_trial(request, public_ref, enter=True)
-    if view is None or view.state is not TrialState.ACTIVE:
+    _, ref = await _trial_view(request, public_ref)
+    trials: TrialCallService = request.app.state.trial_call_service
+    view = await trials.enter_page(ref)
+    if view is None:
         return RedirectResponse(f"/b/m/{public_ref}/test", status_code=303)
     locale = resolve_locale(request)
     current = follow(request, view.group.organisation_id)
@@ -354,6 +357,7 @@ async def trial_call_page(request: Request, public_ref: str) -> Response:
         staff_url="",  # nobody waits in a trial call, so there is nobody to name
         other_way_href=f"/b/m/{public_ref}/test/go",
         back_href=f"/b/m/{public_ref}/test",
+        back_text="trial.page.back",
         trial_until=until,
     )
     return await participant_call_page(request, locale, "call.html", group, context)
@@ -371,9 +375,7 @@ async def trial_call_token(request: Request, public_ref: str, _: SameOrigin) -> 
         HTTPException: ``404`` while ``embedded_call_enabled`` is off and for a booking of a
             service that did not choose the page.
     """
-    view = await _open_trial(request, public_ref, enter=False)
-    if view is None:  # not reached: a view is always returned without ``enter``
-        raise HTTPException(status_code=404)
+    view, _ref = await _trial_view(request, public_ref)
     current = follow(request, view.group.organisation_id)
     service: CallTokenService = request.app.state.call_token_service
     outcome = await service.issue_trial(

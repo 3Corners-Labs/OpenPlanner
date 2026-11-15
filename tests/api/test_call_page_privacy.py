@@ -9,6 +9,7 @@ and again where the page renders it, so a value that is not valid never becomes 
 import html
 
 import pytest
+from pydantic import ValidationError
 
 from app.config import Settings
 from tests.fakes.clock import FixedClock
@@ -88,3 +89,12 @@ async def test_a_stored_address_that_is_not_valid_is_never_rendered_as_a_link(
     assert "privacy statement" not in text.lower()
     assert "javascript:" not in text
     assert "<script>x" not in text
+
+
+def test_the_environment_refuses_an_address_the_portal_would_refuse() -> None:
+    """The rule applies at the environment too: ``Settings`` validates it (empty: no link)."""
+    assert Settings(environment="dev", privacy_statement_url=PRIVACY).privacy_statement_url
+    assert Settings(environment="dev", privacy_statement_url="").privacy_statement_url is None
+    for bad in ("http://voorbeeld.nl/p", "https://127.0.0.1/p", "javascript:alert(1)"):
+        with pytest.raises(ValidationError):
+            Settings(environment="dev", privacy_statement_url=bad)

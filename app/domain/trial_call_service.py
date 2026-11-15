@@ -13,12 +13,11 @@ failure at Webex is recorded on the booking's timeline with Webex's reason and s
 participant as "not possible now"; it does not count as a trial call.
 """
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
 from app.domain.booking import Booking, MeetingRef, TrialCall
-from app.domain.call_client import redirect_client, uses_call_page
+from app.domain.call_client import UsesCallPage, redirect_client
 from app.domain.calls import EventKind, MeetingRequest
 from app.domain.calls import join_link as client_link
 from app.domain.errors import DomainError, ErrorCode
@@ -58,9 +57,8 @@ class TrialCallService:
         video: Video provider, or ``None`` when Webex is not configured.
         integration: Records events on the booking's timeline.
         clock: Source of the current time.
-        call_page_enabled: Whether the platform switch ``embedded_call_enabled`` is on now; with
-            a service whose client is ``embedded`` it decides ``uses_call_page`` (ADR 0123 step
-            6b). Without it, never.
+        uses_page: Whether a service's participant gets the call page now
+            (``app.domain.call_client.call_page_rule``, ADR 0123 step 6b). Without it, never.
     """
 
     def __init__(
@@ -69,10 +67,10 @@ class TrialCallService:
         video: VideoProvider | None,
         integration: IntegrationService,
         clock: Clock,
-        call_page_enabled: Callable[[], bool] | None = None,
+        uses_page: UsesCallPage | None = None,
     ) -> None:
         """Store the collaborators."""
-        self._call_page_enabled = call_page_enabled or (lambda: False)
+        self._uses_page = uses_page or (lambda group: False)
         self._uow = uow
         self._video = video
         self._integration = integration
@@ -100,7 +98,7 @@ class TrialCallService:
         if view.state is not TrialState.AVAILABLE:
             return view
         now = self._clock.now()
-        request = trial_request(group, now, call_page=self._call_page(group))
+        request = trial_request(group, now, call_page=self._uses_page(group))
         try:
             meeting = await self._schedule(request)
         except IntegrationError as error:
@@ -166,26 +164,29 @@ class TrialCallService:
         return link
 
     async def enter_page(self, management_token: str | PublicRef) -> TrialView | None:
-        """Record that the participant opened the call page on the open trial call.
+        """Record, once per trial call, that the participant opened the call page on it.
 
-        For a service that uses the call page only (ADR 0123 point 9). ``None`` when there is no
-        open trial call or the service does not use the page: the caller sends the participant
-        back to the trial page.
+        For a service that uses the call page only (ADR 0123 point 9). The event is written the
+        first time the page is opened on this trial call, so a reload adds no row. ``None`` when
+        there is no open trial call or the service does not use the page: the caller sends the
+        participant back to the trial page.
 
         Raises:
             DomainError: ``booking_not_found``.
         """
         async with self._uow.read() as tx:
             booking, group = await self._load(tx, management_token)
+            events = await tx.get_booking_events(_id(booking))
         state = trial_state(booking, group, self._clock.now())
-        if not self._call_page(group) or state is not TrialState.ACTIVE:
+        if not self._uses_page(group) or state is not TrialState.ACTIVE:
             return None
-        await self._integration.record(_id(booking), EventKind.TRIAL_JOINED, detail="embedded")
+        opened = max((e.at for e in events if e.kind is EventKind.TRIAL_CREATED), default=None)
+        seen = any(
+            e.kind is EventKind.TRIAL_JOINED and (opened is None or e.at >= opened) for e in events
+        )
+        if not seen:
+            await self._integration.record(_id(booking), EventKind.TRIAL_JOINED, detail="embedded")
         return self._view(booking, group)
-
-    def _call_page(self, group: Group) -> bool:
-        """Return whether a booking of ``group`` has the call page (``uses_call_page``)."""
-        return uses_call_page(group, platform_enabled=self._call_page_enabled())
 
     def _view(self, booking: Booking, group: Group) -> TrialView:
         """Return the page's view of ``booking`` now."""
@@ -195,7 +196,7 @@ class TrialCallService:
             state = TrialState.OFF
         expires = booking.trial.expires_at if booking.trial and state is TrialState.ACTIVE else None
         left = max(0, group.trial_calls_per_booking - booking.trial_count)
-        return TrialView(group, booking, state, expires, left, call_page=self._call_page(group))
+        return TrialView(group, booking, state, expires, left, call_page=self._uses_page(group))
 
     async def _schedule(self, request: MeetingRequest) -> MeetingRef:
         """Schedule the trial meeting at Webex.

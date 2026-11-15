@@ -18,6 +18,7 @@ from app.adapters.diagnostics import CheckResult
 from app.adapters.group_check import CheckerConfig, PlatformChecker
 from app.adapters.webhook_registration import WEBEX_EVENTS
 from app.adapters.wxcc_config import parse_flow
+from app.domain.call_client import call_page_rule
 from app.domain.calls import EventKind
 from app.domain.checks import CheckArea, CheckStatus, Finding
 from app.domain.ports import IntegrationError
@@ -160,10 +161,15 @@ class Platforms:
         return httpx.Response(404)
 
 
-def _checker(platforms: Platforms, config: CheckerConfig = CONFIG) -> PlatformChecker:
+def _checker(
+    platforms: Platforms, config: CheckerConfig = CONFIG, *, page: bool = False
+) -> PlatformChecker:
+    """The checker; ``page`` is the platform switch ``embedded_call_enabled`` the call-page rule
+    reads (a group then uses the page when it chose ``embedded``)."""
     clock = FixedClock(NOW)
     tokens, http = webex_client(platforms, clock)
-    return PlatformChecker(http, tokens, config, clock)
+    rule = call_page_rule(lambda: page)
+    return PlatformChecker(http, tokens, config, clock, uses_page=rule)
 
 
 @pytest.fixture
@@ -754,7 +760,6 @@ async def test_a_probe_without_a_probe_meeting_carries_a_placeholder_link() -> N
 # --- the guest finding for a group that uses the call page (ADR 0123 point 17) ------------------
 
 EMBEDDED = replace(GROUP, join_client=JoinClient.EMBEDDED)
-ON = replace(CONFIG, call_page_enabled=True)
 
 
 def _guest_requests(platforms: Platforms) -> list[httpx.Request]:
@@ -765,7 +770,7 @@ def _guest_requests(platforms: Platforms) -> list[httpx.Request]:
 async def test_a_group_that_uses_the_call_page_mints_the_one_fixed_guest() -> None:
     platforms = Platforms()
 
-    findings = await _checker(platforms, ON).check_group(EMBEDDED, [EMBEDDED])
+    findings = await _checker(platforms, page=True).check_group(EMBEDDED, [EMBEDDED])
 
     assert _codes(findings)["webex.guest_ok"] is CheckStatus.OK
     (request,) = _guest_requests(platforms)
@@ -780,7 +785,7 @@ async def test_a_held_embedded_group_acts_as_browser_while_the_switch_is_off() -
     """Its participants get the redirect then, so the browser link is checked like a browser's."""
     platforms = Platforms()
 
-    findings = await _checker(platforms, CONFIG).check_group(EMBEDDED, [EMBEDDED])
+    findings = await _checker(platforms).check_group(EMBEDDED, [EMBEDDED])
 
     (get,) = _gets(platforms)
     assert str(get.url) == "https://w.example/j?launchApp=true"
@@ -793,7 +798,7 @@ async def test_a_refusal_fails_with_the_code_and_no_token_is_in_a_finding() -> N
     platforms = Platforms()
     platforms.guest_status = 403
 
-    findings = await _checker(platforms, ON).check_group(EMBEDDED, [EMBEDDED])
+    findings = await _checker(platforms, page=True).check_group(EMBEDDED, [EMBEDDED])
 
     refused = next(f for f in findings if f.code == "webex.guest_refused")
     assert refused.status is CheckStatus.FAIL
@@ -802,20 +807,18 @@ async def test_a_refusal_fails_with_the_code_and_no_token_is_in_a_finding() -> N
 
 
 @pytest.mark.parametrize(
-    ("group", "config"),
+    ("group", "page"),
     [
-        (EMBEDDED, CONFIG),  # the switch is off: no guest is made at the supplier
-        (GROUP, ON),  # the switch is on, but this service did not choose the page
-        (replace(GROUP, join_client=JoinClient.CHOICE), ON),
+        (EMBEDDED, False),  # the switch is off: no guest is made at the supplier
+        (GROUP, True),  # the switch is on, but this service did not choose the page
+        (replace(GROUP, join_client=JoinClient.CHOICE), True),
     ],
 )
 @pytest.mark.usefixtures("wxcc_ok")
-async def test_any_other_group_creates_no_guest_and_sees_no_finding(
-    group: Any, config: CheckerConfig
-) -> None:
+async def test_any_other_group_creates_no_guest_and_sees_no_finding(group: Any, page: bool) -> None:
     platforms = Platforms()
 
-    findings = await _checker(platforms, config).check_group(group, [group])
+    findings = await _checker(platforms, page=page).check_group(group, [group])
 
     assert _guest_requests(platforms) == []
     assert not [f for f in findings if f.code.startswith("webex.guest")]
@@ -838,8 +841,8 @@ async def test_the_probe_meetings_of_a_group_that_uses_the_call_page_have_no_cha
     the trial probe; a service that did not choose the page keeps the chat as before."""
     on, off = Platforms(), Platforms()
 
-    await _checker(on, ON).check_group(EMBEDDED, [EMBEDDED])
-    await _checker(off, ON).check_group(GROUP, [GROUP])
+    await _checker(on, page=True).check_group(EMBEDDED, [EMBEDDED])
+    await _checker(off, page=True).check_group(GROUP, [GROUP])
 
     bodies = _meeting_bodies(on)
     assert len(bodies) == 3  # the booking's probe, the trial's, the captions'
@@ -852,7 +855,7 @@ async def test_the_probe_meetings_of_a_group_that_uses_the_call_page_have_no_cha
 async def test_a_site_that_keeps_closed_captions_is_ok() -> None:
     platforms = Platforms()
 
-    findings = await _checker(platforms, ON).check_group(EMBEDDED, [EMBEDDED])
+    findings = await _checker(platforms, page=True).check_group(EMBEDDED, [EMBEDDED])
 
     assert _codes(findings)["webex.captions_ok"] is CheckStatus.OK
     asked = [
@@ -872,7 +875,7 @@ async def test_a_site_without_closed_captions_is_a_warning(stored: bool | None, 
     platforms = Platforms()
     platforms.captions_stored = stored
 
-    findings = await _checker(platforms, ON).check_group(EMBEDDED, [EMBEDDED])
+    findings = await _checker(platforms, page=True).check_group(EMBEDDED, [EMBEDDED])
 
     assert _codes(findings)[code] is CheckStatus.WARN
     assert "webex.captions_ok" not in _codes(findings)
@@ -883,7 +886,7 @@ async def test_a_refused_captions_probe_is_a_warning_and_never_a_failure() -> No
     platforms = Platforms()
     platforms.captions_status = 400
 
-    findings = await _checker(platforms, ON).check_group(EMBEDDED, [EMBEDDED])
+    findings = await _checker(platforms, page=True).check_group(EMBEDDED, [EMBEDDED])
 
     refused = next(f for f in findings if f.code == "webex.captions_refused")
     assert refused.status is CheckStatus.WARN
@@ -892,16 +895,16 @@ async def test_a_refused_captions_probe_is_a_warning_and_never_a_failure() -> No
 
 
 @pytest.mark.parametrize(
-    ("group", "config"),
-    [(EMBEDDED, CONFIG), (GROUP, ON), (replace(GROUP, join_client=JoinClient.CHOICE), ON)],
+    ("group", "page"),
+    [(EMBEDDED, False), (GROUP, True), (replace(GROUP, join_client=JoinClient.CHOICE), True)],
 )
 @pytest.mark.usefixtures("wxcc_ok")
 async def test_any_other_group_sends_no_captions_probe_and_sees_no_finding(
-    group: Any, config: CheckerConfig
+    group: Any, page: bool
 ) -> None:
     platforms = Platforms()
 
-    findings = await _checker(platforms, config).check_group(group, [group])
+    findings = await _checker(platforms, page=page).check_group(group, [group])
 
     assert not [f for f in findings if f.code.startswith("webex.captions")]
     assert not [
@@ -914,8 +917,36 @@ async def test_a_captions_probe_that_cannot_be_deleted_is_a_warning_naming_it() 
     platforms = Platforms()
     platforms.delete_status = 500
 
-    findings = await _checker(platforms, ON).check_group(EMBEDDED, [EMBEDDED])
+    findings = await _checker(platforms, page=True).check_group(EMBEDDED, [EMBEDDED])
 
     left = next(f for f in findings if f.code == "webex.captions_left")
     assert left.status is CheckStatus.WARN
     assert ("meeting", "probe-1") in left.params
+
+
+@pytest.mark.parametrize("status", [400, 403, 404])
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_refused_base_probe_sends_no_captions_probe_and_gives_no_captions_finding(
+    status: int,
+) -> None:
+    """The captions probe is a second create call: when the first was refused it would only
+    repeat the cause (and one more request), so it is left out."""
+    platforms = Platforms()
+    platforms.host_status = status
+
+    findings = await _checker(platforms, page=True).check_group(EMBEDDED, [EMBEDDED])
+
+    assert not [f for f in findings if f.code.startswith("webex.captions")]
+    assert len(_meeting_bodies(platforms)) == 1  # the base probe only: no second create call
+    assert any(f.status is CheckStatus.FAIL for f in findings if f.code.startswith("webex."))
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_group_without_a_host_sends_no_captions_probe() -> None:
+    platforms = Platforms()
+    bare = replace(EMBEDDED, video_host_email=None)
+
+    findings = await _checker(platforms, page=True).check_group(bare, [bare])
+
+    assert _codes(findings)["webex.no_host"] is CheckStatus.WARN
+    assert _meeting_bodies(platforms) == []

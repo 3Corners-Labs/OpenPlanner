@@ -442,7 +442,9 @@ toch de keuze tussen app en browser, zet het dan op **Webex laat de deelnemer ki
 Een dienst die de gesprekspagina gebruikt krijgt vergaderingen zonder de eigen chat van het
 videoplatform (ook het proefgesprek), omdat de chat naast de pagina van onszelf is. Het
 proefgesprek van zo'n dienst opent op de gesprekspagina. De koppelingscontrole meldt voor zo'n
-dienst ook of de site ondertitels aanhoudt (een waarschuwing als dat niet zo is). *Gesprek* als soort
+dienst ook of de ondertitelingsoptie (closed captions) van de site aanstaat (een waarschuwing
+als dat niet zo is). Dat zegt niet of live ondertiteling in de gesprekspagina werkt: dat
+probeert u in een echt gesprek. *Gesprek* als soort
 taak kan alleen worden gekozen voor een dienst die de gesprekspagina gebruikt; zolang de dienst
 die niet gebruikt, worden er werkitems gemaakt.
 

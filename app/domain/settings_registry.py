@@ -2498,9 +2498,10 @@ REGISTRY: tuple[SettingSpec, ...] = (
         None,
         _D,
         T.DISPLAY,
-        "The address of the organisation's privacy statement: an https address of at most "
-        "2,048 characters, linked from the call page's line about the external video service "
-        "(ADR 0123 point 5). Empty: the page shows the line without a link.",
+        "The address of the organisation's privacy statement: an https address with a host name "
+        "(not an IP address or localhost) of at most 2,048 characters, linked from the call page's "
+        "line about the external video service (ADR 0123 point 5). Empty: the page shows the "
+        "line without a link.",
         optional=True,
         https_only=True,
     ),

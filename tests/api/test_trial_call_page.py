@@ -151,7 +151,8 @@ async def test_a_trial_call_of_a_service_that_did_not_choose_the_page_keeps_the_
 async def test_opening_the_page_is_recorded_on_the_timeline_without_the_link(site: Site) -> None:
     await site.open_trial()
 
-    await site.client.get(f"{site.base}/test/call")
+    for _ in range(3):  # a reload loop adds no row: once per trial call
+        await site.client.get(f"{site.base}/test/call")
 
     app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
     async with app.state.engine.connect() as conn:
@@ -160,6 +161,14 @@ async def test_opening_the_page_is_recorded_on_the_timeline_without_the_link(sit
         events = await tx.get_booking_events(booking_id)
     joined = [e for e in events if e.kind is EventKind.TRIAL_JOINED]
     assert [e.detail for e in joined] == ["embedded"]
+    # A second trial call is a new one: its first opening is recorded again.
+    site.clock.advance(timedelta(minutes=31))
+    await site.open_trial()
+    await site.client.get(f"{site.base}/test/call")
+    await site.client.get(f"{site.base}/test/call")
+    async with SqlUnitOfWork(app.state.engine).read() as tx:
+        again = await tx.get_booking_events(booking_id)
+    assert [e.detail for e in again if e.kind is EventKind.TRIAL_JOINED] == ["embedded"] * 2
     assert all(TRIAL_LINK not in (e.detail or "") for e in events)
 
 
@@ -286,3 +295,34 @@ async def test_the_trial_and_the_appointment_share_one_guest(site: Site) -> None
 
     assert len(subjects) == 1
     assert len(site.video.created) == 1  # the appointment's own meeting is not made here
+
+
+async def test_the_page_words_of_a_trial_call_never_send_the_participant_to_an_appointment(
+    site: Site,
+) -> None:
+    """The back link says where it leads (2.4.4) and the states a trial can end in are its own."""
+    await site.open_trial()
+
+    english = (await site.client.get(f"{site.base}/test/call?lang=en")).text
+    dutch = (await site.client.get(f"{site.base}/test/call?lang=nl")).text
+
+    for text, back, not_open, deleted in (
+        (
+            english,
+            "Back to the trial call page",
+            "The trial call is no longer open.",
+            "The data of this trial call is deleted together with the rest of your appointment",
+        ),
+        (
+            dutch,
+            "Terug naar de proefgesprekpagina",
+            "Het proefgesprek is niet meer geopend.",
+            "De gegevens van dit proefgesprek worden samen met de rest van uw afspraak verwijderd",
+        ),
+    ):
+        assert text.count(f'href="{site.base}/test">{back}</a>') == 3  # left, ended, the foot
+        assert not_open in text
+        assert deleted in text
+        assert "Back to your appointment" not in text
+        assert "Terug naar uw afspraak" not in text
+        assert "Check the time of your appointment" not in text
