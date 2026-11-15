@@ -21,6 +21,7 @@ from app.web.cookies import cookie_for
 from app.web.locale import LANG_PARAM
 from app.web.security_policy import DEFAULT_PERMISSIONS_POLICY
 from tests.support.idp_route import (
+    CADDYFILE,
     REPO,
     ROUTE,
     detour_pattern,
@@ -240,6 +241,21 @@ def test_a_detour_that_means_a_public_path_only_once_decoded_is_refused(
     """Point 1: Caddy matches the decoded, cleaned path and forwards the raw one."""
     assert bool(re.search(detour_pattern(), path)) is refused
     assert ROUTE.index("handle @detour") < ROUTE.index("handle @login")
+
+
+def test_the_proxy_logs_no_request() -> None:
+    """Paths carry management tokens and Keycloak's action tokens: the proxy keeps no access log,
+    no debug level, and its error route on the https site, where Caddy logs an error the route
+    handled at debug (ADR 0126 *Consequences*, the threat model's row on proxy logs)."""
+    for text in (CADDYFILE, ROUTE):
+        assert not re.search(r"^\s*(log|debug)\b", text, re.MULTILINE)
+    https = CADDYFILE.index("\n{$TLS_DOMAIN}:8443 {")
+    assert CADDYFILE.count("handle_errors {") == 1
+    assert (
+        CADDYFILE.index("handle_errors {")
+        > https
+        > CADDYFILE.index("\nhttp://{$TLS_DOMAIN}:8080 {")
+    )
 
 
 def test_every_answer_the_proxy_makes_itself_carries_the_portals_own_headers() -> None:
