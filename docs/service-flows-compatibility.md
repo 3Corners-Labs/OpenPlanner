@@ -174,8 +174,10 @@ gated paths.
   for the previous supported image on the expanded database after the new image has written new
   records. v0.6.0 is the first release with a fixture; `scripts/upgrade-matrix.sh
   rollback-release` started its public image on its fixture plus the gated records without a
-  downgrade, booked on `/g/demo` and compared the database (2026-11-15). The claim half needs a
-  signed-in agent and is checklist G43. The tests above prove the same at the schema level with
+  downgrade, booked on `/g/demo` and compared the database (2026-11-15). The claim half (checklist
+  G43, #896) runs the image's own `claim_booking` on the expanded database: once, refused twice,
+  refused on work the current code holds, and read back; the route and a booking with an open
+  contact-center attempt are G44. The tests above prove the same at the schema level with
   the current code. The image that may open the gate is the first minor after 0.6.0 (ADR 0122,
   consequences).
 - *A refused downgrade was not atomic* (fixed in this step). Alembic's SQLite default commits
@@ -229,7 +231,7 @@ legacy paths). A row whose proof needs a released image or a browser names its c
 | A27 | Completion and no-show reports from explicit evidence only | n/a | `tests/domain/test_request_work.py::test_start_and_complete_release_the_unit_once_and_complete_the_booking`; the reports: `tests/domain/test_slot_close.py::test_a_pool_booking_is_completed_only_by_the_operators_explicit_evidence` |
 | A28 | Archiving a referenced flow, skill or pool blocks new use, keeps history | n/a | skill keeps binding accepted work: `tests/domain/test_queue_skills.py::test_an_archived_skill_still_binds_accepted_work`; skill not newly chosen: `tests/domain/test_configuration_v1_skills.py::test_a_pool_may_keep_an_archived_skill_but_never_newly_choose_one`; pool not newly chosen: `tests/domain/test_service_flows.py::test_an_archived_pool_may_stay_but_is_not_newly_chosen`; flow never the default: `tests/domain/test_flow_resolution.py::test_an_archived_flow_is_never_the_default` (partly: that a booking made under a flow keeps its revision after the flow is archived is asserted only for a newer revision, A23) |
 | A29 | Configuration export and import keep identities, mappings, revisions | n/a | `tests/adapters/db/test_config_flows.py::test_export_import_export_gives_the_same_document` |
-| A30 | The previous image on the expanded schema: book and claim stay safe | n/a | `tests/test_upgrade_train.py::test_the_previous_image_writes_and_the_current_code_reads_and_claims_it`, `tests/adapters/db/test_gated_records.py::test_with_the_gate_shut_demo_books_at_the_time_the_pool_bookings_hold`; with an image: `scripts/upgrade-matrix.sh rollback IMAGE`; with the released v0.6.0 image and its fixture, run on 2026-11-15 (the claim half is checklist G43): checklist G07 |
+| A30 | The previous image on the expanded schema: book and claim stay safe | n/a | `tests/test_upgrade_train.py::test_the_previous_image_writes_and_the_current_code_reads_and_claims_it`, `tests/adapters/db/test_gated_records.py::test_with_the_gate_shut_demo_books_at_the_time_the_pool_bookings_hold`; with an image: `scripts/upgrade-matrix.sh rollback IMAGE`; with the released v0.6.0 image and its fixture, run on 2026-11-15: checklist G07; the claim in the previous image's own code, `scripts/upgrade-matrix.sh rollback` (`scripts/rollback_claim.py`) and `tests/test_upgrade_train.py::test_the_previous_releases_own_claim_is_safe_on_the_expanded_schema`: checklist G43; through its route and on an open contact-center attempt: not proven, G44 |
 | A31 | A ticket number does not enumerate requests | open | `tests/api/test_immediate_pages.py::test_a_request_is_taken_in_and_shown_by_its_cookie` (partly: a random reference and a cookie, refused the same for a stranger and an unknown reference; no public display exists, follow-up row 20) |
 | A32 | Dutch and English, keyboard, scripts off, narrow screen | open | `tests/api/test_immediate_pages.py::test_a_retried_post_and_a_second_visit_give_the_same_request` (partly: the pages work as plain forms without script; English, keyboard, narrow screen and axe in the browser are checklist G06) |
 | A33 | Never checked in and never claimed requests expire and are deleted | open | `tests/domain/test_immediate_requests.py::test_an_immediate_record_is_deleted_end_to_end` |
