@@ -161,10 +161,10 @@ BLOCKS = (
         "B7",
         Family.CORE,
         "Gespreksregie",
-        "meeting, belpagina, work item, tijdlijn, controle",
+        "meeting, embedded call, work item, tijdlijn, controle",
         "Meeting aanmaken namens de host van de groep, work item naar WxCC op T-dispatch, "
         "ondertekende webhooks terug, tijdlijn en gespreksstatus per boeking met de reden van de "
-        "provider; groepscontrole met een proef-work item. De belpagina laat de deelnemer in een "
+        "provider; groepscontrole met een proef-work item. De embedded call laat de deelnemer in een "
         "eigen pagina bellen: het videoplatform blijft afgeschermd en de huisstijl blijft die van "
         "de organisatie. Als huls gebouwd op de Webex Meetings SDK; een on-premises platform zoals "
         "Cisco Meeting Server is verkend.",
@@ -314,8 +314,8 @@ EXTERNALS = (
     External("Mailprovider", "SMTP per organisatie · B6"),
     External("SMS-gateway", "vandaag Webex Connect · B6"),
     External("DNS", "TXT-controle afzenderdomein · B6"),
-    External("Webex Meetings", "meeting, belpagina, webhooks · B7"),
-    External("Cisco Meeting Server", "verkend: on-premises, web-app in de belpagina · B7", True),
+    External("Webex Meetings", "meeting, embedded call, webhooks · B7"),
+    External("Cisco Meeting Server", "verkend: on-premises, web-app in de embedded call · B7", True),
     External("Webex Contact Center", "work item, taakevents · B7"),
     External("Identity provider", "per organisatie of meegeleverde Keycloak · B17"),
     External("Logplatform", "syslog, Splunk, Elastic of HTTP"),
@@ -614,7 +614,7 @@ LANES = (
         "verkend, nog geen adapter",
         "HTTPS REST, Call Bridge API<br>events via WebSocket of CDR",
         "Cisco Meeting Server",
-        "on-premises; web-app ingebed in de belpagina",
+        "on-premises; web-app ingebed in de embedded call",
         "ruimte per afspraak met secret en pincode",
         "gastlink · binnenkomst en vertrek uit de events",
         planned=True,
