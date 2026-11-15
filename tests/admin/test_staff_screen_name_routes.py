@@ -7,7 +7,7 @@ import pytest
 
 from app.config import Settings
 from app.domain.entitlements import LoginClaims
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AUDITOR,
     GROUP_ADMIN,
     ORG_ADMIN,
@@ -15,9 +15,10 @@ from tests.admin.conftest import (
     SAME_ORIGIN,
     SUPER,
     Site,
-    _running_site,
+    audit_rows,
+    running_site,
 )
-from tests.support.screen_names import audit_rows, id_of, login_each, stored
+from tests.support.screen_names import id_of, login_each, stored
 from tests.support.skill_seed import add_skill, limit
 
 NAME = "Gina"
@@ -236,7 +237,7 @@ async def test_the_mark_is_gone_where_the_organisation_names_by_account_or_by_wo
             headers=SAME_ORIGIN,
         )
         assert saved.status_code == 303
-        await site.client._transport.app.state.live_settings.refresh()  # type: ignore[attr-defined]  # noqa: SLF001
+        await site.app.state.live_settings.refresh()
 
         assert "Geen schermnaam" not in (await site.client.get("/admin/staff")).text
 
@@ -329,7 +330,7 @@ async def test_a_refused_screen_name_leaves_the_stored_skills_and_their_sections
 
 @pytest.fixture
 async def entitled(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
-    async with _running_site(
+    async with running_site(
         settings.model_copy(update={"oidc_claim_mode": "entitlements"}), admin_db
     ) as running:
         yield running

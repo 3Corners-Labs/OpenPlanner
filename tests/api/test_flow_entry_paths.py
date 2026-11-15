@@ -20,8 +20,8 @@ from app.adapters.db.models import (
 from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
 from app.domain.service_flows import FlowState
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import app_client
 from tests.support.domain import NOW
 from tests.support.flows import booking_rows, engine_of, flow_ids, offer_direct_calls, slot_count
 from tests.support.participant import ADA, FRIDAY_0900, SAME_ORIGIN, book

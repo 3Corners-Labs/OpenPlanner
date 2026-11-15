@@ -2,14 +2,13 @@
 
 Both the manager's form on the staff page and the person's own form on *My profile* are tested
 through the same few moves: let people log in (so each has a staff record), find a person's
-number in the staff list, read the stored screen name and read the audit rows of its event.
+number in the staff list and read the stored screen name. The audit rows of its event come
+from ``tests.support.admin_site.audit_rows``.
 """
 
 from sqlalchemy import text
 
-from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.authorization import Scope
-from tests.admin.conftest import Site
+from tests.support.admin_site import Site
 
 
 async def id_of(site: Site, name: str) -> str:
@@ -25,27 +24,9 @@ async def login_each(site: Site, *principals: object) -> None:
         await site.login_as(principal)  # type: ignore[arg-type]
 
 
-async def audit_rows(site: Site) -> list[tuple[str, str, str, str, str | None, str]]:
-    """Return every audit event as (actor, action, outcome, reason, organisation, detail)."""
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    async with SqlUnitOfWork(app.state.engine).read() as tx:
-        found = await tx.list_audit_events(Scope(everything=True), limit=300)
-    return [
-        (
-            e.event.actor,
-            e.event.action,
-            e.event.outcome.value,
-            e.event.reason,
-            e.event.organisation,
-            e.event.detail,
-        )
-        for e in found
-    ]
-
-
 async def stored(site: Site, subject: str) -> str | None:
     """Return the screen name kept for ``subject`` in the database."""
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with app.state.engine.connect() as conn:
         row = await conn.execute(
             text("select screen_name from staff where subject = :s"), {"s": subject}

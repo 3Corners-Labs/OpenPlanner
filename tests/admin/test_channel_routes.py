@@ -14,9 +14,8 @@ from app.admin.channel_routes import (
 )
 from app.domain.channel_settings import SmsProvider
 from app.domain.mail_domain import REASONS, Record, Verdict
-from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
 from tests.fakes.smtp import FakeSmtpServer
-from tests.support.admin_site import audit_events
+from tests.support.admin_site import SAME_ORIGIN, SUPER, Site, audit_events, post_form
 
 PAGE = "/admin/organisations/demo/channels"
 SMTP = {
@@ -38,7 +37,7 @@ SMS = {
 
 
 async def _post(site: Site, path: str, data: dict[str, str]) -> httpx.Response:
-    return await site.client.post(f"{PAGE}/{path}", data=data, headers=SAME_ORIGIN)
+    return await post_form(site, f"{PAGE}/{path}", data)
 
 
 async def test_integrations_page_links_every_organisation(site: Site) -> None:

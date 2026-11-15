@@ -21,8 +21,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from app.adapters.db.config_usage import read_usage
 from app.adapters.db.models import BookingRow, CapacityPoolRow, GroupRow, SlotRow
 from app.adapters.db.uow import SqlUnitOfWork
-from tests.adapters.db.conftest import seed_group
 from tests.support.domain import NOW
+from tests.support.seed_rows import seed_group
 
 ADAPTERS = Path(__file__).parents[3] / "app" / "adapters"
 START = datetime(2026, 1, 5, 8, 0, tzinfo=UTC)

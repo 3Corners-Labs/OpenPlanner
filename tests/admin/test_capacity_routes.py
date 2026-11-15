@@ -15,8 +15,16 @@ from app.domain.capacity_service import FlowRef, PoolLine
 from app.domain.service_flows import FlowState
 from app.i18n import Translator, load_catalogues
 from app.web.locale import RequestLocale
-from tests.admin.conftest import AUDITOR, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
-from tests.support.admin_site import audit_log, site_app, site_uow
+from tests.support.admin_site import (
+    AUDITOR,
+    ORG_ADMIN,
+    OUTSIDER,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+    audit_log,
+    site_uow,
+)
 from tests.support.pool_code import derive_pool_code
 from tests.support.service_flows import flow as make_flow
 from tests.support.service_flows import revision
@@ -466,7 +474,7 @@ async def test_a_pool_stored_without_a_code_shows_a_dash_and_is_edited_with_none
 ) -> None:
     await site.login_as(ORG_ADMIN)
     pool = await add_pool(site, "Loket")
-    engine = site_app(site).state.engine
+    engine = site.app.state.engine
     async with AsyncSession(engine) as session, session.begin():
         await session.execute(update(CapacityPoolRow).values(code=None))
 

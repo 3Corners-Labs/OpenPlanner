@@ -9,8 +9,7 @@ from datetime import timedelta
 import pytest
 
 from app.domain.contact_center import Registration
-from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
-from tests.support.admin_site import site_app
+from tests.support.admin_site import SAME_ORIGIN, SUPER, Site
 from tests.support.contact_center_site import PAGE, _connect, _registrar
 
 ROTATE = f"{PAGE}/contact-center/webhook-secret"
@@ -25,7 +24,7 @@ async def _rotate(site: Site, outcome: Registration) -> str:
 
 
 async def _gap_events(site: Site) -> list[tuple[str, str | None, str]]:
-    audit = await site_app(site).state.admin_service.audit_log(SUPER)
+    audit = await site.app.state.admin_service.audit_log(SUPER)
     return [
         (e.event.reason, e.event.organisation, e.event.detail)
         for e in audit

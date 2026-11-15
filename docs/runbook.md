@@ -991,9 +991,11 @@ only (`127.0.0.1:8080`). From another machine, open a tunnel to it, with that sa
 ssh -L 8080:127.0.0.1:8080 <host>
 ```
 
-Then open `http://127.0.0.1:8080/idp/admin/` (`http://127.0.0.1:8080/admin/` on a host without
-the proxy) and log in as `admin` with `KC_BOOTSTRAP_ADMIN_PASSWORD` from
-`secrets/keycloak.env`. With the proxy, realm `master` must have the loopback as its frontend
+Then open `http://127.0.0.1:8080/idp/admin/master/console/`
+(`http://127.0.0.1:8080/admin/master/console/` on a host without the proxy) and log in as
+`admin` with `KC_BOOTSTRAP_ADMIN_PASSWORD` from `secrets/keycloak.env`. Open that address, not
+the bare `/idp/admin/`: Keycloak redirects the bare path to its public host name, where the
+proxy answers 404. With the proxy, realm `master` must have the loopback as its frontend
 address, or its login form sends the browser to the public address, where the proxy refuses
 it. The installer sets it after every start (run it again after updating the checkout, as for
 every release that changes the host side); it sets nothing while any port of `idp` is published

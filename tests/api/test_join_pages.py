@@ -12,8 +12,8 @@ from app.domain.booking import MeetingRef
 from app.domain.calls import EventKind
 from app.domain.scheduling import JoinClient
 from app.domain.tokens import hash_token
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import app_client
 from tests.support.domain import NOW
 from tests.support.participant import FRIDAY_0900, open_link
 from tests.support.participant import booked as book_and_confirm

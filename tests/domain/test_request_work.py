@@ -16,7 +16,7 @@ from app.domain.queue_service import COMPLETED, STARTED, STARTED_IN_CONFLICT, Qu
 from app.domain.service_requests import HandlingState, WorkItemState
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryTransaction, InMemoryUnitOfWork
-from tests.support.domain import NOW, SLOT_0900
+from tests.support.domain import SLOT_0900
 from tests.support.request_work import (
     ADMIN,
     AGENT,
@@ -31,11 +31,6 @@ from tests.support.request_work import (
     unit_block,
     world,
 )
-
-
-@pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
 
 
 @pytest.fixture

@@ -7,7 +7,7 @@ edits, and a value outside the admin's scope is ignored and not echoed.
 import re
 
 from app.domain.audit import AuditEvent, Outcome
-from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
+from tests.support.admin_site import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
 
 DEMO = ("Demo-acme", "demo", "Demo: videogesprek")
 OTHER = ("Andere acme", "andere-team", "Andere: team")
@@ -175,7 +175,7 @@ async def test_the_widget_fragments_follow_the_same_choice(site: Site) -> None:
 
 
 async def test_the_changes_widget_keeps_only_the_chosen_scope(site: Site) -> None:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     now = site.clock.now()
     async with app.state.admin_service._uow.locked() as tx:  # noqa: SLF001
         await tx.add_audit_event(

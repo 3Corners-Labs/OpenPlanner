@@ -17,7 +17,7 @@ from app.domain.contact_center import TaskKind
 from app.domain.guest_access import GUEST_PROBE
 from app.domain.integration_check import SERVICE_APP_REPORT
 from app.domain.scheduling import JoinClient
-from tests.admin.conftest import OUTSIDER, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import OUTSIDER, SAME_ORIGIN, SUPER, Site
 from tests.support.call_page import set_group
 from tests.support.domain import NOW
 from tests.support.group_settings import SETTINGS_FORM

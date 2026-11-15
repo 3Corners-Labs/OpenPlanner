@@ -6,15 +6,8 @@ from typing import Any
 from app.domain.inbound_gate import Refusal
 from app.domain.integration import EventOutcome
 from app.domain.webhook_ledger import AddressKey, WebhookLedger
-from tests.admin.conftest import Site
-from tests.support.admin_site import site_app
-from tests.support.contact_center_site import (
-    PAGE,
-    SUPPLIER,
-    _call_from,
-    _connect,
-    _set_settings,
-)
+from tests.support.admin_site import Site, set_settings
+from tests.support.contact_center_site import PAGE, SUPPLIER, _call_from, _connect
 
 FORGED = "x" * 43
 
@@ -65,7 +58,7 @@ def _card(page: str) -> str:
 
 async def test_the_counts_are_a_real_table_with_a_caption_and_header_cells(site: Site) -> None:
     await _connect(site)
-    site_app(site).state.integration_service = _Handling(EventOutcome.RECORDED)
+    site.app.state.integration_service = _Handling(EventOutcome.RECORDED)
     await _call_from(site, SUPPLIER)
     await _call_from(site, SUPPLIER)
     await _call_from(site, SUPPLIER, secret=FORGED)
@@ -82,9 +75,9 @@ async def test_the_counts_are_a_real_table_with_a_caption_and_header_cells(site:
 async def test_an_address_the_ledger_could_not_record_shows_the_empty_state(site: Site) -> None:
     """With the ledger full of live, alerted entries a new address has no view at all."""
     await _connect(site)
-    site_app(site).state.integration_service = _Handling(EventOutcome.RECORDED)
-    _set_settings(site, security_event_max_sources=10)
-    ledger: WebhookLedger = site_app(site).state.webhook_ledger
+    site.app.state.integration_service = _Handling(EventOutcome.RECORDED)
+    set_settings(site, security_event_max_sources=10)
+    ledger: WebhookLedger = site.app.state.webhook_ledger
     for index in range(10):
         for _ in range(25):  # past the default threshold: each entry has alerted
             ledger.refused(AddressKey("wxcc", f"other{index}"), Refusal.STALE)

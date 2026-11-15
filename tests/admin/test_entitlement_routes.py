@@ -6,13 +6,19 @@ from contextlib import asynccontextmanager
 import httpx
 import pytest
 
-from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
 from app.domain.audit import Outcome
-from app.domain.authorization import Role, Scope
+from app.domain.authorization import Role
 from app.domain.entitlements import LoginClaims
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site, _running_site
 from tests.fakes.staff_directory import FakeStaffDirectory
+from tests.support.admin_site import (
+    ORG_ADMIN,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+    audit_log,
+    running_site,
+)
 
 SUPERUSER = LoginClaims("sub-root", "Root", entitlements=frozenset({"openplanner:superuser"}))
 TEAM_LEAD = LoginClaims(
@@ -28,7 +34,7 @@ MIXED = LoginClaims(
 @asynccontextmanager
 async def mode_site(settings: Settings, admin_db: str, mode: str) -> AsyncIterator[Site]:
     """The app with ``OIDC_CLAIM_MODE`` set to ``mode``."""
-    async with _running_site(
+    async with running_site(
         settings.model_copy(update={"oidc_claim_mode": mode}), admin_db
     ) as running:
         yield running
@@ -47,27 +53,10 @@ async def shadow(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
 
 
 async def events(site: Site) -> list[tuple[str, str, Outcome, str, str | None, str]]:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    uow = SqlUnitOfWork(app.state.engine)
-    async with uow.read() as tx:
-        found = await tx.list_audit_events(Scope(everything=True), limit=100)
     return [
-        (
-            e.event.actor,
-            e.event.action,
-            e.event.outcome,
-            e.event.reason,
-            e.event.organisation,
-            e.event.detail,
-        )
-        for e in reversed(found)
+        (e.actor, e.action, e.outcome, e.reason, e.organisation, e.detail)
+        for e in await audit_log(site, limit=100)
     ]
-
-
-async def second_client(site: Site) -> httpx.AsyncClient:
-    """Another browser on the same app, for a second session next to ``site.client``."""
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://testserver")
 
 
 async def login(client: httpx.AsyncClient, site: Site, claims: LoginClaims) -> httpx.Response:
@@ -127,7 +116,7 @@ async def test_a1_an_entitlement_login_grants_exactly_its_values(entitled: Site)
 async def test_a9_a12_access_follows_the_idp_value_and_a_change_takes_effect_at_once(
     entitled: Site,
 ) -> None:
-    other = await second_client(entitled)
+    other = entitled.browser().client  # a second session next to ``entitled.client``
     async with other:
         assert (await login(other, entitled, TEAM_LEAD)).status_code == 303
         assert (await other.get("/admin/groups/demo")).status_code == 200
@@ -335,7 +324,7 @@ async def test_the_mapping_page_names_the_own_identity_provider(
     settings: Settings, admin_db: str
 ) -> None:
     configured = settings.model_copy(update={"oidc_discovery_url": DISCOVERY})
-    async with _running_site(configured, admin_db) as running:
+    async with running_site(configured, admin_db) as running:
         await running.login_as(SUPER)
 
         text = (await running.client.get("/admin/idp-mapping")).text
@@ -354,7 +343,7 @@ async def test_the_mapping_page_names_the_bundled_identity_provider(
             "keycloak_admin_url": "http://kc.test/admin/realms/x",
         }
     )
-    async with _running_site(configured, admin_db, directory=FakeStaffDirectory()) as running:
+    async with running_site(configured, admin_db, directory=FakeStaffDirectory()) as running:
         await running.login_as(SUPER)
 
         text = (await running.client.get("/admin/idp-mapping")).text

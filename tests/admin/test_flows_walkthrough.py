@@ -4,8 +4,7 @@ from app.admin.skill_inputs import skill_name
 from app.domain.authorization import CustomRole, Permission, Role
 from app.domain.entitlements import LoginClaims
 from app.domain.skills import Skill
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
-from tests.support.admin_site import site_uow
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site, site_uow
 from tests.support.domain import make_group
 from tests.support.flow_pages import BASE, act, create, create_ready, form_data
 from tests.support.flow_seed import add_flow, add_subjects, publish_flow

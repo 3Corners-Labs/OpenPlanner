@@ -22,7 +22,6 @@ from tests.fakes.persistence import InMemoryUnitOfWork, State
 from tests.support.cross_group import booking_id_methods, refused_as_unknown
 from tests.support.domain import (
     ADA,
-    NOW,
     SLOT_0900,
     SLOT_0930,
     TEST_TOKEN_KEY,
@@ -39,11 +38,6 @@ GROUP_ADMIN = principal("g-1", "G", frozenset({Role.GROUP_ADMIN}), frozenset(), 
 OTHER_TEAM = principal("a-3", "C", frozenset({Role.AGENT}), frozenset(), [("demo", "andere")])
 AUDITOR = principal("u-1", "U", frozenset({Role.AUDITOR}), frozenset({"demo"}), frozenset())
 QUEUE = DispatchKind.OPENPLANNER_QUEUE
-
-
-@pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
 
 
 @pytest.fixture

@@ -14,9 +14,9 @@ from app.adapters.db.engine import create_engine
 from app.adapters.db.models import GroupRow
 from app.cli import _register_webhooks
 from app.config import Settings
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.tokens import ACCESS_TOKEN
 from tests.support.database import migrated_database
+from tests.support.seed_rows import seed_group
 
 HOST = "host-demo@example.nl"
 EVENTS = (

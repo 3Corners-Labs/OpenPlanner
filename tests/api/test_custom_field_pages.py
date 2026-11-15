@@ -17,14 +17,12 @@ from app.adapters.db.models import BookingRow, GroupRow
 from app.adapters.db.uow import SqlUnitOfWork
 from app.config import Settings
 from app.domain.form_fields import Classification, FieldDefinition, FieldType, FormDefinition
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import app_client
 from tests.support.domain import NOW
+from tests.support.participant import ADA, FRIDAY_0900, SAME_ORIGIN
 from tests.support.widget import embed
 
-FRIDAY_0900 = "2026-01-02T08:00:00Z"
-SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
-ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org", "phone": ""}
 SITE = "https://www.acme.example"
 WIDGET = "/api/v1/widget/demo/demo"
 

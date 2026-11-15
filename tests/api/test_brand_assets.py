@@ -12,9 +12,9 @@ from app.domain.branding import Branding, FontFile, FontRef, FontRole, HeaderSty
 from app.domain.scheduling import Organisation
 from app.domain.theme import Theme
 from app.web.branding import theme_css
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.woff2 import make_woff2
+from tests.support.app_client import app_client
 from tests.support.domain import NOW
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x07" * 64

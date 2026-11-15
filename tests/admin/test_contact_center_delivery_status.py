@@ -10,8 +10,7 @@ from app.domain.inbound_gate import Refusal
 from app.domain.integration import EventOutcome
 from app.domain.webhook_ledger import RETRACT_PAUSE, AddressKey, WebhookLedger
 from app.web.webhook_ledger import ALERT_ACTION
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
-from tests.support.admin_site import site_app
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site, set_settings
 from tests.support.contact_center_site import (
     FORM,
     PAGE,
@@ -22,7 +21,6 @@ from tests.support.contact_center_site import (
     _connect,
     _pause,
     _save_networks,
-    _set_settings,
 )
 
 WINDOW = timedelta(minutes=15)
@@ -42,17 +40,17 @@ class _Handling:
 
 
 def _handling(site: Site, outcome: EventOutcome) -> None:
-    site_app(site).state.integration_service = _Handling(outcome)
+    site.app.state.integration_service = _Handling(outcome)
 
 
 def _ledger(site: Site) -> WebhookLedger:
-    ledger: WebhookLedger = site_app(site).state.webhook_ledger
+    ledger: WebhookLedger = site.app.state.webhook_ledger
     return ledger
 
 
 async def _alerts(site: Site) -> list[tuple[str | None, str, str]]:
     """Return ``(organisation, reason, detail)`` of every refusal alert, newest first."""
-    log = await site_app(site).state.admin_service.audit_log(SUPER)
+    log = await site.app.state.admin_service.audit_log(SUPER)
     return [
         (e.event.organisation, e.event.reason, e.event.detail)
         for e in log
@@ -68,7 +66,7 @@ async def _connected_with_alert_at(site: Site, count: int = 5, networks: str = "
     await _connect(site)
     if networks:
         await _save_networks(site, networks)
-    _set_settings(site, webhook_refusal_alert_count=count)
+    set_settings(site, webhook_refusal_alert_count=count)
 
 
 # --- the card ---------------------------------------------------------------------------------
@@ -147,7 +145,7 @@ async def test_the_counts_start_again_with_the_next_window_but_the_last_times_st
 async def test_the_card_shows_the_faults_of_single_calls_by_kind(site: Site) -> None:
     await _connect(site)
     await _save_networks(site, SUPPLIER_RANGE)
-    _set_settings(site, forwarded_allow_ips="*")  # every address could be spoofed
+    set_settings(site, forwarded_allow_ips="*")  # every address could be spoofed
 
     assert await _send(site, SUPPLIER, 2) == [403, 403]
 
@@ -184,7 +182,7 @@ async def test_the_alert_is_a_system_event_for_the_organisation_with_codes_only(
 
     await _send(site, SUPPLIER, 6, secret=FORGED)
 
-    log = await site_app(site).state.admin_service.audit_log(SUPER)
+    log = await site.app.state.admin_service.audit_log(SUPER)
     (alert,) = [e.event for e in log if e.event.action == ALERT_ACTION]
     assert (alert.category, alert.organisation, alert.group) == (Category.SYSTEM, "demo", None)
     for forbidden in (SUPPLIER, STRANGER, FORGED, "client:"):
@@ -261,7 +259,7 @@ async def test_the_threshold_is_the_platform_setting_read_live(site: Site) -> No
     await _send(site, SUPPLIER, 10, secret=FORGED)
     assert await _alerts(site) == []
 
-    _set_settings(site, webhook_refusal_alert_count=5)
+    set_settings(site, webhook_refusal_alert_count=5)
     await _send(site, SUPPLIER, 1, secret=FORGED)
 
     assert len(await _alerts(site)) == 1
@@ -273,7 +271,7 @@ async def test_a_failure_to_write_the_alert_changes_no_answer(site: Site) -> Non
     async def broken(alert: object) -> None:
         raise RuntimeError("the database is gone")
 
-    site_app(site).state.webhook_alert_writer = broken
+    site.app.state.webhook_alert_writer = broken
 
     statuses = await _send(site, SUPPLIER, 8, secret=FORGED)
     signed = await _send(site, SUPPLIER, 1)
@@ -288,13 +286,13 @@ async def test_a_failure_to_write_the_alert_changes_no_answer(site: Site) -> Non
 
 async def test_a_flood_costs_bounded_memory_and_no_database_write_of_its_own(site: Site) -> None:
     await _connect(site)
-    before = len(await site_app(site).state.admin_service.audit_log(SUPER))
+    before = len(await site.app.state.admin_service.audit_log(SUPER))
 
     await _send(site, STRANGER, 60, secret=FORGED)
     for slug in range(40):  # addresses that do not exist: one entry for all of them
         await site.client.post(f"/webhooks/contact-center/webex_cc/nobody{slug}", content=b"{}")
 
-    log = await site_app(site).state.admin_service.audit_log(SUPER)
+    log = await site.app.state.admin_service.audit_log(SUPER)
     new = [e.event.action for e in log[: len(log) - before]]
     assert set(new) <= {"webhook.rejected"}  # the security log's one event per kind and window
     assert len(new) <= 3
@@ -424,7 +422,7 @@ async def test_an_alert_that_could_not_be_written_is_raised_by_the_next_counted_
     site: Site,
 ) -> None:
     await _connected_with_alert_at(site, networks=SUPPLIER_RANGE)
-    state = site_app(site).state
+    state = site.app.state
     working = state.webhook_alert_writer
 
     async def broken(alert: object) -> None:

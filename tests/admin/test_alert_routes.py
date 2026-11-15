@@ -19,8 +19,16 @@ from app.domain.storage import STORAGE_EVENT
 from app.i18n.formatting import placeholders
 from app.web.security_policy import HTML_CSP, SCRIPT_CSP
 from app.web.settings_labels import TLS_FINDING_LABELS
-from tests.admin.conftest import AGENT, AUDITOR, ORG_ADMIN, OUTSIDER, SUPER, Site, _running_site
-from tests.support.admin_site import site_uow
+from tests.support.admin_site import (
+    AGENT,
+    AUDITOR,
+    ORG_ADMIN,
+    OUTSIDER,
+    SUPER,
+    Site,
+    running_site,
+    site_uow,
+)
 from tests.support.queue import own_queue
 from tests.support.top_bar import top_bar_links
 
@@ -233,7 +241,7 @@ async def test_the_overview_loads_the_live_scripts_under_the_script_policy(site:
 @pytest.fixture
 async def quiet_site(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
     changed = settings.model_copy(update={"overview_live_enabled": False})
-    async with _running_site(changed, admin_db) as running:
+    async with running_site(changed, admin_db) as running:
         yield running
 
 

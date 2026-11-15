@@ -8,7 +8,7 @@ import pytest
 from app.admin.api_routes import narrow_clients
 from app.domain.api_access import ApiAccessService
 from app.domain.api_clients import ApiClient, credential_hash
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 
 NEW_CLIENT = {
     "name": "WxCC AI Agent",
@@ -33,7 +33,7 @@ async def register(site: Site) -> tuple[str, str]:
 
 
 def service(site: Site) -> ApiAccessService:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     found: ApiAccessService = app.state.api_access
     return found
 

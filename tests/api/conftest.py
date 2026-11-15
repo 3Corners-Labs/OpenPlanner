@@ -13,9 +13,9 @@ import pytest
 from app.adapters.db.engine import create_engine
 from app.adapters.db.seed import seed_demo
 from app.config import Settings
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.support.agent_api import Agent, agent_api
+from tests.support.app_client import app_client
 from tests.support.database import migrated_database
 from tests.support.domain import NOW
 from tests.support.widget import embed

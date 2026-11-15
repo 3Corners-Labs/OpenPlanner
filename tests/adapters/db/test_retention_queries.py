@@ -11,9 +11,9 @@ from app.domain.authorization import Scope
 from app.domain.booking import BookingStatus
 from app.domain.job_plan import JobType
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW, SLOT_0900, SLOT_0930, TEST_TOKEN_KEY, book
+from tests.support.seed_rows import seed_group
 
 LATER = SLOT_0930 + timedelta(days=3)
 

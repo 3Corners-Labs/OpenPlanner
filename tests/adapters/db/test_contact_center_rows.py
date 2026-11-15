@@ -11,9 +11,9 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef, TaskKind
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW, TEST_TOKEN_KEY, book, webex_routing
+from tests.support.seed_rows import seed_group
 
 WEBEX_CC = ContactCenterKind.WEBEX_CC
 ROUTING = webex_routing("openplanner@example.biz", "openplanner-video", "team-1")

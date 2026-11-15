@@ -14,7 +14,7 @@ import pytest
 
 from app.config import Settings
 from app.web.public_links import PublicRedirectMiddleware
-from tests.conftest import app_client
+from tests.support.app_client import app_client
 
 APP = Path(__file__).resolve().parents[2] / "app"
 PUBLIC = "https://afspraak.example.nl"
