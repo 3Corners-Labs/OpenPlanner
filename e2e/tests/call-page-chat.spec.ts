@@ -436,7 +436,11 @@ test('a refused read keeps what is shown and announces nothing; the wait grows a
   await expect.poll(() => m.reads.length, NEXT).toBeGreaterThan(before);
 
   await expect(messages(page)).toHaveCount(1); // what was shown stays
-  expect((await statuses(page)).length).toBe(said); // and nothing was said about a failure
+  // The polite line says one sentence every 1.5 seconds and may still be saying what the join
+  // queued (the camera, the microphone, being let in), so the count of lines is not the test: no
+  // line that came after the refusal is about the chat or about a failure.
+  const later = (await statuses(page)).slice(said);
+  expect(later.filter((line) => /chat|message|deliver|sent|try again|too fast|not able|refus/i.test(line))).toEqual([]);
   m.readStatus = 0;
   staffSays(m, 'Back again');
   await expect(messages(page)).toHaveCount(2, { timeout: 40_000 }); // a success brings the turns back
