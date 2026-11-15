@@ -16,9 +16,9 @@ from app.adapters.diagnostics import CheckResult, passed, probes, run_checks
 from app.adapters.vendored_files import STATIC_VENDOR, FileTrust, VendoredFile
 from app.adapters.webex_auth import WebexTokens
 from app.adapters.wxcc_config import region_check
+from app.domain.guest_access import GUEST_FACT, GUEST_PROBE
+from app.domain.integration_check import SERVICE_APP_REPORT
 from app.domain.ports import Clock
-
-SERVICE_APP_REPORT = "service_app_check"
 
 NOT_CONFIGURED = CheckResult(
     "token refresh",
@@ -97,10 +97,15 @@ def _sdk_lines(embedded_call_enabled: bool, sdk: VendoredFile | None) -> list[Ch
 
 
 def report_body(results: list[CheckResult], wxcc_checked: bool) -> dict[str, Any]:
-    """Return the report stored for the integrations page."""
+    """Return the report stored for the integrations page.
+
+    Besides the lines it carries the typed fact ``GUEST_FACT`` (the guest probe's line is there
+    and ok), so no reader has to find a line by its name.
+    """
     return {
         "passed": passed(results),
         "wxcc": wxcc_checked,
+        GUEST_FACT: any(r.name == GUEST_PROBE and r.ok for r in results),
         "results": [
             {
                 "name": r.name,

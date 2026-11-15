@@ -269,6 +269,14 @@ SECTIONS = (
                         Permission.RIGHTS_VIEW,
                         "lock",
                     ),
+                    # ADR 0123 step 5d: the own screen name, the name a participant sees.
+                    Screen(
+                        "manage.rights.profile",
+                        "admin.nav.my_profile",
+                        "/admin/rights/profile",
+                        Permission.RIGHTS_VIEW,
+                        "people",
+                    ),
                 ),
             ),
             Screen(
@@ -813,9 +821,28 @@ def _homes() -> dict[str, Home]:
 _HOMES = _homes()
 
 
+ANSWERS_ON: dict[str, str] = {
+    "/admin/rights/profile/screen-name": "/admin/rights/profile",
+    "/admin/staff/{member_id}/screen-name": "/admin/staff/{member_id}",
+    "/admin/staff/{member_id}/skills/{org}": "/admin/staff/{member_id}",
+}
+"""POST routes that answer a refused form with a page (422) at an address that is not the page's.
+
+The register declares pages (GET routes) only, so such a response has no home of its own; it
+takes the home of the page it re-shows, and so keeps its side-navigation entry and its tab row.
+Belongs here: a form whose address differs from the page it answers on. Does not: a form that
+posts to its page's own address (it has the page's home already), or one that only redirects.
+Each key must be a POST route that is no page of the register, each value a registered page
+(``tests/web/test_navigation.py``).
+"""
+
+
 def home_of(route_path: str) -> Home | None:
-    """Return where the route template ``route_path`` lives, or ``None`` if it has no home."""
-    return _HOMES.get(route_path)
+    """Return where the route template ``route_path`` lives, or ``None`` if it has no home.
+
+    A POST route listed in ``ANSWERS_ON`` lives where the page it answers on lives.
+    """
+    return _HOMES.get(ANSWERS_ON.get(route_path, route_path))
 
 
 def screen(key: str) -> Screen:

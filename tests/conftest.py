@@ -1,53 +1,36 @@
-"""Shared fixtures: isolated settings per test, an in-process HTTP client and a mail server."""
+"""Shared fixtures: isolated settings per test, in-process HTTP clients and a mail server.
+
+``site`` is the admin site with the demo data on its own database ``admin_db``; the admin and
+the web tests share it (``tests/api`` has a ``site`` of its own). Its harness is in
+``tests/support/admin_site.py``.
+"""
 
 import smtplib
 import sys
 from collections.abc import AsyncIterator, Iterator
-from contextlib import asynccontextmanager
 from pathlib import Path
-from types import FrameType
 
 import httpx
 import pytest
 from alembic.config import Config
 from pydantic import SecretStr
 
-from app.adapters.integrations import Integrations
 from app.config import Settings
-from app.domain.activity_alert import COUNTED_ACTIONS
-from app.domain.admin import AdminService
-from app.domain.audit import AuditEvent, Outcome
+from app.domain.audit import AuditEvent
 from app.domain.event_context import set_service
 from app.domain.event_schema import detail_problem
 from app.domain.log_events import lookup
-from app.domain.ports import Clock
-from app.main import create_app
 from tests.fakes.smtp import FakeSmtpServer
+from tests.support.admin_site import Site, running_site
+from tests.support.app_client import app_client
+from tests.support.audit_watch import checked_by_its_alert
+from tests.support.database import migrated_database
 from tests.support.git_repository import Git, repository
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = str(ROOT / "app") + "/"
 READ_BACK = APP + "adapters/db/"
 """Where events are built from stored rows; the action was checked when it was written."""
-
-RECORDER = AdminService.record_change.__code__
-"""The one method that may write a success an hourly alert counts: it runs the alert."""
-
-
-def checked_by_its_alert(event: AuditEvent, frame: FrameType | None) -> bool:
-    """Whether ``event`` is no counted success, or is built under ``AdminService.record_change``.
-
-    That method runs the hourly alert right after the event (``app.domain.activity_alert``); a
-    counted success built anywhere else would let a burst pass its threshold unseen. ``frame``
-    is the frame that built the event; the walk goes up the stack from there.
-    """
-    if event.outcome is not Outcome.SUCCESS or event.action not in COUNTED_ACTIONS:
-        return True
-    while frame is not None:
-        if frame.f_code is RECORDER:
-            return True
-        frame = frame.f_back
-    return False
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -118,25 +101,21 @@ def unreachable_db_settings(settings: Settings, tmp_path: Path) -> Settings:
     return settings.model_copy(update={"database_url": f"sqlite+aiosqlite:///{tmp_path}"})
 
 
-@asynccontextmanager
-async def app_client(
-    settings: Settings, clock: Clock | None = None, integrations: Integrations | None = None
-) -> AsyncIterator[httpx.AsyncClient]:
-    """Run the app's lifespan and yield a client that talks to it in-process."""
-    app = create_app(settings, clock, integrations=integrations)
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
-        ) as client,
-    ):
-        yield client
-
-
 @pytest.fixture
 async def client(settings: Settings) -> AsyncIterator[httpx.AsyncClient]:
     async with app_client(settings) as client:
         yield client
+
+
+@pytest.fixture
+def admin_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    return migrated_database(tmp_path, monkeypatch, "admin")
+
+
+@pytest.fixture
+async def site(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
+    async with running_site(settings, admin_db) as running:
+        yield running
 
 
 @pytest.fixture

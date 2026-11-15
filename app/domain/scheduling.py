@@ -25,6 +25,7 @@ from enum import StrEnum
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.domain.branding import Branding
+from app.domain.call_page import OtherWayOffer
 from app.domain.contact_center import ContactCenterRouting
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.routing import SUBJECT_CODE, GroupRouting, offers
@@ -161,12 +162,20 @@ ROOM_ID = re.compile(r"^[A-Za-z0-9_=-]{10,200}$")
 
 
 class JoinClient(StrEnum):
-    """Which Webex page a participant's join link opens (ADR 0075, per group)."""
+    """How a participant of a group gets into the call (ADR 0075, 0123; per group).
+
+    Whoever switches on this enum handles ``EMBEDDED`` explicitly; ``app.domain.call_client`` is
+    the one reader that says which value acts for a booking.
+    """
 
     BROWSER = "browser"
     """The Webex web app straight away; on a computer there is no app to choose or install."""
     CHOICE = "choice"
     """Webex's own page, which offers the app or the browser (the stored link, unchanged)."""
+    EMBEDDED = "embedded"
+    """The call in the organisation's own page (ADR 0123): the participant never leaves it for the
+    video platform, unless the group's ``embedded_call_webex_option`` allows another way. Acts
+    only while the platform switch ``embedded_call_enabled`` is on."""
 
 
 class Offer(StrEnum):
@@ -264,6 +273,10 @@ class Group:
         join_client: Which Webex page the participant's link to the appointment and the trial call
             opens (ADR 0075): the web app straight away (the default) or Webex's own choice
             between app and browser.
+        embedded_call_webex_option: Whether a participant of an embedded call is ever shown a way
+            into the video platform's own app (ADR 0123 point 11, a service's setting from step
+            6a); ``None`` follows the organisation's own value, which every group had before
+            (ADR 0116: written here, read from both for one minor).
         embedding_enabled: Whether the group may appear in the widget on the websites its
             organisation allows (ADR 0035); off until the group switches it on.
         queue_visible_from_minutes: Own queue: how long before its start a booking appears.
@@ -320,6 +333,7 @@ class Group:
     trial_call_minutes: int = DEFAULT_TRIAL_CALL_MINUTES
     trial_calls_per_booking: int = DEFAULT_TRIAL_CALLS_PER_BOOKING
     join_client: JoinClient = JoinClient.BROWSER
+    embedded_call_webex_option: OtherWayOffer | None = None
     embedding_enabled: bool = False
     queue_visible_from_minutes: int = DEFAULT_QUEUE_VISIBLE_FROM_MINUTES
     queue_free_pick_allowed: bool = False

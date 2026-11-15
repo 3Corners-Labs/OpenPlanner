@@ -40,10 +40,9 @@ from app.domain.services import BookingService, ContactInput
 from app.domain.skills import Skill
 from app.domain.staff_directory import DirectoryUser
 from app.domain.updates import Release, ReleaseCheck, Version
-from tests.admin.conftest import GROUP_ADMIN, SUPER, Site
 from tests.fakes.identity import FakeIdentityProvider
 from tests.fakes.staff_directory import FakeStaffDirectory
-from tests.support.admin_site import post_form, site_app, site_uow
+from tests.support.admin_site import GROUP_ADMIN, SUPER, Site, post_form, site_uow
 from tests.support.domain import FRIDAY_0900, NOW, TEST_TOKEN_KEY, book_confirmed
 from tests.support.organisation_providers import NEW_PROVIDER, organisation_claims
 from tests.support.pool_flows import add_pool_flow
@@ -280,7 +279,7 @@ async def mark(site: Site, monkeypatch: pytest.MonkeyPatch) -> Fixture:
             )
         ]
     )
-    site_app(site).state.staff_directory_service._directory = directory  # type: ignore[attr-defined]  # noqa: SLF001
+    site.app.state.staff_directory_service._directory = directory  # type: ignore[attr-defined]  # noqa: SLF001
     async with uow.locked() as tx:
         summary = await tx.get_group_summary("demo")
         assert summary is not None

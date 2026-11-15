@@ -1,12 +1,15 @@
-"""No module under ``tests/`` imports from a test module.
+"""No module under ``tests/`` imports from a test module or from a ``conftest.py``.
 
 Importing a test module brings its fixtures and tests along and couples two tests that should
-run on their own. What several tests share has a home: fakes in ``tests/fakes/``, constants,
-builders and harnesses in ``tests/support/``, fixtures in the nearest ``conftest.py``. The
-source is read, not imported, as ``tests/test_fakes.py`` does.
+run on their own. A ``conftest.py`` is pytest's to load: importing one as a module as well
+gives its fixtures a second way in and lets helpers hide among them. What several tests share
+has a home: fakes in ``tests/fakes/``, constants, builders and harnesses in ``tests/support/``,
+fixtures in the nearest ``conftest.py``, which pytest hands to the tests below it. The source
+is read, not imported, as ``tests/test_fakes.py`` does.
 """
 
 import ast
+from collections.abc import Callable
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,6 +24,11 @@ def _module(path: Path) -> str:
 def _is_test_module(name: str) -> bool:
     """Return whether the dotted ``name`` is a test module or something inside one."""
     return any(part.startswith("test_") for part in name.split("."))
+
+
+def _is_conftest(name: str) -> bool:
+    """Return whether the dotted ``name`` is a ``conftest`` module or something inside one."""
+    return "conftest" in name.split(".")
 
 
 def _plugins(node: ast.AST) -> list[tuple[int, str]]:
@@ -61,6 +69,16 @@ def _imported(source: str, module: str) -> list[tuple[int, str]]:
     return found
 
 
+def _importing(forbidden: Callable[[str], bool]) -> dict[str, str]:
+    """Return, per file and line under ``tests/``, the first ``tests.`` name it may not import."""
+    importing: dict[str, str] = {}
+    for path in sorted(TESTS.rglob("*.py")):
+        for line, name in _imported(path.read_text(encoding="utf-8"), _module(path)):
+            if name.startswith("tests.") and forbidden(name):
+                importing.setdefault(f"{path.relative_to(ROOT)}:{line}", name)
+    return importing
+
+
 def test_every_form_of_import_is_found() -> None:
     source = "\n".join(
         [
@@ -80,11 +98,39 @@ def test_every_form_of_import_is_found() -> None:
     assert {f"tests.api.test_{letter}" for letter in "abcdefh"} <= found
 
 
+def test_every_form_of_conftest_import_is_found() -> None:
+    source = "\n".join(
+        [
+            "import tests.conftest",
+            "from tests.admin.conftest import Site",
+            "from tests.web import conftest",
+            "from .conftest import helper",
+            "from ..domain import conftest",
+            "def later():",
+            "    from tests.scripts.conftest import helper",
+            'pytest_plugins = ["tests.jobs.conftest"]',
+        ]
+    )
+
+    found = {name for _, name in _imported(source, "tests.api.test_g") if _is_conftest(name)}
+
+    assert {
+        f"tests.{package}conftest"
+        for package in ("", "admin.", "web.", "api.", "domain.", "scripts.", "jobs.")
+    } <= found
+    assert not _is_conftest("tests.support.conftest_free")
+
+
 def test_no_module_under_tests_imports_a_test_module() -> None:
-    importing: dict[str, str] = {}
-    for path in sorted(TESTS.rglob("*.py")):
-        for line, name in _imported(path.read_text(encoding="utf-8"), _module(path)):
-            if name.startswith("tests.") and _is_test_module(name):
-                importing.setdefault(f"{path.relative_to(ROOT)}:{line}", name)
+    importing = _importing(_is_test_module)
 
     assert importing == {}, "move what is shared to tests/support/, tests/fakes/ or a conftest.py"
+
+
+def test_no_module_under_tests_imports_a_conftest() -> None:
+    importing = _importing(_is_conftest)
+
+    assert importing == {}, (
+        "move what is shared to tests/support/ or tests/fakes/; "
+        "a fixture reaches the tests below its conftest.py without an import"
+    )

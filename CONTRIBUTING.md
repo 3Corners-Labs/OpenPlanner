@@ -83,7 +83,8 @@ app/
 migrations/    Alembic.
 tests/         mirrors app/; fakes live in tests/fakes/, shared constants, builders and
                harnesses in tests/support/, shared fixtures in the nearest conftest.py.
-               A test module never imports another (tests/test_test_imports.py).
+               Nothing under tests/ imports a test module or a conftest.py
+               (tests/test_test_imports.py).
 ```
 
 ## Writing code

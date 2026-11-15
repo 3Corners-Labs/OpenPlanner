@@ -16,6 +16,7 @@ Called once per worker loop, after the due jobs:
              recovery, deletion of request-level records (ADR 0121 step 5)
     daily ─► retention sweep: purge personal data the purge job missed, alert on a backlog
              ─► purged something? ─► PRAGMA wal_checkpoint(TRUNCATE) (WP-A3)
+    hourly ─► remove the previous webhook secrets whose overlap has ended (ADR 0124 point 8)
 
 The stdout log does not depend on the database: when the disk is full, writing the system
 event may fail, and monitoring must still see the problem. Housekeeping never stops the loop;
@@ -88,6 +89,10 @@ STAFF_EVERY = timedelta(days=1)
 """How often staff records past their retention are erased; the period is a setting."""
 
 
+SECRETS_EVERY = timedelta(hours=1)
+"""How often the previous webhook secrets whose overlap ended are removed (ADR 0124 point 8): the
+rule is the clock at each delivery, so this only tidies, and an hour is plenty."""
+
 BACKUPS_EVERY = timedelta(hours=1)
 """How often update back-ups past their lifetime are deleted (the lifetime is fixed, ADR 0102)."""
 
@@ -121,6 +126,8 @@ class Housekeeping:
             called once per ``ROLLUP_EVERY``.
         watch_requests: The watchdog round of requests (ADR 0121 step 5); called once per
             ``WATCH_EVERY``.
+        drop_secrets: Removes the previous webhook secrets whose overlap has ended and returns the
+            count (ADR 0124 point 8); called once per ``SECRETS_EVERY``.
     """
 
     def __init__(
@@ -140,8 +147,11 @@ class Housekeeping:
         prune_requests: Callable[[], Awaitable[int]] | None = None,
         auto_proposals: Callable[[], Awaitable[int]] | None = None,
         watch_requests: Callable[[], Awaitable[WatchResult]] | None = None,
+        drop_secrets: Callable[[], Awaitable[int]] | None = None,
     ) -> None:
         """Store the collaborators; nothing has been logged, reclaimed or erased yet."""
+        self._drop_secrets = drop_secrets
+        self._secrets_dropped_at: datetime | None = None
         self._watch_requests = watch_requests
         self._requests_watched_at: datetime | None = None
         self._auto_proposals = auto_proposals
@@ -186,6 +196,7 @@ class Housekeeping:
         prune_requests: Callable[[], Awaitable[int]] | None = None,
         auto_proposals: Callable[[], Awaitable[int]] | None = None,
         watch_requests: Callable[[], Awaitable[WatchResult]] | None = None,
+        drop_secrets: Callable[[], Awaitable[int]] | None = None,
     ) -> "Housekeeping":
         """Return housekeeping that measures the SQLite file of ``database_url``."""
         return cls(
@@ -204,6 +215,7 @@ class Housekeeping:
             prune_requests,
             auto_proposals,
             watch_requests,
+            drop_secrets,
         )
 
     async def run(self) -> None:
@@ -218,8 +230,24 @@ class Housekeeping:
         await self._prune_change_requests(now)
         await self._send_auto_proposals(now)
         await self._watch_open_requests(now)
+        await self._drop_previous_secrets(now)
         self._prune_backups(now)
         await self._roll_up_bookings(now)
+
+    async def _drop_previous_secrets(self, now: datetime) -> None:
+        """Remove previous webhook secrets past their overlap, once per ``SECRETS_EVERY``."""
+        if self._drop_secrets is None:
+            return
+        if self._secrets_dropped_at is not None and now - self._secrets_dropped_at < SECRETS_EVERY:
+            return
+        self._secrets_dropped_at = now
+        try:
+            removed = await self._drop_secrets()
+        except Exception as exc:  # never stop the loop over housekeeping
+            log.warning("webhook.previous_secrets_failed", error=type(exc).__name__)
+        else:
+            if removed:
+                log.info("webhook.previous_secrets_removed", connections=removed)
 
     def _prune_backups(self, now: datetime) -> None:
         """Delete update back-ups past their lifetime, at most once per ``BACKUPS_EVERY``."""

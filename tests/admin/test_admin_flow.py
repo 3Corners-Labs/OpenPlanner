@@ -5,7 +5,7 @@ import pytest
 
 from app.domain.audit import Outcome
 from app.domain.authorization import LOCKED_PERMISSIONS, PII_PERMISSIONS
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     GROUP_ADMIN,
     NO_ROLE,
     ORG_ADMIN,
@@ -13,8 +13,9 @@ from tests.admin.conftest import (
     SAME_ORIGIN,
     SUPER,
     Site,
+    audit_events,
 )
-from tests.support.admin_site import audit_events
+from tests.support.app_client import app_client
 from tests.support.principals import legacy_claims
 
 
@@ -350,8 +351,6 @@ async def test_unknown_group_is_a_404(site: Site) -> None:
 
 
 async def test_admin_login_disabled_without_identity_provider(settings) -> None:  # type: ignore[no-untyped-def]
-    from tests.conftest import app_client
-
     async with app_client(settings) as client:
         response = await client.get("/admin/login")
 

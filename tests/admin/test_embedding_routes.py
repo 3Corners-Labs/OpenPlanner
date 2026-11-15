@@ -6,8 +6,7 @@ import httpx
 import pytest
 
 from app.web import widget_bundle
-from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, Site
-from tests.support.admin_site import audit_events
+from tests.support.admin_site import GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, Site, audit_events
 
 PAGE = "/admin/organisations/demo/embedding"
 

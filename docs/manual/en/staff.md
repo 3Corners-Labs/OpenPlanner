@@ -143,7 +143,8 @@ On a staff member's page, under **Screen name**, you set the name the participan
 on the organisation's own call page: next to the staff member's picture, with the organisation's
 own word for staff beside it ("Sanne · agent"), and in the captions. Whoever holds `staff.manage`
 (organisation admins and the superuser) fills it in for the people they see; an empty field removes
-the name.
+the name. A staff member can also set their own screen name, on **My profile** (the topic
+[My profile](my-profile.md)); a manager's change and the person's own change are the same name.
 
 The staff member must not be findable by their account name, so the participant sees a screen name
 and never the account name by default. Choose a **first name or a made-up name**, not the full name.

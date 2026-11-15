@@ -17,6 +17,10 @@ Behaviour is set through files in ``FAKE_HOST_DIR``:
 - ``edge-ipv6``: whether the project's ``edge`` network has IPv6, as ``docker network inspect``
   says (default ``true``).
 - ``latest``: the tag of the latest GitHub release (default none: the API call fails).
+- ``idp-container``: what ``docker compose ps -q idp`` prints (default ``IDP``); an empty file
+  is a provider that is not running (ADR 0126).
+- ``idp-ports``: what ``docker port`` prints for that container, one binding per line (default
+  ``IDP_PORT``, the loopback of docker-compose.yml).
 - ``min-upgrade-from``: the ``MIN_UPGRADE_FROM`` every image's configuration carries (ADR
   0116; default none); ``fail`` may list ``upgrade-path-check`` (a database too old).
 - ``images``: the images on the host, one ``repository:tag`` per line, or ``repository@digest``
@@ -33,9 +37,11 @@ Behaviour is set through files in ``FAKE_HOST_DIR``:
   CLI's ``Refused (...)`` or ``REFUSED ...`` lines.
   ``config plan`` prints one change and the plan hash ``PLAN_HASH``; ``config apply`` refuses
   any other ``--plan-hash`` with ``configuration_plan_stale``.
-- ``idp-stdin.jsonl`` (written, not read): every ``compose exec -T idp sh -c SCRIPT`` with what
-  reached it on stdin, where the installer hands Keycloak's admin CLI its values (ADR 0125
-  step 2); ``fail`` may list ``idp-secrets`` (Keycloak refuses the new client secrets).
+- ``idp-stdin.jsonl`` (written, not read): every ``compose exec -T idp sh KCADM_AS_ADMIN ARGS``
+  (kcadm.sh as realm master's admin, ADR 0126) with its ARGS and what reached it on stdin, where
+  the installer hands Keycloak's admin CLI its values (ADR 0125 step 2). ``get clients`` prints
+  ``id-of-<clientId>``; ``fail`` may list ``idp-exec`` (every call exits 1: Keycloak never
+  answers) or ``idp-secrets`` (Keycloak refuses a client's new secret).
 
 ``apt-get``, ``usermod`` and ``systemctl`` only record their call; ``curl -o`` writes a small
 stand-in for the downloaded file, with a matching checksum unless ``fail`` lists ``checksum``.
@@ -60,6 +66,11 @@ CONFIG_ENV = (
 CONFIG_SUMMARY = "configuration imported\norganisations       2\ngroups              3\n"
 PLAN_HASH = "ab" * 32
 PROXY = "proxy-container-id"
+IDP = "idp-container-id"
+IDP_PORT = "8080/tcp -> 127.0.0.1:8080"
+"""What `docker port` prints for the bundled provider of docker-compose.yml (ADR 0126)."""
+KCADM_AS_ADMIN = "/opt/openplanner/kcadm-as-admin.sh"
+"""Where docker-compose.yml mounts deploy/keycloak/kcadm-as-admin.sh in the provider (ADR 0126)."""
 COSIGN = "3.1.4"
 # The releases the fake registry knows, so an image's digest can be mapped back to the version
 # baked into it (``APP_VERSION``, read by the installer; ADR 0064 step 2).
@@ -80,6 +91,11 @@ def _host() -> Path:
 def _lines(name: str) -> list[str]:
     path = _host() / name
     return path.read_text().splitlines() if path.exists() else []
+
+
+def _given(name: str, default: list[str]) -> list[str]:
+    """Return the lines of switch ``name``, or ``default`` while the test has not written it."""
+    return _lines(name) if (_host() / name).exists() else default
 
 
 def _pin(key: str) -> str:
@@ -154,18 +170,29 @@ def _document(args: list[str]) -> int:
     return 0
 
 
-def _idp(script: str) -> int:
-    """Handle ``compose exec -T idp sh -c SCRIPT``: record the script and its stdin."""
+def _idp(command: list[str]) -> int:
+    """Handle ``compose exec -T idp sh KCADM_AS_ADMIN ARGS``: record ARGS and their stdin."""
+    if command[:2] != ["sh", KCADM_AS_ADMIN]:
+        sys.stderr.write(f"the fake idp container runs only {KCADM_AS_ADMIN}\n")
+        return 2
+    args = command[2:]
     with (_host() / "idp-stdin.jsonl").open("a") as log:
-        log.write(json.dumps({"script": script, "stdin": sys.stdin.read()}) + "\n")
-    return _failing("idp-secrets") if "get clients" in script else 0
+        log.write(json.dumps({"args": args, "stdin": sys.stdin.read()}) + "\n")
+    if _failing("idp-exec"):
+        return 1
+    if args[:2] == ["get", "clients"]:
+        query = args[args.index("-q") + 1]
+        print(f"id-of-{query.removeprefix('clientId=')}")
+    elif args[:1] == ["update"] and args[1].startswith("clients/"):
+        return _failing("idp-secrets")
+    return 0
 
 
 def _compose(args: list[str]) -> int:
     """Handle ``docker compose --project-directory D --env-file F <command>``."""
     command = args[5:]
-    if command[:3] == ["exec", "-T", "idp"]:
-        return _idp(command[-1])
+    if command[:3] == ["exec", "-T", "idp"]:  # kcadm.sh inside the bundled provider
+        return _idp(command[3:])
     if command[:3] == ["exec", "-T", "web"]:
         command = command[3:]
     elif command[:1] == ["run"] and "web" in command:
@@ -176,6 +203,9 @@ def _compose(args: list[str]) -> int:
         print(WEB)
     elif command == ["ps", "-q", "proxy"]:
         print(PROXY)
+    elif command == ["ps", "-q", "idp"]:
+        for line in _given("idp-container", [IDP]):
+            print(line)
     elif command[:2] == ["alembic", "current"]:
         print(f"{(_host() / 'revision').read_text().strip()} (head)")
     elif command[:2] == ["alembic", "downgrade"]:
@@ -214,6 +244,9 @@ def _docker(args: list[str]) -> int:
         return _compose(args)
     elif args[0] == "info":
         return _failing("docker-info")
+    elif args[:2] == ["port", IDP]:  # every address the bundled provider is published on
+        for line in _given("idp-ports", [IDP_PORT]):
+            print(line)
     elif args[0] == "version":
         print(next(iter(_lines("engine-version")), "29.1.3"))
     elif args[:2] == ["network", "inspect"] and args[-1] == f"{PROJECT}_edge":

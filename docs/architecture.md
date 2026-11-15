@@ -139,7 +139,7 @@ flowchart TB
     worker -- "directory API, http, fixed address on edge (ADR 0125)" --> keycloak
     keycloak <--> idpdata
     keycloak -- "PostgreSQL, internal network idp-store, fixed address (ADR 0125)" --> idpdb
-    proxy -- "/idp route (ADR 0112), http, fixed address on edge (ADR 0125)" --> keycloak
+    proxy -- "/idp route: the login only (ADR 0112, 0126), http, fixed address on edge (ADR 0125)" --> keycloak
     web -- https --> cisco
     worker -- https --> cisco
     web -- "syslog+tls or https" --> logs
@@ -160,6 +160,9 @@ flowchart TB
   on its own, or serves an own certificate from `./certs`; port 80 only redirects. It runs as
   uid 10001 on a read-only filesystem, keeps certificates in the `proxy-data` volume and has a
   fixed address on the `edge` network, the only address `web` accepts `X-Forwarded-For` from.
+  It hands web one address, the visitor's: the peer, or behind an edge named in
+  `PROXY_TRUSTED_NETWORKS` the first untrusted address of its `X-Forwarded-For`, read right to
+  left (ADR 0129, the proxy as the security shell).
   `edge` is dual-stack, so Docker forwards visitors over IPv6 to the proxy with NAT and their
   own address reaches the rate limits; web listens on IPv4 only, so the proxy reaches it from
   that one trusted address.
@@ -177,7 +180,10 @@ flowchart TB
   Keycloak runs next to `web`; staff are managed in it from the portal (ADR 0095). In a lab
   without a public name the proxy can issue its certificates from its own certificate authority
   (`TLS_INTERNAL=true`, ADR 0112), publish the root for download on *System status*, and serve
-  Keycloak under `/idp` on the same https address.
+  Keycloak under `/idp` on the same https address; the installer writes `IDP_UPSTREAM` (ADR
+  0112 step 6). The route passes only the login of realm `openplanner` and its assets, keeps the
+  portal's cookies from Keycloak and drops what an answer could do to the whole origin; the
+  admin console is on the host's loopback (ADR 0126).
 - **Every hop with personal data is encrypted, or a recorded exception (ADR 0091).** The
   exceptions are all on one host: the bundled proxy to `web` on the `edge` network (ADR 0091),
   and the hops to the bundled Keycloak from `web` and `worker` and from the proxy, and from

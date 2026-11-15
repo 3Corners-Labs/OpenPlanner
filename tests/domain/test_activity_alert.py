@@ -14,10 +14,10 @@ from app.domain.activity_alert import ALERTS, CHANGES_ALERT, REVEALS_ALERT, aler
 from app.domain.admin import AdminService, record_change
 from app.domain.audit import AuditEvent, Outcome
 from app.domain.authorization import Permission
-from tests.conftest import checked_by_its_alert
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import GROUP_ADMIN
+from tests.support.audit_watch import checked_by_its_alert
 from tests.support.domain import NOW
 
 

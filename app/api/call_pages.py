@@ -2,9 +2,11 @@
 
 This route is the one place that serves the call page's response policy, which lets the page
 reach the call's hosts and use camera, microphone and screen sharing (``app.web.security_policy``,
-applied by ``participant_call_page``). It exists only while ``embedded_call_enabled`` is on;
-while it is off the route answers as an address that does not exist, so nothing about the
-feature shows on an installation that does not use it.
+applied by ``participant_call_page``). It exists only while ``embedded_call_enabled`` is on and
+only for a booking of a service that chose it (``join_client = embedded``, ADR 0123 step 6a;
+``app.domain.call_client.uses_call_page`` is the one question every route asks). Otherwise the
+route answers as an address that does not exist, so nothing about the feature shows on an
+installation, or for a service, that does not use it.
 
 Up to the click that joins (step 4b) the page works with the browser alone: the start state
 (the appointment and one button), the device check and what a refused permission needs. It loads
@@ -20,7 +22,8 @@ leads to the state that says the call is not available in this page, with what
 The markup also carries the two connection values (``embedded_call_connect_seconds`` and
 ``embedded_call_connect_attempts``); the script reads them from there and has no number of its own.
 
-    GET  /b/m/{ref}/call         the call page (404 while the feature is off)
+    GET  /b/m/{ref}/call         the call page (404 while the feature is off or for another
+                                 service's booking)
     POST /b/m/{ref}/call/token   the guest token for the click that joins (ADR 0123 point 6)
     GET  /b/m/{ref}/call/staff   who the participant talks to (ADR 0123 step 5c)
 
@@ -36,7 +39,8 @@ put in a URL, an event or a job. Answers:
     200  the token
     403  no session for this booking, or a cross-site post (a booking that does not exist or is
          not theirs answers alike)
-    404  the switch is off (an address that does not exist)
+    404  the switch is off, or the booking's service did not choose the call page (an address
+         that does not exist)
     409  ``{"error": "not_open"}``: not confirmed, not in the window, or no meeting
     429  ``{"error": "rate_limited"}`` with ``Retry-After``, from either limit
     503  ``{"error": "unavailable"}``: the platform refused or cannot be reached
@@ -56,9 +60,11 @@ for the setting ``term``, for a staff member without a screen name and after the
 (which deletes the claim); the staff table is never scanned per request
 (``app.domain.staff_screen_names``).
 
-Until step 6 gives a service its ``join_client = embedded`` the endpoint is dark behind the
-platform switch alone: any booking of an installation that turned the switch on may ask, which
-step 6 narrows to a service that uses the call page.
+Order of the refusals, so that an outsider learns nothing about a service: the switch first
+(before anything is looked up, the same answer for every address), then the participant's session
+for the booking (an outsider gets the site's usual refusal whatever the booking's service is), and
+only then the service's choice, which only the participant themself can run into. The switch is
+the kill switch: off means nobody, whatever a service says.
 """
 
 from typing import Annotated
@@ -72,7 +78,8 @@ from app.adapters.vendored_files import VendoredFile
 from app.api.labels import slot_label
 from app.api.link_session import authorise
 from app.api.participant import participant_call_page
-from app.domain.call_page import OtherWayOffer, shows_other_way
+from app.domain.call_client import other_way_offer, uses_call_page
+from app.domain.call_page import shows_other_way
 from app.domain.call_token_service import (
     REFUSAL_STATUS,
     CallToken,
@@ -80,7 +87,7 @@ from app.domain.call_token_service import (
     TokenRefusal,
 )
 from app.domain.guest_access import GUEST_TERM_KEY, DisplayNameMode, StaffNameMode
-from app.domain.services import BookingService
+from app.domain.services import BookingDetails, BookingService
 from app.domain.staff_screen_names import StaffScreenNames
 from app.web.contact_labels import contact_service, contact_view
 from app.web.error_pages import refuse_rate_limited
@@ -104,6 +111,29 @@ NO_STORE = {"cache-control": "no-store"}
 """A token, or the answer that there is none, is never kept by a browser or a proxy."""
 
 
+def _require_switch(request: Request) -> None:
+    """Refuse as an address that does not exist while the platform switch is off.
+
+    Raises:
+        HTTPException: ``404``, before anything about the booking is looked at.
+    """
+    if not request.app.state.settings.embedded_call_enabled:
+        raise HTTPException(status_code=404)
+
+
+def _require_service(request: Request, details: BookingDetails) -> None:
+    """Refuse as an address that does not exist for a booking of a service that did not choose us.
+
+    Run after the participant's session was checked, so only they can meet it (ADR 0123 step 6a).
+
+    Raises:
+        HTTPException: ``404`` unless the booking's service uses the call page now.
+    """
+    enabled = request.app.state.settings.embedded_call_enabled
+    if not uses_call_page(details.group, platform_enabled=enabled):
+        raise HTTPException(status_code=404)
+
+
 @router.get("/b/m/{public_ref}/call", response_class=HTMLResponse)
 @limiter.limit(read_limit)
 async def call_page(request: Request, public_ref: str) -> HTMLResponse:
@@ -111,16 +141,16 @@ async def call_page(request: Request, public_ref: str) -> HTMLResponse:
 
     Raises:
         HTTPException: ``404`` while ``embedded_call_enabled`` is off, before anything about
-            the booking is looked at.
+            the booking is looked at, and for a booking of a service that did not choose it.
     """
-    if not request.app.state.settings.embedded_call_enabled:
-        raise HTTPException(status_code=404)
+    _require_switch(request)
     bookings: BookingService = request.app.state.booking_service
     locale = resolve_locale(request)
     details = await bookings.find(await authorise(request, public_ref))
+    _require_service(request, details)
     current = follow(request, details.group.organisation_id)
     booking, group = details.booking, details.group
-    offer = OtherWayOffer.of(current.embedded_call_webex_option)
+    offer = other_way_offer(group, current.embedded_call_webex_option)
     sdk: VendoredFile = request.app.state.call_sdk
     sdk_file = sdk.offer()
     sdk_src = ""
@@ -165,14 +195,13 @@ async def call_token(request: Request, public_ref: str, _: SameOrigin) -> Respon
 
     Raises:
         HTTPException: ``404`` while ``embedded_call_enabled`` is off, before anything about
-            the booking is looked at.
+            the booking is looked at, and for a booking of a service that did not choose it.
     """
-    settings = request.app.state.settings
-    if not settings.embedded_call_enabled:
-        raise HTTPException(status_code=404)
+    _require_switch(request)
     ref = await authorise(request, public_ref)
     bookings: BookingService = request.app.state.booking_service
     details = await bookings.find(ref)  # the one read: the service takes the booking from here
+    _require_service(request, details)
     current = follow(request, details.group.organisation_id)
     term = (
         resolve_locale(request)
@@ -205,15 +234,15 @@ async def call_staff(request: Request, public_ref: str) -> Response:
 
     Raises:
         HTTPException: ``404`` while ``embedded_call_enabled`` is off, before anything about
-            the booking is looked at.
+            the booking is looked at, and for a booking of a service that did not choose it.
     """
-    if not request.app.state.settings.embedded_call_enabled:
-        raise HTTPException(status_code=404)
+    _require_switch(request)
     ref = await authorise(request, public_ref)
     if not within_call_staff_limit(public_ref):  # only a request with the session is counted
         return await refuse_rate_limited(request)
     bookings: BookingService = request.app.state.booking_service
     details = await bookings.find(ref)
+    _require_service(request, details)
     current = follow(request, details.group.organisation_id)
     names: StaffScreenNames = request.app.state.staff_names
     claim = details.booking.claim

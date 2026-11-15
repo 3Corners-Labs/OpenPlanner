@@ -9,10 +9,9 @@ from app.admin.routes import PUBLIC_ADMIN_PATHS
 from app.config import Settings
 from app.main import create_app
 from app.web.help import topic_for_path
-from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
+from tests.support.admin_site import GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
+from tests.support.group_settings import SETTINGS
 from tests.support.routes import all_routes
-
-SETTINGS = "/admin/groups/demo/settings"
 
 NOT_YET_DOCUMENTED: frozenset[str] = frozenset()
 """Admin pages without a manual topic yet. Only shrinks: document a screen, remove it here."""

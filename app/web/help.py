@@ -104,6 +104,12 @@ TOPICS = (
         Permission.STAFF_VIEW,
     ),
     HelpTopic("my-sessions", ("/admin/rights/sessions",), Permission.RIGHTS_VIEW),
+    # ADR 0123 step 5d: the own screen name.
+    HelpTopic(
+        "my-profile",
+        ("/admin/rights/profile", "/admin/rights/profile/screen-name"),
+        Permission.RIGHTS_VIEW,
+    ),
     HelpTopic("idp-mapping", ("/admin/idp-mapping",), Permission.IDP_MAPPING_VIEW),
     HelpTopic("audit", ("/admin/audit",), Permission.AUDIT_VIEW),
     HelpTopic(

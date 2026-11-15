@@ -5,6 +5,7 @@ from app.adapters.db.reports import ReportStore, StoredReport
 from app.adapters.diagnostics import CheckResult
 from app.adapters.service_app_check import SERVICE_APP_REPORT, store_service_app_check
 from app.domain.calls import EventKind
+from app.domain.guest_access import GUEST_PROBE
 from tests.support.domain import NOW
 
 
@@ -58,3 +59,30 @@ async def test_the_check_is_stored_as_a_report(engine: AsyncEngine) -> None:
     assert [r["name"] for r in report.body["results"]] == [
         line.name for line in [CheckResult("token refresh", None, True, "ok")]
     ]
+
+
+async def test_the_guest_fact_is_written_by_the_check_and_a_later_check_takes_it_away(
+    engine: AsyncEngine,
+) -> None:
+    store = ReportStore(engine)
+    meetings = CheckResult("GET /meetings", 200, True, "ok")
+    guest_ok = CheckResult(GUEST_PROBE, 200, True, "ok")
+    guest_refused = CheckResult(GUEST_PROBE, 403, False, "scope")
+
+    assert not await store.guest_check_passed()  # no check has run
+    await store_service_app_check(store, [meetings, guest_ok], False, NOW)
+    assert await store.guest_check_passed()
+    await store_service_app_check(store, [meetings, guest_refused], False, NOW)
+    assert not await store.guest_check_passed()  # a revoked scope stops new choices of embedded
+    await store_service_app_check(store, [meetings, guest_ok], False, NOW)
+    assert await store.guest_check_passed()
+    await store_service_app_check(store, [meetings], False, NOW)  # run with the switch off
+    assert not await store.guest_check_passed()
+
+
+async def test_a_report_without_the_fact_does_not_count(engine: AsyncEngine) -> None:
+    store = ReportStore(engine)
+
+    await store.put(SERVICE_APP_REPORT, {"results": [{"name": GUEST_PROBE, "ok": True}]}, NOW)
+
+    assert not await store.guest_check_passed()  # a line is no fact; the next check writes one

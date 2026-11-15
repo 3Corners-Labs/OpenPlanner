@@ -29,6 +29,7 @@ from app.domain.maintenance import MaintenanceReason
 from app.domain.maintenance_service import MaintenanceService
 from app.main import create_app
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import served
 from tests.support.domain import NOW
 
 SAME_ORIGIN = {"sec-fetch-site": "same-origin"}
@@ -58,12 +59,7 @@ class Site:
 @pytest.fixture
 async def site(demo_settings: Settings) -> AsyncIterator[Site]:
     app = create_app(demo_settings, FixedClock(NOW))
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
-        ) as client,
-    ):
+    async with served(app) as client:
         yield Site(client, app)
 
 
@@ -212,12 +208,7 @@ async def machine(settings: Settings, database_url: str) -> AsyncIterator[Site]:
     """A machine API with one write route besides the real ones (none write today)."""
     on = settings.model_copy(update={"database_url": database_url, "agent_api_enabled": True})
     app = create_app(on, FixedClock(NOW))
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
-        ) as client,
-    ):
+    async with served(app) as client:
         yield Site(client, app)
 
 

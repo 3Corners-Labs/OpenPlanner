@@ -18,7 +18,7 @@ from app.adapters.db.models import (
     SubjectFlowSkillRow,
 )
 from app.adapters.db.uow import SqlUnitOfWork
-from tests.adapters.db.conftest import seed_group
+from tests.support.seed_rows import seed_group
 
 
 async def _group_and_organisation(engine: AsyncEngine) -> tuple[int, int]:

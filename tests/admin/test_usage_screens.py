@@ -12,12 +12,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import GroupRow
-from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.booking import BookingKind
 from app.domain.channels import ChannelKind
 from app.domain.scheduling import DispatchKind
 from app.domain.usage import UsageCell
-from tests.admin.conftest import AGENT, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
+from tests.support.admin_site import AGENT, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site, site_uow
 
 RANGE = "from=2025-12-26&to=2026-01-01"
 HOUR = datetime(2025, 12, 31, 8, tzinfo=UTC)
@@ -25,12 +24,12 @@ HOUR = datetime(2025, 12, 31, 8, tzinfo=UTC)
 
 async def _put(site: Site, slug: str, build: Any) -> None:
     """Write the cells ``build(organisation_id, group_id)`` returns for the group ``slug``."""
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     engine = app.state.engine
     async with AsyncSession(engine) as session:
         group = (await session.execute(select(GroupRow).where(GroupRow.slug == slug))).scalar_one()
         ids = (group.organisation_id, group.id)
-    async with SqlUnitOfWork(engine).locked() as tx:
+    async with site_uow(site).locked() as tx:
         await tx.add_usage_cells(build(*ids))
 
 
@@ -158,7 +157,7 @@ async def test_a_small_count_is_hidden_in_the_table_and_the_chart_and_cannot_be_
 
 async def _fresh(site: Site) -> Site:
     """Remove the cells again so the next write starts from nothing."""
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     from sqlalchemy import delete
 
     from app.adapters.db.models import UsageHourRow

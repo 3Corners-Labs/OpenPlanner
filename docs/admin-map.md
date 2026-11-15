@@ -27,6 +27,7 @@ forms and reading; a sub-page is `standard` unless the register lists it as wide
 | Identity provider mapping | `/admin/idp-mapping` | `idp_mapping.view` | standard | – |
 | My rights | `/admin/rights` | `rights.view` | standard | – |
 | My rights › My sessions | `/admin/rights/sessions` | `rights.view` | standard | – |
+| My rights › My profile | `/admin/rights/profile` | `rights.view` | standard | – |
 | Rights matrix | `/admin/matrix` | `matrix.view` | wide | `/admin/roles`, `/admin/roles/new`, `/admin/roles/{role_id}` |
 
 ### Platform
@@ -64,7 +65,7 @@ Side navigation: *Organisations*. A row *Tab › Sub-tab* is a sub-tab of that t
 | Overview › Settings | `/admin/organisations/{org}/settings` | `settings.organisation.manage` | standard | – |
 | Overview › Embedding | `/admin/organisations/{org}/embedding` | `embedding.manage` | standard | – |
 | Overview › Skills and capacity | `/admin/organisations/{org}/skills` | `organisation.view` | standard | `/admin/organisations/{org}/skills/{skill_id}`, `/admin/organisations/{org}/skills/{skill_id}/archive`, `/admin/organisations/{org}/capacity/{pool_id}`, `/admin/organisations/{org}/capacity/{pool_id}/archive`, `/admin/organisations/{org}/capacity/{pool_id}/staffing`, `/admin/organisations/{org}/capacity/{pool_id}/staffing/{rule_id}`, `/admin/organisations/{org}/capacity/{pool_id}/staffing/{rule_id}/split`, `/admin/organisations/{org}/capacity/{pool_id}/exceptions`, `/admin/organisations/{org}/capacity/{pool_id}/exceptions/{override_id}` |
-| Overview › Login | `/admin/organisations/{org}/login` | `identity_providers.view` | standard | `/admin/organisations/{org}/login/new`, `/admin/organisations/{org}/login/{idp_key}` |
+| Overview › Authentication | `/admin/organisations/{org}/login` | `identity_providers.view` | standard | `/admin/organisations/{org}/login/new`, `/admin/organisations/{org}/login/{idp_key}` |
 | Overview › Configuration | `/admin/organisations/{org}/configuration` | `settings.organisation.manage` | standard | – |
 | Overview › Usage | `/admin/organisations/{org}/usage` | `reports.view` | wide | – |
 | Participants | `/admin/organisations/{org}/branding` | `branding.manage` | standard | – |

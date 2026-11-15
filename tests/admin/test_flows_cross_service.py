@@ -11,8 +11,7 @@ of the form, never a way in.
 import pytest
 
 from app.domain.authorization import Scope
-from tests.admin.conftest import SAME_ORIGIN, Site
-from tests.support.admin_site import site_uow
+from tests.support.admin_site import SAME_ORIGIN, Site, site_uow
 from tests.support.authorization_matrix import ROLES
 from tests.support.domain import make_group
 from tests.support.flow_seed import add_flow, add_subjects

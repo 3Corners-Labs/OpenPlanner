@@ -17,9 +17,10 @@
 # which this script sets for `caddy run` and again for every `caddy reload`. Without a domain
 # Caddy would serve plain HTTP on 8443, so a missing or incomplete setting stops the container.
 # WEB_UPSTREAM (address:port) is where everything else goes: web's fixed address on edge, set in
-# docker-compose.yml. IDP_UPSTREAM (address:port) adds the route /idp/* to the bundled identity
-# provider (ADR 0112) at its fixed address, written by the installer. A name works but is
-# named in the log: this host's DNS may answer it while its container is down (ADR 0125).
+# docker-compose.yml. IDP_UPSTREAM (address:port) adds the route /idp to the bundled identity
+# provider (ADR 0112) at its fixed address, written by the installer; what the route lets through
+# and keeps out is in idp.caddy (ADR 0126). A name works but is named in the log: this host's DNS
+# may answer it while its container is down (ADR 0125).
 set -eu
 
 PORTAL_DIR=${TLS_PORTAL_DIR:-/portal-certs} # the volume's mount point (tests point it elsewhere)
@@ -27,6 +28,7 @@ INTERNAL_CA_DIR=${TLS_INTERNAL_CA_DIR:-/internal-ca}
 CA_ROOT=${TLS_CA_ROOT:-/data/caddy/pki/authorities/local/root.crt}
 POLL=${TLS_PORTAL_POLL_SECONDS:-10}
 CADDYFILE=/etc/caddy/Caddyfile
+IDP_CADDYFILE=/etc/caddy/idp.caddy
 
 fail() { echo "$1" >&2; exit 1; }
 
@@ -109,13 +111,47 @@ export WEB_UPSTREAM
 
 if [ -n "${IDP_UPSTREAM:-}" ]; then
   upstream IDP_UPSTREAM "$IDP_UPSTREAM"
-  IDP_DIRECTIVE="handle /idp/* {
-		reverse_proxy $IDP_UPSTREAM
-	}"
+  # The route and what it lets through live in idp.caddy (ADR 0126), which reads IDP_UPSTREAM
+  # and hands the provider the visitor's address alone, as web gets it (ADR 0129).
+  IDP_DIRECTIVE="import $IDP_CADDYFILE"
 else
   IDP_DIRECTIVE=""
 fi
 export IDP_DIRECTIVE
+
+# trusted_networks VALUE: the reverse proxies, WAFs and load balancers in front of this proxy
+# (PROXY_TRUSTED_NETWORKS, ADR 0129), comma or space separated, as one space-separated line.
+# Only addresses and CIDR ranges, at most 32, and never a range of length 0: trusting every
+# address would let any visitor choose theirs. Caddy itself refuses a malformed address.
+trusted_networks() {
+  ranges=$(printf '%s' "$1" | tr ',\t\n' '   ')
+  count=0
+  for range in $ranges; do
+    case $range in
+      *[!0-9A-Fa-f.:/]* | /* | */*/* | */) fail "PROXY_TRUSTED_NETWORKS: $range is not an IP address or CIDR range" ;;
+    esac
+    case $range in
+      */*)
+        prefix=${range##*/}
+        [ "$prefix" -gt 0 ] 2>/dev/null \
+          || fail "PROXY_TRUSTED_NETWORKS: $range trusts every address; name the edge's own addresses"
+        ;;
+    esac
+    count=$((count + 1))
+  done
+  [ "$count" -le 32 ] || fail "PROXY_TRUSTED_NETWORKS: at most 32 entries, $count given"
+  printf '%s' "$ranges" | tr -s ' ' | sed 's/^ //; s/ $//'
+}
+
+trusted=$(trusted_networks "${PROXY_TRUSTED_NETWORKS:-}")
+if [ -n "$trusted" ]; then
+  TRUSTED_PROXIES_DIRECTIVE="trusted_proxies static $trusted
+		trusted_proxies_strict"
+  echo "visitor's address taken from X-Forwarded-For of: $trusted (right to left, ADR 0129)"
+else
+  TRUSTED_PROXIES_DIRECTIVE=""
+fi
+export TRUSTED_PROXIES_DIRECTIVE
 
 if [ -n "${TLS_CERT_FILE:-}" ] || [ -n "${TLS_KEY_FILE:-}" ]; then
   [ -n "${TLS_CERT_FILE:-}" ] && [ -n "${TLS_KEY_FILE:-}" ] \

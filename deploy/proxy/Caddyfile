@@ -23,7 +23,20 @@
 			write 60s
 			idle 2m
 		}
+		# The reverse proxies, WAFs and load balancers in front of this one (PROXY_TRUSTED_NETWORKS,
+		# ADR 0129): from them the visitor's address is read out of X-Forwarded-For, right to left.
+		# entrypoint.sh renders the directive; empty, nobody is trusted and the peer is the visitor.
+		{$TRUSTED_PROXIES_DIRECTIVE}
 	}
+}
+
+# Every upstream gets exactly one address in X-Forwarded-For: the visitor's ({client_ip}).
+# Without trusted networks that is the peer, and any value the client sent is dropped; from a
+# trusted edge it is the first untrusted address, right to left (ADR 0129). Rate limits,
+# pseudonyms and webhook source networks in the app therefore see the real visitor, and so do
+# the bundled identity provider's events (idp.caddy imports this too).
+(visitor_address) {
+	header_up X-Forwarded-For {client_ip}
 }
 
 http://{$TLS_DOMAIN}:8080 {
@@ -60,14 +73,34 @@ http://{$TLS_DOMAIN}:8080 {
 	request_body @other {
 		max_size 1MB
 	}
-	# Caddy sets X-Forwarded-For to the visitor's address and drops any value the client sent
-	# (no trusted_proxies), so rate limits in the app see the real IP.
-	# The bundled identity provider (ADR 0112) is served under /idp when IDP_UPSTREAM is set;
-	# entrypoint.sh renders IDP_DIRECTIVE, empty otherwise.
+	# The bundled identity provider (ADR 0112) is served under /idp when IDP_UPSTREAM is set:
+	# entrypoint.sh renders IDP_DIRECTIVE as `import /etc/caddy/idp.caddy` (ADR 0126: only the
+	# login, none of the portal's cookies, nothing that acts on the whole origin), empty otherwise.
 	{$IDP_DIRECTIVE}
 	# Everything else goes to web at its fixed address on edge (WEB_UPSTREAM, docker-compose.yml),
 	# never to a name this host's DNS could answer while web is down (ADR 0125 step 2).
 	handle {
-		reverse_proxy {$WEB_UPSTREAM}
+		reverse_proxy {$WEB_UPSTREAM} {
+			import visitor_address
+		}
+	}
+	# Every answer the proxy makes itself (a refusal under /idp, a body over its limit, a 502
+	# while web restarts) is a page of the portal's own origin. It gets the portal's deny-by-
+	# default headers (app/api/security_headers.py, tied by a test), so no script can frame or open
+	# it and act from there with the portal's cookies (ADR 0126 point 4). The body stays empty.
+	# Caddy logs an error this route handled at debug level, below the proxy's log: a 502 no
+	# longer writes the request's URI, with a management token (/b/{token}), to the log.
+	handle_errors {
+		header {
+			Content-Security-Policy "default-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+			Strict-Transport-Security "max-age=63072000; includeSubDomains"
+			X-Content-Type-Options nosniff
+			X-Frame-Options DENY
+			Referrer-Policy same-origin
+			Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=(), interest-cohort=()"
+			Cross-Origin-Opener-Policy same-origin
+			Cross-Origin-Embedder-Policy require-corp
+			Cross-Origin-Resource-Policy same-origin
+		}
 	}
 }

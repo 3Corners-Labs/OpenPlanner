@@ -99,6 +99,8 @@ DONE_MESSAGES: dict[str, str] = {
     "contact_center_saved_not_ready": "admin.done.contact_center_saved_not_ready",
     "contact_center_saved": "admin.done.contact_center_saved",
     "contact_center_not_registered": "admin.done.contact_center_not_registered",
+    "contact_center_replaced": "admin.done.contact_center_replaced",
+    "contact_center_gone": "admin.done.contact_center_gone",
     "confirmed_by_staff": "admin.done.confirmed_by_staff",
     "not_pending": "admin.done.not_pending",
     "confirm_lapsed": "admin.done.confirm_lapsed",
@@ -181,6 +183,7 @@ DONE_MESSAGES: dict[str, str] = {
     "pool_archived": "admin.done.pool_archived",
     "staff_skills_saved": "admin.done.staff_skills_saved",
     "staff_screen_name_saved": "admin.done.staff_screen_name_saved",
+    "staff_screen_name_cleared": "admin.done.staff_screen_name_cleared",
     "staff_screen_name_unchanged": "admin.done.staff_screen_name_unchanged",
     # ADR 0121 step 2d: the flows of a service.
     "flow_created": "admin.done.flow_created",
@@ -239,6 +242,7 @@ FIELD_MESSAGES: dict[str, str] = {
     "embedding_enabled": "admin.form.error.choice",
     "trial_call_enabled": "admin.form.error.choice",
     "join_client": "admin.form.error.choice",
+    "embedded_call_webex_option": "admin.form.error.choice",
     "trial_call_minutes": "admin.form.error.trial_call_minutes",
     "trial_calls_per_booking": "admin.form.error.trial_calls_per_booking",
     "not_picked_up_minutes": "admin.form.error.not_picked_up_minutes",
@@ -622,6 +626,10 @@ class FormData:
             target = "organisation"
         message = CODE_MESSAGES.get(error.code, "error.invalid_request")
         self.errors.append(FormError(target, self._(message)))
+
+    def reject(self, name: str, key: str) -> None:
+        """Link the sentence of catalogue key ``key`` to the field ``name`` (a rule of its own)."""
+        self._fail(name, key)
 
     def error_for(self, name: str) -> str | None:
         """Return the first message linked to ``name``."""

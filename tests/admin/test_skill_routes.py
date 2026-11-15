@@ -3,7 +3,7 @@
 import httpx
 import pytest
 
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AGENT,
     AUDITOR,
     GROUP_ADMIN,
@@ -13,8 +13,8 @@ from tests.admin.conftest import (
     SAME_ORIGIN,
     SUPER,
     Site,
+    audit_log,
 )
-from tests.support.admin_site import audit_log
 from tests.support.skill_seed import add_pool, add_skill, archive_skill, limit
 
 PAGE = "/admin/organisations/demo/skills"

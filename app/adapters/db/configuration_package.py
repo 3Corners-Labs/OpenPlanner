@@ -28,7 +28,7 @@ from sqlalchemy.engine import URL
 
 from app.adapters.crypto import SecretBox, passphrase_box
 from app.adapters.db.engine import create_engine
-from app.adapters.db.sealed import SEALED, reseal
+from app.adapters.db.sealed import SEALED, reseal, without_rotation_state
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.configuration_document import Document, Mode, Scope
 from app.domain.configuration_package import (
@@ -82,7 +82,10 @@ def _reseal_or_refuse(db: sqlite3.Connection, opener: SecretBox, sealer: SecretB
             means a damaged file; the same code keeps the two cases from being told apart).
     """
     try:
-        reseal(db, opener, sealer)
+        # The one place a package's copy of a sealed record is made, for a package that is
+        # written (``tests/support/legacy_package``) and for one that is read: what a rotation
+        # left (the previous webhook secret, the registration outcome) never goes into it.
+        reseal(db, opener, sealer, scrub=without_rotation_state)
     except InvalidTag as exc:
         raise DomainError(ErrorCode.CONFIGURATION_PASSPHRASE_WRONG, "passphrase") from exc
 

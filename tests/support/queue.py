@@ -15,11 +15,10 @@ from app.domain.authorization import Scope
 from app.domain.booking import MeetingRef
 from app.domain.scheduling import DispatchKind, Offer, ScheduleRule, TimeWindow
 from app.domain.services import BookingService
-from tests.admin.conftest import SUPER, Site
-from tests.support.admin_site import site_uow
+from tests.support.admin_site import SUPER, Site, site_uow
 from tests.support.domain import ADA, FRIDAY_0900, TEST_TOKEN_KEY, book_confirmed
 from tests.support.flow_seed import add_flow, publish_flow
-from tests.support.flows import engine_of, flow_ids
+from tests.support.flows import flow_ids
 from tests.support.skill_seed import add_pool
 
 EVERYTHING = Scope(everything=True)
@@ -66,14 +65,14 @@ async def staffed_pool_flow(site: Site) -> tuple[int, int]:
         assert await tx.add_pool_rule(EVERYTHING, pool, ScheduleRule(4, block)) is not None
     await add_flow(site, "advies", pool)
     await publish_flow(site)
-    return pool, (await flow_ids(engine_of(site.client)))["advies"]
+    return pool, (await flow_ids(site.app.state.engine))["advies"]
 
 
 async def request_work(site: Site) -> int:
     """Book in the own queue and put the booking on a staffed pool under a flow without video."""
     booking_id = await own_queue(site, meeting=False, queue_free_pick_allowed=True)
     pool, flow_id = await staffed_pool_flow(site)
-    engine = engine_of(site.client)
+    engine = site.app.state.engine
     async with AsyncSession(engine) as session, session.begin():
         group_id = await session.scalar(
             select(BookingRow.group_id).where(BookingRow.id == booking_id)

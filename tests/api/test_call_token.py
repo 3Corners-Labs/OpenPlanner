@@ -30,9 +30,9 @@ from app.domain.ports import IntegrationError
 from app.domain.settings_registry import BY_KEY
 from app.keys import guest_pseudonym_key
 from app.logging import set_line_tap
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import GUEST_EXPIRES, FakeDispatcher, FakeVideo, webex_cc
+from tests.support.call_page import embedded_app_client
 from tests.support.domain import NOW
 from tests.support.participant import (
     FRIDAY_0900,
@@ -128,7 +128,7 @@ async def _site(settings: Settings, at: datetime, video: FakeVideo) -> AsyncIter
     """Book and confirm while it is early, then let the clock say ``at``."""
     await _prepare(settings)
     clock = FixedClock(NOW)
-    async with app_client(
+    async with embedded_app_client(
         settings, clock, Integrations(None, video, webex_cc(FakeDispatcher()))
     ) as client:
         assert (await book(client)).status_code == 303
@@ -339,7 +339,7 @@ async def test_a_booking_without_a_meeting_gets_no_token(demo_settings: Settings
     settings = _on(demo_settings)
     await _prepare(settings)
     clock = FixedClock(NOW)
-    async with app_client(
+    async with embedded_app_client(
         settings, clock, Integrations(None, video, webex_cc(FakeDispatcher()))
     ) as client:
         await book(client)
@@ -384,7 +384,7 @@ async def test_without_a_video_provider_it_is_the_same_plain_answer(
     settings = _on(demo_settings)
     await _prepare(settings)
     clock = FixedClock(NOW)
-    async with app_client(settings, clock) as client:
+    async with embedded_app_client(settings, clock) as client:
         await book(client)
         base = await open_link(client, await confirm_newest(client))
         await _meeting(settings, await _newest_booking(client))

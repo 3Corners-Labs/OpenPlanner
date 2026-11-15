@@ -15,16 +15,29 @@ from app.domain.errors import DomainError, ErrorCode
 from tests.fakes.persistence import InMemoryUnitOfWork
 
 
+def is_mutmut_member(name: str) -> bool:
+    """Return whether ``name`` is a member that mutmut generated in its mutated copy.
+
+    ``make mutation`` runs the tests against a copy of ``app/`` in which mutmut keeps every
+    method under its own name as a trampoline and adds the original and each mutant beside it
+    as ``xǁClassǁmethod__mutmut_orig`` and ``xǁClassǁmethod__mutmut_N``. They are not use cases.
+    """
+    return "__mutmut_" in name or "ǁ" in name
+
+
 def booking_id_methods(service: type) -> set[str]:
     """Return the public use cases of ``service`` that act on one booking (``booking_id``).
 
     A test that tries each of them with another group's booking compares its list with this
-    one, so a use case added later is tried too.
+    one, so a use case added later is tried too. Members that mutmut generated are left out,
+    so the list is the same in the mutated copy.
     """
     return {
         name
         for name, method in inspect.getmembers(service, inspect.iscoroutinefunction)
-        if not name.startswith("_") and "booking_id" in inspect.signature(method).parameters
+        if not name.startswith("_")
+        and not is_mutmut_member(name)
+        and "booking_id" in inspect.signature(method).parameters
     }
 
 

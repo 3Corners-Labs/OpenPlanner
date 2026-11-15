@@ -7,14 +7,20 @@ in no log, no redirect and no audit event; the cookie means nothing to an admin 
 
 import re
 from datetime import timedelta
-from typing import Any
 
 import httpx
 import pytest
 
-from app.domain.authorization import Scope
-from tests.admin.conftest import AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
-from tests.support.admin_site import site_uow as _uow
+from tests.support.admin_site import (
+    AUDITOR,
+    GROUP_ADMIN,
+    ORG_ADMIN,
+    OUTSIDER,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+    audit_log,
+)
 from tests.support.routes import all_routes
 
 ORG = "/admin/organisations/demo"
@@ -29,7 +35,7 @@ async def _set(site: Site, key: str, value: str) -> None:
         f"{SETTING}/{key}", data={"value": value}, headers=SAME_ORIGIN
     )
     assert response.status_code == 303, key
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     await app.state.live_settings.refresh()
 
 
@@ -39,9 +45,7 @@ async def _switch_on(site: Site) -> None:
 
 def _screen(site: Site, address: str = "10.20.4.31") -> httpx.AsyncClient:
     """A browser on a screen: no admin session, its own cookie jar, its own address."""
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
-    transport = httpx.ASGITransport(app=app, client=(address, 4711))
-    return httpx.AsyncClient(transport=transport, base_url="http://testserver")
+    return site.browser(address).client
 
 
 async def _make(site: Site, **form: str) -> str:
@@ -52,11 +56,6 @@ async def _make(site: Site, **form: str) -> str:
     found = TOKEN.search(response.text)
     assert found is not None
     return found.group(1)
-
-
-async def _events(site: Site) -> list[Any]:
-    async with _uow(site).read() as tx:
-        return list(await tx.list_audit_events(Scope(everything=True), limit=50))
 
 
 async def test_display_links_are_off_by_default(site: Site) -> None:
@@ -101,7 +100,7 @@ async def test_the_link_is_shown_once_and_nowhere_else(site: Site) -> None:
     token = TOKEN.search(response.text)
     assert token is not None
     page = (await site.client.get(BOARD_PAGE)).text
-    events = " ".join(f"{e.event.detail} {e.event.action}" for e in await _events(site))
+    events = " ".join(f"{e.detail} {e.action}" for e in await audit_log(site))
 
     assert "Nieuwe displaylink: kopieer hem nu" in response.text
     assert response.headers["cache-control"] == "no-store"
@@ -206,7 +205,7 @@ async def test_a_revoked_link_stops_the_screen_at_its_next_poll(site: Site) -> N
     after = (await site.client.get(BOARD_PAGE)).text
     assert "Ingetrokken" in after
     assert "wallboard/links/" not in after.split("Ingetrokken", 1)[1].split("</tr>", 1)[0]
-    actions = [e.event.detail for e in await _events(site)]
+    actions = [e.detail for e in await audit_log(site)]
     assert f"revoke:{link_id.group(1)}" in actions
     assert f"create:{link_id.group(1)}" in actions
 
@@ -256,10 +255,10 @@ async def test_the_network_list_applies_at_the_start_and_the_link_stays_valid(
     assert refused.status_code == again.status_code == 403
     assert "niet toegestaan vanaf dit netwerk" in refused.text
     assert ok.status_code == 303  # the link was not used up by the refusal
-    refusals = [e for e in await _events(site) if e.event.action == "wallboard.session_refused"]
+    refusals = [e for e in await audit_log(site) if e.action == "wallboard.session_refused"]
     assert len(refusals) == 1  # one deduplicated event, however often it asks
-    assert "192.0.2.7" not in " ".join(e.event.detail + e.event.reason for e in refusals)
-    assert refusals[0].event.reason == "network"
+    assert "192.0.2.7" not in " ".join(e.detail + e.reason for e in refusals)
+    assert refusals[0].reason == "network"
 
 
 async def test_a_link_may_only_narrow_the_default_networks(site: Site) -> None:
@@ -311,8 +310,8 @@ async def test_a_pinned_session_works_only_from_the_first_address_on_every_reque
     assert same.status_code == 200  # the link stays valid for the right address
     page = (await site.client.get(BOARD_PAGE)).text
     assert "10.20.4.31/32" in page  # shown to the organisation admin, on the list
-    for e in await _events(site):
-        assert "10.20.4.3" not in f"{e.event.detail} {e.event.reason}"
+    for e in await audit_log(site):
+        assert "10.20.4.3" not in f"{e.detail} {e.reason}"
 
 
 async def test_a_pin_of_an_ipv6_address_is_its_64(site: Site) -> None:
@@ -383,7 +382,7 @@ async def test_the_screen_cookie_means_nothing_to_an_admin_route(site: Site) -> 
 
 
 async def test_the_screen_side_has_exactly_three_routes_and_no_other_admin_page(site: Site) -> None:
-    app: Any = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     paths = sorted(r.path for r in all_routes(app.routes) if r.path.startswith("/display"))
 
     assert paths == ["/display", "/display/live", "/display/start/{token}"]

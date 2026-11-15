@@ -14,7 +14,7 @@ import pytest
 
 from app.domain.authorization import MATRIX, Permission, Principal, Role
 from app.domain.entitlements import LoginClaims
-from tests.admin.conftest import AUDITOR, GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import AUDITOR, GROUP_ADMIN, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.support.authorization_matrix import EXPECTED
 from tests.support.principals import legacy_claims
 

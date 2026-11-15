@@ -5,7 +5,7 @@ implementation. ``tests/admin/test_authorization_matrix.py`` sweeps it, role by 
 other admin tests read it to find the routes they cover.
 """
 
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AGENT,
     AUDITOR,
     GROUP_ADMIN,
@@ -323,6 +323,15 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     "POST /admin/rights/sessions/end-others": {
         "/admin/rights/sessions/end-others": statuses(303, 303, 303, 303, 303, 303, 403)
+    },
+    # ADR 0123 step 5d: every admin sets their own screen name (rights.view); the empty form
+    # clears an empty name, which is "unchanged" and goes back to the page. No number is in the
+    # path.
+    "GET /admin/rights/profile": {
+        "/admin/rights/profile": statuses(200, 200, 200, 200, 200, 200, 403)
+    },
+    "POST /admin/rights/profile/screen-name": {
+        "/admin/rights/profile/screen-name": statuses(303, 303, 303, 303, 303, 303, 403)
     },
     # ADR 0098 point 9b: an organisation admin (and the superuser) ends a person's sessions.
     # Outside the scope the answer is 403, an unknown number too; only the superuser, who sees
@@ -1449,6 +1458,12 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/organisations/demo/login": statuses(200, 200, 403, 403, 200, 403, 403),
         "/admin/organisations/andere/login": statuses(200, 403, 403, 200, 403, 403, 403),
         "/admin/organisations/nope/login": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
+    # The route check reads the same as the page: the same people may ask it.
+    "POST /admin/organisations/{org}/login/_check": {
+        "/admin/organisations/demo/login/_check": statuses(200, 200, 403, 403, 200, 403, 403),
+        "/admin/organisations/andere/login/_check": statuses(200, 403, 403, 200, 403, 403, 403),
+        "/admin/organisations/nope/login/_check": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     "GET /admin/organisations/{org}/login/new": {
         "/admin/organisations/demo/login/new": statuses(200, 403, 403, 403, 403, 403, 403),

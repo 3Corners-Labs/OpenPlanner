@@ -6,7 +6,7 @@ reserved suffix of the bundled provider is refused at the field.
 
 import pytest
 
-from tests.admin.conftest import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import AUDITOR, ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.support.organisation_login import register
 
 
