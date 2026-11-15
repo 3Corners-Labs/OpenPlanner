@@ -281,7 +281,11 @@ to another at run time goes through `app` and may reach a file loaded later.
   the page made for it until it is sent, so a retry is the same message), the state of each own message in words, a failed
   send that keeps the text and says so beside the field and in the polite line, and the closed state (the field makes way for
   a sentence that says why; focus moves to it only when the field had it). It has no timer: `call-poll.js` calls its `turn`.
-  Everything a participant or a staff member wrote is set with `textContent`; nothing is stored in the browser.
+  A staff line keeps the label it was first drawn with. A read that says `more` is followed at once by the next; a send
+  answered 403 or 404 (and a read likewise) ends the chat with a sentence and no retry; a send answered 409 `closed`
+  leaves the reason to one more read. On a touch keyboard (`(pointer: coarse)`) Enter starts a new line and the button
+  sends, and the hint says so. The log is a tab stop only while it scrolls. Everything a participant or a staff member
+  wrote is set with `textContent`; nothing is stored in the browser.
 - **`call-render.js` owns** the drawing of the call's parts out of the state, as pure functions: the pictures with the
   label on the other side's (the name and the team's word, or the word alone; also the picture's accessible name),
   the notices, the sharing switches and the staff member's screen, the captions' lines and the bar with its

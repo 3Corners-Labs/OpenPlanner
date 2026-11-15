@@ -26,7 +26,13 @@ from app.domain.call_chat import (
     ChatEventKind,
     ChatState,
 )
-from app.domain.call_chat_service import WAITING_CAP, CallChatService, SendRefusal
+from app.domain.call_chat_service import (
+    READ_LIMIT,
+    WAITING_CAP,
+    CallChatService,
+    ChatRead,
+    ChatRefusal,
+)
 from app.domain.calls import CallStatus, TaskState
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef, TaskKind
 from app.domain.contact_center_dispatch import DispatcherChoice
@@ -67,15 +73,15 @@ class Setup:
 
     async def send(
         self, text: str = WORDS, client_id: str = ID, *, per_minute: int = 20, max_chars: int = 1000
-    ) -> CallMessage | SendRefusal:
+    ) -> CallMessage | ChatRefusal:
         booking, group = await self.booking()
         return await self.service.send(
             booking, group, text, client_id, max_chars=max_chars, per_minute=per_minute
         )
 
-    async def read(self, since: int = 0, waiting: list[int] | None = None):  # noqa: ANN201
-        booking, group = await self.booking()
-        return await self.service.read(booking, group, since, waiting or [])
+    async def read(self, since: int = 0, waiting: list[int] | None = None) -> ChatRead:  # noqa: ANN201
+        booking, _ = await self.booking()
+        return await self.service.read(booking, since, waiting or [])
 
     async def stored(self) -> list[CallMessage]:
         async with SqlUnitOfWork(self.engine).read() as tx:
@@ -185,14 +191,14 @@ async def test_control_and_direction_characters_are_taken_out_before_anything_is
 @pytest.mark.parametrize(
     ("text", "refusal"),
     [
-        ("", SendRefusal.EMPTY),
-        ("  \n\t ", SendRefusal.EMPTY),
-        ("\x00\x01", SendRefusal.EMPTY),  # nothing is left after the cleaning
-        ("a" * 201, SendRefusal.TOO_LONG),
+        ("", ChatRefusal.EMPTY),
+        ("  \n\t ", ChatRefusal.EMPTY),
+        ("\x00\x01", ChatRefusal.EMPTY),  # nothing is left after the cleaning
+        ("a" * 201, ChatRefusal.TOO_LONG),
     ],
 )
 async def test_an_empty_or_too_long_message_is_refused_and_nothing_is_kept(
-    setup: Setup, text: str, refusal: SendRefusal
+    setup: Setup, text: str, refusal: ChatRefusal
 ) -> None:
     assert await setup.send(text, max_chars=200) is refusal
     assert await setup.stored() == []
@@ -205,7 +211,7 @@ async def test_an_empty_or_too_long_message_is_refused_and_nothing_is_kept(
 async def test_an_identifier_that_the_page_would_not_make_is_refused(
     setup: Setup, bad: str
 ) -> None:
-    assert await setup.send(client_id=bad) is SendRefusal.BAD_REQUEST
+    assert await setup.send(client_id=bad) is ChatRefusal.BAD_REQUEST
     assert setup.dispatcher.appended == []
 
 
@@ -215,7 +221,7 @@ async def test_the_rate_counts_the_participants_own_messages_in_the_last_minute(
     assert isinstance(await setup.send(client_id="a" * 16, per_minute=2), CallMessage)
     assert isinstance(await setup.send(client_id="b" * 16, per_minute=2), CallMessage)
 
-    assert await setup.send(client_id="c" * 16, per_minute=2) is SendRefusal.RATE_LIMITED
+    assert await setup.send(client_id="c" * 16, per_minute=2) is ChatRefusal.RATE_LIMITED
 
     setup.clock.advance(timedelta(minutes=1, seconds=1))
     assert isinstance(await setup.send(client_id="c" * 16, per_minute=2), CallMessage)
@@ -246,7 +252,7 @@ async def test_the_ceiling_of_a_booking_takes_no_more(setup: Setup) -> None:
             )
         )
 
-    assert await setup.send() is SendRefusal.FULL
+    assert await setup.send() is ChatRefusal.FULL
     assert setup.dispatcher.appended == []
 
 
@@ -255,7 +261,7 @@ async def test_a_platform_that_cannot_be_reached_keeps_nothing_and_the_retry_is_
 ) -> None:
     setup.dispatcher.append_error = IntegrationError("unreachable", retryable=True)
 
-    assert await setup.send() is SendRefusal.UNAVAILABLE
+    assert await setup.send() is ChatRefusal.UNAVAILABLE
     assert await setup.stored() == []
 
     setup.dispatcher.append_error = None
@@ -273,22 +279,21 @@ async def test_without_a_dispatcher_for_the_platform_nothing_is_kept(engine: Asy
 
     outcome = await service.send(booking, group, WORDS, ID, max_chars=1000, per_minute=20)
 
-    assert outcome is SendRefusal.UNAVAILABLE
+    assert outcome is ChatRefusal.UNAVAILABLE
     assert await made.stored() == []
 
 
 async def test_a_booking_without_a_chat_takes_nothing(engine: AsyncEngine) -> None:
     form = await _make(engine, TaskKind.FORM)
 
-    assert await form.send() is SendRefusal.NO_CHAT
+    assert await form.send() is ChatRefusal.NO_CHAT
     assert form.dispatcher.appended == []
 
 
 async def test_a_service_that_does_not_use_the_page_takes_nothing(setup: Setup) -> None:
     setup.page[0] = False
 
-    assert await setup.send() is SendRefusal.NO_CHAT
-    assert await setup.read() is None
+    assert await setup.send() is ChatRefusal.NO_CHAT
 
 
 async def test_a_cancelled_booking_takes_nothing(setup: Setup) -> None:
@@ -296,36 +301,108 @@ async def test_a_cancelled_booking_takes_nothing(setup: Setup) -> None:
     async with SqlUnitOfWork(setup.engine).locked() as tx:
         await tx.save_booking(replace(booking, status=BookingStatus.CANCELLED))
 
-    assert await setup.send() is SendRefusal.CLOSED
+    assert await setup.send() is ChatRefusal.CLOSED
     assert setup.dispatcher.appended == []
 
 
-@pytest.mark.parametrize("task", [TaskState.ENDED, TaskState.FAILED, TaskState.CANCELLED])
-async def test_a_task_that_ended_closes_the_chat(setup: Setup, task: TaskState) -> None:
+@pytest.mark.parametrize(
+    ("task", "why"),
+    [
+        (TaskState.ENDED, ChatClosed.STAFF),
+        (
+            TaskState.FAILED,
+            ChatClosed.LOST,
+        ),  # a conversation that did not go ahead has its own reason
+        (TaskState.CANCELLED, ChatClosed.LOST),
+    ],
+)
+async def test_a_task_that_ended_closes_the_chat(
+    setup: Setup, task: TaskState, why: ChatClosed
+) -> None:
     async with SqlUnitOfWork(setup.engine).locked() as tx:
         await tx.save_call_status(CallStatus(setup.booking_id, task=task))
 
-    assert await setup.send() is SendRefusal.CLOSED
-    read = await setup.read()
-    assert read is not None
-    assert read.closed is ChatClosed.STAFF
+    assert await setup.send() is ChatRefusal.CLOSED
+    assert (await setup.read()).closed is why
+
+
+async def test_the_status_of_the_booking_is_read_again_inside_the_lock(setup: Setup) -> None:
+    stale, group = await setup.booking()  # read while it was confirmed
+    async with SqlUnitOfWork(setup.engine).locked() as tx:
+        await tx.save_booking(replace(stale, status=BookingStatus.CANCELLED))
+
+    outcome = await setup.service.send(stale, group, WORDS, ID, max_chars=1000, per_minute=20)
+
+    assert outcome is ChatRefusal.CLOSED  # the route's copy said confirmed
+    assert setup.dispatcher.appended == []
+
+
+async def test_a_lost_answer_keeps_the_message_sent_and_a_definite_refusal_takes_it_back(
+    setup: Setup,
+) -> None:
+    setup.dispatcher.append_error = IntegrationError("unreachable", retryable=True, ambiguous=True)
+
+    kept = await setup.send()
+
+    assert isinstance(kept, CallMessage)  # it may have arrived: the confirmation settles it
+    assert [m.state for m in await setup.stored()] == [ChatState.SENT]
+
+    setup.dispatcher.append_error = IntegrationError("rejected_403", retryable=False)
+    assert await setup.send(client_id=OTHER_ID) is ChatRefusal.UNAVAILABLE
+    assert [m.provider_message_id for m in await setup.stored()] == [
+        f"p{ID}"
+    ]  # only the new one went
+
+
+async def test_a_retry_of_a_message_that_is_still_sent_is_appended_again_not_duplicated(
+    setup: Setup,
+) -> None:
+    setup.dispatcher.append_error = IntegrationError("unreachable", retryable=True, ambiguous=True)
+    first = await setup.send()
+    setup.dispatcher.append_error = None
+
+    again = await setup.send()  # the same identifier: the platform takes one aliasId as one message
+
+    assert isinstance(first, CallMessage)
+    assert isinstance(again, CallMessage)
+    assert again.id == first.id
+    assert len(await setup.stored()) == 1
+    assert [m.message_id for _, m in setup.dispatcher.appended] == [f"p{ID}"]
+
+
+async def test_a_retry_of_a_waiting_message_that_fails_for_good_does_not_take_it_back(
+    setup: Setup,
+) -> None:
+    # It was not this call that stored it: a concurrent first send may still be in flight.
+    setup.dispatcher.append_error = IntegrationError("unreachable", retryable=True, ambiguous=True)
+    await setup.send()
+    setup.dispatcher.append_error = IntegrationError("rejected_403", retryable=False)
+
+    assert await setup.send() is ChatRefusal.UNAVAILABLE
+
+    assert len(await setup.stored()) == 1
+
+
+async def test_a_message_that_is_delivered_is_given_back_without_asking_the_platform(
+    setup: Setup,
+) -> None:
+    sent = await setup.send()
+    assert isinstance(sent, CallMessage)
+    async with SqlUnitOfWork(setup.engine).locked() as tx:
+        await tx.confirm_call_message(setup.booking_id, f"p{ID}")
+    asked = len(setup.dispatcher.appended)
+
+    again = await setup.send()
+
+    assert isinstance(again, CallMessage)
+    assert again.state is ChatState.DELIVERED
+    assert len(setup.dispatcher.appended) == asked
 
 
 async def test_a_refused_message_closes_the_chat(setup: Setup) -> None:
     await setup.put(_mine(setup.booking_id, "pold", state=ChatState.REFUSED))
 
-    assert await setup.send() is SendRefusal.CLOSED
-
-
-async def test_a_service_built_without_a_dispatcher_source_says_so(engine: AsyncEngine) -> None:
-    from app.domain.errors import DomainError
-
-    made = await _make(engine)
-    bare = CallChatService(SqlUnitOfWork(engine), lambda _: True)
-    booking, group = await made.booking()
-
-    with pytest.raises(DomainError):
-        await bare.send(booking, group, WORDS, ID, max_chars=1000, per_minute=20)
+    assert await setup.send() is ChatRefusal.CLOSED
 
 
 # --- the confirmation closes the loop ------------------------------------------------------------
@@ -345,6 +422,23 @@ async def test_the_platforms_confirmation_makes_the_sent_message_delivered(setup
 
 
 # --- reading -------------------------------------------------------------------------------------
+
+
+async def test_a_read_is_cut_and_the_cursor_reads_the_rest(setup: Setup) -> None:
+    for number in range(READ_LIMIT + 5):
+        await setup.put(
+            _mine(
+                setup.booking_id, f"p{number}", author=ChatAuthor.STAFF, state=ChatState.DELIVERED
+            )
+        )
+
+    first = await setup.read()
+    rest = await setup.read(since=first.messages[-1].id or 0)
+
+    assert (len(first.messages), first.more) == (READ_LIMIT, True)
+    assert (len(rest.messages), rest.more) == (5, False)
+    ids = [m.id for m in first.messages + rest.messages]
+    assert ids == sorted(set(ids))  # in order, none twice
 
 
 async def test_a_read_returns_only_what_is_newer_than_the_cursor(setup: Setup) -> None:

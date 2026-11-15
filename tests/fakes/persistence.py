@@ -32,7 +32,7 @@ from app.domain.booking import (
 )
 from app.domain.booking_rollup import DayCount, RollableBooking
 from app.domain.branding import Branding, FontFile, FontRole, Logo
-from app.domain.call_chat import CallMessage, ChatState
+from app.domain.call_chat import CallMessage, ChatAuthor, ChatState
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
 from app.domain.capacity import CapacityPool
 from app.domain.change_requests import ChangeRequest
@@ -917,8 +917,41 @@ class InMemoryTransaction(ServiceRequestStore):
         stored.append(replace(message, id=self.state.next_id))
         return True
 
-    async def messages_of_call(self, booking_id: int) -> list[CallMessage]:
-        return sorted(self.state.call_messages.get(booking_id, []), key=lambda m: (m.at, m.id or 0))
+    async def messages_of_call(
+        self, booking_id: int, since: int = 0, limit: int | None = None
+    ) -> list[CallMessage]:
+        found = sorted(
+            (m for m in self.state.call_messages.get(booking_id, []) if (m.id or 0) > since),
+            key=lambda m: m.id or 0,
+        )
+        return found if limit is None else found[:limit]
+
+    async def call_message_by_provider_id(
+        self, booking_id: int, provider_message_id: str
+    ) -> CallMessage | None:
+        for m in self.state.call_messages.get(booking_id, []):
+            if m.provider_message_id == provider_message_id:
+                return m
+        return None
+
+    async def participant_message_times(self, booking_id: int, after: datetime) -> list[datetime]:
+        return [
+            m.at
+            for m in self.state.call_messages.get(booking_id, [])
+            if m.author is ChatAuthor.PARTICIPANT and m.at > after
+        ]
+
+    async def call_message_states(self, booking_id: int, ids: list[int]) -> dict[int, ChatState]:
+        return {
+            m.id: m.state
+            for m in self.state.call_messages.get(booking_id, [])
+            if m.id in ids and m.author is ChatAuthor.PARTICIPANT and m.id is not None
+        }
+
+    async def has_refused_call_message(self, booking_id: int) -> bool:
+        return any(
+            m.state is ChatState.REFUSED for m in self.state.call_messages.get(booking_id, [])
+        )
 
     async def confirm_call_message(self, booking_id: int, provider_message_id: str) -> bool:
         stored = self.state.call_messages.get(booking_id, [])

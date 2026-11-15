@@ -1490,7 +1490,7 @@ stored first and taken back when the contact center cannot be reached, and the p
 sent" and keeps the text (a `503` with `unavailable`): look at the connection's card on *Channels*
 and the contact center's status; a `403` on the append is `messaging_not_configured` (the feature or
 channel is not set up) and never turns into a work item. A message that stays *Verzonden* (sent)
-was accepted and not confirmed: the subscription must include `task-message:appended`. A chat that
+was accepted, or its answer was lost after the request may have arrived (it is then not taken back), and not confirmed: the subscription must include `task-message:appended`. A chat that
 closes by itself means the task ended or the platform refused a message after the end; the thread
 stays readable. `embedded_call_chat_per_minute` (platform) limits what one participant may send in
 a minute, `embedded_call_chat_max_chars` (organisation) the longest message; the most one

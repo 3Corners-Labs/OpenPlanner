@@ -27,6 +27,16 @@ once on a booking without a chat (the page must be as before: no side bar, no ch
 | 11 | 320 px and 400 % zoom | The side bar is below the content, nothing scrolls sideways, every target is at least 24 by 24 px |
 | 12 | Forced colours, dark appearance, reduced motion | The messages and the closed sentence keep a border; the own messages are told apart by their label and not by colour; nothing moves |
 | 13 | Markup typed in a message | It is shown as text, by the participant's reader too |
+| 14 | A window under about 650 px high (a landscape phone, a browser with a large toolbar) at 64 rem wide or more | The side bar is cut to the window less the control bar and scrolls inside itself, so Send is never under the fixed bar (2.4.11); 320 px and 400 % zoom still stack the bar below the content |
+| 15 | `prefers-contrast: more` | Borders and the muted time and state text stay readable (the side bar has no rule of its own for it: look) |
+| 16 | The contrast of the muted time and state text in dark appearance | At least 4.5:1 against the message's background (`--booking-color-text-muted` on the surface and the accent tint) |
+| 17 | The log as a scrolling region | It is a tab stop only while it scrolls, has a visible focus ring and a name, and its scroll target is at least 24 by 24 px; with a few messages it is no tab stop |
+| 18 | A touch keyboard (iOS and Android) | The hint says Enter starts a new line and the button sends, there is no Enter-sends behaviour, and the screen reader reads the hint that is true |
+| 19 | A staff name that arrives after messages were read | Lines already in the log are not read again; only the lines after it carry the name |
+| 20 | The first read of a thread (a reload) and the moment the live region is switched back to polite (after half a second) | The history is not read out by NVDA or VoiceOver, and a message that arrives in that half second is still read |
+| 21 | A session that ended or a chat that is gone (403, 404) | The sentence says so, the field is gone and focus is not lost; a retry is not offered |
+| 22 | A closed chat for each reason (appointment over, the staff closed it, did not go ahead, participant left) | Each has its own sentence, read once |
+| 23 | The date of a message that is not from today | The `time` element reads the date and the time in the page's language |
 
 ## Results
 

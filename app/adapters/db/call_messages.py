@@ -7,6 +7,8 @@ purge deletes the rows (``delete_call_messages``). ``provider_message_id`` is un
 a delivery that arrives twice is one row.
 """
 
+from datetime import UTC, datetime
+
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -58,14 +60,71 @@ class CallMessageQueries:
         await self._session.flush()
         return True
 
-    async def messages_of_call(self, booking_id: int) -> list[CallMessage]:
-        """Return a booking's chat, oldest first."""
-        rows = await self._session.scalars(
+    async def messages_of_call(
+        self, booking_id: int, since: int = 0, limit: int | None = None
+    ) -> list[CallMessage]:
+        """Return a booking's chat in arrival order (by id), only what is newer than ``since``.
+
+        Arrival order and not the platform's time: a staff message carries the platform's clock and
+        an own one ours, and the live page appends in arrival order, so a reload shows the same.
+        """
+        query = (
             select(CallMessageRow)
-            .where(CallMessageRow.booking_id == booking_id)
-            .order_by(CallMessageRow.at, CallMessageRow.id)
+            .where(CallMessageRow.booking_id == booking_id, CallMessageRow.id > since)
+            .order_by(CallMessageRow.id)
         )
+        if limit is not None:
+            query = query.limit(limit)
+        rows = await self._session.scalars(query)
         return [_message(row) for row in rows]
+
+    async def call_message_by_provider_id(
+        self, booking_id: int, provider_message_id: str
+    ) -> CallMessage | None:
+        """Return the booking's message with that provider id, or ``None``."""
+        row = await self._session.scalar(
+            select(CallMessageRow).where(
+                CallMessageRow.booking_id == booking_id,
+                CallMessageRow.provider_message_id == provider_message_id,
+            )
+        )
+        return _message(row) if row else None
+
+    async def participant_message_times(self, booking_id: int, after: datetime) -> list[datetime]:
+        """Return the times of the participant's messages later than ``after`` (the rate window)."""
+        rows = await self._session.scalars(
+            select(CallMessageRow.at).where(
+                CallMessageRow.booking_id == booking_id,
+                CallMessageRow.author == ChatAuthor.PARTICIPANT.value,
+                CallMessageRow.at > after,
+            )
+        )
+        return [at if at.tzinfo else at.replace(tzinfo=UTC) for at in rows]
+
+    async def call_message_states(self, booking_id: int, ids: list[int]) -> dict[int, ChatState]:
+        """Return the state of the participant's messages among ``ids`` (none for an empty list)."""
+        if not ids:
+            return {}
+        rows = await self._session.execute(
+            select(CallMessageRow.id, CallMessageRow.state).where(
+                CallMessageRow.booking_id == booking_id,
+                CallMessageRow.author == ChatAuthor.PARTICIPANT.value,
+                CallMessageRow.id.in_(ids),
+            )
+        )
+        return {row_id: ChatState(state) for row_id, state in rows}
+
+    async def has_refused_call_message(self, booking_id: int) -> bool:
+        """Return whether the platform refused a message of the booking's chat."""
+        found = await self._session.scalar(
+            select(CallMessageRow.id)
+            .where(
+                CallMessageRow.booking_id == booking_id,
+                CallMessageRow.state == ChatState.REFUSED.value,
+            )
+            .limit(1)
+        )
+        return found is not None
 
     async def confirm_call_message(self, booking_id: int, provider_message_id: str) -> bool:
         """Mark the booking's ``sent`` message ``delivered``; ``False`` when there is none."""

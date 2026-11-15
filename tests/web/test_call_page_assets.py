@@ -101,7 +101,7 @@ def _read_by_the_script() -> set[str]:
     names |= {  # "chat_problem_" + the refusal of a send, "chat_closed_" + why the chat is closed
         f"chat_problem_{code}" for code in ("empty", "too_long", "failed", "rate", "full")
     }
-    names |= {f"chat_closed_{why}" for why in ("staff", "ended", "left")}
+    names |= {f"chat_closed_{why}" for why in ("staff", "ended", "left", "lost", "gone")}
     names |= {f"chat_state_{word}" for word in ("sent", "delivered", "refused")}
     names |= {  # "say_failed_" + reason of fail()
         f"say_failed_{reason}"

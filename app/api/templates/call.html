@@ -272,7 +272,7 @@
   <aside class="call-chat" aria-labelledby="call-chat-heading" data-call-chat hidden>
     <h2 id="call-chat-heading">{{ _("callpage.chat.heading") }}</h2>
     <p class="hint call-chat__warning">{{ _("callpage.chat.warning") }}</p>
-    <div class="call-chat__log" role="log" aria-live="polite" aria-relevant="additions" aria-label="{{ _("callpage.chat.log") }}" tabindex="0" data-call-chat-log></div>
+    <div class="call-chat__log" role="log" aria-live="polite" aria-relevant="additions" aria-label="{{ _("callpage.chat.log") }}" data-call-chat-log></div>
     <div class="call-chat__closed" tabindex="-1" data-call-chat-closed hidden>
       <p><strong>{{ _("callpage.chat.closed.heading") }}</strong></p>
       <p data-call-chat-closed-text></p>
@@ -281,7 +281,7 @@
       <div class="field">
         <label for="call-chat-text">{{ _("callpage.chat.label") }}</label>
         <textarea id="call-chat-text" name="text" rows="3" autocomplete="off" aria-describedby="call-chat-keys call-chat-left" data-call-chat-text></textarea>
-        <p class="hint" id="call-chat-keys">{{ _("callpage.chat.keys") }}</p>
+        <p class="hint" id="call-chat-keys"><span class="call-chat__keys-fine">{{ _("callpage.chat.keys") }}</span><span class="call-chat__keys-touch">{{ _("callpage.chat.keys_touch") }}</span></p>
         <p class="hint" id="call-chat-left" data-call-chat-left></p>
         <p class="call-chat__problem" id="call-chat-problem" data-call-chat-problem hidden></p>
       </div>
@@ -394,6 +394,8 @@
     <span data-text="chat_closed_goes_on">{{ _("callpage.chat.closed.goes_on") }}</span>
     <span data-text="chat_closed_ended">{{ _("callpage.chat.closed.ended") }}</span>
     <span data-text="chat_closed_left">{{ _("callpage.chat.closed.left") }}</span>
+    <span data-text="chat_closed_lost">{{ _("callpage.chat.closed.lost") }}</span>
+    <span data-text="chat_closed_gone">{{ _("callpage.chat.closed.gone") }}</span>
     <span data-text="say_chat_closed">{{ _("callpage.say.chat_closed") }}</span>
     <span data-text="say_chat_refused">{{ _("callpage.say.chat_refused") }}</span>
     {% endif %}

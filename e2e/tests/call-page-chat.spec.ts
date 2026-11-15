@@ -39,11 +39,12 @@ test.use({ locale: 'en-US' });
 
 const NEXT = { timeout: 20_000 };
 
-type Line = { id: number; author: 'participant' | 'staff'; text: string; state: string; time: string };
+type Line = { id: number; author: 'participant' | 'staff'; text: string; state: string; time: string; at: string };
+const AT = '2026-11-15T09:30:00+00:00';
 type Model = {
   lines: Line[];
   staff: string;
-  closed: null | 'ended' | 'staff';
+  closed: null | 'ended' | 'staff' | 'lost';
   /** What the next send is answered with, in turn; the last repeats. A number is a status. */
   sends: (number | 'ok')[];
   reads: Request[];
@@ -68,6 +69,7 @@ function model(): Model {
 }
 
 let nextId = 100;
+const ERRORS: Record<number, string> = { 400: 'refused', 403: 'refused', 409: 'closed', 429: 'rate_limited', 503: 'unavailable' };
 
 /** Answer the chat's address as the server does, from `m`; a test changes `m` while the page runs. */
 async function serve(page: Page, m: Model): Promise<void> {
@@ -81,8 +83,8 @@ async function serve(page: Page, m: Model): Promise<void> {
       const body = request.postDataJSON() as { id: string; text: string };
       m.posts.push(body);
       const outcome = m.sends[Math.min(m.posts.length - 1, m.sends.length - 1)];
-      if (outcome !== 'ok') return answer(outcome, { error: outcome === 503 ? 'unavailable' : 'refused' });
-      const line: Line = { id: (nextId += 1), author: 'participant', text: body.text, state: 'sent', time: '09:30' };
+      if (outcome !== 'ok') return answer(outcome, { error: ERRORS[outcome] ?? 'refused' });
+      const line: Line = { id: (nextId += 1), author: 'participant', text: body.text, state: 'sent', time: '09:30', at: AT };
       m.lines.push(line);
       return answer(200, { message: line });
     }
@@ -97,13 +99,15 @@ async function serve(page: Page, m: Model): Promise<void> {
       if (m.confirm && line.state === 'sent') line.state = 'delivered';
       if (line.state !== 'sent') states[String(line.id)] = line.state; // only what the page named as waiting
     }
-    return answer(200, { messages: m.lines.filter((l) => l.id > since), states, staff: m.staff, closed: m.closed });
+    // At most 100 a read, with `more`, as the server answers.
+    const newer = m.lines.filter((l) => l.id > since);
+    return answer(200, { messages: newer.slice(0, 100), states, staff: m.staff, closed: m.closed, more: newer.length > 100 });
   });
 }
 
 /** The staff member writes. */
 const staffSays = (m: Model, text: string): void => {
-  m.lines.push({ id: (nextId += 1), author: 'staff', text, state: 'delivered', time: '09:31' });
+  m.lines.push({ id: (nextId += 1), author: 'staff', text, state: 'delivered', time: '09:31', at: AT });
 };
 
 const probed = new WeakSet<Page>();
@@ -327,16 +331,47 @@ test('a staff member\'s message arrives with their name, politely, without movin
   expect(await log(page).evaluate((el) => el.getAttribute('role'))).toBe('log');
 });
 
-test('without a name the staff member is the team\'s word, and a name that arrives later relabels the line', async ({ page }) => {
+test('without a name the staff member is the team\'s word; a name that comes in after is on the later lines and the read line is left as it was', async ({ page }) => {
   const m = model();
   staffSays(m, 'Hello');
   await inCall(page, m);
-  const who = messages(page).first().locator('.call-chat__who');
-  await expect(who).toHaveText(/^[^·]+$/, NEXT);
+  const first = messages(page).first();
+  await expect(first.locator('.call-chat__who')).toHaveText(/^[^·]+$/, NEXT);
+  await first.evaluate((el) => ((el as HTMLElement & { kept?: boolean }).kept = true));
 
   m.staff = 'Sanne';
+  staffSays(m, 'Second');
 
-  await expect(who).toHaveText(/^Sanne · /, NEXT);
+  await expect(messages(page)).toHaveCount(2, NEXT);
+  await expect(messages(page).nth(1).locator('.call-chat__who')).toHaveText(/^Sanne · /);
+  await expect(first.locator('.call-chat__who')).toHaveText(/^[^·]+$/); // a line that was read is not rewritten
+  expect(await first.evaluate((el) => (el as HTMLElement & { kept?: boolean }).kept)).toBe(true);
+});
+
+test('the time of a message is a time element with its full value, and a thread of more than a hundred is read in pieces', async ({ page }) => {
+  const m = model();
+  for (let n = 1; n <= 105; n += 1) staffSays(m, `Message ${n}`);
+  m.lines[0].time = '12 Nov 2026 09:31'; // not from today: the server puts the date in front
+  await inCall(page, m);
+
+  await expect(messages(page)).toHaveCount(105, NEXT);
+
+  const when = messages(page).first().locator('time.call-chat__time');
+  await expect(when).toHaveText('12 Nov 2026 09:31');
+  await expect(when).toHaveAttribute('datetime', AT);
+  expect(m.reads.length).toBeGreaterThanOrEqual(2); // the first read said "more" and the next came at once
+});
+
+test('the log is a tab stop only while it scrolls', async ({ page }) => {
+  const m = model();
+  staffSays(m, 'Hello');
+  await inCall(page, m);
+  await expect(messages(page)).toHaveCount(1, NEXT);
+  await expect(log(page)).not.toHaveAttribute('tabindex', /.*/);
+
+  for (let n = 1; n <= 30; n += 1) staffSays(m, `Message number ${n} with some words to fill a line or two of the log.`);
+
+  await expect(log(page)).toHaveAttribute('tabindex', '0', NEXT);
 });
 
 test('a reload shows the thread and a message that arrives twice is shown once', async ({ page }) => {
@@ -429,6 +464,46 @@ test('a chat that the staff member closed shows the thread and a sentence instea
   await expect(heading(page, IN_CALL)).toBeVisible(); // the call itself goes on
 });
 
+test('a send that the server says is closed does not decide the reason: one more read brings the last message and the server\'s reason', async ({ page }) => {
+  const m = model();
+  m.sends = [409];
+  await inCall(page, m);
+  await field(page).fill('Are you still there?');
+  m.closed = 'staff'; // the conversation ended while the participant was typing
+  staffSays(m, 'Goodbye, the chat is ending.');
+
+  await sendButton(page).click();
+
+  await expect(closedBox(page)).toBeVisible(NEXT);
+  await expect(messages(page).filter({ hasText: 'Goodbye, the chat is ending.' })).toHaveCount(1); // read after the 409
+  await expect(closedBox(page)).toContainText('has closed the chat');
+});
+
+test('a conversation that did not go ahead has its own sentence, not the staff member\'s', async ({ page }) => {
+  const m = model();
+  await inCall(page, m);
+
+  m.closed = 'lost';
+
+  await expect(closedBox(page)).toContainText('the conversation did not go ahead', NEXT);
+  await expect(closedBox(page)).not.toContainText('has closed the chat');
+});
+
+test('a session that is gone (403) or a chat that is gone (404) says so, takes the form away and offers no retry', async ({ page }) => {
+  const m = model();
+  m.sends = [403];
+  await inCall(page, m);
+  await field(page).fill('Hello');
+
+  await sendButton(page).click();
+
+  await expect(closedBox(page)).toContainText('The chat is no longer available.');
+  await expect(closedBox(page)).toContainText('open your appointment again');
+  await expect(field(page)).toBeHidden();
+  await expect(sendButton(page)).toBeHidden();
+  await expect(problem(page)).toBeHidden(); // no "choose Send to try again"
+});
+
 test('a message the platform refused shows as not delivered and the chat is closed', async ({ page }) => {
   const m = model();
   await inCall(page, m);
@@ -457,7 +532,7 @@ test('when the call ends the thread stays readable and the field makes way for t
   await expect(closedBox(page)).toContainText('The chat is closed because the call has ended. You can still read the messages.');
   await expect(field(page)).toBeHidden();
   await expect(messages(page)).toHaveCount(1);
-  await expect(page.getByText('The personal data of this call, the chat included, is deleted 24 hours after the end of your appointment.')).toBeVisible();
+  await expect(page.getByText('Our copy of the personal data of this call, the chat included, is deleted 24 hours after the end of your appointment. The contact center keeps its own record of the chat.')).toBeVisible();
 });
 
 test('when the participant leaves the sentence says so', async ({ page }) => {
@@ -536,9 +611,7 @@ test('the whole chat is reachable and usable by the keyboard alone, in the order
   await inCall(page, m);
   await expect(messages(page)).toHaveCount(1, NEXT);
 
-  await tabTo(page, log(page));
-  await expect(log(page)).toBeFocused(); // it scrolls, so it can be focused
-  await page.keyboard.press('Tab');
+  await tabTo(page, field(page)); // the log does not scroll, so it is no tab stop
   await expect(field(page)).toBeFocused();
   await page.keyboard.type('From the keyboard');
   await page.keyboard.press('Tab');
@@ -564,7 +637,7 @@ test('axe finds nothing on the side bar in the check, the call, with a closed ch
   await expect(messages(page)).toHaveCount(1, NEXT);
   await expectNoAxeViolations(page);
 
-  m.lines.push({ id: 900, author: 'participant', text: 'Lost', state: 'refused', time: '09:40' });
+  m.lines.push({ id: 900, author: 'participant', text: 'Lost', state: 'refused', time: '09:40', at: AT });
   m.closed = 'staff';
   await expect(closedBox(page)).toBeVisible(NEXT);
   await expectNoAxeViolations(page);
@@ -597,6 +670,28 @@ test('with forced colours and reduced motion the messages keep a border and noth
   await expect(messages(page).first()).toHaveCSS('border-top-style', 'solid');
   await expect(messages(page).first()).not.toHaveCSS('border-top-width', '0px');
   await expectNoAxeViolations(page);
+});
+
+test.describe('a touch keyboard', () => {
+  test.use({ hasTouch: true, isMobile: true });
+
+  test('Enter starts a new line and the button sends, and the hint says so', async ({ page, browserName }) => {
+    test.skip(browserName === 'firefox', 'Firefox has no mobile emulation');
+    const m = model();
+    await inCall(page, m);
+
+    await expect(page.getByText('Choose Send to send the message. Enter starts a new line.')).toBeVisible();
+    await expect(page.getByText('Enter sends the message. Shift and Enter together start a new line.')).toBeHidden();
+    await field(page).click();
+    await field(page).pressSequentially('a');
+    await field(page).press('Enter');
+    await field(page).pressSequentially('b');
+
+    await expect(field(page)).toHaveValue('a\nb');
+    expect(m.posts).toEqual([]);
+    await sendButton(page).click();
+    await expect(messages(page)).toHaveCount(1);
+  });
 });
 
 test('the lobby has the chat too', async ({ page }) => {

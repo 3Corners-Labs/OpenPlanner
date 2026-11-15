@@ -92,9 +92,11 @@ JOURNEY_GROUP_SLUG = "demo-reis"
 CALL_GROUP_SLUG = "demo-gesprek"
 """The team that chose the call page of its own (``join_client = embedded``, ADR 0123 step 6a): the
 call page's browser specs open its booking, while the journey team keeps the redirect."""
-CHAT_TASK_ID = "seed-conversation-task"
-"""The id of the conversation task of the seeded booking whose call page has a chat (ADR 0123 step
-7c): a made-up id, no platform holds it, so the end-to-end specs stub what the page sends."""
+CHAT_TASK_PREFIX = "seed-conversation-"
+"""The start of the id of the conversation task of the seeded booking whose call page has a chat
+(ADR 0123 step 7c). The id is made unique per seeding by the booking's reference (a task is found by
+its id, and a reseed must not leave two bookings with one), no platform holds it, and the
+end-to-end specs stub what the page sends."""
 JOURNEY_HOST = "proefhost@example.org"
 """Video host of the journey team: a made-up address, so the team offers video and the trial
 call without a Webex Service App; the simulator stands in for Webex."""
@@ -393,7 +395,11 @@ async def seed_closure_examples(
         )
         await tx.save_task(
             chat_booking.id or 0,
-            ContactCenterTaskRef(CHAT_TASK_ID, ContactCenterKind.WEBEX_CC, TaskKind.CONVERSATION),
+            ContactCenterTaskRef(
+                f"{CHAT_TASK_PREFIX}{chat_booking.public_ref}",
+                ContactCenterKind.WEBEX_CC,
+                TaskKind.CONVERSATION,
+            ),
         )
     return ClosureExamples(
         closed_group=f"/g/{CLOSED_GROUP_SLUG}",

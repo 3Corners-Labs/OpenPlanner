@@ -14825,4 +14825,13 @@ msgid "callpage.failed.chat"
 msgstr "U kunt ons ook bereiken via de chat naast deze pagina."
 
 msgid "callpage.ended.deleted_chat"
-msgstr "De persoonsgegevens van dit gesprek, de chat inbegrepen, worden 24 uur na het einde van uw afspraak verwijderd."
+msgstr "Onze kopie van de persoonsgegevens van dit gesprek, de chat inbegrepen, wordt 24 uur na het einde van uw afspraak verwijderd. Het contactcenter bewaart een eigen verslag van de chat."
+
+msgid "callpage.chat.closed.lost"
+msgstr "De chat is niet meer beschikbaar, omdat het gesprek niet is doorgegaan. U kunt de berichten nog lezen."
+
+msgid "callpage.chat.closed.gone"
+msgstr "De chat is niet meer beschikbaar. Uw sessie is mogelijk verlopen: open uw afspraak opnieuw met de koppeling in uw e-mail."
+
+msgid "callpage.chat.keys_touch"
+msgstr "Kies Verzenden om het bericht te sturen. Enter maakt een nieuwe regel."

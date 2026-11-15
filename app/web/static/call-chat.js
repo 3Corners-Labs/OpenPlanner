@@ -36,6 +36,7 @@
   var app = (window.openplannerCall = window.openplannerCall || {});
 
   var NEAR_END_PX = 24; // a log scrolled this close to its end follows new messages
+  var LIVE_AGAIN_MS = 500; // how long a first, historic draw is kept out of the live region
   var OVER = { left: true, ended: true }; // the screens after which the page is over
 
   var chatUrl = "";
@@ -54,7 +55,8 @@
   var drawn = {}; // key -> what that element shows, to leave an unchanged line alone
   var cursor = 0; // the newest server id the page holds
   var staff = ""; // the staff member's name for the participant, "" for none
-  var closed = ""; // why our server says the chat takes nothing more: "", "ended" or "staff"
+  var closed = ""; // why our server says the chat takes nothing more: "", "ended", "staff" or "lost"
+  var gone = false; // the server no longer answers this booking's chat (the session ended, or it is gone)
   var loaded = false; // the first answer has been drawn
   var pending = null; // { id, text }: the message in flight or to retry
   var sending = false;
@@ -62,20 +64,22 @@
   var screen = "start";
   var finalRead = false; // a read has been done on a page that is over
 
-  function enabled() {
-    return Boolean(chatUrl);
-  }
-
   function reason(state) {
+    if (gone) return "gone";
     if (state.screen === "ended") return "ended";
     if (state.screen === "left") return "left";
     return closed;
   }
 
   // ---- the lines of the log ----------------------------------------------------------------------
+  // A staff line keeps the label it was first drawn with: a name that comes in after it is on the lines
+  // after it, and a line that was read is not rewritten (a reader would hear it again).
   function who(item) {
     if (item.author === "participant") return app.texts.chat_you;
-    return staff ? app.texts.staff_named.replace("{name}", staff) : app.texts.staff_term;
+    if (!item.label) {
+      item.label = staff ? app.texts.staff_named.replace("{name}", staff) : app.texts.staff_term;
+    }
+    return item.label;
   }
 
   function stateWord(item) {
@@ -92,7 +96,9 @@
     var node = element("div", "call-chat__message");
     node.classList.add("call-chat__message--" + item.author);
     var meta = element("p", "call-chat__meta");
-    meta.append(element("strong", "call-chat__who"), " ", element("span", "call-chat__time"));
+    var when = element("time", "call-chat__time");
+    when.setAttribute("datetime", item.at);
+    meta.append(element("strong", "call-chat__who"), " ", when);
     node.append(meta, element("p", "call-chat__text"), element("p", "call-chat__state"));
     return node;
   }
@@ -126,6 +132,10 @@
       if (log.children[index] !== node) log.insertBefore(node, log.children[index] || null);
     });
     if (follow || wasNear) log.scrollTop = log.scrollHeight;
+    // The log can be focused for its scrolling only while it scrolls (a box that does not scroll is
+    // a stop with nothing to do), and keeps its tab stop while it has focus.
+    if (log.scrollHeight > log.clientHeight) log.setAttribute("tabindex", "0");
+    else if (document.activeElement !== log) log.removeAttribute("tabindex");
   }
 
   // ---- what comes in --------------------------------------------------------------------------
@@ -149,6 +159,7 @@
         text: String(message.text),
         state: String(message.state),
         time: String(message.time),
+        at: String(message.at),
       });
       added = true;
     });
@@ -160,15 +171,17 @@
       if (next === "refused") refused = true;
     });
     staff = typeof body.staff === "string" ? body.staff : "";
-    closed = body.closed === "ended" || body.closed === "staff" ? body.closed : "";
+    closed = ["ended", "staff", "lost"].indexOf(body.closed) !== -1 ? body.closed : "";
     var first = !loaded;
     loaded = true;
     if (first) log.setAttribute("aria-live", "off");
     draw(first);
     if (first) {
-      window.requestAnimationFrame(function () {
+      // Back to polite after a moment: a reader that is slow to work through a change after the next
+      // frame would otherwise read the history out (the manual pass of step 8 looks at this).
+      window.setTimeout(function () {
         log.setAttribute("aria-live", "polite");
-      });
+      }, LIVE_AGAIN_MS);
     }
     if (refused) app.say("say_chat_refused");
     sync(app.state);
@@ -239,6 +252,7 @@
         text: String(message.text),
         state: String(message.state),
         time: String(message.time),
+        at: String(message.at),
       });
     }
     field.value = "";
@@ -277,10 +291,18 @@
             sent(body.message);
             return;
           }
-          if (status === 409 && body.error === "closed") {
-            pending = null;
-            closed = closed || "staff";
+          if (status === 403 || status === 404) {
+            gone = true; // a retry cannot work: the session ended, or the chat is no longer there
             sync(app.state);
+            return;
+          }
+          if (status === 409 && body.error === "closed") {
+            // Not decided here: one more read brings the staff member's last messages and the
+            // server's own reason, which the sentence then says.
+            pending = null;
+            turn().then(function () {
+              if (!reason(app.state)) refuse("failed");
+            });
             return;
           }
           refuse(problemOf(status, body));
@@ -296,7 +318,7 @@
   // Whether the page still needs a turn: not before the start, not once the chat is closed and read,
   // and on a page that is over only until it has been read once.
   function wants(state) {
-    if (!enabled() || state.screen === "start") return false;
+    if (gone || state.screen === "start") return false;
     if (OVER[state.screen] && finalRead) return false;
     return !(closed && loaded);
   }
@@ -312,7 +334,8 @@
   }
 
   // One read for the poll's turn: resolves true when it went well, false otherwise (so the poll
-  // waits longer), and never rejects.
+  // waits longer), and never rejects. A read that says there is more is followed at once by the
+  // next, so a long thread comes in pieces without a wait between them.
   function turn(signal) {
     var query = "?since=" + cursor;
     var ids = waiting();
@@ -321,13 +344,19 @@
     return window
       .fetch(address, { method: "GET", credentials: "same-origin", cache: "no-store", signal: signal })
       .then(function (response) {
+        if (response.status === 403 || response.status === 404) return { gone: true };
         if (!response.ok) throw new Error("refused");
         return response.json();
       })
       .then(function (body) {
+        if (body.gone) {
+          gone = true;
+          sync(app.state);
+          return true;
+        }
         receive(body);
         if (OVER[app.state.screen]) finalRead = true;
-        return true;
+        return body.more === true ? turn(signal) : true;
       })
       .catch(function () {
         return false;
@@ -343,7 +372,6 @@
 
   // Called by `render` after every change of the page's state.
   function sync(state) {
-    if (!enabled() || !box) return;
     if (state.screen !== screen) {
       screen = state.screen;
       finalRead = false;
@@ -370,7 +398,7 @@
   }
 
   function reset() {
-    if (!enabled()) return;
+    gone = false;
     items = [];
     nodes = {};
     drawn = {};
@@ -392,10 +420,6 @@
   function init() {
     chatUrl = app.root.dataset.callChatUrl || "";
     maxChars = parseInt(app.root.dataset.callChatMax, 10) || 0;
-    if (!chatUrl || !maxChars) {
-      chatUrl = "";
-      return;
-    }
     box = app.$("[data-call-chat]");
     log = app.$("[data-call-chat-log]");
     form = app.$("[data-call-chat-form]");
@@ -418,6 +442,8 @@
     field.addEventListener("keydown", function (event) {
       if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
       if (event.ctrlKey || event.metaKey || event.altKey) return;
+      // A touch keyboard has no Shift and Enter: there Enter starts a new line and the button sends.
+      if (window.matchMedia("(pointer: coarse)").matches) return;
       event.preventDefault();
       send();
     });

@@ -106,25 +106,51 @@ def test_the_text_is_cleaned_of_control_and_direction_characters_only(
     assert clean_text(text) == cleaned
 
 
-def _mine(state: ChatState) -> CallMessage:
-    return CallMessage(1, ChatAuthor.PARTICIPANT, "x", NOW, state, "p1")
-
-
 @pytest.mark.parametrize(
-    ("open_", "task", "messages", "expected"),
+    ("open_", "task", "refused", "expected"),
     [
-        (True, TaskState.QUEUED, [], None),
-        (True, TaskState.CONNECTED, [_mine(ChatState.DELIVERED)], None),
-        (True, TaskState.NONE, [_mine(ChatState.SENT)], None),
-        (False, TaskState.CONNECTED, [], ChatClosed.ENDED),  # the appointment is over
-        (False, TaskState.ENDED, [], ChatClosed.ENDED),  # over wins over a task that ended
-        (True, TaskState.ENDED, [], ChatClosed.STAFF),
-        (True, TaskState.FAILED, [], ChatClosed.STAFF),
-        (True, TaskState.CANCELLED, [], ChatClosed.STAFF),
-        (True, TaskState.CONNECTED, [_mine(ChatState.REFUSED)], ChatClosed.STAFF),
+        (True, TaskState.QUEUED, False, None),
+        (True, TaskState.CONNECTED, False, None),
+        (True, TaskState.NONE, False, None),
+        (False, TaskState.CONNECTED, False, ChatClosed.ENDED),  # the appointment is over
+        (False, TaskState.ENDED, False, ChatClosed.ENDED),  # over wins over a task that ended
+        (True, TaskState.ENDED, False, ChatClosed.STAFF),
+        (True, TaskState.CONNECTED, True, ChatClosed.STAFF),  # a refused message
+        (True, TaskState.FAILED, False, ChatClosed.LOST),  # the conversation did not go ahead
+        (True, TaskState.CANCELLED, False, ChatClosed.LOST),
+        (True, TaskState.FAILED, True, ChatClosed.LOST),
     ],
 )
 def test_the_chat_is_closed_when_the_appointment_is_over_or_the_conversation_ended(
-    open_: bool, task: TaskState, messages: list[CallMessage], expected: ChatClosed | None
+    open_: bool, task: TaskState, refused: bool, expected: ChatClosed | None
 ) -> None:
-    assert chat_closed(open_, task, messages) is expected
+    assert chat_closed(open_, task, refused) is expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "\u200b",
+        "\ufeff",
+        "\u2060",
+        "\u2800",
+        "\u200b\u200b \u2800",
+        "\u3164",
+        "\u00a0",
+        "\u200b\n\t",
+    ],
+)
+def test_a_message_with_nothing_to_see_is_empty(text: str) -> None:
+    assert check_text(clean_text(text), 1000) is ChatRefusal.EMPTY
+    assert check_text(text, 1000) is ChatRefusal.EMPTY  # also without the cleaning
+
+
+@pytest.mark.parametrize(
+    ("text", "cleaned"),
+    [
+        ("a\u200bb\ufeffc\u2060d", "abcd"),  # invisible format characters go
+        ("\U0001f468\u200d\U0001f469", "\U0001f468\u200d\U0001f469"),  # the emoji joiner stays
+    ],
+)
+def test_invisible_format_characters_go_and_the_emoji_joiner_stays(text: str, cleaned: str) -> None:
+    assert clean_text(text) == cleaned

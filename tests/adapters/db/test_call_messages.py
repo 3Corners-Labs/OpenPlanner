@@ -26,6 +26,7 @@ from app.domain.call_chat import (
 )
 from app.domain.call_chat_service import CallChatService
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef, TaskKind
+from app.domain.contact_center_dispatch import DispatcherChoice
 from app.domain.integration import EventOutcome
 from app.domain.purge import purge_booking
 from app.domain.retention_sweep import RetentionSweep
@@ -102,7 +103,11 @@ async def _make(engine: AsyncEngine, task_kind: TaskKind = TaskKind.CONVERSATION
     assert group is not None
     page = [True]
     return Setup(
-        engine, booking_id, group.organisation_id, CallChatService(uow, lambda _: page[0]), page
+        engine,
+        booking_id,
+        group.organisation_id,
+        CallChatService(uow, lambda _: page[0], lambda: DispatcherChoice({}), FixedClock(NOW)),
+        page,
     )
 
 
@@ -121,7 +126,7 @@ def _message(booking_id: int, provider_id: str, **changes: object) -> CallMessag
     return CallMessage(**{**base.__dict__, **changes})  # type: ignore[arg-type]
 
 
-async def test_a_message_is_stored_once_per_provider_id_and_listed_oldest_first(
+async def test_a_message_is_stored_once_per_provider_id_and_listed_in_arrival_order(
     setup: Setup,
 ) -> None:
     id_ = setup.booking_id
@@ -133,7 +138,9 @@ async def test_a_message_is_stored_once_per_provider_id_and_listed_oldest_first(
     stored = await setup.stored()
 
     assert (first, again, second) == (True, False, True)
-    assert [m.provider_message_id for m in stored] == ["a", "b"]
+    # By id, the order the messages arrived in, whatever time each carries: the live page appends
+    # in that order, so a reload shows the same.
+    assert [m.provider_message_id for m in stored] == ["b", "a"]
     assert stored[1].message_text == "Hallo"  # the replay did not replace it
     assert all(m.id is not None for m in stored)
 
@@ -309,14 +316,16 @@ async def test_switching_the_page_off_ends_the_chat_for_what_comes_in(setup: Set
     assert await setup.stored() == []
 
 
-async def test_the_thread_is_read_oldest_first(setup: Setup) -> None:
+async def test_the_thread_is_read_in_arrival_order_not_in_the_platforms_time(
+    setup: Setup,
+) -> None:
     later = replace(_agent("Tweede", "m-2"), at=NOW - timedelta(seconds=1))
     await setup.deliver(later, key="a")
     await setup.deliver(_agent("Eerste", "m-1"), key="b")
 
     thread = await setup.service.thread(setup.booking_id)
 
-    assert [m.message_text for m in thread] == ["Eerste", "Tweede"]
+    assert [m.message_text for m in thread] == ["Tweede", "Eerste"]
 
 
 # --- the bound, the closed booking, the clock, a confirmation that comes early -----------------
@@ -365,7 +374,7 @@ async def test_a_message_cannot_claim_a_time_after_the_gates_own(setup: Setup) -
     await setup.deliver(future, key="a")
     await setup.deliver(past, key="b")
 
-    assert [m.at for m in await setup.stored()] == [NOW - timedelta(minutes=2), NOW]
+    assert [m.at for m in await setup.stored()] == [NOW, NOW - timedelta(minutes=2)]
 
 
 async def test_a_confirmation_that_comes_before_its_message_is_processed_when_it_comes_again(

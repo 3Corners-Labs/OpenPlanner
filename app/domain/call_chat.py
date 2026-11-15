@@ -27,7 +27,6 @@ the organisation's ``embedded_call_staff_name`` and our own record of who accept
 
 import re
 import unicodedata
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
@@ -87,6 +86,8 @@ class ChatClosed(StrEnum):
     """The appointment is over (the booking is no longer a confirmed one)."""
     STAFF = "staff"
     """The conversation was ended on the contact center's side, or a message was refused."""
+    LOST = "lost"
+    """The task failed or was cancelled at the platform: the conversation did not go ahead."""
 
 
 class ChatRefusal(StrEnum):
@@ -94,6 +95,19 @@ class ChatRefusal(StrEnum):
 
     EMPTY = "empty"
     TOO_LONG = "too_long"
+    BAD_REQUEST = "bad_request"
+    """The page's identifier of the message is not of the shape the page makes."""
+    RATE_LIMITED = "rate_limited"
+    """More messages in the last minute than ``embedded_call_chat_per_minute`` allows."""
+    CLOSED = "closed"
+    """The chat takes nothing more (the appointment is over, or the conversation ended)."""
+    FULL = "full"
+    """The booking's chat holds ``MAX_MESSAGES_PER_BOOKING`` messages."""
+    UNAVAILABLE = "unavailable"
+    """The contact center is not configured, refused or could not be reached; nothing was kept
+    that is known not to have arrived."""
+    NO_CHAT = "no_chat"
+    """The booking has no chat (not a conversation task on a service that uses the page)."""
 
 
 class ChatEventKind(StrEnum):
@@ -183,25 +197,43 @@ def has_chat(task_kind: TaskKind | None, uses_call_page: bool) -> bool:
     return uses_call_page and task_kind is TaskKind.CONVERSATION
 
 
+_BLANK_LOOKING = frozenset("\u2800\u3164\u115f\u1160\u17b4\u17b5\u180e")
+"""Characters that draw nothing yet are not white space nor a format character."""
+
+
 def clean_text(text: str) -> str:
     """Return ``text`` as it is kept: one kind of line end, control characters taken out.
 
-    A tab stays and a line break stays; every other control character and every character that
-    turns the direction of the text around is dropped, so a message cannot hide or reorder what
-    the staff member reads. Nothing else changes, and the text is not trimmed.
+    A tab stays and a line break stays; every other control character, every invisible format
+    character (zero-width space, joiners, the byte order mark, the word joiner) except the zero
+    width joiner that emoji sequences need, and every character that turns the direction of the
+    text around is dropped, so a message cannot hide or reorder what the staff member reads.
+    Nothing else changes, and the text is not trimmed.
     """
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = _UNSAFE.sub("", text)
-    return "".join(c for c in text if c in "\n\t" or unicodedata.category(c) != "Cc")
+    return "".join(
+        c for c in text if c in "\n\t\u200d" or unicodedata.category(c) not in ("Cc", "Cf")
+    )
+
+
+def _visible(char: str) -> bool:
+    """Return whether ``char`` draws something a reader sees."""
+    return (
+        not char.isspace()
+        and char not in _BLANK_LOOKING
+        and unicodedata.category(char) not in ("Cc", "Cf", "Zs", "Zl", "Zp")
+    )
 
 
 def check_text(text: str, max_chars: int) -> ChatRefusal | None:
     """Return why a participant's message may not be sent, or ``None`` when it may.
 
-    A message of only white space is empty. Length counts characters of the text as written
+    A message with no character that draws something (white space, an invisible or blank-looking
+    character only) is empty. Length counts characters of the text as written
     (``embedded_call_chat_max_chars``). The call page's sending applies it to ``clean_text``.
     """
-    if not text.strip():
+    if not any(_visible(c) for c in text):
         return ChatRefusal.EMPTY
     if len(text) > max_chars:
         return ChatRefusal.TOO_LONG
@@ -227,24 +259,23 @@ def capped(text: str) -> str:
     return text[:INBOUND_TEXT_CAP]
 
 
-def chat_closed(
-    booking_open: bool, task: TaskState, messages: Sequence[CallMessage]
-) -> ChatClosed | None:
+def chat_closed(booking_open: bool, task: TaskState, refused: bool) -> ChatClosed | None:
     """Return why the chat takes nothing more, or ``None`` while it is open.
 
-    The appointment being over closes it for good (``ENDED``). Otherwise it is closed from the
-    contact center's side (``STAFF``) when the task ended, failed or was cancelled, or when the
-    platform refused a message (ADR 0123 point 8: a message appended after the end is refused a
-    second later, so a refusal means the conversation is over).
+    The appointment being over closes it for good (``ENDED``). A task that failed or was
+    cancelled means the conversation did not go ahead (``LOST``). A task that ended, or a message
+    the platform refused, means the contact center's side closed it (``STAFF``; ADR 0123 point 8:
+    a message appended after the end is refused a second later).
 
     Args:
         booking_open: Whether the booking is still a confirmed one.
         task: The state of the contact-center task.
-        messages: The booking's chat.
+        refused: Whether the platform refused a message of the booking's chat.
     """
     if not booking_open:
         return ChatClosed.ENDED
-    over = task in (TaskState.ENDED, TaskState.FAILED, TaskState.CANCELLED)
-    if over or any(m.state is ChatState.REFUSED for m in messages):
+    if task in (TaskState.FAILED, TaskState.CANCELLED):
+        return ChatClosed.LOST
+    if task is TaskState.ENDED or refused:
         return ChatClosed.STAFF
     return None

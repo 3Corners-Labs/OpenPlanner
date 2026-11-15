@@ -964,6 +964,23 @@ body:has([data-call-state="call"]:not([hidden])) .call-stage {
   outline-offset: 2px;
 }
 
+/* The way to send is said for the pointer in use: a touch keyboard has no Shift and Enter, so there
+   Enter starts a new line and the button sends (call-chat.js). The sentence that is not true here is
+   not in the box and so not read. */
+.call-chat__keys-touch {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .call-chat__keys-fine {
+    display: none;
+  }
+
+  .call-chat__keys-touch {
+    display: inline;
+  }
+}
+
 .call-chat__form .field {
   margin-bottom: var(--booking-space-s);
 }
@@ -1003,9 +1020,14 @@ body:has([data-call-state="call"]:not([hidden])) .call-stage {
     margin-top: 0;
   }
 
+  /* The bar is fixed at the foot of the window: a side bar taller than the window less the bar would
+     leave Send under it (WCAG 2.4.11), so it is cut to the room there is and scrolls inside itself. */
   .call-chat {
     position: sticky;
     top: var(--booking-space-m);
+    max-height: calc(100vh - 8rem);
+    max-height: calc(100dvh - 8rem);
+    overflow-y: auto;
   }
 }
 

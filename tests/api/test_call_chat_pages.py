@@ -25,12 +25,15 @@ from app.domain.authorization import Role
 from app.domain.booking import MeetingRef
 from app.domain.call_chat import (
     CallMessage,
+    ChatAuthor,
     ChatDirection,
     ChatEvent,
     ChatEventKind,
     ChatSender,
+    ChatState,
 )
 from app.domain.call_chat_service import CallChatService
+from app.domain.calls import CallStatus, TaskState
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef, TaskKind
 from app.domain.contact_center_dispatch import DispatcherChoice
 from app.domain.integration import EventOutcome
@@ -122,6 +125,13 @@ class Site:
         )
         event = replace(event, sender=ChatSender.AGENT)
         assert await self.deliver(event, message_id) is EventOutcome.RECORDED
+
+    async def confirm(self, message_id: int) -> None:
+        async with SqlUnitOfWork(self.app.state.engine).locked() as tx:
+            stored = next(
+                m for m in await tx.messages_of_call(self.booking_id) if m.id == message_id
+            )
+            await tx.confirm_call_message(self.booking_id, stored.provider_message_id)
 
     async def staff_member(self, screen_name: str | None) -> None:
         engine = create_engine(self.settings.database_url)
@@ -377,7 +387,13 @@ async def test_a_read_that_brings_nothing_carries_no_message(site: Site) -> None
 
     nothing = await site.read(f"?since={cursor}")
 
-    assert nothing.json() == {"messages": [], "states": {}, "staff": "", "closed": None}
+    assert nothing.json() == {
+        "messages": [],
+        "states": {},
+        "staff": "",
+        "closed": None,
+        "more": False,
+    }
     assert WORDS not in nothing.text
     assert sent["id"] <= cursor
 
@@ -571,3 +587,129 @@ async def test_the_read_has_the_per_booking_bound_of_the_poll_and_names_nothing(
         assert answers[-1].headers["retry-after"] == "60"
         # The bucket of the name is a different one: the staff poll still answers.
         assert (await running.client.get(f"{running.base}/call/staff")).status_code == 200
+
+
+# ---- queries and bodies the page would not make ---------------------------------------------
+
+
+@pytest.mark.parametrize("waiting", ["\u00b2", "1,\u00b2,3", "\u0663", "1;2", ",,,", "9" * 400])
+async def test_a_waiting_list_with_digits_that_are_not_ascii_never_breaks_the_read(
+    site: Site, waiting: str
+) -> None:
+    # ``str.isdigit`` accepts a superscript, which ``int`` refuses: that was a 500.
+    response = await site.client.get(site.path, params={"waiting": waiting})
+
+    assert response.status_code == 200
+    assert response.json()["states"] == {}
+
+
+async def test_deeply_nested_json_is_a_refused_body_and_not_a_server_error(site: Site) -> None:
+    nested = b"[" * 30_000  # json.loads raises RecursionError for this, not ValueError
+
+    response = await site.client.post(
+        site.path, content=nested, headers={**SAME_SITE, "content-type": "application/json"}
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"error": "bad_request"}
+    assert site.dispatcher.appended == []
+
+
+async def test_only_the_participants_own_waiting_ids_are_answered(site: Site) -> None:
+    mine = (await site.send()).json()["message"]
+    await site.staff_says("antwoord")
+    theirs = (await site.read()).json()["messages"][-1]["id"]
+    await site.confirm(mine["id"])
+
+    states = (await site.read(f"?waiting={mine['id']},{theirs}")).json()["states"]
+
+    assert states == {str(mine["id"]): "delivered"}  # a staff message's id is never answered
+
+
+# ---- a thread of many messages ----------------------------------------------------------------
+
+
+async def test_a_read_is_cut_and_says_there_is_more_and_the_cursor_reads_the_rest(
+    site: Site,
+) -> None:
+    async with SqlUnitOfWork(site.app.state.engine).locked() as tx:
+        for number in range(105):
+            await tx.add_call_message(
+                CallMessage(
+                    site.booking_id,
+                    ChatAuthor.STAFF,
+                    f"bericht {number}",
+                    site.clock.now(),
+                    ChatState.DELIVERED,
+                    f"m-{number}",
+                )
+            )
+
+    first = (await site.read()).json()
+    rest = (await site.read(f"?since={first['messages'][-1]['id']}")).json()
+
+    assert (len(first["messages"]), first["more"]) == (100, True)
+    assert (len(rest["messages"]), rest["more"]) == (5, False)
+    assert [m["text"] for m in first["messages"] + rest["messages"]] == [
+        f"bericht {n}" for n in range(105)
+    ]  # in order, none twice
+
+
+# ---- the time of a message ----------------------------------------------------------------------
+
+
+async def test_a_message_from_another_day_carries_its_date_and_one_from_today_does_not(
+    site: Site,
+) -> None:
+    async with SqlUnitOfWork(site.app.state.engine).locked() as tx:
+        await tx.add_call_message(
+            CallMessage(
+                site.booking_id,
+                ChatAuthor.STAFF,
+                "gisteren",
+                site.clock.now() - timedelta(days=3),
+                ChatState.DELIVERED,
+                "m-old",
+            )
+        )
+    await site.send("vandaag")
+
+    old, today = (await site.read()).json()["messages"]
+
+    assert " " not in today["time"].strip()  # the clock only
+    assert old["time"].endswith(today["time"])  # the same hour, three days before ...
+    assert old["time"] != today["time"]  # ... with its date in front
+    assert any(ch.isdigit() for ch in old["time"].split(" ")[0])  # a date in front
+    assert old["at"].startswith("20")  # the machine-readable value for the page's time element
+
+
+# ---- why a chat is closed -----------------------------------------------------------------------
+
+
+async def test_a_task_that_failed_is_a_chat_that_did_not_go_ahead_and_not_one_the_staff_closed(
+    site: Site,
+) -> None:
+    async with SqlUnitOfWork(site.app.state.engine).locked() as tx:
+        await tx.save_call_status(CallStatus(site.booking_id, task=TaskState.FAILED))
+
+    assert (await site.read()).json()["closed"] == "lost"
+    nl = (await site.client.get(f"{site.base}/call?lang=nl")).text
+    assert "omdat het gesprek niet is doorgegaan" in nl
+    assert "omdat het gesprek niet is doorgegaan" not in "Uw medewerker heeft de chat gesloten"
+
+
+# ---- the attempts, not only the stored messages -------------------------------------------------
+
+
+async def test_a_platform_that_is_down_is_not_asked_without_end(demo_settings: Settings) -> None:
+    # Messages taken back leave no row, so the domain's rate does not see them: the attempts of the
+    # booking are bounded on their own, at twice the per-minute setting (10 at 5).
+    settings = _on(demo_settings, rate_limit_enabled=True, embedded_call_chat_per_minute=5)
+    async for running in _site(settings):
+        running.dispatcher.append_error = IntegrationError("rejected_403", retryable=False)
+
+        answers = [await running.send(f"poging {n}", client_id=f"{n:016d}") for n in range(12)]
+
+        assert [a.status_code for a in answers] == [503] * 10 + [429] * 2
+        assert answers[-1].headers["retry-after"]
+        assert await running.stored() == []

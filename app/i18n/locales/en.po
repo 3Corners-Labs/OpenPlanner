@@ -14812,4 +14812,13 @@ msgid "callpage.failed.chat"
 msgstr "You can still reach us in the chat beside this page."
 
 msgid "callpage.ended.deleted_chat"
-msgstr "The personal data of this call, the chat included, is deleted 24 hours after the end of your appointment."
+msgstr "Our copy of the personal data of this call, the chat included, is deleted 24 hours after the end of your appointment. The contact center keeps its own record of the chat."
+
+msgid "callpage.chat.closed.lost"
+msgstr "The chat is no longer available, because the conversation did not go ahead. You can still read the messages."
+
+msgid "callpage.chat.closed.gone"
+msgstr "The chat is no longer available. Your session may have ended: open your appointment again with the link in your email."
+
+msgid "callpage.chat.keys_touch"
+msgstr "Choose Send to send the message. Enter starts a new line."
