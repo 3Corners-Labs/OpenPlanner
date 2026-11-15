@@ -156,6 +156,17 @@ def test_the_gate_stays_shut_while_a_blocking_item_is_open() -> None:
         assert service_flows.ROLLBACK_SAFE is False, open_blocking
 
 
+def test_only_the_browser_run_and_the_decision_still_block_the_gate() -> None:
+    """G07 is proven against the v0.6.0 fixture; G06 and G10 are what is left (checklist)."""
+    open_blocking = sorted(
+        name
+        for name, item in _checklist().items()
+        if item.blocks == "yes" and not item.status.startswith("done")
+    )
+
+    assert open_blocking == ["G06", "G10"]
+
+
 def test_contact_center_flows_stay_blocked_while_a_cc_item_is_open() -> None:
     """G13 to G15 are enforced by code until they are done (product owner, 2026-11-14)."""
     open_cc = [
