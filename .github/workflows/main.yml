@@ -48,7 +48,7 @@ jobs:
     # Not on a maintenance line: its fixes ran it on main first (ADR 0116 point 3).
     if: github.ref_name == 'main' || github.ref_type == 'tag'
     runs-on: ubuntu-26.04
-    timeout-minutes: 60   # took 22 to 30+ minutes at v0.5.1 (the first run hit the old limit of 30)
+    timeout-minutes: 90   # took 22 to 30+ minutes at v0.5.1; about 55 now, runs were cancelled at 60 (#590 raised 30 to 60)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
