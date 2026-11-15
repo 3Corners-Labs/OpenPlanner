@@ -177,3 +177,16 @@ AuditRow = tuple[str, str, Outcome, str]
 async def audit_events(site: Site) -> list[AuditRow]:
     """Return actor, action, outcome and reason of the newest 50 audit events, oldest first."""
     return [(e.actor, e.action, e.outcome, e.reason) for e in await audit_log(site)]
+
+
+AuditDetailRow = tuple[str, str, str, str, str | None, str]
+"""An audit event with its organisation and detail: actor, action, outcome (its value), reason,
+organisation and detail."""
+
+
+async def audit_rows(site: Site, limit: int = 300) -> list[AuditDetailRow]:
+    """Return the newest ``limit`` audit events as ``AuditDetailRow``, newest first."""
+    return [
+        (e.actor, e.action, e.outcome.value, e.reason, e.organisation, e.detail)
+        for e in reversed(await audit_log(site, limit=limit))
+    ]

@@ -12,9 +12,10 @@ from tests.support.admin_site import (
     SAME_ORIGIN,
     SUPER,
     Site,
+    audit_rows,
 )
 from tests.support.principals import principal
-from tests.support.screen_names import audit_rows, id_of, login_each, stored
+from tests.support.screen_names import id_of, login_each, stored
 
 PAGE = "/admin/rights/profile"
 POST = "/admin/rights/profile/screen-name"

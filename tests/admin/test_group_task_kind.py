@@ -5,11 +5,9 @@
 saved and audited with the routing's other attributes, under the same permission.
 """
 
-import httpx
-
 from app.domain.contact_center import TaskKind
-from tests.support.admin_site import OUTSIDER, SUPER, Site, audit_log, post_form, site_uow
-from tests.support.group_settings import SETTINGS_FORM
+from tests.support.admin_site import OUTSIDER, SUPER, Site, audit_log, site_uow
+from tests.support.group_settings import SETTINGS_FORM, save_settings
 
 GROUP = "/admin/groups/demo"
 FIELD = "contact_center_task_kind"
@@ -19,10 +17,6 @@ def _switch(site: Site, *, on: bool) -> None:
     """Set the platform switch the way the portal's value would reach the running process."""
     app = site.app
     app.state.settings = app.state.settings.model_copy(update={"embedded_call_enabled": on})
-
-
-async def _post(site: Site, data: dict[str, str]) -> httpx.Response:
-    return await post_form(site, f"{GROUP}/settings", data)
 
 
 async def _stored(site: Site) -> TaskKind | None:
@@ -57,9 +51,9 @@ async def test_the_form_offers_the_conversation_while_the_switch_is_on(site: Sit
 async def test_a_conversation_submitted_while_the_switch_is_off_is_refused(site: Site) -> None:
     """Abuse case: a crafted post cannot choose a kind the page does not offer."""
     await site.login_as(SUPER)
-    await _post(site, dict(SETTINGS_FORM))
+    await save_settings(site, dict(SETTINGS_FORM))
 
-    response = await _post(site, {**SETTINGS_FORM, "name": "X", FIELD: "conversation"})
+    response = await save_settings(site, {**SETTINGS_FORM, "name": "X", FIELD: "conversation"})
 
     assert response.status_code == 422
     assert f'<a href="#{FIELD}">' in response.text
@@ -71,7 +65,7 @@ async def test_no_note_while_the_switch_is_on_or_the_group_holds_the_form(site: 
 
     assert "maakt hij werkitems" not in (await site.client.get(f"{GROUP}/settings")).text
     _switch(site, on=True)
-    await _post(site, {**SETTINGS_FORM, FIELD: "conversation"})
+    await save_settings(site, {**SETTINGS_FORM, FIELD: "conversation"})
     assert "maakt hij werkitems" not in (await site.client.get(f"{GROUP}/settings")).text
 
 
@@ -79,7 +73,7 @@ async def test_a_kind_that_is_no_kind_is_refused(site: Site) -> None:
     await site.login_as(SUPER)
     _switch(site, on=True)
 
-    response = await _post(site, {**SETTINGS_FORM, FIELD: "chat"})
+    response = await save_settings(site, {**SETTINGS_FORM, FIELD: "chat"})
 
     assert response.status_code == 422
     assert f'<a href="#{FIELD}">' in response.text
@@ -91,7 +85,7 @@ async def test_the_conversation_is_saved_audited_and_shown_while_the_switch_is_o
     await site.login_as(SUPER)
     _switch(site, on=True)
 
-    saved = await _post(site, {**SETTINGS_FORM, FIELD: "conversation"})
+    saved = await save_settings(site, {**SETTINGS_FORM, FIELD: "conversation"})
 
     assert saved.headers["location"] == f"{GROUP}/settings?done=saved"
     assert await _stored(site) is TaskKind.CONVERSATION
@@ -104,14 +98,14 @@ async def test_a_conversation_already_held_survives_the_switch_going_off(site: S
     """Saving another setting never resets a held conversation unseen."""
     await site.login_as(SUPER)
     _switch(site, on=True)
-    await _post(site, {**SETTINGS_FORM, FIELD: "conversation"})
+    await save_settings(site, {**SETTINGS_FORM, FIELD: "conversation"})
     _switch(site, on=False)
 
     page = (await site.client.get(f"{GROUP}/settings")).text
     assert _options(page) == ["form", "conversation"]
     assert '<option value="conversation" selected' in page
     assert "maakt hij werkitems" in page  # the note: in force only with the switch
-    saved = await _post(site, {**SETTINGS_FORM, "name": "Y", FIELD: "conversation"})
+    saved = await save_settings(site, {**SETTINGS_FORM, "name": "Y", FIELD: "conversation"})
 
     assert saved.headers["location"] == f"{GROUP}/settings?done=saved"
     assert await _stored(site) is TaskKind.CONVERSATION
@@ -120,9 +114,9 @@ async def test_a_conversation_already_held_survives_the_switch_going_off(site: S
 async def test_a_form_without_the_select_keeps_the_kind(site: Site) -> None:
     await site.login_as(SUPER)
     _switch(site, on=True)
-    await _post(site, {**SETTINGS_FORM, FIELD: "conversation"})
+    await save_settings(site, {**SETTINGS_FORM, FIELD: "conversation"})
 
-    await _post(site, {**SETTINGS_FORM, "name": "Z"})  # an older page: no such input
+    await save_settings(site, {**SETTINGS_FORM, "name": "Z"})  # an older page: no such input
 
     assert await _stored(site) is TaskKind.CONVERSATION
 
@@ -132,7 +126,7 @@ async def test_a_user_without_group_edit_cannot_change_it(site: Site) -> None:
     await site.login_as(OUTSIDER)
     _switch(site, on=True)
 
-    response = await _post(site, {**SETTINGS_FORM, FIELD: "conversation"})
+    response = await save_settings(site, {**SETTINGS_FORM, FIELD: "conversation"})
 
     assert response.status_code in (302, 303, 403, 404)
     assert await _stored(site) is not TaskKind.CONVERSATION

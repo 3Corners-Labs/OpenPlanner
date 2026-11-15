@@ -35,11 +35,6 @@ def uow() -> InMemoryUnitOfWork:
 
 
 @pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
-
-
-@pytest.fixture
 def service(uow: InMemoryUnitOfWork, clock: FixedClock) -> StaffScreenNames:
     return StaffScreenNames(uow, clock, [KEY, PREVIOUS])
 

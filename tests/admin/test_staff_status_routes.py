@@ -10,7 +10,7 @@ from tests.support.admin_site import (
     SAME_ORIGIN,
     SUPER,
     Site,
-    audit_log,
+    audit_rows,
 )
 
 
@@ -32,13 +32,6 @@ async def _device(site: Site, principal: object) -> str:
     await site.login_as(principal)  # type: ignore[arg-type]
     site.clock.advance(timedelta(minutes=1))
     return _cookie(site)
-
-
-async def _audit(site: Site) -> list[tuple[str, str, str, str, str | None, str]]:
-    return [
-        (e.actor, e.action, e.outcome.value, e.reason, e.organisation, e.detail)
-        for e in reversed(await audit_log(site, limit=300))
-    ]
 
 
 async def _id_of(site: Site, name: str) -> str:
@@ -69,7 +62,7 @@ async def test_suspending_ends_the_sessions_and_refuses_the_next_login(site: Sit
     refused = await site.login_as(GROUP_ADMIN)
     assert refused.status_code == 403
     assert "geschorst" in refused.text
-    events = await _audit(site)
+    events = await audit_rows(site)
     assert (
         ORG_ADMIN.subject,
         "staff.suspended",
@@ -94,7 +87,7 @@ async def test_reinstating_lets_the_person_log_in_again(site: Site) -> None:
     assert response.headers["location"] == f"/admin/staff/{gina}?done=staff_reinstated"
     site.client.cookies.clear()
     assert (await site.login_as(GROUP_ADMIN)).status_code == 303
-    assert any(e[1] == "staff.reinstated" for e in await _audit(site))
+    assert any(e[1] == "staff.reinstated" for e in await audit_rows(site))
 
 
 async def test_nobody_suspends_themselves(site: Site) -> None:
@@ -124,7 +117,7 @@ async def test_an_organisation_admin_cannot_suspend_a_superuser_or_another_organ
 
     assert await _opens(site, boss) == 200
     assert await _opens(site, otto) == 200
-    assert not any(e[1] == "staff.suspended" for e in await _audit(site))
+    assert not any(e[1] == "staff.suspended" for e in await audit_rows(site))
 
 
 async def test_buttons_are_only_offered_to_those_who_may_use_them(site: Site) -> None:
@@ -173,7 +166,7 @@ async def test_the_superuser_erases_a_suspended_person(site: Site) -> None:
     listing = (await site.client.get("/admin/staff")).text
     assert "Gina Group" not in listing
     assert "Gewiste medewerker" in listing
-    events = await _audit(site)
+    events = await audit_rows(site)
     assert (
         SUPER.subject,
         "staff.erased",

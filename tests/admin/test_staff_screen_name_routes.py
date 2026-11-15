@@ -15,9 +15,10 @@ from tests.support.admin_site import (
     SAME_ORIGIN,
     SUPER,
     Site,
+    audit_rows,
     running_site,
 )
-from tests.support.screen_names import audit_rows, id_of, login_each, stored
+from tests.support.screen_names import id_of, login_each, stored
 from tests.support.skill_seed import add_skill, limit
 
 NAME = "Gina"

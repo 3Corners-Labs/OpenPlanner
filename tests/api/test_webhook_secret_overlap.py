@@ -30,6 +30,7 @@ from app.domain.webhook_secrets import SecretFinding
 from app.main import create_app
 from app.web.webhook_secrets import install_installation_secrets, installation_status
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import served
 from tests.support.database import migrated_database
 from tests.support.domain import NOW
 from tests.support.webhooks import wxcc_body
@@ -67,13 +68,7 @@ def _settings(settings: Settings, database_url: str, **update: object) -> Settin
 @asynccontextmanager
 async def _running(settings: Settings, clock: FixedClock) -> AsyncIterator[httpx.AsyncClient]:
     """A fresh application process on the same database: a restart when used twice."""
-    app = create_app(settings, clock)
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
-        ) as client,
-    ):
+    async with served(create_app(settings, clock)) as client:
         yield client
 
 

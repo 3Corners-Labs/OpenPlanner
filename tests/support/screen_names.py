@@ -2,13 +2,12 @@
 
 Both the manager's form on the staff page and the person's own form on *My profile* are tested
 through the same few moves: let people log in (so each has a staff record), find a person's
-number in the staff list, read the stored screen name and read the audit rows of its event.
+number in the staff list and read the stored screen name. The audit rows of its event come
+from ``tests.support.admin_site.audit_rows``.
 """
 
 from sqlalchemy import text
 
-from app.adapters.db.uow import SqlUnitOfWork
-from app.domain.authorization import Scope
 from tests.support.admin_site import Site
 
 
@@ -23,24 +22,6 @@ async def login_each(site: Site, *principals: object) -> None:
     for principal in principals:
         site.client.cookies.clear()
         await site.login_as(principal)  # type: ignore[arg-type]
-
-
-async def audit_rows(site: Site) -> list[tuple[str, str, str, str, str | None, str]]:
-    """Return every audit event as (actor, action, outcome, reason, organisation, detail)."""
-    app = site.app
-    async with SqlUnitOfWork(app.state.engine).read() as tx:
-        found = await tx.list_audit_events(Scope(everything=True), limit=300)
-    return [
-        (
-            e.event.actor,
-            e.event.action,
-            e.event.outcome.value,
-            e.event.reason,
-            e.event.organisation,
-            e.event.detail,
-        )
-        for e in found
-    ]
 
 
 async def stored(site: Site, subject: str) -> str | None:
