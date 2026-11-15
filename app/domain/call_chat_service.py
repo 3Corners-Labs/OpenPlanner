@@ -19,35 +19,97 @@ Nothing of a delivery is kept but the message's text, its identifier, its time a
 no sender identifier, no name, no origin. The text is personal data (``privacy.CHAT_FIELDS``) and
 never reaches a log, an audit event or a job payload from here; the booking's purge deletes it.
 
-The participant's own messages (the side bar sending) and the page's reading of the thread are
-step 7c; ``thread`` and the rules in ``app.domain.call_chat`` are what it uses (it applies them;
-nothing calls ``thread`` in step 7b but its test).
+The participant's side (step 7c) is ``read`` and ``send``:
+
+    send(booking, text, id) ─► the chat exists, is open, the text and the rate are in bounds, room
+                               is left ─► stored ``sent`` (committed) ─► appended to the contact
+                               center's task, its identifier the message's ``aliasId`` ─► the
+                               platform's confirmation (above) makes it ``delivered``; when the
+                               platform cannot be reached the stored message is taken back, so
+                               nothing stays that never left
+    read(booking, since, waiting) ─► what is new since the page's last look, the new state of the
+                               messages it still shows as waiting, and whether the chat is closed
+
+Both are asked after the route has checked the platform switch, the participant's session and the
+booking's service; the service checks that the booking has a chat at all.
 """
 
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import datetime
+from enum import StrEnum
 
 from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
-from app.domain.booking import BookingStatus
+from app.domain.booking import Booking, BookingStatus
 from app.domain.call_chat import (
+    CLIENT_ID,
     MAX_MESSAGES_PER_BOOKING,
+    PROVIDER_PREFIX,
+    RATE_WINDOW,
     CallMessage,
     ChatAuthor,
+    ChatClosed,
     ChatDirection,
     ChatEvent,
     ChatEventKind,
+    ChatRefusal,
     ChatSender,
     ChatState,
+    chat_closed,
+    check_text,
+    clean_text,
     has_chat,
+    within_rate,
 )
 from app.domain.call_client import UsesCallPage
+from app.domain.calls import ParticipantMessage, TaskState
 from app.domain.contact_center import ContactCenterKind
+from app.domain.contact_center_dispatch import DispatcherChoice
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import EventOutcome, claim_event
-from app.domain.ports import Transaction, UnitOfWork
+from app.domain.ports import Clock, IntegrationError, Transaction, UnitOfWork
+from app.domain.scheduling import Group
 
 CLOSED_STATUSES = frozenset({BookingStatus.CANCELLED, BookingStatus.REFUSED})
 """Booking states whose chat takes nothing more: the appointment is not going ahead."""
 LIMIT_EVENT = "chat.limit_reached"
 """The system event written once when a booking's chat reaches ``MAX_MESSAGES_PER_BOOKING``."""
+WAITING_CAP = 20
+"""The most waiting messages the page names when it reads; a longer list is cut (a page that
+sent more than this in a minute is refused by the rate limit before). A fixed rule, no setting."""
+READ_LIMIT = 100
+"""The most messages one read returns; the page keeps reading while ``more`` is true. A fixed
+protection bound, not a setting: a thread of the ceiling's size is never sent in one answer."""
+
+
+class AppendOutcome(StrEnum):
+    """What came of handing a message to the contact center."""
+
+    SENT = "sent"
+    NOT_SENT = "not_sent"
+    """A definite refusal, or a failure before anything was sent: the message did not arrive."""
+    UNKNOWN = "unknown"
+    """The answer was lost after the request may have reached the platform (a timeout, a broken
+    connection): the message may have arrived."""
+
+
+@dataclass(frozen=True)
+class ChatRead:
+    """What the call page learns when it reads its chat.
+
+    Attributes:
+        messages: Messages that are new since the page's cursor, oldest first, at most
+            ``READ_LIMIT``.
+        states: The state of each message the page named as waiting, once it is not waiting any
+            more (by message id).
+        closed: Why the chat takes nothing more, or ``None`` while it is open.
+        more: Whether there are messages after the last one returned (the page reads again).
+    """
+
+    messages: list[CallMessage] = field(default_factory=list)
+    states: dict[int, ChatState] = field(default_factory=dict)
+    closed: ChatClosed | None = None
+    more: bool = False
 
 
 class CallChatService:
@@ -57,12 +119,23 @@ class CallChatService:
         uow: Opens database transactions.
         uses_call_page: Whether a service's participant gets the call page now
             (``app.domain.call_client.call_page_rule``); a booking without it has no chat.
+        dispatchers: Gives the dispatcher choice for appending a participant's message (read at
+            every send, because the integrations are wired again when settings change).
+        clock: The time of a sent message and of the rate window.
     """
 
-    def __init__(self, uow: UnitOfWork, uses_call_page: UsesCallPage) -> None:
+    def __init__(
+        self,
+        uow: UnitOfWork,
+        uses_call_page: UsesCallPage,
+        dispatchers: Callable[[], DispatcherChoice],
+        clock: Clock,
+    ) -> None:
         """Store the collaborators."""
         self._uow = uow
         self._uses_page = uses_call_page
+        self._dispatchers = dispatchers
+        self._clock = clock
 
     async def record(
         self,
@@ -129,6 +202,152 @@ class CallChatService:
         """
         async with self._uow.read() as tx:
             return await tx.messages_of_call(booking_id)
+
+    def has_chat(self, booking: Booking, group: Group) -> bool:
+        """Return whether ``booking`` has a chat now (a conversation task, a call-page service)."""
+        task = booking.contact_center_task
+        return has_chat(task.task_kind if task else None, self._uses_page(group))
+
+    async def read(self, booking: Booking, since: int, waiting: list[int]) -> ChatRead:
+        """Return what is new in the booking's chat.
+
+        The caller has checked the participant's session and that the booking has a chat
+        (``has_chat``); nothing here looks at either.
+
+        Args:
+            booking: The participant's booking, checked by the route.
+            since: The id of the newest message the page already shows (0 for none); only newer
+                ones are returned, at most ``READ_LIMIT`` (``more`` says there are further ones),
+                so a read that brings nothing carries no message.
+            waiting: The ids of the page's own messages that it still shows as waiting for the
+                platform (cut at ``WAITING_CAP``); their state is returned once it changed.
+        """
+        if booking.id is None:
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "booking")
+        async with self._uow.read() as tx:
+            found = await tx.messages_of_call(booking.id, since, READ_LIMIT + 1)
+            states = await tx.call_message_states(booking.id, waiting[:WAITING_CAP])
+            refused = await tx.has_refused_call_message(booking.id)
+            status = await tx.get_call_status(booking.id)
+        return ChatRead(
+            found[:READ_LIMIT],
+            {i: state for i, state in states.items() if state is not ChatState.SENT},
+            chat_closed(
+                booking.status is BookingStatus.CONFIRMED,
+                status.task if status else TaskState.NONE,
+                refused,
+            ),
+            len(found) > READ_LIMIT,
+        )
+
+    async def send(
+        self,
+        booking: Booking,
+        group: Group,
+        text: str,
+        client_id: str,
+        *,
+        max_chars: int,
+        per_minute: int,
+    ) -> CallMessage | ChatRefusal:
+        """Store a participant's message and append it to the contact-center task.
+
+        The message is stored ``sent`` and committed before the platform is asked, so the
+        platform's confirmation always finds it. When the platform definitely did not take it (a
+        refusal, a failure before anything was sent) the stored message is taken back and
+        ``UNAVAILABLE`` is returned. When the answer is lost after the request may have arrived (a
+        timeout) the message stays ``sent``: the platform's confirmation, or a refusal after the
+        end, settles it, and the page shows it as sent until then. The page's identifier is the
+        message's key: the same one sent again is the stored message and, while that is still
+        ``sent``, is appended once more (the platform takes one ``aliasId`` as one message), so a
+        retry after a timeout cannot make a second message. The text is cleaned first; the status of
+        the booking is read again inside the write lock. Nothing of the text reaches a log, an
+        audit event or an error.
+
+        Args:
+            booking: The participant's booking, checked by the route.
+            group: The booking's service.
+            text: What the participant wrote.
+            client_id: The page's identifier of the message (random letters and digits).
+            max_chars: ``embedded_call_chat_max_chars`` of the organisation.
+            per_minute: ``embedded_call_chat_per_minute``.
+
+        Returns:
+            The stored message, or why it was not sent.
+        """
+        task = booking.contact_center_task
+        if booking.id is None or task is None or not self.has_chat(booking, group):
+            return ChatRefusal.NO_CHAT
+        if not CLIENT_ID.fullmatch(client_id):
+            return ChatRefusal.BAD_REQUEST
+        cleaned = clean_text(text)
+        refusal = check_text(cleaned, max_chars)
+        if refusal is not None:
+            return refusal
+        now = self._clock.now()
+        provider_id = f"{PROVIDER_PREFIX}{client_id}"
+        inserted = False
+        async with self._uow.locked() as tx:
+            kept = await tx.call_message_by_provider_id(booking.id, provider_id)
+            if kept is not None and kept.state is not ChatState.SENT:
+                return kept
+            if kept is None:
+                fresh = await tx.get_booking(booking.id)
+                status = await tx.get_call_status(booking.id)
+                if chat_closed(
+                    fresh is not None and fresh.status is BookingStatus.CONFIRMED,
+                    status.task if status else TaskState.NONE,
+                    await tx.has_refused_call_message(booking.id),
+                ):
+                    return ChatRefusal.CLOSED
+                if await tx.count_call_messages(booking.id) >= MAX_MESSAGES_PER_BOOKING:
+                    return ChatRefusal.FULL
+                mine = await tx.participant_message_times(booking.id, now - RATE_WINDOW)
+                if not within_rate(mine, now, per_minute):
+                    return ChatRefusal.RATE_LIMITED
+                await tx.add_call_message(
+                    CallMessage(
+                        booking.id,
+                        ChatAuthor.PARTICIPANT,
+                        cleaned,
+                        now,
+                        ChatState.SENT,
+                        provider_id,
+                    )
+                )
+                kept = await tx.call_message_by_provider_id(booking.id, provider_id)
+                inserted = True
+        if (
+            kept is None
+        ):  # stored or found above in the same lock: a broken store, not a participant
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "call_message")
+        outcome = await self._append(booking, group, provider_id, cleaned)
+        if outcome is AppendOutcome.NOT_SENT:
+            if inserted:
+                async with self._uow.locked() as tx:
+                    await tx.withdraw_call_message(booking.id, provider_id)
+            return ChatRefusal.UNAVAILABLE
+        return kept
+
+    async def _append(
+        self, booking: Booking, group: Group, provider_id: str, text: str
+    ) -> AppendOutcome:
+        """Hand the message to the contact center: did it arrive, not, or may it have?"""
+        task = booking.contact_center_task
+        if task is None:
+            return AppendOutcome.NOT_SENT
+        try:
+            dispatcher = await self._dispatchers().for_organisation(
+                group.organisation_id, task.kind
+            )
+            if dispatcher is None:
+                return AppendOutcome.NOT_SENT
+            await dispatcher.append_message(task, ParticipantMessage(provider_id, text))
+        except IntegrationError as error:
+            return AppendOutcome.UNKNOWN if error.ambiguous else AppendOutcome.NOT_SENT
+        except DomainError:
+            return AppendOutcome.NOT_SENT
+        return AppendOutcome.SENT
 
 
 def _would_change(event: ChatEvent, held: int, waiting: list[str]) -> bool:

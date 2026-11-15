@@ -305,7 +305,7 @@ A group whose routing has the task kind `conversation` (default `form`, the work
 ```
 worker/web ──HTTPS──> WxCC Create Task v2 (channelType customMessaging): booking reference (the participant's identifier, one conversation per appointment), first name, the same flow variables as a work item (route, routing variables, skill codes, interaction kind), and as the first text message: the booking reference, first name, start (text), group name and, for a video task, the meeting link, composed from a fixed catalogue text in the organisation's language
 WxCC ──task id──> OpenPlanner (bookings.contact_center_task_id, with the kind the task was made with in bookings.contact_center_task_kind)
-worker/web ──HTTPS──> WxCC Task Messages v2 (mediaType customMessaging), when a later step has a participant message to append: the message identifier (aliasId) and the text the participant wrote
+web ──HTTPS──> WxCC Task Messages v2 (mediaType customMessaging), for each message the participant sends in the call page's side bar: the message identifier (aliasId) and the text the participant wrote
 ```
 
 | Data item | Where | Source | Retention | Leaves the system |
@@ -313,7 +313,7 @@ worker/web ──HTTPS──> WxCC Task Messages v2 (mediaType customMessaging),
 | The routing's task kind | `group_contact_center.task_kind` | the group's settings | until changed; no personal data | no |
 | The kind a task was created with | `bookings.contact_center_task_kind` | the dispatch | with the booking row; a kind is no personal data and is not purged | no |
 | The first message | not stored: composed at dispatch from the catalogue and the allowed fields | the booking | not kept by OpenPlanner | to WxCC, as the conversation's first text (no other field of the booking: no surname, address, phone number, form answer or note) |
-| A participant's later message (from step 7c) | `call_messages.message_text`, stored when the page sends it (step 7c); nothing sends one yet | the participant | with the booking's purge (see the chat below) | to WxCC as the text of an appended message |
+| A participant's later message (step 7c) | `call_messages.message_text`, stored when the page sends it (`POST /b/m/{ref}/call/chat`), before it is handed to WxCC | the participant | with the booking's purge (see the chat below) | to WxCC as the text of an appended message |
 | The conversation's transcript | **at the contact center**: it keeps the transcript and the thread per participant identifier and business address, and masks card numbers | the contact center | the contact center's own; **OpenPlanner's purge does not reach it** (the follow-up ADR of step 7b states the retention; a question to the supplier, `docs/research/call-page-on-the-meetings-sdk.md`) | no |
 
 ### The chat beside the call: what comes in and where it is kept (ADR 0123 point 8, step 7b)
@@ -329,7 +329,7 @@ web  ──verified, matched to the booking by the task id──> call_messages 
 | Data item | Where | Source | Retention | Leaves the system |
 |---|---|---|---|---|
 | A staff member's message | `call_messages.message_text` (author `staff`, state `delivered`, the platform's message id, the time) | the contact center's delivery | **deleted with the booking's purge** (`purge_personal_data`, 24 hours after the end of the appointment, or the booking's held moments); a row cannot outlive its booking | no |
-| A participant's message and its state | `call_messages` (author `participant`, state `sent`, `delivered` or `refused`) | the participant, from step 7c; step 7b stores only the platform's confirmation of it | as above | to WxCC as the text of an appended message (step 7c) |
+| A participant's message and its state | `call_messages` (author `participant`, state `sent`, `delivered` or `refused`) | the participant, from the call page's side bar (step 7c); the platform's confirmation or refusal only changes the state | as above | to WxCC as the text of an appended message (step 7c) |
 | The flow's own messages (the queue text) | not stored | the contact center | not kept by OpenPlanner | no |
 | Who wrote a staff message | not stored: the delivery's staff identifier and the participant's name are never read; the name a participant sees is worked out when the thread is read (`embedded_call_staff_name`, step 7c) | | | no |
 | The secret of the message address | the connection's sealed record (`message_secret`, the one before it for the overlap) | made on the server, shown once | until replaced or the connection is removed; never in a log, an event or a job | no |
@@ -466,6 +466,30 @@ After the booking's purge the claim is gone and so is the name; erasing the staf
 screen name and the account name, and the endpoint answers `{}` for it. The account's name is shown
 only where the organisation chose `name`; with the default a staff member without a screen name is shown
 by the organisation's word for staff alone.
+
+### The chat beside the call: what the page sends and asks (ADR 0123 point 8, step 7c)
+
+A booking whose task is a conversation (`has_chat`) has a side bar on its call page. Nothing of it
+exists in the markup of any other booking, and the video platform is never involved: the chat runs
+through our own server and the contact center's task.
+
+```
+participant's browser ──POST /b/m/{ref}/call/chat {id, text}──> web ──store (sent)──> call_messages
+                                                                   └─HTTPS──> WxCC Task Messages v2 (aliasId = our id, text)
+participant's browser ──GET /b/m/{ref}/call/chat?since=&waiting=──> web ──> new messages, states, the staff member's name, closed
+```
+
+| What happens | What leaves the browser | What comes in | Stored by us |
+|---|---|---|---|
+| The participant sends a message | one `POST` to our own address with the participant's session cookie: a random identifier made in the browser and the text | the stored message (identifier, author kind, text as kept, state, time worded in the group's zone) | `call_messages.message_text` and its state, until the booking's purge |
+| The page asks what is new, in the turns of its one poll (`embedded_call_chat_poll_seconds`), in every state after the start until the chat is closed and read | one `GET` to our own address: the newest message id it holds and the ids of its own messages it still shows as waiting | only messages newer than that (at most 100 at a time, the page asks again at once), the new state of those waiting, the staff member's name for the participant (never an account name unless the organisation chose that) and whether the chat is closed | nothing new |
+| The server hands a message to the contact center | the text and our identifier, to WxCC Task Messages v2 | 202; the confirmation comes later as an event (step 7b) | a message the platform definitely did not take is taken back: nothing stays that never left; one whose answer was lost after the request may have arrived stays `sent` until the confirmation or a refusal settles it |
+
+The thread lives in the page only while it is open; nothing is written to the browser's storage.
+The staff member's name for the participant is the one of the staff-name flow above (the screen name
+by default). The contact center keeps its own transcript of the same words and our purge does not
+reach it (DPIA, ADR 0123 point 18). The participant is asked, above the first message, not to
+write identity numbers; there is no filter.
 
 ### Meetings without chat, the trial call on the page, the privacy link (ADR 0123 points 5, 8, 9 and 17, step 6b)
 

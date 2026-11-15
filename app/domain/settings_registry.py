@@ -2453,9 +2453,9 @@ REGISTRY: tuple[SettingSpec, ...] = (
         3,
         _C,
         T.WEBEX,
-        "Seconds between two looks of the call page at who is in the call, and from the chat's "
-        "step on at its new messages: the one poll of the page while it waits or is in the "
-        "call (ADR 0123).",
+        "Seconds between two looks of the call page at who is in the call and at the new "
+        "messages of the chat beside it: the one poll of the page, in the lobby and the call "
+        "for the name and in every state after the start for the chat (ADR 0123).",
         minimum=2,
         maximum=10,
     ),

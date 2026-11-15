@@ -240,6 +240,7 @@ FLOWS: dict[str, Flow] = {
     "## Flow: the chat's inbound deliveries and their storage (ADR 0123 point 8, step 7b)": Flow(
         (WEBHOOK, CHANGE, DENIED)
     ),
+    "## Flow: the participant's side of the chat (ADR 0123 point 8, step 7c)": Flow((PUBLIC,)),
     "## Flow: own queue (ADR 0043)": Flow(ADMIN),
     "## Flow: requests and work items (ADR 0121 step 5)": Flow(ADMIN),
     "## Flow: immediate intake and check-in (ADR 0121 step 7)": Flow((PUBLIC, DENIED, CHANGE)),

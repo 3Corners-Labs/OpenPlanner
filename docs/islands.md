@@ -174,15 +174,15 @@ subresource integrity (entry below).
 
 ### `call-page.js`
 
-The call page's script is eleven files that share one object, `window.openplannerCall` (no build step,
+The call page's script is twelve files that share one object, `window.openplannerCall` (no build step,
 each under 500 lines, each with a header that says what it owns and never does). The page loads them
 in this order: `call-status.js`, `call-sound.js`, `call-devices.js`, `call-connection.js`, `call-media.js`,
-`call-captions.js`, `call-remote.js`, `call-render.js`, `call-events.js` and `call-poll.js` only define, `call-page.js` starts them. A file needs nothing at load time that a later file
+`call-captions.js`, `call-remote.js`, `call-render.js`, `call-events.js`, `call-chat.js` (only for a booking that has a chat; the markup names it only then, and `call-page.js` supplies a chat that wants nothing otherwise) and `call-poll.js` only define, `call-page.js` starts them. A file needs nothing at load time that a later file
 makes (`call-devices.js` makes the store of chosen device ids, `app.choice`, which `call-media.js` uses;
-`call-connection.js` makes `app.call`, which `call-media.js`, `call-captions.js`, `call-remote.js` and `call-events.js` use; `call-render.js` makes `app.view`, which `call-page.js` uses; `call-poll.js` makes `app.poll`, which `call-page.js` uses and which reads `app.call.epoch`); a call from one file
+`call-connection.js` makes `app.call`, which `call-media.js`, `call-captions.js`, `call-remote.js` and `call-events.js` use; `call-render.js` makes `app.view`, which `call-page.js` uses; `call-poll.js` makes `app.poll`, which `call-page.js` uses and which reads `app.call.epoch` and asks `app.chat`); a call from one file
 to another at run time goes through `app` and may reach a file loaded later.
 
-- **ADR:** 0123 points 3, 5, 6, 10, 11, 13, 14, 15 and 16 (build steps 4b, 4c, 5a, 5b and 5c). Not an island: the call page is a kind of page
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 13, 14, 15 and 16 (build steps 4b, 4c, 5a, 5b, 5c and 7c). Not an island: the call page is a kind of page
   of its own (above), and the scripts are the page's, loaded by no other.
 - **Server renders:** the start state (the appointment, the sentence of what the call needs, the begin
   button, `hidden`), the device check with its three refused-permission panels, the states connecting,
@@ -195,7 +195,9 @@ to another at run time goes through `app` and may reach a file loaded later.
   sentence is the state's own paragraph). All of it in the page's language; the scripts have no text of
   their own. The root carries `data-call-token-url`, `data-call-seconds` and `data-call-attempts` (the two
   connection settings), `data-call-staff-url` and `data-call-poll-seconds` (the address of our own endpoint for who the participant
-  talks to and `embedded_call_chat_poll_seconds`) and, only when the server found the vendored file whole (placed, checksum of the
+  talks to and `embedded_call_chat_poll_seconds`), for a booking that has a chat `data-call-chat-url` and `data-call-chat-max`
+  (the chat's address and `embedded_call_chat_max_chars`; the side bar `[data-call-chat]`, `hidden`, with its log, its closed
+  sentence, its labelled field and its button, and the chat's sentences as `[data-text]`) and, only when the server found the vendored file whole (placed, checksum of the
   pinned version, equal bytes), `data-call-sdk` and `data-call-sdk-integrity`.
 - **`call-page.js` owns** the page's one `state` and the one way to change it, `go(screen, patch)`: a table
   of allowed moves, one `render`, focus on the new heading and one sentence for the live region. It also
@@ -267,9 +269,23 @@ to another at run time goes through `app` and may reach a file loaded later.
   the term again). An answer of 404 clears the name; any other refusal or a network error keeps it and doubles the wait to
   the next turn (up to 30 seconds), a success brings the interval back, and nothing is announced for a failure. The poll
   stops on leaving, ending and failing and a page restored from the browser's memory, and an answer on its way is dropped
-  when the call's epoch has moved. It asks nobody but that address, never the video platform, and stores nothing. The
-  chat of step 7c is asked for in the same turns. The visible label on the picture is `aria-hidden`: the picture carries
+  when the call's epoch has moved. It asks nobody but our own addresses, never the video platform, and stores nothing. The
+  chat of step 7c is asked for in the same turns (`app.chat.wants` and `app.chat.turn`; a turn went well only when both
+  requests did), in every state after the start until the chat is closed and read; the poll stops by itself when nothing
+  is wanted any more. The visible label on the picture is `aria-hidden`: the picture carries
   the same words as its accessible name, so they are read once.
+- **`call-chat.js` owns** the side bar (step 7c): the thread as a log (a polite live region that only gains nodes; every
+  message has a node of its own kept by its key and changed only where its words changed, so a reader's place and a screen
+  reader's place hold, and the history of a first read is drawn with the region switched off), the labelled field with the
+  characters left said in text, sending (the button, Enter; Shift and Enter break the line; a message keeps the identifier
+  the page made for it until it is sent, so a retry is the same message), the state of each own message in words, a failed
+  send that keeps the text and says so beside the field and in the polite line, and the closed state (the field makes way for
+  a sentence that says why; focus moves to it only when the field had it). It has no timer: `call-poll.js` calls its `turn`.
+  A staff line keeps the label it was first drawn with. A read that says `more` is followed at once by the next; a send
+  answered 403 or 404 (and a read likewise) ends the chat with a sentence and no retry; a send answered 409 `closed`
+  leaves the reason to one more read. On a touch keyboard (`(pointer: coarse)`) Enter starts a new line and the button
+  sends, and the hint says so. The log is a tab stop only while it scrolls. Everything a participant or a staff member
+  wrote is set with `textContent`; nothing is stored in the browser.
 - **`call-render.js` owns** the drawing of the call's parts out of the state, as pure functions: the pictures with the
   label on the other side's (the name and the team's word, or the word alone; also the picture's accessible name),
   the notices, the sharing switches and the staff member's screen, the captions' lines and the bar with its
@@ -313,42 +329,42 @@ to another at run time goes through `app` and may reach a file loaded later.
 - **Used by:** the call page only (`call.html`, with `call-page.css`).
 - **Size** (lines): `call-status.js` 56, `call-sound.js` 130, `call-devices.js` 389, `call-connection.js` 439,
   `call-media.js` 342, `call-captions.js` 194, `call-remote.js` 142, `call-render.js` 148, `call-events.js` 110,
-  `call-poll.js` 140, `call-page.js` 385; about 0.9, 1.8, 4.0, 5.2, 4.3, 2.8, 2.1, 2.5, 1.7, 2.3 and 5.4 KB gzipped (in
+  `call-chat.js` 427, `call-poll.js` 168, `call-page.js` 405; about 0.9, 1.8, 4.0, 5.2, 4.3, 2.8, 2.1, 2.5, 1.7, 4.8, 2.7 and 5.7 KB gzipped (in
   the order of the loading), about 5.6 KB gzipped (styles). `call-connection.js` and `call-devices.js` are the files to watch.
 
 ### `call-status.js`
 
-- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a, 5b and 5c). The polite status line; one of the eleven files described under
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a, 5b and 5c). The polite status line; one of the twelve files described under
   `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
 - **Used by:** the call page only. **Size:** see `call-page.js`.
 
 ### `call-sound.js`
 
-- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a, 5b and 5c). The level meter and the test sound of the check; one of the eleven files described under
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a, 5b and 5c). The level meter and the test sound of the check; one of the twelve files described under
   `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
 - **Used by:** the call page only. **Size:** see `call-page.js`.
 
 ### `call-devices.js`
 
-- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a, 5b and 5c). The devices, their lists and the choice; one of the eleven files described under
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a, 5b and 5c). The devices, their lists and the choice; one of the twelve files described under
   `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
 - **Used by:** the call page only. **Size:** see `call-page.js`.
 
 ### `call-connection.js`
 
-- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a, 5b and 5c). The call: token, SDK, attempts, lobby, leaving; one of the eleven files described under
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a, 5b and 5c). The call: token, SDK, attempts, lobby, leaving; one of the twelve files described under
   `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
 - **Used by:** the call page only. **Size:** see `call-page.js`.
 
 ### `call-media.js`
 
-- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a, 5b and 5c). The participant's camera, microphone and screen in the lobby and the call; one of the eleven files described under
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 13 and 16 (steps 4b, 4c, 5a, 5b and 5c). The participant's camera, microphone and screen in the lobby and the call; one of the twelve files described under
   `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
 - **Used by:** the call page only. **Size:** see `call-page.js`.
 
 ### `call-events.js`
 
-- **ADR:** 0123 points 3, 5, 6, 10, 11, 12, 13 and 16 (steps 4b, 4c, 5a, 5b and 5c). What the meeting tells the page; one of the eleven files described under
+- **ADR:** 0123 points 3, 5, 6, 10, 11, 12, 13 and 16 (steps 4b, 4c, 5a, 5b and 5c). What the meeting tells the page; one of the twelve files described under
   `call-page.js` (what it owns and never does is in its header), loaded before `call-page.js`, which starts it.
 - **Used by:** the call page only. **Size:** see `call-page.js`.
 
@@ -382,16 +398,23 @@ to another at run time goes through `app` and may reach a file loaded later.
   `call-events.js` and `call-page.js`, which starts it.
 - **Used by:** the call page only. **Size:** see `call-page.js`.
 
+### `call-chat.js`
+
+- **ADR:** 0123 point 8 (step 7c). The chat beside the call: the thread, sending, the closed state; one of the
+  twelve files described under `call-page.js` (what it owns and never does is in its header), loaded before
+  `call-poll.js` and only for a booking that has a chat (the markup names it only then), and started by `call-page.js`.
+- **Used by:** the call page only. **Size:** see `call-page.js`.
+
 ### `call-poll.js`
 
 - **ADR:** 0123 points 8, 10 and 13 (step 5c). The one poll of our own server for who the participant talks to; one of the
-  eleven files described under `call-page.js` (what it owns and never does is in its header), loaded before
+  twelve files described under `call-page.js` (what it owns and never does is in its header), loaded before
   `call-page.js`, which starts it.
 - **Used by:** the call page only. **Size:** see `call-page.js`.
 
 ### `call-render.js`
 
 - **ADR:** 0123 points 10, 12, 13 and 15 (steps 5a and 5b). How the call's parts look, as functions of the state; one
-  of the eleven files described under `call-page.js` (what it owns and never does is in its header), loaded before
+  of the twelve files described under `call-page.js` (what it owns and never does is in its header), loaded before
   `call-page.js`, which starts it.
 - **Used by:** the call page only. **Size:** see `call-page.js`.

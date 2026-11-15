@@ -1,5 +1,6 @@
 /*
- * The one poll of the participant's call page: who the participant talks to (ADR 0123 step 5c).
+ * The one poll of the participant's call page: who the participant talks to (ADR 0123 step 5c) and,
+ * in the same turns, what is new in the chat beside the call (step 7c).
  *
  * Owns: asking our own server, while the page waits in the lobby or is in the call, for the staff
  * member's name (`GET` on the address the server put in the markup) once on entering the lobby,
@@ -11,8 +12,11 @@
  * once more. A name that is cleared is not announced and the label is the team's word again. An
  * answer of 404 (the switch went off) clears the name; any other refusal or a network error keeps
  * the name and makes the next turn wait twice as long, up to `BACKOFF_MAX_MS`, and a success brings
- * back the setting's interval. Nothing is announced for a failure. This is the page's one poll: the chat of step 7c is asked
- * for in the same turns, not by a timer of its own.
+ * back the setting's interval. Nothing is announced for a failure. This is the page's one poll: the chat
+ * (`call-chat.js`, which has no timer) is asked for in the same turns, in every state after the start while
+ * `app.chat.wants` says the page still needs it; a turn is one request for the name (in the lobby and the call)
+ * and one for the chat, together, and it went well only when both did. When neither is wanted any more the poll
+ * stops by itself.
  *
  * Never: it asks nobody but our own server, at the address the markup names, never the video platform,
  * and stores nothing (the name lives in the page's state only and is gone with the call). The
@@ -41,8 +45,19 @@
   var request = null; // the AbortController of the request in flight
   var watching = ""; // the screen (lobby or call) the poll has asked for, "" when it is stopped
 
+  // The staff member's name is asked for in the lobby and the call only.
   function watches(screen) {
     return screen === "lobby" || screen === "call";
+  }
+
+  // What this turn asks for: the name (when the page has an address for it and is in the lobby or the
+  // call), the chat (when the page has one and still needs it).
+  function wantsName(state) {
+    return Boolean(url) && watches(state.screen);
+  }
+
+  function wantsAny(state) {
+    return wantsName(state) || app.chat.wants(state);
   }
 
   function stop() {
@@ -88,11 +103,10 @@
     }, waitMs);
   }
 
-  function ask() {
-    var epoch = app.call.epoch;
-    var controller = new AbortController();
-    request = controller;
-    window
+  // The name: resolves true when the turn went well. An answer that comes after the call moved on is
+  // dropped.
+  function askName(controller, epoch) {
+    return window
       .fetch(url, { method: "GET", credentials: "same-origin", cache: "no-store", signal: controller.signal })
       .then(function (response) {
         if (response.status === 404) return { gone: true };
@@ -101,26 +115,40 @@
       })
       .then(
         function (body) {
-          if (request !== controller) return;
-          request = null;
-          if (epoch !== app.call.epoch || !watches(app.state.screen)) return;
+          if (request !== controller || epoch !== app.call.epoch || !wantsName(app.state)) return true;
           receive(nameOf(body));
-          settle(epoch, !(body && body.gone));
+          return !(body && body.gone);
         },
         function () {
-          if (request !== controller) return;
-          request = null;
-          if (epoch !== app.call.epoch || !watches(app.state.screen)) return;
-          settle(epoch, false);
+          return false;
         },
       );
   }
 
-  // Called by `render` after every change of the state: starts the poll when the page enters the
-  // lobby or the call (and asks again when it moves on to the call), stops it
-  // everywhere else.
+  function ask() {
+    var epoch = app.call.epoch;
+    var controller = new AbortController();
+    request = controller;
+    var jobs = [];
+    if (wantsName(app.state)) jobs.push(askName(controller, epoch));
+    if (app.chat.wants(app.state)) jobs.push(app.chat.turn(controller.signal));
+    if (!jobs.length) {
+      stop();
+      return;
+    }
+    Promise.all(jobs).then(function (results) {
+      if (request !== controller) return;
+      request = null;
+      if (epoch !== app.call.epoch || !wantsAny(app.state)) return;
+      settle(epoch, results.every(Boolean));
+    });
+  }
+
+  // Called by `render` after every change of the state: starts the poll when the page enters a screen
+  // that needs it (the lobby and the call for the name, every screen after the start for the chat) and
+  // asks again when it moves on to another, stops it everywhere else.
   function sync(state) {
-    if (!url || !turnMs || !watches(state.screen)) {
+    if (!turnMs || !wantsAny(state)) {
       if (watching || timer || request) stop();
       return;
     }

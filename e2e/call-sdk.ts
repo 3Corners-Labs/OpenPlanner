@@ -109,10 +109,10 @@ export const reconnection = (page: Page, step: 'start' | 'success' | 'fail', pay
   );
 
 /** Open the call page with the made-up devices and the stand-in's plan; fail where the stack offers no SDK. */
-export async function open(page: Page, plan: Plan = {}): Promise<void> {
+export async function open(page: Page, plan: Plan = {}, name: 'call_page' | 'call_chat_page' = 'call_page'): Promise<void> {
   await spy(page, { devices: 'made-up' });
   await page.addInitScript((p) => ((window as unknown as { __sdkPlan: Plan }).__sdkPlan = p), plan);
-  await openCallPage(page);
+  await openCallPage(page, name);
   const offered = await page.locator('[data-call]').getAttribute('data-call-sdk');
   expect(offered, NO_STAND_IN).not.toBeNull();
 }

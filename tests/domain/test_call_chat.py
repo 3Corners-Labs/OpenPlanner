@@ -8,15 +8,19 @@ from app.domain.call_chat import (
     INBOUND_TEXT_CAP,
     CallMessage,
     ChatAuthor,
+    ChatClosed,
     ChatEvent,
     ChatEventKind,
     ChatRefusal,
     ChatState,
     capped,
+    chat_closed,
     check_text,
+    clean_text,
     has_chat,
     within_rate,
 )
+from app.domain.calls import TaskState
 from app.domain.contact_center import TaskKind
 
 NOW = datetime(2026, 1, 5, 9, 0, tzinfo=UTC)
@@ -82,3 +86,71 @@ def test_the_text_never_reaches_a_repr_so_it_cannot_reach_a_log_line_by_accident
     assert "geheim-woord" not in repr(message)
     assert "geheim-woord" not in repr(event)
     assert "geheim-woord" not in str(message)
+
+
+@pytest.mark.parametrize(
+    ("text", "cleaned"),
+    [
+        ("Hallo", "Hallo"),
+        ("a\r\nb\rc", "a\nb\nc"),  # one kind of line end
+        ("a\tb\nc", "a\tb\nc"),  # a tab and a line break stay
+        ("a\x00b\x07c\x1bd\x7fe", "abcde"),  # the other control characters go
+        ("tekst‮niet omgekeerd⁦", "tekstniet omgekeerd"),  # direction characters go
+        ("  spaties blijven  ", "  spaties blijven  "),  # nothing is trimmed
+        ("emoji 👍 en é", "emoji 👍 en é"),
+    ],
+)
+def test_the_text_is_cleaned_of_control_and_direction_characters_only(
+    text: str, cleaned: str
+) -> None:
+    assert clean_text(text) == cleaned
+
+
+@pytest.mark.parametrize(
+    ("open_", "task", "refused", "expected"),
+    [
+        (True, TaskState.QUEUED, False, None),
+        (True, TaskState.CONNECTED, False, None),
+        (True, TaskState.NONE, False, None),
+        (False, TaskState.CONNECTED, False, ChatClosed.ENDED),  # the appointment is over
+        (False, TaskState.ENDED, False, ChatClosed.ENDED),  # over wins over a task that ended
+        (True, TaskState.ENDED, False, ChatClosed.STAFF),
+        (True, TaskState.CONNECTED, True, ChatClosed.STAFF),  # a refused message
+        (True, TaskState.FAILED, False, ChatClosed.LOST),  # the conversation did not go ahead
+        (True, TaskState.CANCELLED, False, ChatClosed.LOST),
+        (True, TaskState.FAILED, True, ChatClosed.LOST),
+    ],
+)
+def test_the_chat_is_closed_when_the_appointment_is_over_or_the_conversation_ended(
+    open_: bool, task: TaskState, refused: bool, expected: ChatClosed | None
+) -> None:
+    assert chat_closed(open_, task, refused) is expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "\u200b",
+        "\ufeff",
+        "\u2060",
+        "\u2800",
+        "\u200b\u200b \u2800",
+        "\u3164",
+        "\u00a0",
+        "\u200b\n\t",
+    ],
+)
+def test_a_message_with_nothing_to_see_is_empty(text: str) -> None:
+    assert check_text(clean_text(text), 1000) is ChatRefusal.EMPTY
+    assert check_text(text, 1000) is ChatRefusal.EMPTY  # also without the cleaning
+
+
+@pytest.mark.parametrize(
+    ("text", "cleaned"),
+    [
+        ("a\u200bb\ufeffc\u2060d", "abcd"),  # invisible format characters go
+        ("\U0001f468\u200d\U0001f469", "\U0001f468\u200d\U0001f469"),  # the emoji joiner stays
+    ],
+)
+def test_invisible_format_characters_go_and_the_emoji_joiner_stays(text: str, cleaned: str) -> None:
+    assert clean_text(text) == cleaned

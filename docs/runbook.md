@@ -1483,6 +1483,20 @@ Rotating the message secret keeps the old one valid for `webhook_secret_overlap_
 hold the chat text of appointments that are not yet purged; restoring a database that predates
 the migration `0121` loses nothing it knew, and a downgrade to before it drops the table.
 
+*The participant's side (step 7c).* The side bar of the call page sends through
+`POST /b/m/{ref}/call/chat` and reads through `GET /b/m/{ref}/call/chat`; both are open during
+maintenance like the call itself. A participant who says a message did not arrive: the message is
+stored first and taken back when the contact center cannot be reached, and the page then says "not
+sent" and keeps the text (a `503` with `unavailable`): look at the connection's card on *Channels*
+and the contact center's status; a `403` on the append is `messaging_not_configured` (the feature or
+channel is not set up) and never turns into a work item. A message that stays *Verzonden* (sent)
+was accepted, or its answer was lost after the request may have arrived (it is then not taken back), and not confirmed: the subscription must include `task-message:appended`. A chat that
+closes by itself means the task ended or the platform refused a message after the end; the thread
+stays readable. `embedded_call_chat_per_minute` (platform) limits what one participant may send in
+a minute, `embedded_call_chat_max_chars` (organisation) the longest message; the most one
+appointment's chat holds is fixed at 500. The words of a message are in no log; to find a booking's
+chat, use its timeline (codes only).
+
 ### 6. Checking the Service App (`wxcc-check`)
 
 After creating the Service App, after changing its scopes or authorisation in Control Hub, and
@@ -3121,8 +3135,8 @@ staff list marks who has none); it is no loss while the call page is dark behind
 `embedded_call_chat_poll_seconds` (class C, platform: an organisation cannot change it). The route's
 limits follow it and are no setting of their own: a bound per booking of three times the poll rate
 (18 a minute at 10 seconds, 60 at the default 3, 90 at 2) and a bound per address of fifty times that
-(900, 3000, 4500: fifty calls at three times their normal rate behind one address). From step 7c the chat is asked for in the same poll and counts against the same
-per-booking bound.
+(900, 3000, 4500: fifty calls at three times their normal rate behind one address). The chat (step 7c) is asked for in the same poll, in its own bucket of the same size, so a
+booking's chat read and name read each have the bound above.
 
 ## The call page's SDK does not work (ADR 0123 step 4c)
 

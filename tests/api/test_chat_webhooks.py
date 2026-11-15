@@ -34,6 +34,7 @@ from app.domain.contact_center import (
     TaskKind,
 )
 from app.domain.contact_center_connection import ContactCenterConnectionService
+from app.domain.contact_center_dispatch import DispatcherChoice
 from app.domain.services import BookingService
 from app.domain.webhook_secrets import WebhookSecrets
 from app.main import create_app
@@ -130,7 +131,9 @@ async def _site(
             connections,
             lambda: FakeOrganisationDispatchers(),
         )
-        app.state.call_chat_service = CallChatService(uow, lambda _: True)
+        app.state.call_chat_service = CallChatService(
+            uow, lambda _: True, lambda: DispatcherChoice({}), FixedClock(NOW)
+        )
         yield Site(client, engine, connections, booking_id, group.organisation_id)
 
 

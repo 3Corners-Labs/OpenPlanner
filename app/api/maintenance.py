@@ -127,6 +127,10 @@ OPEN_ROUTES = frozenset(
         # ADR 0123 step 5c: who the participant talks to. The call runs during maintenance, so the
         # page's poll stays open like the token: a read of our own record that changes nothing.
         "/b/m/{public_ref}/call/staff",
+        # ADR 0123 step 7c: the chat beside the call. It goes on during maintenance as the call
+        # does: the read is of our own record and the send appends to the contact center's task,
+        # stored beside the booking like the messages that come in (step 7b).
+        "/b/m/{public_ref}/call/chat",
         "/b/m/{public_ref}/wait",
         "/b/m/{public_ref}/wait/status",
         "/r/{ref}",

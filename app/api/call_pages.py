@@ -26,6 +26,8 @@ The markup also carries the two connection values (``embedded_call_connect_secon
                                  service's booking)
     POST /b/m/{ref}/call/token   the guest token for the click that joins (ADR 0123 point 6)
     GET  /b/m/{ref}/call/staff   who the participant talks to (ADR 0123 step 5c)
+    GET/POST /b/m/{ref}/call/chat  the chat beside the call (step 7c, ``app.api.call_chat_pages``;
+                                 the page carries its address only for a booking that has a chat)
 
 The token endpoint (step 4a) answers JSON with ``token``, ``expires_at`` (UTC, ISO 8601) and
 ``link`` (the meeting's guest link, never the host's). Every answer the endpoint builds carries
@@ -75,11 +77,13 @@ from starlette.exceptions import HTTPException
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from app.adapters.vendored_files import VendoredFile
+from app.api.call_guards import require_service, require_switch, staff_name_json
 from app.api.labels import slot_label
 from app.api.link_session import authorise
 from app.api.participant import participant_call_page
 from app.config import Settings
-from app.domain.call_client import other_way_offer, uses_call_page
+from app.domain.call_chat_service import CallChatService
+from app.domain.call_client import other_way_offer
 from app.domain.call_page import shows_other_way
 from app.domain.call_token_service import (
     REFUSAL_STATUS,
@@ -87,12 +91,11 @@ from app.domain.call_token_service import (
     CallTokenService,
     TokenRefusal,
 )
-from app.domain.guest_access import GUEST_TERM_KEY, DisplayNameMode, StaffNameMode
+from app.domain.guest_access import GUEST_TERM_KEY, DisplayNameMode
 from app.domain.participant_links import PublicRef
 from app.domain.privacy_statement import privacy_link
 from app.domain.scheduling import Group
 from app.domain.services import BookingDetails, BookingService
-from app.domain.staff_screen_names import StaffScreenNames
 from app.domain.trial_call_service import TrialCallService, TrialView
 from app.i18n.dates import format_clock
 from app.web.contact_labels import contact_service, contact_view
@@ -117,29 +120,6 @@ NO_STORE = {"cache-control": "no-store"}
 """A token, or the answer that there is none, is never kept by a browser or a proxy."""
 
 
-def _require_switch(request: Request) -> None:
-    """Refuse as an address that does not exist while the platform switch is off.
-
-    Raises:
-        HTTPException: ``404``, before anything about the booking is looked at.
-    """
-    if not request.app.state.settings.embedded_call_enabled:
-        raise HTTPException(status_code=404)
-
-
-def _require_service(request: Request, details: BookingDetails) -> None:
-    """Refuse as an address that does not exist for a booking of a service that did not choose us.
-
-    Run after the participant's session was checked, so only they can meet it (ADR 0123 step 6a).
-
-    Raises:
-        HTTPException: ``404`` unless the booking's service uses the call page now.
-    """
-    enabled = request.app.state.settings.embedded_call_enabled
-    if not uses_call_page(details.group, platform_enabled=enabled):
-        raise HTTPException(status_code=404)
-
-
 async def _page_context(
     request: Request,
     locale: RequestLocale,
@@ -150,6 +130,7 @@ async def _page_context(
     slot: str,
     token_url: str,
     staff_url: str,
+    chat_url: str = "",
     other_way_href: str,
     back_href: str,
     back_text: str = "join.back",
@@ -196,6 +177,10 @@ async def _page_context(
         "sdk_integrity": sdk_file.integrity if sdk_file else "",
         "token_url": token_url,
         "staff_url": staff_url,
+        # The chat beside the call (step 7c): the address only for a booking that has one, so any
+        # other booking's page has no side bar, no poll of it and no sentence about it.
+        "chat_url": chat_url,
+        "chat_max_chars": current.embedded_call_chat_max_chars,
         "poll_seconds": current.embedded_call_chat_poll_seconds,
         "connect_seconds": current.embedded_call_connect_seconds,
         "connect_attempts": current.embedded_call_connect_attempts,
@@ -211,11 +196,11 @@ async def call_page(request: Request, public_ref: str) -> HTMLResponse:
         HTTPException: ``404`` while ``embedded_call_enabled`` is off, before anything about
             the booking is looked at, and for a booking of a service that did not choose it.
     """
-    _require_switch(request)
+    require_switch(request)
     bookings: BookingService = request.app.state.booking_service
     locale = resolve_locale(request)
     details = await bookings.find(await authorise(request, public_ref))
-    _require_service(request, details)
+    require_service(request, details)
     current = follow(request, details.group.organisation_id)
     booking, group = details.booking, details.group
     context = await _page_context(
@@ -227,6 +212,7 @@ async def call_page(request: Request, public_ref: str) -> HTMLResponse:
         slot=slot_label(booking.start, booking.end, group, locale),
         token_url=f"/b/m/{public_ref}/call/token",
         staff_url=f"/b/m/{public_ref}/call/staff",
+        chat_url=_chat_url(request, details, public_ref),
         other_way_href=f"/b/m/{public_ref}/join/go",
         back_href=f"/b/m/{public_ref}/join",
     )
@@ -246,11 +232,11 @@ async def call_token(request: Request, public_ref: str, _: SameOrigin) -> Respon
         HTTPException: ``404`` while ``embedded_call_enabled`` is off, before anything about
             the booking is looked at, and for a booking of a service that did not choose it.
     """
-    _require_switch(request)
+    require_switch(request)
     ref = await authorise(request, public_ref)
     bookings: BookingService = request.app.state.booking_service
     details = await bookings.find(ref)  # the one read: the service takes the booking from here
-    _require_service(request, details)
+    require_service(request, details)
     current = follow(request, details.group.organisation_id)
     service: CallTokenService = request.app.state.call_token_service
     outcome = await service.issue(
@@ -260,6 +246,12 @@ async def call_token(request: Request, public_ref: str, _: SameOrigin) -> Respon
         lambda: within_call_token_limit(public_ref),
     )
     return await _token_response(request, outcome)
+
+
+def _chat_url(request: Request, details: BookingDetails, public_ref: str) -> str:
+    """Return the address of the booking's chat, or nothing when the booking has none."""
+    chat: CallChatService = request.app.state.call_chat_service
+    return f"/b/m/{public_ref}/call/chat" if chat.has_chat(details.booking, details.group) else ""
 
 
 def _guest_term(request: Request, group: Group) -> str:
@@ -292,20 +284,14 @@ async def call_staff(request: Request, public_ref: str) -> Response:
         HTTPException: ``404`` while ``embedded_call_enabled`` is off, before anything about
             the booking is looked at, and for a booking of a service that did not choose it.
     """
-    _require_switch(request)
+    require_switch(request)
     ref = await authorise(request, public_ref)
     if not within_call_staff_limit(public_ref):  # only a request with the session is counted
         return await refuse_rate_limited(request)
     bookings: BookingService = request.app.state.booking_service
     details = await bookings.find(ref)
-    _require_service(request, details)
-    current = follow(request, details.group.organisation_id)
-    names: StaffScreenNames = request.app.state.staff_names
-    claim = details.booking.claim
-    label = await names.label_of(
-        claim.claimed_by if claim else None, StaffNameMode(current.embedded_call_staff_name)
-    )
-    return JSONResponse(label.as_json(), headers=NO_STORE)
+    require_service(request, details)
+    return JSONResponse(await staff_name_json(request, details), headers=NO_STORE)
 
 
 async def _trial_view(request: Request, public_ref: str) -> tuple[TrialView, PublicRef]:
@@ -318,7 +304,7 @@ async def _trial_view(request: Request, public_ref: str) -> tuple[TrialView, Pub
         HTTPException: ``404`` while the switch is off or for a service that did not choose the
             page.
     """
-    _require_switch(request)
+    require_switch(request)
     ref = await authorise(request, public_ref)
     trials: TrialCallService = request.app.state.trial_call_service
     view = await trials.view(ref)

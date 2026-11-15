@@ -32,7 +32,7 @@ from app.domain.booking import (
 )
 from app.domain.booking_rollup import DayCount, RollableBooking
 from app.domain.branding import Branding, FontFile, FontRole, Logo
-from app.domain.call_chat import CallMessage
+from app.domain.call_chat import CallMessage, ChatState
 from app.domain.calls import (
     BookingEvent,
     BookingOverview,
@@ -2631,8 +2631,31 @@ class Transaction(Protocol):
         """
         ...
 
-    async def messages_of_call(self, booking_id: int) -> list[CallMessage]:
-        """Return a booking's chat, oldest first (the caller checks the participant's session)."""
+    async def messages_of_call(
+        self, booking_id: int, since: int = 0, limit: int | None = None
+    ) -> list[CallMessage]:
+        """Return a booking's chat in arrival order (by id), only what is newer than ``since``.
+
+        The caller checks the participant's session; ``limit`` cuts the answer (``None``: all).
+        """
+        ...
+
+    async def call_message_by_provider_id(
+        self, booking_id: int, provider_message_id: str
+    ) -> CallMessage | None:
+        """Return the booking's message with that provider id, or ``None``."""
+        ...
+
+    async def participant_message_times(self, booking_id: int, after: datetime) -> list[datetime]:
+        """Return the times of the participant's messages later than ``after`` (the rate window)."""
+        ...
+
+    async def call_message_states(self, booking_id: int, ids: list[int]) -> dict[int, ChatState]:
+        """Return the state of the participant's messages among ``ids``."""
+        ...
+
+    async def has_refused_call_message(self, booking_id: int) -> bool:
+        """Return whether the platform refused a message of the booking's chat."""
         ...
 
     async def confirm_call_message(self, booking_id: int, provider_message_id: str) -> bool:
@@ -2649,6 +2672,14 @@ class Transaction(Protocol):
 
     async def sent_call_message_ids(self, booking_id: int) -> list[str]:
         """Return the provider ids of the booking's messages that wait for their confirmation."""
+        ...
+
+    async def withdraw_call_message(self, booking_id: int, provider_message_id: str) -> bool:
+        """Delete one ``sent`` message that never reached the platform; ``False`` if none.
+
+        The call page's sending (ADR 0123 step 7c) stores a message before it hands it to the
+        platform and takes it back when the platform could not be reached.
+        """
         ...
 
     async def delete_call_messages(self, booking_id: int) -> None:

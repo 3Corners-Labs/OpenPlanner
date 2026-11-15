@@ -873,3 +873,177 @@ body:has([data-call-state="call"]:not([hidden])) .call-stage {
     border-color: var(--booking-color-text);
   }
 }
+
+/* --- The chat beside the call (step 7c) ------------------------------------------------------- */
+/* The side bar sits after the call's content in the page and below it on a narrow window, so a
+   reading order and a keyboard order follow the page; from 64 rem it takes a column of its own to
+   the right of everything else. It is shown in every state after the start. */
+.call-chat {
+  box-sizing: border-box;
+  margin-top: var(--booking-space-m);
+  padding: var(--booking-space-m);
+  border: 1px solid var(--booking-color-border-strong);
+  border-radius: var(--booking-radius);
+  background: var(--booking-color-surface);
+}
+
+.call-chat h2 {
+  margin-top: 0;
+}
+
+.call-chat__warning {
+  margin-bottom: var(--booking-space-s);
+}
+
+/* The log scrolls inside itself and can be focused for that; its place is kept when a message is
+   added (the script appends, it never draws a line again that did not change). */
+.call-chat__log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--booking-space-s);
+  max-height: 20rem;
+  margin-bottom: var(--booking-space-s);
+  overflow-y: auto;
+}
+
+.call-chat__message {
+  box-sizing: border-box;
+  max-width: 90%;
+  padding: var(--booking-space-s);
+  border: 1px solid var(--booking-color-border);
+  border-radius: var(--booking-radius);
+  background: var(--booking-color-background);
+  overflow-wrap: anywhere;
+}
+
+.call-chat__message--participant {
+  align-self: flex-end;
+  border-color: var(--booking-color-accent);
+  background: var(--booking-color-accent-subtle);
+}
+
+.call-chat__message p {
+  margin: 0;
+}
+
+.call-chat__who {
+  font-weight: 700;
+}
+
+.call-chat__time,
+.call-chat__state {
+  color: var(--booking-color-text-muted);
+  font-size: 0.875rem;
+}
+
+/* Line breaks of a message are kept as the writer made them. */
+.call-chat__text {
+  white-space: pre-wrap;
+}
+
+.call-chat__state:empty {
+  display: none;
+}
+
+.call-chat__closed {
+  margin-bottom: var(--booking-space-s);
+  padding: var(--booking-space-s) var(--booking-space-m);
+  border: 1px solid var(--booking-color-border-strong);
+  border-left-width: 6px;
+  border-radius: var(--booking-radius);
+  background: var(--booking-color-background);
+}
+
+.call-chat__closed p {
+  margin: 0;
+}
+
+.call-chat__closed:focus-visible,
+.call-chat__log:focus-visible {
+  outline: 3px solid var(--booking-color-accent);
+  outline-offset: 2px;
+}
+
+/* The way to send is said for the pointer in use: a touch keyboard has no Shift and Enter, so there
+   Enter starts a new line and the button sends (call-chat.js). The sentence that is not true here is
+   not in the box and so not read. */
+.call-chat__keys-touch {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .call-chat__keys-fine {
+    display: none;
+  }
+
+  .call-chat__keys-touch {
+    display: inline;
+  }
+}
+
+.call-chat__form .field {
+  margin-bottom: var(--booking-space-s);
+}
+
+.call-chat__form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+}
+
+.call-chat__problem {
+  margin: var(--booking-space-xs) 0 0;
+  padding-left: var(--booking-space-s);
+  border-left: 4px solid var(--booking-color-error);
+  font-weight: 700;
+}
+
+.call-chat__form > :last-child {
+  margin-bottom: 0;
+}
+
+@media (min-width: 64rem) {
+  body:has([data-call-state]:not([hidden])) .call:has(> .call-chat:not([hidden])) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    column-gap: var(--booking-space-l);
+    align-items: start;
+  }
+
+  body:has([data-call-state]:not([hidden])) .call:has(> .call-chat:not([hidden])) > * {
+    grid-column: 1;
+  }
+
+  body:has([data-call-state]:not([hidden])) .call:has(> .call-chat:not([hidden])) > .call-chat {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    margin-top: 0;
+  }
+
+  /* The bar is fixed at the foot of the window: a side bar taller than the window less the bar would
+     leave Send under it (WCAG 2.4.11), so it is cut to the room there is and scrolls inside itself. */
+  .call-chat {
+    position: sticky;
+    top: var(--booking-space-m);
+    max-height: calc(100vh - 8rem);
+    max-height: calc(100dvh - 8rem);
+    overflow-y: auto;
+  }
+}
+
+@media (forced-colors: active) {
+  .call-chat,
+  .call-chat__message,
+  .call-chat__closed {
+    border: 1px solid CanvasText;
+  }
+
+  .call-chat__message--participant {
+    border-width: 3px;
+  }
+
+  .call-chat__closed:focus-visible,
+  .call-chat__log:focus-visible {
+    outline: 3px solid Highlight;
+  }
+}

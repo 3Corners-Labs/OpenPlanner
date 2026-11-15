@@ -7,8 +7,10 @@ conversation task. Messages are kept with the booking so a reload shows the thre
 reply is not lost (``call_messages``). Pure rules, no framework:
 
     has_chat(task kind, service uses the page) ─► whether a booking has a chat at all
+    clean_text(text)                           ─► control and direction characters taken out
     check_text(text, max_chars)                ─► a participant's message may be sent
     within_rate(sent_at, now, per_minute)      ─► the participant is not flooding the desktop
+    chat_closed(open, task state, messages)    ─► whether, and why, the chat takes nothing more
     ChatEvent                                  ─► what a verified delivery says, platform-neutral
 
 The text of a message is personal data (free text of a participant, or a staff member's words to
@@ -23,10 +25,13 @@ the organisation's ``embedded_call_staff_name`` and our own record of who accept
 (``app.domain.screen_name``), so nothing about who wrote is stored here.
 """
 
+import re
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
 
+from app.domain.calls import TaskState
 from app.domain.contact_center import TaskKind
 
 INBOUND_TEXT_CAP = 4000
@@ -43,6 +48,17 @@ still gets its 204) and one system event, ``chat.limit_reached``, says so, once,
 
 RATE_WINDOW = timedelta(minutes=1)
 """The window ``embedded_call_chat_per_minute`` counts messages in."""
+
+CLIENT_ID = re.compile(r"[A-Za-z0-9]{16,40}")
+"""What the call page's own identifier of a message looks like: random letters and digits, chosen in
+the browser and kept for a retry, so the same message sent twice is one message (step 7c)."""
+
+PROVIDER_PREFIX = "p"
+"""Put before the page's identifier to make the platform's message identifier (``aliasId``), so
+that the identifier of one of our messages never looks like one the platform made itself."""
+
+_UNSAFE = re.compile("[\u202a-\u202e\u2066-\u2069]")
+"""The characters that turn the direction of text around: not kept in a chat message."""
 
 
 class ChatAuthor(StrEnum):
@@ -63,11 +79,35 @@ class ChatState(StrEnum):
     """Refused afterwards by ``task-message:append-failed``: the conversation is closed."""
 
 
+class ChatClosed(StrEnum):
+    """Why a chat takes nothing more; the participant can still read it."""
+
+    ENDED = "ended"
+    """The appointment is over (the booking is no longer a confirmed one)."""
+    STAFF = "staff"
+    """The conversation was ended on the contact center's side, or a message was refused."""
+    LOST = "lost"
+    """The task failed or was cancelled at the platform: the conversation did not go ahead."""
+
+
 class ChatRefusal(StrEnum):
     """Why a participant's message is not sent; a code, never user-facing text."""
 
     EMPTY = "empty"
     TOO_LONG = "too_long"
+    BAD_REQUEST = "bad_request"
+    """The page's identifier of the message is not of the shape the page makes."""
+    RATE_LIMITED = "rate_limited"
+    """More messages in the last minute than ``embedded_call_chat_per_minute`` allows."""
+    CLOSED = "closed"
+    """The chat takes nothing more (the appointment is over, or the conversation ended)."""
+    FULL = "full"
+    """The booking's chat holds ``MAX_MESSAGES_PER_BOOKING`` messages."""
+    UNAVAILABLE = "unavailable"
+    """The contact center is not configured, refused or could not be reached; nothing was kept
+    that is known not to have arrived."""
+    NO_CHAT = "no_chat"
+    """The booking has no chat (not a conversation task on a service that uses the page)."""
 
 
 class ChatEventKind(StrEnum):
@@ -157,14 +197,43 @@ def has_chat(task_kind: TaskKind | None, uses_call_page: bool) -> bool:
     return uses_call_page and task_kind is TaskKind.CONVERSATION
 
 
+_BLANK_LOOKING = frozenset("\u2800\u3164\u115f\u1160\u17b4\u17b5\u180e")
+"""Characters that draw nothing yet are not white space nor a format character."""
+
+
+def clean_text(text: str) -> str:
+    """Return ``text`` as it is kept: one kind of line end, control characters taken out.
+
+    A tab stays and a line break stays; every other control character, every invisible format
+    character (zero-width space, joiners, the byte order mark, the word joiner) except the zero
+    width joiner that emoji sequences need, and every character that turns the direction of the
+    text around is dropped, so a message cannot hide or reorder what the staff member reads.
+    Nothing else changes, and the text is not trimmed.
+    """
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = _UNSAFE.sub("", text)
+    return "".join(
+        c for c in text if c in "\n\t\u200d" or unicodedata.category(c) not in ("Cc", "Cf")
+    )
+
+
+def _visible(char: str) -> bool:
+    """Return whether ``char`` draws something a reader sees."""
+    return (
+        not char.isspace()
+        and char not in _BLANK_LOOKING
+        and unicodedata.category(char) not in ("Cc", "Cf", "Zs", "Zl", "Zp")
+    )
+
+
 def check_text(text: str, max_chars: int) -> ChatRefusal | None:
     """Return why a participant's message may not be sent, or ``None`` when it may.
 
-    A message of only white space is empty. Length counts characters of the text as written
-    (``embedded_call_chat_max_chars``). Step 7c applies it to what the participant sends; nothing
-    in step 7b calls it.
+    A message with no character that draws something (white space, an invisible or blank-looking
+    character only) is empty. Length counts characters of the text as written
+    (``embedded_call_chat_max_chars``). The call page's sending applies it to ``clean_text``.
     """
-    if not text.strip():
+    if not any(_visible(c) for c in text):
         return ChatRefusal.EMPTY
     if len(text) > max_chars:
         return ChatRefusal.TOO_LONG
@@ -179,7 +248,7 @@ def within_rate(sent: list[datetime], now: datetime, per_minute: int) -> bool:
         now: The time of the attempt.
         per_minute: ``embedded_call_chat_per_minute``.
 
-    Step 7c applies it to what the participant sends; nothing in step 7b calls it.
+    The call page's sending applies it, per booking.
     """
     recent = sum(1 for at in sent if now - RATE_WINDOW < at <= now)
     return recent < per_minute
@@ -188,3 +257,25 @@ def within_rate(sent: list[datetime], now: datetime, per_minute: int) -> bool:
 def capped(text: str) -> str:
     """Return a delivered text cut at ``INBOUND_TEXT_CAP`` characters."""
     return text[:INBOUND_TEXT_CAP]
+
+
+def chat_closed(booking_open: bool, task: TaskState, refused: bool) -> ChatClosed | None:
+    """Return why the chat takes nothing more, or ``None`` while it is open.
+
+    The appointment being over closes it for good (``ENDED``). A task that failed or was
+    cancelled means the conversation did not go ahead (``LOST``). A task that ended, or a message
+    the platform refused, means the contact center's side closed it (``STAFF``; ADR 0123 point 8:
+    a message appended after the end is refused a second later).
+
+    Args:
+        booking_open: Whether the booking is still a confirmed one.
+        task: The state of the contact-center task.
+        refused: Whether the platform refused a message of the booking's chat.
+    """
+    if not booking_open:
+        return ChatClosed.ENDED
+    if task in (TaskState.FAILED, TaskState.CANCELLED):
+        return ChatClosed.LOST
+    if task is TaskState.ENDED or refused:
+        return ChatClosed.STAFF
+    return None

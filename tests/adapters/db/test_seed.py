@@ -24,6 +24,7 @@ from app.domain.availability import utc_bounds
 from app.domain.booking import Booking, BookingStatus
 from app.domain.booking_changes import planner_may_change, planner_may_request_rebook
 from app.domain.calls import JoinState, join_state
+from app.domain.contact_center import ContactCenterKind, TaskKind
 from app.domain.ports import Transaction
 from app.domain.scheduling import JoinClient
 from app.domain.tokens import hash_token
@@ -227,3 +228,50 @@ async def test_the_call_page_example_is_a_confirmed_booking_reached_by_its_link(
     async with SqlUnitOfWork(engine).read() as tx:
         booking = await _by_link(tx, examples.call_page)
     assert booking.status is BookingStatus.CONFIRMED
+
+
+async def test_the_chat_example_is_a_confirmed_booking_of_the_call_team_with_a_conversation_task(
+    engine: AsyncEngine,
+) -> None:
+    await seed_demo(engine)
+
+    examples = await seed_closure_examples(engine, NOW, KEY)
+
+    assert examples.call_chat_page.endswith("/call")
+    assert examples.call_chat_page != examples.call_page
+    async with SqlUnitOfWork(engine).read() as tx:
+        chat = await _by_link(tx, examples.call_chat_page)
+        plain = await _by_link(tx, examples.call_page)
+    assert chat.status is BookingStatus.CONFIRMED
+    assert chat.group_id == plain.group_id
+    assert chat.contact_center_task is not None
+    assert chat.contact_center_task.task_kind is TaskKind.CONVERSATION
+    assert plain.contact_center_task is None  # the other page keeps no chat
+
+
+async def test_every_seeding_makes_its_own_conversation_task_id(engine: AsyncEngine) -> None:
+    await seed_demo(engine)
+
+    first = await seed_closure_examples(engine, NOW, KEY)
+    second = await seed_closure_examples(engine, NOW, KEY)
+
+    async with SqlUnitOfWork(engine).read() as tx:
+        found = [await _by_link(tx, p.call_chat_page) for p in (first, second)]
+        ids = [b.contact_center_task.id for b in found if b.contact_center_task]
+        by_task = [await tx.get_booking_by_task(i, ContactCenterKind.WEBEX_CC) for i in ids]
+    assert len(set(ids)) == 2  # not one id for both, which a lookup by task id could not tell apart
+    assert [b.id for b in by_task if b] == [b.id for b in found]
+
+
+async def test_without_the_chat_example_no_booking_holds_a_conversation_task(
+    engine: AsyncEngine,
+) -> None:
+    # The upgrade fixture stands for an earlier image, whose database holds none (migration 0116).
+    await seed_demo(engine)
+
+    examples = await seed_closure_examples(engine, NOW, KEY, chat=False)
+
+    assert examples.call_chat_page == ""
+    async with SqlUnitOfWork(engine).read() as tx:
+        booking = await _by_link(tx, examples.call_page)
+    assert booking.contact_center_task is None
