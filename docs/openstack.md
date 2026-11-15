@@ -46,8 +46,20 @@ the chart of `docs/kubernetes.md`, with the storage and load balancer notes ther
    ```sh
    sudo mkfs.ext4 -L openplanner /dev/vdb          # the device name differs; check with lsblk
    sudo mkdir -p /var/lib/docker
-   echo 'LABEL=openplanner /var/lib/docker ext4 defaults,nofail 0 2' | sudo tee -a /etc/fstab
+   echo 'LABEL=openplanner /var/lib/docker ext4 defaults 0 2' | sudo tee -a /etc/fstab
    sudo mount /var/lib/docker
+   findmnt /var/lib/docker                        # must show the volume, not the root disk
+   ```
+
+   No `nofail`, on purpose: if the volume is missing at boot, the mount fails and Docker must
+   not start, because it would otherwise write the database to the unencrypted root disk. Make
+   that a rule of systemd as well, so the services wait for the mount:
+
+   ```sh
+   sudo mkdir -p /etc/systemd/system/docker.service.d
+   printf '[Unit]\nRequiresMountsFor=/var/lib/docker\n' |
+     sudo tee /etc/systemd/system/docker.service.d/mount.conf
+   sudo systemctl daemon-reload
    ```
 
    The volumes `openplanner_data` (the SQLite database and `data/backups`), the proxy's
@@ -110,6 +122,7 @@ Cinder snapshot:
 ```sh
 cd ~/openplanner
 docker compose --env-file .env.update exec web python -m app.cli backup-db before-upgrade
+sync                                            # flush the copy to the volume before the snapshot
 openstack volume snapshot create --volume <volume> --force before-upgrade   # --force: attached
 ```
 

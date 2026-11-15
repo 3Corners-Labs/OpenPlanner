@@ -37,7 +37,9 @@ writes its findings at the end.
 2. Create a **block volume**, attach it, format it, and mount it at `/var/lib/docker` before the
    installer runs (the commands are in `docs/openstack.md`, *Setting it up*, step 2).
 3. Install as `docs/install.md` says, `--mode test` for a user test on its own name.
-4. Before an upgrade: `python -m app.cli backup-db`, then a snapshot of the volume. Delete the
+4. Before an upgrade: `python -m app.cli backup-db`, then `sync`, then a snapshot of the volume.
+   Mount the volume without `nofail`, so Docker never starts on the unencrypted disk
+   (`docs/openstack.md`, *Setting it up*, step 2). Delete the
    snapshot when the upgrade has proved itself; it holds personal data as long as the database does.
 5. **Test a restore from a snapshot on a second server** before go-live: make a volume from the
    snapshot, attach it, follow *Restoring a copy by hand*. Write down how long it took.
