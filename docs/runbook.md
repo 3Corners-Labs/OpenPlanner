@@ -587,7 +587,10 @@ browser uses the last one) and drop its `Domain`, drop
 `Reporting-Endpoints`, `Accept-CH` and `Critical-CH`, send the portal's own
 `Strict-Transport-Security` and `Permissions-Policy`,
 `Cross-Origin-Opener-Policy: same-origin-allow-popups` and the added `Content-Security-Policy`,
-and refuse a request with a `Service-Worker` header. Every answer it makes itself (a refusal, an
+and refuse a request with a `Service-Worker` header. It sets `X-Forwarded-For` to the visitor's
+address alone (Keycloak records the first address it is given, so an appended one lets a
+visitor choose theirs; nginx's `$proxy_add_x_forwarded_for` appends) and sets or removes
+`X-Forwarded-Proto`, `-Host` and `-Port` itself. Every answer it makes itself (a refusal, an
 error page, a body over its limit) must carry the portal's own security headers, as
 `handle_errors` in `deploy/proxy/Caddyfile` does for Caddy's handlers. `deploy/proxy/idp.caddy` is the reference.
 

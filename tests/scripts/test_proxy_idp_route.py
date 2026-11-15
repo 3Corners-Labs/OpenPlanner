@@ -259,10 +259,16 @@ def test_the_proxy_logs_no_request() -> None:
 
 
 def test_the_provider_gets_the_visitors_address_alone_as_web_does() -> None:
-    """ADR 0129: every upstream gets exactly one address in X-Forwarded-For, the visitor's."""
-    rule = "header_up X-Forwarded-For {client_ip}"
-    assert re.search(rf"^\s*{re.escape(rule)}$", ROUTE, re.MULTILINE)
-    assert re.search(rf"reverse_proxy \{{\$WEB_UPSTREAM\}} \{{\s*{re.escape(rule)}", CADDYFILE)
+    """ADR 0129: every upstream gets exactly one address in X-Forwarded-For, the visitor's, from
+    one snippet; Keycloak also reads X-Forwarded-Port, which the route removes (ADR 0126)."""
+    snippet = re.search(r"^\(visitor_address\) \{\n(.*?)^\}$", CADDYFILE, re.MULTILINE | re.DOTALL)
+    assert snippet, "the Caddyfile defines no visitor_address snippet"
+    assert snippet.group(1).strip() == "header_up X-Forwarded-For {client_ip}"
+    assert (CADDYFILE + ROUTE).count("X-Forwarded-For {client_ip}") == 1
+    for upstream, text in (("WEB_UPSTREAM", CADDYFILE), ("IDP_UPSTREAM", ROUTE)):
+        block = rf"reverse_proxy \{{\${upstream}\}} \{{(\s*#[^\n]*)*\s*import visitor_address$"
+        assert re.search(block, text, re.MULTILINE), upstream
+    assert re.search(r"^\s*header_up -X-Forwarded-Port$", ROUTE, re.MULTILINE)
 
 
 def test_every_answer_the_proxy_makes_itself_carries_the_portals_own_headers() -> None:

@@ -332,10 +332,10 @@ edge_checks() { # redirect, machine paths, body limit, non-root, standards: the 
   forged_header_check
 }
 
-# The provider of pass 3 (ADR 0126): it answers every request with 200 and the Cookie and
-# X-Forwarded-For headers it was given (ADR 0129), sets every header an answer must not get
-# through to the browser, and prints each path it serves. It runs in web's image on the edge
-# network as idp-probe:8080.
+# The provider of pass 3 (ADR 0126): it answers every request with 200 and the Cookie,
+# X-Forwarded-For (ADR 0129) and X-Forwarded-Port headers it was given, sets every header an
+# answer must not get through to the browser, and prints each path it serves. It runs in web's
+# image on the edge network as idp-probe:8080.
 idp_probe_code='
 import http.server, json
 FORGED = [
@@ -360,7 +360,7 @@ FORGED = [
 class Probe(http.server.BaseHTTPRequestHandler):
     def answer(self):
         print(self.path, flush=True)
-        fields = {"cookie": "Cookie", "forwarded_for": "X-Forwarded-For"}
+        fields = {"cookie": "Cookie", "forwarded_for": "X-Forwarded-For", "forwarded_port": "X-Forwarded-Port"}
         body = json.dumps({key: self.headers.get_all(name) or [] for key, name in fields.items()}).encode()
         self.send_response(200)
         for name, value in FORGED:
@@ -448,7 +448,7 @@ idp_route_checks() { # pass 3: the route of ADR 0126 in front of a provider that
   ! probe_saw '%2[Ff]|%5[cC]|;' || fail "a detour reached the provider"
   # shellcheck disable=SC2086
   given="$(curl -sk $resolve -H 'Cookie: __Host-op_admin=s1; KC_RESTART=k1; lang=nl; __Host-op_link=s2; AUTH_SESSION_ID=a1' \
-    -H 'X-Forwarded-For: 203.0.113.9' \
+    -H 'X-Forwarded-For: 203.0.113.9' -H 'X-Forwarded-Port: 4444' \
     "$base/idp/realms/openplanner/x")"
   echo "  the provider was given: $given"
   for kept in KC_RESTART=k1 AUTH_SESSION_ID=a1; do
@@ -458,6 +458,7 @@ idp_route_checks() { # pass 3: the route of ADR 0126 in front of a provider that
   # ADR 0129: the provider gets one address, the visitor's, never one the visitor wrote.
   echo "$given" | grep -q '"forwarded_for": \["[^",]*"\]' || fail "the provider is not given exactly one address ($given)"
   ! echo "$given" | grep -q '203\.0\.113\.9' || fail "the provider is given the address the visitor forged ($given)"
+  echo "$given" | grep -q '"forwarded_port": \[\]' || fail "the provider is given the port the visitor forged ($given)"
   direct="$(compose exec -T web python -I -c "$probe_direct_code" | tr -d '\r')"
   head="$(head_of "$base/healthz")"
   portal_hsts="$(values_of strict-transport-security)"
