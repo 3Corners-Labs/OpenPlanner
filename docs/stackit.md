@@ -70,7 +70,8 @@ because those protect the people who try it.
    use the SMTP relay of a mail provider on port 587.
 5. Check: `docker compose --env-file .env.update exec web python -m app.cli address-check`,
    *System status* in the portal, and one test booking from another network.
-6. Subscribe the beta to its update channel as the superuser on `/admin/updates`: channel `rc`
+6. Subscribe the beta to its update channel as the superuser, in *Advanced settings*, topic
+   *Updates* (`/admin/updates` shows the result, it does not change it): channel `rc`
    (every merge to `main` becomes a signed candidate) and, if you want it to follow without a
    click, auto-apply. A `--mode test` host trusts images signed on `main`, which is why this is
    possible here and refused in production (`docs/install.md`, *Update channel*). A production
