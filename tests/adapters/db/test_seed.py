@@ -261,3 +261,17 @@ async def test_every_seeding_makes_its_own_conversation_task_id(engine: AsyncEng
         by_task = [await tx.get_booking_by_task(i, ContactCenterKind.WEBEX_CC) for i in ids]
     assert len(set(ids)) == 2  # not one id for both, which a lookup by task id could not tell apart
     assert [b.id for b in by_task if b] == [b.id for b in found]
+
+
+async def test_without_the_chat_example_no_booking_holds_a_conversation_task(
+    engine: AsyncEngine,
+) -> None:
+    # The upgrade fixture stands for an earlier image, whose database holds none (migration 0116).
+    await seed_demo(engine)
+
+    examples = await seed_closure_examples(engine, NOW, KEY, chat=False)
+
+    assert examples.call_chat_page == ""
+    async with SqlUnitOfWork(engine).read() as tx:
+        booking = await _by_link(tx, examples.call_page)
+    assert booking.contact_center_task is None

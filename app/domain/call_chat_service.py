@@ -65,7 +65,7 @@ from app.domain.call_client import UsesCallPage
 from app.domain.calls import ParticipantMessage, TaskState
 from app.domain.contact_center import ContactCenterKind
 from app.domain.contact_center_dispatch import DispatcherChoice
-from app.domain.errors import DomainError
+from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import EventOutcome, claim_event
 from app.domain.ports import Clock, IntegrationError, Transaction, UnitOfWork
 from app.domain.scheduling import Group
@@ -222,7 +222,8 @@ class CallChatService:
             waiting: The ids of the page's own messages that it still shows as waiting for the
                 platform (cut at ``WAITING_CAP``); their state is returned once it changed.
         """
-        assert booking.id is not None  # noqa: S101 - a stored booking
+        if booking.id is None:
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "booking")
         async with self._uow.read() as tx:
             found = await tx.messages_of_call(booking.id, since, READ_LIMIT + 1)
             states = await tx.call_message_states(booking.id, waiting[:WAITING_CAP])
@@ -316,7 +317,10 @@ class CallChatService:
                 )
                 kept = await tx.call_message_by_provider_id(booking.id, provider_id)
                 inserted = True
-        assert kept is not None  # noqa: S101 - just stored, or found above
+        if (
+            kept is None
+        ):  # stored or found above in the same lock: a broken store, not a participant
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, "call_message")
         outcome = await self._append(booking, group, provider_id, cleaned)
         if outcome is AppendOutcome.NOT_SENT:
             if inserted:

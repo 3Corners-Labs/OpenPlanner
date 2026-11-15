@@ -306,7 +306,7 @@ async def _seed_calendar(engine: AsyncEngine) -> None:
 
 
 async def seed_closure_examples(
-    engine: AsyncEngine, now: datetime, token_key: bytes
+    engine: AsyncEngine, now: datetime, token_key: bytes, *, chat: bool = True
 ) -> ClosureExamples:
     """Add a closed team, a planned closure and a booking on hold to the demo organisation.
 
@@ -317,6 +317,10 @@ async def seed_closure_examples(
         engine: The database.
         now: The current time; the closed team closed a day earlier.
         token_key: The key that derives management links (ADR 0011).
+        chat: Whether to add the booking whose task is a conversation (``call_chat_page``, for
+            the end-to-end stack). The upgrade fixture leaves it out: it stands for what an
+            earlier image holds, and none holds a conversation task (migration 0116 refuses to
+            go back past one). Without it ``call_chat_page`` is empty.
     """
     created = await _seed_group(
         engine, DEMO_SLUG, "Demo-acme", CLOSED_GROUP_SLUG, "Demo: tijdelijk gesloten"
@@ -385,22 +389,25 @@ async def seed_closure_examples(
             token_key,
             status=BookingStatus.CONFIRMED,
         )
-        chat_token, chat_booking = await store_example_booking(
-            tx,
-            call_group,
-            now + JOURNEY_CALL_IN + timedelta(hours=3),
-            now,
-            token_key,
-            status=BookingStatus.CONFIRMED,
-        )
-        await tx.save_task(
-            chat_booking.id or 0,
-            ContactCenterTaskRef(
-                f"{CHAT_TASK_PREFIX}{chat_booking.public_ref}",
-                ContactCenterKind.WEBEX_CC,
-                TaskKind.CONVERSATION,
-            ),
-        )
+        chat_page = ""
+        if chat:
+            chat_token, chat_booking = await store_example_booking(
+                tx,
+                call_group,
+                now + JOURNEY_CALL_IN + timedelta(hours=3),
+                now,
+                token_key,
+                status=BookingStatus.CONFIRMED,
+            )
+            await tx.save_task(
+                chat_booking.id or 0,
+                ContactCenterTaskRef(
+                    f"{CHAT_TASK_PREFIX}{chat_booking.public_ref}",
+                    ContactCenterKind.WEBEX_CC,
+                    TaskKind.CONVERSATION,
+                ),
+            )
+            chat_page = f"/b/{chat_token}/call"
     return ClosureExamples(
         closed_group=f"/g/{CLOSED_GROUP_SLUG}",
         planned_closure=f"/g/{PLANNED_GROUP_SLUG}/closure",
@@ -412,7 +419,7 @@ async def seed_closure_examples(
         pending_flow_webkit=f"/b/{pending[3]}/confirm",
         proposal_page=f"/b/{proposed}/proposal",
         call_page=f"/b/{call_token}/call",
-        call_chat_page=f"/b/{chat_token}/call",
+        call_chat_page=chat_page,
         trial_page=f"/b/{token}/test",
         journeys=journeys,
         demo_agenda=_agenda_path(demo, demo_day),
