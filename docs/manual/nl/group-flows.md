@@ -120,8 +120,6 @@ niet meer in de tabel en verdwijnt uit het concept zodra u het opslaat.
 #### Waar het verzoek terechtkomt
 
 Nu kan dat alleen de eigen wachtrij; het contactcenter staat in de lijst met *(volgt)*.
-De dienst moet dan zelf de eigen wachtrij van OpenPlanner gebruiken (instellingen van de dienst);
-anders kan niemand het werk oppakken en wordt de flow niet geactiveerd.
 
 <!-- field: completion -->
 #### Afronding
