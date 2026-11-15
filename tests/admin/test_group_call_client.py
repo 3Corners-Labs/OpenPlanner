@@ -24,6 +24,7 @@ from tests.support.admin_site import (
     SUPER,
     Site,
     audit_log,
+    set_settings,
     site_uow,
 )
 from tests.support.group_settings import SETTINGS_FORM, save_settings
@@ -32,12 +33,6 @@ GROUP = "/admin/groups/demo"
 CLIENT = "join_client"
 OPTION = "embedded_call_webex_option"
 NOW = datetime(2026, 1, 1, tzinfo=UTC)
-
-
-def _switch(site: Site, *, on: bool) -> None:
-    """Set the platform switch the way the portal's value would reach the running process."""
-    app = site.app
-    app.state.settings = app.state.settings.model_copy(update={"embedded_call_enabled": on})
 
 
 async def _check(site: Site, *, guest: bool | None) -> None:
@@ -64,7 +59,7 @@ def _options(page: str, name: str = CLIENT) -> list[str]:
 
 async def _embedded(site: Site, option: str | None = None) -> None:
     """Choose ``embedded`` the way an admin does, with the switch on and the check passed."""
-    _switch(site, on=True)
+    set_settings(site, embedded_call_enabled=True)
     await _check(site, guest=True)
     await save_settings(
         site, {**SETTINGS_FORM, CLIENT: "embedded", **({OPTION: option} if option else {})}
@@ -87,7 +82,7 @@ async def test_the_form_offers_the_organisations_own_page_while_the_switch_is_on
     site: Site,
 ) -> None:
     await site.login_as(SUPER)
-    _switch(site, on=True)
+    set_settings(site, embedded_call_enabled=True)
 
     page = (await site.client.get(f"{GROUP}/settings?lang=en")).text
 
@@ -108,7 +103,7 @@ async def test_embedded_is_refused_with_a_plain_sentence_until_the_guest_check_p
 ) -> None:
     """Abuse case: a group saved as embedded without a passed check."""
     await site.login_as(SUPER)
-    _switch(site, on=True)
+    set_settings(site, embedded_call_enabled=True)
     for guest in (None, False):  # never run with the switch on; run and refused by the platform
         await _check(site, guest=guest)
 
@@ -135,7 +130,7 @@ async def test_embedded_submitted_while_the_switch_is_off_is_refused(site: Site)
 
 async def test_embedded_is_saved_and_audited_once_the_check_minted_a_guest(site: Site) -> None:
     await site.login_as(SUPER)
-    _switch(site, on=True)
+    set_settings(site, embedded_call_enabled=True)
     await _check(site, guest=True)
 
     saved = await save_settings(site, {**SETTINGS_FORM, CLIENT: "embedded"})
@@ -152,7 +147,7 @@ async def test_embedded_is_saved_and_audited_once_the_check_minted_a_guest(site:
 
 async def test_a_nonsense_client_is_refused(site: Site) -> None:
     await site.login_as(SUPER)
-    _switch(site, on=True)
+    set_settings(site, embedded_call_enabled=True)
 
     response = await save_settings(site, {**SETTINGS_FORM, CLIENT: "popup"})
 
@@ -168,7 +163,7 @@ async def test_a_held_embedded_choice_stays_on_the_list_and_says_what_the_switch
 ) -> None:
     await site.login_as(SUPER)
     await _embedded(site)
-    _switch(site, on=False)
+    set_settings(site, embedded_call_enabled=False)
 
     page = (await site.client.get(f"{GROUP}/settings?lang=en")).text
 
@@ -183,7 +178,7 @@ async def test_saving_another_setting_never_resets_a_held_choice_or_asks_for_the
 ) -> None:
     await site.login_as(SUPER)
     await _embedded(site)
-    _switch(site, on=False)
+    set_settings(site, embedded_call_enabled=False)
     await _check(site, guest=False)  # the check has failed since; keeping it is no new choice
 
     saved = await save_settings(site, {**SETTINGS_FORM, "name": "Y", CLIENT: "embedded"})
@@ -276,7 +271,7 @@ async def test_the_option_is_there_before_embedded_is_chosen_and_hidden_when_not
     await site.login_as(SUPER)
 
     off = (await site.client.get(f"{GROUP}/settings")).text  # the switch is off, nothing held
-    _switch(site, on=True)
+    set_settings(site, embedded_call_enabled=True)
     on = (await site.client.get(f"{GROUP}/settings")).text
 
     assert f'name="{OPTION}"' not in off
@@ -333,7 +328,7 @@ async def test_leaving_embedded_keeps_the_option_for_later(site: Site) -> None:
 async def test_the_organisations_admin_may_change_the_choice_and_the_option(site: Site) -> None:
     """The option is a service's setting under ``group.edit``, not only the platform's."""
     await site.login_as(ORG_ADMIN)
-    _switch(site, on=True)
+    set_settings(site, embedded_call_enabled=True)
     await _check(site, guest=True)
 
     saved = await save_settings(site, {**SETTINGS_FORM, CLIENT: "embedded"})
@@ -347,7 +342,7 @@ async def test_the_organisations_admin_may_change_the_choice_and_the_option(site
 async def test_a_manager_of_another_group_cannot_change_it(site: Site) -> None:
     """Abuse case: the choice is guarded by the group's own edit right."""
     await site.login_as(OUTSIDER)
-    _switch(site, on=True)
+    set_settings(site, embedded_call_enabled=True)
     await _check(site, guest=True)
 
     response = await save_settings(site, {**SETTINGS_FORM, CLIENT: "embedded", OPTION: "always"})

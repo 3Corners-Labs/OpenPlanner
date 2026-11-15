@@ -12,12 +12,11 @@ import structlog.testing
 
 from app.adapters.db.credentials import CredentialStore
 from app.adapters.db.record_names import contact_center_credential_name
-from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.integrations import sealed_store
 from app.domain.contact_center import ContactCenterKind
 from app.domain.webhook_ledger import AddressKey, Delivered
 from app.domain.webhook_secret_sweep import PreviousSecretSweep
-from tests.support.admin_site import SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import SAME_ORIGIN, SUPER, Site, set_settings, site_uow
 from tests.support.contact_center_site import (
     PAGE,
     SUPPLIER,
@@ -26,7 +25,6 @@ from tests.support.contact_center_site import (
     _connections,
     _pause,
     _registrar,
-    _set_settings,
 )
 
 ROTATE = f"{PAGE}/contact-center/webhook-secret"
@@ -100,7 +98,7 @@ async def test_an_overlap_of_nothing_refuses_the_previous_secret_at_once(site: S
     old = await _rotate(site)
     assert await _status(site, old) == 204
 
-    _set_settings(site, webhook_secret_overlap_minutes=0)
+    set_settings(site, webhook_secret_overlap_minutes=0)
 
     assert await _status(site, old) == 401
     assert await _status(site, await _current(site)) == 204
@@ -158,7 +156,7 @@ async def test_the_card_says_until_when_the_previous_secret_works_and_what_the_b
 
 async def test_the_button_says_so_when_the_overlap_is_nothing(site: Site) -> None:
     await _connect(site)
-    _set_settings(site, webhook_secret_overlap_minutes=0)
+    set_settings(site, webhook_secret_overlap_minutes=0)
 
     page = (await site.client.get(PAGE)).text
     await _rotate(site)
@@ -199,7 +197,7 @@ async def test_the_sweep_removes_a_previous_secret_once_the_live_overlap_has_end
     await _rotate(site)
     state = site.app.state
     sweep = PreviousSecretSweep(
-        SqlUnitOfWork(state.engine),
+        site_uow(site),
         site.clock,
         _connections(site),
         lambda: timedelta(minutes=state.settings.webhook_secret_overlap_minutes),

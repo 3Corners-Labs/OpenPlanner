@@ -94,11 +94,6 @@ async def _call_from(site: Site, address: str, secret: str | None = None) -> htt
         return await c.post(ADDRESS, content=body, headers=sign_wxcc(body, secret, stamp))
 
 
-def _set_settings(site: Site, **update: object) -> None:
-    state = site.app.state
-    state.settings = state.settings.model_copy(update=update)
-
-
 async def _pause(site: Site, state: str, org: str = "demo") -> httpx.Response:
     """Press the card's button: ``off`` pauses the deliveries, ``on`` resumes them."""
     return await site.client.post(

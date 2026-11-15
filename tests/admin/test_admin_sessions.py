@@ -7,7 +7,7 @@ from pathlib import Path
 
 import structlog
 
-from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, Site, audit_log
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, Site, audit_log, set_settings
 
 
 def _cookie_value(site: Site) -> str:
@@ -106,8 +106,7 @@ async def test_the_reference_is_never_logged_or_audited(site: Site) -> None:
 
 
 async def test_more_sessions_than_the_limit_end_the_one_idle_longest(site: Site) -> None:
-    app = site.app
-    app.state.settings = app.state.settings.model_copy(update={"admin_max_sessions_per_person": 2})
+    set_settings(site, admin_max_sessions_per_person=2)
     cookies = []
     for _ in range(3):
         site.client.cookies.clear()

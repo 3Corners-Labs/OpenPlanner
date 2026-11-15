@@ -6,17 +6,11 @@ saved and audited with the routing's other attributes, under the same permission
 """
 
 from app.domain.contact_center import TaskKind
-from tests.support.admin_site import OUTSIDER, SUPER, Site, audit_log, site_uow
+from tests.support.admin_site import OUTSIDER, SUPER, Site, audit_log, set_settings, site_uow
 from tests.support.group_settings import SETTINGS_FORM, save_settings
 
 GROUP = "/admin/groups/demo"
 FIELD = "contact_center_task_kind"
-
-
-def _switch(site: Site, *, on: bool) -> None:
-    """Set the platform switch the way the portal's value would reach the running process."""
-    app = site.app
-    app.state.settings = app.state.settings.model_copy(update={"embedded_call_enabled": on})
 
 
 async def _stored(site: Site) -> TaskKind | None:
@@ -41,7 +35,7 @@ async def test_the_form_offers_only_the_form_while_the_switch_is_off(site: Site)
 
 async def test_the_form_offers_the_conversation_while_the_switch_is_on(site: Site) -> None:
     await site.login_as(SUPER)
-    _switch(site, on=True)
+    set_settings(site, embedded_call_enabled=True)
 
     page = (await site.client.get(f"{GROUP}/settings")).text
 
@@ -64,14 +58,14 @@ async def test_no_note_while_the_switch_is_on_or_the_group_holds_the_form(site: 
     await site.login_as(SUPER)
 
     assert "maakt hij werkitems" not in (await site.client.get(f"{GROUP}/settings")).text
-    _switch(site, on=True)
+    set_settings(site, embedded_call_enabled=True)
     await save_settings(site, {**SETTINGS_FORM, FIELD: "conversation"})
     assert "maakt hij werkitems" not in (await site.client.get(f"{GROUP}/settings")).text
 
 
 async def test_a_kind_that_is_no_kind_is_refused(site: Site) -> None:
     await site.login_as(SUPER)
-    _switch(site, on=True)
+    set_settings(site, embedded_call_enabled=True)
 
     response = await save_settings(site, {**SETTINGS_FORM, FIELD: "chat"})
 
@@ -83,7 +77,7 @@ async def test_the_conversation_is_saved_audited_and_shown_while_the_switch_is_o
     site: Site,
 ) -> None:
     await site.login_as(SUPER)
-    _switch(site, on=True)
+    set_settings(site, embedded_call_enabled=True)
 
     saved = await save_settings(site, {**SETTINGS_FORM, FIELD: "conversation"})
 
@@ -97,9 +91,9 @@ async def test_the_conversation_is_saved_audited_and_shown_while_the_switch_is_o
 async def test_a_conversation_already_held_survives_the_switch_going_off(site: Site) -> None:
     """Saving another setting never resets a held conversation unseen."""
     await site.login_as(SUPER)
-    _switch(site, on=True)
+    set_settings(site, embedded_call_enabled=True)
     await save_settings(site, {**SETTINGS_FORM, FIELD: "conversation"})
-    _switch(site, on=False)
+    set_settings(site, embedded_call_enabled=False)
 
     page = (await site.client.get(f"{GROUP}/settings")).text
     assert _options(page) == ["form", "conversation"]
@@ -113,7 +107,7 @@ async def test_a_conversation_already_held_survives_the_switch_going_off(site: S
 
 async def test_a_form_without_the_select_keeps_the_kind(site: Site) -> None:
     await site.login_as(SUPER)
-    _switch(site, on=True)
+    set_settings(site, embedded_call_enabled=True)
     await save_settings(site, {**SETTINGS_FORM, FIELD: "conversation"})
 
     await save_settings(site, {**SETTINGS_FORM, "name": "Z"})  # an older page: no such input
@@ -124,7 +118,7 @@ async def test_a_form_without_the_select_keeps_the_kind(site: Site) -> None:
 async def test_a_user_without_group_edit_cannot_change_it(site: Site) -> None:
     """The select is part of the settings form, so ``group.edit`` guards it as the rest."""
     await site.login_as(OUTSIDER)
-    _switch(site, on=True)
+    set_settings(site, embedded_call_enabled=True)
 
     response = await save_settings(site, {**SETTINGS_FORM, FIELD: "conversation"})
 

@@ -12,12 +12,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import GroupRow
-from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.booking import BookingKind
 from app.domain.channels import ChannelKind
 from app.domain.scheduling import DispatchKind
 from app.domain.usage import UsageCell
-from tests.support.admin_site import AGENT, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
+from tests.support.admin_site import AGENT, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site, site_uow
 
 RANGE = "from=2025-12-26&to=2026-01-01"
 HOUR = datetime(2025, 12, 31, 8, tzinfo=UTC)
@@ -30,7 +29,7 @@ async def _put(site: Site, slug: str, build: Any) -> None:
     async with AsyncSession(engine) as session:
         group = (await session.execute(select(GroupRow).where(GroupRow.slug == slug))).scalar_one()
         ids = (group.organisation_id, group.id)
-    async with SqlUnitOfWork(engine).locked() as tx:
+    async with site_uow(site).locked() as tx:
         await tx.add_usage_cells(build(*ids))
 
 

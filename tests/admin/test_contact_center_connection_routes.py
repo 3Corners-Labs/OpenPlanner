@@ -11,7 +11,7 @@ from app.domain.contact_center import ContactCenterKind, Registration
 from app.domain.integration import EventOutcome
 from app.domain.networks import NetworkList
 from app.web.protection import RateLimits, configure_rate_limits
-from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site, set_settings
 from tests.support.contact_center_site import (
     FORM,
     PAGE,
@@ -25,7 +25,6 @@ from tests.support.contact_center_site import (
     _pause,
     _registrar,
     _save_networks,
-    _set_settings,
 )
 
 
@@ -275,9 +274,9 @@ async def test_a_refused_list_is_shown_at_its_input_and_stores_nothing(
 async def test_the_card_never_leaves_the_state_of_the_address_silent(site: Site) -> None:
     await _connect(site)
     open_card = (await site.client.get(PAGE)).text
-    _set_settings(site, webhook_source_networks_required=True)
+    set_settings(site, webhook_source_networks_required=True)
     required = (await site.client.get(PAGE)).text
-    _set_settings(site, webhook_source_networks_contact_center=SUPPLIER_RANGE)
+    set_settings(site, webhook_source_networks_contact_center=SUPPLIER_RANGE)
     default = (await site.client.get(PAGE)).text
     await _save_networks(site, "2001:4860:4860::/48")
     own = (await site.client.get(PAGE)).text
@@ -295,7 +294,7 @@ async def test_a_list_on_a_chain_that_cannot_be_trusted_is_shown_as_refused_with
 ) -> None:
     await _connect(site)
     await _save_networks(site, SUPPLIER_RANGE)
-    _set_settings(site, forwarded_allow_ips="*")
+    set_settings(site, forwarded_allow_ips="*")
 
     page = (await site.client.get(PAGE)).text
 
@@ -324,7 +323,7 @@ async def test_an_own_list_replaces_the_installations_default_and_without_one_th
     site: Site,
 ) -> None:
     await _connect(site)
-    _set_settings(site, webhook_source_networks_contact_center=SUPPLIER_RANGE)
+    set_settings(site, webhook_source_networks_contact_center=SUPPLIER_RANGE)
 
     default_in = await _call_from(site, SUPPLIER)
     default_out = await _call_from(site, STRANGER)
@@ -343,7 +342,7 @@ async def test_a_required_list_refuses_an_organisation_without_one_and_a_list_op
     site: Site,
 ) -> None:
     await _connect(site)
-    _set_settings(site, webhook_source_networks_required=True)
+    set_settings(site, webhook_source_networks_required=True)
 
     refused = await _call_from(site, SUPPLIER)
     await _save_networks(site, SUPPLIER_RANGE)
@@ -379,7 +378,7 @@ async def test_a_corrupted_stored_list_refuses_every_call_and_the_card_says_so(
     """Abuse case: a list that cannot be read is no empty list ("any source"): it is refused."""
     await _connect(site)
     await _damage_the_stored_list(site, damage)
-    _set_settings(site, webhook_source_networks_contact_center=SUPPLIER_RANGE)  # not a way round
+    set_settings(site, webhook_source_networks_contact_center=SUPPLIER_RANGE)  # not a way round
 
     inside = await _call_from(site, SUPPLIER)
     outside = await _call_from(site, STRANGER)
@@ -426,7 +425,7 @@ async def test_an_unreadable_default_tells_the_card_whom_to_ask_and_an_own_list_
 ) -> None:
     """The organisation cannot repair the installation's default: the card says so."""
     await _connect(site)
-    _set_settings(site, webhook_source_networks_contact_center="garbage")
+    set_settings(site, webhook_source_networks_contact_center="garbage")
 
     card = (await site.client.get(PAGE)).text
     refused = await _call_from(site, SUPPLIER)

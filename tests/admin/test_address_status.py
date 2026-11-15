@@ -3,7 +3,7 @@
 from typing import Any
 
 from app.domain.public_address import AddressCheck, AddressFinding, AddressKind, Forwarded
-from tests.support.admin_site import AUDITOR, SUPER, Site, site_uow
+from tests.support.admin_site import AUDITOR, SUPER, Site, set_settings, site_uow
 
 PUBLIC = "https://afspraak.example.nl"
 
@@ -18,8 +18,7 @@ async def _save(site: Site, **update: Any) -> None:
 
 
 def _settings(site: Site, **update: Any) -> None:
-    app = site.app
-    app.state.settings = app.state.settings.model_copy(update={"public_base_url": PUBLIC, **update})
+    set_settings(site, **{"public_base_url": PUBLIC, **update})
 
 
 async def _part(site: Site) -> str:

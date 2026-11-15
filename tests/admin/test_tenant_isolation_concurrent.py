@@ -44,7 +44,7 @@ from app.keys import management_token_key
 from app.web.organisation_settings import follow_group_from_path
 from tests.fakes.messaging import SmtpRecorder
 from tests.fakes.woff2 import make_woff2
-from tests.support.admin_site import ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site, site_uow
 
 MIN_REQUESTS = 200
 BACKGROUND_PATH = "/__probe/{slug}/background"
@@ -205,7 +205,6 @@ async def _configure(site: Site, app: FastAPI) -> None:
                     organisation_id=organisation_id, origin=org.origin, position=0
                 )
             )
-    engine = app.state.engine
     for org in ORGS:
         base = f"/admin/organisations/{org.slug}"
         steps = (
@@ -245,7 +244,7 @@ async def _configure(site: Site, app: FastAPI) -> None:
     )
     assert smtp.status_code == 303
     await app.state.live_settings.refresh()  # other processes follow within RELOAD_SECONDS
-    uow = SqlUnitOfWork(engine)
+    uow = site_uow(site)
     for org in ORGS:
         group = await app.state.booking_service.get_group(org.group)
         async with uow.locked() as tx:

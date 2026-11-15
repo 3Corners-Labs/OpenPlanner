@@ -17,7 +17,7 @@ from tests.support.admin_site import (
     audit_log,
     post_form,
 )
-from tests.support.group_settings import SETTINGS_FORM
+from tests.support.group_settings import SETTINGS_FORM, save_settings
 from tests.support.participant import SAME_ORIGIN as PARTICIPANT
 from tests.support.participant import confirm_newest
 
@@ -216,8 +216,8 @@ async def test_settings_are_saved_and_unchanged_saves_say_so(site: Site) -> None
     await site.login_as(ORG_ADMIN)
     form = dict(SETTINGS_FORM)
 
-    saved = await post_form(site, f"{GROUP}/settings", form)
-    again = await post_form(site, f"{GROUP}/settings", form)
+    saved = await save_settings(site, form)
+    again = await save_settings(site, form)
 
     assert saved.headers["location"] == f"{GROUP}/settings?done=saved"
     assert again.headers["location"] == f"{GROUP}/settings?done=unchanged"
@@ -263,7 +263,7 @@ async def test_group_switches_to_the_own_queue(site: Site) -> None:
         "not_picked_up_minutes": "10",
     }
 
-    saved = await post_form(site, f"{GROUP}/settings", form)
+    saved = await save_settings(site, form)
 
     assert 'name="dispatch_kind"' in page
     assert "Eigen wachtrij van OpenPlanner" in page
@@ -320,7 +320,7 @@ async def test_dispatch_fields_are_checked(site: Site, kind: str, minutes: str, 
         "not_picked_up_minutes": "10",
     }
 
-    response = await post_form(site, f"{GROUP}/settings", form)
+    response = await save_settings(site, form)
 
     assert response.status_code == 422
     assert error in response.text
@@ -329,9 +329,8 @@ async def test_dispatch_fields_are_checked(site: Site, kind: str, minutes: str, 
 async def test_invalid_settings_show_the_field_error(site: Site) -> None:
     await site.login_as(SUPER)
 
-    response = await post_form(
+    response = await save_settings(
         site,
-        f"{GROUP}/settings",
         {
             "name": "Demo",
             "timezone": "Europe/Amsterdam",
@@ -669,9 +668,8 @@ async def test_audit_log_says_what_changed(site: Site) -> None:
         f"{GROUP}/staffing",
         {"weekday": "5", "opens": "10:00", "closes": "11:00", "capacity": "1"},
     )
-    await post_form(
+    await save_settings(
         site,
-        f"{GROUP}/settings",
         {
             "name": "Demo-team",
             "timezone": "Europe/Amsterdam",
@@ -744,13 +742,11 @@ async def test_the_direct_call_cap_is_optional(site: Site) -> None:
     }
     field = 'id="direct_call_max_concurrent" name="direct_call_max_concurrent" type="number"'
 
-    capped = await post_form(site, f"{GROUP}/settings", {**form, "direct_call_max_concurrent": "4"})
+    capped = await save_settings(site, {**form, "direct_call_max_concurrent": "4"})
     page = (await site.client.get(f"{GROUP}/settings")).text
-    zero = await post_form(site, f"{GROUP}/settings", {**form, "direct_call_max_concurrent": "0"})
-    text = await post_form(
-        site, f"{GROUP}/settings", {**form, "direct_call_max_concurrent": "veel"}
-    )
-    cleared = await post_form(site, f"{GROUP}/settings", {**form, "direct_call_max_concurrent": ""})
+    zero = await save_settings(site, {**form, "direct_call_max_concurrent": "0"})
+    text = await save_settings(site, {**form, "direct_call_max_concurrent": "veel"})
+    cleared = await save_settings(site, {**form, "direct_call_max_concurrent": ""})
 
     assert capped.headers["location"] == f"{GROUP}/settings?done=saved"
     assert f'{field} value="4"' in page
@@ -858,7 +854,7 @@ async def test_trial_call_fields_are_checked(site: Site, field: str, value: str)
     await site.login_as(SUPER)
     form = {**SETTINGS_FORM, field: value}
 
-    response = await post_form(site, f"{GROUP}/settings", form)
+    response = await save_settings(site, form)
 
     assert response.status_code == 422
     assert f'<a href="#{field}">' in response.text
@@ -877,12 +873,10 @@ async def test_a_refused_routing_value_is_linked_to_its_input_and_nothing_is_sav
 ) -> None:
     """ADR 0032: the routing's refusal (``contact_center.<attribute>``) points at the input."""
     await site.login_as(SUPER)
-    await post_form(site, f"{GROUP}/settings", dict(SETTINGS_FORM))
+    await save_settings(site, dict(SETTINGS_FORM))
     before = (await site.client.get(f"{GROUP}/settings")).text
 
-    response = await post_form(
-        site, f"{GROUP}/settings", {**SETTINGS_FORM, "name": "X", field: value}
-    )
+    response = await save_settings(site, {**SETTINGS_FORM, "name": "X", field: value})
 
     assert response.status_code == 422
     assert f'<a href="#{field}">' in response.text
@@ -898,7 +892,7 @@ async def test_the_trial_call_switch_and_limits_are_saved(site: Site) -> None:
         "trial_calls_per_booking": "5",
     }
 
-    saved = await post_form(site, f"{GROUP}/settings", form)
+    saved = await save_settings(site, form)
     after = (await site.client.get(f"{GROUP}/settings")).text
 
     assert saved.headers["location"] == f"{GROUP}/settings?done=saved"
@@ -911,7 +905,7 @@ async def test_the_join_client_is_saved_and_shown(site: Site) -> None:
     await site.login_as(SUPER)
 
     default = (await site.client.get(f"{GROUP}/settings")).text
-    saved = await post_form(site, f"{GROUP}/settings", {**SETTINGS_FORM, "join_client": "choice"})
+    saved = await save_settings(site, {**SETTINGS_FORM, "join_client": "choice"})
     after = (await site.client.get(f"{GROUP}/settings")).text
 
     assert '<option value="browser" selected' in default
@@ -922,7 +916,7 @@ async def test_the_join_client_is_saved_and_shown(site: Site) -> None:
 async def test_an_unknown_join_client_is_refused_and_nothing_changes(site: Site) -> None:
     await site.login_as(SUPER)
 
-    refused = await post_form(site, f"{GROUP}/settings", {**SETTINGS_FORM, "join_client": "app"})
+    refused = await save_settings(site, {**SETTINGS_FORM, "join_client": "app"})
     after = (await site.client.get(f"{GROUP}/settings")).text
 
     assert refused.status_code == 422
@@ -979,7 +973,7 @@ async def test_archiving_removes_the_public_page_and_makes_the_group_read_only(
     overview = await site.client.get(GROUP)
     assert overview.status_code == 200
     assert "Deze dienst is gearchiveerd" in overview.text
-    refused = await post_form(site, f"{GROUP}/settings", dict(SETTINGS_FORM))
+    refused = await save_settings(site, dict(SETTINGS_FORM))
     assert refused.status_code == 409
     assert "gearchiveerd en kan niet meer worden gewijzigd" in refused.text
     again = await post_form(

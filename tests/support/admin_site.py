@@ -153,6 +153,12 @@ async def running_site(
         yield Site(app, client, idp, clock, dns, discovery, providers, directory, log_senders)
 
 
+def set_settings(site: Site, **update: object) -> None:
+    """Change the running app's settings, as a value saved in the portal reaches its process."""
+    state = site.app.state
+    state.settings = state.settings.model_copy(update=update)
+
+
 def site_uow(site: Site) -> SqlUnitOfWork:
     """Return a unit of work on the site's database."""
     return SqlUnitOfWork(site.app.state.engine)

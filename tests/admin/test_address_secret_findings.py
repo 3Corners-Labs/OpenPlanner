@@ -1,16 +1,10 @@
 """System status says when a previous webhook secret is still set (ADR 0124 point 8)."""
 
 from datetime import timedelta
-from typing import Any
 
 from pydantic import SecretStr
 
-from tests.support.admin_site import AUDITOR, Site
-
-
-def _settings(site: Site, **update: Any) -> None:
-    app = site.app
-    app.state.settings = app.state.settings.model_copy(update=update)
+from tests.support.admin_site import AUDITOR, Site, set_settings
 
 
 async def _part(site: Site) -> str:
@@ -21,7 +15,7 @@ async def _part(site: Site) -> str:
 async def test_a_previous_value_inside_its_overlap_is_no_finding_and_after_it_is_one(
     site: Site,
 ) -> None:
-    _settings(
+    set_settings(
         site,
         wxcc_webhook_secret=SecretStr("current-secret-value"),
         wxcc_webhook_secret_previous=SecretStr("previous-secret-value"),
@@ -43,7 +37,7 @@ async def test_a_previous_value_inside_its_overlap_is_no_finding_and_after_it_is
 
 
 async def test_a_previous_value_equal_to_the_current_one_is_a_finding_at_once(site: Site) -> None:
-    _settings(
+    set_settings(
         site,
         webex_webhook_secret=SecretStr("same-secret-value"),
         webex_webhook_secret_previous=SecretStr("same-secret-value"),
@@ -61,7 +55,7 @@ async def test_a_previous_value_equal_to_the_current_one_is_a_finding_at_once(si
 
 
 async def test_without_a_previous_value_there_is_no_finding(site: Site) -> None:
-    _settings(site, webex_webhook_secret=SecretStr("only-secret-value"))
+    set_settings(site, webex_webhook_secret=SecretStr("only-secret-value"))
     await site.login_as(AUDITOR)
 
     part = await _part(site)

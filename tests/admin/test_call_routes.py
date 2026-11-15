@@ -38,6 +38,7 @@ from tests.support.admin_site import (
     Site,
     audit_log,
     running_site,
+    set_settings,
     site_uow,
 )
 from tests.support.domain import ADA, FRIDAY_0900, TEST_TOKEN_KEY, book_confirmed
@@ -188,10 +189,7 @@ async def test_integrations_page_shows_status_without_secrets(site: Site) -> Non
 
 
 async def test_integrations_page_shows_the_webhook_base_url(site: Site) -> None:
-    app = site.app
-    app.state.settings = app.state.settings.model_copy(
-        update={"webhook_base_url": "https://abc.trycloudflare.com"}
-    )
+    set_settings(site, webhook_base_url="https://abc.trycloudflare.com")
     await site.login_as(SUPER)
 
     text = (await site.client.get("/admin/integrations")).text

@@ -4,7 +4,8 @@ The secrets come from the environment, which the application cannot write: an op
 value verifies for the overlap counted from the moment the application first saw the current
 secret, kept in the database as a fingerprint. A restart does not start the overlap again, a
 changed secret does, a store that cannot be read grants nothing, and no secret or fingerprint
-reaches a log.
+reaches a log. Each ``app_client`` is a fresh application process on the same database, so a
+second one is a restart.
 """
 
 import json
@@ -27,10 +28,9 @@ from app.adapters.db.uow import SqlTransaction, SqlUnitOfWork
 from app.adapters.webhooks import WEBEX_INBOUND, WXCC_INBOUND, sign_webex, sign_wxcc
 from app.config import Settings
 from app.domain.webhook_secrets import SecretFinding
-from app.main import create_app
 from app.web.webhook_secrets import install_installation_secrets, installation_status
 from tests.fakes.clock import FixedClock
-from tests.support.app_client import served
+from tests.support.app_client import app_client
 from tests.support.database import migrated_database
 from tests.support.domain import NOW
 from tests.support.webhooks import wxcc_body
@@ -65,13 +65,6 @@ def _settings(settings: Settings, database_url: str, **update: object) -> Settin
     )
 
 
-@asynccontextmanager
-async def _running(settings: Settings, clock: FixedClock) -> AsyncIterator[httpx.AsyncClient]:
-    """A fresh application process on the same database: a restart when used twice."""
-    async with served(create_app(settings, clock)) as client:
-        yield client
-
-
 async def _wxcc(client: httpx.AsyncClient, clock: FixedClock, secret: str) -> int:
     body = wxcc_body("task:connected", at=clock.now())
     stamp = int(clock.now().timestamp() * 1000)
@@ -92,7 +85,7 @@ async def test_the_previous_value_verifies_for_the_overlap_and_then_stops(
     settings: Settings, database_url: str
 ) -> None:
     clock = FixedClock(NOW)
-    async with _running(_settings(settings, database_url), clock) as client:
+    async with app_client(_settings(settings, database_url), clock) as client:
         inside = (
             await _wxcc(client, clock, OLD),
             await _wxcc(client, clock, NEW),
@@ -124,7 +117,7 @@ async def test_without_a_previous_value_the_old_secret_is_refused_at_once(
         wxcc_webhook_secret_previous=None,
         webex_webhook_secret_previous=None,
     )
-    async with _running(none, clock) as client:
+    async with app_client(none, clock) as client:
         assert (await _wxcc(client, clock, OLD), await _webex(client, OLD)) == (401, 401)
 
 
@@ -132,7 +125,7 @@ async def test_an_overlap_of_nothing_refuses_the_previous_value_at_once(
     settings: Settings, database_url: str
 ) -> None:
     clock = FixedClock(NOW)
-    async with _running(
+    async with app_client(
         _settings(settings, database_url, webhook_secret_overlap_minutes=0), clock
     ) as client:
         assert (await _wxcc(client, clock, OLD), await _webex(client, OLD)) == (401, 401)
@@ -143,14 +136,14 @@ async def test_a_restart_does_not_start_the_overlap_again_but_a_changed_secret_d
     settings: Settings, database_url: str
 ) -> None:
     clock = FixedClock(NOW)
-    async with _running(_settings(settings, database_url), clock) as client:
+    async with app_client(_settings(settings, database_url), clock) as client:
         assert await _wxcc(client, clock, OLD) == 204
     clock.advance(timedelta(minutes=61))
 
-    async with _running(_settings(settings, database_url), clock) as restarted:
+    async with app_client(_settings(settings, database_url), clock) as restarted:
         after_restart = await _wxcc(restarted, clock, OLD)
     third = "third-installation-secret-5555555555"
-    async with _running(
+    async with app_client(
         _settings(
             settings,
             database_url,
@@ -171,7 +164,7 @@ async def test_a_rotation_of_the_management_key_keeps_the_first_sighting(
     clock = FixedClock(NOW)
     key = "m" * 40
     first = _settings(settings, database_url, management_token_key=SecretStr(key))
-    async with _running(first, clock) as client:
+    async with app_client(first, clock) as client:
         assert await _wxcc(client, clock, OLD) == 204
     clock.advance(timedelta(minutes=61))
     new_key = "n" * 40
@@ -182,7 +175,7 @@ async def test_a_rotation_of_the_management_key_keeps_the_first_sighting(
         management_token_key_previous=SecretStr(key),
     )
 
-    async with _running(rotated, clock) as client:
+    async with app_client(rotated, clock) as client:
         refused = await _wxcc(client, clock, OLD)
 
     assert refused == 401  # the fingerprint under the previous key matched: not first seen now
@@ -192,7 +185,7 @@ async def test_only_a_keyed_fingerprint_and_a_time_are_stored_never_a_secret(
     settings: Settings, database_url: str
 ) -> None:
     clock = FixedClock(NOW)
-    async with _running(_settings(settings, database_url), clock) as client:
+    async with app_client(_settings(settings, database_url), clock) as client:
         await _wxcc(client, clock, NEW)
 
     engine = create_engine(database_url)
@@ -218,7 +211,7 @@ async def test_a_store_that_cannot_be_read_grants_no_overlap(
     monkeypatch.setattr(SqlTransaction, "get_secret_sighting", broken)
     clock = FixedClock(NOW)
 
-    async with _running(_settings(settings, database_url), clock) as client:
+    async with app_client(_settings(settings, database_url), clock) as client:
         with structlog.testing.capture_logs() as logs:
             results = (await _wxcc(client, clock, OLD), await _wxcc(client, clock, NEW))
 
@@ -232,7 +225,7 @@ async def test_no_secret_or_fingerprint_reaches_a_log(
 ) -> None:
     clock = FixedClock(NOW)
     with structlog.testing.capture_logs() as logs:
-        async with _running(_settings(settings, database_url), clock) as client:
+        async with app_client(_settings(settings, database_url), clock) as client:
             await _wxcc(client, clock, OLD)
             clock.advance(timedelta(minutes=61))
             await _wxcc(client, clock, OLD)

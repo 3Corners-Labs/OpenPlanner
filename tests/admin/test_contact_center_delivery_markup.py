@@ -6,14 +6,8 @@ from typing import Any
 from app.domain.inbound_gate import Refusal
 from app.domain.integration import EventOutcome
 from app.domain.webhook_ledger import AddressKey, WebhookLedger
-from tests.support.admin_site import Site
-from tests.support.contact_center_site import (
-    PAGE,
-    SUPPLIER,
-    _call_from,
-    _connect,
-    _set_settings,
-)
+from tests.support.admin_site import Site, set_settings
+from tests.support.contact_center_site import PAGE, SUPPLIER, _call_from, _connect
 
 FORGED = "x" * 43
 
@@ -82,7 +76,7 @@ async def test_an_address_the_ledger_could_not_record_shows_the_empty_state(site
     """With the ledger full of live, alerted entries a new address has no view at all."""
     await _connect(site)
     site.app.state.integration_service = _Handling(EventOutcome.RECORDED)
-    _set_settings(site, security_event_max_sources=10)
+    set_settings(site, security_event_max_sources=10)
     ledger: WebhookLedger = site.app.state.webhook_ledger
     for index in range(10):
         for _ in range(25):  # past the default threshold: each entry has alerted

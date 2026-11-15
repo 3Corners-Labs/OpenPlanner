@@ -10,7 +10,7 @@ from app.domain.inbound_gate import Refusal
 from app.domain.integration import EventOutcome
 from app.domain.webhook_ledger import RETRACT_PAUSE, AddressKey, WebhookLedger
 from app.web.webhook_ledger import ALERT_ACTION
-from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site, set_settings
 from tests.support.contact_center_site import (
     FORM,
     PAGE,
@@ -21,7 +21,6 @@ from tests.support.contact_center_site import (
     _connect,
     _pause,
     _save_networks,
-    _set_settings,
 )
 
 WINDOW = timedelta(minutes=15)
@@ -67,7 +66,7 @@ async def _connected_with_alert_at(site: Site, count: int = 5, networks: str = "
     await _connect(site)
     if networks:
         await _save_networks(site, networks)
-    _set_settings(site, webhook_refusal_alert_count=count)
+    set_settings(site, webhook_refusal_alert_count=count)
 
 
 # --- the card ---------------------------------------------------------------------------------
@@ -146,7 +145,7 @@ async def test_the_counts_start_again_with_the_next_window_but_the_last_times_st
 async def test_the_card_shows_the_faults_of_single_calls_by_kind(site: Site) -> None:
     await _connect(site)
     await _save_networks(site, SUPPLIER_RANGE)
-    _set_settings(site, forwarded_allow_ips="*")  # every address could be spoofed
+    set_settings(site, forwarded_allow_ips="*")  # every address could be spoofed
 
     assert await _send(site, SUPPLIER, 2) == [403, 403]
 
@@ -260,7 +259,7 @@ async def test_the_threshold_is_the_platform_setting_read_live(site: Site) -> No
     await _send(site, SUPPLIER, 10, secret=FORGED)
     assert await _alerts(site) == []
 
-    _set_settings(site, webhook_refusal_alert_count=5)
+    set_settings(site, webhook_refusal_alert_count=5)
     await _send(site, SUPPLIER, 1, secret=FORGED)
 
     assert len(await _alerts(site)) == 1
