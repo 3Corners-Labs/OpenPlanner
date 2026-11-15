@@ -164,10 +164,10 @@ BLOCKS = (
         "meeting, embedded call, work item, tijdlijn, controle",
         "Meeting aanmaken namens de host van de groep, work item naar WxCC op T-dispatch, "
         "ondertekende webhooks terug, tijdlijn en gespreksstatus per boeking met de reden van de "
-        "provider; groepscontrole met een proef-work item. De embedded call laat de deelnemer in een "
-        "eigen pagina bellen: het videoplatform blijft afgeschermd en de huisstijl blijft die van "
-        "de organisatie. Als huls gebouwd op de Webex Meetings SDK; een on-premises platform zoals "
-        "Cisco Meeting Server is verkend.",
+        "provider; groepscontrole met een proef-work item. De embedded call laat de deelnemer in "
+        "een eigen pagina bellen: het videoplatform blijft afgeschermd en de huisstijl blijft die "
+        "van de organisatie. Als huls gebouwd op de Webex Meetings SDK; een on-premises platform "
+        "zoals Cisco Meeting Server is verkend.",
         "domain/calls · call_service · call_page · guest_access · integration · jobs/calls · "
         "api/call_pages · adapters/webex_meetings · wxcc · webhooks · group_check",
         "0017 · 0018 · 0021 · 0065 · 0068 · 0082 · 0123",
@@ -315,7 +315,9 @@ EXTERNALS = (
     External("SMS-gateway", "vandaag Webex Connect · B6"),
     External("DNS", "TXT-controle afzenderdomein · B6"),
     External("Webex Meetings", "meeting, embedded call, webhooks · B7"),
-    External("Cisco Meeting Server", "verkend: on-premises, web-app in de embedded call · B7", True),
+    External(
+        "Cisco Meeting Server", "verkend: on-premises, web-app in de embedded call · B7", True
+    ),
     External("Webex Contact Center", "work item, taakevents · B7"),
     External("Identity provider", "per organisatie of meegeleverde Keycloak · B17"),
     External("Logplatform", "syslog, Splunk, Elastic of HTTP"),
