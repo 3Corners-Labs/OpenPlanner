@@ -37,6 +37,15 @@
       "island": true
     },
     {
+      "name": "call page with a chat",
+      "path": "{call_chat_page}",
+      "locales": [
+        "nl",
+        "en"
+      ],
+      "island": true
+    },
+    {
       "name": "closed group",
       "path": "/g/demo-gesloten",
       "locales": [

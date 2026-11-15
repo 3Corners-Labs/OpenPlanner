@@ -435,6 +435,22 @@ option is on (a warning when it is not). That does not say that live captions wo
 page: try that in a real call. *Conversation* as the kind of task can be chosen only for a
 service that uses the call page; as long as the service does not use it, it makes work items.
 
+**The chat beside the call.** When the task is a *conversation*, the call page has a side bar with
+the chat of that appointment, in every state after the start, also when the picture cannot be set
+up or the browser refuses the camera or microphone: the participant can always reach you. The
+participant writes in the field (Enter sends, Shift and Enter start a new line) and sees each message
+as *Sent*, *Delivered* or *Not delivered*; you answer in the conversation in Agent Desktop. Your
+messages are shown under the name of the staff member who accepted the task, set by the organisation setting for the
+staff member's name in the call (the screen name by default, never the account name unless the organisation chose
+that), and under the organisation's word for staff when there is none. The side bar asks the
+participant not to write identity numbers; there is no filter on what they write. The chat closes
+when the appointment is over, when you end the conversation or when the platform refuses a message
+(after the end): the field then makes way for a sentence that says why, and the messages stay
+readable until the booking's data is deleted. The contact center keeps its own transcript, which
+OpenPlanner's deletion does not reach. How often the page looks for new messages (platform) and how
+many messages a participant may send a minute (platform) are set by the platform administrator; the
+longest message by the organisation (*Organisation settings*).
+
 <!-- field: embedded_call_webex_option -->
 ### Way into Webex next to our page
 

@@ -448,6 +448,23 @@ probeert u in een echt gesprek. *Gesprek* als soort
 taak kan alleen worden gekozen voor een dienst die de gesprekspagina gebruikt; zolang de dienst
 die niet gebruikt, worden er werkitems gemaakt.
 
+**De chat naast het gesprek.** Is de taak een *gesprek*, dan heeft de gesprekspagina een zijbalk met
+de chat van die afspraak, in elke stap na het begin, ook als het beeld niet kan worden klaargezet
+of de browser de camera of microfoon weigert: de deelnemer kan u altijd bereiken. De deelnemer
+schrijft in het veld (Enter verstuurt, Shift en Enter maken een nieuwe regel) en ziet bij elk
+bericht *Verzonden*, *Aangekomen* of *Niet aangekomen*; u antwoordt in het gesprek in Agent
+Desktop. Uw berichten staan onder de naam van de medewerker die de taak heeft aangenomen, ingesteld
+met de organisatie-instelling voor de naam van de medewerker in het gesprek (standaard de schermnaam, nooit de accountnaam
+tenzij de organisatie dat koos), en onder het woord van de organisatie voor medewerkers als er geen
+is. De zijbalk vraagt de deelnemer geen identiteitsnummers te schrijven; wat iemand schrijft wordt
+niet gefilterd. De chat sluit als de afspraak voorbij is, als u het gesprek beëindigt of als het
+platform een bericht weigert (na het einde): het veld maakt dan plaats voor een zin die zegt
+waarom, en de berichten blijven leesbaar tot de gegevens van de boeking worden verwijderd. Het
+contactcenter bewaart een eigen verslag, dat de verwijdering van OpenPlanner niet bereikt. Hoe
+vaak de pagina naar nieuwe berichten kijkt en hoeveel berichten een deelnemer per minuut mag sturen
+bepaalt de platformbeheerder (platform); het langste bericht de organisatie
+(*Organisatie-instellingen*).
+
 <!-- field: embedded_call_webex_option -->
 ### Weg naar Webex naast onze pagina
 

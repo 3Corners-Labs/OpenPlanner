@@ -13932,7 +13932,7 @@ msgid "settings.field.embedded_call_display_name.label"
 msgstr "Participant's name shown to staff in the call (first name or own word)"
 
 msgid "settings.field.embedded_call_chat_poll_seconds.label"
-msgstr "Seconds between two looks of the call page at who is in the call (and later at new messages)"
+msgstr "Seconds between two looks of the call page at who is in the call and at new chat messages"
 
 msgid "settings.field.embedded_call_chat_per_minute.label"
 msgstr "Chat messages one participant may send per minute on the call page"
@@ -14732,3 +14732,84 @@ msgstr "Only a superuser can change the channel."
 
 msgid "admin.updates.channel_card.settings_link"
 msgstr "Change the line and the update window in Advanced settings"
+
+msgid "callpage.chat.heading"
+msgstr "Chat with our {agent}"
+
+msgid "callpage.chat.warning"
+msgstr "Please do not share identity numbers in the chat, such as your passport or ID card number."
+
+msgid "callpage.chat.log"
+msgstr "Chat messages"
+
+msgid "callpage.chat.label"
+msgstr "Your message"
+
+msgid "callpage.chat.keys"
+msgstr "Enter sends the message. Shift and Enter together start a new line."
+
+msgid "callpage.chat.left"
+msgstr "{n} characters left"
+
+msgid "callpage.chat.over"
+msgstr "{n} characters too many"
+
+msgid "callpage.chat.send"
+msgstr "Send"
+
+msgid "callpage.chat.you"
+msgstr "You"
+
+msgid "callpage.chat.state.sent"
+msgstr "Sent"
+
+msgid "callpage.chat.state.delivered"
+msgstr "Delivered"
+
+msgid "callpage.chat.state.refused"
+msgstr "Not delivered"
+
+msgid "callpage.chat.problem.empty"
+msgstr "Write a message first."
+
+msgid "callpage.chat.problem.too_long"
+msgstr "Your message is too long. Make it shorter."
+
+msgid "callpage.chat.problem.failed"
+msgstr "The message was not sent. Your text is still in the field. Choose Send to try again."
+
+msgid "callpage.chat.problem.rate"
+msgstr "You are sending too fast. Wait a moment and try again."
+
+msgid "callpage.chat.problem.full"
+msgstr "This chat is full. You cannot send more messages."
+
+msgid "callpage.chat.closed.heading"
+msgstr "Chat closed"
+
+msgid "callpage.chat.closed.staff"
+msgstr "Our {agent} has closed the chat. You can still read the messages."
+
+msgid "callpage.chat.closed.goes_on"
+msgstr "The call goes on."
+
+msgid "callpage.chat.closed.ended"
+msgstr "The chat is closed because the call has ended. You can still read the messages."
+
+msgid "callpage.chat.closed.left"
+msgstr "The chat is closed because you left the call. You can still read the messages."
+
+msgid "callpage.say.chat_closed"
+msgstr "The chat is closed."
+
+msgid "callpage.say.chat_refused"
+msgstr "A message was not delivered."
+
+msgid "callpage.denied.chat"
+msgstr "The chat stays available."
+
+msgid "callpage.failed.chat"
+msgstr "You can still reach us in the chat beside this page."
+
+msgid "callpage.ended.deleted_chat"
+msgstr "The personal data of this call, the chat included, is deleted 24 hours after the end of your appointment."

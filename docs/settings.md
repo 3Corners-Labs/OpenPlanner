@@ -224,7 +224,7 @@ On the host, `python -m app.cli settings list` shows every setting with its sour
 | `EMBEDDED_CALL_CONNECT_SECONDS` | int | `30` | 10–90 | `settings.platform.manage` | Seconds the call page waits for one attempt at registering or joining before it tries again (ADR 0123). |
 | `EMBEDDED_CALL_CONNECT_ATTEMPTS` | int | `3` | 1–5 | `settings.platform.manage` | Attempts the call page makes before it says it cannot connect (ADR 0123). |
 | `EMBEDDED_CALL_TOKEN_PER_BOOKING_PER_HOUR` | int | `10` | 5–30 | `settings.platform.manage` | Guest tokens one booking may ask for in an hour on the call page; per address the common read limit applies (ADR 0123 point 6). |
-| `EMBEDDED_CALL_CHAT_POLL_SECONDS` | int | `3` | 2–10 | `settings.platform.manage` | Seconds between two looks of the call page at who is in the call, and from the chat's step on at its new messages: the one poll of the page while it waits or is in the call (ADR 0123). |
+| `EMBEDDED_CALL_CHAT_POLL_SECONDS` | int | `3` | 2–10 | `settings.platform.manage` | Seconds between two looks of the call page at who is in the call and at the new messages of the chat beside it: the one poll of the page, in the lobby and the call for the name and in every state after the start for the chat (ADR 0123). |
 | `EMBEDDED_CALL_CHAT_PER_MINUTE` | int | `20` | 5–60 | `settings.platform.manage` | Chat messages one participant may send in a minute on the call page (ADR 0123 step 7b). |
 
 ## D. Organisation (portal, organisation settings; lockable by env)

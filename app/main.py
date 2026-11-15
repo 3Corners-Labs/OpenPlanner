@@ -62,6 +62,7 @@ from app.admin.session import session_cookie_for
 from app.api import (
     booking_pages,
     brand_assets,
+    call_chat_pages,
     call_pages,
     direct_pages,
     health,
@@ -100,6 +101,7 @@ from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.closure_service import ClosureService
 from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.contact_center_connection import ContactCenterConnectionService
+from app.domain.contact_center_dispatch import DispatcherChoice
 from app.domain.contact_service import ContactService
 from app.domain.csv_export import ExportLimits
 from app.domain.diagnostics import DiagnosticsService
@@ -706,7 +708,14 @@ def create_app(
             ),
         )
         # ADR 0123 step 7b: the messages of a conversation task, stored with their booking.
-        app.state.call_chat_service = CallChatService(uow, uses_page)
+        app.state.call_chat_service = CallChatService(
+            uow,
+            uses_page,
+            lambda: DispatcherChoice(
+                app.state.integrations.dispatchers, app.state.integrations.organisations
+            ),
+            clock,
+        )
         # ADR 0082 points 5 and 7: the last inbound webhooks and the health of the connections.
         app.state.health_service = IntegrationHealthService(
             uow, clock, lambda: live().health_policy()
@@ -996,6 +1005,7 @@ def create_app(
         booking_pages.router,
         join_pages.router,
         call_pages.router,
+        call_chat_pages.router,
         trial_pages.router,
         direct_pages.router,
         immediate_pages.router,

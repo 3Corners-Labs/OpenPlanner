@@ -1,4 +1,4 @@
-"""The call page's own scripts and styles (ADR 0123 steps 4b, 4c, 5a, 5b and 5c).
+"""The call page's own scripts and styles (ADR 0123 steps 4b, 4c, 5a, 5b, 5c and 7c).
 
 The scripts are checked for what they must never do (reach anything but the token, the staff
 name's address and the SDK file, set a style, build markup, log), for the texts they read (the
@@ -25,10 +25,11 @@ SCRIPT_FILES = (
     "call-remote.js",
     "call-render.js",
     "call-events.js",
+    "call-chat.js",
     "call-poll.js",
     "call-page.js",
 )
-"""In the order the page loads them: the ten that only define, then the page that starts them."""
+"""In the order the page loads them: the eleven that only define, then the page that starts them."""
 SOURCES = {name: (STATIC / name).read_text() for name in SCRIPT_FILES}
 SCRIPT = "\n".join(SOURCES.values())
 STYLES = (STATIC / "call-page.css").read_text()
@@ -53,10 +54,12 @@ def test_the_script_reaches_nothing_outside_the_browser_but_our_two_addresses_an
     )
 
     assert forbidden.search(_code()) is None
-    # Two requests, each to an address the server gave and each to our own server (the token, and
-    # the name of who the participant talks to); one other file, with its checksum.
-    assert re.findall(r"\bfetch\s*\(([^,)]*)", _code()) == ["tokenUrl", "url"]
+    # Four requests, each to an address the server gave and each to our own server (the token; the
+    # name of who the participant talks to; the chat's read and its send, which are one address);
+    # one other file, with its checksum.
+    assert re.findall(r"\bfetch\s*\(([^,)]*)", _code()) == ["tokenUrl", "chatUrl", "address", "url"]
     assert 'url = app.root.dataset.callStaffUrl || "";' in SOURCES["call-poll.js"]
+    assert 'chatUrl = app.root.dataset.callChatUrl || "";' in SOURCES["call-chat.js"]
     assert re.findall(r'createElement\("script"\)', _code()) == ['createElement("script")']
     assert re.findall(r"\.src\s*=\s*(\w+)", _code()) == ["sdkSource"]
     assert re.findall(r"\.integrity\s*=\s*(\w+)", _code()) == ["sdkIntegrity"]
@@ -95,6 +98,11 @@ def _read_by_the_script() -> set[str]:
     names |= {"on", "off"}  # texts[on ? "on" : "off"]
     names |= {f"say_{kind}_{state}" for kind in ("camera", "microphone") for state in ("on", "off")}
     names |= {f"say_without_{kind}" for kind in ("camera", "microphone", "both")}
+    names |= {  # "chat_problem_" + the refusal of a send, "chat_closed_" + why the chat is closed
+        f"chat_problem_{code}" for code in ("empty", "too_long", "failed", "rate", "full")
+    }
+    names |= {f"chat_closed_{why}" for why in ("staff", "ended", "left")}
+    names |= {f"chat_state_{word}" for word in ("sent", "delivered", "refused")}
     names |= {  # "say_failed_" + reason of fail()
         f"say_failed_{reason}"
         for reason in (

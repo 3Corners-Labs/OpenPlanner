@@ -1,5 +1,5 @@
 /*
- * The participant's call page: its one state and its one view (ADR 0123 steps 4b, 4c, 5a, 5b and 5c).
+ * The participant's call page: its one state and its one view (ADR 0123 steps 4b, 4c, 5a, 5b, 5c and 7c).
  *
  * Owns: the page's single `state` and the one way to change it, `go(screen, patch)`, which checks
  * the move against a table of allowed transitions, renders, moves focus to the new heading and
@@ -14,7 +14,8 @@
  * lobby, leaving), call-media.js the participant's camera, microphone and screen in the call,
  * call-captions.js the captions, call-remote.js the other side's picture, sound and screen,
  * call-render.js how the call's parts look, call-events.js what the meeting tells the page,
- * call-poll.js the one poll of our own server for who the participant talks to. They only define;
+ * call-chat.js the chat beside the call (step 7c), call-poll.js the one poll of our own server for who the
+ * participant talks to and for what is new in the chat. They only define;
  * this file, loaded last, starts them.
  *
  * Never: it makes no request of its own (the token is call-connection.js's, the name call-poll.js's),
@@ -175,6 +176,7 @@
       delete state[key];
     });
     Object.assign(state, fresh());
+    app.chat.reset();
     render();
     app.say("");
   }
@@ -273,6 +275,7 @@
     view.sharing(state);
     view.captions(state);
     view.bar(state);
+    app.chat.sync(state);
     app.poll.sync(state);
   }
   // ---- what the participant does -----------------------------------------------------------------
@@ -320,10 +323,27 @@
     restart();
   }
 
+  // A booking without a chat does not load call-chat.js: the page then has a chat that wants nothing.
+  if (!app.chat) {
+    var nothing = function () {};
+    app.chat = {
+      init: nothing,
+      sync: nothing,
+      reset: nothing,
+      wants: function () {
+        return false;
+      },
+      turn: function () {
+        return Promise.resolve(true);
+      },
+    };
+  }
+
   app.sound.init();
   app.devices.init();
   app.connection.init();
   app.remote.init();
+  app.chat.init();
   app.poll.init();
 
   $$("[data-call-browser]").forEach(function (step) {

@@ -13,9 +13,12 @@ import { fixture } from './pages';
 export type Plan = { devices: 'real' | 'made-up' | 'none'; refuse?: 'camera' | 'microphone' | 'both'; delay?: number };
 export type Spied = { deviceRequests: number; streams: MediaStream[]; statuses: string[]; delay: number };
 
-/** Open the call page in English through its emailed link (the cookie is set on the way). */
-export async function openCallPage(page: Page): Promise<void> {
-  await page.goto(`${fixture('call_page')}?lang=en`);
+/**
+ * Open the call page in English through its emailed link (the cookie is set on the way). `name` is
+ * the seeded booking: `call_page` has no chat, `call_chat_page` (ADR 0123 step 7c) has the chat.
+ */
+export async function openCallPage(page: Page, name: 'call_page' | 'call_chat_page' = 'call_page'): Promise<void> {
+  await page.goto(`${fixture(name)}?lang=en`);
   await expect(page.getByRole('heading', { level: 1, name: 'Your video call' })).toBeVisible();
 }
 

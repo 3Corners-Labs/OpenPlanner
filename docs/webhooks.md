@@ -218,8 +218,11 @@ identifier and business address, so one per appointment. The first message is a 
 text in the organisation's language with the booking reference, first name, start, group name
 and, for a video task, the meeting link; nothing else of the booking.
 
-Task Messages v2, `POST /v2/tasks/{taskId}/messages`, one participant message (nothing sends one
-before step 7b); `aliasId` is the message's own identifier, so the same one twice is one message:
+Task Messages v2, `POST /v2/tasks/{taskId}/messages`, one participant message, sent when the
+participant writes in the call page's side bar (step 7c); `aliasId` is `p` followed by the
+identifier the page made for the message (random letters and digits, kept for a retry), so the same
+one twice is one message at the platform, and it is the identifier its confirmation
+(`task-message:appended`, inbound) carries back:
 
 ```json
 {"mediaType": "customMessaging",

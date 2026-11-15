@@ -947,6 +947,14 @@ class InMemoryTransaction(ServiceRequestStore):
             if m.state is ChatState.SENT
         ]
 
+    async def withdraw_call_message(self, booking_id: int, provider_message_id: str) -> bool:
+        stored = self.state.call_messages.get(booking_id, [])
+        for m in stored:
+            if m.provider_message_id == provider_message_id and m.state is ChatState.SENT:
+                stored.remove(m)
+                return True
+        return False
+
     async def delete_call_messages(self, booking_id: int) -> None:
         self.state.call_messages.pop(booking_id, None)
 

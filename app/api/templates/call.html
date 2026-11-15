@@ -1,7 +1,8 @@
 {#- The participant's call page (ADR 0123): the start state and the device check (step 4b), then
     connecting, the lobby, the first moment in the call, leaving and failing (step 4c), then the
     notices, the devices of the call, the ended state and the failure inside the call (step 5a), then
-    sharing a screen both ways and the captions (step 5b), then the staff member's name (step 5c).
+    sharing a screen both ways and the captions (step 5b), then the staff member's name (step 5c), then
+    the chat beside the call, only for a booking that has one (step 7c).
     Everything the page says is rendered here, in the reader's language; call-page.js only shows
     and hides it and reads the words it needs from [data-text] (each sentence is in the markup
     once). Without the script the
@@ -110,7 +111,7 @@
     <li>{{ step_two }}</li>
     <li>{{ _("callpage.denied.step_retry") }}</li>
   </ol>
-  <p>{{ without }}</p>
+  <p>{{ without }}{% if chat_url %} {{ _("callpage.denied.chat") }}{% endif %}</p>
   <p><button type="button" class="button button--secondary" data-call-retry>{{ _("callpage.denied.retry") }}</button></p>
 </div>
 {%- endmacro %}
@@ -118,7 +119,7 @@
 {% block title %}{{ _("trial.title" if trial_until is not none else "call.title") }} – {{ group.name }}{% endblock %}
 {% block head_extra %}<link rel="stylesheet" href="{{ static_url('call-page.css') }}">{% endblock %}
 {% block content %}
-<div class="call" data-call data-call-token-url="{{ token_url }}" data-call-seconds="{{ connect_seconds }}" data-call-attempts="{{ connect_attempts }}" data-call-staff-url="{{ staff_url }}" data-call-poll-seconds="{{ poll_seconds }}"{% if sdk_src %} data-call-sdk="{{ sdk_src }}" data-call-sdk-integrity="{{ sdk_integrity }}"{% endif %}>
+<div class="call" data-call data-call-token-url="{{ token_url }}" data-call-seconds="{{ connect_seconds }}" data-call-attempts="{{ connect_attempts }}" data-call-staff-url="{{ staff_url }}" data-call-poll-seconds="{{ poll_seconds }}"{% if chat_url %} data-call-chat-url="{{ chat_url }}" data-call-chat-max="{{ chat_max_chars }}"{% endif %}{% if sdk_src %} data-call-sdk="{{ sdk_src }}" data-call-sdk-integrity="{{ sdk_integrity }}"{% endif %}>
   <p class="visually-hidden" role="status" aria-live="polite" data-call-status></p>
   {{ notices() }}
 
@@ -242,6 +243,7 @@
       <p data-call-failure="not_open" data-text="say_failed_not_open" hidden>{{ _("trial.page.not_open" if trial_until is not none else "callpage.failed.not_open") }}</p>
       <p data-call-failure="rate_limited" data-text="say_failed_rate_limited" hidden>{{ _("callpage.failed.rate_limited") }}</p>
       <p data-call-failure="unavailable" data-text="say_failed_unavailable" hidden>{{ _("callpage.failed.unavailable") }}</p>
+      {% if chat_url %}<p>{{ _("callpage.failed.chat") }}</p>{% endif %}
     </div>
     <p class="actions">
       <button type="button" class="button button--large" data-call-again>{{ _("callpage.failed.retry") }}</button>
@@ -252,14 +254,41 @@
 
   {{ over("left", _("callpage.left.heading"), _("trial.page.left_body" if trial_until is not none else "callpage.left.body")) }}
   {#- A trial call says so in the states it can end in (ADR 0123 point 9): it has no appointment time and no "your appointment" to go back to. -#}
-  {{ over("ended", _("callpage.ended.heading"), _("trial.page.ended_body" if trial_until is not none else "callpage.ended.body"), _("trial.page.ended_deleted" if trial_until is not none else "callpage.ended.deleted")) }}
+  {{ over("ended", _("callpage.ended.heading"), _("trial.page.ended_body" if trial_until is not none else "callpage.ended.body"), _("trial.page.ended_deleted" if trial_until is not none else ("callpage.ended.deleted_chat" if chat_url else "callpage.ended.deleted"))) }}
 
   <section class="call-state" aria-labelledby="call-unavailable-heading" data-call-state="unavailable" hidden>
     <h1 id="call-unavailable-heading" tabindex="-1">{{ _("callpage.unavailable.heading") }}</h1>
-    <div class="notice"><p>{{ _("call.unavailable") }}</p></div>
+    <div class="notice"><p>{{ _("call.unavailable") }}</p>{% if chat_url %}<p>{{ _("callpage.failed.chat") }}</p>{% endif %}</div>
     {% if other_way_failed %}<p>{{ other_way("button button--secondary") }}</p>{% endif %}
     {{ contact("call-unavailable-contacts") }}
   </section>
+
+  {% if chat_url %}
+  {#- The chat beside the call (ADR 0123 point 8, step 7c), only for a booking that has one. A side bar of the
+      page, shown in every state after the start: a participant whose picture cannot be set up still reaches the
+      staff member (point 8). The log is the page's one place for the messages (a polite live region that the script
+      only adds to, so a reader keeps its place); the field is labelled and its limits are said in text; a closed
+      chat has no field, a sentence says why. The script sets every message with textContent. -#}
+  <aside class="call-chat" aria-labelledby="call-chat-heading" data-call-chat hidden>
+    <h2 id="call-chat-heading">{{ _("callpage.chat.heading") }}</h2>
+    <p class="hint call-chat__warning">{{ _("callpage.chat.warning") }}</p>
+    <div class="call-chat__log" role="log" aria-live="polite" aria-relevant="additions" aria-label="{{ _("callpage.chat.log") }}" tabindex="0" data-call-chat-log></div>
+    <div class="call-chat__closed" tabindex="-1" data-call-chat-closed hidden>
+      <p><strong>{{ _("callpage.chat.closed.heading") }}</strong></p>
+      <p data-call-chat-closed-text></p>
+    </div>
+    <form class="call-chat__form" data-call-chat-form novalidate>
+      <div class="field">
+        <label for="call-chat-text">{{ _("callpage.chat.label") }}</label>
+        <textarea id="call-chat-text" name="text" rows="3" autocomplete="off" aria-describedby="call-chat-keys call-chat-left" data-call-chat-text></textarea>
+        <p class="hint" id="call-chat-keys">{{ _("callpage.chat.keys") }}</p>
+        <p class="hint" id="call-chat-left" data-call-chat-left></p>
+        <p class="call-chat__problem" id="call-chat-problem" data-call-chat-problem hidden></p>
+      </div>
+      <p class="actions"><button type="submit" class="button" data-call-chat-send>{{ _("callpage.chat.send") }}</button></p>
+    </form>
+  </aside>
+  {% endif %}
 
   {#- The one bar of controls, for the lobby and the call: a child of the whole call area, so that it
       stays at the foot of the window wherever the page is scrolled. `render` shows it on those two
@@ -349,16 +378,36 @@
     <span data-text="staff_term">{{ _("callpage.staff.term") }}</span>
     <span data-text="staff_named">{{ _("callpage.staff.named", name="{name}") }}</span>
     <span data-text="say_staff_name">{{ _("callpage.say.staff_name", name="{name}") }}</span>
+    {% if chat_url %}
+    <span data-text="chat_you">{{ _("callpage.chat.you") }}</span>
+    <span data-text="chat_left">{{ _("callpage.chat.left", n="{n}") }}</span>
+    <span data-text="chat_over">{{ _("callpage.chat.over", n="{n}") }}</span>
+    <span data-text="chat_state_sent">{{ _("callpage.chat.state.sent") }}</span>
+    <span data-text="chat_state_delivered">{{ _("callpage.chat.state.delivered") }}</span>
+    <span data-text="chat_state_refused">{{ _("callpage.chat.state.refused") }}</span>
+    <span data-text="chat_problem_empty">{{ _("callpage.chat.problem.empty") }}</span>
+    <span data-text="chat_problem_too_long">{{ _("callpage.chat.problem.too_long") }}</span>
+    <span data-text="chat_problem_failed">{{ _("callpage.chat.problem.failed") }}</span>
+    <span data-text="chat_problem_rate">{{ _("callpage.chat.problem.rate") }}</span>
+    <span data-text="chat_problem_full">{{ _("callpage.chat.problem.full") }}</span>
+    <span data-text="chat_closed_staff">{{ _("callpage.chat.closed.staff") }}</span>
+    <span data-text="chat_closed_goes_on">{{ _("callpage.chat.closed.goes_on") }}</span>
+    <span data-text="chat_closed_ended">{{ _("callpage.chat.closed.ended") }}</span>
+    <span data-text="chat_closed_left">{{ _("callpage.chat.closed.left") }}</span>
+    <span data-text="say_chat_closed">{{ _("callpage.say.chat_closed") }}</span>
+    <span data-text="say_chat_refused">{{ _("callpage.say.chat_refused") }}</span>
+    {% endif %}
   </div>
 
   <p data-call-back><a href="{{ back_href }}">{{ _(back_text) }}</a></p>
 </div>
 {% endblock %}
-{#- Eleven own scripts that share one object, in this order. Each only defines when it loads, and what
+{#- Twelve own scripts that share one object, in this order. Each only defines when it loads, and what
     it needs at that moment comes from a file before it: the status line, the sound of the check, the
     devices (which make the store of chosen ids), the call, the call's media (which uses that store),
     the captions, the other side's streams, how the call's parts look, what the meeting tells the page,
-    the one poll of our own server (who the participant talks to), then the page, which starts them. -#}
+    the chat beside the call (loaded only for a booking that has one), the one poll of
+    our own server (who the participant talks to, and what is new in the chat), then the page, which starts them. -#}
 {% block scripts %}<script src="{{ static_url('call-status.js') }}" defer></script>
 <script src="{{ static_url('call-sound.js') }}" defer></script>
 <script src="{{ static_url('call-devices.js') }}" defer></script>
@@ -368,5 +417,6 @@
 <script src="{{ static_url('call-remote.js') }}" defer></script>
 <script src="{{ static_url('call-render.js') }}" defer></script>
 <script src="{{ static_url('call-events.js') }}" defer></script>
-<script src="{{ static_url('call-poll.js') }}" defer></script>
+{% if chat_url %}<script src="{{ static_url('call-chat.js') }}" defer></script>
+{% endif %}<script src="{{ static_url('call-poll.js') }}" defer></script>
 <script src="{{ static_url('call-page.js') }}" defer></script>{% endblock %}

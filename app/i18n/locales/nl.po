@@ -13945,7 +13945,7 @@ msgid "settings.field.embedded_call_display_name.label"
 msgstr "Naam van de deelnemer voor de medewerker in het gesprek (voornaam of eigen woord)"
 
 msgid "settings.field.embedded_call_chat_poll_seconds.label"
-msgstr "Seconden tussen twee keer kijken van de gesprekspagina wie er in het gesprek zit (en later naar nieuwe berichten)"
+msgstr "Seconden tussen twee keer kijken van de gesprekspagina naar wie er in het gesprek zit en naar nieuwe chatberichten"
 
 msgid "settings.field.embedded_call_chat_per_minute.label"
 msgstr "Berichten die een deelnemer per minuut in de chat van de gesprekspagina mag sturen"
@@ -14745,3 +14745,84 @@ msgstr "Alleen een superuser kan het kanaal wijzigen."
 
 msgid "admin.updates.channel_card.settings_link"
 msgstr "Wijzig de lijn en het updatevenster in Geavanceerde instellingen"
+
+msgid "callpage.chat.heading"
+msgstr "Chat met uw {agent}"
+
+msgid "callpage.chat.warning"
+msgstr "Deel geen identiteitsnummers in de chat, zoals uw paspoort- of identiteitskaartnummer."
+
+msgid "callpage.chat.log"
+msgstr "Berichten van de chat"
+
+msgid "callpage.chat.label"
+msgstr "Uw bericht"
+
+msgid "callpage.chat.keys"
+msgstr "Enter verstuurt het bericht. Shift en Enter samen maken een nieuwe regel."
+
+msgid "callpage.chat.left"
+msgstr "Nog {n} tekens"
+
+msgid "callpage.chat.over"
+msgstr "{n} tekens te veel"
+
+msgid "callpage.chat.send"
+msgstr "Verzenden"
+
+msgid "callpage.chat.you"
+msgstr "U"
+
+msgid "callpage.chat.state.sent"
+msgstr "Verzonden"
+
+msgid "callpage.chat.state.delivered"
+msgstr "Aangekomen"
+
+msgid "callpage.chat.state.refused"
+msgstr "Niet aangekomen"
+
+msgid "callpage.chat.problem.empty"
+msgstr "Schrijf eerst een bericht."
+
+msgid "callpage.chat.problem.too_long"
+msgstr "Uw bericht is te lang. Maak het korter."
+
+msgid "callpage.chat.problem.failed"
+msgstr "Het bericht is niet verzonden. Uw tekst staat nog in het veld. Kies Verzenden om het opnieuw te proberen."
+
+msgid "callpage.chat.problem.rate"
+msgstr "U verstuurt te snel. Wacht even en probeer het dan opnieuw."
+
+msgid "callpage.chat.problem.full"
+msgstr "Deze chat zit vol. U kunt geen berichten meer sturen."
+
+msgid "callpage.chat.closed.heading"
+msgstr "Chat gesloten"
+
+msgid "callpage.chat.closed.staff"
+msgstr "Uw {agent} heeft de chat gesloten. U kunt de berichten nog lezen."
+
+msgid "callpage.chat.closed.goes_on"
+msgstr "Het gesprek gaat door."
+
+msgid "callpage.chat.closed.ended"
+msgstr "De chat is gesloten omdat het gesprek is beëindigd. U kunt de berichten nog lezen."
+
+msgid "callpage.chat.closed.left"
+msgstr "De chat is gesloten omdat u het gesprek hebt verlaten. U kunt de berichten nog lezen."
+
+msgid "callpage.say.chat_closed"
+msgstr "De chat is gesloten."
+
+msgid "callpage.say.chat_refused"
+msgstr "Een bericht is niet aangekomen."
+
+msgid "callpage.denied.chat"
+msgstr "De chat blijft beschikbaar."
+
+msgid "callpage.failed.chat"
+msgstr "U kunt ons ook bereiken via de chat naast deze pagina."
+
+msgid "callpage.ended.deleted_chat"
+msgstr "De persoonsgegevens van dit gesprek, de chat inbegrepen, worden 24 uur na het einde van uw afspraak verwijderd."

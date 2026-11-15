@@ -115,6 +115,20 @@ class CallMessageQueries:
         )
         return list(rows)
 
+    async def withdraw_call_message(self, booking_id: int, provider_message_id: str) -> bool:
+        """Delete one ``sent`` message that never reached the platform; ``False`` if none.
+
+        Only a message still waiting is deleted: one the platform confirmed or refused stays.
+        """
+        result = await self._session.execute(
+            delete(CallMessageRow).where(
+                CallMessageRow.booking_id == booking_id,
+                CallMessageRow.provider_message_id == provider_message_id,
+                CallMessageRow.state == ChatState.SENT.value,
+            )
+        )
+        return bool(getattr(result, "rowcount", 0))
+
     async def delete_call_messages(self, booking_id: int) -> None:
         """Delete the whole chat of a booking: the text goes with the booking's purge."""
         await self._session.execute(

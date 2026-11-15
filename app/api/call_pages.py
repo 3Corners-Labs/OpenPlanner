@@ -26,6 +26,8 @@ The markup also carries the two connection values (``embedded_call_connect_secon
                                  service's booking)
     POST /b/m/{ref}/call/token   the guest token for the click that joins (ADR 0123 point 6)
     GET  /b/m/{ref}/call/staff   who the participant talks to (ADR 0123 step 5c)
+    GET/POST /b/m/{ref}/call/chat  the chat beside the call (step 7c, ``app.api.call_chat_pages``;
+                                 the page carries its address only for a booking that has a chat)
 
 The token endpoint (step 4a) answers JSON with ``token``, ``expires_at`` (UTC, ISO 8601) and
 ``link`` (the meeting's guest link, never the host's). Every answer the endpoint builds carries
@@ -79,6 +81,7 @@ from app.api.labels import slot_label
 from app.api.link_session import authorise
 from app.api.participant import participant_call_page
 from app.config import Settings
+from app.domain.call_chat_service import CallChatService
 from app.domain.call_client import other_way_offer, uses_call_page
 from app.domain.call_page import shows_other_way
 from app.domain.call_token_service import (
@@ -150,6 +153,7 @@ async def _page_context(
     slot: str,
     token_url: str,
     staff_url: str,
+    chat_url: str = "",
     other_way_href: str,
     back_href: str,
     back_text: str = "join.back",
@@ -196,6 +200,10 @@ async def _page_context(
         "sdk_integrity": sdk_file.integrity if sdk_file else "",
         "token_url": token_url,
         "staff_url": staff_url,
+        # The chat beside the call (step 7c): the address only for a booking that has one, so any
+        # other booking's page has no side bar, no poll of it and no sentence about it.
+        "chat_url": chat_url,
+        "chat_max_chars": current.embedded_call_chat_max_chars,
         "poll_seconds": current.embedded_call_chat_poll_seconds,
         "connect_seconds": current.embedded_call_connect_seconds,
         "connect_attempts": current.embedded_call_connect_attempts,
@@ -227,6 +235,7 @@ async def call_page(request: Request, public_ref: str) -> HTMLResponse:
         slot=slot_label(booking.start, booking.end, group, locale),
         token_url=f"/b/m/{public_ref}/call/token",
         staff_url=f"/b/m/{public_ref}/call/staff",
+        chat_url=_chat_url(request, details, public_ref),
         other_way_href=f"/b/m/{public_ref}/join/go",
         back_href=f"/b/m/{public_ref}/join",
     )
@@ -260,6 +269,12 @@ async def call_token(request: Request, public_ref: str, _: SameOrigin) -> Respon
         lambda: within_call_token_limit(public_ref),
     )
     return await _token_response(request, outcome)
+
+
+def _chat_url(request: Request, details: BookingDetails, public_ref: str) -> str:
+    """Return the address of the booking's chat, or nothing when the booking has none."""
+    chat: CallChatService = request.app.state.call_chat_service
+    return f"/b/m/{public_ref}/call/chat" if chat.has_chat(details.booking, details.group) else ""
 
 
 def _guest_term(request: Request, group: Group) -> str:

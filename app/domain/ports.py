@@ -2651,6 +2651,14 @@ class Transaction(Protocol):
         """Return the provider ids of the booking's messages that wait for their confirmation."""
         ...
 
+    async def withdraw_call_message(self, booking_id: int, provider_message_id: str) -> bool:
+        """Delete one ``sent`` message that never reached the platform; ``False`` if none.
+
+        The call page's sending (ADR 0123 step 7c) stores a message before it hands it to the
+        platform and takes it back when the platform could not be reached.
+        """
+        ...
+
     async def delete_call_messages(self, booking_id: int) -> None:
         """Delete a booking's chat (its purge, ADR 0123 step 7b)."""
         ...
