@@ -2205,6 +2205,19 @@ merge is already a candidate*. `git tag --list 'v*-rc.*' --contains <sha>` shows
 Without that check `v0.4.0-rc.179` (#480) was tagged after `v0.4.0-rc.176` (#481, its
 descendant) on 2026-11-03, and docker01 went back past the fix.
 
+**No candidate while the last release tag is not published.** A release tag `vX.Y.Z` is tagged
+first and published later: `main.yml` builds, signs and attaches everything on the tag, and
+the GitHub release exists only when that run is done (on 2026-11-15 the run of `v0.6.0` waited
+about three hours for the mutation test, and was tagged a second time after a first failure).
+Merges in between used to become `v0.7.0-rc.N` and `v0.6.1-rc.N` while `v0.6.0` was not out.
+Now `release_plan --candidate` asks GitHub (`gh release view`, `GH_TOKEN` is the job's token)
+and, as long as the last release tag has no published release, prints nothing: the log says
+*no release candidate: ... the last release tag is not published yet*, and the next merge after
+the release is the first candidate. Nothing is lost: a candidate is cumulative. If GitHub
+cannot answer (an HTTP error), the step fails with the error rather than guess; re-run it. If
+a release tag is abandoned for good (its run will not be finished), retag it or delete the tag
+(release app, ADR 0107) before candidates can resume.
+
 Installations on the `rc` channel are offered candidates and releases alike, and move to the
 release when it comes. The superuser chooses the channel in the portal (`update_channel`, class
 C, settings page or `/admin/updates`; not usable in production, ADR 0067), and with
