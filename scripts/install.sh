@@ -1163,7 +1163,7 @@ idp_console() {
     warn "the bundled identity provider did not take the loopback address of its admin console within ${HEALTH_TIMEOUT}s (docs/runbook.md, Opening the admin console)"
     return 0
   fi
-  log "the bundled identity provider's admin console: $console/admin/ on this host only (ADR 0126)"
+  log "the bundled identity provider's admin console: $console/admin/master/console/ on this host only (ADR 0126)"
 }
 
 # 6. Host updater -------------------------------------------------------------------------------
