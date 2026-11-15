@@ -258,3 +258,12 @@ def test_release_published_raises_when_github_does_not_answer(
     monkeypatch.setattr(release_plan.subprocess, "run", hang)
     with pytest.raises(ReleaseLookupError, match="no answer"):
         real_release_published("v0.3.0")
+
+
+def test_release_published_raises_when_gh_is_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    def missing(*_args: object, **_kwargs: object) -> None:
+        raise FileNotFoundError(2, "No such file or directory")
+
+    monkeypatch.setattr(release_plan.subprocess, "run", missing)
+    with pytest.raises(ReleaseLookupError, match="cannot run gh"):
+        real_release_published("v0.3.0")

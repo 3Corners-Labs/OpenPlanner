@@ -273,6 +273,10 @@ def release_published(tag: str) -> bool:
         raise ReleaseLookupError(
             f"gh release view {tag}: no answer in {_GH_TIMEOUT_SECONDS} s"
         ) from error
+    except OSError as error:  # `gh` is not installed or not executable
+        raise ReleaseLookupError(
+            f"gh release view {tag}: cannot run gh ({error.strerror})"
+        ) from error
     if result.returncode == 0:
         return result.stdout.strip() == "false"
     if "release not found" in result.stderr:
