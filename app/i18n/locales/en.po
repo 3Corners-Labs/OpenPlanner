@@ -14711,3 +14711,24 @@ msgstr "You can set a screen name once your login has been recorded. Log out and
 
 msgid "admin.profile.screen_name.erased"
 msgstr "Your data has been deleted. You can set a screen name again after your next login."
+
+msgid "admin.done.channel_saved"
+msgstr "The update channel has been saved. The installation applies it within ten seconds."
+
+msgid "admin.updates.channel_card.heading"
+msgstr "Update channel"
+
+msgid "admin.updates.channel_card.lead"
+msgstr "Choose which versions this installation is offered, and whether it requests a newer version itself. These are the same settings as in Advanced settings, topic Updates."
+
+
+
+
+msgid "admin.updates.channel_card.save"
+msgstr "Save channel"
+
+msgid "admin.updates.channel_card.read_only"
+msgstr "Only a superuser can change the channel."
+
+msgid "admin.updates.channel_card.settings_link"
+msgstr "Change the line and the update window in Advanced settings"

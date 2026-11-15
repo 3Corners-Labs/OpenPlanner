@@ -30,9 +30,18 @@ The first card shows:
   newest minor), *Security fixes only* (from 1.0.0 the minor before it), *Extended line* (with
   its end date) or *No longer supported*: update to a supported line then.
 
-The channel, automatic updating, the interval between two checks, the line and the window are
-not set here but by the superuser in **Advanced settings**, topic Updates (`UPDATE_CHANNEL`,
-`UPDATE_AUTO_APPLY`, `UPDATE_CHECK_MINUTES`, `UPDATE_LINE`, `UPDATE_WINDOW`; see
+The card **Update channel** (below this one) lets the superuser choose the **channel**
+(*Releases* or *Release candidates*) and switch **Update itself** on or off, then **Save
+channel**. It changes the same settings as Advanced settings (`UPDATE_CHANNEL`,
+`UPDATE_AUTO_APPLY`) with the same rules and the same audit entry, and works without
+JavaScript. Release candidates are refused in a production installation, and automatic updating
+there only works with a window set. When the server operator fixes a value in `.env`, the card
+shows *Locked by the server operator* with the variable's name and no control for that value.
+Everyone else sees the values as text.
+
+The interval between two checks, the line and the window are set by the superuser in
+**Advanced settings**, topic Updates (`UPDATE_CHECK_MINUTES`, `UPDATE_LINE`, `UPDATE_WINDOW`; the
+card links there; see
 [Advanced settings](advanced-settings.md)). The window is up to seven ranges such as
 `mon 02:00-04:00, sat 01:00-05:00` in the portal's time zone, each at least 30 minutes. Inside
 a range the server files an automatic update itself and the updater carries it out; outside, it
