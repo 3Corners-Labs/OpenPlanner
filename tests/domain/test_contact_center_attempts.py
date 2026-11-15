@@ -153,7 +153,7 @@ def _completion(dispatch: DispatchKind, completion: CompletionPolicy) -> Readine
         handling_action=HandlingAction.VIEW_REQUEST,
     )
     carrier = webex_routing().descriptor.capabilities
-    items = readiness(made, pool(), offered_subjects=(), carrier=carrier)
+    items = readiness(made, pool(), offered_subjects=(), own_queue=True, carrier=carrier)
     return next(i for i in items if i.code is ReadinessCheck.COMPLETION).reason
 
 
@@ -178,7 +178,7 @@ def test_a_contact_center_flow_without_a_meeting_waits_only_for_the_rollback_gat
     )
     carrier = webex_routing().descriptor.capabilities
 
-    items = readiness(made, pool(), offered_subjects=(), carrier=carrier)
+    items = readiness(made, pool(), offered_subjects=(), own_queue=True, carrier=carrier)
 
     assert [(i.code, i.reason) for i in items if not i.ok] == [
         (ReadinessCheck.ROLLBACK, ReadinessReason.ROLLBACK_NOT_SAFE)

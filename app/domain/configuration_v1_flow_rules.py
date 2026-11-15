@@ -99,6 +99,7 @@ from app.domain.flow_readiness import (
     readiness,
 )
 from app.domain.routing_codec import routing_from_json
+from app.domain.scheduling import DispatchKind as GroupDispatchKind
 from app.domain.service_flows import (
     FlowRevision,
     FlowState,
@@ -179,6 +180,9 @@ class _World:
         carriers: What the platform of every group's complete contact-center routing carries,
             by slug; a group without one (or with one that cannot be read) is absent (ADR 0121
             step 6).
+        own_queues: The slugs of the groups with an own queue (``dispatch_kind`` is
+            ``openplanner_queue``, ``Group.has_own_queue``); a group whose field is absent has
+            the dataclass default, the contact center, and is not in it.
     """
 
     organisations: Mapping[str, int]
@@ -190,6 +194,7 @@ class _World:
     pool_by_id: Mapping[int, CapacityPool]
     subjects: Mapping[str, frozenset[str]]
     carriers: Mapping[str, ContactCenterCapabilities] = field(default_factory=dict)
+    own_queues: frozenset[str] = frozenset()
 
     @property
     def skills_by_id(self) -> dict[int, Skill]:
@@ -254,6 +259,7 @@ def _read_world(root: Entity, descriptors: Mapping[str, ProviderDescriptor]) -> 
     group_organisation: dict[str, str] = {}
     subjects: dict[str, frozenset[str]] = {}
     carriers: dict[str, ContactCenterCapabilities] = {}
+    own_queues: set[str] = set()
     for address, group in walk(root, GROUP_KIND):
         groups[address[1]] = next(ids)
         group_organisation[address[1]] = address[0]
@@ -265,8 +271,19 @@ def _read_world(root: Entity, descriptors: Mapping[str, ProviderDescriptor]) -> 
         carrier = _carrier(group.fields.get("contact_center"), descriptors)
         if carrier is not None:
             carriers[address[1]] = carrier
+        if group.fields.get("dispatch_kind") == GroupDispatchKind.OPENPLANNER_QUEUE.value:
+            own_queues.add(address[1])
     world = _World(
-        organisations, groups, group_organisation, skills, {}, {}, {}, subjects, carriers
+        organisations,
+        groups,
+        group_organisation,
+        skills,
+        {},
+        {},
+        {},
+        subjects,
+        carriers,
+        frozenset(own_queues),
     )
     pools: dict[tuple[str, str], CapacityPool] = {}
     legacy: dict[str, CapacityPool] = {}
@@ -781,6 +798,7 @@ def _check_publication(run: _Run, address: Address, number: int, built: FlowRevi
                 offered_subjects=run.world.subjects.get(address[1], ()),
                 coded_skills=run.world.coded_skills,
                 carrier=run.world.carriers.get(address[1]),
+                own_queue=address[1] in run.world.own_queues,
             )
         )
 
@@ -810,6 +828,7 @@ def _check_state(run: _Run, address: Address, built: ServiceFlow) -> Iterator[Re
             offered_subjects=run.world.subjects.get(address[1], ()),
             coded_skills=run.world.coded_skills,
             carrier=run.world.carriers.get(address[1]),
+            own_queue=address[1] in run.world.own_queues,
         )
         if not can_activate(items):
             for item in items:

@@ -32,7 +32,7 @@ def contact_center() -> FlowRevision:
 
 def rollback_reason(rev: FlowRevision) -> ReadinessReason | None:
     """Return the reason of the rollback point of ``rev``'s checklist."""
-    items = readiness(rev, pool(), offered_subjects=(), carrier=CARRIER)
+    items = readiness(rev, pool(), offered_subjects=(), own_queue=True, carrier=CARRIER)
     return next(i for i in items if i.code is ReadinessCheck.ROLLBACK).reason
 
 
@@ -49,7 +49,9 @@ def test_a_shut_gate_behaves_as_before(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_an_open_gate_refuses_a_contact_center_flow(monkeypatch: pytest.MonkeyPatch) -> None:
     open_gate(monkeypatch)
-    items = readiness(contact_center(), pool(), offered_subjects=(), carrier=CARRIER)
+    items = readiness(
+        contact_center(), pool(), offered_subjects=(), own_queue=True, carrier=CARRIER
+    )
     assert not can_activate(items)
     assert rollback_reason(contact_center()) is ReadinessReason.CONTACT_CENTER_NOT_READY
 

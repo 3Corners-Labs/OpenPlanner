@@ -24,10 +24,17 @@ from tests.support.domain import NOW
 from tests.support.flow_pages import BASE, act, create, create_ready, form_data, save
 from tests.support.flow_seed import add_subjects
 from tests.support.locales import nl_locale
-from tests.support.pool_flows import shut_gate
+from tests.support.pool_flows import set_own_queue, shut_gate
 from tests.support.skill_seed import add_pool, add_skill
 
 SUPER_SCOPE = Scope(everything=True)
+
+
+@pytest.fixture
+async def site(site: Site) -> Site:
+    """The admin site; ``demo`` works on the own queue, where the flows here dispatch."""
+    await set_own_queue(site_uow(site))
+    return site
 
 
 async def test_the_page_speaks_english_with_the_names_of_both_languages(site: Site) -> None:
