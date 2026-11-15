@@ -6,8 +6,6 @@ unit kept, A33 and A34), a pool booking nobody claimed (an expired request), and
 a request without an appointment deleted on time, by the round and by the nightly sweep.
 """
 
-from collections.abc import AsyncIterator
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import replace
 from datetime import timedelta
 
@@ -33,7 +31,7 @@ from app.domain.service_requests import (
 )
 from app.domain.webhook_replay import INSTALLATION_SCOPE
 from tests.fakes.clock import FixedClock
-from tests.fakes.persistence import InMemoryTransaction, InMemoryUnitOfWork
+from tests.fakes.persistence import CommitFailingUnitOfWork, InMemoryUnitOfWork
 from tests.support.contact_center_requests import CC_FLOW, Desk, cc_world, desk
 from tests.support.domain import NOW, SLOT_0900
 from tests.support.request_work import (
@@ -404,29 +402,13 @@ async def test_a_late_task_of_an_attempt_the_watchdog_expired_in_doubt_is_ended(
     assert [i.state for i in contact_center_items(uow)] == [WorkItemState.EXPIRED]
 
 
-class CommitFails:
-    """A store whose locked transactions all fail at the commit: nothing they wrote is kept."""
-
-    def __init__(self, uow: InMemoryUnitOfWork) -> None:
-        self._uow = uow
-
-    def read(self) -> AbstractAsyncContextManager[InMemoryTransaction]:
-        return self._uow.read()
-
-    @asynccontextmanager
-    async def locked(self) -> AsyncIterator[InMemoryTransaction]:
-        async with self._uow.read() as tx:  # a copy, thrown away
-            yield tx
-        raise RuntimeError("commit failed")
-
-
 async def test_a_round_whose_commit_fails_reports_no_task_ended_and_plans_none() -> None:
     """The count says what was committed, never what was only written in a lost transaction."""
     the_desk, booking_id = await dispatched_attempt()
     uow, clock = the_desk.uow, the_desk.clock
     clock.advance(DEADLINE - clock.now())
 
-    result = await RequestWatch(CommitFails(uow), clock, 24).run()  # type: ignore[arg-type]
+    result = await RequestWatch(CommitFailingUnitOfWork(uow), clock, 24).run()
 
     assert (result.tasks_ended, result.failed, result.errors) == (0, 1, ("RuntimeError",))
     assert end_jobs(uow, booking_id) == 0
