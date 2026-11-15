@@ -1229,7 +1229,7 @@ msgid "admin.field.join_client"
 msgstr "How the participant gets into the call"
 
 msgid "admin.field.join_client_hint"
-msgstr "How the participant gets into the call. 'Straight into the browser': the participant goes to Webex and the call opens in its web version. 'Webex lets the participant choose': the participant goes to Webex and chooses there between the app and the browser. 'In the organisation's own page': the call runs in our own page. The trial call always opens in Webex."
+msgstr "How the participant gets into the call. 'Straight into the browser': the participant goes to Webex and the call opens in its web version. 'Webex lets the participant choose': the participant goes to Webex and chooses there between the app and the browser. 'In the organisation's own page': the call runs in our own page. The trial call opens in our own page when that is chosen, and in Webex otherwise."
 
 msgid "admin.group.join_client_browser"
 msgstr "Straight into the browser"
