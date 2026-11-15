@@ -214,6 +214,9 @@ async def _record_task_event(
             platform=inbound.kind.value,
             kind=event.kind.value,
             outcome=outcome.value,
+            # Whether the event carried a booking reference as its origin, never the value: the
+            # operator check G15 of ADR 0121 step 29 reads it (docs/runbook.md).
+            origin="reference" if event.origin else "none",
         )
     await _note(request, delivery, outcome)
     return Response(status_code=204)

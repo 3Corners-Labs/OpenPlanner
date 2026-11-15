@@ -11,6 +11,7 @@ from datetime import timedelta
 import pytest
 
 from app.domain import contact_center_attempts as attempts
+from app.domain.booking import BookingStatus
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.flow_readiness import ReadinessCheck, ReadinessReason, readiness
 from app.domain.service_flows import (
@@ -109,6 +110,38 @@ def test_the_fence_waits_for_the_window() -> None:
     assert attempts.due_for_fence(doubt, NOW + timedelta(minutes=10), 10)
     assert attempts.due_for_fence(item, NOW + timedelta(minutes=10), 10)  # a crash mid-create
     assert not attempts.due_for_fence(attempts.dispatched(item), NOW + timedelta(hours=1), 10)
+
+
+def test_the_watchdog_ends_at_the_platform_the_task_of_an_attempt_it_ends() -> None:
+    """Step 27 (E9): an expired or cancelled attempt that holds a task has it ended, once.
+
+    A cancelled booking's task is ended by the cancellation's own job (ADR 0021), so the
+    watchdog adds none; an attempt in doubt has no task to end (a late one is an orphan); the
+    own queue's work and started work (recovery, A34) are never the platform's to end.
+    """
+    _, item = opened()
+    sent = attempts.dispatched(item)
+    expired = replace(sent, state=WorkItemState.EXPIRED, ended_at=LATER)
+    cancelled = replace(sent, state=WorkItemState.CANCELLED, ended_at=LATER)
+
+    def ends(
+        before: WorkItem | None,
+        after: WorkItem | None,
+        *,
+        has_task: bool = True,
+        booking: BookingStatus = BookingStatus.CONFIRMED,
+    ) -> bool:
+        return attempts.watchdog_ends_task(before, after, has_task=has_task, booking=booking)
+
+    assert ends(sent, expired)
+    assert ends(sent, cancelled, booking=BookingStatus.NO_SHOW)
+    assert not ends(sent, cancelled, booking=BookingStatus.CANCELLED)
+    assert not ends(sent, expired, has_task=False)
+    assert not ends(sent, replace(sent, state=WorkItemState.RECOVERY_REQUIRED))
+    assert not ends(sent, None)
+    assert not ends(None, expired)
+    _, own = claim(queued(), None, now=NOW, agent="a", lease_minutes=5)
+    assert not ends(own, replace(own, state=WorkItemState.EXPIRED, ended_at=LATER))
 
 
 def test_platform_events_start_complete_or_requeue() -> None:

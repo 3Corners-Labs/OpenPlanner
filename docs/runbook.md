@@ -1338,7 +1338,70 @@ sends (ADR 0121 follow-up 29). Until it is seen on the test tenant, a task that 
 made after an unanswered create cannot be recognised: the attempt is still fenced after
 `contact_center_reconcile_minutes` and the own queue takes the request, but the late task stays
 with an agent at the platform until someone closes it there. Watch the timeline of such
-bookings (*outcome_unknown*, *fenced*) and close a stray work item by hand.
+bookings (*outcome_unknown*, *fenced*) and close a stray work item by hand. The check that
+settles it is *Checklist G15* below.
+
+**An attempt the watchdog ends** (ADR 0121 step 27). Work the contact center holds that no
+agent connected by `request_unresolved_hours` after its appointment's end is expired by the
+worker's watchdog round, and work whose booking ended otherwise (a no-show, say) is cancelled.
+The round then plans the same end-task job as a cancellation (ADR 0021): the task is marked
+cancelled and ended at the platform, and the booking's timeline says *task_end_requested*, or
+*end_not_possible* with the platform's code. The `requests.watched` log line counts them in
+`tasks_ended`. A cancelled booking's task is ended by its cancellation, not a second time.
+
+#### Checklist G15: does a task event carry the origin? (ADR 0121 step 29)
+
+The last item before `CONTACT_CENTER_FLOWS_READY` may flip
+(`docs/service-flows-gate-checklist.md`). A person does it on the test host (docker01) with a
+real Webex Contact Center tenant; it takes about fifteen minutes. OpenPlanner sends the booking
+reference as the task's `origin.id` in every Create Task; the question is whether the platform
+sends it back in its task events, which is what lets a late task be matched to its attempt.
+Since step 27 every task event's log line says so, without the value: `webhook.contact_center`
+has `origin=reference` (the event carried a booking reference) or `origin=none`.
+
+Before you start (5 minutes):
+
+1. docker01 runs an image with step 27 (`/admin/updates` shows a candidate at or after the
+   merge of the PR that closed G13); otherwise **Update now**.
+2. A service on docker01 is routed to that tenant (its *Contact center* tab complete) and offers
+   a direct call ("start now", ADR 0072), or has an appointment you can book within the
+   dispatch lead time. `wxcc-check` is all `OK` and `webhooks-list` shows the subscription at
+   docker01's address as active (sections 6 and 8).
+3. An agent of the tenant is signed in to Agent Desktop, available in the service's queue.
+
+The check (10 minutes):
+
+1. Note the time. As a participant, start a direct call on the service's page (or book an
+   appointment starting a few minutes from now). The booking's timeline in the portal shows
+   *task_created* within a minute.
+2. In Agent Desktop, accept the work item (the platform sends `task:connected`), then end it
+   (`task:ended`). Wait a minute for the events.
+3. On docker01, from the installation directory:
+
+   ```
+   docker compose logs web --since 15m | grep '"webhook.contact_center"'
+   ```
+
+   Find the lines of this task (`kind` `task_created`, `task_connected`, `task_ended`, in that
+   order, at the times you noted). Read `origin` on each; `outcome` does not matter for this
+   check (a booking's own `task_created` is already known and may say `ignored`).
+4. Optional, if the tenant's flow handles it: cancel a second direct call while it waits and
+   check that its `task_ended` line says `origin=reference` too.
+
+What to record, in the row G15 of `docs/service-flows-gate-checklist.md` (a docs PR):
+
+- the date, the image version from `/admin/updates`, the tenant's region (`WXCC_API_BASE_URL`
+  host, not the organisation id);
+- per event kind seen, the `origin` value (`reference` or `none`);
+- the verdict: **carries the origin** when `task_created` (the event a late task produces) says
+  `reference`; then set the row to `done` with the date and that PR, and say in the PR that the
+  constant may flip. **Does not carry it** when `task_created` says `none`: leave the row open,
+  say so in the PR and tell the product owner. A late task then cannot be matched, the fence
+  still keeps one owner, and a stray task needs closing by hand (above); matching it by another
+  field is a new decision.
+
+Never paste a log line with a task id, a name or a reference into the PR or an issue: the
+three values above are all the check needs.
 
 The client's flow reads
 `openplannerInteraction` (`none`: work without a meeting, an empty `meetingLink`) to route that
