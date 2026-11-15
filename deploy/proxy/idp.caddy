@@ -29,7 +29,9 @@ handle @idp {
 			# Exactly one address, the visitor's, as web gets it (ADR 0129; the Caddyfile's snippet).
 			import visitor_address
 			# Caddy sets X-Forwarded-Proto and -Host itself, but Keycloak also reads X-Forwarded-Port
-			# (KC_PROXY_HEADERS=xforwarded), which a visitor could set; the port is in -Host already.
+			# (KC_PROXY_HEADERS=xforwarded), which a visitor could set. A port the visitor writes into
+			# Host still arrives inside -Host and moves only the back-channel endpoints of that
+			# visitor's own discovery answer (accepted, ADR 0126 *Consequences*).
 			header_up -X-Forwarded-Port
 			# ADR 0126 point 2: none of the portal's cookies reaches the provider. On https every
 			# cookie of the portal is a `__Host-` cookie (app/web/cookies.py), besides `lang`

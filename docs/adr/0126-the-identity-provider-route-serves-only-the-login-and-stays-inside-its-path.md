@@ -194,6 +194,11 @@ None, after checking. Every value below is a fixed security rule or follows from
   holds the page's address (Keycloak's own pages send none). Read in Caddy's source by the
   review, not reproduced; a log filter that drops the URI and `Referer` would close it, a
   follow-up outside this decision.
+- Keycloak gets the visitor's address alone and no `X-Forwarded-Port` (ADR 0129's rule, shared
+  with web's route). A port the visitor writes into `Host` still reaches it inside
+  `X-Forwarded-Host`, since Caddy's host matcher ignores the port: it moves only the
+  back-channel endpoints in that visitor's own discovery answer, which nothing of the portal
+  uses. Accepted; pinning `X-Forwarded-Host` would drop a public port other than 443.
 - A reverse proxy of the operator's own in front of the bundled provider must do the same; the
   runbook lists what.
 - Updated with this decision: `docs/runbook.md`, `docs/threat-model.md`, `docs/dataflow.md`,
