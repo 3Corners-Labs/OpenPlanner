@@ -18,9 +18,9 @@ from app.domain.integration_check import CHECK_EVENT
 from app.domain.request_log import REQUEST_EVENT
 from app.domain.security_log import TOKEN_REFRESH_FAILED
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW, SLOT_0900, TEST_TOKEN_KEY, book
+from tests.support.seed_rows import seed_group
 
 
 def _event(

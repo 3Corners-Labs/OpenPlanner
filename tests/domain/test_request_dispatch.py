@@ -30,15 +30,10 @@ from app.domain.webhook_replay import INSTALLATION_SCOPE
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.contact_center_requests import CC_FLOW, WINDOW, Desk, cc_world, desk
-from tests.support.domain import NOW, webex_routing
+from tests.support.domain import webex_routing
 from tests.support.request_work import AGENT, FLOW, at, book
 
 SOURCE = "webex_cc"
-
-
-@pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
 
 
 @pytest.fixture

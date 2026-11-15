@@ -16,8 +16,8 @@ from app.config import Settings
 from app.domain.authorization import Scope
 from app.main import create_app
 from app.web.protection import limiter
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import app_client, in_process
 from tests.support.database import migrated_database
 from tests.support.domain import NOW
 from tests.support.webhooks import SECRET, sign, timestamp, wxcc_body
@@ -271,7 +271,7 @@ async def test_rotating_addresses_within_an_ipv6_64_never_opens_a_fresh_bucket(
     app = create_app(limited, FixedClock(NOW))
 
     async def post(address: str, path: str, **headers: str) -> int:
-        transport = httpx.ASGITransport(app=app, client=(address, 4711))
+        transport = in_process(app, address)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
             return (await c.post(path, content=b"{}", headers=headers)).status_code
 
@@ -445,7 +445,7 @@ async def _from(
     app: Any, address: str, path: str, body: bytes = b"{}", **headers: str
 ) -> httpx.Response:
     """Post one call that arrives from ``address``, as the server would derive it."""
-    transport = httpx.ASGITransport(app=app, client=(address, 4711))
+    transport = in_process(app, address)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
         return await c.post(path, content=body, headers=headers)
 
@@ -801,7 +801,7 @@ async def test_two_forwarded_for_lines_that_disagree_are_judged_by_the_least_saf
         webhook_source_networks_video=SUPPLIER_RANGE,
         forwarded_allow_ips="172.31.240.2",
     ) as app:
-        transport = httpx.ASGITransport(app=app, client=(SUPPLIER, 4711))
+        transport = in_process(app, SUPPLIER)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
             listed = await c.post(
                 "/webhooks/webex", content=b"{}", headers=[*lines, *_webex().items()]

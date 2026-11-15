@@ -3,7 +3,7 @@
 from sqlalchemy import text
 
 from app.domain.authorization import Role
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AGENT,
     AUDITOR,
     GROUP_ADMIN,
@@ -12,9 +12,10 @@ from tests.admin.conftest import (
     SAME_ORIGIN,
     SUPER,
     Site,
+    audit_rows,
 )
 from tests.support.principals import principal
-from tests.support.screen_names import audit_rows, id_of, login_each, stored
+from tests.support.screen_names import id_of, login_each, stored
 
 PAGE = "/admin/rights/profile"
 POST = "/admin/rights/profile/screen-name"
@@ -188,7 +189,7 @@ async def test_an_erased_record_keeps_no_name_and_the_service_refuses_the_write(
     await site.client.post(f"/admin/staff/{gina}/suspend", headers=SAME_ORIGIN)
     await login_each(site, SUPER)
     await site.client.post(f"/admin/staff/{gina}/erase", headers=SAME_ORIGIN)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
 
     service = app.state.staff_names
     member = await service.own(GROUP_ADMIN.subject)
@@ -204,7 +205,7 @@ async def test_a_suspended_record_may_still_set_its_name(site: Site) -> None:
     await login_each(site, GROUP_ADMIN, ORG_ADMIN)
     gina = await id_of(site, "Gina Group")
     await site.client.post(f"/admin/staff/{gina}/suspend", headers=SAME_ORIGIN)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
 
     result = await app.state.staff_names.set_own_screen_name(GROUP_ADMIN, NAME)
 
@@ -216,7 +217,7 @@ async def test_without_a_staff_record_the_page_says_so_and_the_post_is_a_conflic
     site: Site,
 ) -> None:
     await login_each(site, GROUP_ADMIN)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with app.state.engine.begin() as conn:
         await conn.execute(text("delete from staff where subject = :s"), {"s": GROUP_ADMIN.subject})
 

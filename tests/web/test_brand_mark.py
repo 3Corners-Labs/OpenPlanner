@@ -3,7 +3,7 @@
 import re
 from pathlib import Path
 
-from tests.admin.conftest import SUPER, Site
+from tests.support.admin_site import SUPER, Site
 
 STATIC = Path(__file__).resolve().parents[2] / "app" / "web" / "static"
 

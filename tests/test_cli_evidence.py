@@ -26,12 +26,12 @@ from app.domain.evidence import Status, render_json, render_markdown
 from app.domain.log_destinations import DestinationKind, LogDestination
 from app.domain.public_address import InstanceAnswer, InstanceReply
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.fakes.instance import FakeInstanceProbe
 from tests.fakes.tls import FakeCertificateProbe
 from tests.support.database import migrated_database
 from tests.support.domain import ADA, NOW, SLOT_0900, TEST_TOKEN_KEY, book
+from tests.support.seed_rows import seed_group
 
 SECRETS = {
     "smtp_password": "zzmark-smtp-password",

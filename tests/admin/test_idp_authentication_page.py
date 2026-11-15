@@ -10,14 +10,14 @@ from collections.abc import AsyncIterator
 import pytest
 
 from app.config import Settings
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AUDITOR,
     ORG_ADMIN,
     OUTSIDER,
     SAME_ORIGIN,
     SUPER,
     Site,
-    _running_site,
+    running_site,
 )
 from tests.support.organisation_login import LOGIN, register, route_domain
 
@@ -28,7 +28,7 @@ CHECK = f"{LOGIN}/_check"
 async def routed(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
     """A site that allows organisation providers, with acme-a.nl routing to org-a."""
     switched_on = settings.model_copy(update={"organisation_idps_enabled": True})
-    async with _running_site(switched_on, admin_db) as running:
+    async with running_site(switched_on, admin_db) as running:
         running.page_url = await route_domain(running)  # type: ignore[attr-defined]
         yield running
 

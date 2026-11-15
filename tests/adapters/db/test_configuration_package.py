@@ -28,13 +28,13 @@ from app.domain.configuration_document import Mode, Scope
 from app.domain.configuration_document_service import Actor, ConfigurationDocumentService
 from app.domain.configuration_package import CONFIGURATION_TABLES, STATE_TABLES, VERSION_TABLE
 from app.domain.errors import DomainError, ErrorCode
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.fakes.identity_providers import FakeDiscoveryFetcher
 from tests.support.configuration_package import NOW, PASSPHRASE, SOURCE_BOX, database_path
 from tests.support.database import migrated_database
 from tests.support.legacy_package import export_package
 from tests.support.principals import principal
+from tests.support.seed_rows import seed_group
 
 TARGET_BOX = SecretBox(b"t" * 32)
 ENVIRONMENT = {"OIDC_DISCOVERY_URL": "https://idp.example/.well-known/openid-configuration"}

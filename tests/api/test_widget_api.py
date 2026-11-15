@@ -21,8 +21,8 @@ from app.api.widget_schemas import MAX_BODY_BYTES
 from app.config import Settings
 from app.domain.maintenance import MaintenanceReason
 from app.domain.maintenance_service import MaintenanceService
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import app_client
 from tests.support.domain import NOW
 from tests.support.participant import FRIDAY_0900
 from tests.support.widget import ADA, BASE, SITE, embed

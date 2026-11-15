@@ -13,15 +13,19 @@ from app.adapters.integrations import Integrations
 from app.config import Settings
 from app.domain.ports import IntegrationError
 from app.domain.scheduling import JoinClient
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo, webex_cc
+from tests.support.app_client import app_client
 from tests.support.domain import NOW
-from tests.support.participant import confirm_newest, emailed_token, open_link
+from tests.support.participant import (
+    ADA,
+    FRIDAY_0900,
+    SAME_ORIGIN,
+    confirm_newest,
+    emailed_token,
+    open_link,
+)
 
-FRIDAY_0900 = "2026-01-02T08:00:00Z"
-SAME_ORIGIN = {"origin": "http://testserver", "sec-fetch-site": "same-origin"}
-ADA = {"first_name": "Ada", "last_name": "Lovelace", "email": "ada@example.org", "phone": ""}
 HOST = "host@example.nl"
 
 

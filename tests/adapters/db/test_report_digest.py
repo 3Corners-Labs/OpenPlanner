@@ -17,11 +17,11 @@ from app.domain.staff import Membership, StaffMember
 from app.domain.usage import FactKind, UsageFact, UsageOutcome, hour_of
 from app.domain.usage_report_service import UsageReportService
 from app.domain.usage_rollup_service import UsageRollup
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.fakes.digest import FakeStaffAddresses
 from tests.fakes.messaging import RecordingSender
 from tests.support.principals import principal
+from tests.support.seed_rows import seed_group
 
 NOW = datetime(2026, 11, 9, 8, 0, tzinfo=UTC)  # a Monday, 09:00 in Amsterdam
 ORG = "org-alfa"

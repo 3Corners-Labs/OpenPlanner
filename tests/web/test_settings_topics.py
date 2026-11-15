@@ -5,7 +5,7 @@ import pytest
 from app.domain.settings_registry import REGISTRY, SettingClass, SettingSpec, Topic
 from app.i18n import Translator, load_catalogues
 from app.web.navigation import render_markdown, screens, topic_anchor, topic_home
-from tests.admin.conftest import SUPER, Site
+from tests.support.admin_site import SUPER, Site
 
 PORTAL = [spec for spec in REGISTRY if spec.in_portal]
 

@@ -17,8 +17,8 @@ from app.adapters.db.engine import create_engine
 from app.adapters.db.models import BookingRow, GroupRow, JobRow, ScheduleRuleRow
 from app.config import Settings
 from app.web.static_assets import ASSETS
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import app_client
 from tests.support.domain import NOW
 from tests.support.participant import (
     ADA,

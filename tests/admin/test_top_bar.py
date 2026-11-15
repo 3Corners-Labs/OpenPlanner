@@ -12,7 +12,7 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import JobRow
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AGENT,
     AUDITOR,
     GROUP_ADMIN,
@@ -20,8 +20,8 @@ from tests.admin.conftest import (
     ORG_ADMIN,
     SUPER,
     Site,
+    site_uow,
 )
-from tests.support.admin_site import site_uow
 from tests.support.queue import own_queue
 from tests.support.top_bar import top_bar_links
 
@@ -29,7 +29,7 @@ from tests.support.top_bar import top_bar_links
 async def _seed_jobs(site: Site) -> int:
     """Make some jobs run and fail; return how many are active now."""
     await own_queue(site)
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     async with AsyncSession(app.state.engine) as session, session.begin():
         await session.execute(
             update(JobRow)

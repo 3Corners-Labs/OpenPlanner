@@ -19,7 +19,7 @@ from app.adapters.integrations import Integrations
 from app.config import Settings
 from app.domain.ports import Clock
 from app.domain.scheduling import JoinClient
-from tests.conftest import app_client
+from tests.support.app_client import app_client
 
 VOID = frozenset({"meta", "link", "input", "br", "img", "source", "hr", "wbr"})
 HEADINGS = frozenset({"h1", "h2", "h3"})

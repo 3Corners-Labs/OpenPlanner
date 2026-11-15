@@ -21,7 +21,7 @@ from scripts.adr_issues import (
     render,
 )
 from tests.fakes.gh import FakeGh, pr_state
-from tests.scripts.conftest import fake_program, script_path
+from tests.support.fake_programs import fake_program, script_path
 
 ADR = """# 0099. An example
 

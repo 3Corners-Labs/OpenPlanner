@@ -4,7 +4,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.requests import Request
 
 from app.web.error_pages import validation_error_page
-from tests.admin.conftest import SUPER, Site
+from tests.support.admin_site import SUPER, Site
 
 
 async def test_a_malformed_query_parameter_on_a_page_is_not_echoed(site: Site) -> None:

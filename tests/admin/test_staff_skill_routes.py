@@ -4,7 +4,7 @@ import re
 
 import httpx
 
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AUDITOR,
     GROUP_ADMIN,
     ORG_ADMIN,
@@ -12,8 +12,8 @@ from tests.admin.conftest import (
     SAME_ORIGIN,
     SUPER,
     Site,
+    audit_log,
 )
-from tests.support.admin_site import audit_log
 from tests.support.skill_seed import add_skill, archive_skill, limit, staff_id
 
 SKILLS = "/admin/organisations/demo/skills"

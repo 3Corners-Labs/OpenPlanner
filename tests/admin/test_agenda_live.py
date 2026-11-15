@@ -11,8 +11,8 @@ from app.domain.calls import CallState, EventKind, MeetingStatus
 from app.domain.integration import IntegrationService
 from app.domain.ports import IntegrationError
 from app.web.static_assets import ASSETS
-from tests.admin.conftest import AUDITOR, GROUP_ADMIN, OUTSIDER, Site
 from tests.fakes.integrations import FakeVideo
+from tests.support.admin_site import AUDITOR, GROUP_ADMIN, OUTSIDER, Site
 from tests.support.admin_site import site_uow as _uow
 from tests.support.domain import FRIDAY_0900
 from tests.support.queue import own_queue as _own_queue

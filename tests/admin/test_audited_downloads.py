@@ -18,8 +18,7 @@ from app.domain.audit import Outcome
 from app.domain.security_log import CROSS_SITE, REQUEST_REJECTED
 from app.web.protection import require_same_origin
 from app.web.route_dependencies import dependency_calls
-from tests.admin.conftest import SUPER, Site
-from tests.support.admin_site import audit_events, site_app
+from tests.support.admin_site import SUPER, Site, audit_events
 from tests.support.downloads import AUDITED_DOWNLOADS, address
 from tests.support.routes import all_routes
 
@@ -134,7 +133,7 @@ def test_the_only_guarded_gets_are_the_audited_downloads(site: Site) -> None:
     # each one must be a listed admin download, never a participant page.
     guarded = {
         route.path
-        for route in all_routes(site_app(site).routes)
+        for route in all_routes(site.app.routes)
         if "GET" in route.methods and require_same_origin in dependency_calls(route)
     }
 

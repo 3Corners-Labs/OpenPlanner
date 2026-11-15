@@ -12,13 +12,11 @@ import structlog.testing
 
 from app.adapters.db.credentials import CredentialStore
 from app.adapters.db.record_names import contact_center_credential_name
-from app.adapters.db.uow import SqlUnitOfWork
 from app.adapters.integrations import sealed_store
 from app.domain.contact_center import ContactCenterKind
 from app.domain.webhook_ledger import AddressKey, Delivered
 from app.domain.webhook_secret_sweep import PreviousSecretSweep
-from tests.admin.conftest import SAME_ORIGIN, SUPER, Site
-from tests.support.admin_site import site_app
+from tests.support.admin_site import SAME_ORIGIN, SUPER, Site, set_settings, site_uow
 from tests.support.contact_center_site import (
     PAGE,
     SUPPLIER,
@@ -27,7 +25,6 @@ from tests.support.contact_center_site import (
     _connections,
     _pause,
     _registrar,
-    _set_settings,
 )
 
 ROTATE = f"{PAGE}/contact-center/webhook-secret"
@@ -52,7 +49,7 @@ async def _status(site: Site, secret: str) -> int:
 
 
 def _record(site: Site) -> CredentialStore:
-    state = site_app(site).state
+    state = site.app.state
     store = sealed_store(state.engine, state.settings)
     assert isinstance(store, CredentialStore)
     return store
@@ -87,7 +84,7 @@ async def test_a_delivery_under_the_previous_secret_is_accepted_like_any_other(
     assert await _status(site, new) == 204
     assert await _status(site, old) == 204  # the same event again, through the other secret
 
-    view = site_app(site).state.webhook_ledger.view(KEY)
+    view = site.app.state.webhook_ledger.view(KEY)
     assert view is not None
     assert view.by_previous == 1
     # Both are verified deliveries of the same kind (an event about work this connection did not
@@ -101,7 +98,7 @@ async def test_an_overlap_of_nothing_refuses_the_previous_secret_at_once(site: S
     old = await _rotate(site)
     assert await _status(site, old) == 204
 
-    _set_settings(site, webhook_secret_overlap_minutes=0)
+    set_settings(site, webhook_secret_overlap_minutes=0)
 
     assert await _status(site, old) == 401
     assert await _status(site, await _current(site)) == 204
@@ -159,7 +156,7 @@ async def test_the_card_says_until_when_the_previous_secret_works_and_what_the_b
 
 async def test_the_button_says_so_when_the_overlap_is_nothing(site: Site) -> None:
     await _connect(site)
-    _set_settings(site, webhook_secret_overlap_minutes=0)
+    set_settings(site, webhook_secret_overlap_minutes=0)
 
     page = (await site.client.get(PAGE)).text
     await _rotate(site)
@@ -198,9 +195,9 @@ async def test_the_sweep_removes_a_previous_secret_once_the_live_overlap_has_end
 ) -> None:
     await _connect(site)
     await _rotate(site)
-    state = site_app(site).state
+    state = site.app.state
     sweep = PreviousSecretSweep(
-        SqlUnitOfWork(state.engine),
+        site_uow(site),
         site.clock,
         _connections(site),
         lambda: timedelta(minutes=state.settings.webhook_secret_overlap_minutes),
@@ -247,7 +244,7 @@ async def test_no_secret_reaches_a_log_an_audit_event_or_the_security_events(sit
         site.clock.advance(timedelta(minutes=61))
         await _status(site, old)  # refused after it ended
         await _status(site, "x" * 43)
-    audit = await site_app(site).state.admin_service.audit_log(SUPER)
+    audit = await site.app.state.admin_service.audit_log(SUPER)
 
     texts = repr(logs) + repr([(e.event.detail, e.event.reason) for e in audit])
     assert old not in texts

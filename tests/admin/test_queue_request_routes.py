@@ -11,11 +11,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import BookingRow
-from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.authorization import Scope
 from app.domain.request_watch import RequestWatch
-from tests.admin.conftest import AGENT, GROUP_ADMIN, SAME_ORIGIN, Site
-from tests.support.flows import engine_of
+from tests.support.admin_site import AGENT, GROUP_ADMIN, SAME_ORIGIN, Site, site_uow
 from tests.support.queue import request_work
 
 QUEUE = "/admin/groups/demo/queue"
@@ -51,7 +49,7 @@ async def test_request_work_is_started_and_completed_without_a_meeting(site: Sit
 
     assert done.status_code == 303
     assert done.headers["location"].endswith("done=completed")
-    async with AsyncSession(engine_of(site.client)) as session:
+    async with AsyncSession(site.app.state.engine) as session:
         status = await session.scalar(select(BookingRow.status).where(BookingRow.id == booking_id))
     assert status == "completed"
 
@@ -78,7 +76,7 @@ async def test_a_supervisor_lists_and_completes_work_in_recovery(site: Site) -> 
     await site.client.post(f"{QUEUE}/{booking_id}/claim", headers=SAME_ORIGIN)
     await site.client.post(f"{QUEUE}/{booking_id}/start", headers=SAME_ORIGIN)
     site.clock.advance(timedelta(days=3))
-    await RequestWatch(SqlUnitOfWork(engine_of(site.client)), site.clock, 24).run()
+    await RequestWatch(site_uow(site), site.clock, 24).run()
 
     agent_page = (await site.client.get(QUEUE)).text
     await site.login_as(GROUP_ADMIN)

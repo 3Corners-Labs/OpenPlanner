@@ -5,7 +5,7 @@ implementation. ``tests/admin/test_authorization_matrix.py`` sweeps it, role by 
 other admin tests read it to find the routes they cover.
 """
 
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AGENT,
     AUDITOR,
     GROUP_ADMIN,

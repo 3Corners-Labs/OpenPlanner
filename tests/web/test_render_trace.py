@@ -1,7 +1,7 @@
 """The ``template.render`` trace point: template name and duration (ADR 0085 point 9)."""
 
+from tests.support.template_source import RenderSource
 from tests.support.tracing import captured_trace
-from tests.web.conftest import RenderSource
 
 
 def test_rendering_a_page_leaves_its_template_name_and_duration(

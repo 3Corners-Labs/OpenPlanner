@@ -6,8 +6,7 @@ Calendar: "now" is Thursday 1 January 2026 08:00 UTC; the demo group is open on 
 
 import re
 
-from tests.admin.conftest import GROUP_ADMIN, ORG_ADMIN, Site
-from tests.support.admin_site import audit_events, post_form
+from tests.support.admin_site import GROUP_ADMIN, ORG_ADMIN, Site, audit_events, post_form
 from tests.support.closure_pages import CLOSURE, UNTIL_SATURDAY
 from tests.support.participant import SAME_ORIGIN as PARTICIPANT
 from tests.support.participant import booked_page
