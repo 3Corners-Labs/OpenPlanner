@@ -6,6 +6,22 @@ All notable changes are listed here, generated from Conventional Commits on rele
 
 ## 0.6.0 (2026-11-14)
 
+### Release build
+
+- The first tag `v0.6.0` (on the merge of #866) stopped in the mutation job of its build, a
+  test bug, so nothing was published. The mutation test gate ran green again: test helper fix
+  #870 (the per-booking introspection test ignores mutmut's generated methods). The release is
+  tagged again on the merge of this second release PR, so it also carries what merged in
+  between:
+  - the call page is chosen per service (ADR 0123 step 6a, #862; still off unless the platform
+    setting `embedded_call_enabled` is on) and the captions are not drawn again when their
+    lines did not change (#869);
+  - a webhook secret rotates with an overlap (ADR 0124 step 4, #843);
+  - the proxy trusts the edge in front of it, read right to left (ADR 0129, #865), and only the
+    login of the bundled identity provider is public, inside `/idp` (ADR 0126, #845);
+  - the authentication page shows the steps, warnings and where an address would log in
+    (ADR 0083, #867).
+
 ### Shipped dark
 
 - Services, named flows, skills and shared capacity pools (ADR 0121, ADR 0122) are in the
