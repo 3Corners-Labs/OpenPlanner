@@ -13940,6 +13940,12 @@ msgstr "Chat messages one participant may send per minute on the call page"
 msgid "settings.field.embedded_call_chat_max_chars.label"
 msgstr "Longest chat message a participant may send on the call page, in characters"
 
+msgid "settings.field.embedded_call_chat_per_minute.label"
+msgstr "Chat messages one participant may send per minute on the call page"
+
+msgid "settings.field.embedded_call_chat_max_chars.label"
+msgstr "Longest chat message a participant may send on the call page, in characters"
+
 msgid "settings.field.embedded_call_staff_name.label"
 msgstr "Staff member's name shown to the participant in the call (the staff member's screen name, the account name, or the own word alone)"
 

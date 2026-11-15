@@ -13953,6 +13953,12 @@ msgstr "Berichten die een deelnemer per minuut in de chat van de gesprekspagina 
 msgid "settings.field.embedded_call_chat_max_chars.label"
 msgstr "Langste chatbericht dat een deelnemer op de gesprekspagina mag sturen, in tekens"
 
+msgid "settings.field.embedded_call_chat_per_minute.label"
+msgstr "Berichten die een deelnemer per minuut in de chat van de gesprekspagina mag sturen"
+
+msgid "settings.field.embedded_call_chat_max_chars.label"
+msgstr "Langste chatbericht dat een deelnemer op de gesprekspagina mag sturen, in tekens"
+
 msgid "settings.field.embedded_call_staff_name.label"
 msgstr "Naam van de medewerker voor de deelnemer in het gesprek (schermnaam van de medewerker, accountnaam of alleen het eigen woord)"
 
