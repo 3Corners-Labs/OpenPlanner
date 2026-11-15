@@ -179,18 +179,21 @@ None, after checking. Every value below is a fixed security rule or follows from
   recovery, for an outage before that move, keeps the whole list; ADR 0125 itself stays as
   recorded.
 - Caddy logs an error that `handle_errors` handled at debug level, below what the proxy logs.
-  A 502 while web restarts therefore no longer writes the request's URI to the proxy's log,
-  where it carried a management link's token (`/b/<token>`; measured on 2026-11-15 without the
-  block, at error level), or a Keycloak action token from an invitation or a reset mail
-  (`/idp/realms/openplanner/login-actions/action-token?key=…`). The proxy's log then says
-  nothing about such a 502; web's and the updater's logs say why web was down. One line at the
-  default level still carries the URI, from before this decision: `reverse_proxy` warns when
-  an answer breaks off after its headers (the browser leaves, the upstream dies mid-body). A
-  management link answers with an empty redirect, but Keycloak's action-token pages are long
-  enough. Read in Caddy's source by the review, not reproduced; a log filter that drops the
-  request's URI would close it, a follow-up outside this decision.
+  A 502 therefore no longer writes the request's URI to the proxy's log: while web restarts, a
+  management link's token (`/b/<token>`; measured on 2026-11-15 without the block, at error
+  level), and while the identity provider restarts, a Keycloak action token from an invitation
+  or a reset mail (`/idp/realms/openplanner/login-actions/action-token?key=…`). The proxy's log
+  then says nothing about such a 502; web's and the updater's logs say why web was down. One
+  line at the default level still carries the URI and the request's headers, `Referer` among
+  them, from before this decision: `reverse_proxy` warns when an answer breaks off after its
+  headers (the browser leaves, the upstream dies mid-body). Long enough to break off are
+  Keycloak's action-token pages, a management link's page during maintenance or after a 429,
+  and an asset fetched from such a page, whose `Referer` holds the page's address. Read in
+  Caddy's source by the review, not reproduced; a log filter that drops the URI and `Referer`
+  would close it, a follow-up outside this decision.
 - A reverse proxy of the operator's own in front of the bundled provider must do the same; the
   runbook lists what.
 - Updated with this decision: `docs/runbook.md`, `docs/threat-model.md`, `docs/dataflow.md`,
-  CLAUDE.md's security baseline (the framing exception of point 4), ADR 0112's Status line and
-  its row in `docs/adr-status.md`, which still called step 6 open.
+  `docs/kubernetes.md` (the ingress's logs), CLAUDE.md's security baseline and the
+  security-review skill's list of safeguards (the framing exception of point 4), ADR 0112's
+  Status line and its row in `docs/adr-status.md`, which still called step 6 open.

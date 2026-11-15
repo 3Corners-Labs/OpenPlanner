@@ -595,8 +595,9 @@ web ──portal-certs volume──> proxy: privkey.pem, fullchain.pem, serial
 certificate is made on the host or imported straight into the `portal-certs` volume, which the
 database backup leaves out on purpose; it is never in a log, an audit event, an error message or
 a page. It concerns the organisation's server identity, not a participant. The CA learns the domain name and the operator's e-mail address; no participant data
-leaves through this flow. The proxy keeps no access log, so booking paths with management tokens are not
-written anywhere. Certificates are logged publicly in Certificate Transparency logs (domain
+leaves through this flow. The proxy keeps no access log and logs an answer it makes itself below its level, so booking
+paths with management tokens are not written in normal operation; an answer that breaks off
+after its headers is the exception (threat model, proxy logs; ADR 0126). Certificates are logged publicly in Certificate Transparency logs (domain
 name only).
 
 ## Outbound connections and the hop to web (ADR 0091)

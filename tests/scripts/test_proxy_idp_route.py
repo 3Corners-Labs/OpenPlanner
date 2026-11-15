@@ -251,11 +251,9 @@ def test_the_proxy_logs_no_request() -> None:
         assert not re.search(r"^\s*(log|debug)\b", text, re.MULTILINE)
     https = CADDYFILE.index("\n{$TLS_DOMAIN}:8443 {")
     assert CADDYFILE.count("handle_errors {") == 1
-    assert (
-        CADDYFILE.index("handle_errors {")
-        > https
-        > CADDYFILE.index("\nhttp://{$TLS_DOMAIN}:8080 {")
-    )
+    assert https < CADDYFILE.index("handle_errors {") < CADDYFILE.index("\n}", https)
+    # Headers only: a handler in it that can fail makes Caddy log the first error at error level.
+    assert re.search(r"handle_errors \{\s*header \{[^{}]*\}\s*\}", CADDYFILE)
 
 
 def test_every_answer_the_proxy_makes_itself_carries_the_portals_own_headers() -> None:

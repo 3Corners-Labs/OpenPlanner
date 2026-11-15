@@ -151,8 +151,9 @@ section; the installer's default) nothing else is needed. Behind a reverse proxy
   Check it from outside: `curl -sI https://<host name>/admin` must answer with a
   `Location: https://…`.
 - A request body limit on the proxy (for example 64 KB for `/g/*` and `/b/*`).
-- No access log on the proxy, and no request line in its error log (nginx, for one, writes
-  `request: "GET /b/<token> …"` there when the upstream is down): paths carry management tokens.
+- No access log on the proxy, and no request line in its error log: paths carry management
+  tokens. nginx, for one, writes `request: "GET /b/<token> …"` and the upstream's URL with the
+  path at level `error` when the upstream is down, so set its `error_log` to `crit`.
 - Answer plain `http://` requests for `/api/*` and `/webhooks/*` with `403` and no `Location`
   header, and redirect only the browser paths. A redirect makes a bot or Webex Connect flow that
   was configured with `http://` repeat its POST, with the client secret or webhook body, in
