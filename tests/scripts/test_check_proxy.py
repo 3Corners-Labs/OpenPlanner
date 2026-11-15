@@ -40,16 +40,11 @@ def test_every_program_the_script_runs_in_a_container_compiles(name: str) -> Non
     compile(_program(name), name, "exec")
 
 
-def _body_of(script: str, name: str) -> str:
-    """Return the body of the shell function ``name`` in ``script``."""
+def _body(name: str, script: str = SCRIPT) -> str:
+    """Return the body of the shell function ``name`` in ``script`` (check-proxy.sh by default)."""
     match = re.search(rf"^{name}\(\) \{{.*?^\}}$", script, re.MULTILINE | re.DOTALL)
     assert match, f"{name} is not defined"
     return match.group(0)
-
-
-def _body(name: str) -> str:
-    """Return the body of the shell function ``name`` in check-proxy.sh."""
-    return _body_of(SCRIPT, name)
 
 
 def test_every_pass_runs_the_standards_through_edge_checks() -> None:
@@ -199,8 +194,8 @@ def test_pass_five_sets_the_console_address_as_the_installer_and_the_runbook_do(
 
     assert f"KC_HTTP_RELATIVE_PATH={path}" in render
     # The installer: the published loopback binding, then the relative path, through the helper.
-    assert f'compose exec -T idp {helper} "$@"' in _body_of(installer, "idp_kcadm")
-    console = _body_of(installer, "idp_console")
+    assert f'compose exec -T idp {helper} "$@"' in _body("idp_kcadm", installer)
+    console = _body("idp_console", installer)
     assert "console=http://$published$path" in console
     assert 'update realms/master -s "attributes.frontendUrl=$console"' in console
     # Pass 5 and the runbook fill in that shape for the port they publish.
