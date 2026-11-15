@@ -119,6 +119,8 @@ save it.
 #### Where the request goes
 
 For now that can only be the own queue; the contact center is in the list with *(to follow)*.
+The service itself must then use OpenPlanner's own queue (the service's settings); otherwise
+nobody can pick the work up and the flow is not activated.
 
 <!-- field: completion -->
 #### Completion

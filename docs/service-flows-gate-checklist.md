@@ -19,6 +19,14 @@ configuration import alike (one rule, in the rollback point of `app/domain/flow_
 Flows on the own queue and the legacy flows of existing services are not affected. The constant
 is a protection, never a setting; the PR that closes G13 to G15 flips it to `True`.
 
+The same point holds a second rule, which is not an item because it never lifts (product owner,
+2026-11-15; ADR 0121 row 39, #895): once the gate is open, a non-legacy flow that dispatches to
+the own queue is not activated on a service without an own queue (`Group.has_own_queue`, the
+service's `dispatch_kind` is `openplanner_queue`), with the reason `own_queue_missing`, in the
+portal and in the configuration import alike. Without that queue nobody can claim the flow's
+work and the watchdog expires it. While the gate is shut the checklist still names only
+`rollback_not_safe`.
+
 `tests/test_service_flows_compatibility.py` reads this table: every open row of either ADR has an
 item here, and `ROLLBACK_SAFE` must be `False` while any item with *Blocks* `yes` is not `done`.
 

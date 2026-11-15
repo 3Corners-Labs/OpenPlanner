@@ -112,6 +112,7 @@ settings only, and no train module imports it.
 | B | Unchanged: a document without the new sections leaves skills, pools and flows alone | `tests/domain/test_configuration_v1_flows.py::test_a_document_without_the_sections_leaves_skills_pools_and_flows_alone` |
 | B | Unchanged: the same, through the database adapter | `tests/adapters/db/test_config_flows.py::test_a_document_without_the_sections_leaves_what_the_installation_has` |
 | B | Intended: export, import, export gives the same document | `tests/adapters/db/test_config_flows.py::test_export_import_export_gives_the_same_document` |
+| B | Gated: a document cannot activate a flow on the own queue on a service without one (ADR 0121 row 39) | `tests/domain/test_own_queue_flows_gate.py::test_a_document_cannot_activate_an_own_queue_flow_on_a_service_without_one` |
 | R | Unchanged: every table is configuration or state, so requests never travel in a package | `tests/adapters/db/test_configuration_package.py::test_every_table_of_the_model_is_configuration_or_state` |
 
 ### Public API `/api/v1` (widget)
