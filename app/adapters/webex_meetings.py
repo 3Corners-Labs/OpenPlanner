@@ -35,6 +35,20 @@ MEETING_OPTIONS: dict[str, Any] = {
 }
 """Defaults for every meeting (ADR 0017: cohost for staff, lobby for guests, chat on)."""
 
+NO_CHAT_OPTIONS: dict[str, Any] = {
+    "meetingOptions": {"enabledChat": False},
+    "attendeePrivileges": {"enabledChatHost": False, "enabledChatOtherParticipants": False},
+}
+"""What a meeting for the call page changes (ADR 0123 point 8, step 6b): the platform's own chat
+is off for everyone, because the participant's page cannot reach it (the chat beside the call
+page is our own, step 7) and staff must not write into a panel nobody answers. Everything else of
+``MEETING_OPTIONS`` stays: lobby, cohost, video, file transfer."""
+
+CAPTIONS_OPTION = "enabledClosedCaptions"
+"""The key of ``meetingOptions`` that asks the site for closed captions and that its answer
+carries back (the group check's captions probe, ADR 0123 point 17). Taken from the Meetings API's
+meeting object; its answer on the lab site is checked in the first real meeting (step 8)."""
+
 TRIAL_OPTIONS: dict[str, Any] = {
     "enabledJoinBeforeHost": True,
     "enableConnectAudioBeforeHost": True,
@@ -54,10 +68,14 @@ class ProbeMeeting:
         ref: The meeting's id and link, as a booking's meeting has them.
         stored: Webex's value for every key of ``TRIAL_OPTIONS`` its answer carried. A key the
             answer leaves out is absent here: no answer is not a refusal.
+        captions: What the answer says about closed captions (``enabledClosedCaptions`` of its
+            ``meetingOptions``): ``True`` or ``False``, ``None`` when the answer leaves it out
+            (the site does not say, which is not the same as no).
     """
 
     ref: MeetingRef
     stored: dict[str, Any]
+    captions: bool | None = None
 
     @property
     def ignored(self) -> dict[str, Any]:
@@ -119,7 +137,13 @@ class WebexMeetings:
         if not isinstance(data.get("id"), str) or not isinstance(data.get("webLink"), str):
             raise IntegrationError("unexpected_response", retryable=False)
         stored = {key: data[key] for key in TRIAL_OPTIONS if key in data}
-        return ProbeMeeting(MeetingRef(data["id"], data["webLink"]), stored)
+        options = data.get("meetingOptions")
+        captions = options.get(CAPTIONS_OPTION) if isinstance(options, dict) else None
+        return ProbeMeeting(
+            MeetingRef(data["id"], data["webLink"]),
+            stored,
+            captions if isinstance(captions, bool) else None,
+        )
 
     async def delete_meeting(self, meeting_id: str, host_email: str) -> None:
         """Delete the meeting; one that no longer exists counts as deleted."""
@@ -222,7 +246,11 @@ def meeting_body(request: MeetingRequest, now: datetime) -> dict[str, Any]:
     zone = ZoneInfo(request.timezone)
     start = max(request.start, now).replace(microsecond=0)
     end = request.end.replace(microsecond=0)
-    options = {**MEETING_OPTIONS, **TRIAL_OPTIONS} if request.join_before_host else MEETING_OPTIONS
+    options = _merge(MEETING_OPTIONS, TRIAL_OPTIONS if request.join_before_host else {})
+    if not request.chat_enabled:
+        options = _merge(options, NO_CHAT_OPTIONS)
+    if request.closed_captions:
+        options = _merge(options, {"meetingOptions": {CAPTIONS_OPTION: True}})
     return {
         "title": request.title,
         "start": start.astimezone(zone).isoformat(),
@@ -231,3 +259,15 @@ def meeting_body(request: MeetingRequest, now: datetime) -> dict[str, Any]:
         "hostEmail": request.host_email,
         **options,
     }
+
+
+def _merge(base: dict[str, Any], over: dict[str, Any]) -> dict[str, Any]:
+    """Return ``base`` with ``over`` laid over it; a nested object (``meetingOptions``) merges."""
+    merged = dict(base)
+    for key, value in over.items():
+        inner = merged.get(key)
+        if isinstance(inner, dict) and isinstance(value, dict):
+            merged[key] = {**inner, **value}
+        else:
+            merged[key] = value
+    return merged

@@ -18,6 +18,7 @@ from datetime import datetime
 
 from app.domain.authorization import Scope
 from app.domain.booking import Booking
+from app.domain.call_client import uses_call_page
 from app.domain.calls import (
     ContactCenterTask,
     EventKind,
@@ -52,8 +53,9 @@ OpeningText = Callable[[str | None, ContactCenterTask], str]
 (``None`` when it cannot be read: the edge applies the installation's default) and the task
 (ADR 0123 step 7a); the catalogue and the translator are the edge's, so the domain is handed
 the function."""
-ConversationEnabled = Callable[[], bool]
-"""Whether the platform switch ``embedded_call_enabled`` is on now; read at the edge, class C."""
+CallPageEnabled = Callable[[], bool]
+"""Whether the platform switch ``embedded_call_enabled`` is on now; read at the edge, class C. It
+is the kill switch of ``uses_call_page`` (ADR 0123 step 6b), no longer the rule itself."""
 OPENING_MESSAGE = "opening_message"
 """What a refusal names when a conversation task cannot be given its first message."""
 
@@ -69,8 +71,10 @@ class CallService:
         start_label: Formats the start time for agents.
         opening: Composes the first message of a conversation task (ADR 0123 step 7a); without
             it a conversation task cannot be built and is refused as not ready.
-        conversation_enabled: Whether the platform switch is on; a routing's conversation is in
-            force only while it is (``task_kind_in_force``). Without it, never.
+        call_page_enabled: Whether the platform switch is on. A booking's meeting is created
+            without the platform's own chat, and a routing's conversation is in force, only for
+            a service that uses the call page (``uses_call_page``: its client is ``embedded``
+            and this switch is on, ADR 0123 step 6b). Without it, never.
         guest_keys: The keys a guest's subject may have been derived under, the current one
             first (ADR 0123 point 7); only the worker's rename of a guest needs them.
     """
@@ -85,7 +89,7 @@ class CallService:
         fallback: FallbackService | None = None,
         organisations: OrganisationDispatchers | None = None,
         opening: OpeningText | None = None,
-        conversation_enabled: ConversationEnabled | None = None,
+        call_page_enabled: CallPageEnabled | None = None,
         guest_keys: GuestKeys | None = None,
     ) -> None:
         """Store the collaborators; ``fallback`` diverts dispatches to the own queue (ADR 0082).
@@ -100,7 +104,7 @@ class CallService:
         self._start_label = start_label
         self._fallback = fallback
         self._opening = opening
-        self._conversation_enabled = conversation_enabled or (lambda: False)
+        self._call_page_enabled = call_page_enabled or (lambda: False)
         self._guest_keys = guest_keys
 
     @property
@@ -113,11 +117,20 @@ class CallService:
         """Whether tasks can be created (needs video for the meeting link)."""
         return self._video is not None and self._dispatchers.configured
 
+    def uses_call_page(self, group: Group) -> bool:
+        """Return whether a booking of ``group`` has the call page of our own (ADR 0123 step 6b).
+
+        The one question of ``app.domain.call_client.uses_call_page`` with the platform switch
+        read now: it decides the meeting's options and whether a conversation task may be made.
+        """
+        return uses_call_page(group, platform_enabled=self._call_page_enabled())
+
     async def ensure_meeting(self, booking: Booking, group: Group) -> Booking:
         """Create the booking's meeting if the group has video and it has none yet."""
         if self._video is None or not group.video_enabled or booking.meeting is not None:
             return booking
-        meeting = await self._video.create_meeting(meeting_request(booking, group))
+        request = meeting_request(booking, group, call_page=self.uses_call_page(group))
+        meeting = await self._video.create_meeting(request)
         booking_id = _id(booking)
         async with self._uow.locked() as tx:
             await tx.save_meeting(booking_id, meeting)
@@ -171,7 +184,7 @@ class CallService:
             start_label=self._start_label(booking, group),
             skills=skills,
             interaction=interaction,
-            conversation_enabled=self._conversation_enabled(),
+            conversation_enabled=self.uses_call_page(group),
         )
         if task.task_kind is not TaskKind.CONVERSATION:
             return task

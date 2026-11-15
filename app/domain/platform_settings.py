@@ -22,6 +22,7 @@ from zoneinfo import available_timezones
 
 from app.domain.authorization import Scope
 from app.domain.ports import UnitOfWork
+from app.domain.privacy_statement import valid_privacy_url
 from app.domain.settings_registry import Kind, SettingSpec, within_bounds
 from app.domain.source_networks import valid_source_networks
 from app.domain.update_policy import valid_line, valid_window
@@ -119,6 +120,7 @@ def _known_zone(value: str) -> bool:
 
 CHECKED_KEYS: Mapping[str, Callable[[str], bool]] = {
     "admin_timezone": _known_zone,
+    "privacy_statement_url": valid_privacy_url,
     "bundled_idp_login_suffix": valid_suffix,
     "update_line": valid_line,
     "update_window": valid_window,
@@ -126,8 +128,9 @@ CHECKED_KEYS: Mapping[str, Callable[[str], bool]] = {
     "webhook_source_networks_contact_center": valid_source_networks,
 }
 """String settings with a format of their own, and the check of it: an IANA time zone this
-installation knows, a lower-case domain name (ADR 0106 point 5), a line ``X.Y`` and an update
-window (ADR 0116 point 9), and a list of at most 32 networks (ADR 0124 point 3)."""
+installation knows, an organisation's privacy statement address (ADR 0123 step 6b), a lower-case
+domain name (ADR 0106 point 5), a line ``X.Y`` and an update window (ADR 0116 point 9), and a list
+of at most 32 networks (ADR 0124 point 3)."""
 
 PRODUCTION_REFUSED: Mapping[str, frozenset[object]] = {
     "update_channel": frozenset({"rc"}),

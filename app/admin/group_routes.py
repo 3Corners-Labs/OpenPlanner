@@ -94,6 +94,7 @@ from app.admin.staffing_views import (
 from app.admin.task_kind_input import routing_with_task_kind, with_task_kind_field
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
+from app.domain.call_client import uses_call_page
 from app.domain.call_page import OtherWayOffer
 from app.domain.contact_center import ContactCenterRouting
 from app.domain.errors import DomainError, ErrorCode
@@ -695,7 +696,10 @@ async def _settings_response(
         integrations,
         form,
         current.contact_center,
-        embedded_call_enabled=request.app.state.settings.embedded_call_enabled,
+        uses_call_page=uses_call_page(
+            context.group.group,
+            platform_enabled=request.app.state.settings.embedded_call_enabled,
+        ),
         _=locale.gettext,
     )
     return group_page(
@@ -789,12 +793,17 @@ async def save_settings(
     auto_send = form.choice("reschedule_auto_send", {"yes", "no"})
     fallback = form.choice("dispatch_fallback", {f.value for f in DispatchFallback})
     chosen = (phone, dispatch, embedding, free_pick, trial, client, fallback, auto_send)
+    # The conversation is for a service that uses the call page (ADR 0123 step 6b): the client the
+    # form chooses now counts, so one post may choose both; a refused client counts as the stored.
+    after_post = replace(context.group.group, join_client=client or context.group.group.join_client)
     try:
         center = routing_with_task_kind(
             _form_routing(form),
             form,
             context.group.group.contact_center,
-            embedded_call_enabled=request.app.state.settings.embedded_call_enabled,
+            uses_call_page=uses_call_page(
+                after_post, platform_enabled=request.app.state.settings.embedded_call_enabled
+            ),
         )
     except DomainError as error:
         form.refusal(error)

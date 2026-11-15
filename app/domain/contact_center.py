@@ -166,12 +166,13 @@ class ContactCenterCapabilities:
 
 
 def task_kind_in_force(kind: TaskKind, conversation_enabled: bool) -> TaskKind:
-    """Return the kind of task a routing makes now (ADR 0123 step 7a).
+    """Return the kind of task a routing makes now (ADR 0123 point 8, steps 7a and 6b).
 
-    A routing that holds ``conversation`` makes one only while the platform switch
-    ``embedded_call_enabled`` is on (``conversation_enabled``), because only then can anything
-    show a chat to the participant; while it is off the routing makes a form, as before the
-    step. Pure: the caller passes the switch in from the edge.
+    A routing that holds ``conversation`` makes one only for a booking whose service uses the
+    call page (``conversation_enabled``, the answer of ``app.domain.call_client.uses_call_page``,
+    which is also false while the platform switch ``embedded_call_enabled`` is off), because only
+    that page can show the chat to the participant; otherwise the routing makes a form, as before
+    step 7a. Pure: the caller passes the answer in.
     """
     if kind is TaskKind.CONVERSATION and not conversation_enabled:
         return TaskKind.FORM

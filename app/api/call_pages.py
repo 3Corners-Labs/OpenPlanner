@@ -72,12 +72,13 @@ from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Request
 from starlette.exceptions import HTTPException
-from starlette.responses import HTMLResponse, JSONResponse, Response
+from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from app.adapters.vendored_files import VendoredFile
 from app.api.labels import slot_label
 from app.api.link_session import authorise
 from app.api.participant import participant_call_page
+from app.config import Settings
 from app.domain.call_client import other_way_offer, uses_call_page
 from app.domain.call_page import shows_other_way
 from app.domain.call_token_service import (
@@ -87,11 +88,16 @@ from app.domain.call_token_service import (
     TokenRefusal,
 )
 from app.domain.guest_access import GUEST_TERM_KEY, DisplayNameMode, StaffNameMode
+from app.domain.privacy_statement import privacy_link
+from app.domain.scheduling import Group
 from app.domain.services import BookingDetails, BookingService
 from app.domain.staff_screen_names import StaffScreenNames
+from app.domain.trial_call import TrialState
+from app.domain.trial_call_service import TrialCallService, TrialView
+from app.i18n.dates import format_clock
 from app.web.contact_labels import contact_service, contact_view
 from app.web.error_pages import refuse_rate_limited
-from app.web.locale import resolve_locale
+from app.web.locale import RequestLocale, resolve_locale
 from app.web.organisation_settings import follow
 from app.web.protection import (
     call_staff_address_limit,
@@ -134,6 +140,65 @@ def _require_service(request: Request, details: BookingDetails) -> None:
         raise HTTPException(status_code=404)
 
 
+async def _page_context(
+    request: Request,
+    locale: RequestLocale,
+    current: Settings,
+    group: Group,
+    public_ref: str,
+    *,
+    slot: str,
+    token_url: str,
+    staff_url: str,
+    other_way_href: str,
+    back_href: str,
+    trial_until: str | None = None,
+) -> dict[str, object]:
+    """Return what ``call.html`` needs for the appointment's page or the trial call's page.
+
+    The two pages are the same page (ADR 0123 point 9); only the addresses differ: the token and
+    the staff address (none for a trial call: nobody is waiting in it), where "join another way"
+    and "back" lead, and ``trial_until`` (when the trial call closes), which turns the start
+    state's line about the time into the trial's. Everything the browser may see is decided here.
+    """
+    offer = other_way_offer(group, current.embedded_call_webex_option)
+    sdk: VendoredFile = request.app.state.call_sdk
+    sdk_file = sdk.offer()
+    sdk_src = ""
+    if sdk_file is not None:
+        try:
+            sdk_src = ASSETS.url(sdk_file.path)
+        except FileNotFoundError:
+            sdk_file = None  # gone between the check and the address: no offer, not an error
+    return {
+        "group": group,
+        "ref": public_ref,
+        "slot_label": slot,
+        "trial_until": trial_until,
+        # The address a participant sees in their address bar is the installation's public one
+        # (ADR 0086 point 4: never an address read from the request).
+        "host": urlsplit(current.public_base_url).hostname or "",
+        "contacts": contact_view(await contact_service(request).public_for_group(group), locale),
+        # The server decides what the browser may see: no link at all unless the setting allows.
+        "other_way_href": other_way_href,
+        "back_href": back_href,
+        "other_way_before": shows_other_way(offer, failed=False),
+        "other_way_failed": shows_other_way(offer, failed=True),
+        # The organisation's privacy statement, linked from the line about the external service
+        # (point 5): only an https address (``privacy_link`` checks it again where it is shown).
+        "privacy_url": privacy_link(current.privacy_statement_url) or "",
+        # The server decides whether the page may load the SDK at all: a file that is not
+        # placed, or whose bytes are not the manifest's, is never named in the markup.
+        "sdk_src": sdk_src,
+        "sdk_integrity": sdk_file.integrity if sdk_file else "",
+        "token_url": token_url,
+        "staff_url": staff_url,
+        "poll_seconds": current.embedded_call_chat_poll_seconds,
+        "connect_seconds": current.embedded_call_connect_seconds,
+        "connect_attempts": current.embedded_call_connect_attempts,
+    }
+
+
 @router.get("/b/m/{public_ref}/call", response_class=HTMLResponse)
 @limiter.limit(read_limit)
 async def call_page(request: Request, public_ref: str) -> HTMLResponse:
@@ -150,37 +215,18 @@ async def call_page(request: Request, public_ref: str) -> HTMLResponse:
     _require_service(request, details)
     current = follow(request, details.group.organisation_id)
     booking, group = details.booking, details.group
-    offer = other_way_offer(group, current.embedded_call_webex_option)
-    sdk: VendoredFile = request.app.state.call_sdk
-    sdk_file = sdk.offer()
-    sdk_src = ""
-    if sdk_file is not None:
-        try:
-            sdk_src = ASSETS.url(sdk_file.path)
-        except FileNotFoundError:
-            sdk_file = None  # gone between the check and the address: no offer, not an error
-    context = {
-        "group": group,
-        "ref": public_ref,
-        "slot_label": slot_label(booking.start, booking.end, group, locale),
-        # The address a participant sees in their address bar is the installation's public one
-        # (ADR 0086 point 4: never an address read from the request).
-        "host": urlsplit(current.public_base_url).hostname or "",
-        "contacts": contact_view(await contact_service(request).public_for_group(group), locale),
-        # The server decides what the browser may see: no link at all unless the setting allows.
-        "other_way_href": f"/b/m/{public_ref}/join/go",
-        "other_way_before": shows_other_way(offer, failed=False),
-        "other_way_failed": shows_other_way(offer, failed=True),
-        # The server decides whether the page may load the SDK at all: a file that is not
-        # placed, or whose bytes are not the manifest's, is never named in the markup.
-        "sdk_src": sdk_src,
-        "sdk_integrity": sdk_file.integrity if sdk_file else "",
-        "token_url": f"/b/m/{public_ref}/call/token",
-        "staff_url": f"/b/m/{public_ref}/call/staff",
-        "poll_seconds": current.embedded_call_chat_poll_seconds,
-        "connect_seconds": current.embedded_call_connect_seconds,
-        "connect_attempts": current.embedded_call_connect_attempts,
-    }
+    context = await _page_context(
+        request,
+        locale,
+        current,
+        group,
+        public_ref,
+        slot=slot_label(booking.start, booking.end, group, locale),
+        token_url=f"/b/m/{public_ref}/call/token",
+        staff_url=f"/b/m/{public_ref}/call/staff",
+        other_way_href=f"/b/m/{public_ref}/join/go",
+        back_href=f"/b/m/{public_ref}/join",
+    )
     return await participant_call_page(request, locale, "call.html", group, context)
 
 
@@ -203,18 +249,25 @@ async def call_token(request: Request, public_ref: str, _: SameOrigin) -> Respon
     details = await bookings.find(ref)  # the one read: the service takes the booking from here
     _require_service(request, details)
     current = follow(request, details.group.organisation_id)
-    term = (
-        resolve_locale(request)
-        .for_scope(details.group.organisation_id, details.group.id)
-        .gettext(GUEST_TERM_KEY)
-    )
     service: CallTokenService = request.app.state.call_token_service
     outcome = await service.issue(
         details.booking,
         DisplayNameMode(current.embedded_call_display_name),
-        term,
+        _guest_term(request, details.group),
         lambda: within_call_token_limit(public_ref),
     )
+    return await _token_response(request, outcome)
+
+
+def _guest_term(request: Request, group: Group) -> str:
+    """Return the organisation's word for a participant, in the reader's language."""
+    return (
+        resolve_locale(request).for_scope(group.organisation_id, group.id).gettext(GUEST_TERM_KEY)
+    )
+
+
+async def _token_response(request: Request, outcome: CallToken | TokenRefusal) -> Response:
+    """Answer a token request: the token, or the refusal with its status (the one table)."""
     if outcome is TokenRefusal.RATE_LIMITED:
         return await refuse_rate_limited(request)
     if isinstance(outcome, TokenRefusal):
@@ -250,6 +303,87 @@ async def call_staff(request: Request, public_ref: str) -> Response:
         claim.claimed_by if claim else None, StaffNameMode(current.embedded_call_staff_name)
     )
     return JSONResponse(label.as_json(), headers=NO_STORE)
+
+
+async def _open_trial(request: Request, public_ref: str, *, enter: bool) -> TrialView | None:
+    """Return the view of the participant's open trial call for a service that uses the page.
+
+    The same order of refusals as the appointment's routes: the switch, then the participant's
+    session, then the service's choice. ``enter`` records that the page was opened (the page, not
+    the token endpoint). ``None`` when no trial call is open: the caller sends the participant
+    back to the trial page, which says why.
+
+    Raises:
+        HTTPException: ``404`` while the switch is off or for a service that did not choose the
+            page.
+    """
+    _require_switch(request)
+    ref = await authorise(request, public_ref)
+    trials: TrialCallService = request.app.state.trial_call_service
+    view = await trials.view(ref)
+    if not view.call_page:
+        raise HTTPException(status_code=404)
+    return await trials.enter_page(ref) if enter else view
+
+
+@router.get("/b/m/{public_ref}/test/call", response_class=HTMLResponse)
+@limiter.limit(read_limit)
+async def trial_call_page(request: Request, public_ref: str) -> Response:
+    """Show the call page on the participant's open trial call (ADR 0123 point 9).
+
+    Raises:
+        HTTPException: ``404`` while ``embedded_call_enabled`` is off and for a booking of a
+            service that did not choose the page; ``303`` back to the trial page when no trial
+            call is open.
+    """
+    view = await _open_trial(request, public_ref, enter=True)
+    if view is None or view.state is not TrialState.ACTIVE:
+        return RedirectResponse(f"/b/m/{public_ref}/test", status_code=303)
+    locale = resolve_locale(request)
+    current = follow(request, view.group.organisation_id)
+    group = view.group
+    until = format_clock(view.expires_at, group.tz, locale.code) if view.expires_at else ""
+    context = await _page_context(
+        request,
+        locale,
+        current,
+        group,
+        public_ref,
+        slot=until,
+        token_url=f"/b/m/{public_ref}/test/call/token",
+        staff_url="",  # nobody waits in a trial call, so there is nobody to name
+        other_way_href=f"/b/m/{public_ref}/test/go",
+        back_href=f"/b/m/{public_ref}/test",
+        trial_until=until,
+    )
+    return await participant_call_page(request, locale, "call.html", group, context)
+
+
+@router.post("/b/m/{public_ref}/test/call/token")
+@limiter.limit(read_limit)
+async def trial_call_token(request: Request, public_ref: str, _: SameOrigin) -> Response:
+    """Hand the call page a guest token for the open trial call (ADR 0123 point 9).
+
+    As ``call_token``: the participant's session, the form protection, the same budget per
+    booking and the same guest; only the meeting is the trial call's, and only while it is open.
+
+    Raises:
+        HTTPException: ``404`` while ``embedded_call_enabled`` is off and for a booking of a
+            service that did not choose the page.
+    """
+    view = await _open_trial(request, public_ref, enter=False)
+    if view is None:  # not reached: a view is always returned without ``enter``
+        raise HTTPException(status_code=404)
+    current = follow(request, view.group.organisation_id)
+    service: CallTokenService = request.app.state.call_token_service
+    outcome = await service.issue_trial(
+        view.booking,
+        view.group,
+        DisplayNameMode(current.embedded_call_display_name),
+        _guest_term(request, view.group),
+        lambda: within_call_token_limit(public_ref),
+    )
+    return await _token_response(request, outcome)
 
 
 def _answer(token: CallToken) -> JSONResponse:

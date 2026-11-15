@@ -56,10 +56,13 @@ def trial_state(booking: Booking, group: Group, now: datetime) -> TrialState:
     return TrialState.AVAILABLE
 
 
-def trial_request(group: Group, now: datetime) -> MeetingRequest:
+def trial_request(group: Group, now: datetime, *, call_page: bool = False) -> MeetingRequest:
     """Return the meeting to schedule for a trial call opened at ``now``.
 
-    Starts at the minute ``now`` falls in, so Webex does not see a start in the past.
+    Starts at the minute ``now`` falls in, so Webex does not see a start in the past. With
+    ``call_page`` (the service uses the call page of our own, ADR 0123 point 9 and step 6b) the
+    meeting has no chat of the platform's, like the appointment's own meeting: the participant
+    tries the path of the real appointment.
 
     Raises:
         DomainError: ``integration_not_ready`` (``video_host_email``) without a host.
@@ -74,4 +77,5 @@ def trial_request(group: Group, now: datetime) -> MeetingRequest:
         timezone=group.timezone,
         host_email=group.video_host_email,
         join_before_host=True,
+        chat_enabled=not call_page,
     )

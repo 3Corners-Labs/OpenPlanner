@@ -3,7 +3,9 @@
 The first message is composed at the edge in the organisation's language and handed in as a
 function; the kind the task was created with is stored on the booking, whatever the routing says
 later. A conversation is never built without its text and never for a platform that does not
-carry it.
+carry it. And never for a booking whose service does not use the call page (ADR 0123 step 6b):
+only that page can show the chat, so the platform switch is the kill switch and the service's own
+client is the rule.
 """
 
 from dataclasses import replace
@@ -18,7 +20,7 @@ from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef, T
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.integration import IntegrationService
 from app.domain.ports import IntegrationError
-from app.domain.scheduling import Organisation, ScheduleRule
+from app.domain.scheduling import JoinClient, Organisation, ScheduleRule
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo, webex_cc
@@ -30,6 +32,7 @@ CONVERSATION_GROUP = make_group(
     organisation_id=1,
     slug="balie",
     name="Balie",
+    join_client=JoinClient.EMBEDDED,
     video_host_email="host@example.nl",
     contact_center=webex_routing(
         "openplanner@example.biz", "openplanner-chat", task_kind=TaskKind.CONVERSATION
@@ -43,11 +46,16 @@ def _opening(locale: str | None, task: ContactCenterTask) -> str:
 
 
 async def _service(  # type: ignore[no-untyped-def]
-    dispatcher: FakeDispatcher, *, opening=_opening, locale: str = "en", enabled: bool = True
+    dispatcher: FakeDispatcher,
+    *,
+    opening=_opening,
+    locale: str = "en",
+    enabled: bool = True,
+    group=CONVERSATION_GROUP,
 ):
     state = State()
     state.organisations[1] = Organisation(1, "Demo", "demo", default_locale=locale)
-    state.groups[1] = CONVERSATION_GROUP
+    state.groups[1] = group
     state.rules[1] = [ScheduleRule(weekday=0, window=window(capacity=1))]
     uow = InMemoryUnitOfWork(state)
     clock = FixedClock(NOW)
@@ -61,7 +69,7 @@ async def _service(  # type: ignore[no-untyped-def]
         webex_cc(dispatcher),
         lambda b, g: "label",
         opening=opening,
-        conversation_enabled=lambda: enabled,
+        call_page_enabled=lambda: enabled,
     )
     return uow, calls, booking
 
@@ -221,3 +229,65 @@ async def test_a_bad_opening_text_is_a_refusal_of_the_dispatch_not_an_error() ->
     assert refused.value.code is ErrorCode.INTEGRATION_NOT_READY
     assert refused.value.field == "opening_message"
     assert dispatcher.items == []
+
+
+@pytest.mark.parametrize("client", [JoinClient.BROWSER, JoinClient.CHOICE])
+async def test_a_service_that_does_not_use_the_call_page_never_gets_a_conversation(
+    client: JoinClient,
+) -> None:
+    """The rule of ADR 0123 step 6b: the routing holds a conversation, the platform switch is on,
+    and the booking still gets the work item, because its service's client is not ``embedded``."""
+    group = replace(CONVERSATION_GROUP, join_client=client)
+    dispatcher = FakeDispatcher()
+    _, calls, booking = await _service(dispatcher, group=group)
+
+    done = await calls.ensure_task(booking, group)
+
+    assert dispatcher.kinds == [TaskKind.FORM]
+    [task] = dispatcher.items
+    assert task.first_message == ""
+    assert done.contact_center_task == ContactCenterTaskRef("task-1", WEBEX_CC, TaskKind.FORM)
+
+
+async def test_a_held_embedded_client_makes_no_conversation_while_the_switch_is_off() -> None:
+    dispatcher = FakeDispatcher()
+    _, calls, booking = await _service(dispatcher, enabled=False)
+
+    await calls.ensure_task(booking, CONVERSATION_GROUP)
+
+    assert dispatcher.kinds == [TaskKind.FORM]
+
+
+@pytest.mark.parametrize(
+    ("client", "enabled", "chat"),
+    [
+        (JoinClient.EMBEDDED, True, False),
+        (JoinClient.EMBEDDED, False, True),  # a held choice while the switch is off: as before
+        (JoinClient.BROWSER, True, True),
+        (JoinClient.CHOICE, True, True),
+    ],
+)
+async def test_the_meeting_is_created_without_the_platforms_chat_only_for_the_call_page(
+    client: JoinClient, enabled: bool, chat: bool
+) -> None:
+    """ADR 0123 step 6b, behind the video port: the request says whether the chat is on."""
+    group = replace(CONVERSATION_GROUP, join_client=client)
+    dispatcher = FakeDispatcher()
+    uow, calls, booking = await _service(dispatcher, group=group, enabled=enabled)
+    video = FakeVideo()
+    calls = CallService(
+        uow,
+        calls._integration,  # the service the helper built
+        video,
+        webex_cc(dispatcher),
+        lambda b, g: "label",
+        call_page_enabled=lambda: enabled,
+    )
+
+    await calls.ensure_meeting(replace(booking, meeting=None), group)
+
+    assert [r.chat_enabled for r in video.created] == [chat]
+    assert (video.created[0].title, video.created[0].host_email) == (
+        "Videogesprek Balie",
+        "host@example.nl",
+    )

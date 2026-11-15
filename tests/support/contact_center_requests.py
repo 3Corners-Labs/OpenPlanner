@@ -78,7 +78,8 @@ def desk(
     """Return the request dispatch of ``uow`` wired as the worker wires it.
 
     ``own_connections`` are the organisations with a contact-center connection of their own;
-    ``conversation_enabled`` is the platform switch of ADR 0123 step 7a.
+    ``conversation_enabled`` is the platform switch of ADR 0123 (a conversation also needs the
+    group's client to be ``embedded``, step 6b).
     """
     work = RequestWork(
         PoolBookings(clock, treatment_buffer=5), lease_minutes=5, unresolved_hours=24
@@ -104,7 +105,7 @@ def desk(
         webex_cc(dispatcher),
         lambda b, g: "x",
         opening=lambda locale, task: f"opening {task.reference}",
-        conversation_enabled=lambda: conversation_enabled,
+        call_page_enabled=lambda: conversation_enabled,
     )
     dispatch = RequestDispatch(
         uow,

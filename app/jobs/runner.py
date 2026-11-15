@@ -156,8 +156,10 @@ class JobRunner:
         request_work: The request work of new flows (ADR 0121 step 6b); with it, a dispatch
             job of request work goes to ``RequestDispatch`` and ``requests`` fences attempts.
         reconcile_minutes: ``contact_center_reconcile_minutes`` (class C), read when called.
-        conversation_enabled: ``embedded_call_enabled`` (class C), read when called: a routing's
-            conversation task is made only while it is on (ADR 0123 step 7a).
+        call_page_enabled: ``embedded_call_enabled`` (class C), read when called: the kill
+            switch of ``uses_call_page``; a meeting is created without the platform's chat and a
+            routing's conversation task is made only for a service that uses the call page
+            (ADR 0123 steps 6b and 7a).
         guest_keys: The keys of the guest subjects now in force, the current one first (ADR 0123
             point 7); with them a ``rename_guest`` job can run.
         after_purge: Called once after a round that ran ``purge_pii`` jobs (the worker passes
@@ -184,7 +186,7 @@ class JobRunner:
         organisations: OrganisationDispatchers | None = None,
         request_work: RequestWork | None = None,
         reconcile_minutes: Callable[[], int] | None = None,
-        conversation_enabled: Callable[[], bool] | None = None,
+        call_page_enabled: Callable[[], bool] | None = None,
         guest_keys: GuestKeys | None = None,
     ) -> None:
         """Store the collaborators and decide which job types this worker can handle."""
@@ -214,7 +216,7 @@ class JobRunner:
                 fallback,
                 organisations,
                 partial(conversation_opening, composer.translator),
-                conversation_enabled,
+                call_page_enabled,
                 guest_keys,
             )
             if integration is not None

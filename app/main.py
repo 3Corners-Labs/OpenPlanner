@@ -372,7 +372,11 @@ def create_app(
                 lambda: app.state.settings.embedded_call_enabled,
             )
             app.state.trial_call_service = TrialCallService(
-                uow, wired.video, app.state.integration_service, clock
+                uow,
+                wired.video,
+                app.state.integration_service,
+                clock,
+                lambda: app.state.settings.embedded_call_enabled,
             )
             # ADR 0123 point 6: the call page's guest token; rebuilt with the video provider.
             app.state.call_token_service = CallTokenService(

@@ -2405,6 +2405,16 @@ but only when the schema is downgraded with `alembic downgrade 0119`; starting t
 on the current schema does not. The service's own option is lost by that downgrade; the
 organisation's value is never touched.
 
+**Call page, step 6b (ADR 0123).** A service that uses the call page has its meetings made
+without the video platform's chat, also its trial call; a meeting made before this step keeps its
+chat. The group check ("Koppeling controleren") shows a captions finding for such a service:
+*off* or *unknown* means the site does not keep closed captions for the meeting (switch them on in
+the site's settings at the video platform); it never blocks the call. The conversation task is
+made only for a service that uses the page: a service that holds *Conversation* but not the page
+makes work items again (the form says so); to stop conversations everywhere switch
+`embedded_call_enabled` off. The organisation's privacy statement address is set on the
+organisation's Settings tab (`privacy_statement_url`); empty means no link.
+
 **Services, flows and requests (ADR 0121, ADR 0122; proof in `docs/service-flows-compatibility.md`).**
 Migrations 0109 to 0115 (minor 0.6) only add: tables, nullable or defaulted columns on
 `bookings` and `slots`, and a backfill of one legacy pool and the default flows per service.

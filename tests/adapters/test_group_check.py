@@ -99,6 +99,9 @@ class Platforms:
         self.trial_stored: dict[str, Any] = {}
         """Options Webex's answer to the trial probe carries (an empty answer says nothing)."""
         self.guest_status = 200
+        self.captions_status = 200
+        self.captions_stored: bool | None = True
+        """What the answer to the captions probe says about closed captions (``None``: nothing)."""
         self.web_link = "https://w.example/j"
         self.browser_status = 302
         self.browser_keeps_parameter = True
@@ -119,7 +122,19 @@ class Platforms:
                 return httpx.Response(self.guest_status, json={"message": "Refused."})
             return httpx.Response(200, json={"accessToken": "guest-token", "expiresIn": 3600})
         if url == f"{WEBEX}/meetings" and request.method == "POST":
-            trial = json.loads(request.content).get("enabledJoinBeforeHost") is True
+            sent = json.loads(request.content)
+            if sent.get("meetingOptions", {}).get("enabledClosedCaptions") is True:
+                if self.captions_status != 200:
+                    return httpx.Response(self.captions_status, json={"message": "Refused."})
+                options = (
+                    {}
+                    if self.captions_stored is None
+                    else {"enabledClosedCaptions": self.captions_stored}
+                )
+                return httpx.Response(
+                    200, json={"id": "probe-1", "webLink": self.web_link, "meetingOptions": options}
+                )
+            trial = sent.get("enabledJoinBeforeHost") is True
             status = self.trial_status if trial else self.host_status
             if status != 200:
                 refusal = {"message": "Refused.", "errors": [{"description": self.reason}]}
@@ -804,3 +819,103 @@ async def test_any_other_group_creates_no_guest_and_sees_no_finding(
 
     assert _guest_requests(platforms) == []
     assert not [f for f in findings if f.code.startswith("webex.guest")]
+
+
+# --- chat off for a group that uses the call page, and the captions report (ADR 0123 6b) -----
+
+
+def _meeting_bodies(platforms: Platforms) -> list[dict[str, Any]]:
+    return [
+        json.loads(r.content)
+        for r in platforms.requests
+        if r.method == "POST" and r.url.path == "/v1/meetings"
+    ]
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_the_probe_meetings_of_a_group_that_uses_the_call_page_have_no_chat() -> None:
+    """Exactly what a booking of that service sends (step 6b): chat off in the booking probe and
+    the trial probe; a service that did not choose the page keeps the chat as before."""
+    on, off = Platforms(), Platforms()
+
+    await _checker(on, ON).check_group(EMBEDDED, [EMBEDDED])
+    await _checker(off, ON).check_group(GROUP, [GROUP])
+
+    bodies = _meeting_bodies(on)
+    assert len(bodies) == 3  # the booking's probe, the trial's, the captions'
+    assert [b["meetingOptions"]["enabledChat"] for b in bodies] == [False, False, False]
+    assert all(b["attendeePrivileges"]["enabledChatHost"] is False for b in bodies)
+    assert [b["meetingOptions"]["enabledChat"] for b in _meeting_bodies(off)] == [True, True]
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_site_that_keeps_closed_captions_is_ok() -> None:
+    platforms = Platforms()
+
+    findings = await _checker(platforms, ON).check_group(EMBEDDED, [EMBEDDED])
+
+    assert _codes(findings)["webex.captions_ok"] is CheckStatus.OK
+    asked = [
+        b for b in _meeting_bodies(platforms) if "enabledClosedCaptions" in b["meetingOptions"]
+    ]
+    assert len(asked) == 1
+    deleted = [r for r in platforms.requests if r.method == "DELETE"]
+    assert len(deleted) == 3  # every probe meeting is deleted again, the captions' too
+
+
+@pytest.mark.parametrize(
+    ("stored", "code"),
+    [(False, "webex.captions_off"), (None, "webex.captions_unknown")],
+)
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_site_without_closed_captions_is_a_warning(stored: bool | None, code: str) -> None:
+    platforms = Platforms()
+    platforms.captions_stored = stored
+
+    findings = await _checker(platforms, ON).check_group(EMBEDDED, [EMBEDDED])
+
+    assert _codes(findings)[code] is CheckStatus.WARN
+    assert "webex.captions_ok" not in _codes(findings)
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_refused_captions_probe_is_a_warning_and_never_a_failure() -> None:
+    platforms = Platforms()
+    platforms.captions_status = 400
+
+    findings = await _checker(platforms, ON).check_group(EMBEDDED, [EMBEDDED])
+
+    refused = next(f for f in findings if f.code == "webex.captions_refused")
+    assert refused.status is CheckStatus.WARN
+    assert ("error", "rejected_400") in refused.params
+    assert _codes(findings)["webex.guest_ok"] is CheckStatus.OK  # the rest of the check goes on
+
+
+@pytest.mark.parametrize(
+    ("group", "config"),
+    [(EMBEDDED, CONFIG), (GROUP, ON), (replace(GROUP, join_client=JoinClient.CHOICE), ON)],
+)
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_any_other_group_sends_no_captions_probe_and_sees_no_finding(
+    group: Any, config: CheckerConfig
+) -> None:
+    platforms = Platforms()
+
+    findings = await _checker(platforms, config).check_group(group, [group])
+
+    assert not [f for f in findings if f.code.startswith("webex.captions")]
+    assert not [
+        b for b in _meeting_bodies(platforms) if "enabledClosedCaptions" in b["meetingOptions"]
+    ]
+
+
+@pytest.mark.usefixtures("wxcc_ok")
+async def test_a_captions_probe_that_cannot_be_deleted_is_a_warning_naming_it() -> None:
+    platforms = Platforms()
+    platforms.delete_status = 500
+
+    findings = await _checker(platforms, ON).check_group(EMBEDDED, [EMBEDDED])
+
+    left = next(f for f in findings if f.code == "webex.captions_left")
+    assert left.status is CheckStatus.WARN
+    assert ("meeting", "probe-1") in left.params

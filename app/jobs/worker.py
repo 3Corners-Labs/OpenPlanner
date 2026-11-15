@@ -273,7 +273,7 @@ async def run_worker(
                 organisations=wired.organisations,
                 request_work=work,
                 reconcile_minutes=lambda: live.settings.contact_center_reconcile_minutes,
-                conversation_enabled=lambda: live.settings.embedded_call_enabled,
+                call_page_enabled=lambda: live.settings.embedded_call_enabled,
                 # ADR 0123 point 7: the guest renamed at the purge, under both keys in a rotation.
                 guest_keys=lambda: guest_pseudonym_keys(settings),
                 integration=integration,

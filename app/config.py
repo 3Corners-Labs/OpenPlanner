@@ -327,6 +327,10 @@ class Settings(BaseSettings):
     # service may set its own (``groups.embedded_call_webex_option``); this value is the default
     # of every service that has not (empty there means "as the organisation").
     embedded_call_webex_option: Literal["hidden", "on_failure", "always"] = "hidden"
+    # ADR 0123 point 5 and step 6b: the address of the organisation's privacy statement, linked
+    # from the call page. An https address of at most 2,048 characters (``app.domain.
+    # privacy_statement``); empty means no link. Class D organisation.
+    privacy_statement_url: str | None = None
     # ADR 0121 step 5: the watchdog: hours after the appointment's end before unstarted work
     # expires and started work is marked for recovery. Class D organisation.
     request_unresolved_hours: int = Field(default=24, ge=1, le=168)

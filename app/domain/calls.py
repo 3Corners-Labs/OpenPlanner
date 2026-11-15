@@ -384,6 +384,14 @@ class MeetingRequest:
     host_email: str
     join_before_host: bool = False
     """A trial call (ADR 0071): the participant can enter alone, without the lobby."""
+    chat_enabled: bool = True
+    """Whether the platform's own chat is on in the meeting. Off for a service that uses the call
+    page (ADR 0123 point 8 and step 6b): the chat beside that page is our own, so staff must not
+    write into a panel the participant cannot see. Every other meeting keeps the chat as ADR 0017
+    has it."""
+    closed_captions: bool = False
+    """Ask the site to switch closed captions on (ADR 0123 point 17): only the group check's
+    captions probe sets it, to read back whether the site keeps it. No booking asks for it."""
 
 
 PROBE_KIND = "probe"
@@ -496,8 +504,12 @@ CONVERSATION_OPEN = "conversation_open"
 appointment's participant identifier and refused a second one (ADR 0123 point 8)."""
 
 
-def meeting_request(booking: Booking, group: Group) -> MeetingRequest:
+def meeting_request(booking: Booking, group: Group, *, call_page: bool = False) -> MeetingRequest:
     """Return the meeting to schedule for ``booking`` in ``group``.
+
+    ``call_page`` says that the booking's participant joins in the call page of our own
+    (``app.domain.call_client.uses_call_page``, asked by the caller): the meeting is then created
+    without the platform's own chat (ADR 0123 step 6b). Every other meeting is as before.
 
     Raises:
         DomainError: ``integration_not_ready`` (``video_host_email``) without a host.
@@ -510,6 +522,7 @@ def meeting_request(booking: Booking, group: Group) -> MeetingRequest:
         end=booking.end,
         timezone=group.timezone,
         host_email=group.video_host_email,
+        chat_enabled=not call_page,
     )
 
 
@@ -534,9 +547,9 @@ def contact_center_task(
             ``meeting`` or ``contact``) or what the group's platform cannot carry
             (``interaction_kind``, ``skill_codes`` or ``task_kind``, ADR 0121 step 6, ADR 0123
             step 7a). The task is of the routing's kind in force (``task_kind_in_force``: a
-            conversation only while ``conversation_enabled``, the platform switch the caller
-            passes in); a conversation still lacks its ``first_message``, which the caller
-            composes.
+            conversation only while ``conversation_enabled``, which the caller sets from the one
+            question "does this booking's service use the call page", ADR 0123 step 6b); a
+            conversation still lacks its ``first_message``, which the caller composes.
     """
     routing = _complete_routing(group)
     task_kind = task_kind_in_force(routing.task_kind, conversation_enabled)

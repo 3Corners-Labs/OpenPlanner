@@ -435,10 +435,16 @@ aangezet (de platforminstelling *embedded_call_enabled*), en pas nadat de contro
 App op **Koppelingen** een gast bij het videoplatform heeft kunnen aanmaken (de gastrechten van de
 Service App). Dat is nodig voor het hele team: zonder die rechten kan geen deelnemer meedoen. Staat
 de platforminstelling later uit, dan blijft uw keuze staan, maar de deelnemers van dit team worden
-dan voorlopig doorgestuurd naar Webex, direct in de browser. Het proefgesprek opent voorlopig nog in
-Webex. De teksten in de bevestiging, op de pagina voor het gesprek en op de proefgesprekpagina
+dan voorlopig doorgestuurd naar Webex, direct in de browser. De teksten in de bevestiging, op de pagina voor het gesprek en op de proefgesprekpagina
 volgen deze keuze. Webex kan het gedrag van de directe browserlink zelf wijzigen; ziet de deelnemer
 toch de keuze tussen app en browser, zet het dan op **Webex laat de deelnemer kiezen**.
+
+Een dienst die de gesprekspagina gebruikt krijgt vergaderingen zonder de eigen chat van het
+videoplatform (ook het proefgesprek), omdat de chat naast de pagina van onszelf is. Het
+proefgesprek van zo'n dienst opent op de gesprekspagina. De koppelingscontrole meldt voor zo'n
+dienst ook of de site ondertitels aanhoudt (een waarschuwing als dat niet zo is). *Gesprek* als soort
+taak kan alleen worden gekozen voor een dienst die de gesprekspagina gebruikt; zolang de dienst
+die niet gebruikt, worden er werkitems gemaakt.
 
 <!-- field: embedded_call_webex_option -->
 ### Weg naar Webex naast onze pagina

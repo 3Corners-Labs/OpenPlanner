@@ -482,6 +482,18 @@ msgstr "Het proefgesprek opent in uw browser; op een computer hoeft u niets te i
 msgid "trial.browser_choice"
 msgstr "Op een computer hoeft u niets te installeren: vraagt Webex om de app te openen, kies dan 'Deelnemen via deze browser'. Op een telefoon of tablet vraagt Webex om de Webex-app."
 
+msgid "trial.page.intro"
+msgstr "Een proefgesprek laat u vooraf zien of het videogesprek voor u werkt. Het is een echt gesprek, met dezelfde pagina en dezelfde verbinding als uw afspraak. U kunt controleren:"
+
+msgid "trial.page.alone"
+msgstr "U bent er alleen in. Niemand van het team komt erbij en niemand wacht op u. De pagina vraagt toestemming voor uw camera en microfoon, net als bij uw afspraak."
+
+msgid "trial.page.browser"
+msgstr "Het proefgesprek opent in deze browser; er is niets te installeren."
+
+msgid "trial.page.until"
+msgstr "Open tot"
+
 msgid "trial.open_hint"
 msgstr "Het proefgesprek blijft {minutes} minuten open."
 
@@ -1601,10 +1613,10 @@ msgid "admin.field.contact_center_task_kind"
 msgstr "Soort taak in het contactcenter"
 
 msgid "admin.field.contact_center_task_kind_hint"
-msgstr "Werkitem: de medewerker ziet de velden en de link in het agent desktop (standaard). Gesprek: een berichtentaak die de medewerker in het agent desktop beantwoordt. Het gesprek kan alleen gekozen worden op een installatie waar de gesprekspagina aanstaat, en vraagt het berichtenkanaal van het contactcenter."
+msgstr "Werkitem: de medewerker ziet de velden en de link in het agent desktop (standaard). Gesprek: een berichtentaak die de medewerker in het agent desktop beantwoordt. Het gesprek kan alleen gekozen worden voor een dienst die de gesprekspagina gebruikt (Groep, Instellingen, Video), en vraagt het berichtenkanaal van het contactcenter."
 
 msgid "admin.field.contact_center_task_kind_off"
-msgstr "Deze dienst staat op Gesprek, maar zolang de gesprekspagina op deze installatie niet aanstaat maakt hij werkitems."
+msgstr "Deze dienst staat op Gesprek, maar zolang hij de gesprekspagina niet gebruikt (of de gesprekspagina op deze installatie niet aanstaat) maakt hij werkitems."
 
 msgid "admin.contact_center.task_kind.form"
 msgstr "Werkitem"
@@ -4859,6 +4871,21 @@ msgstr "De gesprekspagina kan een gast aanmaken bij het videoplatform (de Servic
 
 msgid "admin.check.webex.guest_refused"
 msgstr "Het videoplatform weigerde een gast aan te maken ({error}): de Service App heeft de gastrechten nodig, dus deelnemers kunnen niet in onze pagina meedoen."
+
+msgid "admin.check.webex.captions_ok"
+msgstr "De site van het videoplatform houdt ondertitels aan: een deelnemer van de gesprekspagina kan ze aanzetten."
+
+msgid "admin.check.webex.captions_off"
+msgstr "De site van het videoplatform houdt ondertitels niet aan voor deze meeting: de gesprekspagina heeft dan geen ondertitels om te tonen. Zet ze aan in de instellingen van de site (Control Hub)."
+
+msgid "admin.check.webex.captions_unknown"
+msgstr "Het videoplatform zegt niet of ondertitels aanstaan op de site: of de gesprekspagina ondertitels kan tonen is niet vast te stellen. Probeer het in een echt gesprek."
+
+msgid "admin.check.webex.captions_refused"
+msgstr "Het videoplatform weigerde de proefmeeting voor de ondertitels ({error}) voor host {host}: of de gesprekspagina ondertitels kan tonen is niet vast te stellen."
+
+msgid "admin.check.webex.captions_left"
+msgstr "De proefmeeting {meeting} voor de ondertitels van host {host} is gepland maar kon niet worden verwijderd ({error}); verwijder hem in Webex."
 
 msgid "admin.check.webex.trial_left"
 msgstr "De proefgesprek-meeting {meeting} voor host {host} is gepland maar kon niet worden verwijderd ({error}); verwijder hem in Webex."
@@ -14119,6 +14146,12 @@ msgstr "De bezorgingen zijn hervat."
 
 msgid "settings.field.embedded_call_webex_option.label"
 msgstr "Weg naar de eigen app van het videoplatform naast het gesprek (nooit, alleen als de pagina het gesprek niet kan geven, of altijd). Geldt voor elk team dat er zelf geen koos; een team kiest het onder Groep, Instellingen, Video"
+
+msgid "settings.field.privacy_statement_url.label"
+msgstr "Adres van de privacyverklaring van de organisatie (https, hoogstens 2.048 tekens); de gesprekspagina linkt ernaar bij de regel over de externe videodienst. Leeg: geen link"
+
+msgid "callpage.privacy.link"
+msgstr "Privacyverklaring van de organisatie (opent in een nieuw tabblad)"
 
 msgid "callpage.start.body"
 msgstr "U voert het gesprek hier, in deze pagina. U hoeft niets te installeren."

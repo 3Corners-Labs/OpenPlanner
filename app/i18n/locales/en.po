@@ -482,6 +482,18 @@ msgstr "The trial call opens in your browser; on a computer there is nothing to 
 msgid "trial.browser_choice"
 msgstr "On a computer there is nothing to install: if Webex asks to open the app, choose 'Join from this browser'. On a phone or tablet Webex asks for the Webex app."
 
+msgid "trial.page.intro"
+msgstr "A trial call shows you beforehand whether the video call works for you. It is a real call, on the same page and with the same connection as your appointment. You can check:"
+
+msgid "trial.page.alone"
+msgstr "You will be alone in it. Nobody from the team joins and nobody is waiting for you. The page asks for permission to use your camera and microphone, just as for your appointment."
+
+msgid "trial.page.browser"
+msgstr "The trial call opens in this browser; there is nothing to install."
+
+msgid "trial.page.until"
+msgstr "Open until"
+
 msgid "trial.open_hint"
 msgstr "The trial call stays open for {minutes} minutes."
 
@@ -1601,10 +1613,10 @@ msgid "admin.field.contact_center_task_kind"
 msgstr "Kind of contact-center task"
 
 msgid "admin.field.contact_center_task_kind_hint"
-msgstr "Work item: the staff member sees the fields and the link in the agent desktop (the default). Conversation: a messaging task the staff member answers in the agent desktop. The conversation can be chosen only on an installation that has the call page switched on, and needs the messaging channel of the contact center."
+msgstr "Work item: the staff member sees the fields and the link in the agent desktop (the default). Conversation: a messaging task the staff member answers in the agent desktop. The conversation can be chosen only for a service that uses the call page (Group, Settings, Video), and needs the messaging channel of the contact center."
 
 msgid "admin.field.contact_center_task_kind_off"
-msgstr "This service holds Conversation, but until the call page is switched on for this installation it makes work items."
+msgstr "This service holds Conversation, but as long as it does not use the call page (or the call page is not switched on for this installation) it makes work items."
 
 msgid "admin.contact_center.task_kind.form"
 msgstr "Work item"
@@ -4859,6 +4871,21 @@ msgstr "The call page can create a guest at the video platform (the Service App 
 
 msgid "admin.check.webex.guest_refused"
 msgstr "The video platform refused to create a guest ({error}): the Service App needs the guest scopes, so participants cannot join in our page."
+
+msgid "admin.check.webex.captions_ok"
+msgstr "The video platform's site keeps closed captions: a participant of the call page can switch them on."
+
+msgid "admin.check.webex.captions_off"
+msgstr "The video platform's site does not keep closed captions for this meeting, so the call page has no captions to show. Switch them on in the site's settings (Control Hub)."
+
+msgid "admin.check.webex.captions_unknown"
+msgstr "The video platform does not say whether closed captions are on for the site, so whether the call page can show captions cannot be established. Try it in a real call."
+
+msgid "admin.check.webex.captions_refused"
+msgstr "The video platform refused the captions probe meeting ({error}) for host {host}: whether the call page can show captions cannot be established."
+
+msgid "admin.check.webex.captions_left"
+msgstr "The captions probe meeting {meeting} for host {host} was scheduled but could not be deleted ({error}); delete it in Webex."
 
 msgid "admin.check.webex.trial_left"
 msgstr "The trial-call meeting {meeting} for host {host} was scheduled but could not be deleted ({error}); delete it in Webex."
@@ -14106,6 +14133,12 @@ msgstr "Deliveries are resumed."
 
 msgid "settings.field.embedded_call_webex_option.label"
 msgstr "Way into the video platform's own app next to the call (never, only when the page cannot give the call, or always). It holds for every team that has not chosen its own; a team chooses it under Group, Settings, Video"
+
+msgid "settings.field.privacy_statement_url.label"
+msgstr "Address of the organisation's privacy statement (https, at most 2,048 characters); the call page links to it from the line about the external video service. Empty: no link"
+
+msgid "callpage.privacy.link"
+msgstr "The organisation's privacy statement (opens in a new tab)"
 
 msgid "callpage.start.body"
 msgstr "You have the call here, in this page. There is nothing to install."

@@ -47,13 +47,13 @@ class Setup:
         queue: FakeQueue,
         *,
         translator: Translator | None = None,
-        conversation_enabled: Callable[[], bool] | None = None,
+        call_page_enabled: Callable[[], bool] | None = None,
         guest_keys: GuestKeys | None = None,
     ) -> JobRunner:
         """Return a job runner that takes its jobs from ``queue`` and calls the fakes.
 
-        ``translator`` replaces the catalogue and ``conversation_enabled`` is the platform
-        switch of ADR 0123 step 7a (off when not given). ``guest_keys`` are the keys of the guest
+        ``translator`` replaces the catalogue and ``call_page_enabled`` is the platform
+        switch of ADR 0123 (off when not given). ``guest_keys`` are the keys of the guest
         subjects now in force (ADR 0123 point 7); without them a rename has no subject to work out.
         """
         composer = MessageComposer(
@@ -68,7 +68,7 @@ class Setup:
             video=self.video,
             dispatchers=webex_cc(self.dispatcher),
             integration=self.integration,
-            conversation_enabled=conversation_enabled,
+            call_page_enabled=call_page_enabled,
             guest_keys=guest_keys,
         )
 

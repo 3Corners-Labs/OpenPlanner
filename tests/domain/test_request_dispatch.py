@@ -18,6 +18,7 @@ from app.domain.integration import EventOutcome
 from app.domain.job_plan import JobType
 from app.domain.ports import IntegrationError
 from app.domain.request_dispatch import IN_DOUBT_SKIP, OWN_QUEUE
+from app.domain.scheduling import JoinClient
 from app.domain.service_flows import FlowRevision, InteractionKind
 from app.domain.service_requests import (
     HandlingState,
@@ -202,7 +203,9 @@ async def test_an_adopted_task_keeps_the_kind_its_create_was_tried_as(
     given the kind the create was tried as, never one read from the routing afterwards."""
     state = uow.state
     state.groups[1] = replace(
-        state.groups[1], contact_center=webex_routing(task_kind=TaskKind.CONVERSATION)
+        state.groups[1],
+        contact_center=webex_routing(task_kind=TaskKind.CONVERSATION),
+        join_client=JoinClient.EMBEDDED,
     )
     conversation_desk = desk(uow, clock, conversation_enabled=True)
     booking_id = await book(uow, clock, CC_FLOW)
@@ -229,7 +232,9 @@ async def test_a_failed_attempt_leaves_no_kind_and_the_next_attempt_is_labelled_
     so it reads the latest attempt."""
     state = uow.state
     state.groups[1] = replace(
-        state.groups[1], contact_center=webex_routing(task_kind=TaskKind.CONVERSATION)
+        state.groups[1],
+        contact_center=webex_routing(task_kind=TaskKind.CONVERSATION),
+        join_client=JoinClient.EMBEDDED,
     )
     the_desk = desk(uow, clock, conversation_enabled=True)
     booking_id = await book(uow, clock, CC_FLOW)
@@ -260,7 +265,9 @@ async def test_an_attempt_keeps_its_kind_while_it_is_in_doubt_and_loses_it_with_
 ) -> None:
     state = uow.state
     state.groups[1] = replace(
-        state.groups[1], contact_center=webex_routing(task_kind=TaskKind.CONVERSATION)
+        state.groups[1],
+        contact_center=webex_routing(task_kind=TaskKind.CONVERSATION),
+        join_client=JoinClient.EMBEDDED,
     )
     the_desk = desk(uow, clock, conversation_enabled=True)
     booking_id = await book(uow, clock, CC_FLOW)
@@ -283,7 +290,9 @@ async def test_a_conversation_is_not_created_while_the_switch_is_off(
     """The switch also holds at dispatch: the routing holds a conversation, a form is made."""
     state = uow.state
     state.groups[1] = replace(
-        state.groups[1], contact_center=webex_routing(task_kind=TaskKind.CONVERSATION)
+        state.groups[1],
+        contact_center=webex_routing(task_kind=TaskKind.CONVERSATION),
+        join_client=JoinClient.EMBEDDED,
     )
     off = desk(uow, clock, conversation_enabled=False)
     booking_id = await book(uow, clock, CC_FLOW)

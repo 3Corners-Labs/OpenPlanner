@@ -1192,6 +1192,28 @@ Integrations (nothing schedules it), so a stored "passed" is as old as the last 
 scope shows at the next check (the button, or the group check within a day for a group that holds
 `embedded`), and until then new choices of `embedded` are still accepted. No age limit is built.
 
+## Flow: the rest of the call page's step 6 (ADR 0123 step 6b)
+
+Meetings of a service that uses the page have no platform chat; the trial call opens on the page
+(`GET /b/m/{ref}/test/call`, `POST /b/m/{ref}/test/call/token`); the group check reports captions;
+the organisation's privacy statement address is linked on the page; and a conversation task is
+made only for a service that uses the page (`task_kind_in_force`, fed by `uses_call_page`).
+Inputs from outside: the participant's session and the reference on the two new routes, the
+privacy address typed by an organisation admin (or the environment), and the group form's task kind.
+
+| Abuse case | Control | Test |
+|---|---|---|
+| A trial token is minted without a session, from another browser, cross-site, or for a trial call that is not open | Same order as the appointment's routes: switch, session, service; the guest is minted only while `trial_state` is active; a closed or unopened trial call answers `409 not_open` and mints nothing | `tests/api/test_trial_call_page.py::test_without_the_participants_session_nothing_is_handed_out`, `::test_a_cross_site_post_for_a_trial_token_is_refused`, `::test_the_token_is_for_the_trial_meeting_only_while_it_is_open`, `::test_no_token_before_a_trial_call_is_opened` |
+| The trial call page is reached for a service that did not choose the page, or while the switch is off | `404` as an address that does not exist, after the session | `tests/api/test_trial_call_page.py::test_a_service_that_did_not_choose_the_page_has_no_trial_call_page`, `::test_the_switch_off_closes_the_trial_call_page_too` |
+| The platform's address is reached around the page on a trial call | `/test/go` leads back to the page unless the service's option allows the other way | `tests/api/test_trial_call_page.py::test_the_way_around_the_page_is_closed_while_the_services_option_is_hidden`, `::test_the_way_around_the_page_opens_when_the_services_option_allows_it` |
+| The trial page names the supplier, or the call page policy reaches the trial page | The trial page has its own neutral texts for such a service and keeps the ordinary policy; only `app.api.call_pages` serves the call policy | `tests/api/test_trial_call_page.py::test_the_trial_page_leads_to_the_call_page_and_never_names_the_platform` |
+| A meeting for the page keeps the platform's chat, so staff write into a panel nobody reads | `MeetingRequest.chat_enabled` is false for a service that uses the page, in the booking's meeting, the trial and the check's probes | `tests/domain/test_call_service_conversation.py::test_the_meeting_is_created_without_the_platforms_chat_only_for_the_call_page`, `tests/adapters/test_webex_meetings.py::test_a_meeting_for_the_call_page_is_created_without_the_platforms_chat` |
+| A privacy address is a script, an `http` address, one with credentials or an attribute break-out | Checked at save (`valid_privacy_url`, class D bounds) and again where the page renders it (`privacy_link`); the link is `rel="noopener noreferrer"` | `tests/domain/test_privacy_statement.py`, `tests/api/test_call_page_privacy.py::test_a_stored_address_that_is_not_valid_is_never_rendered_as_a_link` |
+| A conversation task is sent for a booking of a service that does not use the page | The domain's `task_kind_in_force` takes the answer of `uses_call_page`; the form offers and accepts the conversation only for such a service | `tests/domain/test_call_service_conversation.py::test_a_service_that_does_not_use_the_call_page_never_gets_a_conversation`, `tests/admin/test_group_task_kind.py::test_a_conversation_for_a_service_that_does_not_use_the_page_is_refused` |
+| The captions probe creates meetings that stay, or runs for a group that does not use the page | One probe meeting, deleted at once (a failure is a warning naming it); only for a group that uses the page while the switch is on | `tests/adapters/test_group_check.py::test_a_site_that_keeps_closed_captions_is_ok`, `::test_any_other_group_sends_no_captions_probe_and_sees_no_finding`, `::test_a_captions_probe_that_cannot_be_deleted_is_a_warning_naming_it` |
+
+What an attack on this flow leaves in the log: a request without a session is the one `token.rejected` security event of the link, a cross-site post the `request.rejected` event, a denial for a manager of another group the authorisation event, and a successful change of the task kind or the privacy address is an audit event with field names and never a value. A request for a service that did not choose the page, or while the switch is off, leaves no event.
+
 ## Flow: the staff member's name on the participant's call page (ADR 0123 step 5c)
 
 The participant sees who they talk to, and the staff member must not be findable by their account
