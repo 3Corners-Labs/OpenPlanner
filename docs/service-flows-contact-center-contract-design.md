@@ -199,7 +199,7 @@ The booking timeline records the event as before. A request that is terminal or 
 | E7 | How is a late task recognised? | By the booking reference in the event's `origin`, for a service routed to that platform, at its organisation's address (or the installation's without an own connection); a cancelled booking's late task is ended; open item until seen on the test host |
 | E8 | What do platform events do? | connected = start, ended = complete (also without a connect: the platform says the work is done), failed = back to the own queue |
 | E9 | A contact-center attempt that the watchdog expires | Expired as before; its task at the platform is not ended (follow-up row 27) |
-| E10 | The own queue's row of work the contact center holds | Shown as open; a claim is refused `already_claimed` (follow-up row 28: show it as held by the contact center). Built in step 28 (#G14PR): shown as held, without *Claim*, never next and never "not picked up"; a claim in a race is still refused `already_claimed` |
+| E10 | The own queue's row of work the contact center holds | Shown as open; a claim is refused `already_claimed` (follow-up row 28: show it as held by the contact center). Built in step 28 (#894): shown as held, without *Claim*, never next and never "not picked up"; a claim in a race is still refused `already_claimed` |
 
 ### 11.7 Settings, migration, threat model
 

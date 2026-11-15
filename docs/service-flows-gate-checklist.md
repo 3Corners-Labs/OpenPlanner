@@ -45,7 +45,7 @@ the PR that did it.
 | G11 | A downgrade refused part way stopped between revisions (Alembic committed every SQLite migration on its own); the migration run is now one transaction (`transactional_ddl=True` in `migrations/env.py`) | step 8 | no | build | done (#786) |
 | G12 | Diff the generated OpenAPI document against a stored copy (CLAUDE.md asks for it); today one test holds that `/api/v1` requires no `flow` | 0121/35 | no | build | open |
 | G13 | The watchdog ends the task at the platform when it expires or cancels a contact-center attempt | 0121/27 | cc | build | follow-up (enforced by code until done) |
-| G14 | The own queue shows work the contact center holds as held, not as open. Built: the row says *held by the contact center*, offers no claim, is never next and never "not picked up" | 0121/28 | cc | build | done (#G14PR) |
+| G14 | The own queue shows work the contact center holds as held, not as open. Built: the row says *held by the contact center*, offers no claim, is never next and never "not picked up" | 0121/28 | cc | build | done (#894) |
 | G15 | See on the test host that Webex Contact Center's task events carry the origin, so a late task is matched | 0121/29 | cc | operator | follow-up (enforced by code until done) |
 | G16 | Immediate work dispatched to the contact center: a reference for work without a booking and the matching of its late events | 0121/30 | no | build | follow-up |
 | G17 | The staff detail's table "what this person may pick up, and why" | 0121/4c | no | build | planned |
