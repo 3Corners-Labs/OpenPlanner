@@ -44,10 +44,11 @@ class WatchResult:
     expired_unclaimed: int = 0
     deleted: int = 0
     failed: int = 0
-    tasks_ended: int = 0
-    """Contact-center tasks the round handed to the end-task job (ADR 0121 step 27)."""
     errors: tuple[str, ...] = ()
     """The type names of the failures, sorted and once each; never a message."""
+    tasks_ended: int = 0
+    """Contact-center tasks handed to the end-task job (ADR 0121 step 27), counted once the
+    transaction that planned the job committed."""
 
 
 class RequestWatch:
@@ -102,7 +103,12 @@ class RequestWatch:
             deleted += outcome == _DONE
             failed += outcome == _FAILED
         return WatchResult(
-            changed, expired, deleted, failed, self._tasks_ended, tuple(sorted(self._errors))
+            changed=changed,
+            expired_unclaimed=expired,
+            deleted=deleted,
+            failed=failed,
+            errors=tuple(sorted(self._errors)),
+            tasks_ended=self._tasks_ended,
         )
 
     async def _attempt(self, step: Awaitable[bool]) -> str:
@@ -115,11 +121,21 @@ class RequestWatch:
         return _DONE if done else _SKIPPED
 
     async def _watch(self, request_id: int, now: datetime) -> bool:
-        """Apply the watchdog's outcome to one request, under the lock."""
+        """Apply the watchdog's outcome to one request; count a task end once it committed."""
+        changed, task_ended = await self._apply(request_id, now)
+        self._tasks_ended += task_ended
+        return changed
+
+    async def _apply(self, request_id: int, now: datetime) -> tuple[bool, bool]:
+        """Apply the watchdog's outcome to one request, under the lock.
+
+        Returns whether the request changed and whether an end-task job was planned; both hold
+        only when this returns, after the transaction committed.
+        """
         async with self._uow.locked() as tx:
             request = await tx.get_service_request(request_id)
             if request is None:
-                return False
+                return False, False
             item = await tx.get_active_work_item(request_id)
             booking = (
                 await tx.get_booking(request.booking_id) if request.booking_id is not None else None
@@ -133,20 +149,21 @@ class RequestWatch:
             outcome = watchdog_outcome(request, item, phase=phase, now=now, deadline=deadline)
             if outcome is None:
                 if deadline == request.watchdog_at:
-                    return False
+                    return False, False
                 # The booking goes ahead at another time: the deadline follows it.
                 moved = replace(request, watchdog_at=deadline)
-                return await tx.update_service_request(moved, request.handling)
+                return await tx.update_service_request(moved, request.handling), False
             if outcome.item is not None and item is not None:
                 if not await tx.update_work_item(outcome.item, item.state):
-                    return False
+                    return False, False
             if not await tx.update_service_request(outcome.request, request.handling):
                 raise RuntimeError("request changed under the lock")
             if outcome.clear_claim and booking is not None and booking.claim is not None:
                 await tx.release_claim(request.booking_id or 0)
-            if booking is not None:
-                await self._end_task(tx, booking, item, outcome.item, now)
-            return True
+            ended = booking is not None and await self._end_task(
+                tx, booking, item, outcome.item, now
+            )
+            return True, ended
 
     async def _end_task(
         self,
@@ -155,7 +172,7 @@ class RequestWatch:
         before: WorkItem | None,
         after: WorkItem | None,
         now: datetime,
-    ) -> None:
+    ) -> bool:
         """Plan the end of the platform's task when the round ended its attempt (step 27).
 
         The end-task job (``CallService.end_task``, ADR 0021) marks the task cancelled, ends it,
@@ -168,11 +185,11 @@ class RequestWatch:
             has_task=booking.contact_center_task is not None,
             booking=booking.status,
         ):
-            return
+            return False
         booking_id = booking.id or 0
         await tx.delete_pending_jobs(booking_id, {JobType.END_WXCC_TASK})
         await tx.add_jobs(booking_id, [PlannedJob(JobType.END_WXCC_TASK, now, None)])
-        self._tasks_ended += 1
+        return True
 
     async def _expire(self, found: UnclaimedBooking, now: datetime) -> bool:
         """Record an ``expired`` request for a pool booking nobody claimed (A33)."""
