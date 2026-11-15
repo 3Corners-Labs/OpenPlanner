@@ -163,6 +163,7 @@ from app.domain.tls_source import CertificateSourceService
 from app.domain.trial_call_service import TrialCallService
 from app.domain.usage_api_service import UsageApiLimits, UsageApiService
 from app.domain.usage_export_service import UsageExportService
+from app.domain.usage_report_pool_service import PoolUsageService
 from app.domain.usage_report_service import UsageReportService
 from app.domain.wallboard_link import parse_networks
 from app.domain.wallboard_link_service import WallboardLinkService
@@ -474,6 +475,14 @@ def create_app(
             lambda: live().reporting_min_cell_size,
             lambda organisation: per_organisation(organisation).reporting_org_min_cell_size,
             lambda organisation: per_organisation(organisation).reporting_staff_view_enabled,
+        )
+        app.state.pool_usage_service = PoolUsageService(
+            uow,
+            app.state.admin_service,
+            clock,
+            lambda: live().reporting_min_cell_size,
+            lambda organisation: per_organisation(organisation).reporting_org_min_cell_size,
+            lambda: live().booking_row_retention_days,
         )
         app.state.wallboard_service = WallboardService(
             uow,

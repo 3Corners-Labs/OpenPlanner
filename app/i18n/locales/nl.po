@@ -11823,6 +11823,36 @@ msgstr "Blokken met te weinig bezetting"
 msgid "reports.capacity.shortfall.state"
 msgstr "Stand"
 
+msgid "reports.capacity.pools.title"
+msgstr "Capaciteitspools"
+
+msgid "reports.capacity.pools.intro"
+msgstr "Bezetting per pool, in eenheiduren: één persoon gedurende één uur. De pool wordt gedeeld door diensten, dus de cijfers hangen aan de pool en niet aan een dienst."
+
+msgid "reports.capacity.pools.pool"
+msgstr "Pool"
+
+msgid "reports.capacity.pools.staffed"
+msgstr "Bemand voor afspraken (eenheiduren)"
+
+msgid "reports.capacity.pools.appointments"
+msgstr "Afspraken"
+
+msgid "reports.capacity.pools.utilisation"
+msgstr "Bezettingsgraad"
+
+msgid "reports.capacity.pools.idle"
+msgstr "Niet geboekt (eenheiduren)"
+
+msgid "reports.capacity.pools.archived"
+msgstr "(gearchiveerd)"
+
+msgid "reports.capacity.pools.reach"
+msgstr "De cijfers van de pools beginnen op {day}: oudere afspraken zijn al samengevoegd tot dagtotalen."
+
+msgid "reports.capacity.pools.rule"
+msgstr "Alleen uren die voorbij zijn tellen mee, en alleen uren waarin de pool voor afspraken is bemand. De bemanning is die van nu; afspraken zijn de afspraken die nog bewaard worden. Een pool met minder dan {n} afspraken toont alleen de bemanning. De kolommen rechts tellen uren per vulling."
+
 msgid "reports.channels.messages.title"
 msgstr "Berichten verstuurd en mislukt"
 

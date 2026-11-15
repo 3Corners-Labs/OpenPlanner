@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.domain.booking import BookingKind, BookingStatus
+from app.domain.booking_facts import BookingFacts
 from app.domain.calls import CallState, CallStatus
 from app.domain.scheduling import DispatchKind
 from app.domain.slot_close import (
@@ -14,6 +15,7 @@ from app.domain.slot_close import (
     SlotStaffing,
     closing_facts,
     in_order,
+    late_completion,
     not_picked_up,
     outcome_of,
     pool_not_picked_up,
@@ -243,3 +245,21 @@ def test_a_pool_booking_nobody_claimed_or_started_was_not_picked_up() -> None:
     assert facts[0].bucket_hour == START
     assert not pool_not_picked_up(picked)
     assert not pool_not_picked_up(started)
+
+
+def test_a_completion_after_the_closing_is_written_and_before_it_is_left_to_the_closing() -> None:
+    start = datetime(2026, 1, 5, 8, 0, tzinfo=UTC)
+    end = start + timedelta(minutes=30)
+    facts = BookingFacts(
+        1, 2, BookingKind.SCHEDULED, DispatchKind.OPENPLANNER_QUEUE, "nl", start, start
+    )
+
+    assert late_completion(facts, start, end, None) is None  # never closed anything yet
+    assert late_completion(facts, start, end, end - timedelta(minutes=1)) is None
+    fact = late_completion(facts, start, end, end)
+    assert fact is not None
+    assert (fact.kind, fact.outcome, fact.bucket_hour) == (
+        FactKind.BOOKING_OUTCOME,
+        UsageOutcome.COMPLETED,
+        start,
+    )

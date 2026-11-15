@@ -17,6 +17,7 @@ from app.domain.usage_report_csv import (
     TIDY_HEADER,
     TIDY_VERSION,
 )
+from app.domain.usage_report_pools import POOL_RULE
 from app.domain.usage_rollup import FILL_CLASSES, feed_rows
 from app.domain.usage_suppress import MIN_CELL_SIZE_FLOOR
 
@@ -74,6 +75,8 @@ def render_markdown() -> str:
     parts.append(f"- Fill of a closed slot: {', '.join(f'`{c}`' for c in FILL_CLASSES)}\n")
     parts.append("\n## How an outcome is derived\n\n")
     parts.append(OUTCOME_RULE.strip() + "\n")
+    parts.append("\n## Utilisation of a counted pool\n\n")
+    parts.append(POOL_RULE.strip() + "\n")
     parts.append("\n## Duration buckets\n\n")
     parts.append(
         "The same ten buckets for every duration; a signed duration (a host who was early) "

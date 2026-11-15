@@ -133,6 +133,7 @@ from app.adapters.db.skills import SkillQueries
 from app.adapters.db.staff import StaffQueries
 from app.adapters.db.updates import UpdateQueries
 from app.adapters.db.usage import UsageQueries
+from app.adapters.db.usage_pools import UsagePoolQueries
 from app.adapters.db.usage_reports import UsageReportQueries
 from app.adapters.db.usage_rollup import UsageRollupQueries
 from app.adapters.db.usage_slots import UsageSlotQueries
@@ -502,6 +503,7 @@ class SqlTransaction(
     ProposalQueries,
     ChangeRequestQueries,
     SkillQueries,
+    UsagePoolQueries,
     PoolStaffingQueries,
     CapacityPoolQueries,
     ServiceFlowQueries,

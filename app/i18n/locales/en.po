@@ -11810,6 +11810,36 @@ msgstr "Blocks short of staff"
 msgid "reports.capacity.shortfall.state"
 msgstr "State"
 
+msgid "reports.capacity.pools.title"
+msgstr "Capacity pools"
+
+msgid "reports.capacity.pools.intro"
+msgstr "Utilisation per pool, in unit-hours: one person for one hour. A pool is shared by services, so the figures belong to the pool and not to a service."
+
+msgid "reports.capacity.pools.pool"
+msgstr "Pool"
+
+msgid "reports.capacity.pools.staffed"
+msgstr "Staffed for appointments (unit-hours)"
+
+msgid "reports.capacity.pools.appointments"
+msgstr "Appointments"
+
+msgid "reports.capacity.pools.utilisation"
+msgstr "Utilisation"
+
+msgid "reports.capacity.pools.idle"
+msgstr "Not booked (unit-hours)"
+
+msgid "reports.capacity.pools.archived"
+msgstr "(archived)"
+
+msgid "reports.capacity.pools.reach"
+msgstr "The pool figures start on {day}: older appointments are already merged into daily counts."
+
+msgid "reports.capacity.pools.rule"
+msgstr "Only hours that have passed count, and only hours in which the pool is staffed for appointments. The staffing is today's; appointments are those still kept. A pool with fewer than {n} appointments shows its staffing only. The columns on the right count hours per fill level."
+
 msgid "reports.channels.messages.title"
 msgstr "Messages sent and failed"
 

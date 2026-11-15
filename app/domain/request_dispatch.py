@@ -144,6 +144,7 @@ class AttemptEvents:
                 await _write(tx, _Write(new_request, request, new_item, item.state))
                 if booking.status is BookingStatus.CONFIRMED:
                     await tx.save_booking(replace(booking, status=BookingStatus.COMPLETED))
+                    await self._work.completed(tx, booking)
             elif kind is EventKind.TASK_FAILED:
                 new_request, new_item = attempts.failed(request, item, now=at)
                 await _write(tx, _Write(new_request, request, new_item, item.state))

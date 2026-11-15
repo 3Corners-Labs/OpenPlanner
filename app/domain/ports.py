@@ -130,6 +130,7 @@ from app.domain.updates import (
 from app.domain.usage import StaffFact, UsageCell, UsageFact
 from app.domain.usage_backfill import BackfillBooking
 from app.domain.usage_report import DayStatusCount, ReportGroup
+from app.domain.usage_report_pools import PoolInputs
 from app.domain.usage_rollup import UsageBatch, UsagePruned, UsageState
 from app.domain.usage_staff import StaffCell
 from app.domain.wallboard_link import WallboardLink
@@ -2916,6 +2917,29 @@ class UsageUnitOfWork(Protocol):
         ...
 
     def read(self) -> AbstractAsyncContextManager[UsageStore]:
+        """Open a read transaction."""
+        ...
+
+
+class PoolReportStore(Protocol):
+    """What the utilisation of a counted pool reads (ADR 0122 step 5): times, no personal data."""
+
+    async def read_pool_report_inputs(
+        self, scope: Scope, organisation_slug: str, first_day: date, last_day: date
+    ) -> PoolInputs | None:
+        """Return the counted pools of the organisation inside ``scope`` for the range.
+
+        Each pool with its staffing, its closed days and the intervals of the appointments that
+        hold a unit (confirmed, completed, no show) over its own local days ``first_day`` to
+        ``last_day``; ``None`` for an organisation that is missing or outside ``scope``.
+        """
+        ...
+
+
+class PoolReportUnitOfWork(Protocol):
+    """Opens read transactions that carry the pool report's ``PoolReportStore``."""
+
+    def read(self) -> AbstractAsyncContextManager[PoolReportStore]:
         """Open a read transaction."""
         ...
 
