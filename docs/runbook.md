@@ -2399,7 +2399,9 @@ Prefer "Restore previous version" in the portal (above) within 24 hours of an up
 `./scripts/install.sh --version <previous>` pins both images (application and proxy) at that
 version, verified. If the release contained a migration, first run
 `docker compose run --rm web alembic downgrade <previous-revision>` with the *new* image, then
-deploy the old images. Every migration is reversible (enforced in CI).
+deploy the old images. Every migration is reversible (enforced in CI). The downgrade past
+migration `0121` (ADR 0123 step 7b) drops `call_messages`: the text of the appointments' chats is
+personal data and is deleted, not kept; the contact center's own transcript stays.
 
 **Services created while an older image ran (ADR 0121 step 2e).** A service (group) that an
 image from before the flows was used to create has no legacy capacity pool and no default flows.

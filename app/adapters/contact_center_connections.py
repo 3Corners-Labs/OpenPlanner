@@ -220,7 +220,9 @@ class SealedConnections:
         still holds no longer verifies (CC-4d), and with it go the previous secret and the stored
         registration outcome, in the same write: an overlap is for a rotation, not for a move, and
         what a registration left at the old tenant says nothing about the new one. Changing the
-        allowed networks alone touches neither the secret nor anything else of the record.
+        allowed networks alone touches neither the secret nor anything else of the record. The
+        message secret (ADR 0124 point 15) is kept on a move on purpose: the console holds it, and
+        the new tenant is told the address and the secret again by the administrator.
         """
 
         def apply(stored: dict[str, object] | None) -> dict[str, object]:

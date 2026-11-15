@@ -2631,7 +2631,7 @@ class Transaction(Protocol):
         """
         ...
 
-    async def list_call_messages(self, booking_id: int) -> list[CallMessage]:
+    async def messages_of_call(self, booking_id: int) -> list[CallMessage]:
         """Return a booking's chat, oldest first (the caller checks the participant's session)."""
         ...
 
@@ -2643,8 +2643,12 @@ class Transaction(Protocol):
         """Mark every ``sent`` message of the booking ``refused``; return how many."""
         ...
 
-    async def participant_message_times(self, booking_id: int, since: datetime) -> list[datetime]:
-        """Return when the booking's participant wrote messages at or after ``since``."""
+    async def count_call_messages(self, booking_id: int) -> int:
+        """Return how many messages a booking's chat holds (the bound of the chat, step 7b)."""
+        ...
+
+    async def sent_call_message_ids(self, booking_id: int) -> list[str]:
+        """Return the provider ids of the booking's messages that wait for their confirmation."""
         ...
 
     async def delete_call_messages(self, booking_id: int) -> None:

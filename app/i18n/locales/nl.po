@@ -11138,7 +11138,7 @@ msgid "admin.channels.cc_messages_title"
 msgstr "Chatberichten"
 
 msgid "admin.channels.cc_messages_lead"
-msgstr "Het contactcenter bezorgt de berichten van een gesprek op dit adres. Zet het als webhook-adres van het berichtenkanaal in de console, met het geheim hieronder."
+msgstr "Het contactcenter bezorgt de berichten van een gesprek op dit adres. Zet het als webhookadres van het berichtenkanaal in de console, met het geheim hieronder."
 
 msgid "admin.channels.cc_messages_none"
 msgstr "Er is nog geen geheim gemaakt, dus dit adres bestaat nog niet."
@@ -11150,13 +11150,13 @@ msgid "admin.channels.cc_messages_previous"
 msgstr "Het vorige geheim werkt nog tot {at}."
 
 msgid "admin.channels.cc_messages_make"
-msgstr "Maak een geheim voor dit adres"
+msgstr "Geheim voor dit adres maken"
 
 msgid "admin.channels.cc_messages_make_lead"
 msgstr "U ziet het geheim één keer, op de volgende pagina. Een geheim dat al werkte blijft nog {minutes} minuten werken."
 
 msgid "admin.channels.cc_messages_make_lead_now"
-msgstr "U ziet het geheim één keer, op de volgende pagina. Een geheim dat al werkte houdt direct op te werken."
+msgstr "U ziet het geheim één keer, op de volgende pagina. Een geheim dat al werkte werkt direct niet meer."
 
 msgid "admin.channels.cc_messages_secret_title"
 msgstr "Geheim voor het berichtenadres"

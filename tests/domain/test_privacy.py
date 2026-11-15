@@ -7,7 +7,6 @@ import pytest
 from app.domain.privacy import (
     ALIASES,
     CALL_MESSAGE_ENTITY,
-    CHAT_CLASSIFICATION,
     CHAT_FIELDS,
     DATA_FIELDS,
     DERIVED_FIELDS,
@@ -137,7 +136,6 @@ def test_the_text_of_the_chat_is_the_one_personal_field_of_a_third_entity() -> N
     """ADR 0123 step 7b: the rule that personal data lives on two entities only is amended."""
     assert CHAT_FIELDS == ("message_text",)
     assert CALL_MESSAGE_ENTITY == "CallMessage"
-    assert CHAT_CLASSIFICATION is Classification.SENSITIVE
     # It is no field of the appointment: the booking's purge reaches it through its own delete.
     assert not set(CHAT_FIELDS) & (PII_FIELDS | set(PURGED_FIELDS) | ALIASES)
     assert not is_pii("message_text")  # ``Booking`` has no such column; ``CHAT_FIELDS`` is the list

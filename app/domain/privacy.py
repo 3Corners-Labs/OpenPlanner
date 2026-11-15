@@ -157,17 +157,16 @@ ENTITIES: tuple[str, ...] = (ENTITY, REQUEST_ENTITY, CALL_MESSAGE_ENTITY)
 
 CHAT_FIELDS: tuple[str, ...] = ("message_text",)
 """The personal data of ``CallMessage`` (``call_messages``): the text a participant wrote, or a
-staff member wrote to them. Free text by nature, so it is classified ``sensitive`` and is never in
-a log (the mask covers the name ``message_text`` wherever it is a key), an audit event, a job
-payload or an address. The booking's purge deletes the rows (``purge_personal_data``), so the text
-goes with every other field; the contact center keeps its own transcript, which this purge does
-not reach (``docs/dataflow.md``, ADR 0123 point 18). The name is on no list of ``Booking``: it is
-no column of the appointment, and a test checks that the table has exactly these personal columns.
-There is no author name: who wrote is a kind (``app.domain.call_chat.ChatAuthor``) and the name a
+staff member wrote to them. Free text by nature (it would be ``sensitive``; the *Data fields*
+card lists the appointment's fields only) and is never in a log (the mask covers the name
+``message_text`` wherever it is a key), an audit event, a job payload or an address. The
+booking's purge deletes the rows (``purge_personal_data``), so the text goes with every other
+field; the contact center keeps its own transcript, which this purge does not reach
+(``docs/dataflow.md``, ADR 0123 point 18). The name is on no list of ``Booking``: it is no column
+of the appointment, and a test checks that the table has exactly these personal columns. There is
+no author name: who wrote is a kind (``app.domain.call_chat.ChatAuthor``) and the name a
 participant sees is worked out when the thread is read (``embedded_call_staff_name``)."""
 
-CHAT_CLASSIFICATION = Classification.SENSITIVE
-"""How sensitive the chat text is: what the participant told us, in words of their own."""
 
 REQUEST_DATA_FIELDS: tuple[str, ...] = ("first_name", "last_name", "email", "phone", "form_answers")
 """The columns of the request-level record (``request_personal_data``): a subset of

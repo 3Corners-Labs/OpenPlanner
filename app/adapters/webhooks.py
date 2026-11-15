@@ -19,7 +19,7 @@ import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Protocol
 
 from pydantic import SecretStr
 
@@ -252,6 +252,19 @@ class InboundWebhook:
     event_type: Callable[[dict[str, Any]], str]
 
 
+class ChatReader(Protocol):
+    """Reads a platform's message event of a conversation task (ADR 0123 step 7b)."""
+
+    def __call__(
+        self, payload: dict[str, Any], *, assume_appended: bool = False
+    ) -> ChatEvent | None:
+        """Return the chat event of the verified ``payload``, or ``None`` when it is none.
+
+        ``assume_appended``: the body came to the address that carries appended messages only.
+        """
+        ...
+
+
 @dataclass(frozen=True)
 class ContactCenterWebhook(InboundWebhook):
     """A contact-center platform's webhooks (ADR 0032 point 6): the record and its addresses.
@@ -263,14 +276,13 @@ class ContactCenterWebhook(InboundWebhook):
         kind: The platform.
         alias: An older address that still works and where OpenPlanner still registers, until
             the subscriptions move (CC-4); ``None`` for a platform without one.
-        chat: Reads the platform's message events of a conversation task (ADR 0123 step 7b):
-            ``(payload, assume_appended)`` → the chat event, or ``None``; ``None`` for a platform
-            that has no conversation task.
+        chat: Reads the platform's message events of a conversation task (ADR 0123 step 7b);
+            ``None`` for a platform that has no conversation task.
     """
 
     kind: ContactCenterKind
     alias: str | None = None
-    chat: Callable[..., ChatEvent | None] | None = None
+    chat: ChatReader | None = None
 
     def messages_path(self, organisation: str) -> str:
         """Return the address of an organisation's message deliveries (ADR 0124 point 15)."""
@@ -376,7 +388,11 @@ WXCC_MESSAGES = replace(
     previous=_no_secret,
     parse=_no_event,
 )
-"""The deliveries of a conversation's messages: ``/webhooks/contact-center/webex_cc/{org}/messages``
+"""The deliveries of a conversation's messages (kept as a ``ContactCenterWebhook``: the gate's
+``Address`` takes ``verify``, ``secret``, ``previous``, ``parse`` and ``event_type`` of one record,
+so a smaller shape would need a second ``Address`` and a second path through the gate for the
+sake of three stubs; the unused hooks are ``_no_secret`` and ``_no_event``):
+``/webhooks/contact-center/webex_cc/{org}/messages``
 (ADR 0124 point 15). The signature is WxCC's own, as for the events; the secret is the connection's
 message secret. It exists only per organisation and reads chat events, never task events."""
 

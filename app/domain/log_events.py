@@ -2100,6 +2100,17 @@ _AUDIT = (
         "Repeated `origin_mismatch` from your own site: check the proxy's `Host` header.",
     ),
     _e(
+        "chat.limit_reached",
+        _SYS,
+        "outcome",
+        "",
+        "A booking's chat reached its fixed ceiling of messages.",
+        "The contact center delivered as many messages for one appointment as a chat may hold "
+        "(`MAX_MESSAGES_PER_BOOKING`, ADR 0123 step 7b); later deliveries are ignored and "
+        "answered as usual. Written once per booking, with no text.",
+        "Check that the messaging asset's flow does not loop; a real conversation never gets here.",
+    ),
+    _e(
         "retention.sweep",
         _SYS,
         "warning outcome",

@@ -32,7 +32,7 @@ from app.domain.booking import (
 )
 from app.domain.booking_rollup import DayCount, RollableBooking
 from app.domain.branding import Branding, FontFile, FontRole, Logo
-from app.domain.call_chat import CallMessage, ChatAuthor, ChatState
+from app.domain.call_chat import CallMessage, ChatState
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
 from app.domain.capacity import CapacityPool
 from app.domain.change_requests import ChangeRequest
@@ -917,7 +917,7 @@ class InMemoryTransaction(ServiceRequestStore):
         stored.append(replace(message, id=self.state.next_id))
         return True
 
-    async def list_call_messages(self, booking_id: int) -> list[CallMessage]:
+    async def messages_of_call(self, booking_id: int) -> list[CallMessage]:
         return sorted(self.state.call_messages.get(booking_id, []), key=lambda m: (m.at, m.id or 0))
 
     async def confirm_call_message(self, booking_id: int, provider_message_id: str) -> bool:
@@ -937,11 +937,14 @@ class InMemoryTransaction(ServiceRequestStore):
                 count += 1
         return count
 
-    async def participant_message_times(self, booking_id: int, since: datetime) -> list[datetime]:
+    async def count_call_messages(self, booking_id: int) -> int:
+        return len(self.state.call_messages.get(booking_id, []))
+
+    async def sent_call_message_ids(self, booking_id: int) -> list[str]:
         return [
-            m.at
+            m.provider_message_id
             for m in self.state.call_messages.get(booking_id, [])
-            if m.author is ChatAuthor.PARTICIPANT and m.at >= since
+            if m.state is ChatState.SENT
         ]
 
     async def delete_call_messages(self, booking_id: int) -> None:

@@ -419,7 +419,11 @@ No A or B setting: nothing here is needed before login or tied to the host.
 rules; a setting would let an installation widen what the page may reach); the size gate of the
 vendored file; chat off for embedded meetings until a route of point 8 is built; `autoUploadLogs`
 off and the temporary device registration (privacy); the guest token's lifetime (set by Webex);
-the pseudonym key, which is the existing bootstrap key material, not a new secret.
+the pseudonym key, which is the existing bootstrap key material, not a new secret; the most
+messages one booking's chat holds (`MAX_MESSAGES_PER_BOOKING`, 500, step 7b): a protection bound
+against a holder of the message address's secret filling the table (the gate limits requests, not
+rows), not a tuning value, so it is no setting (ADR 0042: a protection is not switched or tuned
+from the portal); a real conversation of an appointment is a few dozen messages.
 
 ## Build status
 

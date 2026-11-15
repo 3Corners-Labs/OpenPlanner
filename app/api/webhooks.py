@@ -39,6 +39,7 @@ from app.adapters.webhooks import (
     InboundWebhook,
 )
 from app.adapters.wxcc_chat import chat_key
+from app.domain.call_chat import ChatEvent
 from app.domain.call_chat_service import CallChatService
 from app.domain.connection_health import InboundEvent, Platform
 from app.domain.integration import EventOutcome, IntegrationService
@@ -140,11 +141,13 @@ async def organisation_messages(request: Request, delivery: MessagesDelivery) ->
     ADR 0124 point 15), signed with the secret of this address. The body is a participant's words
     or a staff member's: it is stored for the booking whose task it names and never logged.
     """
-    return await _record_chat(request, delivery, assume_appended=True)
+    inbound = delivery.address.inbound
+    event = inbound.chat(delivery.payload, assume_appended=True) if inbound.chat else None
+    return await _record_chat(request, delivery, event)
 
 
 async def _record_chat(
-    request: Request, delivery: Delivery[ContactCenterWebhook], *, assume_appended: bool = False
+    request: Request, delivery: Delivery[ContactCenterWebhook], event: ChatEvent | None
 ) -> Response:
     """Read one verified body as a chat event and store it; anything else is acknowledged.
 
@@ -153,11 +156,6 @@ async def _record_chat(
     """
     inbound = delivery.address.inbound
     organisation_id = delivery.address.organisation_id
-    event = (
-        inbound.chat(delivery.payload, assume_appended=assume_appended)
-        if inbound.chat is not None and organisation_id is not None
-        else None
-    )
     outcome = EventOutcome.IGNORED
     if event is not None and organisation_id is not None:
         chat: CallChatService = request.app.state.call_chat_service
@@ -193,8 +191,9 @@ async def _record_task_event(
     event = inbound.parse(delivery.payload)
     if event is None and inbound.chat is not None and delivery.address.organisation_id is not None:
         # A message event of a conversation (ADR 0123 step 7b): the subscription reports them too.
-        if inbound.chat(delivery.payload) is not None:
-            return await _record_chat(request, delivery)
+        message = inbound.chat(delivery.payload)
+        if message is not None:
+            return await _record_chat(request, delivery, message)
     outcome = EventOutcome.IGNORED
     if event is not None:
         outcome = await _service(request).record_task_event(

@@ -50,7 +50,7 @@
   {% else %}
   <p class="hint">{{ _("admin.channels.cc_messages_none") }}</p>
   {% endif %}
-  <form method="post" action="/admin/organisations/{{ organisation.slug }}/channels/contact-center/message-secret" aria-labelledby="contact-center-messages-heading">
+  <form method="post" action="/admin/organisations/{{ organisation.slug }}/channels/contact-center/message-secret">
     <p id="cc-messages-lead">{% if cc.overlap_minutes %}{{ _("admin.channels.cc_messages_make_lead", minutes=cc.overlap_minutes) }}{% else %}{{ _("admin.channels.cc_messages_make_lead_now") }}{% endif %}</p>
     <button type="submit" class="button button--secondary" aria-describedby="cc-messages-lead">{{ _("admin.channels.cc_messages_make") }}</button>
   </form>

@@ -20,12 +20,16 @@ no sender identifier, no name, no origin. The text is personal data (``privacy.C
 never reaches a log, an audit event or a job payload from here; the booking's purge deletes it.
 
 The participant's own messages (the side bar sending) and the page's reading of the thread are
-steps 7c; ``thread`` and the rules in ``app.domain.call_chat`` are what they use.
+step 7c; ``thread`` and the rules in ``app.domain.call_chat`` are what it uses (it applies them;
+nothing calls ``thread`` in step 7b but its test).
 """
 
 from datetime import datetime
 
+from app.domain.audit import SYSTEM_ACTOR, AuditEvent, Outcome, Source
+from app.domain.booking import BookingStatus
 from app.domain.call_chat import (
+    MAX_MESSAGES_PER_BOOKING,
     CallMessage,
     ChatAuthor,
     ChatDirection,
@@ -39,6 +43,11 @@ from app.domain.call_client import UsesCallPage
 from app.domain.contact_center import ContactCenterKind
 from app.domain.integration import EventOutcome, claim_event
 from app.domain.ports import Transaction, UnitOfWork
+
+CLOSED_STATUSES = frozenset({BookingStatus.CANCELLED, BookingStatus.REFUSED})
+"""Booking states whose chat takes nothing more: the appointment is not going ahead."""
+LIMIT_EVENT = "chat.limit_reached"
+"""The system event written once when a booking's chat reaches ``MAX_MESSAGES_PER_BOOKING``."""
 
 
 class CallChatService:
@@ -84,8 +93,9 @@ class CallChatService:
             body_identity: The identity of the verified body, when the event has no key.
 
         Returns:
-            ``RECORDED``, ``DUPLICATE`` (a replay), ``IGNORED`` (a booking without a chat, a
-            message from the flow, or a confirmation of a message that is not ours) or
+            ``RECORDED``, ``DUPLICATE`` (a replay), ``IGNORED`` (a booking without a chat or a
+            cancelled one, a message from the flow, a full chat, or a confirmation or refusal
+            that finds nothing waiting: not remembered, so its redelivery counts) or
             ``UNKNOWN``.
         """
         async with self._uow.locked() as tx:
@@ -98,11 +108,18 @@ class CallChatService:
             task = booking.contact_center_task
             if not has_chat(task.task_kind if task else None, self._uses_page(group)):
                 return EventOutcome.IGNORED
-            if not _worth_keeping(event):
+            if booking.status in CLOSED_STATUSES or not _worth_keeping(event):
+                return EventOutcome.IGNORED
+            # Asked before the replay memory is touched: an event that changes nothing now (a
+            # confirmation whose message is not stored yet) must stay unclaimed, so its redelivery
+            # is processed when the message exists.
+            held = await tx.count_call_messages(booking.id)
+            waiting = await tx.sent_call_message_ids(booking.id)
+            if not _would_change(event, held, waiting):
                 return EventOutcome.IGNORED
             if not await claim_event(tx, source, event_key, scope, body_identity, at):
                 return EventOutcome.DUPLICATE
-            return await _apply(tx, booking.id, event, at)
+            return await _apply(tx, booking.id, event, at, held)
 
     async def thread(self, booking_id: int) -> list[CallMessage]:
         """Return a booking's chat, oldest first.
@@ -111,27 +128,62 @@ class CallChatService:
         a chat (``has_chat``); nothing here looks at either.
         """
         async with self._uow.read() as tx:
-            return await tx.list_call_messages(booking_id)
+            return await tx.messages_of_call(booking_id)
 
 
-async def _apply(tx: Transaction, booking_id: int, event: ChatEvent, at: datetime) -> EventOutcome:
-    """Write what ``event`` says to the booking's thread, in the caller's transaction."""
+def _would_change(event: ChatEvent, held: int, waiting: list[str]) -> bool:
+    """Return whether ``event`` would change the thread now.
+
+    A refusal needs a message waiting, a confirmation the very message it names, and a staff
+    message room under ``MAX_MESSAGES_PER_BOOKING``.
+    """
+    if event.kind is ChatEventKind.APPEND_FAILED:
+        return bool(waiting)
+    if event.direction is ChatDirection.INBOUND:
+        return event.message_id in waiting
+    return held < MAX_MESSAGES_PER_BOOKING
+
+
+async def _apply(
+    tx: Transaction, booking_id: int, event: ChatEvent, at: datetime, held: int
+) -> EventOutcome:
+    """Write what ``event`` says to the booking's thread, in the caller's transaction.
+
+    A staff message is stamped with the time it claims, never later than ``at`` (the gate's time):
+    a signed body cannot put a message in the future. The message that fills the chat leaves one
+    system event ``chat.limit_reached`` (a code, no text).
+    """
     if event.kind is ChatEventKind.APPEND_FAILED:
         await tx.refuse_sent_call_messages(booking_id)
         return EventOutcome.RECORDED
     if event.direction is ChatDirection.INBOUND:
-        confirmed = await tx.confirm_call_message(booking_id, event.message_id)
-        return EventOutcome.RECORDED if confirmed else EventOutcome.IGNORED
+        await tx.confirm_call_message(booking_id, event.message_id)
+        return EventOutcome.RECORDED
     stored = await tx.add_call_message(
         CallMessage(
             booking_id,
             ChatAuthor.STAFF,
             event.message_text,
-            event.at or at,
+            min(event.at or at, at),
             ChatState.DELIVERED,
             event.message_id,
         )
     )
+    if stored and held + 1 >= MAX_MESSAGES_PER_BOOKING:
+        await tx.add_audit_event(
+            AuditEvent(
+                at,
+                SYSTEM_ACTOR,
+                LIMIT_EVENT,
+                Outcome.FAILURE,
+                "limit_reached",
+                None,
+                None,
+                "",
+                Source.SYSTEM,
+                booking_id=booking_id,
+            )
+        )
     return EventOutcome.RECORDED if stored else EventOutcome.DUPLICATE
 
 

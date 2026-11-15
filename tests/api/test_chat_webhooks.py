@@ -66,7 +66,7 @@ class Site:
 
     async def thread(self) -> list[CallMessage]:
         async with SqlUnitOfWork(self.engine).read() as tx:
-            return await tx.list_call_messages(self.booking_id)
+            return await tx.messages_of_call(self.booking_id)
 
     async def post(self, path: str, data: dict[str, Any], secret: str, **fields: Any) -> int:
         payload = {

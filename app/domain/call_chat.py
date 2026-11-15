@@ -34,6 +34,13 @@ INBOUND_TEXT_CAP = 4000
 ``embedded_call_chat_max_chars``): a fixed rule, not a setting. What the participant may send is
 that setting; what the platform delivers is cut here, so one delivery cannot fill the table."""
 
+MAX_MESSAGES_PER_BOOKING = 500
+"""The most messages one booking's chat holds (a conversation of an appointment is a few dozen).
+A fixed protection bound, not a setting (ADR 0042: a protection is not tuned from the portal): the
+holder of the address's secret could otherwise add rows of ``INBOUND_TEXT_CAP`` characters without
+end, because the gate limits requests and not rows. Past it a delivery is ignored (the platform
+still gets its 204) and one system event, ``chat.limit_reached``, says so, once, without text."""
+
 RATE_WINDOW = timedelta(minutes=1)
 """The window ``embedded_call_chat_per_minute`` counts messages in."""
 
@@ -154,7 +161,8 @@ def check_text(text: str, max_chars: int) -> ChatRefusal | None:
     """Return why a participant's message may not be sent, or ``None`` when it may.
 
     A message of only white space is empty. Length counts characters of the text as written
-    (``embedded_call_chat_max_chars``).
+    (``embedded_call_chat_max_chars``). Step 7c applies it to what the participant sends; nothing
+    in step 7b calls it.
     """
     if not text.strip():
         return ChatRefusal.EMPTY
@@ -170,6 +178,8 @@ def within_rate(sent: list[datetime], now: datetime, per_minute: int) -> bool:
         sent: The times the booking's participant messages were sent, any order.
         now: The time of the attempt.
         per_minute: ``embedded_call_chat_per_minute``.
+
+    Step 7c applies it to what the participant sends; nothing in step 7b calls it.
     """
     recent = sum(1 for at in sent if now - RATE_WINDOW < at <= now)
     return recent < per_minute

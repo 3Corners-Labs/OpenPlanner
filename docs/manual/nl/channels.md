@@ -199,7 +199,7 @@ Voor een dienst waarvan de deelnemer een chat naast het gesprek krijgt, bezorgt 
 berichten van het gesprek op een tweede adres op de kaart, **Chatberichten**, dat eindigt op
 `/messages`. Dat adres heeft een eigen geheim, los van het webhookgeheim.
 
-1. Kies **Maak een geheim voor dit adres**. De volgende pagina toont het adres en het geheim
+1. Kies **Geheim voor dit adres maken**. De volgende pagina toont het adres en het geheim
    **één keer**; OpenPlanner bewaart het geheim versleuteld en kan het niet opnieuw tonen.
 2. Zet in de console van het contactcenter het adres als webhookadres van het berichtenkanaal en het
    geheim als geheim ervan.

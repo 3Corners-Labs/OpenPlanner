@@ -7,9 +7,7 @@ purge deletes the rows (``delete_call_messages``). ``provider_message_id`` is un
 a delivery that arrives twice is one row.
 """
 
-from datetime import datetime
-
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import CallMessageRow
@@ -60,7 +58,7 @@ class CallMessageQueries:
         await self._session.flush()
         return True
 
-    async def list_call_messages(self, booking_id: int) -> list[CallMessage]:
+    async def messages_of_call(self, booking_id: int) -> list[CallMessage]:
         """Return a booking's chat, oldest first."""
         rows = await self._session.scalars(
             select(CallMessageRow)
@@ -80,7 +78,7 @@ class CallMessageQueries:
             )
             .values(state=ChatState.DELIVERED.value)
         )
-        return bool(result.rowcount)  # type: ignore[attr-defined]
+        return bool(getattr(result, "rowcount", 0))
 
     async def refuse_sent_call_messages(self, booking_id: int) -> int:
         """Mark every ``sent`` message of the booking ``refused``; return how many.
@@ -96,15 +94,23 @@ class CallMessageQueries:
             )
             .values(state=ChatState.REFUSED.value)
         )
-        return int(result.rowcount)  # type: ignore[attr-defined]
+        return int(getattr(result, "rowcount", 0) or 0)
 
-    async def participant_message_times(self, booking_id: int, since: datetime) -> list[datetime]:
-        """Return when the booking's participant wrote messages at or after ``since``."""
+    async def count_call_messages(self, booking_id: int) -> int:
+        """Return how many messages the booking's chat holds (see ``MAX_MESSAGES_PER_BOOKING``)."""
+        count = await self._session.scalar(
+            select(func.count())
+            .select_from(CallMessageRow)
+            .where(CallMessageRow.booking_id == booking_id)
+        )
+        return int(count or 0)
+
+    async def sent_call_message_ids(self, booking_id: int) -> list[str]:
+        """Return the provider ids of the booking's messages still waiting for confirmation."""
         rows = await self._session.scalars(
-            select(CallMessageRow.at).where(
+            select(CallMessageRow.provider_message_id).where(
                 CallMessageRow.booking_id == booking_id,
-                CallMessageRow.author == ChatAuthor.PARTICIPANT.value,
-                CallMessageRow.at >= since,
+                CallMessageRow.state == ChatState.SENT.value,
             )
         )
         return list(rows)

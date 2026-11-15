@@ -9,12 +9,13 @@ from dataclasses import dataclass, replace
 from datetime import timedelta
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.adapters.db.models import BookingRow, CallMessageRow
+from app.adapters.db.models import AuditEventRow, BookingRow, CallMessageRow
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.call_chat import (
+    MAX_MESSAGES_PER_BOOKING,
     CallMessage,
     ChatAuthor,
     ChatDirection,
@@ -27,9 +28,17 @@ from app.domain.call_chat_service import CallChatService
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef, TaskKind
 from app.domain.integration import EventOutcome
 from app.domain.purge import purge_booking
+from app.domain.retention_sweep import RetentionSweep
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
-from tests.support.domain import NOW, SLOT_0900, TEST_TOKEN_KEY, another_participant, book
+from tests.support.domain import (
+    NOW,
+    SLOT_0900,
+    SLOT_0930,
+    TEST_TOKEN_KEY,
+    another_participant,
+    book,
+)
 from tests.support.seed_rows import seed_group
 
 PROVIDER = ContactCenterKind.WEBEX_CC
@@ -48,7 +57,11 @@ class Setup:
     """One element: whether the booking's service uses the call page (a test flips it)."""
 
     async def deliver(
-        self, event: ChatEvent, key: str = "", organisation_id: int | None = None
+        self,
+        event: ChatEvent,
+        key: str = "",
+        organisation_id: int | None = None,
+        body: str | None = None,
     ) -> EventOutcome:
         return await self.service.record(
             event,
@@ -58,12 +71,12 @@ class Setup:
             organisation_id=self.organisation_id if organisation_id is None else organisation_id,
             event_key=key,
             scope="organisation:1",
-            body_identity=f"body:{key}",
+            body_identity=body if body is not None else f"body:{key}",
         )
 
     async def stored(self) -> list[CallMessage]:
         async with SqlUnitOfWork(self.engine).read() as tx:
-            return await tx.list_call_messages(self.booking_id)
+            return await tx.messages_of_call(self.booking_id)
 
 
 def _agent(text: str = "Goedemiddag", message_id: str = "m-1", task: str = "task-1") -> ChatEvent:
@@ -74,7 +87,7 @@ def _agent(text: str = "Goedemiddag", message_id: str = "m-1", task: str = "task
         ChatSender.AGENT,
         message_id,
         text,
-        NOW + timedelta(seconds=5),
+        NOW - timedelta(seconds=5),
     )
 
 
@@ -147,20 +160,6 @@ async def test_a_message_is_confirmed_once_and_a_refusal_closes_every_one_still_
     }
 
 
-async def test_only_the_participants_messages_count_for_the_rate_and_only_since_the_moment(
-    setup: Setup,
-) -> None:
-    id_ = setup.booking_id
-    async with SqlUnitOfWork(setup.engine).locked() as tx:
-        await tx.add_call_message(_message(id_, "old", at=NOW - timedelta(minutes=5)))
-        await tx.add_call_message(_message(id_, "new", at=NOW))
-        await tx.add_call_message(_message(id_, "staff", at=NOW, author=ChatAuthor.STAFF))
-    async with SqlUnitOfWork(setup.engine).read() as tx:
-        times = await tx.participant_message_times(id_, NOW - timedelta(minutes=1))
-
-    assert times == [NOW]
-
-
 # --- the purge -----------------------------------------------------------------------------------
 
 
@@ -231,7 +230,7 @@ async def test_a_staff_message_is_stored_as_delivered_once_whatever_the_number_o
     assert [(m.author, m.state, m.message_text) for m in stored] == [
         (ChatAuthor.STAFF, ChatState.DELIVERED, "Goedemiddag")
     ]
-    assert stored[0].at == NOW + timedelta(seconds=5)
+    assert stored[0].at == NOW - timedelta(seconds=5)
 
 
 async def test_a_message_without_a_time_gets_the_time_the_gate_used(setup: Setup) -> None:
@@ -311,10 +310,118 @@ async def test_switching_the_page_off_ends_the_chat_for_what_comes_in(setup: Set
 
 
 async def test_the_thread_is_read_oldest_first(setup: Setup) -> None:
-    later = replace(_agent("Tweede", "m-2"), at=NOW + timedelta(seconds=9))
+    later = replace(_agent("Tweede", "m-2"), at=NOW - timedelta(seconds=1))
     await setup.deliver(later, key="a")
     await setup.deliver(_agent("Eerste", "m-1"), key="b")
 
     thread = await setup.service.thread(setup.booking_id)
 
     assert [m.message_text for m in thread] == ["Eerste", "Tweede"]
+
+
+# --- the bound, the closed booking, the clock, a confirmation that comes early -----------------
+
+
+async def _audit_actions(engine: AsyncEngine) -> list[str]:
+    async with engine.connect() as conn:
+        return list((await conn.execute(select(AuditEventRow.action))).scalars())
+
+
+async def test_a_chat_holds_at_most_the_fixed_number_of_messages_and_says_so_once(
+    setup: Setup,
+) -> None:
+    """The gate limits requests, not rows: a secret holder cannot grow the table without end."""
+    async with SqlUnitOfWork(setup.engine).locked() as tx:
+        for number in range(MAX_MESSAGES_PER_BOOKING - 1):
+            await tx.add_call_message(_message(setup.booking_id, f"seed-{number}"))
+
+    last = await setup.deliver(_agent(message_id="the-500th"), key="k500")
+    over = await setup.deliver(_agent(message_id="the-501st"), key="k501")
+    more = await setup.deliver(_agent(message_id="the-502nd"), key="k502")
+
+    async with SqlUnitOfWork(setup.engine).read() as tx:
+        held = await tx.count_call_messages(setup.booking_id)
+    assert (last, over, more) == (EventOutcome.RECORDED, EventOutcome.IGNORED, EventOutcome.IGNORED)
+    assert held == MAX_MESSAGES_PER_BOOKING == 500
+    assert (await _audit_actions(setup.engine)).count("chat.limit_reached") == 1
+
+
+async def test_a_cancelled_booking_takes_no_more_messages(setup: Setup) -> None:
+    async with setup.engine.begin() as conn:
+        await conn.execute(
+            update(BookingRow).where(BookingRow.id == setup.booking_id).values(status="cancelled")
+        )
+
+    outcome = await setup.deliver(_agent(), key="k")
+
+    assert outcome is EventOutcome.IGNORED
+    assert await setup.stored() == []
+
+
+async def test_a_message_cannot_claim_a_time_after_the_gates_own(setup: Setup) -> None:
+    future = replace(_agent(), at=NOW + timedelta(days=3))
+    past = replace(_agent(message_id="m-past"), at=NOW - timedelta(minutes=2))
+
+    await setup.deliver(future, key="a")
+    await setup.deliver(past, key="b")
+
+    assert [m.at for m in await setup.stored()] == [NOW - timedelta(minutes=2), NOW]
+
+
+async def test_a_confirmation_that_comes_before_its_message_is_processed_when_it_comes_again(
+    setup: Setup,
+) -> None:
+    """The row is committed after the request returns: an early confirmation is no replay."""
+    confirmation = ChatEvent(ChatEventKind.APPENDED, "task-1", message_id="mine")
+
+    early = await setup.deliver(confirmation, key="same-event")
+    async with SqlUnitOfWork(setup.engine).locked() as tx:
+        await tx.add_call_message(_message(setup.booking_id, "mine"))
+    late = await setup.deliver(confirmation, key="same-event")
+    again = await setup.deliver(confirmation, key="same-event")
+
+    assert (early, late, again) == (
+        EventOutcome.IGNORED,
+        EventOutcome.RECORDED,
+        EventOutcome.IGNORED,
+    )
+    assert [m.state for m in await setup.stored()] == [ChatState.DELIVERED]
+
+
+async def test_a_refusal_with_nothing_waiting_is_not_remembered_and_two_bodies_are_two_refusals(
+    setup: Setup,
+) -> None:
+    """Without a message id a refusal is told apart by its signed body, which carries its time."""
+    failed = ChatEvent(ChatEventKind.APPEND_FAILED, "task-1")
+
+    nothing = await setup.deliver(failed, key="", body="body:t1")
+    async with SqlUnitOfWork(setup.engine).locked() as tx:
+        await tx.add_call_message(_message(setup.booking_id, "first"))
+    first = await setup.deliver(failed, key="", body="body:t1")  # now there is something
+    async with SqlUnitOfWork(setup.engine).locked() as tx:
+        await tx.add_call_message(_message(setup.booking_id, "second"))
+    replay = await setup.deliver(failed, key="", body="body:t1")  # the same signed body
+    second = await setup.deliver(failed, key="", body="body:t2")  # another second, another body
+
+    states = {m.provider_message_id: m.state for m in await setup.stored()}
+    assert (nothing, first, replay, second) == (
+        EventOutcome.IGNORED,
+        EventOutcome.RECORDED,
+        EventOutcome.DUPLICATE,
+        EventOutcome.RECORDED,
+    )
+    assert states == {"first": ChatState.REFUSED, "second": ChatState.REFUSED}
+
+
+async def test_the_nightly_sweep_deletes_the_chat_of_a_booking_the_purge_job_missed(
+    setup: Setup,
+) -> None:
+    """The safety net under the purge job reaches the same delete (threat model, retention)."""
+    async with SqlUnitOfWork(setup.engine).locked() as tx:
+        await tx.add_call_message(_message(setup.booking_id, "a", message_text="Mijn vraag"))
+    clock = FixedClock(SLOT_0930 + timedelta(hours=26))
+
+    result = await RetentionSweep(SqlUnitOfWork(setup.engine), clock).run()
+
+    assert (result.overdue, result.purged) == (1, 1)
+    assert await setup.stored() == []

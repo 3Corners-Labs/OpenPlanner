@@ -11,8 +11,9 @@ nothing it knew.
   platform's identifier of the message: unique per booking, so a delivery that comes twice is one
   row. The rows go with their booking (``ON DELETE CASCADE``) and with its purge.
 
-Downgrade drops the table; the messages of a conversation are lost, which is what a rollback past
-this step means (the contact center keeps its own transcript).
+Downgrade drops the table, and with it the text of every chat: personal data that is deleted, not
+kept anywhere (the contact center keeps its own transcript). That is what a rollback past this step
+means.
 
 Revision ID: 0121
 Revises: 0120
