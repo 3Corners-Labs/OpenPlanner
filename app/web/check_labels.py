@@ -17,6 +17,8 @@ FINDING_LABELS: dict[str, str] = {
     "webex.browser_link_ok": "admin.check.webex.browser_link_ok",
     "webex.browser_link_lost": "admin.check.webex.browser_link_lost",
     "webex.browser_link_unreachable": "admin.check.webex.browser_link_unreachable",
+    "webex.guest_ok": "admin.check.webex.guest_ok",
+    "webex.guest_refused": "admin.check.webex.guest_refused",
     "webex.probe_left": "admin.check.webex.probe_left",
     "webex.trial_ok": "admin.check.webex.trial_ok",
     "webex.trial_refused": "admin.check.webex.trial_refused",

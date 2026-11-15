@@ -168,6 +168,7 @@ from app.domain.booking import (
     TrialCall,
 )
 from app.domain.branding import Branding, FontFile, FontRef, FontRole, HeaderStyle, Logo, LogoRef
+from app.domain.call_page import OtherWayOffer
 from app.domain.calls import (
     BookingEvent,
     BookingOverview,
@@ -293,6 +294,11 @@ def _group(row: GroupRow, center: GroupContactCenterRow | None) -> Group:
         trial_call_minutes=row.trial_call_minutes,
         trial_calls_per_booking=row.trial_calls_per_booking,
         join_client=JoinClient(row.join_client),
+        embedded_call_webex_option=(
+            OtherWayOffer(row.embedded_call_webex_option)
+            if row.embedded_call_webex_option
+            else None
+        ),
         embedding_enabled=row.embedding_enabled,
         queue_visible_from_minutes=row.queue_visible_from_minutes,
         queue_free_pick_allowed=row.queue_free_pick_allowed,
@@ -388,6 +394,9 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "trial_call_minutes": group.trial_call_minutes,
         "trial_calls_per_booking": group.trial_calls_per_booking,
         "join_client": group.join_client.value,
+        "embedded_call_webex_option": (
+            group.embedded_call_webex_option.value if group.embedded_call_webex_option else None
+        ),
         "embedding_enabled": group.embedding_enabled,
         "queue_visible_from_minutes": group.queue_visible_from_minutes,
         "queue_free_pick_allowed": group.queue_free_pick_allowed,

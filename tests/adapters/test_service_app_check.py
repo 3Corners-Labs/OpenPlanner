@@ -15,6 +15,7 @@ from app.adapters.service_app_check import (
     service_app_check,
 )
 from app.adapters.vendored_files import VendoredFile
+from app.domain.guest_access import GUEST_FACT, GUEST_PROBE
 from tests.fakes.clock import FixedClock
 from tests.fakes.tokens import webex_tokens
 
@@ -108,6 +109,11 @@ def test_a_report_round_trips_without_tokens_or_bodies() -> None:
 
     assert body["passed"] is True  # the v1 probe is secondary
     assert body["wxcc"] is True
+    assert body[GUEST_FACT] is False  # no guest line in these results
+    assert report_body([*LINES, CheckResult(GUEST_PROBE, 200, True, "ok")], True)[GUEST_FACT]
+    assert not report_body([*LINES, CheckResult(GUEST_PROBE, 403, False, "scope")], True)[
+        GUEST_FACT
+    ]
     assert results_from_report(body) == LINES
     assert results_from_report({"results": [{"status": 200}, "junk"]}) == []
     assert "token" not in str(body).lower().replace("token refresh", "")

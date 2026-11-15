@@ -764,6 +764,21 @@
           "minimum": 0,
           "maximum": 60
         },
+        "embedded_call_webex_option": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "on_failure",
+                "always"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "embedding_enabled": {
           "type": "boolean"
         },
@@ -903,7 +918,8 @@
           "type": "string",
           "enum": [
             "browser",
-            "choice"
+            "choice",
+            "embedded"
           ]
         },
         "legacy_pool": {

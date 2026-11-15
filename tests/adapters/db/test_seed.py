@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.db.seed import (
     BROWSERS,
+    CALL_GROUP_SLUG,
     CLOSED_GROUP_SLUG,
     DEMO_SLUG,
     FIRST_WEEKEND_DAY,
@@ -24,6 +25,7 @@ from app.domain.booking import Booking, BookingStatus
 from app.domain.booking_changes import planner_may_change, planner_may_request_rebook
 from app.domain.calls import JoinState, join_state
 from app.domain.ports import Transaction
+from app.domain.scheduling import JoinClient
 from app.domain.tokens import hash_token
 from app.domain.trial_call import TrialState, trial_state
 from tests.support.domain import NOW
@@ -106,6 +108,25 @@ async def test_a_second_run_adds_only_a_new_booking_link(engine: AsyncEngine) ->
     assert len(closures) == 1
     assert second.suspended_booking != first.suspended_booking
     assert first.trial_page == f"{first.suspended_booking}/test"
+
+
+async def test_the_call_pages_booking_belongs_to_a_team_that_chose_the_page(
+    engine: AsyncEngine,
+) -> None:
+    await seed_demo(engine)
+
+    examples = await seed_closure_examples(engine, NOW, KEY)
+
+    async with SqlUnitOfWork(engine).read() as tx:
+        call = await tx.get_group(CALL_GROUP_SLUG)
+        journey = await tx.get_group(JOURNEY_GROUP_SLUG)
+        booking = await _by_link(tx, examples.call_page)
+    assert call is not None
+    assert journey is not None
+    assert call.join_client is JoinClient.EMBEDDED
+    assert call.video_enabled
+    assert journey.join_client is JoinClient.BROWSER  # the journey keeps the redirect
+    assert booking.group_id == call.id
 
 
 async def test_the_journey_has_two_confirmed_bookings_per_browser(engine: AsyncEngine) -> None:
