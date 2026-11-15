@@ -1,6 +1,7 @@
 {% extends "admin/layout.html" %}
 {% from "admin/_icons.html" import icon %}
 {% from "admin/_fields.html" import field with context %}
+{% from "admin/_setting_form.html" import setting_row, setting_head with context %}
 {% block title %}{{ _("admin.updates.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -44,34 +45,11 @@
   </div>
   {% if channel_card.editable %}
   <form method="post" action="/admin/updates/channel">
-    <div class="field">
-      {% if channel_card.channel.locked %}
-      <span class="field__label">{{ _("admin.updates.channel") }}</span>
-      <p>{{ _("admin.updates.channel." ~ channel_card.channel.value) }}</p>
-      <p class="hint">{{ _("admin.settings.locked") }}: <code>{{ channel_card.channel.variable }}</code></p>
-      {% else %}
-      <label for="value-update_channel">{{ _("admin.updates.channel") }}</label>
-      <select id="value-update_channel" name="update_channel" aria-describedby="hint-update_channel">
-        {% for choice in ("release", "rc") %}<option value="{{ choice }}"{% if choice == channel_card.channel.value %} selected{% endif %}>{{ _("admin.updates.channel." ~ choice) }}</option>{% endfor %}
-      </select>
-      <p class="hint" id="hint-update_channel">{{ _("admin.updates.channel_card.channel_hint") }}</p>
-      {% endif %}
+    <div class="settings-list">
+      {{ setting_head() }}
+      {% for row in channel_card.rows %}{{ setting_row(row, "/admin/updates", "") }}{% endfor %}
     </div>
-    <div class="field">
-      {% if channel_card.auto_apply.locked %}
-      <span class="field__label">{{ _("admin.updates.channel_card.auto_apply") }}</span>
-      <p>{% if channel_card.auto_apply.value == "true" %}{{ _("admin.settings.value.on") }}{% else %}{{ _("admin.settings.value.off") }}{% endif %}</p>
-      <p class="hint">{{ _("admin.settings.locked") }}: <code>{{ channel_card.auto_apply.variable }}</code></p>
-      {% else %}
-      <label for="value-update_auto_apply">{{ _("admin.updates.channel_card.auto_apply") }}</label>
-      <select id="value-update_auto_apply" name="update_auto_apply" aria-describedby="hint-update_auto_apply">
-        <option value="true"{% if channel_card.auto_apply.value == "true" %} selected{% endif %}>{{ _("admin.settings.value.on") }}</option>
-        <option value="false"{% if channel_card.auto_apply.value != "true" %} selected{% endif %}>{{ _("admin.settings.value.off") }}</option>
-      </select>
-      <p class="hint" id="hint-update_auto_apply">{{ _("admin.updates.channel_card.auto_apply_hint") }}</p>
-      {% endif %}
-    </div>
-    {% if not (channel_card.channel.locked and channel_card.auto_apply.locked) %}
+    {% if channel_card.rows | selectattr("editable") | list %}
     <div class="form-actions">
       <button type="submit" class="button">{{ _("admin.updates.channel_card.save") }}</button>
     </div>

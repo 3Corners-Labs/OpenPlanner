@@ -18,7 +18,7 @@ one, which shows the open request's steps itself.
     POST /admin/updates/snooze                  hide the banner for 60 minutes (this session)
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo
@@ -26,8 +26,10 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Query, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
+from app.adapters.live_settings import LiveSettings
 from app.admin.authz import AdminContext, RequirePermission, can_function, session_principal
 from app.admin.forms import (
+    CODE_MESSAGES,
     Field,
     FormData,
     done_message,
@@ -38,6 +40,7 @@ from app.admin.forms import (
 from app.admin.pages import Locale, SameOrigin, admin_moment, templates
 from app.admin.pages import page as _page
 from app.admin.return_to import safe_next
+from app.admin.settings_routes import SettingRow, input_value, setting_row_for
 from app.domain.audit import AuditEntry
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError, ErrorCode
@@ -120,60 +123,55 @@ class Banner:
 
 
 @dataclass(frozen=True)
-class ChannelControl:
-    """One of the two settings of the channel card.
-
-    Attributes:
-        key: The setting's key, also the form field's name.
-        value: The effective value as the form submits it (``rc``, ``true``).
-        variable: The environment variable that locks it.
-        locked: Whether the environment locks it (shown with the reason, no control).
-    """
-
-    key: str
-    value: str
-    variable: str
-    locked: bool
-
-
-@dataclass(frozen=True)
 class ChannelCard:
-    """The channel card: the two settings, and whether this admin may change them.
+    """The channel card: the two settings as Advanced settings shows them, in one form.
 
     Attributes:
-        channel: The channel setting.
-        auto_apply: The automatic-updates setting.
+        rows: The channel and the automatic-updates setting; a locked one has no control.
         editable: Whether the viewer holds ``settings.platform.manage`` (superuser).
         settings_link: A link to Advanced settings, topic Updates; empty when the viewer may
             not see it.
     """
 
-    channel: ChannelControl
-    auto_apply: ChannelControl
+    rows: list[SettingRow]
     editable: bool
     settings_link: str
 
 
-async def _channel_card(request: Request, context: AdminContext) -> ChannelCard:
+async def _channel_card(
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    refusal: tuple[str, DomainError] | None = None,
+) -> ChannelCard:
     """Read the two settings through the same states Advanced settings shows.
 
     The stored values are read again first, so the card shows what the processes now apply.
     """
-    await request.app.state.live_settings.refresh()
-    states = {s.spec.key: s for s in request.app.state.live_settings.states()}
-
-    def control(key: str) -> ChannelControl:
-        state = states[key]
-        value = str(state.value).lower()
-        return ChannelControl(key, value, state.spec.env, state.locked)
-
+    live: LiveSettings = request.app.state.live_settings
+    await live.refresh()
     can = can_function(context.principal)
-    return ChannelCard(
-        control(CHANNEL_KEY),
-        control(AUTO_APPLY_KEY),
-        can(Permission.SETTINGS_PLATFORM_MANAGE),
-        SETTINGS_LINK if can(Permission.SETTINGS_PLATFORM_VIEW) else "",
-    )
+    manage = can(Permission.SETTINGS_PLATFORM_MANAGE)
+    states = {s.spec.key: s for s in live.states()}
+    rows = [
+        replace(
+            setting_row_for(
+                states[key],
+                locale,
+                manage=manage,
+                error=(
+                    locale.gettext(CODE_MESSAGES.get(refusal[1].code, "error.invalid_request"))
+                    if refusal and refusal[0] == key
+                    else None
+                ),
+            ),
+            from_portal=False,  # the card has no reset: Advanced settings has
+            adoptable=False,
+        )
+        for key in (CHANNEL_KEY, AUTO_APPLY_KEY)
+    ]
+    link = SETTINGS_LINK if can(Permission.SETTINGS_PLATFORM_VIEW) else ""
+    return ChannelCard(rows, manage, link)
 
 
 @dataclass(frozen=True)
@@ -426,14 +424,18 @@ async def _overview(
     context: AdminContext,
     error: DomainError | None = None,
     form: FormData | None = None,
+    refused_setting: tuple[str, DomainError] | None = None,
 ) -> HTMLResponse:
-    """Render the updates page, with the refusal of a request or the form's errors."""
+    """Render the updates page, with the refusal of a request or the form's errors.
+
+    ``refused_setting`` is the setting of the channel card a change was refused for.
+    """
     service = update_service(request)
     found = await service.overview(context.principal)
     entries = await service.history(context.principal)
     check = found.check
     live = _progress(request, locale, found) if found.open else None
-    channel_card = await _channel_card(request, context)
+    channel_card = await _channel_card(request, locale, context, refused_setting)
     response = _page(
         request,
         locale,
@@ -622,14 +624,16 @@ async def change_channel(
     """
     form = await read_form(request, locale)
     service: SettingsService = request.app.state.settings_service
-    await request.app.state.live_settings.refresh()
-    states = {s.spec.key: s for s in request.app.state.live_settings.states()}
+    live: LiveSettings = request.app.state.live_settings
+    await live.refresh()
+    states = {s.spec.key: s for s in live.states()}
+    key = CHANNEL_KEY
     try:
         for key in (CHANNEL_KEY, AUTO_APPLY_KEY):
             raw = form.text(key)
-            if raw and raw != str(states[key].value).lower():
+            if raw and raw != input_value(states[key]):
                 await service.change(context.principal, key, raw)
     except DomainError as error:
         raise_refusal(error)
-        return await _overview(request, locale, context, error)
+        return await _overview(request, locale, context, error, refused_setting=(key, error))
     return redirect_done(URL, "channel_saved")

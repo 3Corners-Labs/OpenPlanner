@@ -14622,14 +14622,8 @@ msgstr "Update channel"
 msgid "admin.updates.channel_card.lead"
 msgstr "Choose which versions this installation is offered, and whether it requests a newer version itself. These are the same settings as in Advanced settings, topic Updates."
 
-msgid "admin.updates.channel_card.channel_hint"
-msgstr "Release candidates are not available in production: production follows releases."
 
-msgid "admin.updates.channel_card.auto_apply"
-msgstr "Update itself"
 
-msgid "admin.updates.channel_card.auto_apply_hint"
-msgstr "The worker requests a newer version as soon as the check finds one. In production this only takes effect with an update window."
 
 msgid "admin.updates.channel_card.save"
 msgstr "Save channel"

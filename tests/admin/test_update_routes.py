@@ -522,6 +522,7 @@ async def test_rc_stays_refused_in_production(site: Site) -> None:
         CHANNEL_POST, data={"update_channel": "rc"}, headers=SAME_ORIGIN
     )
     assert refused.status_code == 409
+    assert 'id="error-update_channel"' in refused.text  # the refusal sits at the field
     assert '<option value="rc" selected>' not in (await site.client.get("/admin/updates")).text
 
 

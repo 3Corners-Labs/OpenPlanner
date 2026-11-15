@@ -14635,14 +14635,8 @@ msgstr "Updatekanaal"
 msgid "admin.updates.channel_card.lead"
 msgstr "Kies welke versies deze installatie aangeboden krijgt en of zij zelf een nieuwere versie aanvraagt. Dit zijn dezelfde instellingen als in Geavanceerde instellingen, onderwerp Updates."
 
-msgid "admin.updates.channel_card.channel_hint"
-msgstr "Releasekandidaten zijn in productie niet beschikbaar: productie volgt releases."
 
-msgid "admin.updates.channel_card.auto_apply"
-msgstr "Zelf updaten"
 
-msgid "admin.updates.channel_card.auto_apply_hint"
-msgstr "De worker vraagt een nieuwere versie aan zodra de controle er een vindt. In productie werkt dit alleen met een updatevenster."
 
 msgid "admin.updates.channel_card.save"
 msgstr "Kanaal opslaan"
