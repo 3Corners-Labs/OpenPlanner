@@ -394,7 +394,7 @@ async def change_topic(
         if spec.topic.value != topic or spec.key not in form.values or spec.key == SOURCE_KEY:
             continue
         raw = form.text(spec.key)
-        if (spec.secret and not raw) or (not spec.secret and raw == _input(state)):
+        if (spec.secret and not raw) or (not spec.secret and raw == input_value(state)):
             continue
         hours = _hours(form.text("hours")) if spec.key == LOG_LEVEL else None
         try:
@@ -898,31 +898,43 @@ def _sections(
         if not state.spec.in_portal or state.spec.key == SOURCE_KEY:  # its own block (ADR 0070)
             continue
         by_topic.setdefault(state.spec.topic, []).append(
-            SettingRow(
-                _(SETTING_LABELS[state.spec.key]),
-                state.spec.env,
-                _value(state, locale),
-                _(SOURCE_LABELS[state.source]),
-                state.locked,
-                state.outside_bounds,
-                state.portal_ignored,
-                key=state.spec.key,
-                editable=manage and editable(state.spec) and not state.locked,
-                input=_input(state),
-                choices=state.spec.choices,
-                from_portal=state.source.value == "portal",
-                expires=state.spec.key == LOG_LEVEL,
-                error=errors.get(state.spec.key),
-                secret=state.spec.secret,
-                adoptable=manage
-                and editable(state.spec)
-                and state.locked
-                and state.spec.key not in stored,
-                adopted=state.locked and state.spec.key in stored,
-                boolean=state.spec.kind is Kind.BOOL,
+            setting_row_for(
+                state, locale, manage=manage, error=errors.get(state.spec.key), stored=stored
             )
         )
     return topic_sections("platform.settings.values", by_topic, locale)
+
+
+def setting_row_for(
+    state: SettingState,
+    locale: RequestLocale,
+    *,
+    manage: bool,
+    error: str | None = None,
+    stored: frozenset[str] = frozenset(),
+) -> SettingRow:
+    """Build the row of one class C or D setting (Advanced settings and the Updates card)."""
+    _ = locale.gettext
+    return SettingRow(
+        _(SETTING_LABELS[state.spec.key]),
+        state.spec.env,
+        _value(state, locale),
+        _(SOURCE_LABELS[state.source]),
+        state.locked,
+        state.outside_bounds,
+        state.portal_ignored,
+        key=state.spec.key,
+        editable=manage and editable(state.spec) and not state.locked,
+        input=input_value(state),
+        choices=state.spec.choices,
+        from_portal=state.source.value == "portal",
+        expires=state.spec.key == LOG_LEVEL,
+        error=error,
+        secret=state.spec.secret,
+        adoptable=manage and editable(state.spec) and state.locked and state.spec.key not in stored,
+        adopted=state.locked and state.spec.key in stored,
+        boolean=state.spec.kind is Kind.BOOL,
+    )
 
 
 def _value(state: SettingState, locale: RequestLocale) -> str:
@@ -937,7 +949,7 @@ def _value(state: SettingState, locale: RequestLocale) -> str:
     return str(state.value)
 
 
-def _input(state: SettingState) -> str:
+def input_value(state: SettingState) -> str:
     """Return the value as the form's input shows it (empty for a secret or no value)."""
     if state.spec.secret or state.value is None:
         return ""

@@ -550,6 +550,9 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/updates/update": {
         "/admin/updates/update": statuses(409, 403, 403, 403, 403, 403, 403)
     },
+    "POST /admin/updates/channel": {
+        "/admin/updates/channel": statuses(303, 403, 403, 403, 403, 403, 403),
+    },
     "POST /admin/updates/restore": {
         "/admin/updates/restore": statuses(409, 403, 403, 403, 403, 403, 403),
     },

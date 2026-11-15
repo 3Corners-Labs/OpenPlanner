@@ -1,6 +1,7 @@
 {% extends "admin/layout.html" %}
 {% from "admin/_icons.html" import icon %}
 {% from "admin/_fields.html" import field with context %}
+{% from "admin/_setting_form.html" import setting_row, setting_head with context %}
 {% block title %}{{ _("admin.updates.title") }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -35,6 +36,30 @@
       <button type="submit" class="button button--secondary"{% if overview.check_requested %} disabled{% endif %}>{{ _("admin.updates.check_now") }}</button>
     </div>
   </form>
+  {% endif %}
+</section>
+<section class="card" aria-labelledby="channel-heading">
+  <div class="card__header">
+    <h2 id="channel-heading">{{ _("admin.updates.channel_card.heading") }}</h2>
+    <p class="card__lead">{{ _("admin.updates.channel_card.lead") }}</p>
+  </div>
+  {% if channel_card.editable %}
+  <form method="post" action="/admin/updates/channel">
+    <div class="settings-list">
+      {{ setting_head() }}
+      {% for row in channel_card.rows %}{{ setting_row(row, "/admin/updates", "") }}{% endfor %}
+    </div>
+    {% if channel_card.rows | selectattr("editable") | list %}
+    <div class="form-actions">
+      <button type="submit" class="button">{{ _("admin.updates.channel_card.save") }}</button>
+    </div>
+    {% endif %}
+  </form>
+  {% else %}
+  <p>{{ _("admin.updates.channel_card.read_only") }}</p>
+  {% endif %}
+  {% if channel_card.settings_link %}
+  <p><a href="{{ channel_card.settings_link }}">{{ _("admin.updates.channel_card.settings_link") }}</a></p>
   {% endif %}
 </section>
 {% if progress %}

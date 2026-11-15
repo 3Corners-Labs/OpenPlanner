@@ -14676,3 +14676,24 @@ msgstr "U kunt een schermnaam instellen zodra uw login is vastgelegd. Log uit en
 
 msgid "admin.profile.screen_name.erased"
 msgstr "Uw gegevens zijn gewist. Een schermnaam kunt u weer instellen na uw volgende login."
+
+msgid "admin.done.channel_saved"
+msgstr "Het updatekanaal is opgeslagen. De installatie past het binnen tien seconden toe."
+
+msgid "admin.updates.channel_card.heading"
+msgstr "Updatekanaal"
+
+msgid "admin.updates.channel_card.lead"
+msgstr "Kies welke versies deze installatie aangeboden krijgt en of zij zelf een nieuwere versie aanvraagt. Dit zijn dezelfde instellingen als in Geavanceerde instellingen, onderwerp Updates."
+
+
+
+
+msgid "admin.updates.channel_card.save"
+msgstr "Kanaal opslaan"
+
+msgid "admin.updates.channel_card.read_only"
+msgstr "Alleen een superuser kan het kanaal wijzigen."
+
+msgid "admin.updates.channel_card.settings_link"
+msgstr "Wijzig de lijn en het updatevenster in Geavanceerde instellingen"
