@@ -81,8 +81,32 @@ def _names(tree: ast.AST) -> set[str]:
     return found
 
 
+def _definition(root: Path, entry: Entry) -> ast.AST:
+    """Return the definition of the symbol in its file.
+
+    Raises:
+        LookupError: The file is missing or does not define the symbol, so a renamed or deleted
+            symbol fails the check instead of measuring as zero.
+    """
+    try:
+        tree = ast.parse((root / entry.path).read_text(encoding="utf-8"))
+    except FileNotFoundError as error:
+        raise LookupError(entry.symbol) from error
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef) and (
+            node.name == entry.symbol
+        ):
+            return node
+    raise LookupError(entry.symbol)
+
+
 def afferent(root: Path, entry: Entry) -> int:
-    """Count the files of ``app/`` besides the defining one that name the symbol."""
+    """Count the files of ``app/`` besides the defining one that name the symbol.
+
+    Raises:
+        LookupError: The symbol is not defined in its file.
+    """
+    _definition(root, entry)
     own = (root / entry.path).resolve()
     count = 0
     for file in sorted((root / "app").rglob("*.py")):
@@ -100,19 +124,14 @@ def efferent(root: Path, entry: Entry) -> int:
     Raises:
         LookupError: The symbol is not defined in its file.
     """
-    tree = ast.parse((root / entry.path).read_text(encoding="utf-8"))
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef) and (
-            node.name == entry.symbol
-        ):
-            called: set[str] = set()
-            for inner in ast.walk(node):
-                if isinstance(inner, ast.Call):
-                    func = inner.func
-                    called.add(func.id if isinstance(func, ast.Name) else getattr(func, "attr", ""))
-            called.discard("")
-            return len(called)
-    raise LookupError(entry.symbol)
+    node = _definition(root, entry)
+    called: set[str] = set()
+    for inner in ast.walk(node):
+        if isinstance(inner, ast.Call):
+            func = inner.func
+            called.add(func.id if isinstance(func, ast.Name) else getattr(func, "attr", ""))
+    called.discard("")
+    return len(called)
 
 
 def measure(root: Path, entry: Entry) -> int:
@@ -155,7 +174,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
     args = parser.parse_args(argv)
-    failures, hints = report(args.root, load())
+    try:
+        entries = load(BUDGET_FILE)
+    except (ValueError, KeyError, OSError) as error:
+        print(f"coupling: the budget file is unusable: {error}", file=sys.stderr)
+        return 1
+    failures, hints = report(args.root, entries)
     for line in hints:
         print(f"hint: {line}")
     for line in failures:

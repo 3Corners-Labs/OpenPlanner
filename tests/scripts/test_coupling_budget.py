@@ -52,6 +52,28 @@ def test_a_measure_far_under_its_ceiling_only_hints(tmp_path: Path) -> None:
     assert len(hints) == 1
 
 
+def test_a_missing_afferent_symbol_fails_instead_of_counting_zero(tmp_path: Path) -> None:
+    failures, hints = cb.report(_tree(tmp_path), [_entry("Renamed", "afferent", 5)])
+    assert failures == ["Renamed: not found in app/core.py"]
+    assert hints == []
+
+
+def test_a_missing_defining_file_fails(tmp_path: Path) -> None:
+    entry = _entry("Thing", "afferent", 5, path="app/gone.py")
+    failures, _ = cb.report(_tree(tmp_path), [entry])
+    assert failures == ["Thing: not found in app/gone.py"]
+
+
+def test_main_reports_an_unusable_budget_file_without_a_traceback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    bad = tmp_path / "budget.json"
+    bad.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(cb, "BUDGET_FILE", bad)
+    assert cb.main(["--root", str(tmp_path)]) == 1
+    assert "unusable" in capsys.readouterr().err
+
+
 def test_a_missing_symbol_fails(tmp_path: Path) -> None:
     failures, _ = cb.report(_tree(tmp_path), [_entry("gone", "efferent", 5)])
     assert failures == ["gone: not found in app/core.py"]
