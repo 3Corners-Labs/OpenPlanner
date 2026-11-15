@@ -35,6 +35,7 @@ from app.adapters.crypto import SecretBox
 from app.adapters.db.admin_sessions import AdminSessionQueries
 from app.adapters.db.alert_targets import AlertTargetQueries
 from app.adapters.db.api_clients import ApiClientQueries
+from app.adapters.db.call_messages import CallMessageQueries
 from app.adapters.db.call_status_rows import call_status_of
 from app.adapters.db.capacity_pools import CapacityPoolQueries
 from app.adapters.db.certificate import CertificateQueries
@@ -533,6 +534,7 @@ class SqlTransaction(
     CertificateQueries,
     PublicAddressQueries,
     SecretSightingQueries,
+    CallMessageQueries,
     OwnCertificateQueries,
 ):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
@@ -1957,7 +1959,8 @@ class SqlTransaction(
         """Delete the personal fields and provider links of a booking (ADR 0102 point 11).
 
         Sets every column of ``privacy.PURGED_FIELDS`` to NULL, empties the message of the
-        booking's timeline events, replaces the management token hash by a random value (the
+        booking's timeline events, deletes the booking's chat messages (``privacy.CHAT_FIELDS``),
+        replaces the management token hash by a random value (the
         column is unique and not null; the old hash can no longer find the booking) and records
         ``pii_purged_at``. The salt stays: without the token it identifies nothing.
 
@@ -1990,6 +1993,8 @@ class SqlTransaction(
             )
             .values({name: None for name in REQUEST_DERIVED_FIELDS})
         )
+        # ADR 0123 step 7b: the text of the booking's chat is personal data (``CHAT_FIELDS``).
+        await self.delete_call_messages(booking_id)
         # ADR 0093 point 5: a purged booking leaves every participant link session.
         await self._session.execute(
             delete(ParticipantLinkBookingRow).where(

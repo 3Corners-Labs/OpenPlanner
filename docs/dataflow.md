@@ -313,8 +313,29 @@ worker/web ──HTTPS──> WxCC Task Messages v2 (mediaType customMessaging),
 | The routing's task kind | `group_contact_center.task_kind` | the group's settings | until changed; no personal data | no |
 | The kind a task was created with | `bookings.contact_center_task_kind` | the dispatch | with the booking row; a kind is no personal data and is not purged | no |
 | The first message | not stored: composed at dispatch from the catalogue and the allowed fields | the booking | not kept by OpenPlanner | to WxCC, as the conversation's first text (no other field of the booking: no surname, address, phone number, form answer or note) |
-| A participant's later message (from step 7b) | stored only from step 7b; nothing sends one in 7a | the participant | step 7b states it and puts it on the list of `app/domain/privacy.py` | to WxCC as the text of an appended message |
+| A participant's later message (from step 7c) | `call_messages.message_text`, stored when the page sends it (step 7c); nothing sends one yet | the participant | with the booking's purge (see the chat below) | to WxCC as the text of an appended message |
 | The conversation's transcript | **at the contact center**: it keeps the transcript and the thread per participant identifier and business address, and masks card numbers | the contact center | the contact center's own; **OpenPlanner's purge does not reach it** (the follow-up ADR of step 7b states the retention; a question to the supplier, `docs/research/call-page-on-the-meetings-sdk.md`) | no |
+
+### The chat beside the call: what comes in and where it is kept (ADR 0123 point 8, step 7b)
+
+The contact center delivers the messages of a conversation task, and the platform's events about them, to two addresses of the organisation's own connection. Both pass the one gate of ADR 0124; neither is read by anything but the chat.
+
+```
+WxCC ──HTTPS POST, signed──> /webhooks/contact-center/webex_cc/{org}/messages   every message the flow or the staff member sends (a secret of its own, shown once in the portal)
+WxCC ──HTTPS POST, signed──> /webhooks/contact-center/webex_cc/{org}            task-message:appended (confirms what we appended), task-message:append-failed (it was refused after the end)
+web  ──verified, matched to the booking by the task id──> call_messages (message_text, author kind, time, state, the platform's message id)
+```
+
+| Data item | Where | Source | Retention | Leaves the system |
+|---|---|---|---|---|
+| A staff member's message | `call_messages.message_text` (author `staff`, state `delivered`, the platform's message id, the time) | the contact center's delivery | **deleted with the booking's purge** (`purge_personal_data`, 24 hours after the end of the appointment, or the booking's held moments); a row cannot outlive its booking | no |
+| A participant's message and its state | `call_messages` (author `participant`, state `sent`, `delivered` or `refused`) | the participant, from step 7c; step 7b stores only the platform's confirmation of it | as above | to WxCC as the text of an appended message (step 7c) |
+| The flow's own messages (the queue text) | not stored | the contact center | not kept by OpenPlanner | no |
+| Who wrote a staff message | not stored: the delivery's staff identifier and the participant's name are never read; the name a participant sees is worked out when the thread is read (`embedded_call_staff_name`, step 7c) | | | no |
+| The secret of the message address | the connection's sealed record (`message_secret`, the one before it for the overlap) | made on the server, shown once | until replaced or the connection is removed; never in a log, an event or a job | no |
+| The words in a log, an event, a job or an address | never | | | no |
+
+`message_text` is the one personal column of a third entity (`privacy.CHAT_FIELDS`, `CallMessage`) and is masked by the log processor wherever it is a key. The contact center keeps its own transcript of the same words, which our purge does not reach: the DPIA takes it (ADR 0123 point 18), and chat is not switched on for an organisation before the retention at the contact center is known.
 
 ### The guest of the call page (ADR 0123 points 6 and 7, step 4a)
 

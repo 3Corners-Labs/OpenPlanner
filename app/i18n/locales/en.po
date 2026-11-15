@@ -11121,6 +11121,48 @@ msgstr "The previous secret still works until {at}."
 msgid "admin.channels.cc_rotate"
 msgstr "Make a new webhook secret"
 
+msgid "admin.channels.cc_messages_title"
+msgstr "Chat messages"
+
+msgid "admin.channels.cc_messages_lead"
+msgstr "The contact center delivers the messages of a conversation to this address. Set it as the webhook address of the messaging asset in the console, with the secret below."
+
+msgid "admin.channels.cc_messages_none"
+msgstr "No secret has been made yet, so this address does not exist yet."
+
+msgid "admin.channels.cc_messages_made"
+msgstr "The secret was made on {at}."
+
+msgid "admin.channels.cc_messages_previous"
+msgstr "The previous secret still verifies until {at}."
+
+msgid "admin.channels.cc_messages_make"
+msgstr "Make a secret for this address"
+
+msgid "admin.channels.cc_messages_make_lead"
+msgstr "You see the secret once, on the next page. A secret that was already valid keeps working for {minutes} minutes."
+
+msgid "admin.channels.cc_messages_make_lead_now"
+msgstr "You see the secret once, on the next page. A secret that was already valid stops working at once."
+
+msgid "admin.channels.cc_messages_secret_title"
+msgstr "Secret for the message address"
+
+msgid "admin.channels.cc_messages_secret_once"
+msgstr "You see this secret only now. Paste it into the contact center's console as the secret of the messaging asset. Lost it? Make a new one."
+
+msgid "admin.channels.cc_messages_address"
+msgstr "Address"
+
+msgid "admin.channels.cc_messages_secret"
+msgstr "Secret"
+
+msgid "admin.channels.cc_messages_done"
+msgstr "I have pasted the secret"
+
+msgid "admin.channels.cc_messages_store"
+msgstr "OpenPlanner does not show this secret again. Never put it in an email, chat or ticket."
+
 msgid "admin.channels.cc_remove_lead"
 msgstr "Removes the own connection and its secrets. This organisation then uses the installation's connection again."
 
@@ -13891,6 +13933,12 @@ msgstr "Participant's name shown to staff in the call (first name or own word)"
 
 msgid "settings.field.embedded_call_chat_poll_seconds.label"
 msgstr "Seconds between two looks of the call page at who is in the call (and later at new messages)"
+
+msgid "settings.field.embedded_call_chat_per_minute.label"
+msgstr "Chat messages one participant may send per minute on the call page"
+
+msgid "settings.field.embedded_call_chat_max_chars.label"
+msgstr "Longest chat message a participant may send on the call page, in characters"
 
 msgid "settings.field.embedded_call_staff_name.label"
 msgstr "Staff member's name shown to the participant in the call (the staff member's screen name, the account name, or the own word alone)"

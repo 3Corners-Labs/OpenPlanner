@@ -32,6 +32,7 @@ from app.domain.booking import (
 )
 from app.domain.booking_rollup import DayCount, RollableBooking
 from app.domain.branding import Branding, FontFile, FontRole, Logo
+from app.domain.call_chat import CallMessage, ChatState
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
 from app.domain.capacity import CapacityPool
 from app.domain.change_requests import ChangeRequest
@@ -139,6 +140,7 @@ class State:
     organisation_slugs: dict[int, str] = field(default_factory=dict)
     organisations: dict[int, Organisation] = field(default_factory=dict)
     booking_events: dict[int, list[BookingEvent]] = field(default_factory=dict)
+    call_messages: dict[int, list[CallMessage]] = field(default_factory=dict)
     call_status: dict[int, CallStatus] = field(default_factory=dict)
     webhook_events: dict[tuple[str, str], datetime] = field(default_factory=dict)
     audit: list[AuditEvent] = field(default_factory=list)
@@ -907,6 +909,47 @@ class InMemoryTransaction(ServiceRequestStore):
     async def get_booking_events(self, booking_id: int) -> list[BookingEvent]:
         return list(self.state.booking_events.get(booking_id, []))
 
+    async def add_call_message(self, message: CallMessage) -> bool:
+        stored = self.state.call_messages.setdefault(message.booking_id, [])
+        if any(m.provider_message_id == message.provider_message_id for m in stored):
+            return False
+        self.state.next_id += 1
+        stored.append(replace(message, id=self.state.next_id))
+        return True
+
+    async def messages_of_call(self, booking_id: int) -> list[CallMessage]:
+        return sorted(self.state.call_messages.get(booking_id, []), key=lambda m: (m.at, m.id or 0))
+
+    async def confirm_call_message(self, booking_id: int, provider_message_id: str) -> bool:
+        stored = self.state.call_messages.get(booking_id, [])
+        for i, m in enumerate(stored):
+            if m.provider_message_id == provider_message_id and m.state is ChatState.SENT:
+                stored[i] = replace(m, state=ChatState.DELIVERED)
+                return True
+        return False
+
+    async def refuse_sent_call_messages(self, booking_id: int) -> int:
+        stored = self.state.call_messages.get(booking_id, [])
+        count = 0
+        for i, m in enumerate(stored):
+            if m.state is ChatState.SENT:
+                stored[i] = replace(m, state=ChatState.REFUSED)
+                count += 1
+        return count
+
+    async def count_call_messages(self, booking_id: int) -> int:
+        return len(self.state.call_messages.get(booking_id, []))
+
+    async def sent_call_message_ids(self, booking_id: int) -> list[str]:
+        return [
+            m.provider_message_id
+            for m in self.state.call_messages.get(booking_id, [])
+            if m.state is ChatState.SENT
+        ]
+
+    async def delete_call_messages(self, booking_id: int) -> None:
+        self.state.call_messages.pop(booking_id, None)
+
     async def list_bookings(
         self, scope: Scope, group_id: int, lower: datetime, upper: datetime
     ) -> list[BookingOverview]:
@@ -1250,6 +1293,7 @@ class InMemoryTransaction(ServiceRequestStore):
         self.state.booking_events[booking_id] = [
             replace(e, message="") for e in self.state.booking_events.get(booking_id, [])
         ]
+        self.state.call_messages.pop(booking_id, None)
         self.state.purged_at[booking_id] = now
         self._forget_agents_of_booking(booking_id)
 

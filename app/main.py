@@ -88,6 +88,7 @@ from app.domain.alert_delivery import AlertTargetService
 from app.domain.alerts import AlertService
 from app.domain.api_access import ApiAccessService
 from app.domain.branding_service import BrandingService
+from app.domain.call_chat_service import CallChatService
 from app.domain.call_client import call_page_rule
 from app.domain.call_retry import CallRetryService
 from app.domain.call_service import CallService
@@ -704,6 +705,8 @@ def create_app(
                 own_connection,
             ),
         )
+        # ADR 0123 step 7b: the messages of a conversation task, stored with their booking.
+        app.state.call_chat_service = CallChatService(uow, uses_page)
         # ADR 0082 points 5 and 7: the last inbound webhooks and the health of the connections.
         app.state.health_service = IntegrationHealthService(
             uow, clock, lambda: live().health_policy()

@@ -193,6 +193,30 @@ de *list*-melding ook veroorzaken terwijl echte bezorgingen binnenkomen: het kos
 gebeurtenis per venster en verbergt niets. Andere mislukte aanroepen van vreemden staan op de
 kaart en geven geen melding.
 
+### Chatberichten
+
+Voor een dienst waarvan de deelnemer een chat naast het gesprek krijgt, bezorgt het contactcenter de
+berichten van het gesprek op een tweede adres op de kaart, **Chatberichten**, dat eindigt op
+`/messages`. Dat adres heeft een eigen geheim, los van het webhookgeheim.
+
+1. Kies **Geheim voor dit adres maken**. De volgende pagina toont het adres en het geheim
+   **één keer**; OpenPlanner bewaart het geheim versleuteld en kan het niet opnieuw tonen.
+2. Zet in de console van het contactcenter het adres als webhookadres van het berichtenkanaal en het
+   geheim als geheim ervan.
+3. Kwijt? Maak een nieuw geheim. Het geheim dat tot dan werkte, blijft nog werken tijdens de overlap
+   die de platformbeheerder instelde (standaard 60 minuten), zodat er geen bericht verloren gaat terwijl u het
+   nieuwe plakt; de kaart zegt tot wanneer.
+
+Zolang er geen geheim is gemaakt bestaat het adres niet en wordt elke aanroep beantwoord als een
+onbekend adres. De pauze en de toegestane bronnetwerken van de kaart gelden ook voor dit adres. Is het
+adres niet bereikbaar, dan mislukt de flow van het contactcenter bij de eerste berichtstap en eindigt de
+taak voordat een medewerker hem ziet.
+
+De berichten van de medewerker worden bij de afspraak bewaard en samen met die afspraak verwijderd, 24
+uur na de afspraak, net als de gegevens van de deelnemer. Het contactcenter bewaart een eigen
+gespreksverslag; de verwijdering door OpenPlanner bereikt dat niet. De chat van de vergadering zelf staat
+voor deze diensten uit, dus medewerkers antwoorden alleen in het bureaublad van het contactcenter.
+
 ## Wat wordt vastgelegd
 
 Elke wijziging komt in het auditlog met de namen van de gewijzigde velden, nooit de waarden.

@@ -138,6 +138,8 @@ OPEN_ROUTES = frozenset(
         "/o/{slug}/font/{role}",
         "/webhooks/contact-center/{kind}",
         "/webhooks/contact-center/{kind}/{org}",
+        # ADR 0123 step 7b: the messages of a conversation; platform input like the events.
+        "/webhooks/contact-center/{kind}/{org}/messages",
         "/webhooks/webex",
         "/webhooks/wxcc",
     }

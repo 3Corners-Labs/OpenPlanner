@@ -1,0 +1,10 @@
+{
+  "id": "6f1d3c0e-0000-4000-8000-000000000002",
+  "specversion": "1.0",
+  "type": "task-message:append-failed",
+  "comciscotimestamp": 1767600009000,
+  "data": {
+    "taskId": "task-1",
+    "reason": "NOT_FOUND"
+  }
+}

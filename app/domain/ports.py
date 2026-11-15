@@ -32,6 +32,7 @@ from app.domain.booking import (
 )
 from app.domain.booking_rollup import DayCount, RollableBooking
 from app.domain.branding import Branding, FontFile, FontRole, Logo
+from app.domain.call_chat import CallMessage
 from app.domain.calls import (
     BookingEvent,
     BookingOverview,
@@ -631,6 +632,23 @@ class ContactCenterConnections(Protocol):
         """Return the current and previous webhook secret with the time of the rotation.
 
         As ``webhook_secret``, for the webhook gate (ADR 0124 point 8); never shown.
+        """
+        ...
+
+    async def make_message_secret(self, organisation_id: int, now: datetime) -> str | None:
+        """Make the secret of the message address and return it, the one time it is shown.
+
+        ``None`` without a connection. The secret that was current becomes the previous one for
+        the overlap (ADR 0124 points 8 and 15).
+        """
+        ...
+
+    async def message_secrets(
+        self, organisation_id: int, kind: ContactCenterKind
+    ) -> WebhookSecrets | None:
+        """Return the current and previous secret of the message address; ``None`` without one.
+
+        For the webhook gate (ADR 0124 point 15); never shown again.
         """
         ...
 
@@ -2604,6 +2622,37 @@ class Transaction(Protocol):
 
     async def save_address_check(self, check: AddressCheck) -> None:
         """Replace the latest round trip of ``check.kind``."""
+        ...
+
+    async def add_call_message(self, message: CallMessage) -> bool:
+        """Store a message of a booking's chat; ``False`` when its provider id is stored already.
+
+        Locked transactions only (ADR 0123 step 7b); the text is personal data.
+        """
+        ...
+
+    async def messages_of_call(self, booking_id: int) -> list[CallMessage]:
+        """Return a booking's chat, oldest first (the caller checks the participant's session)."""
+        ...
+
+    async def confirm_call_message(self, booking_id: int, provider_message_id: str) -> bool:
+        """Mark the booking's ``sent`` message ``delivered``; ``False`` when there is none."""
+        ...
+
+    async def refuse_sent_call_messages(self, booking_id: int) -> int:
+        """Mark every ``sent`` message of the booking ``refused``; return how many."""
+        ...
+
+    async def count_call_messages(self, booking_id: int) -> int:
+        """Return how many messages a booking's chat holds (the bound of the chat, step 7b)."""
+        ...
+
+    async def sent_call_message_ids(self, booking_id: int) -> list[str]:
+        """Return the provider ids of the booking's messages that wait for their confirmation."""
+        ...
+
+    async def delete_call_messages(self, booking_id: int) -> None:
+        """Delete a booking's chat (its purge, ADR 0123 step 7b)."""
         ...
 
     async def get_secret_sighting(self, platform: str) -> Sighting | None:

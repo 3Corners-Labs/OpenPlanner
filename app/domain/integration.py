@@ -202,7 +202,7 @@ class IntegrationService:
                     return EventOutcome.IGNORED
                 detail = "host" if kind is EventKind.HOST_JOINED else detail
                 kind = TRIAL_MEETING_EVENTS[kind]
-            if not await _claim(tx, WEBEX_SOURCE, event_key, scope, body_identity, at):
+            if not await claim_event(tx, WEBEX_SOURCE, event_key, scope, body_identity, at):
                 return EventOutcome.DUPLICATE
             await self._record(tx, booking.id, kind, at, detail)
         return EventOutcome.RECORDED
@@ -252,7 +252,7 @@ class IntegrationService:
             if booking is not None and booking.id is not None:
                 if kind is EventKind.TASK_CREATED:
                     return EventOutcome.IGNORED
-                if not await _claim(tx, source, event_key, scope, body_identity, at):
+                if not await claim_event(tx, source, event_key, scope, body_identity, at):
                     return EventOutcome.DUPLICATE
                 await self._record(tx, booking.id, kind, at, detail)
                 recorded = booking.id
@@ -334,7 +334,7 @@ class IntegrationService:
         await tx.save_call_status(after)
 
 
-async def _claim(
+async def claim_event(
     tx: Transaction, source: str, event_key: str, scope: str, body_identity: str, at: datetime
 ) -> bool:
     """Remember the event of ``source``; ``False`` when it was seen before (a replay).

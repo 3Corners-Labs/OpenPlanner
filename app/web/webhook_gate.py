@@ -50,7 +50,7 @@ import structlog
 from fastapi import Depends, Request
 from starlette.responses import Response
 
-from app.adapters.contact_centers import inbound
+from app.adapters.contact_centers import inbound, messages
 from app.adapters.webhooks import (
     WEBEX_INBOUND,
     WXCC_INBOUND,
@@ -424,6 +424,33 @@ async def organisation_address(
         return Unresolved(UNKNOWN_SOURCE)
     service: ContactCenterConnectionService = request.app.state.contact_center_connection_service
     target = await service.webhook_target(org, handling.kind)
+    if not target.found or target.secrets is None:
+        return Unresolved(handling.source, target.organisation)
+    sources = source_list_that_applies(target.allowed_networks, contact_center_networks(request))
+    return Address(
+        handling,
+        target.secrets,
+        target.organisation_id,
+        target.organisation,
+        sources,
+        paused=not target.inbound_enabled,
+    )
+
+
+async def messages_address(
+    request: Request, kind: str, org: str
+) -> Address[ContactCenterWebhook] | Unresolved:
+    """Resolve ``/webhooks/contact-center/{kind}/{org}/messages``: the deliveries of a chat.
+
+    It exists once the organisation has a connection to the platform and has made the secret of
+    this address (ADR 0124 point 15); the connection's networks and pause apply to it, and the
+    rule of when it exists is the connection service's (``message_target``).
+    """
+    handling = messages(kind)
+    if handling is None:
+        return Unresolved(UNKNOWN_SOURCE)
+    service: ContactCenterConnectionService = request.app.state.contact_center_connection_service
+    target = await service.message_target(org, handling.kind)
     if not target.found or target.secrets is None:
         return Unresolved(handling.source, target.organisation)
     sources = source_list_that_applies(target.allowed_networks, contact_center_networks(request))

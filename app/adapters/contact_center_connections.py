@@ -45,6 +45,14 @@ WEBHOOK_SECRET_BYTES = 32
 PREVIOUS_KEY = "previous_webhook_secret"
 """The field of the sealed record that holds the secret before the last rotation."""
 
+MESSAGE_KEY = "message_secret"
+MESSAGE_PREVIOUS_KEY = "previous_message_secret"
+MESSAGE_AT_KEY = "message_secret_at"
+"""The fields of the secret of the address that receives a conversation's messages (ADR 0124 point
+15): the current secret, the one before its last replacement and when the current one was made.
+It is the platform's own secret for that address (the administrator pastes it into the console),
+shown once when it is made; the webhook secret of the subscription never leaves the server."""
+
 
 def new_webhook_secret() -> str:
     """Return a fresh webhook secret (URL-safe, never typed or shown)."""
@@ -76,6 +84,18 @@ def secrets_of(record: dict[str, object]) -> WebhookSecrets | None:
     )
 
 
+def message_secrets_of(record: dict[str, object]) -> WebhookSecrets | None:
+    """Return the secrets of the message address a sealed record holds, or ``None`` without one."""
+    current, previous = record.get(MESSAGE_KEY), record.get(MESSAGE_PREVIOUS_KEY)
+    if not isinstance(current, str) or not current:
+        return None
+    return WebhookSecrets(
+        current,
+        previous if isinstance(previous, str) and previous else None,
+        _time_of(record.get(MESSAGE_AT_KEY)),
+    )
+
+
 def _write_secrets(record: dict[str, object], secrets: WebhookSecrets) -> None:
     """Put ``secrets`` into ``record``; a missing previous secret leaves no field behind."""
     record["webhook_secret"] = secrets.current
@@ -92,6 +112,10 @@ def _tidied(record: dict[str, object], now: datetime) -> dict[str, object]:
     if held is not None and held.previous is not None:
         if settled(held, now, OVERLAP_MAX).previous is None:
             record.pop(PREVIOUS_KEY, None)
+    messages = message_secrets_of(record)
+    if messages is not None and messages.previous is not None:
+        if settled(messages, now, OVERLAP_MAX).previous is None:
+            record.pop(MESSAGE_PREVIOUS_KEY, None)
     return record
 
 
@@ -140,6 +164,7 @@ class SealedConnections:
         if record is None:
             return None
         rotated = record.get("webhook_secret_at")
+        message_made = _time_of(record.get(MESSAGE_AT_KEY))
         networks = (
             read_stored_networks(record["allowed_networks"])
             if "allowed_networks" in record
@@ -156,6 +181,8 @@ class SealedConnections:
             allowed_networks=networks,
             inbound_enabled=record.get("inbound_enabled") is not False,
             registration=_registration_of(record.get("registration")),
+            message_secret_at=message_made,
+            has_previous_message_secret=bool(record.get(MESSAGE_PREVIOUS_KEY)),
         )
 
     async def paused(self, organisation_ids: Sequence[int]) -> dict[int, ContactCenterKind]:
@@ -193,7 +220,9 @@ class SealedConnections:
         still holds no longer verifies (CC-4d), and with it go the previous secret and the stored
         registration outcome, in the same write: an overlap is for a rotation, not for a move, and
         what a registration left at the old tenant says nothing about the new one. Changing the
-        allowed networks alone touches neither the secret nor anything else of the record.
+        allowed networks alone touches neither the secret nor anything else of the record. The
+        message secret (ADR 0124 point 15) is kept on a move on purpose: the console holds it, and
+        the new tenant is told the address and the secret again by the administrator.
         """
 
         def apply(stored: dict[str, object] | None) -> dict[str, object]:
@@ -280,6 +309,32 @@ class SealedConnections:
 
         await self._change(organisation_id, apply, now)
 
+    async def make_message_secret(self, organisation_id: int, now: datetime) -> str | None:
+        """Make the secret of the message address and return it; ``None`` without a connection.
+
+        The one time the value leaves the store: the caller shows it once and keeps nothing. A
+        secret that was current becomes the previous one for the overlap, as for the webhook
+        secret (ADR 0124 points 8 and 15). Read and written in one locked transaction.
+        """
+        made: list[str] = []
+
+        def apply(record: dict[str, object] | None) -> dict[str, object] | None:
+            if record is None:
+                return None
+            new = new_webhook_secret()
+            held = rotated(message_secrets_of(record), new, now)
+            record[MESSAGE_KEY] = held.current
+            record[MESSAGE_AT_KEY] = now.isoformat()
+            if held.previous is None:
+                record.pop(MESSAGE_PREVIOUS_KEY, None)
+            else:
+                record[MESSAGE_PREVIOUS_KEY] = held.previous
+            made.append(new)
+            return record
+
+        await self._change(organisation_id, apply, now)
+        return made[0] if made else None
+
     async def drop_expired_previous(
         self, organisation_ids: Sequence[int], now: datetime, overlap: timedelta
     ) -> int:
@@ -292,27 +347,43 @@ class SealedConnections:
         names = {contact_center_credential_name(i): i for i in organisation_ids}
         removed = 0
         for name, record in (await self._store.get_many(list(names))).items():
-            held = secrets_of(record)
-            if held is None or held.previous is None:
-                continue
-            if settled(held, now, overlap).previous is not None:
-                continue
-            dropped = False
-
-            def apply(current: dict[str, object] | None) -> dict[str, object] | None:
-                nonlocal dropped
-                found = secrets_of(current) if current else None
-                if current is None or found is None or found.previous is None:
-                    return None
-                if settled(found, now, overlap).previous is not None:
-                    return None  # rotated again in the meantime: its overlap is running
-                current.pop(PREVIOUS_KEY, None)
-                dropped = True
-                return current
-
-            await self._store.update(name, apply, now)
-            removed += dropped
+            for read, key in (
+                (secrets_of, PREVIOUS_KEY),
+                (message_secrets_of, MESSAGE_PREVIOUS_KEY),
+            ):
+                removed += await self._drop_previous(name, record, read, key, now, overlap)
         return removed
+
+    async def _drop_previous(
+        self,
+        name: str,
+        record: dict[str, object],
+        read: Callable[[dict[str, object]], WebhookSecrets | None],
+        key: str,
+        now: datetime,
+        overlap: timedelta,
+    ) -> int:
+        """Remove the previous secret ``key`` of one stored record if its overlap has ended."""
+        held = read(record)
+        if held is None or held.previous is None:
+            return 0
+        if settled(held, now, overlap).previous is not None:
+            return 0
+        dropped = False
+
+        def apply(current: dict[str, object] | None) -> dict[str, object] | None:
+            nonlocal dropped
+            found = read(current) if current else None
+            if current is None or found is None or found.previous is None:
+                return None
+            if settled(found, now, overlap).previous is not None:
+                return None  # rotated again in the meantime: its overlap is running
+            current.pop(key, None)
+            dropped = True
+            return current
+
+        await self._store.update(name, apply, now)
+        return int(dropped)
 
     async def delete(self, organisation_id: int) -> None:
         """Remove the organisation's connection, its secrets and the access tokens it was given."""
@@ -342,6 +413,19 @@ class SealedConnections:
             return None
         secret = record.get("webhook_secret")
         return secret if isinstance(secret, str) and secret else None
+
+    async def message_secrets(
+        self, organisation_id: int, kind: ContactCenterKind
+    ) -> WebhookSecrets | None:
+        """Return the current and previous secret of the message address, or ``None``.
+
+        ``None`` unless the organisation is connected to ``kind`` and has made one. For the
+        webhook gate only (ADR 0124 point 15); never shown again.
+        """
+        record = await self._record(organisation_id)
+        if record is None or record.get("kind") != kind.value:
+            return None
+        return message_secrets_of(record)
 
     async def webhook_secrets(
         self, organisation_id: int, kind: ContactCenterKind

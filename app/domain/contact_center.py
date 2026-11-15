@@ -376,6 +376,11 @@ class OrganisationConnection:
         inbound_enabled: Whether the address accepts events (ADR 0124 point 9); off: a verified
             event is dropped and the platform still gets its 204. A record without the field
             reads as on.
+        message_secret_at: When the secret of the address that receives a conversation's messages
+            was made (ADR 0124 point 15, ADR 0123 step 7b); ``None``: none yet, and that address
+            does not exist. Never the secret.
+        has_previous_message_secret: Whether the message secret before the last one is still kept
+            for its overlap.
     """
 
     kind: ContactCenterKind
@@ -388,6 +393,8 @@ class OrganisationConnection:
     inbound_enabled: bool = True
     has_previous_webhook_secret: bool = False
     registration: "Registration | None" = None
+    message_secret_at: datetime | None = None
+    has_previous_message_secret: bool = False
 
 
 @dataclass(frozen=True)

@@ -605,6 +605,13 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
             303, 403, 403, 403, 403, 403, 403
         ),
     },
+    # ADR 0124 point 15: the secret of the address for message deliveries, shown once; without a
+    # connection the superuser is sent back to the card with a refusal.
+    "POST /admin/organisations/{org}/channels/contact-center/message-secret": {
+        "/admin/organisations/demo/channels/contact-center/message-secret": statuses(
+            303, 403, 403, 403, 403, 403, 403
+        ),
+    },
     # ADR 0124 point 9: the pause; without the state wanted the superuser gets a 422.
     "POST /admin/organisations/{org}/channels/contact-center/inbound": {
         "/admin/organisations/demo/channels/contact-center/inbound": statuses(

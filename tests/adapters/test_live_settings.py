@@ -197,6 +197,7 @@ async def test_the_organisation_states_show_the_source() -> None:
         "booking_confirm_window_hours",
         "booking_confirm_cutoff_hours",
         "booking_confirm_reminders",
+        "embedded_call_chat_max_chars",
         "embedded_call_display_name",
         "embedded_call_staff_name",
         "embedded_call_webex_option",

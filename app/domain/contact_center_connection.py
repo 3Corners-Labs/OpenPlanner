@@ -199,6 +199,51 @@ class ContactCenterConnectionService:
             shown.inbound_enabled if shown else True,
         )
 
+    async def message_target(self, slug: str, kind: ContactCenterKind) -> WebhookTarget:
+        """Return whether an organisation's address for message deliveries exists (ADR 0124 pt 15).
+
+        As ``webhook_target``, but verified with the connection's message secret: it exists once
+        an administrator has made one. The connection's networks and pause apply to it as well.
+        """
+        if self._connections is None or not is_slug(slug):
+            return WebhookTarget()
+        organisation_id = await self._admin.organisation_id(slug)
+        if organisation_id is None:
+            return WebhookTarget()
+        secrets = await self._connections.message_secrets(organisation_id, kind)
+        if secrets is None:
+            return WebhookTarget(organisation=slug)
+        shown = await self._connections.get(organisation_id)
+        return WebhookTarget(
+            organisation_id,
+            secrets,
+            slug,
+            shown.allowed_networks if shown else NetworkList(),
+            shown.inbound_enabled if shown else True,
+        )
+
+    async def make_message_secret(self, principal: Principal, organisation: str) -> str:
+        """Make the secret of the message address and return it: the one time it is shown.
+
+        Audited by name (``contact_center_connection.make_message_secret``), never the value. A
+        secret that was current keeps verifying for ``webhook_secret_overlap_minutes``, so the
+        administrator can paste the new one into the platform's console without losing a message.
+        The caller must show the value on a page that is not stored and keep it nowhere else.
+
+        Raises:
+            DomainError: as ``save``, and ``invalid_configuration`` naming ``connection`` when
+                the organisation has no connection yet.
+        """
+        organisation_id = await self._authorize(principal, organisation)
+        connections = self._ready()
+        if await connections.get(organisation_id) is None:
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}connection")
+        await self._audit(principal, organisation, f"{AUDIT_KEY}.make_message_secret")
+        made = await connections.make_message_secret(organisation_id, self._clock.now())
+        if made is None:  # the connection went away in the meantime
+            raise DomainError(ErrorCode.INVALID_CONFIGURATION, f"{CONNECTION_FIELD}connection")
+        return made
+
     async def save(
         self, principal: Principal, organisation: str, change: ConnectionChange
     ) -> Registration:

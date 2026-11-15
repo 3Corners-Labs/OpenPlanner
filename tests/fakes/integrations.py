@@ -281,6 +281,9 @@ class FakeContactCenterConnections:
         """Organisations whose stored list cannot be read (until a save replaces it)."""
         self.secrets: dict[int, WebhookSecrets] = {}
         """The webhook secrets per organisation once rotated (``secret-of-{id}`` before that)."""
+        self.message_secrets_held: dict[int, WebhookSecrets] = {}
+        """The secrets of the message address per organisation, once made."""
+        self.message_makes = 0
 
     async def get(self, organisation_id: int) -> OrganisationConnection | None:
         shown = self.connections.get(organisation_id)
@@ -289,6 +292,13 @@ class FakeContactCenterConnections:
         held = self.secrets.get(organisation_id)
         if shown is not None and held is not None:
             shown = replace(shown, has_previous_webhook_secret=held.previous is not None)
+        messages = self.message_secrets_held.get(organisation_id)
+        if shown is not None and messages is not None:
+            shown = replace(
+                shown,
+                message_secret_at=messages.rotated_at,
+                has_previous_message_secret=messages.previous is not None,
+            )
         return shown
 
     async def save(self, organisation_id: int, change: ConnectionChange, now: datetime) -> None:
@@ -333,6 +343,24 @@ class FakeContactCenterConnections:
                 held, f"secret-of-{organisation_id}-r{self.rotations}", now
             )
             self.connections[organisation_id] = replace(old, webhook_secret_at=now)
+
+    async def make_message_secret(self, organisation_id: int, now: datetime) -> str | None:
+        if organisation_id not in self.connections:
+            return None
+        self.message_makes += 1
+        new = f"message-secret-of-{organisation_id}-m{self.message_makes}"
+        self.message_secrets_held[organisation_id] = rotated(
+            self.message_secrets_held.get(organisation_id), new, now
+        )
+        return new
+
+    async def message_secrets(
+        self, organisation_id: int, kind: ContactCenterKind
+    ) -> WebhookSecrets | None:
+        shown = self.connections.get(organisation_id)
+        if shown is None or shown.kind is not kind:
+            return None
+        return self.message_secrets_held.get(organisation_id)
 
     async def drop_expired_previous(
         self, organisation_ids: Sequence[int], now: datetime, overlap: timedelta

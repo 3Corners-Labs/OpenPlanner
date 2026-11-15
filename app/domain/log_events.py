@@ -1293,6 +1293,15 @@ _OPERATIONS = (
         "A verified webhook of a contact-center platform was processed (ADR 0032).",
     ),
     _e(
+        "webhook.chat",
+        _OPS,
+        "info",
+        "platform kind outcome",
+        "Contact center {platform} reported a chat event ({kind}): {outcome}.",
+        "A verified message event of a conversation task was processed (ADR 0123 step 7b); "
+        "codes only, never the text of a message.",
+    ),
+    _e(
         "webhook.alert_failed",
         _OPS,
         "warning",
@@ -2089,6 +2098,17 @@ _AUDIT = (
         "A request was rejected before it reached the application: {reason}.",
         "A honeypot field, a cross-site POST or a foreign `Origin` (ADR 0053).",
         "Repeated `origin_mismatch` from your own site: check the proxy's `Host` header.",
+    ),
+    _e(
+        "chat.limit_reached",
+        _SYS,
+        "outcome",
+        "",
+        "A booking's chat reached its fixed ceiling of messages.",
+        "The contact center delivered as many messages for one appointment as a chat may hold "
+        "(`MAX_MESSAGES_PER_BOOKING`, ADR 0123 step 7b); later deliveries are ignored and "
+        "answered as usual. Written once per booking, with no text.",
+        "Check that the messaging asset's flow does not loop; a real conversation never gets here.",
     ),
     _e(
         "retention.sweep",

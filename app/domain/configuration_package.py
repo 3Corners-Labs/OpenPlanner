@@ -84,6 +84,7 @@ STATE_TABLES = frozenset(
         "booking_day_counts",
         "booking_events",
         "bookings",
+        "call_messages",
         "call_status",
         "certificate_checks",
         "closure_notices",
