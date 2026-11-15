@@ -69,8 +69,9 @@ the rules it does not.
 - POST forms on public pages depend on `require_same_origin` and a rate limit.
 - Webhooks: HMAC signature verified, timestamp window 300 s.
 - The safeguards of CLAUDE.md's security baseline stay in place, among them: the honeypot on
-  the booking form, CSP, HSTS and `X-Frame-Options: DENY` on every response, the CORS allow-list,
-  the OIDC checks (PKCE, `state`, `nonce`, asymmetric algorithms only), the session cookie flags,
+  the booking form, CSP, HSTS and `X-Frame-Options: DENY` on every response (except the bundled
+  identity provider's own pages under `/idp`, which keep Keycloak's `SAMEORIGIN`, ADR 0126), the
+  CORS allow-list, the OIDC checks (PKCE, `state`, `nonce`, asymmetric algorithms only), the session cookie flags,
   no login bypass or role switcher, integration secrets stored encrypted, write-only and audited
   (ADR 0008), and the PII mask in `app/logging.py`.
 - New user-facing strings use `_()` with nl and en entries.

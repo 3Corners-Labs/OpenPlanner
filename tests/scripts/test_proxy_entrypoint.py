@@ -284,10 +284,12 @@ def test_the_identity_provider_is_routed_only_when_an_upstream_is_named(
     routed = run(bin_dir, tmp_path, **COMPOSE, IDP_UPSTREAM=IDP_ADDRESS)
 
     assert plain.idp == ["run:"]
-    directive = "\n".join(routed.idp)  # a multi-line directive: one log line per line of it
-    assert directive.startswith("run:handle /idp/* {")
-    assert f"reverse_proxy {IDP_ADDRESS}" in directive
-    assert "warning" not in routed.stderr
+    # The route and its rules are one file (ADR 0126), which reads IDP_UPSTREAM itself.
+    assert routed.idp == ["run:import /etc/caddy/idp.caddy"]
+    assert "warning" not in routed.stderr  # an address, never a name (ADR 0125 step 2)
+    dockerfile = (ENTRYPOINT.parent / "Dockerfile").read_text()
+    assert "COPY idp.caddy /etc/caddy/idp.caddy" in dockerfile
+    assert "reverse_proxy {$IDP_UPSTREAM}" in (ENTRYPOINT.parent / "idp.caddy").read_text()
 
 
 def test_everything_else_goes_to_web_at_the_address_compose_names(
@@ -315,7 +317,7 @@ def test_a_name_in_idp_upstream_works_and_is_named(bin_dir: Path, tmp_path: Path
     """A proxy.env from before ADR 0125 step 2, until the installer writes the address."""
     outcome = run(bin_dir, tmp_path, **COMPOSE, IDP_UPSTREAM="idp:8080")
 
-    assert "reverse_proxy idp:8080" in "\n".join(outcome.idp)
+    assert outcome.idp == ["run:import /etc/caddy/idp.caddy"]  # which reads IDP_UPSTREAM
     assert "IDP_UPSTREAM=idp:8080 is a name" in outcome.stderr
 
 
