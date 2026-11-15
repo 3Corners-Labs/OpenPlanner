@@ -56,3 +56,25 @@ def test_the_script_prints_one_line_of_json(
     assert main(["claimed", url, "999999"]) == 0
 
     assert json.loads(capsys.readouterr().out) == {"999999": None}
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        [],
+        ["claim"],
+        ["claim", "sqlite+aiosqlite:///x.db"],
+        ["claim", "u", "agent"],
+        ["claimed", "u"],
+        ["claimed", "u", "x"],
+        ["other", "u", "1"],
+    ],
+)
+def test_missing_or_bad_arguments_print_a_usage_line_and_exit_2(
+    arguments: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(arguments) == 2
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.startswith("usage: rollback_claim.py")

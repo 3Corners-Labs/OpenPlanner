@@ -65,8 +65,9 @@ AT = time(10)
 """Local start of the pool bookings: inside the shared pool's staffing and the demo's hours."""
 LENGTH = timedelta(minutes=30)
 """The in-person flow's length (``demonstration.FLOWS``)."""
-LEGACY_AFTER = timedelta(days=7)
-"""How long after the pool bookings the previous image's own-shape booking starts."""
+LEGACY_AFTER_DAYS = 7
+"""Days after the pool bookings, on the same local wall time, that the previous image's
+own-shape booking starts."""
 AGENT = "gated-records"
 """The pseudonymous agent of the started work; no staff member stands behind it."""
 
@@ -124,9 +125,22 @@ async def write_gated_records(engine: AsyncEngine, now: datetime, token_key: byt
         second = await _pool_booking(tx, demo, ids, begin + LENGTH, now, token_key)
         attempt = await _attempt(tx, demo, ids, second, now)
         immediate = await _immediate(tx, demo, ids, now)
-        legacy = await _legacy_booking(tx, demo, begin + LEGACY_AFTER, now, token_key)
+        legacy = await _legacy_booking(tx, demo, legacy_start(demo, begin), now, token_key)
     day = begin.astimezone(demo.tz).date().isoformat()
     return GatedRecords(first.id or 0, started, attempt, immediate, legacy.id or 0, day)
+
+
+def legacy_start(group: Group, begin: datetime) -> datetime:
+    """Return the same local wall time ``LEGACY_AFTER_DAYS`` days after ``begin``, in UTC.
+
+    Computed in the group's zone, so a change of daylight saving time in between does not move
+    the booking off the local start the pool bookings hold.
+    """
+    local = begin.astimezone(group.tz)
+    day = local.date() + timedelta(days=LEGACY_AFTER_DAYS)
+    return datetime.combine(day, local.timetz().replace(tzinfo=None), tzinfo=group.tz).astimezone(
+        UTC
+    )
 
 
 def _next_weekday_at(group: Group, now: datetime) -> datetime:

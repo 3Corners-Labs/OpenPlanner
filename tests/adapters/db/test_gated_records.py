@@ -6,17 +6,19 @@ upgrade matrix's ``rollback`` mode does before it starts the previous image. Wit
 time the pool bookings hold, and every work item stays the one active item of its request.
 """
 
+from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.adapters.db.gated_records import write_gated_records
+from app.adapters.db.gated_records import legacy_start, write_gated_records
 from app.adapters.db.seed import seed_demo
 from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.booking import BookingStatus, Claim
 from app.domain.service_requests import HandlingState, WorkChannel, WorkItemState
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
-from tests.support.domain import NOW, TEST_TOKEN_KEY, another_participant
+from tests.support.domain import NOW, TEST_TOKEN_KEY, another_participant, make_group
 from tests.support.pool_flows import shut_gate
 
 
@@ -99,3 +101,14 @@ async def test_the_started_booking_carries_the_booking_claim_the_previous_image_
     assert held is not None
     assert held.claim is not None
     assert held.claim.claimed_by != "previous-image"
+
+
+def test_the_legacy_booking_keeps_its_local_start_across_a_change_of_daylight_saving_time() -> None:
+    group = make_group(timezone="Europe/Amsterdam")
+    begin = datetime(2026, 10, 21, 8, 0, tzinfo=UTC)  # 10:00 CEST; the clocks go back on 25 Oct
+
+    start = legacy_start(group, begin)
+
+    local = start.astimezone(group.tz)
+    assert (local.date().isoformat(), local.hour, local.minute) == ("2026-10-28", 10, 0)
+    assert start == datetime(2026, 10, 28, 9, 0, tzinfo=UTC)  # 10:00 CET, an hour later in UTC

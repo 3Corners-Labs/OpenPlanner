@@ -67,7 +67,9 @@ async def claimed_by(url: str, booking_ids: list[int]) -> dict[int, str | None]:
 
 def main(argv: list[str]) -> int:
     """Run ``claim`` or ``claimed`` (see the module docstring); print one line of JSON."""
-    if len(argv) < 2 or argv[0] not in {"claim", "claimed"}:  # noqa: PLR2004
+    mode = argv[0] if argv else ""
+    first_id = {"claim": 3, "claimed": 2}.get(mode)  # URL (AGENT) before the ids
+    if first_id is None or len(argv) <= first_id or not all(v.isdigit() for v in argv[first_id:]):
         sys.stderr.write("usage: rollback_claim.py claim URL AGENT ID... | claimed URL ID...\n")
         return 2
     if argv[0] == "claim":
