@@ -63,6 +63,8 @@ jobs:
         run: make shellcheck
       - name: dead code (vulture, ADR 0127)
         run: make deadcode
+      - name: coupling budget (ADR 0127)
+        run: make coupling
       - name: mypy --strict
         run: make type
       - name: import-linter

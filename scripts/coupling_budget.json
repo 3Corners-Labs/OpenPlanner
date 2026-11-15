@@ -1,0 +1,32 @@
+{
+  "symbols": [
+    {
+      "symbol": "Settings",
+      "path": "app/config.py",
+      "kind": "afferent",
+      "ceiling": 39,
+      "reason": "Read everywhere by design; a new reader belongs behind an existing accessor"
+    },
+    {
+      "symbol": "Transaction",
+      "path": "app/domain/ports.py",
+      "kind": "afferent",
+      "ceiling": 65,
+      "reason": "The persistence port; a new user of it is a new adapter call, not a new dependency"
+    },
+    {
+      "symbol": "create_app",
+      "path": "app/main.py",
+      "kind": "efferent",
+      "ceiling": 208,
+      "reason": "The one place that wires the application; wiring moves to a router or a module, not into this body"
+    },
+    {
+      "symbol": "run_worker",
+      "path": "app/jobs/worker.py",
+      "kind": "efferent",
+      "ceiling": 139,
+      "reason": "The one place that wires the worker loop; a new job registers itself"
+    }
+  ]
+}

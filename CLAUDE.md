@@ -45,6 +45,7 @@ Per PR (ADR 0058: all of these run in the merge queue before anything reaches `m
 - `ruff format` and `ruff check` (config in `pyproject.toml`; rules: E, F, I, B, UP, S, N, ASYNC, PT, D with Google convention).
 - `jscpd` copy-paste detection on `app/`, `tests/` (and `widget/`), threshold 1%.
 - `make deadcode` (vulture, confidence 80, ADR 0127): unused code in `app/` fails; delete it, or list a signature-bound name in `[tool.vulture]` with the reason.
+- `make coupling` (ADR 0127): the most coupled symbols stay under the ceilings of `scripts/coupling_budget.json`; raise a ceiling only in the PR that needs it, with its reason.
 - `mypy --strict` on `app/`.
 - `import-linter`: `app/domain` imports nothing from `app/adapters`, `app/api`, `app/admin`, `app/jobs`, nor any framework.
 - `pytest` with coverage ≥ 90% on `app/domain/` and `app/i18n/`, ≥ 75% overall. Tests mirror the source tree. Includes the authorisation matrix (every role × every admin endpoint × own/other group) and the abuse cases from `docs/threat-model.md`.
