@@ -5,6 +5,9 @@ Helm chart. Meant for hosting OpenPlanner externally without a server of your ow
 **trial**: written against the Kubernetes API and TransIP's published facts, and tested by
 rendering the chart; the first real cluster run is step 3 of the ADR.
 
+> On OpenStack without a cluster? One virtual machine with the host installation is the simpler
+> route: `docs/openstack.md`.
+
 ## What you get, and what you do not
 
 - One pod with `web` and `worker` on one volume. **One replica, never more**: the database is a
