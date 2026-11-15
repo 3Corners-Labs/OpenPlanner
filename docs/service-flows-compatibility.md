@@ -76,6 +76,7 @@ settings only, and no train module imports it.
 | C | Unchanged: no other booking field or label reaches the payload | `tests/adapters/test_wxcc_routing_payload.py::test_no_other_booking_field_or_label_reaches_the_payload` |
 | C | Unchanged: the meeting first, then the work item, idempotent | `tests/jobs/test_call_jobs.py::test_meeting_then_work_item` |
 | C | Gated: a flow on the own queue is never dispatched to the contact center | `tests/domain/test_request_dispatch.py::test_a_flow_on_the_own_queue_is_never_dispatched` |
+| C | Gated: the own queue shows work the contact center holds as held, never next nor "not picked up" (ADR 0121 step 28); a legacy booking is never held | `tests/domain/test_request_dispatch.py::test_the_own_queue_shows_work_the_contact_center_holds_as_held` |
 
 ### Emergency closure (ADR 0024)
 

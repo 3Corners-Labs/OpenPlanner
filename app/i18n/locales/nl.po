@@ -1996,6 +1996,9 @@ msgstr "Door u opgepakt"
 msgid "admin.queue.state.claimed"
 msgstr "Opgepakt door een collega"
 
+msgid "admin.queue.state.held_by_contact_center"
+msgstr "Bij het contactcenter"
+
 msgid "admin.queue.state.in_lobby"
 msgstr "Deelnemer wacht"
 

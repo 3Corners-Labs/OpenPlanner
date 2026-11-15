@@ -1996,6 +1996,9 @@ msgstr "Picked up by you"
 msgid "admin.queue.state.claimed"
 msgstr "Picked up by a colleague"
 
+msgid "admin.queue.state.held_by_contact_center"
+msgstr "Held by the contact center"
+
 msgid "admin.queue.state.in_lobby"
 msgstr "Participant waiting"
 

@@ -106,6 +106,8 @@ class QueueRow:
         without_video: Request work of a flow without video (ADR 0121 step 5).
         awaiting_check_in: Request work of a flow with an explicit check-in that is not checked
             in yet: it cannot be claimed until it is (ADR 0121 step 7, choice I2).
+        held: The contact center holds the work (an active contact-center attempt, ADR 0121
+            step 28): shown as held, never offered for a claim, never "not picked up".
     """
 
     booking_id: int
@@ -124,6 +126,7 @@ class QueueRow:
     missing: tuple[Skill, ...] = ()
     without_video: bool = False
     awaiting_check_in: bool = False
+    held: bool = False
 
 
 @dataclass(frozen=True)
@@ -531,7 +534,9 @@ async def load_entries(
 ) -> list[QueueEntry]:
     """Load the group's queue entries at ``now`` inside ``scope`` (also the worker's wait watch).
 
-    A booking ends one slot length after its start, so earlier ones have ended.
+    A booking ends one slot length after its start, so earlier ones have ended. An entry whose
+    request the contact center holds is marked ``held`` (ADR 0121 step 28), so every reader of
+    the queue (the page, pick up next, the overview, the wait watch) treats it as taken.
     """
     lower = now - timedelta(minutes=group.slot_minutes)
     upper = now + timedelta(minutes=group.queue_visible_from_minutes, seconds=1)
@@ -539,7 +544,21 @@ async def load_entries(
     entries = (QueueEntry(o.booking, o.status) for o in overviews)
     if not group.has_own_queue:  # a fallback queue (ADR 0082): only the bookings that fell back
         entries = (e for e in entries if e.status.fallback)
-    return visible(entries, group, now)
+    return [replace(e, held=await _held(tx, e.booking)) for e in visible(entries, group, now)]
+
+
+async def _held(tx: Transaction, booking: Booking) -> bool:
+    """Return whether the contact center holds the request of ``booking``.
+
+    Only a booking of a flow can have a request; a legacy booking is never read further.
+    """
+    if booking.flow is None:
+        return False
+    request = await tx.get_request_of_booking(_id(booking))
+    if request is None:
+        return False
+    item = await tx.get_active_work_item(request.id or 0)
+    return item is not None and item.held_by_contact_center
 
 
 def _signed_in_for(
@@ -610,6 +629,7 @@ def _row(entry: QueueEntry, me: tuple[str, ...], overdue: bool) -> QueueRow:
         mine=claim is not None and claim.claimed_by in me,
         direct=entry.is_direct,
         overdue=overdue,
+        held=entry.held,
         video=entry.video,
         routing=booking.routing,
         fallback=entry.status.fallback,
