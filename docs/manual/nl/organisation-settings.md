@@ -51,6 +51,10 @@ bewaart alle onderwerpen samen.
 - **Rustperiode na een wijzigingsverzoek** (1 tot 1440 minuten, standaard 10): nadat een
   verzoek een afspraak heeft bereikt, krijgt de deelnemer in deze periode geen nieuw bericht voor
   diezelfde afspraak, ook niet als de bot opnieuw vraagt. Kan niet worden uitgezet.
+- **Privacyverklaring (adres)**: het https-adres van de privacyverklaring van de organisatie, hoogstens
+  2.048 tekens, met een hostnaam (geen IP-adres en niet `localhost`). De gesprekspagina linkt ernaar bij de regel dat een externe videodienst het gesprek
+  verzorgt (de link opent in een nieuw tabblad). In die verklaring staat welke dienst dat is: de
+  pagina zelf noemt hem niet. Leeg: de pagina toont de regel zonder link.
 
 ## Een instelling wijzigen
 

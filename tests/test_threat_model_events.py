@@ -220,6 +220,9 @@ FLOWS: dict[str, Flow] = {
         "server, and there is nothing to attribute"
     ),
     "## Flow: the call page chosen by a service (ADR 0123 step 6a)": Flow((PUBLIC, DENIED, CHANGE)),
+    "## Flow: the rest of the call page's step 6 (ADR 0123 step 6b)": Flow(
+        (PUBLIC, DENIED, CHANGE)
+    ),
     "## Flow: the staff member's name on the participant's call page (ADR 0123 step 5c)": Flow(
         (PUBLIC, DENIED, CHANGE)
     ),

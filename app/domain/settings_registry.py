@@ -2492,6 +2492,19 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "that has not chosen its own; a service may (Group > Settings > Video, ADR 0123 step 6a).",
         choices=tuple(m.value for m in OtherWayOffer),
     ),
+    S(
+        "privacy_statement_url",
+        K.URL,
+        None,
+        _D,
+        T.DISPLAY,
+        "The address of the organisation's privacy statement: an https address with a host name "
+        "(not an IP address or localhost) of at most 2,048 characters, linked from the call page's "
+        "line about the external video service (ADR 0123 point 5). Empty: the page shows the "
+        "line without a link.",
+        optional=True,
+        https_only=True,
+    ),
 )
 """Every setting of the service, in the order of ``docs/settings.md``."""
 

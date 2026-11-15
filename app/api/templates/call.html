@@ -92,7 +92,7 @@
   <p data-text="say_{{ name }}">{{ body }}</p>
   {%- if note %}
   <p>{{ note }}</p>{% endif %}
-  <p><a class="button button--secondary" href="/b/m/{{ ref }}/join">{{ _("join.back") }}</a></p>
+  <p><a class="button button--secondary" href="{{ back_href }}">{{ _(back_text) }}</a></p>
 </section>
 {%- endmacro %}
 
@@ -115,7 +115,7 @@
 </div>
 {%- endmacro %}
 
-{% block title %}{{ _("call.title") }} – {{ group.name }}{% endblock %}
+{% block title %}{{ _("trial.title" if trial_until is not none else "call.title") }} – {{ group.name }}{% endblock %}
 {% block head_extra %}<link rel="stylesheet" href="{{ static_url('call-page.css') }}">{% endblock %}
 {% block content %}
 <div class="call" data-call data-call-token-url="{{ token_url }}" data-call-seconds="{{ connect_seconds }}" data-call-attempts="{{ connect_attempts }}" data-call-staff-url="{{ staff_url }}" data-call-poll-seconds="{{ poll_seconds }}"{% if sdk_src %} data-call-sdk="{{ sdk_src }}" data-call-sdk-integrity="{{ sdk_integrity }}"{% endif %}>
@@ -124,9 +124,10 @@
 
   <section class="call-state" aria-labelledby="call-start-heading" data-call-state="start">
     <p class="eyebrow">{{ group.name }}</p>
-    <h1 id="call-start-heading" tabindex="-1">{{ _("call.title") }}</h1>
+    <h1 id="call-start-heading" tabindex="-1">{{ _("trial.title" if trial_until is not none else "call.title") }}</h1>
     <dl class="details">
-      <dt>{{ _("manage.when") }}</dt><dd>{{ slot_label }}</dd>
+      {#- A trial call has no appointment time: it says until when it is open (ADR 0123 point 9). -#}
+      {% if trial_until is not none %}<dt>{{ _("trial.page.until") }}</dt><dd>{{ trial_until }}</dd>{% else %}<dt>{{ _("manage.when") }}</dt><dd>{{ slot_label }}</dd>{% endif %}
       <dt>{{ _("manage.team") }}</dt><dd>{{ group.name }}</dd>
     </dl>
     <p>{{ _("callpage.start.body") }}</p>
@@ -181,6 +182,8 @@
     <p class="hint" data-call-missing="microphone" hidden>{{ _("callpage.check.no_microphone") }}</p>
     <p data-call-recheck hidden><button type="button" class="button button--secondary" data-call-retry>{{ _("callpage.denied.retry") }}</button></p>
     <p class="hint" id="call-external">{{ _("callpage.check.external") }}</p>
+    {#- The organisation's privacy statement (ADR 0123 point 5): only an https address the server checked, in a new tab (leaving would lose the device check) and said so in the link's text, with no referrer and no opener. -#}
+    {% if privacy_url %}<p class="hint"><a href="{{ privacy_url }}" target="_blank" rel="noopener noreferrer">{{ _("callpage.privacy.link") }}</a></p>{% endif %}
     <p class="actions">
       <button type="button" class="button button--large" aria-describedby="call-external" data-call-join>{{ _("callpage.check.join") }}</button>
       {% if other_way_before %}{{ other_way() }}{% endif %}
@@ -236,7 +239,7 @@
       <p data-call-failure="generic" data-text="say_failed_generic" hidden>{{ _("callpage.failed.generic") }}</p>
       <p data-call-failure="media" data-text="say_failed_media" hidden>{{ _("callpage.failed.media") }}</p>
       <p data-call-failure="lost" data-text="say_failed_lost" hidden>{{ _("callpage.failed.lost") }}</p>
-      <p data-call-failure="not_open" data-text="say_failed_not_open" hidden>{{ _("callpage.failed.not_open") }}</p>
+      <p data-call-failure="not_open" data-text="say_failed_not_open" hidden>{{ _("trial.page.not_open" if trial_until is not none else "callpage.failed.not_open") }}</p>
       <p data-call-failure="rate_limited" data-text="say_failed_rate_limited" hidden>{{ _("callpage.failed.rate_limited") }}</p>
       <p data-call-failure="unavailable" data-text="say_failed_unavailable" hidden>{{ _("callpage.failed.unavailable") }}</p>
     </div>
@@ -247,8 +250,9 @@
     <div data-call-failed-contacts>{{ contact("call-failed-contacts") }}</div>
   </section>
 
-  {{ over("left", _("callpage.left.heading"), _("callpage.left.body")) }}
-  {{ over("ended", _("callpage.ended.heading"), _("callpage.ended.body"), _("callpage.ended.deleted")) }}
+  {{ over("left", _("callpage.left.heading"), _("trial.page.left_body" if trial_until is not none else "callpage.left.body")) }}
+  {#- A trial call says so in the states it can end in (ADR 0123 point 9): it has no appointment time and no "your appointment" to go back to. -#}
+  {{ over("ended", _("callpage.ended.heading"), _("trial.page.ended_body" if trial_until is not none else "callpage.ended.body"), _("trial.page.ended_deleted" if trial_until is not none else "callpage.ended.deleted")) }}
 
   <section class="call-state" aria-labelledby="call-unavailable-heading" data-call-state="unavailable" hidden>
     <h1 id="call-unavailable-heading" tabindex="-1">{{ _("callpage.unavailable.heading") }}</h1>
@@ -347,7 +351,7 @@
     <span data-text="say_staff_name">{{ _("callpage.say.staff_name", name="{name}") }}</span>
   </div>
 
-  <p data-call-back><a href="/b/m/{{ ref }}/join">{{ _("join.back") }}</a></p>
+  <p data-call-back><a href="{{ back_href }}">{{ _(back_text) }}</a></p>
 </div>
 {% endblock %}
 {#- Eleven own scripts that share one object, in this order. Each only defines when it loads, and what

@@ -26,19 +26,20 @@ def with_task_kind_field(
     form: FormData,
     current: ContactCenterRouting | None,
     *,
-    embedded_call_enabled: bool,
+    uses_call_page: bool,
     _: BoundGettext,
 ) -> list[Field]:
     """Return ``fields`` with the task kind's select after the routing value's input.
 
     The select offers ``task_kinds_offered``; its value is the submitted one or the group's.
-    A group that holds ``conversation`` while the switch is off is told, next to the select,
-    that it makes work items until the switch is on (``task_kind_in_force``).
+    A group that holds ``conversation`` without using the call page is told, next to the select,
+    that it makes work items until it does (``task_kind_in_force``). ``uses_call_page`` is the
+    service's answer (``app.domain.call_client.uses_call_page``) for the client the form shows.
     """
-    kinds = task_kinds_offered(current, embedded_call_enabled=embedded_call_enabled)
+    kinds = task_kinds_offered(current, uses_call_page=uses_call_page)
     kept = current.task_kind if current else TaskKind.FORM
     hint = _("admin.field.contact_center_task_kind_hint")
-    if kept is TaskKind.CONVERSATION and not embedded_call_enabled:
+    if kept is TaskKind.CONVERSATION and not uses_call_page:
         hint = f"{hint} {_('admin.field.contact_center_task_kind_off')}"
     select = Field(
         TASK_KIND_FIELD,
@@ -58,7 +59,7 @@ def routing_with_task_kind(
     form: FormData,
     current: ContactCenterRouting | None,
     *,
-    embedded_call_enabled: bool,
+    uses_call_page: bool,
 ) -> ContactCenterRouting | None:
     """Return ``center`` made of the kind the form chose; a refused kind is a field error.
 
@@ -75,6 +76,6 @@ def routing_with_task_kind(
     kept = current.task_kind if current else TaskKind.FORM
     if TASK_KIND_FIELD not in form.values:
         return replace(center, task_kind=kept)
-    offered = task_kinds_offered(current, embedded_call_enabled=embedded_call_enabled)
+    offered = task_kinds_offered(current, uses_call_page=uses_call_page)
     chosen = form.choice(TASK_KIND_FIELD, {kind.value for kind in offered})
     return replace(center, task_kind=TaskKind(chosen) if chosen else TaskKind.FORM)

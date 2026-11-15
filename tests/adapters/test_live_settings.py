@@ -200,6 +200,7 @@ async def test_the_organisation_states_show_the_source() -> None:
         "embedded_call_display_name",
         "embedded_call_staff_name",
         "embedded_call_webex_option",
+        "privacy_statement_url",
         "closure_max_retention_days",
         "closure_max_notice_days",
         "queue_wait_warning_minutes",

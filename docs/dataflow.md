@@ -446,6 +446,28 @@ screen name and the account name, and the endpoint answers `{}` for it. The acco
 only where the organisation chose `name`; with the default a staff member without a screen name is shown
 by the organisation's word for staff alone.
 
+### Meetings without chat, the trial call on the page, the privacy link (ADR 0123 points 5, 8, 9 and 17, step 6b)
+
+A meeting for a booking of a service that uses the call page is created with the platform's own
+chat off (`enabledChat` and the two chat privileges); the request still carries only the group's
+name and times. The trial call of such a service opens on the call page: the trial meeting (made
+as before, also without chat) is entered through `GET /b/m/{ref}/test/call`, and the guest token
+for it comes from `POST /b/m/{ref}/test/call/token`, the same guest per booking and the same
+budget as the appointment's (point 7). Nothing new about the participant leaves: the subject and
+the first name or the organisation's word, as for the appointment. The group check adds one probe
+meeting for such a group (title of the probe, no participant) that asks the site for closed
+captions and reads back whether it kept them; it is deleted at once. The organisation's privacy
+statement address (`privacy_statement_url`, class D) is an address the organisation chose; it is
+rendered as a link on the call page only when it is an https address, and nothing is sent to it
+by us (the participant's browser follows it in a new tab, without referrer).
+
+| Data item | Where | Source | Retention | Leaves the system |
+|---|---|---|---|---|
+| The trial meeting's guest link | `bookings.trial_join_url` (as before) | the video platform, when the trial call is opened | purged with the contact; the meeting is deleted minutes after it closes | to the participant's browser as the token endpoint's `link`; never in a log, event or job |
+| That the page was opened on a trial call | `booking_events` (`trial_joined`, detail `embedded`) | the page | with the timeline; no personal data | no |
+| The captions probe | nothing stored; the finding says ok, off, unknown or refused | the site's answer | replaced by the next check | probe meeting to the platform: the probe's title, the host, times |
+| The privacy statement address | organisation setting `privacy_statement_url` | the organisation admin | until changed; no personal data | to the participant's browser as a link |
+
 
 ## Own queue (ADR 0043)
 

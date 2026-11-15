@@ -171,6 +171,17 @@ async def test_purge_jobs_are_not_touched() -> None:
     assert not any(".refuse(" in source or ".status()" in source for source in sources)
 
 
+def test_the_trial_call_on_the_call_page_closes_with_the_trial_call() -> None:
+    """ADR 0038 and ADR 0123 step 6b: unlike the appointment's call routes (a confirmed
+    appointment takes place during maintenance), the trial call is no appointment: entering it
+    writes an event and its token mints a guest at the video platform, so it closes like
+    ``/test`` and ``/test/go``."""
+    trial = {"/b/m/{public_ref}/test/call", "/b/m/{public_ref}/test/call/token"}
+
+    assert trial <= BOOKING_ROUTES
+    assert not trial & OPEN_ROUTES
+
+
 def test_every_public_route_is_closed_or_explicitly_open(demo_settings: Settings) -> None:
     app = create_app(demo_settings, FixedClock(NOW))
     public = {

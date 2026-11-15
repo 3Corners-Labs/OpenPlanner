@@ -55,6 +55,7 @@ from app.domain.admin_session_service import AdminSessionService
 from app.domain.alert_delivery import AlertNotifier
 from app.domain.alerts import QUEUE_WAIT_EVENT, RECOVERY_EVENT, open_conditions
 from app.domain.booking_rollup_service import BookingRowRollup
+from app.domain.call_client import call_page_rule
 from app.domain.change_request_service import prune_change_requests
 from app.domain.diagnostics import DiagnosticsService
 from app.domain.event_context import set_service, trace_scope
@@ -182,6 +183,9 @@ async def run_worker(
 
     health = IntegrationHealthService(uow, clock, lambda: live.settings.health_policy())
 
+    # ADR 0123 step 6b: the one call-page question, built once; the switch is read at every call.
+    uses_page = call_page_rule(lambda: live.settings.embedded_call_enabled)
+
     def build_runner(
         current: Settings,
     ) -> tuple[Integrations, JobRunner, IntegrationWatch, IntegrationHealthWatch]:
@@ -195,6 +199,7 @@ async def run_worker(
             probe_timeout=lambda: timedelta(
                 seconds=live.settings.integration_probe_timeout_seconds
             ),
+            uses_page=uses_page,
         )
         # ADR 0065 step 2: the automatic group check, with the checker of this wiring.
         watch = IntegrationWatch(
@@ -273,7 +278,7 @@ async def run_worker(
                 organisations=wired.organisations,
                 request_work=work,
                 reconcile_minutes=lambda: live.settings.contact_center_reconcile_minutes,
-                conversation_enabled=lambda: live.settings.embedded_call_enabled,
+                uses_page=uses_page,
                 # ADR 0123 point 7: the guest renamed at the purge, under both keys in a rotation.
                 guest_keys=lambda: guest_pseudonym_keys(settings),
                 integration=integration,

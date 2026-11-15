@@ -45,7 +45,12 @@ from app.adapters.contact_centers import routing
 from app.adapters.db.reports import ReportStore
 from app.admin.authz import AdminContext, RequirePermission, can_function
 from app.admin.block_subjects import block_subject_values, read_block_subjects, subject_choices
-from app.admin.call_client_input import EmbeddedOffer, read_call_client, with_call_client_fields
+from app.admin.call_client_input import (
+    EmbeddedOffer,
+    read_call_client,
+    shown_client,
+    with_call_client_fields,
+)
 from app.admin.check_routes import check_service, check_view
 from app.admin.form_summary import form_summary
 from app.admin.forms import (
@@ -94,6 +99,7 @@ from app.admin.staffing_views import (
 from app.admin.task_kind_input import routing_with_task_kind, with_task_kind_field
 from app.admin.timezones import DEFAULT_TIMEZONE, timezone_options
 from app.domain.authorization import LEVELS, Level, Permission
+from app.domain.call_client import uses_call_page
 from app.domain.call_page import OtherWayOffer
 from app.domain.contact_center import ContactCenterRouting
 from app.domain.errors import DomainError, ErrorCode
@@ -238,6 +244,16 @@ def planning_service(request: Request) -> PlanningService:
     """Return the application's planning service."""
     service: PlanningService = request.app.state.planning_service
     return service
+
+
+def _page_with(request: Request, group: Group, client: JoinClient | None) -> bool:
+    """Return whether ``group`` would use the call page with ``client`` as its client.
+
+    The task kind's select and its check follow the client the form chooses, not the stored one
+    (ADR 0123 step 6b); ``None`` (a refused client) counts as the stored one.
+    """
+    chosen = group if client is None else replace(group, join_client=client)
+    return uses_call_page(chosen, platform_enabled=request.app.state.settings.embedded_call_enabled)
 
 
 async def _call_client_inputs(
@@ -695,7 +711,8 @@ async def _settings_response(
         integrations,
         form,
         current.contact_center,
-        embedded_call_enabled=request.app.state.settings.embedded_call_enabled,
+        # The select follows the client the form shows (the posted one on a refused form).
+        uses_call_page=_page_with(request, context.group.group, shown_client(form, current, offer)),
         _=locale.gettext,
     )
     return group_page(
@@ -789,12 +806,14 @@ async def save_settings(
     auto_send = form.choice("reschedule_auto_send", {"yes", "no"})
     fallback = form.choice("dispatch_fallback", {f.value for f in DispatchFallback})
     chosen = (phone, dispatch, embedding, free_pick, trial, client, fallback, auto_send)
+    # The conversation is for a service that uses the call page (ADR 0123 step 6b): the client the
+    # form chooses now counts, so one post may choose both; a refused client counts as the stored.
     try:
         center = routing_with_task_kind(
             _form_routing(form),
             form,
             context.group.group.contact_center,
-            embedded_call_enabled=request.app.state.settings.embedded_call_enabled,
+            uses_call_page=_page_with(request, context.group.group, client),
         )
     except DomainError as error:
         form.refusal(error)

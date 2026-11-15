@@ -65,18 +65,19 @@ ROUTING_MESSAGE = "admin.form.error.integration_text"
 
 
 def task_kinds_offered(
-    current: ContactCenterRouting | None, *, embedded_call_enabled: bool
+    current: ContactCenterRouting | None, *, uses_call_page: bool
 ) -> tuple[TaskKind, ...]:
-    """Return the task kinds the group form offers and accepts (ADR 0123 step 7a).
+    """Return the task kinds the group form offers and accepts (ADR 0123 point 8, step 6b).
 
-    The form is always offered. The conversation is offered only while the platform switch
-    ``embedded_call_enabled`` is on (until then nothing can show a chat to a participant) and
-    only when the platform declares that it carries conversations. A group that holds
-    ``conversation`` already keeps it on the list, so that saving another setting never resets
-    it unseen; choosing it afresh stays closed while the switch is off.
+    The form is always offered. The conversation is offered only for a service that uses the call
+    page (``uses_call_page``: its client is ``embedded`` and the platform switch is on; nothing
+    else can show a chat to a participant) and only when the platform declares that it carries
+    conversations. A group that holds ``conversation`` already keeps it on the list, so that
+    saving another setting never resets it unseen; choosing it afresh stays closed for a service
+    that does not use the call page.
     """
     carried = _DESCRIPTOR.capabilities.carries_task(TaskKind.CONVERSATION)
     holds = current is not None and current.task_kind is TaskKind.CONVERSATION
-    if carried and (embedded_call_enabled or holds):
+    if carried and (uses_call_page or holds):
         return (TaskKind.FORM, TaskKind.CONVERSATION)
     return (TaskKind.FORM,)

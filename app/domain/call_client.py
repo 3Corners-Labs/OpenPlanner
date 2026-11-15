@@ -10,6 +10,7 @@ decides it for itself:
     chosen_client(service, flow)                    what was chosen, whatever the switch says
     call_client(service, flow, platform_enabled)    which client acts for the booking
     uses_call_page(service, flow, platform_enabled) whether the booking's participant gets our page
+    call_page_rule(platform_enabled)                the same question as one callable, built once
     redirect_client(service, flow)                  how a redirect to the platform is shaped
     other_way_offer(service, default)               what the page shows next to the call
     allows_other_way(offer)                         whether the platform's address may answer
@@ -19,6 +20,7 @@ Pure Python: the platform switch ``embedded_call_enabled`` (class C) and the fin
 check come in as arguments read at the edge.
 """
 
+from collections.abc import Callable
 from enum import StrEnum
 
 from app.domain.call_page import OtherWayOffer
@@ -69,6 +71,27 @@ def uses_call_page(
     ``call_client`` already answers the default client for every service while it is off.
     """
     return call_client(service, flow, platform_enabled=platform_enabled) is JoinClient.EMBEDDED
+
+
+UsesCallPage = Callable[[Group], bool]
+"""The question "does this service's participant get the call page now" as one callable. It is
+built once where the application is wired (``call_page_rule``) and handed to every service that
+asks it (the meeting's options, the trial call, the conversation task, the group check), so no
+service keeps a switch of its own."""
+
+
+def call_page_rule(platform_enabled: Callable[[], bool]) -> UsesCallPage:
+    """Return ``uses_call_page`` with the platform switch read now, as one callable.
+
+    Args:
+        platform_enabled: Reads ``embedded_call_enabled`` (class C) at every call, so a change
+            in the portal applies without a restart.
+    """
+
+    def rule(service: Group) -> bool:
+        return uses_call_page(service, platform_enabled=platform_enabled())
+
+    return rule
 
 
 def redirect_client(service: Group, flow: JoinClient | None = None) -> RedirectClient:

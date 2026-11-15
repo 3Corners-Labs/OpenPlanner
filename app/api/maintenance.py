@@ -72,6 +72,12 @@ BOOKING_ROUTES = frozenset(
         "/b/m/{public_ref}/reschedule",
         "/b/m/{public_ref}/test",
         "/b/m/{public_ref}/test/go",
+        # ADR 0123 step 6b: the trial call on the call page closes with the rest of the trial
+        # call (ADR 0071 closes it because it schedules a meeting). Unlike the appointment's own
+        # call routes below, which stay open, the trial is no confirmed appointment taking place:
+        # entering it records an event and its token mints a guest at the video platform.
+        "/b/m/{public_ref}/test/call",
+        "/b/m/{public_ref}/test/call/token",
         "/b/m/{public_ref}/wait/leave",
         # ADR 0121 step 7: withdrawing an immediate request changes it, like stopping a
         # direct call.

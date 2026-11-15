@@ -79,8 +79,11 @@ class EmbeddedOffer:
         )
 
 
-def _shown(form: FormData, current: GroupSettings, offer: EmbeddedOffer) -> JoinClient:
-    """Return the client the form shows: the submitted one when it is offered, else the group's."""
+def shown_client(form: FormData, current: GroupSettings, offer: EmbeddedOffer) -> JoinClient:
+    """Return the client the form shows: the submitted one when it is offered, else the group's.
+
+    The task kind's select follows it (``group_routes``), so the two agree on a refused form.
+    """
     try:
         submitted = JoinClient(form.values.get(CLIENT_FIELD, current.join_client.value))
     except ValueError:
@@ -138,7 +141,7 @@ def with_call_client_fields(
             CLIENT_FIELD,
             _("admin.field.join_client"),
             "select",
-            _shown(form, current, offer).value,
+            shown_client(form, current, offer).value,
             hint=hint,
             error=form.error_for(CLIENT_FIELD),
             options=tuple(

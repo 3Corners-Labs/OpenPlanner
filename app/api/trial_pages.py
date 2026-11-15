@@ -8,6 +8,10 @@ it. Like the join page it never reloads by itself (WCAG 2.2.1).
     GET  /b/m/{ref}/test       status page: what the trial call is, the button, or why not
     POST /b/m/{ref}/test       open a trial call ─► 303 back to the status page
     GET  /b/m/{ref}/test/go    record the click, 303 to the trial meeting (else back)
+
+For a service that uses the call page of our own (ADR 0123 point 9) the button leads to the trial
+call on that page (``/b/m/{ref}/test/call``, ``app.api.call_pages``); ``/test/go`` is then the
+way around it and leads to the platform only where the service's option allows (point 11).
 """
 
 from typing import Annotated
@@ -18,7 +22,7 @@ from starlette.responses import HTMLResponse, RedirectResponse, Response
 from app.api.labels import slot_label
 from app.api.link_session import authorise
 from app.api.participant import participant_page
-from app.domain.call_client import redirect_client
+from app.domain.call_client import allows_other_way, other_way_offer, redirect_client
 from app.domain.trial_call_service import TrialCallService, TrialView
 from app.i18n.dates import format_clock
 from app.web.locale import RequestLocale, request_locale
@@ -43,6 +47,7 @@ def _context(view: TrialView, public_ref: str, locale: RequestLocale) -> dict[st
     return {
         "ref": public_ref,
         "redirect": redirect_client(group).value,
+        "call_page": view.call_page,
         "state": view.state.value,
         "failed": view.failed,
         "calls_left": view.calls_left,
@@ -82,5 +87,16 @@ async def open_trial(request: Request, public_ref: str, locale: Locale, _: SameO
 @limiter.limit(read_limit)
 async def trial_go(request: Request, public_ref: str) -> Response:
     """Send the participant into the open trial meeting, or back to the page when there is none."""
-    link = await _service(request).join_link(await authorise(request, public_ref))
+    ref = await authorise(request, public_ref)
+    service = _service(request)
+    view = await service.view(ref)
+    if view.call_page:
+        # The call is in our page (ADR 0123 point 9); the platform's address answers only where
+        # the service's option allows it (point 11), as ``/join/go`` does for the appointment.
+        offer = other_way_offer(
+            view.group, follow(request, view.group.organisation_id).embedded_call_webex_option
+        )
+        if not allows_other_way(offer):
+            return RedirectResponse(f"/b/m/{public_ref}/test/call", status_code=303)
+    link = await service.join_link(ref)
     return RedirectResponse(link or f"/b/m/{public_ref}/test", status_code=303)

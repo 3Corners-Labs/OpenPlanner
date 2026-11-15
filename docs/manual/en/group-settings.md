@@ -424,10 +424,16 @@ page (the platform setting *embedded_call_enabled*), and only after the Service 
 **Integrations** has been able to create a guest at the video platform (the Service App's guest
 scopes). That is needed for the whole team: without those scopes no participant can join. If the
 platform setting is switched off later, your choice stays, but the participants of this team are
-sent to Webex in the meantime, straight into the browser. The trial call still opens in Webex for
-now. The texts in the confirmation, on the call page and on the trial call page follow this choice.
+sent to Webex in the meantime, straight into the browser. The texts in the confirmation, on the call page and on the trial call page follow this choice.
 Webex can change the behaviour of the direct browser link itself; if the participant does see the
 choice between app and browser anyway, set it to **Webex lets the participant choose**.
+
+A service that uses the call page gets meetings without the video platform's own chat (the trial
+call too), because the chat beside the page is our own. The trial call of such a service opens on
+the call page. The integration check also reports for such a service whether the site's closed-captions
+option is on (a warning when it is not). That does not say that live captions work in the call
+page: try that in a real call. *Conversation* as the kind of task can be chosen only for a
+service that uses the call page; as long as the service does not use it, it makes work items.
 
 <!-- field: embedded_call_webex_option -->
 ### Way into Webex next to our page

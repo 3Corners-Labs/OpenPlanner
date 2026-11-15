@@ -18,6 +18,7 @@ from app.domain.integration import EventOutcome
 from app.domain.job_plan import JobType
 from app.domain.ports import IntegrationError
 from app.domain.request_dispatch import IN_DOUBT_SKIP, OWN_QUEUE
+from app.domain.scheduling import JoinClient
 from app.domain.service_flows import FlowRevision, InteractionKind
 from app.domain.service_requests import (
     HandlingState,
@@ -197,9 +198,11 @@ async def test_an_adopted_task_keeps_the_kind_its_create_was_tried_as(
     given the kind the create was tried as, never one read from the routing afterwards."""
     state = uow.state
     state.groups[1] = replace(
-        state.groups[1], contact_center=webex_routing(task_kind=TaskKind.CONVERSATION)
+        state.groups[1],
+        contact_center=webex_routing(task_kind=TaskKind.CONVERSATION),
+        join_client=JoinClient.EMBEDDED,
     )
-    conversation_desk = desk(uow, clock, conversation_enabled=True)
+    conversation_desk = desk(uow, clock, uses_call_page=True)
     booking_id = await book(uow, clock, CC_FLOW)
     conversation_desk.dispatcher.error = IntegrationError(
         "unreachable", retryable=True, ambiguous=True
@@ -224,9 +227,11 @@ async def test_a_failed_attempt_leaves_no_kind_and_the_next_attempt_is_labelled_
     so it reads the latest attempt."""
     state = uow.state
     state.groups[1] = replace(
-        state.groups[1], contact_center=webex_routing(task_kind=TaskKind.CONVERSATION)
+        state.groups[1],
+        contact_center=webex_routing(task_kind=TaskKind.CONVERSATION),
+        join_client=JoinClient.EMBEDDED,
     )
-    the_desk = desk(uow, clock, conversation_enabled=True)
+    the_desk = desk(uow, clock, uses_call_page=True)
     booking_id = await book(uow, clock, CC_FLOW)
     the_desk.dispatcher.error = IntegrationError("rejected_409", retryable=False)
 
@@ -237,7 +242,7 @@ async def test_a_failed_attempt_leaves_no_kind_and_the_next_attempt_is_labelled_
     assert booking.contact_center_task is None
     assert booking.attempted_task_kind is TaskKind.FORM  # cleared by the final failure
     uow.state.groups[1] = replace(uow.state.groups[1], contact_center=webex_routing())  # a form now
-    the_desk = desk(uow, clock, conversation_enabled=True)
+    the_desk = desk(uow, clock, uses_call_page=True)
     the_desk.dispatcher.error = IntegrationError("unreachable", retryable=True, ambiguous=True)
     at(clock)
     assert await dispatch(the_desk, booking_id) == IN_DOUBT_SKIP
@@ -255,9 +260,11 @@ async def test_an_attempt_keeps_its_kind_while_it_is_in_doubt_and_loses_it_with_
 ) -> None:
     state = uow.state
     state.groups[1] = replace(
-        state.groups[1], contact_center=webex_routing(task_kind=TaskKind.CONVERSATION)
+        state.groups[1],
+        contact_center=webex_routing(task_kind=TaskKind.CONVERSATION),
+        join_client=JoinClient.EMBEDDED,
     )
-    the_desk = desk(uow, clock, conversation_enabled=True)
+    the_desk = desk(uow, clock, uses_call_page=True)
     booking_id = await book(uow, clock, CC_FLOW)
     the_desk.dispatcher.error = IntegrationError("unreachable", retryable=True, ambiguous=True)
 
@@ -278,9 +285,11 @@ async def test_a_conversation_is_not_created_while_the_switch_is_off(
     """The switch also holds at dispatch: the routing holds a conversation, a form is made."""
     state = uow.state
     state.groups[1] = replace(
-        state.groups[1], contact_center=webex_routing(task_kind=TaskKind.CONVERSATION)
+        state.groups[1],
+        contact_center=webex_routing(task_kind=TaskKind.CONVERSATION),
+        join_client=JoinClient.EMBEDDED,
     )
-    off = desk(uow, clock, conversation_enabled=False)
+    off = desk(uow, clock, uses_call_page=False)
     booking_id = await book(uow, clock, CC_FLOW)
 
     assert await dispatch(off, booking_id) is None

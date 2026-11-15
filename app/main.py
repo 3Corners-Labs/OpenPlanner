@@ -88,6 +88,7 @@ from app.domain.alert_delivery import AlertTargetService
 from app.domain.alerts import AlertService
 from app.domain.api_access import ApiAccessService
 from app.domain.branding_service import BrandingService
+from app.domain.call_client import call_page_rule
 from app.domain.call_retry import CallRetryService
 from app.domain.call_service import CallService
 from app.domain.call_token_service import CallTokenService
@@ -349,6 +350,10 @@ def create_app(
             if wired_with is not None and wired_with != webex_fingerprint(current):
                 wire_integrations(current)
 
+        # ADR 0123 step 6b: the one question "does this service's participant get the call page",
+        # built once; the platform switch is read at every call, so a portal change applies.
+        uses_page = call_page_rule(lambda: app.state.settings.embedded_call_enabled)
+
         def wire_integrations(current: Settings) -> None:
             wired = integrations or build_integrations(
                 current,
@@ -358,6 +363,7 @@ def create_app(
                 app.state.security_log,
                 request_log,
                 probe_timeout=lambda: timedelta(seconds=live().integration_probe_timeout_seconds),
+                uses_page=uses_page,
             )
             app.state.integrations = wired
             app.state.call_service = CallService(
@@ -369,10 +375,14 @@ def create_app(
                 app.state.fallback_service,
                 wired.organisations,
                 partial(conversation_opening, app.state.translator),
-                lambda: app.state.settings.embedded_call_enabled,
+                uses_page,
             )
             app.state.trial_call_service = TrialCallService(
-                uow, wired.video, app.state.integration_service, clock
+                uow,
+                wired.video,
+                app.state.integration_service,
+                clock,
+                uses_page,
             )
             # ADR 0123 point 6: the call page's guest token; rebuilt with the video provider.
             app.state.call_token_service = CallTokenService(
