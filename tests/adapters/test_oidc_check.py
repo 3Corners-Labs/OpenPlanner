@@ -7,6 +7,7 @@ import pytest
 
 from app.adapters.diagnostics import passed
 from app.adapters.oidc_check import OidcTarget, check_oidc
+from app.domain.web_transport import BUNDLED_IDP_DISCOVERY_URL
 from tests.fakes.identity_providers import discovery_document
 from tests.fakes.oidc_provider import DISCOVERY, ISSUER, oidc_provider, signing_key
 
@@ -157,13 +158,14 @@ async def test_plain_http_back_channel_endpoints_fail_in_production_only() -> No
 
 
 async def test_http_back_channel_on_an_internal_discovery_address_is_expected() -> None:
-    """ADR 0112: web reaches the bundled provider on the internal http address."""
-    internal = "http://idp:8080/idp/realms/openplanner/.well-known/openid-configuration"
+    """ADR 0112: web reaches the bundled provider on the internal http address (ADR 0125)."""
+    internal = BUNDLED_IDP_DISCOVERY_URL
+    back_channel = internal.removesuffix("/.well-known/openid-configuration")
     metadata = {
         **discovery_document(
             ISSUER,
-            token_endpoint="http://idp:8080/idp/realms/openplanner/protocol/openid-connect/token",
-            jwks_uri="http://idp:8080/idp/realms/openplanner/protocol/openid-connect/certs",
+            token_endpoint=f"{back_channel}/protocol/openid-connect/token",
+            jwks_uri=f"{back_channel}/protocol/openid-connect/certs",
         ),
         "issuer": "https://afspraak.example.nl/idp/realms/openplanner",
     }

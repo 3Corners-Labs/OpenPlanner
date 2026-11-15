@@ -251,6 +251,9 @@ Three statements disagree: the repository says MIT, the npm metadata says "Cisco
 7. Can the telemetry to `client-logs` and `metrics` be switched off?
 8. Can the scopes of a guest token be narrowed to joining a meeting? If not, can an organisation's policy deny messaging to the guests of a guest issuer? A guest can write to any account whose address it knows (section 16).
 9. How long does the contact center keep a conversation's transcript and the thread per participant identifier and business address, and how is it deleted?
+10. Captions started by an SDK guest (ADR 0123 step 5b): does the press turn the speech of the whole meeting into text, the staff member's too, or only what this participant hears? Does the staff member see them, can a stop by the guest end them for everyone, and does the platform keep a transcript of the meeting (where, how long, who can read it)?
+11. Does the real-time data link (`enableAutomaticLLM`, or `updateLLMConnection` when it is off at the join) exist for guests at all, can it be opened only at the press of the captions button and closed again before the meeting is left, and what does it carry besides captions?
+12. Does a shared screen by an SDK guest carry sound, and does stopping the display stream end the browser's capture on every browser?
 
 ## 15. What was not tried
 

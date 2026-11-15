@@ -1,8 +1,11 @@
 #!/usr/bin/env sh
-# An independent review of everything since the last release by a second model, before the
-# release PR of a minor or major version merges (ADR 0078 point 4). It reuses the review mode
-# of the Codex CLI exactly as the /codex skill runs it: read-only sandbox, high reasoning
-# effort, no prompt of our own. The findings go into the release PR under "## Release audit".
+# An optional, occasional review of everything since the last release by a second model
+# (ADR 0128; it was a required step for a minor or major release under ADR 0078 point 4). No
+# workflow runs it and no check waits for it: whoever wants a second opinion runs it on their
+# own machine, with the Codex CLI installed and signed in to their own account. It reuses the
+# review mode of the Codex CLI exactly as the /codex skill runs it: read-only sandbox, high
+# reasoning effort, no prompt of our own. The findings may go into the release PR under
+# "## Release audit"; nothing reads a verdict there.
 #
 # Usage: scripts/release-audit.sh [BASE]
 #   BASE  the ref to review against; default: the last release tag (candidates excluded).

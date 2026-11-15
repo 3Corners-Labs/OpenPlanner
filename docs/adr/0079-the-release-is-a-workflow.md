@@ -4,7 +4,9 @@ Status: accepted (2026-10-31, `po:approved` on #183), requested by the product o
 ADR 0052 (point 3: the release PR and the tag come from the `release` workflow; the dispatch is
 the instruction) and ADR 0078 (point 4: the audit runs as a job, not on a laptop; its step 5 is
 prepared here). Point 7 amended by ADR 0107: the release identity is the release app in the
-environment `release`, and `RELEASE_TOKEN` is gone. Built: the first release through the workflow was `v0.4.0` (#511) with its audit; see *Build status*.
+environment `release`, and `RELEASE_TOKEN` is gone. Built: the first release through the workflow was `v0.4.0` (#511) with its audit; see *Build status*. Point 3 (the
+`audit` job), the audit parts of points 4, 6 and 7 and the setting `OPENAI_API_KEY` superseded
+by ADR 0128 (2026-11-14): the audit is optional and runs outside the workflow.
 
 ## Context
 

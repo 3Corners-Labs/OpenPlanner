@@ -29,7 +29,6 @@ from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from app.adapters.db.reports import HEALTH_REPORT, REGISTRATIONS_REPORT, ReportStore
 from app.adapters.integrations import Integrations
-from app.adapters.service_app_check import SERVICE_APP_REPORT
 from app.adapters.webhooks import WXCC_INBOUND
 from app.admin import (
     agenda_routes,
@@ -68,6 +67,7 @@ from app.admin import (
     planner_routes,
     pool_staffing_routes,
     preference_routes,
+    profile_routes,
     proposal_routes,
     queue_routes,
     request_queue_routes,
@@ -81,6 +81,7 @@ from app.admin import (
     skill_routes,
     staff_directory_routes,
     staff_routes,
+    staff_screen_name_routes,
     staff_status_routes,
     update_routes,
     usage_routes,
@@ -150,6 +151,7 @@ from app.domain.contact_center import ContactCenterKind
 from app.domain.entitlements import ClaimMode, LoginClaims, resolve
 from app.domain.errors import DomainError
 from app.domain.identity import PLATFORM
+from app.domain.integration_check import SERVICE_APP_REPORT
 from app.domain.integration_health import IntegrationHealthService
 from app.domain.login_domains import EMAIL_DOMAIN_MISMATCH, EMAIL_NOT_VERIFIED
 from app.domain.login_service import (
@@ -896,7 +898,9 @@ def register_admin(app: FastAPI) -> None:
         role_routes.router,
         staff_directory_routes.router,
         staff_routes.router,
+        staff_screen_name_routes.router,
         session_routes.router,
+        profile_routes.router,
         staff_status_routes.router,
         group_routes.router,
         call_routes.router,

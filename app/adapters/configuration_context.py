@@ -36,6 +36,7 @@ def rule_context(settings: Settings) -> RuleContext:
             "idp_max_per_organisation": settings.idp_max_per_organisation,
             "booking_form_max_custom_fields": settings.booking_form_max_custom_fields,
             "bundled_idp_login_suffix": settings.bundled_idp_login_suffix,
+            "embedded_call_enabled": settings.embedded_call_enabled,
         },
         built_in_claim_values=frozenset(
             value.casefold()

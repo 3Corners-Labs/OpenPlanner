@@ -44,6 +44,8 @@ _PERMISSION = Permission.GROUP_EDIT
 
 CHECK_EVENT = "integration.check"
 """Audit action of a check; the reason is the overall status (by hand) or the failing code."""
+SERVICE_APP_REPORT = "service_app_check"
+"""The name of the stored report of the service-app check, the one home of the name."""
 SERVICE_APP_CHECK_EVENT = "integration.service_app_check"
 PROBE_REASON_PREFIX = "wxcc.probe."
 """A check failure whose reason starts with this failed on the probe work item (ADR 0082

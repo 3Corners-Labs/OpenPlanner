@@ -1,6 +1,6 @@
 [project]
 name = "openplanner"
-version = "0.5.1"
+version = "0.6.0"
 description = "Lightweight group-booking service with Webex Contact Center dispatch."
 readme = "README.md"
 license = "EUPL-1.2"
@@ -187,5 +187,6 @@ exclude_dirs = ["tests", "migrations"]
 [tool.mutmut]
 # The i18n core is pure logic too and is held to the same bar (ADR 0004).
 source_paths = ["app/domain/", "app/i18n/"]
-also_copy = ["app/", "alembic.ini", "migrations/"]
+# docs/configuration-schema/ is the one published file a selected test compares with the code.
+also_copy = ["app/", "alembic.ini", "migrations/", "docs/configuration-schema/"]
 pytest_add_cli_args_test_selection = ["tests/domain/", "tests/i18n/"]

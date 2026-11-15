@@ -15,12 +15,17 @@ from pathlib import Path
 
 import pytest
 
+from app.domain.web_transport import BUNDLED_IDP_UPSTREAM
+from tests.support.compose import compose_file
+
 ENTRYPOINT = Path(__file__).parents[2] / "deploy/proxy/entrypoint.sh"
 SH = shutil.which("sh") or "/bin/sh"
 FAKE_CADDY = """#!/bin/sh
 # Fake caddy: records the command and the TLS_DIRECTIVE it was started or reloaded with.
 echo "$1:${TLS_DIRECTIVE-unset}" >> "$CADDY_LOG"
 echo "$1:${IDP_DIRECTIVE-unset}" >> "$CADDY_LOG.idp"
+echo "$1:${WEB_UPSTREAM-unset}" >> "$CADDY_LOG.web"
+echo "$1:${TRUSTED_PROXIES_DIRECTIVE-unset}" >> "$CADDY_LOG.trusted"
 if [ "$1" = run ]; then sleep "${CADDY_RUN_SECONDS:-0}"; fi
 """
 
@@ -32,7 +37,7 @@ def bin_dir(tmp_path: Path) -> Path:
     directory.mkdir()
     (directory / "caddy").write_text(FAKE_CADDY)
     (directory / "caddy").chmod(0o755)
-    for tool in ("sh", "head", "sleep", "echo", "cp", "mv", "chmod"):
+    for tool in ("sh", "head", "sleep", "echo", "cp", "mv", "chmod", "tr", "sed"):
         real = shutil.which(tool)
         if real and not (directory / tool).exists():
             os.symlink(real, directory / tool)
@@ -48,6 +53,8 @@ class Outcome:
     stderr: str
     logged: list[str]
     idp: list[str]
+    web: list[str]
+    trusted: list[str]
 
 
 def run(bin_dir: Path, tmp_path: Path, run_seconds: int = 0, **env: str) -> Outcome:
@@ -76,9 +83,14 @@ def run(bin_dir: Path, tmp_path: Path, run_seconds: int = 0, **env: str) -> Outc
         returncode = process.wait(timeout=30)
     time.sleep(1.5)  # let the watcher notice that caddy is gone and write its last line
     lines = log.read_text().splitlines() if log.exists() else []
-    idp_log = Path(f"{log}.idp")
+    idp_log, web_log = Path(f"{log}.idp"), Path(f"{log}.web")
+    trusted_log = Path(f"{log}.trusted")
     idp = idp_log.read_text().splitlines() if idp_log.exists() else []
-    return Outcome(returncode, out.read_text(), err.read_text(), lines, idp)
+    web = web_log.read_text().splitlines() if web_log.exists() else []
+    trusted = trusted_log.read_text().splitlines() if trusted_log.exists() else []
+    for used in (idp_log, web_log, trusted_log):
+        used.unlink(missing_ok=True)  # the next run in the same test starts its own
+    return Outcome(returncode, out.read_text(), err.read_text(), lines, idp, web, trusted)
 
 
 def write_pair(portal: Path, serial: str) -> None:
@@ -256,33 +268,119 @@ def test_operator_files_win_over_the_internal_authority(bin_dir: Path, tmp_path:
     assert outcome.logged == [f"run:tls {cert} {key}"]
 
 
+IDP_ADDRESS = BUNDLED_IDP_UPSTREAM
+"""The bundled identity provider's fixed address and port (ADR 0125 step 2)."""
+WEB_ADDRESS = compose_file()["services"]["proxy"]["environment"]["WEB_UPSTREAM"]
+"""Web's fixed address and port on edge, as ``docker-compose.yml`` hands it to the proxy."""
+ACME = {"TLS_DOMAIN": "a.example.nl", "ACME_EMAIL": "ops@example.nl"}
+COMPOSE = {**ACME, "WEB_UPSTREAM": WEB_ADDRESS}
+"""What the proxy gets from ``docker-compose.yml`` and an ACME ``proxy.env``."""
+
+
 def test_the_identity_provider_is_routed_only_when_an_upstream_is_named(
     bin_dir: Path, tmp_path: Path
 ) -> None:
-    plain = run(bin_dir, tmp_path, TLS_DOMAIN="a.example.nl", ACME_EMAIL="ops@example.nl")
-    (tmp_path / "caddy.log.idp").unlink()
-    routed = run(
-        bin_dir,
-        tmp_path,
-        TLS_DOMAIN="a.example.nl",
-        ACME_EMAIL="ops@example.nl",
-        IDP_UPSTREAM="idp:8080",
-    )
+    plain = run(bin_dir, tmp_path, **COMPOSE)
+    routed = run(bin_dir, tmp_path, **COMPOSE, IDP_UPSTREAM=IDP_ADDRESS)
 
     assert plain.idp == ["run:"]
-    directive = "\n".join(routed.idp)  # a multi-line directive: one log line per line of it
-    assert directive.startswith("run:handle /idp/* {")
-    assert "reverse_proxy idp:8080" in directive
+    # The route and its rules are one file (ADR 0126), which reads IDP_UPSTREAM itself.
+    assert routed.idp == ["run:import /etc/caddy/idp.caddy"]
+    assert "warning" not in routed.stderr  # an address, never a name (ADR 0125 step 2)
+    dockerfile = (ENTRYPOINT.parent / "Dockerfile").read_text()
+    assert "COPY idp.caddy /etc/caddy/idp.caddy" in dockerfile
+    assert "reverse_proxy {$IDP_UPSTREAM}" in (ENTRYPOINT.parent / "idp.caddy").read_text()
 
 
-def test_an_upstream_with_an_odd_character_is_refused(bin_dir: Path, tmp_path: Path) -> None:
-    outcome = run(
-        bin_dir,
-        tmp_path,
-        TLS_DOMAIN="a.example.nl",
-        ACME_EMAIL="ops@example.nl",
-        IDP_UPSTREAM="idp:8080; respond 200",
-    )
+def test_everything_else_goes_to_web_at_the_address_compose_names(
+    bin_dir: Path, tmp_path: Path
+) -> None:
+    """ADR 0125 step 2: never the name web, which the host's DNS may answer while it is down."""
+    outcome = run(bin_dir, tmp_path, **COMPOSE)
+
+    assert outcome.web == [f"run:{WEB_ADDRESS}"]
+    assert "warning" not in outcome.stderr
+
+
+def test_an_older_compose_file_falls_back_to_the_name_web_and_says_so(
+    bin_dir: Path, tmp_path: Path
+) -> None:
+    """A portal update replaces the image before the checkout: the route must keep working."""
+    outcome = run(bin_dir, tmp_path, **ACME)
+
+    assert outcome.returncode == 0
+    assert outcome.web == ["run:web:8000"]
+    assert "WEB_UPSTREAM=web:8000 is a name" in outcome.stderr
+
+
+def test_a_name_in_idp_upstream_works_and_is_named(bin_dir: Path, tmp_path: Path) -> None:
+    """A proxy.env from before ADR 0125 step 2, until the installer writes the address."""
+    outcome = run(bin_dir, tmp_path, **COMPOSE, IDP_UPSTREAM="idp:8080")
+
+    assert outcome.idp == ["run:import /etc/caddy/idp.caddy"]  # which reads IDP_UPSTREAM
+    assert "IDP_UPSTREAM=idp:8080 is a name" in outcome.stderr
+
+
+@pytest.mark.parametrize("name", ["IDP_UPSTREAM", "WEB_UPSTREAM"])
+def test_an_upstream_with_an_odd_character_is_refused(
+    bin_dir: Path, tmp_path: Path, name: str
+) -> None:
+    outcome = run(bin_dir, tmp_path, **{**COMPOSE, name: f"{IDP_ADDRESS}; respond 200"})
 
     assert outcome.returncode == 1
-    assert "IDP_UPSTREAM must be host:port" in outcome.stderr
+    assert f"{name} must be host:port" in outcome.stderr
+    assert outcome.logged == []
+
+
+def test_no_upstream_is_trusted_by_default(bin_dir: Path, tmp_path: Path) -> None:
+    """ADR 0129: without PROXY_TRUSTED_NETWORKS the peer is the visitor, as before."""
+    outcome = run(bin_dir, tmp_path, **COMPOSE)
+
+    assert outcome.trusted == ["run:"]
+    assert "X-Forwarded-For of" not in outcome.stdout
+
+
+def test_trusted_networks_are_read_right_to_left_and_announced(
+    bin_dir: Path, tmp_path: Path
+) -> None:
+    networks = "10.20.0.0/16, 192.0.2.10\n2001:db8::/48"
+
+    outcome = run(bin_dir, tmp_path, **COMPOSE, PROXY_TRUSTED_NETWORKS=networks)
+
+    directive = "\n".join(outcome.trusted)  # a multi-line directive: one log line per line of it
+    assert directive.startswith("run:trusted_proxies static 10.20.0.0/16 192.0.2.10 2001:db8::/48")
+    assert "trusted_proxies_strict" in directive
+    assert "10.20.0.0/16 192.0.2.10 2001:db8::/48 (right to left" in outcome.stdout
+
+
+@pytest.mark.parametrize("everything", ["0.0.0.0/0", "::/0", "10.0.0.0/00"])
+def test_a_range_that_trusts_every_address_is_refused(
+    bin_dir: Path, tmp_path: Path, everything: str
+) -> None:
+    outcome = run(bin_dir, tmp_path, **COMPOSE, PROXY_TRUSTED_NETWORKS=f"192.0.2.10 {everything}")
+
+    assert outcome.returncode == 1
+    assert "trusts every address" in outcome.stderr
+    assert outcome.logged == []
+
+
+@pytest.mark.parametrize(
+    "odd", ["10.0.0.0/8; respond 200", "edge.example.nl", "10.0.0.0/8/9", "/8", "10.0.0.0/"]
+)
+def test_anything_but_addresses_and_ranges_is_refused(
+    bin_dir: Path, tmp_path: Path, odd: str
+) -> None:
+    outcome = run(bin_dir, tmp_path, **COMPOSE, PROXY_TRUSTED_NETWORKS=odd)
+
+    assert outcome.returncode == 1
+    assert "is not an IP address or CIDR range" in outcome.stderr
+    assert outcome.logged == []
+
+
+def test_more_than_32_trusted_entries_are_refused(bin_dir: Path, tmp_path: Path) -> None:
+    networks = " ".join(f"192.0.2.{n}" for n in range(1, 34))
+
+    outcome = run(bin_dir, tmp_path, **COMPOSE, PROXY_TRUSTED_NETWORKS=networks)
+
+    assert outcome.returncode == 1
+    assert "at most 32 entries, 33 given" in outcome.stderr

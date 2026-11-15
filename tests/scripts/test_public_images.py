@@ -59,7 +59,7 @@ def test_the_notes_carry_the_references_and_the_identity_of_the_tag() -> None:
     assert "https://github.com/o/r/.github/workflows/main.yml@refs/tags/v0.4.0" in notes
     assert "cosign verify-attestation" in notes
     assert "token.actions.githubusercontent.com" in notes
-    assert "Release audit" in notes  # a minor release carries the audit of ADR 0078
+    assert "audit" not in notes  # optional since ADR 0128: the notes never claim one
 
 
 def test_the_notes_of_a_patch_claim_no_audit() -> None:
@@ -70,7 +70,7 @@ def test_the_notes_of_a_patch_claim_no_audit() -> None:
         check=True,
     ).stdout
     assert "refs/tags/v0.4.1" in notes
-    assert "Release audit" not in notes
+    assert "audit" not in notes
 
 
 def _bash_major() -> int:

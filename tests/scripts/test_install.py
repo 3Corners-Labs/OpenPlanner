@@ -10,15 +10,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-import yaml
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 
 from app.adapters.bootstrap import GENERATED
 from app.config import Settings
 from app.domain.settings_registry import BY_KEY
-from app.domain.web_transport import BUNDLED_IDP_DISCOVERY_URL
+from app.domain.web_transport import BUNDLED_IDP_DISCOVERY_URL, BUNDLED_IDP_UPSTREAM
 from tests.fakes import updater_host
 from tests.fakes.updater_host import digest
+from tests.support.compose import compose_file, fixed_address
 
 REPO = Path(__file__).parents[2]
 BASH = shutil.which("bash") or "/bin/bash"
@@ -37,6 +37,9 @@ SYSTEM = (
     *("hostname", "install", "mkdir", "mktemp", "mv", "rm", "sed", "sort", "tail", "tr", "uniq"),
 )
 KEYS = tuple(BY_KEY[key].env for key in GENERATED)
+IDP_UPSTREAM = BUNDLED_IDP_UPSTREAM
+"""Where the proxy reaches the bundled provider: its fixed address (ADR 0125 step 2)."""
+IDP_DB_ADDRESS = str(fixed_address("idp-db", "idp-store"))
 PRODUCTION = {
     "TLS_DOMAIN": "afspraak.example.nl",
     "ACME_EMAIL": "ops@example.nl",
@@ -113,6 +116,14 @@ class Host:
     def ran(self, fragment: str) -> bool:
         return any(fragment in command for command in self.commands())
 
+    def after_start(self, fragment: str) -> bool:
+        """Whether the first call holding ``fragment`` came after `up -d` and the ready check."""
+        commands = self.commands()
+        started = max(i for i, c in enumerate(commands) if c.endswith(" up -d"))
+        ready = max(i for i, c in enumerate(commands) if "/readyz" in c)
+        called = min(i for i, c in enumerate(commands) if fragment in c)
+        return started < ready < called
+
     def settings(self, name: str) -> dict[str, str]:
         """Read an env file as Compose does: the last occurrence wins, quotes removed."""
         values = {}
@@ -130,11 +141,10 @@ def host(tmp_path: Path) -> Host:
         (tmp_path / directory).mkdir(parents=True)
     shutil.copytree(REPO / "scripts" / "updater", host.checkout / "scripts" / "updater")
     shutil.copy(REPO / "scripts" / "install.sh", host.checkout / "scripts" / "install.sh")
-    # The bundled identity provider is rendered on the host (ADR 0106 step 5).
-    shutil.copy(
-        REPO / "scripts" / "render-keycloak-realm.sh",
-        host.checkout / "scripts" / "render-keycloak-realm.sh",
-    )
+    # The bundled identity provider is rendered on the host (ADR 0106 step 5), at the fixed
+    # addresses both scripts read (ADR 0125 step 2).
+    for script in ("render-keycloak-realm.sh", "fixed-addresses.sh"):
+        shutil.copy(REPO / "scripts" / script, host.checkout / "scripts" / script)
     (host.checkout / "deploy" / "keycloak").mkdir(parents=True)
     shutil.copy(
         REPO / "deploy" / "keycloak" / "realm.template.json",
@@ -481,7 +491,7 @@ def test_lab_mode_runs_the_dev_services_and_removes_a_stray_proxy(host: Host) ->
     assert "OIDC_DISCOVERY_URL" not in host.settings(".env")
     login = host.settings("secrets/keycloak-app.env")
     assert login["OIDC_ISSUER"] == "http://127.0.0.1:8080/realms/openplanner"
-    assert login["OIDC_DISCOVERY_URL"].startswith("http://idp:8080/realms/openplanner/")
+    assert login["OIDC_DISCOVERY_URL"].startswith(f"http://{IDP_UPSTREAM}/realms/openplanner/")
     assert host.settings(".env.update")["COMPOSE_PROFILES"] == "idp,mailpit"
     assert host.settings(".env.update")["OPENPLANNER_IDP"] == "bundled"
     assert not host.file("proxy.env").exists()
@@ -582,7 +592,7 @@ def test_test_mode_runs_the_https_proxy_by_default(host: Host) -> None:
     assert host.settings("proxy.env") == {
         "TLS_DOMAIN": "test.example.nl",
         "ACME_EMAIL": "ops@example.nl",
-        "IDP_UPSTREAM": "idp:8080",  # the bundled Keycloak under /idp (ADR 0112)
+        "IDP_UPSTREAM": IDP_UPSTREAM,  # the bundled Keycloak under /idp (ADR 0112, 0125)
     }
     assert host.settings(".env.update")["COMPOSE_PROFILES"] == "idp,tls"
     assert host.file("certs").is_dir()
@@ -637,7 +647,7 @@ def test_a_lab_opts_in_to_https_with_a_domain(host: Host) -> None:
         "TLS_DOMAIN": "docker01.example.nl",
         "ACME_EMAIL": "ops@example.nl",
         "ACME_CA": "https://acme-staging-v02.api.letsencrypt.org/directory",
-        "IDP_UPSTREAM": "idp:8080",
+        "IDP_UPSTREAM": IDP_UPSTREAM,
     }
 
 
@@ -686,7 +696,7 @@ def test_the_internal_ca_needs_no_mailbox_and_locks_the_portal_source(host: Host
     assert host.settings("proxy.env") == {
         "TLS_DOMAIN": "afspraak.example.nl",
         "TLS_INTERNAL": "true",
-        "IDP_UPSTREAM": "idp:8080",
+        "IDP_UPSTREAM": IDP_UPSTREAM,
     }
     assert host.settings(".env.update")["COMPOSE_PROFILES"] == "idp,tls"
     assert host.settings(".env")["TLS_CERTIFICATE_SOURCE"] == "own"
@@ -825,6 +835,8 @@ def _with_package(host: Host, *args: str, **settings: str) -> subprocess.Complet
 
 
 HOST_SETTINGS = {k: v for k, v in PRODUCTION.items() if not k.startswith("OIDC_")}
+WITHOUT_MAIL = {k: v for k, v in HOST_SETTINGS.items() if not k.startswith("SMTP_")}
+"""A host with the bundled provider and no SMTP server of its own."""
 
 
 def test_the_configuration_and_passphrase_options_go_together(host: Host) -> None:
@@ -876,9 +888,7 @@ def test_the_package_answers_the_login_questions_and_is_imported_once_healthy(
     assert "a passphrase of sixteen chars" not in " ".join(commands)
     assert not list(host.checkout.glob(".package.*"))
     # The import waits for health and uses a copy inside the container.
-    started = commands.index(next(c for c in commands if c.endswith(" up -d")))
-    imported = commands.index(next(c for c in commands if "app.cli config import" in c))
-    assert started < imported
+    assert host.after_start("app.cli config import")
     assert any(c.endswith("web:/srv/data/configuration-package.sqlite") for c in commands)
     assert host.ran("exec -T web rm -f /srv/data/configuration-package.sqlite")
     assert "organisations       2" in result.stdout
@@ -969,34 +979,126 @@ def test_a_test_install_renders_the_bundled_realm_and_hands_over_the_login(host:
     assert "OIDC_DISCOVERY_URL" not in env
     assert "OIDC_CLIENT_SECRET" not in env
     assert app["OIDC_ISSUER"] == "https://afspraak.example.nl/idp/realms/openplanner"
-    assert app["KEYCLOAK_ADMIN_URL"] == "http://idp:8080/idp/admin/realms/openplanner"
+    assert app["KEYCLOAK_ADMIN_URL"] == f"http://{IDP_UPSTREAM}/idp/admin/realms/openplanner"
     assert host.settings("secrets/keycloak.env")["KC_HOSTNAME"] == "https://afspraak.example.nl/idp"
     assert host.file("secrets/keycloak-realm.json").is_file()
     assert "KC_SUPER_PASSWORD in" in result.stderr + result.stdout
     assert app["OIDC_CLIENT_SECRET"] not in result.stderr + result.stdout  # a path, never a value
-    assert "until ADR 0125 step 2" not in result.stderr  # the warning is production's (point 7)
+    # A first install makes its secrets on the fixed address: nothing to replace (ADR 0125).
+    assert "client secrets" not in result.stderr + result.stdout
+    assert not host.file("secrets/keycloak-secrets.pending").exists()
+
+
+KCADM = "exec -T idp sh /opt/openplanner/kcadm-as-admin.sh"
+"""How the installer runs kcadm.sh as realm master's admin (deploy/keycloak/kcadm-as-admin.sh)."""
 
 
 def test_the_realms_mail_server_is_set_after_the_start_without_a_password_in_an_argument(
     host: Host,
 ) -> None:
-    settings = {k: v for k, v in PRODUCTION.items() if not k.startswith("OIDC_")}
-
-    result = host.run("--mode", "test", "--non-interactive", **settings)
+    result = host.run("--mode", "test", "--non-interactive", **HOST_SETTINGS)
 
     assert result.returncode == 0, result.stderr
-    assert host.ran("exec -T idp sh -c")
-    assert not host.ran("pass word #1")  # the password goes through stdin
+    assert host.ran(f"{KCADM} update realms/openplanner -f -")  # the body comes on stdin
+    assert host.after_start("update realms/openplanner")
+    assert not host.ran("pass word #1")
     assert "mail server: smtp.example.nl" in result.stderr + result.stdout
 
 
 def test_without_an_smtp_host_the_install_says_keycloak_cannot_mail(host: Host) -> None:
-    settings = {k: v for k, v in PRODUCTION.items() if not k.startswith(("OIDC_", "SMTP_"))}
-
-    result = host.run("--mode", "test", "--non-interactive", **settings)
+    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
 
     assert result.returncode == 0, result.stderr
     assert "Keycloak cannot mail invitations" in result.stderr
+    assert not host.ran("realms/openplanner")
+
+
+def test_the_admin_console_is_put_on_the_loopback_after_the_start_adr_0126(host: Host) -> None:
+    """Behind the proxy realm master's login must stay on the loopback, where the console is."""
+    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
+
+    assert result.returncode == 0, result.stderr
+    assert host.ran("port idp-container-id")
+    # The published loopback port, with the proxy's path, as one argument of kcadm.sh's own,
+    # read from the container the start made.
+    assert host.ran(
+        f"{KCADM} update realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp"
+    )
+    assert host.after_start("port idp-container-id")
+    assert host.after_start("update realms/master")
+    assert not host.ran("rm --stop --force idp idp-db")  # a bundled install keeps its provider
+    output = result.stderr + result.stdout
+    assert "admin console: http://127.0.0.1:8080/idp/admin/ on this host only" in output
+
+
+@pytest.mark.parametrize(
+    "run",
+    [
+        pytest.param(("--mode", "test", "--non-interactive"), id="behind the proxy"),
+        pytest.param(("--mode", "lab", "--version", "1.4.0", "--non-interactive"), id="no proxy"),
+    ],
+)
+def test_a_provider_published_beyond_the_loopback_gets_a_warning_with_or_without_the_proxy(
+    host: Host, run: tuple[str, ...]
+) -> None:
+    """One more port on every interface (an override's 8780) puts realm master on the network."""
+    host.given("idp-ports", "8080/tcp -> 127.0.0.1:8080\n8080/tcp -> 0.0.0.0:8780\n")
+
+    result = host.run(*run, **(WITHOUT_MAIL if "test" in run else {}))
+
+    assert result.returncode == 0, result.stderr
+    assert host.ran("port idp-container-id")
+    assert not host.ran("frontendUrl")
+    assert "published beyond the loopback (8080/tcp -> 0.0.0.0:8780)" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("ports", "console"),
+    [
+        ("8080/tcp -> 127.0.0.1:8080\n8080/tcp -> [::1]:8080\n", "http://127.0.0.1:8080/idp"),
+        ("8080/tcp -> [::1]:8080\n", "http://[::1]:8080/idp"),
+    ],
+)
+def test_the_console_address_is_the_loopback_the_provider_is_published_on(
+    host: Host, ports: str, console: str
+) -> None:
+    host.given("idp-ports", ports)
+
+    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
+
+    assert result.returncode == 0, result.stderr
+    assert host.ran(f"realms/master -s attributes.frontendUrl={console}")
+
+
+def test_a_provider_that_is_not_running_is_named_as_such(host: Host) -> None:
+    """No container, so nothing published: say so, not that a port is wrong."""
+    host.given("idp-container", "")
+
+    result = host.run("--mode", "test", "--non-interactive", **WITHOUT_MAIL)
+
+    assert result.returncode == 0, result.stderr
+    assert not host.ran("frontendUrl")
+    assert "publishes no port on the loopback, or is not running" in result.stderr
+
+
+def test_a_provider_that_never_answers_is_waited_for_once(host: Host) -> None:
+    """The steps on the provider share one wait: after the mail server's, the console tries once."""
+    host.given("fail", "idp-exec\n")
+
+    result = host.run("--mode", "test", "--non-interactive", HEALTH_TIMEOUT="5", **HOST_SETTINGS)
+
+    assert result.returncode == 0, result.stderr
+    assert host.ran(f"{KCADM} update realms/openplanner")
+    assert sum("realms/master" in command for command in host.commands()) == 1
+    assert "did not take its mail server" in result.stderr
+    assert "did not take the loopback address of its admin console" in result.stderr
+
+
+def test_an_own_provider_gets_no_console_step(host: Host) -> None:
+    result = host.run("--mode", "test", "--idp", "own", "--non-interactive", **PRODUCTION)
+
+    assert result.returncode == 0, result.stderr
+    assert not host.ran("ps -q idp")
     assert not host.ran("exec -T idp")
 
 
@@ -1062,7 +1164,7 @@ def test_production_runs_the_bundled_keycloak_on_its_own_database(host: Host) ->
     assert pins["OPENPLANNER_IDP_START"] == "start"
     assert {"idp", "idp-db"} <= set(pins["COMPOSE_PROFILES"].split(","))
     assert keycloak["KC_DB"] == "postgres"
-    assert keycloak["KC_DB_URL_HOST"] == "idp-db"
+    assert keycloak["KC_DB_URL_HOST"] == IDP_DB_ADDRESS  # never the name (ADR 0125 step 2)
     assert keycloak["KC_HTTP_ENABLED"] == "true"
     assert host.settings("secrets/idp-db.env")["POSTGRES_PASSWORD"] == keycloak["KC_DB_PASSWORD"]
     assert host.settings(".env")["ADMIN_MFA_REQUIRED"] == "true"
@@ -1091,7 +1193,7 @@ def _container_settings(host: Host) -> Settings:
     the containers read, in the order ``docker-compose.yml`` lists them (a later file wins).
     """
     values: dict[str, str] = {}
-    for entry in yaml.safe_load((REPO / "docker-compose.yml").read_text())["x-app"]["env_file"]:
+    for entry in compose_file()["x-app"]["env_file"]:
         if host.file(entry["path"]).is_file():
             values |= host.settings(entry["path"])
     return _ContainerSettings(**{key.lower(): value for key, value in values.items()})
@@ -1111,12 +1213,258 @@ def test_web_and_worker_start_on_what_a_production_install_with_the_bundled_keyc
     assert settings.production_problems() == []
 
 
-def test_production_with_the_bundled_provider_warns_until_adr_0125_step_2(host: Host) -> None:
-    """ADR 0125 point 7: the host owner is told what production runs on, and the way out."""
+def test_production_with_the_bundled_provider_no_longer_warns(host: Host) -> None:
+    """ADR 0125 point 7 warned until step 2 gave every hop on the host a fixed address."""
     result = _production_bundled(host)
 
-    assert "until ADR 0125 step 2" in result.stderr
-    assert "--idp own" in result.stderr
+    assert "ADR 0125" not in result.stderr
+    assert "--idp own" not in result.stderr
+
+
+SECRET_KEYS = ("KC_OPENPLANNER_CLIENT_SECRET", "KC_DIRECTORY_CLIENT_SECRET")
+MARK = "secrets/keycloak-secrets.pending"
+
+
+def _secrets(host: Host) -> dict[str, str]:
+    """Return the bundled provider's two client secrets as ``secrets/keycloak.env`` holds them."""
+    kept = host.settings("secrets/keycloak.env")
+    return {key: kept[key] for key in SECRET_KEYS}
+
+
+def _as_before_adr_0125_step_2(host: Host) -> dict[str, str]:
+    """Give an installed host the files it had before ADR 0125 step 2; return its secrets.
+
+    The render script wrote the name ``idp`` into the login and the directory and ``idp-db`` as
+    Keycloak's database, did not mark its client secrets, and the installer wrote
+    ``IDP_UPSTREAM=idp:8080``. The fake's logs start again, so the next run is read on its own.
+    """
+    for name, pinned, by_name in (
+        ("secrets/keycloak-app.env", IDP_UPSTREAM, "idp:8080"),
+        ("proxy.env", f"IDP_UPSTREAM={IDP_UPSTREAM}", "IDP_UPSTREAM=idp:8080"),
+        ("secrets/keycloak.env", f"KC_DB_URL_HOST={IDP_DB_ADDRESS}", "KC_DB_URL_HOST=idp-db"),
+        ("secrets/keycloak.env", "KC_CLIENT_SECRETS_PINNED=true\n", ""),
+    ):
+        path = host.file(name)
+        assert pinned in path.read_text()
+        path.write_text(path.read_text().replace(pinned, by_name))
+    for log in ("calls.jsonl", "idp-stdin.jsonl"):
+        (host.fakes / log).unlink(missing_ok=True)
+    return _secrets(host)
+
+
+def _secrets_handed_to_keycloak(host: Host) -> list[tuple[str, str]]:
+    """Return each client secret Keycloak got on stdin, after the client it was for, in order."""
+    log = host.fakes / "idp-stdin.jsonl"
+    calls = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+    return [
+        (call["args"][1], json.loads(call["stdin"])["secret"])
+        for call in calls
+        if call["args"][:1] == ["update"] and call["args"][1].startswith("clients/")
+    ]
+
+
+def _for_both_clients(secrets: dict[str, str]) -> list[tuple[str, str]]:
+    """Return how both secrets reach Keycloak: each on the client its clientId finds."""
+    return [
+        ("clients/id-of-openplanner-admin", secrets["KC_OPENPLANNER_CLIENT_SECRET"]),
+        ("clients/id-of-openplanner-directory", secrets["KC_DIRECTORY_CLIENT_SECRET"]),
+    ]
+
+
+def test_a_host_that_ran_on_the_names_moves_to_the_fixed_addresses_with_new_secrets(
+    host: Host,
+) -> None:
+    """ADR 0125 step 2: whatever answered a name may hold both client secrets, so both go."""
+    _production_bundled(host)
+    old = _as_before_adr_0125_step_2(host)
+    others = ("KC_SUPER_PASSWORD", "KC_BOOTSTRAP_ADMIN_PASSWORD", "KC_DB_PASSWORD")
+    unchanged = {key: host.settings("secrets/keycloak.env")[key] for key in others}
+
+    result = host.run("--non-interactive")
+
+    assert result.returncode == 0, result.stderr
+    output = result.stdout + result.stderr
+    keycloak, app = host.settings("secrets/keycloak.env"), host.settings("secrets/keycloak-app.env")
+    # Every hop at its fixed address: the proxy's route, the login, the directory, the database.
+    assert host.settings("proxy.env")["IDP_UPSTREAM"] == IDP_UPSTREAM
+    assert "instead of idp:8080" in output
+    assert app["OIDC_DISCOVERY_URL"] == BUNDLED_IDP_DISCOVERY_URL
+    assert app["KEYCLOAK_ADMIN_URL"] == f"http://{IDP_UPSTREAM}/idp/admin/realms/openplanner"
+    assert keycloak["KC_DB_URL_HOST"] == IDP_DB_ADDRESS
+    # Both secrets new, in all three files; nothing else replaced.
+    new = _secrets(host)
+    assert all(new[key] != old[key] for key in SECRET_KEYS)
+    assert [app["OIDC_CLIENT_SECRET"], app["KEYCLOAK_DIRECTORY_CLIENT_SECRET"]] == [*new.values()]
+    realm = host.file("secrets/keycloak-realm.json").read_text()
+    assert all(value in realm for value in new.values())
+    assert not any(value in realm for value in old.values())
+    assert {key: keycloak[key] for key in others} == unchanged
+    # Keycloak takes them once it runs, after web and worker: through stdin, never an argument.
+    assert _secrets_handed_to_keycloak(host) == _for_both_clients(new)
+    assert not any(host.ran(value) for value in (*new.values(), *old.values()))
+    assert host.after_start("get clients")
+    assert "took its new client secrets" in output
+    assert not host.file(MARK).exists()
+    assert _container_settings(host).production_problems() == []
+
+
+def test_a_refused_secret_change_stops_the_run_and_the_next_run_sets_the_same_pair(
+    host: Host,
+) -> None:
+    """Until Keycloak has the new secrets staff cannot log in: loud, and finished by a rerun."""
+    _production_bundled(host)
+    old = _as_before_adr_0125_step_2(host)
+    host.given("fail", "idp-secrets\n")
+
+    refused = host.run("--non-interactive", HEALTH_TIMEOUT="2")
+
+    assert refused.returncode == 1
+    assert "did not take its new client secrets" in refused.stderr
+    assert "KC_BOOTSTRAP_ADMIN_PASSWORD" in refused.stderr
+    assert host.file(MARK).exists()
+    made = _secrets(host)
+    assert all(made[key] != old[key] for key in SECRET_KEYS)
+
+    host.given("fail", "")
+    (host.fakes / "idp-stdin.jsonl").unlink()
+    again = host.run("--non-interactive")
+
+    assert again.returncode == 0, again.stderr
+    assert _secrets(host) == made  # the same pair, not a third one
+    assert _secrets_handed_to_keycloak(host) == _for_both_clients(made)
+    assert not host.file(MARK).exists()
+
+
+def test_a_file_the_installer_cannot_read_is_never_emptied(host: Host) -> None:
+    """Dropping lines replaces a file only when it was read: the secrets in it must survive."""
+    _production_bundled(host)
+    kept = host.file("secrets/keycloak.env")
+    before = kept.read_text()
+    kept.chmod(0)
+    try:
+        result = host.run("--non-interactive")
+    finally:
+        kept.chmod(0o600)
+
+    assert result.returncode == 1
+    assert f"could not rewrite {kept}" in result.stderr
+    assert kept.read_text() == before  # not empty, not half written
+
+
+def test_a_rewrite_of_env_that_cannot_finish_stops_the_run_and_keeps_the_file(
+    tmp_path: Path,
+) -> None:
+    """rewrite_env stops inside its command substitution; its callers must carry that out."""
+    source = (REPO / "scripts" / "install.sh").read_text()
+    functions = [
+        re.search(rf"^{name}\(\) {{.*?^}}$", source, re.MULTILINE | re.DOTALL)
+        for name in ("die", "write_private", "rewrite_env")
+    ]
+    assert all(functions)
+    env = tmp_path / ".env"
+    env.write_text("A=1\nA=2\n")
+    script = "\n".join(
+        [
+            "set -Eeuo pipefail",
+            f"ENV_FILE={env}",
+            *(match.group(0) for match in functions if match),
+            "backup=$(rewrite_env '{ print }')",
+            "echo continued",
+        ]
+    )
+    env.chmod(0)
+    try:
+        result = subprocess.run(  # noqa: S603 - fixed argv, the installer's own functions
+            [BASH, "-c", script], capture_output=True, text=True, check=False
+        )
+    finally:
+        env.chmod(0o600)
+
+    assert result.returncode == 1
+    assert "continued" not in result.stdout
+    assert f"could not back up {env}" in result.stderr
+    assert env.read_text() == "A=1\nA=2\n"
+    # Every caller is a plain assignment, which errexit stops; `local x=$(...)` or a condition
+    # would swallow the failure and go on without the rewrite.
+    calls = [line.strip() for line in source.splitlines() if "$(rewrite_env" in line]
+    assert calls
+    assert all(line.startswith("backup=$(rewrite_env ") for line in calls), calls
+
+
+def test_a_rerun_on_the_fixed_address_keeps_the_client_secrets(host: Host) -> None:
+    _production_bundled(host)
+    before = _secrets(host)
+    (host.fakes / "idp-stdin.jsonl").unlink(missing_ok=True)
+
+    again = host.run("--non-interactive")
+
+    assert again.returncode == 0, again.stderr
+    assert _secrets(host) == before
+    assert _secrets_handed_to_keycloak(host) == []
+    assert "client secrets" not in again.stdout + again.stderr
+
+
+def _leave_and_return(host: Host) -> subprocess.CompletedProcess[str]:
+    """Move an installed host to its own provider (--idp own) and back to the bundled one."""
+    with host.file(".env").open("a") as env:
+        env.writelines(
+            f"{key}='{PRODUCTION[key]}'\n" for key in ("OIDC_DISCOVERY_URL", "OIDC_CLIENT_SECRET")
+        )
+    assert host.run("--idp", "own", "--non-interactive").returncode == 0
+    return host.run("--idp", "bundled", "--non-interactive")
+
+
+def test_a_host_back_from_its_own_provider_keeps_a_pair_made_on_the_fixed_address(
+    host: Host,
+) -> None:
+    """The render script marked the pair: it never travelled to the name idp."""
+    _production_bundled(host)
+    before = _secrets(host)
+
+    back = _leave_and_return(host)
+
+    assert back.returncode == 0, back.stderr
+    assert _secrets(host) == before
+    assert host.settings("secrets/keycloak.env")["KC_CLIENT_SECRETS_PINNED"] == "true"
+    assert _secrets_handed_to_keycloak(host) == []
+
+
+def test_a_host_that_left_before_step_2_gets_a_new_pair_on_its_way_back(host: Host) -> None:
+    """Its unmarked pair waited in secrets/keycloak.env, and the realm in the volume has it too."""
+    _production_bundled(host)
+    old = _as_before_adr_0125_step_2(host)
+
+    back = _leave_and_return(host)
+
+    assert back.returncode == 0, back.stderr
+    new = _secrets(host)
+    assert all(new[key] != old[key] for key in SECRET_KEYS)
+    assert _secrets_handed_to_keycloak(host)[-2:] == _for_both_clients(new)
+    assert not host.file(MARK).exists()
+
+
+def test_a_render_by_hand_before_the_installer_does_not_keep_the_old_pair(host: Host) -> None:
+    """System status and the runbook send operators to the render script; it keeps values."""
+    _production_bundled(host)
+    old = _as_before_adr_0125_step_2(host)
+    render = subprocess.run(  # noqa: S603 - the checkout's own script
+        [BASH, str(host.file("scripts/render-keycloak-realm.sh")), "--dir", str(host.checkout)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert render.returncode == 0, render.stderr
+    assert (
+        host.settings("secrets/keycloak-app.env")["OIDC_DISCOVERY_URL"] == BUNDLED_IDP_DISCOVERY_URL
+    )
+    assert _secrets(host) == old  # the login moved, the pair did not
+
+    result = host.run("--non-interactive")
+
+    assert result.returncode == 0, result.stderr
+    new = _secrets(host)
+    assert all(new[key] != old[key] for key in SECRET_KEYS)
+    assert _secrets_handed_to_keycloak(host) == _for_both_clients(new)
 
 
 def test_a_host_that_leaves_the_bundled_keycloak_logs_in_with_its_own_provider(
@@ -1138,13 +1486,8 @@ def test_a_host_that_leaves_the_bundled_keycloak_logs_in_with_its_own_provider(
     # Only once the new proxy, web and worker run without it (`up -d`, then ready): stopped
     # earlier, the name idp would reach the host's resolver while they still use it. `compose rm`
     # never removes the named volumes idp-data and idp-db-data, which the fake docker cannot show.
-    commands = host.commands()
-    retired = max(i for i, c in enumerate(commands) if "rm --stop --force idp idp-db" in c)
-    started = max(i for i, c in enumerate(commands) if c.endswith(" up -d"))
-    ready = max(i for i, c in enumerate(commands) if "/readyz" in c)
-    assert started < ready < retired
+    assert host.after_start("rm --stop --force idp idp-db")
     assert "containers (idp, idp-db) are removed" in result.stderr + result.stdout
-    assert "until ADR 0125 step 2" not in result.stderr
     settings = _container_settings(host)
     assert settings.oidc_discovery_url == own["OIDC_DISCOVERY_URL"]
     assert settings.keycloak_admin_url is None
@@ -1211,10 +1554,10 @@ def test_a_document_is_planned_and_applied_with_the_hash_of_its_plan(host: Host)
 
     assert result.returncode == 0, result.stderr
     commands = host.commands()
-    started = commands.index(next(c for c in commands if c.endswith(" up -d")))
+    assert host.after_start("app.cli config plan")
     planned = commands.index(next(c for c in commands if "app.cli config plan" in c))
     applied = commands.index(next(c for c in commands if "app.cli config apply" in c))
-    assert started < planned < applied
+    assert planned < applied
     assert any(c.endswith(f"web:{DOCUMENT_IN_WEB}") for c in commands)
     assert host.ran(f"config apply {DOCUMENT_IN_WEB} --plan-hash {'ab' * 32}")
     assert host.ran(f"exec -T web rm -f {DOCUMENT_IN_WEB}")
@@ -1302,3 +1645,27 @@ def test_a_passphrase_file_alone_is_refused(host: Host) -> None:
 
     assert alone.returncode == 1
     assert "--configuration and --passphrase-file go together" in alone.stderr
+
+
+def test_trusted_proxies_are_written_kept_on_a_rerun_and_cleared(host: Host) -> None:
+    """ADR 0129: the edge in front of the proxy goes to proxy.env; an empty list removes it."""
+    args = ("--mode", "test", "--idp", "own", "--non-interactive")
+
+    first = host.run(*args, "--trusted-proxies", "10.20.0.0/16, 192.0.2.10", **PRODUCTION)
+    trusted = host.settings("proxy.env").get("PROXY_TRUSTED_NETWORKS")
+    rerun = host.run(*args, **PRODUCTION)
+    kept = host.settings("proxy.env").get("PROXY_TRUSTED_NETWORKS")
+    cleared = host.run(*args, "--trusted-proxies", "", **PRODUCTION)
+
+    assert first.returncode == rerun.returncode == cleared.returncode == 0, cleared.stderr
+    assert trusted == kept == "10.20.0.0/16, 192.0.2.10"
+    assert "PROXY_TRUSTED_NETWORKS" not in host.settings("proxy.env")
+
+
+def test_trusted_proxies_refuse_anything_but_addresses(host: Host) -> None:
+    result = host.run(
+        "--mode", "test", "--non-interactive", "--trusted-proxies", "edge.example.nl", **PRODUCTION
+    )
+
+    assert result.returncode != 0
+    assert "--trusted-proxies takes IP addresses and CIDR ranges" in result.stderr

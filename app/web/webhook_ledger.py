@@ -37,6 +37,7 @@ from app.domain.webhook_ledger import (
     WebhookLedger,
 )
 from app.domain.webhook_sources import ChainFault
+from app.web.webhook_secrets import install_installation_secrets
 
 log = structlog.get_logger()
 
@@ -61,6 +62,9 @@ def install_webhook_ledger(
     app: FastAPI, uow: UnitOfWork, clock: Clock, live: Callable[[], Settings]
 ) -> None:
     """Put the application's delivery ledger and the writer of its alert on ``app.state``.
+
+    The service of the installation's own webhook secrets is installed with it (ADR 0124 point 8),
+    so ``app.main`` has one place to wire the gate's state.
 
     The window and the cap are the security log's (``security_event_window_minutes``,
     ``security_event_max_sources``) and the threshold is ``webhook_refusal_alert_count``, all read
@@ -87,6 +91,7 @@ def install_webhook_ledger(
         on_dropped=dropped,
     )
     app.state.webhook_alert_writer = write
+    install_installation_secrets(app, uow, clock, live)  # ADR 0124 point 8
 
 
 async def write_alert(uow: UnitOfWork, alert: Alert, at: datetime) -> None:
@@ -172,6 +177,16 @@ async def note_refused(
 async def note_delivered(request: Request, key: AddressKey, outcome: Delivered) -> None:
     """Tell the ledger a call passed every check, and write the alert if that one is the one."""
     await _tell(request, lambda ledger: ledger.delivered(key, outcome))
+
+
+async def note_previous_secret(request: Request, key: AddressKey) -> None:
+    """Tell the ledger a call verified under the previous secret (ADR 0124 point 8): a count."""
+
+    def count(ledger: WebhookLedger) -> Alert | None:
+        ledger.verified_by_previous(key)
+        return None
+
+    await _tell(request, count)
 
 
 async def note_outcome(request: Request, key: AddressKey, outcome: EventOutcome) -> None:

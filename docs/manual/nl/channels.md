@@ -87,7 +87,15 @@ getoond; een leeg veld laat het bewaarde geheim staan.
 Na het opslaan ziet u het **Webhookadres** van deze organisatie. Het contactcenter meldt daar de
 status van taken. OpenPlanner controleert elke melding met een geheim dat de server zelf maakt;
 niemand typt of ziet het. Met **Nieuw webhookgeheim maken** vervangt u het, bijvoorbeeld als u
-denkt dat het is uitgelekt; het oude werkt dan meteen niet meer. **Eigen koppeling verwijderen**
+denkt dat het is uitgelekt. Het contactcenter krijgt het nieuwe geheim direct te horen. Het oude
+geheim blijft nog even werken (de platformbeheerder stelt in hoe lang, standaard 60 minuten), zodat
+er geen melding verloren gaat terwijl het contactcenter het nieuwe overneemt; de kaart zegt tot
+wanneer. Maakt u meteen daarna nog een nieuw geheim, dan werken de oude direct niet meer: zo beëindigt u een
+uitgelekt geheim zonder te wachten (de platformbeheerder kan die tijd ook op 0 zetten). *Geziene
+bezorgingen* telt hoeveel meldingen nog met het oude geheim zijn gecontroleerd: blijft dat op nul, dan
+gebruikt het contactcenter het nieuwe. Zegt de kaart dat het contactcenter het nieuwe geheim niet
+heeft gekregen, of dat er nu geen abonnement is, dan probeert er niets vanzelf opnieuw: controleer de
+rechten van de Service App en druk op **Opslaan** op de kaart om opnieuw aan te melden. **Eigen koppeling verwijderen**
 wist de koppeling en haar geheimen.
 
 Zolang een organisatie geen eigen koppeling heeft, gebruikt zij de koppeling van de installatie.

@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from app.config import Settings
 from app.domain.event_schema import Envelope
-from app.domain.web_transport import BUNDLED_IDP_DISCOVERY_URL
+from app.domain.web_transport import BUNDLED_IDP_ADDRESS, BUNDLED_IDP_DISCOVERY_URL
 from app.i18n.dates import ClockStyle
 
 
@@ -140,9 +140,12 @@ def test_production_starts_with_the_bundled_provider_on_the_internal_network() -
     for missing in ("oidc_issuer", "oidc_client_secret"):
         with pytest.raises(ValidationError, match="OIDC needs an https discovery URL"):
             Settings(**PRODUCTION, **{**BUNDLED_LOGIN, missing: None})  # type: ignore[arg-type]
-    elsewhere = BUNDLED_IDP_DISCOVERY_URL.replace("idp:8080", "idp.example.nl")
-    with pytest.raises(ValidationError, match="OIDC needs an https discovery URL"):
-        Settings(**PRODUCTION, **{**BUNDLED_LOGIN, "oidc_discovery_url": elsewhere})  # type: ignore[arg-type]
+    # Another host, and the name the address replaced (ADR 0125 step 2): both refused.
+    for host in ("idp.example.nl", "idp:8080"):
+        elsewhere = BUNDLED_IDP_DISCOVERY_URL.replace(f"{BUNDLED_IDP_ADDRESS}:8080", host)
+        assert elsewhere != BUNDLED_IDP_DISCOVERY_URL
+        with pytest.raises(ValidationError, match="OIDC needs an https discovery URL"):
+            Settings(**PRODUCTION, **{**BUNDLED_LOGIN, "oidc_discovery_url": elsewhere})  # type: ignore[arg-type]
 
 
 def test_a_test_installation_with_the_bundled_provider_lists_no_login_problem() -> None:

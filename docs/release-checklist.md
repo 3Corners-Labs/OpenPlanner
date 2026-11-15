@@ -50,8 +50,9 @@ copy the checklist into the release PR's conversation or an issue titled `Releas
 
 1. [ ] *Actions → release → Run workflow* on `main`, `step = release-pr`, first with `dry_run`.
        Then for real. Leave `version` empty unless the number must be higher.
-2. [ ] **Minor or major:** read `## Release audit`. P1 findings: fix in their own PRs and re-run
-       the *release audit* job; P2: open issues. Then change the last line to `Verdict: pass`. (PO)
+2. [ ] Optional, now and then (ADR 0128): `make release-audit` on a machine with the Codex CLI;
+       paste the findings under `## Release audit`, fix what blocks in their own PRs, make issues
+       of the rest. No check waits for it.
 3. [ ] Set the label `po:approved` as an administrator; wait for green CI; the merge queue merges. (PO)
 
 ## D. Tag and publish

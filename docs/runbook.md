@@ -151,7 +151,11 @@ section; the installer's default) nothing else is needed. Behind a reverse proxy
   Check it from outside: `curl -sI https://<host name>/admin` must answer with a
   `Location: https://…`.
 - A request body limit on the proxy (for example 64 KB for `/g/*` and `/b/*`).
-- No access log on the proxy: paths carry management tokens.
+- No access log on the proxy, and no request line in its error log: paths carry management
+  tokens. nginx, for one, writes `request: "GET /b/<token> …"` and the upstream's URL with the
+  path at level `error` when the upstream is down, so set its `error_log` to `crit`; that keeps
+  out the usual lines, while a rare `crit` line written during a request (a connection refused
+  by SELinux, a temporary file that cannot be written) still carries both.
 - Answer plain `http://` requests for `/api/*` and `/webhooks/*` with `403` and no `Location`
   header, and redirect only the browser paths. A redirect makes a bot or Webex Connect flow that
   was configured with `http://` repeat its POST, with the client secret or webhook body, in
@@ -161,6 +165,16 @@ section; the installer's default) nothing else is needed. Behind a reverse proxy
   do not serve `/static/` from the proxy itself. `scripts/check-proxy.sh` shows what to expect.
 
 ### Address and proxy (ADR 0086)
+
+**Behind another edge (ADR 0129).** A reverse proxy, WAF or load balancer of the organisation may
+sit in front of the bundled proxy. Without more, every visitor then arrives with the edge's
+address: one rate-limit bucket for everyone, one caller pseudonym, and webhook source networks
+that see the edge. Name the edge's own addresses in `PROXY_TRUSTED_NETWORKS` (`proxy.env`, or
+`--trusted-proxies` of the installer) and restart the proxy. It then takes the visitor's address
+from the edge's `X-Forwarded-For`, read right to left (`trusted_proxies_strict`), and hands web
+exactly that one address. The proxy's log says at start which networks it trusts; a range of
+length 0, a name or more than 32 entries stop it. The edge must send `X-Forwarded-For` and
+`X-Forwarded-Proto`, and speak https to the bundled proxy.
 
 *Advanced settings* → *System status* → **Address and proxy** shows what the installation
 believes about its own address: the shape (bundled proxy, own reverse proxy, no proxy), the
@@ -517,7 +531,8 @@ Moving docker01 from plain http to this took these steps, all without root, beca
 
 1. `git fetch --tags && git merge --ff-only v<rc>` in the checkout, so compose has the volume
    `internal-ca` and the `idp` service on the `edge` network.
-2. `proxy.env` with `TLS_DOMAIN`, `TLS_INTERNAL=true` and `IDP_UPSTREAM=idp:8080`.
+2. `proxy.env` with `TLS_DOMAIN`, `TLS_INTERNAL=true` and `IDP_UPSTREAM`: then `idp:8080`, since
+   ADR 0125 step 2 the provider's fixed address `172.31.240.4:8080`, which the installer writes.
 3. `docker-compose.override.yml`: `proxy` and `idp` under the profile the installer set
    (`profiles: !override [dev]`), the proxy image pinned by hand
    (`ghcr.io/3corners-labs/openplanner-proxy:<rc>`; the updater pins it only when
@@ -530,22 +545,54 @@ Moving docker01 from plain http to this took these steps, all without root, beca
 5. `secrets/keycloak.env`: set `KC_OPENPLANNER_BASE_URL=https://<host>` (an existing value wins
    over `PUBLIC_BASE_URL`), run `scripts/render-keycloak-realm.sh`, and recreate `idp`.
 6. An existing realm is not re-imported: set the redirect URI, web origin and post-logout URI of
-   client `openplanner-admin` to the https address with `kcadm.sh` (against
-   `http://localhost:8080/idp`).
+   client `openplanner-admin` to the https address with `kcadm.sh` (today through the helper of
+   *Opening the admin console*, which logs in on `http://localhost:8080/idp` itself).
 7. `docker compose --env-file .env.update up -d --force-recreate web worker proxy`.
 8. Verify with `oidc-check`, `tls-check` and `address-check` from `web`.
+9. Since ADR 0126 (with the release that brings it): follow *Opening the admin console* (under
+   *Bundled identity provider*), then check that `https://<host>/idp/admin/` answers 404 from
+   another machine.
 
 #### The bundled identity provider behind the proxy
 
-With `IDP_UPSTREAM=idp:8080` in `proxy.env` the proxy serves the bundled Keycloak under `/idp` on
-the same host name and certificate. Run `scripts/render-keycloak-realm.sh` after `PUBLIC_BASE_URL`
+With `IDP_UPSTREAM=172.31.240.4:8080` in `proxy.env`, the provider's fixed address on `edge` (ADR
+0125 step 2), the proxy serves the bundled Keycloak under `/idp` on the same host name and
+certificate. Run `scripts/render-keycloak-realm.sh` after `PUBLIC_BASE_URL`
 is `https://<host>`: it writes `KC_HOSTNAME=https://<host>/idp`, `KC_HTTP_RELATIVE_PATH=/idp` and
 `KC_PROXY_HEADERS=xforwarded` for Keycloak, and the whole login (`OIDC_DISCOVERY_URL`,
 `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, the admin URL) into
 `secrets/keycloak-app.env`, which web and worker read after `.env`. Remove the same names from
-`.env` so one place holds them, recreate `idp`, `web` and `worker`, and log in at
-`https://<host>/idp/realms/openplanner`. Keycloak's admin console is then
-`https://<host>/idp/admin/` (user `admin`). Port 8780 is no longer needed.
+`.env` so one place holds them, recreate `idp`, `web` and `worker`, and log in to the portal,
+which sends you to Keycloak's login under `https://<host>/idp/realms/openplanner/`. Port 8780 is
+no longer needed: remove any published port of `idp` other than `127.0.0.1:8080` from
+`docker-compose.override.yml`.
+
+Only the login is public (ADR 0126, `deploy/proxy/idp.caddy`): the proxy passes
+`/idp/realms/openplanner/*` (the login, its OIDC endpoints and the account console) and
+`/idp/resources/*`, and answers 404 itself for the rest of `/idp`, the admin console
+(`/idp/admin`) and realm `master` among it. It removes the portal's cookies before a request
+reaches Keycloak, keeps every cookie Keycloak sets under `/idp/`, drops the answers' headers that
+act on the whole host, and adds a policy that lets a Keycloak page fetch and post only under
+`/idp/`. The admin console is on the host's loopback: see *Opening the admin console* under
+*Bundled identity provider*. The staff directory and the login's back channel use the
+provider's fixed address (`http://172.31.240.4:8080/idp/...`) on the internal network and do
+not pass the proxy.
+
+A reverse proxy of your own in front of the bundled Keycloak must do the same: pass only those
+two paths, and refuse a path that is one of them only once decoded or resolved (an encoded slash,
+dot or backslash, a dot segment, a `;`), remove the `Cookie` pairs whose name starts with `__Host-` and the one named `lang`,
+rewrite every `Path` attribute of a `Set-Cookie` that lies outside `/idp/` to `/idp/` (a
+browser uses the last one) and drop its `Domain`, drop
+`Service-Worker-Allowed`, `Clear-Site-Data`, `Alt-Svc`, `NEL`, `Report-To`,
+`Reporting-Endpoints`, `Accept-CH` and `Critical-CH`, send the portal's own
+`Strict-Transport-Security` and `Permissions-Policy`,
+`Cross-Origin-Opener-Policy: same-origin-allow-popups` and the added `Content-Security-Policy`,
+and refuse a request with a `Service-Worker` header. It sets `X-Forwarded-For` to the visitor's
+address alone (Keycloak records the first address it is given, so an appended one lets a
+visitor choose theirs; nginx's `$proxy_add_x_forwarded_for` appends) and sets or removes
+`X-Forwarded-Proto`, `-Host` and `-Port` itself. Every answer it makes itself (a refusal, an
+error page, a body over its limit) must carry the portal's own security headers, as
+`handle_errors` in `deploy/proxy/Caddyfile` does for Caddy's handlers. `deploy/proxy/idp.caddy` is the reference.
 
 ### Test the certificate flow end to end (ADR 0064)
 
@@ -641,11 +688,12 @@ Without `OIDC_DISCOVERY_URL` the admin portal is disabled; participants' pages w
 In production also set `SESSION_SECRET` (at least 32 random bytes); the image refuses to start
 without it, and with an `http` discovery URL or without `OIDC_CLIENT_SECRET` (ADR 0013). The one
 http discovery URL production accepts is the bundled identity provider's internal address,
-`http://idp:8080/idp/realms/openplanner/...` with an https `OIDC_ISSUER`, as
-`scripts/render-keycloak-realm.sh` writes it (a recorded exception, ADR 0125). Until ADR 0125
-step 2 that address is the name `idp`, which this host's DNS may answer while the container is
-down: read the ADR before a production host goes live on the bundled provider (the installer
-warns), and see *After an unexplained outage of the bundled provider* below. A host that
+`http://172.31.240.4:8080/idp/realms/openplanner/...` with an https `OIDC_ISSUER`, as
+`scripts/render-keycloak-realm.sh` writes it (a recorded exception, ADR 0125): the provider's
+fixed address on the `edge` network, never the name `idp`, which this host's DNS could answer
+while the container is down (ADR 0125 step 2). A host whose login still names `idp` (installed
+before that step) is refused at start in production; the installer of this release moves it (see
+*Fixed addresses on the host* below). A host that
 leaves the bundled provider runs the installer with `--idp own`, which deletes
 `secrets/keycloak-app.env` (Compose reads that file after `.env`, so its login would otherwise
 win over yours), removes the `/idp` route from `proxy.env` and stops the `idp` and `idp-db`
@@ -792,8 +840,9 @@ the security log `admin.login` with reason `mfa_required`; neither holds a claim
 
 **MFA locks the superuser out** (lost phone, a policy that does not emit `amr`). There is no
 break-glass login. Fix it at the identity provider: with the bundled Keycloak open the admin
-console (realm `openplanner` → *Users* → `super` → *Credentials*, delete the OTP credential;
-the next login asks to register a new one). If the IdP cannot be fixed in time, use the host
+console on the host (*Opening the admin console* under *Bundled identity provider*; realm
+`openplanner` → *Users* → `super` → *Credentials*, delete the OTP credential; the next login
+asks to register a new one). If the IdP cannot be fixed in time, use the host
 CLI of the next section (closure, `oidc-check`); lowering the requirement is a deployment
 change in `.env` (`ADMIN_MFA_REQUIRED=false` and a restart of `web`), a decision for the
 product owner.
@@ -851,7 +900,7 @@ domain every `idp_domain_recheck_hours`; a record that disappears raises the sys
 `idp.domain_check` and, after `idp_domain_grace_days`, the domain stops routing.
 
 **Registering an organisation's provider.**
-1. In the portal: Organisations › *organisation* › Overview › Login › *Add*. Enter the
+1. In the portal: Organisations › *organisation* › Overview › Authentication › *Add*. Enter the
    discovery URL and the client id, and choose the client authentication:
    - `private_key_jwt` (default): give the organisation's IdP team the JWKS address shown on
      the provider's page;
@@ -920,23 +969,62 @@ from `PUBLIC_BASE_URL` in `.env` (the redirect URIs, and the https hostname of K
 prints no value. The login (`OIDC_DISCOVERY_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`,
 `OIDC_CLIENT_SECRET`) is written to `secrets/keycloak-app.env`, so nothing is copied into
 `.env`. `OIDC_ISSUER` is `<KC_HOSTNAME>/realms/openplanner`: Keycloak announces its public
-address, not the `idp:8080` it is fetched on, and the login is refused on any other issuer (ADR 0097).
+address, not the internal address it is fetched on, and the login is refused on any other issuer
+(ADR 0097).
 `python -m app.cli oidc-check` compares the two and names the issuer to set when they differ.
 When Keycloak itself sits behind a TLS proxy and OpenPlanner fetches its discovery document over
 https, set `KC_PROXY_HEADERS=xforwarded` (and let the proxy send `X-Forwarded-Proto`): otherwise
 Keycloak announces its token endpoint and key set as `http://`, and `oidc-check` fails on
 *provider endpoints* in production. With the bundled provider behind the bundled proxy
-(`render-keycloak-realm.sh` sets the header), web fetches the document on the internal network as
-`http://idp:8080/idp/...` (ADR 0112), the endpoints follow that address, and `oidc-check` reports
-them as expected. Keycloak's own address
+(`render-keycloak-realm.sh` sets the header), web fetches the document on the internal network at
+the provider's fixed address, `http://172.31.240.4:8080/idp/...` (ADR 0112, ADR 0125), the
+endpoints follow that address, and `oidc-check` reports them as expected. Keycloak's own address
 for browsers is `KC_HOSTNAME` in the same file (default `http://127.0.0.1:8080`): a lab on the
 host itself needs nothing more; reaching the login from another machine goes through the proxy
-and is step 2. The admin console is bound to the host's loopback and is never published.
+and is step 2. The admin console is never published: the proxy serves the login and nothing
+else under `/idp` (ADR 0126), and the console is opened on the host's loopback.
+
+**Opening the admin console (ADR 0126).** Keycloak publishes its port on the host's loopback
+only (`127.0.0.1:8080`). From another machine, open a tunnel to it, with that same local port:
+
+```bash
+ssh -L 8080:127.0.0.1:8080 <host>
+```
+
+Then open `http://127.0.0.1:8080/idp/admin/` (`http://127.0.0.1:8080/admin/` on a host without
+the proxy) and log in as `admin` with `KC_BOOTSTRAP_ADMIN_PASSWORD` from
+`secrets/keycloak.env`. With the proxy, realm `master` must have the loopback as its frontend
+address, or its login form sends the browser to the public address, where the proxy refuses
+it. The installer sets it after every start (run it again after updating the checkout, as for
+every release that changes the host side); it sets nothing while any port of `idp` is published
+beyond the loopback, and says so. On a host set up by hand:
+
+1. Check that `docker port $(docker compose --env-file .env.update ps -q idp)` lists the loopback
+   only (`127.0.0.1` or `[::1]`): nothing on `0.0.0.0`, `[::]` or another address, such as the
+   8780 of an older override. Remove any other published port from `docker-compose.override.yml`.
+2. Recreate `idp` once after updating the checkout, so the container has the helper's mount:
+   `docker compose --env-file .env.update up -d idp`.
+3. Run, with the address listed for `8080/tcp` (`127.0.0.1:8080` by default):
+
+```bash
+docker compose --env-file .env.update exec -T idp sh /opt/openplanner/kcadm-as-admin.sh update realms/master -s attributes.frontendUrl=http://127.0.0.1:8080/idp
+```
+
+`deploy/keycloak/kcadm-as-admin.sh` logs `kcadm.sh` in as `admin` inside the container with the
+container's own password, so no secret is typed or shown in a process list, and the login is
+gone when the command ends. Every `kcadm.sh` step against `idp` in this runbook goes through it:
+`kcadm-as-admin.sh ARGS` below stands for
+`docker compose --env-file .env.update exec -T idp sh /opt/openplanner/kcadm-as-admin.sh ARGS`.
+Realm `openplanner` keeps its public address and issuer; the staff directory and the login are
+unaffected. Every step below that names the console uses this one.
 
 **Mail from Keycloak.** Invitations and password resets of the Staff screen are sent by
 Keycloak itself, not by OpenPlanner. The rendered realm has no mail server yet; set one in the
-admin console (realm `openplanner` → *Realm settings* → *Email*) or with `kcadm.sh update
-realms/openplanner -s 'smtpServer={"host":"…","port":"…","from":"…"}'`. On a lab with the `dev`
+admin console (realm `openplanner` → *Realm settings* → *Email*) or through the helper, with the
+body on stdin so a password in it never reaches a process list or the shell history:
+`kcadm-as-admin.sh update realms/openplanner -f - < smtp.json`, where `smtp.json` holds
+`{"smtpServer":{"host":"…","port":"…","from":"…"}}` (and `"auth":"true"`, `"user"`, `"password"`
+for a server with a login; delete the file afterwards). The installer does the same. On a lab with the `dev`
 profile, Mailpit (`mailpit:1025`, no authentication) catches them. Without it an invitation
 creates the person but reports that the mail failed.
 
@@ -944,7 +1032,8 @@ creates the person but reports that the mail failed.
 docker01 on 2026-11-02, without root:
 
 1. Back up `.env`, `docker-compose.override.yml` and the old realm file, and export the users
-   with their entitlements (`kcadm.sh get users -r openplanner -q briefRepresentation=false`);
+   with their entitlements (through the helper: `kcadm-as-admin.sh get users -r openplanner -q
+   briefRepresentation=false`);
    their passwords do not move.
 2. Bring the checkout to the running release (`git merge --ff-only v<version>`), so compose
    has the `idp` service.
@@ -953,7 +1042,9 @@ docker01 on 2026-11-02, without root:
 4. In `docker-compose.override.yml`, switch the old service off and run `idp` under the
    profile the installer set: `keycloak: profiles: !override [lab-old-keycloak]` and
    `idp: profiles: !override [dev]` with its published port.
-5. In `.env`, point `OIDC_DISCOVERY_URL` at `http://idp:8080/realms/openplanner/...`, set
+5. In `.env`, point `OIDC_DISCOVERY_URL` at `http://idp:8080/realms/openplanner/...` (today the
+   render script writes the login, at the provider's fixed address, into
+   `secrets/keycloak-app.env`, and `.env` holds none of it; ADR 0106 step 5, ADR 0125), set
    `OIDC_CLIENT_SECRET` to `KC_OPENPLANNER_CLIENT_SECRET`, and drop any `KEYCLOAK_*` lines
    (`secrets/keycloak-app.env` holds them).
 6. `docker compose --env-file .env.update up -d idp web worker`, then `python -m app.cli
@@ -971,15 +1062,16 @@ Manage › Staff: invite, add or remove a role, disable, send a password reset (
 actions appear only when `web` has the three `KEYCLOAK_*` values above; restart `web` and
 `worker` after a render (`docker compose --profile idp up -d web worker`). A realm imported
 before ADR 0095 (such as an older lab realm) has no `openplanner-directory` client; add it with
-Keycloak's own CLI and put its secret in `secrets/keycloak-app.env` by hand:
+Keycloak's own CLI, through the helper of *Opening the admin console*, and put its secret in
+`secrets/keycloak-app.env` by hand:
 
 ```sh
-docker compose exec idp /opt/keycloak/bin/kcadm.sh config credentials \
-  --server http://localhost:8080 --realm master --user admin   # asks for the admin password
-docker compose exec idp /opt/keycloak/bin/kcadm.sh create clients -r openplanner \
+docker compose --env-file .env.update exec -T idp sh /opt/openplanner/kcadm-as-admin.sh \
+  create clients -r openplanner \
   -s clientId=openplanner-directory -s serviceAccountsEnabled=true -s publicClient=false \
   -s standardFlowEnabled=false -s directAccessGrantsEnabled=false
-docker compose exec idp /opt/keycloak/bin/kcadm.sh add-roles -r openplanner \
+docker compose --env-file .env.update exec -T idp sh /opt/openplanner/kcadm-as-admin.sh \
+  add-roles -r openplanner \
   --uusername service-account-openplanner-directory --cclientid realm-management \
   --rolename manage-users --rolename view-realm
 ```
@@ -987,8 +1079,8 @@ docker compose exec idp /opt/keycloak/bin/kcadm.sh add-roles -r openplanner \
 Read the generated secret in the admin console (*Clients* → `openplanner-directory` →
 *Credentials*), never in a shell history.
 
-**Resetting the password of `super`.** On the host, open the admin console at
-http://127.0.0.1:8080 (over an SSH tunnel from elsewhere), log in as `admin` with
+**Resetting the password of `super`.** Open the admin console on the host (*Opening the admin
+console*, above), log in as `admin` with
 `KC_BOOTSTRAP_ADMIN_PASSWORD`, open realm `openplanner` → *Users* → `super` →
 *Credentials* → *Reset password*, tick *Temporary* so the next login asks for a new one. The
 CLI of ADR 0042 §10 creates no user and starts no session; the admin console is the only way.
@@ -997,7 +1089,8 @@ CLI of ADR 0042 §10 creates no user and starts no session; the admin console is
 `start` on its own PostgreSQL container `idp-db` (profile `idp-db`, volume `idp-db-data`, user
 and password in `secrets/idp-db.env`, the same password as `KC_DB_PASSWORD` in
 `secrets/keycloak.env`). The admin console stays on the host's loopback (`127.0.0.1:8080`,
-`/idp` there), the login is served by the proxy. Back the database up next to the application's:
+`/idp` there; *Opening the admin console*), the login is served by the proxy and nothing else
+under `/idp` (ADR 0126). Back the database up next to the application's:
 
 ```bash
 docker compose --env-file .env.update exec -T idp-db pg_dump -U keycloak keycloak | gzip > idp-$(date +%F).sql.gz
@@ -1015,21 +1108,60 @@ Deleting it and starting again re-imports the rendered realm, so `super` gets th
 password of `secrets/keycloak.env` back; a changed `KC_OPENPLANNER_CLIENT_SECRET` needs a new
 render and a restart of `idp` and `web`.
 
-**After an unexplained outage of the bundled provider (ADR 0125 point 8).** Until ADR 0125
-step 2, web, worker and the proxy reach Keycloak by the name `idp`. While its container is
-down, this host's DNS may answer that name, and whoever answered may hold staff passwords and
-one-time codes, the portal's session cookie, Keycloak's own session cookies (of the console too)
-and both client secrets, all of which work after the outage; it also served pages and script on
-the portal's own address. Nothing logs whether Keycloak's console was used in that time (the
-proxy keeps no access log, Keycloak no event log here), so assume it was. When the `idp`
-container was down and the reason is not known (an update or a restart you did yourself is
-known), work through these steps in this order:
+**Fixed addresses on the host (ADR 0125 step 2).** Every hop between the containers of one
+host goes to a fixed address, never to a name: the proxy reaches web at `172.31.240.3:8000`
+(`WEB_UPSTREAM`, set in `docker-compose.yml`) and the bundled provider at `172.31.240.4:8080`
+(`IDP_UPSTREAM` in `proxy.env`); web and worker reach the provider's login and staff directory at
+that address (`secrets/keycloak-app.env`); Keycloak reaches its database at `172.31.240.18:5432`
+(`KC_DB_URL_HOST` in `secrets/keycloak.env`) on the internal network `idp-store`, which only
+`idp` and `idp-db` join. The addresses are in `scripts/fixed-addresses.sh`, which the installer,
+the render script and `scripts/check-proxy.sh` read, and in `docker-compose.yml`; a test keeps
+them equal. They lie outside the range Docker hands out, so while a
+container is down its address stays free and its hop fails: logging in fails, `/idp` answers
+502, and so does the portal while web restarts. (Mailpit, a lab's mail catcher, keeps its name;
+it is never in production, ADR 0125 point 5.) Before this step the hops used the names `idp`,
+`idp-db` and `web`, which Docker passes to the host's resolver while the container is down.
+`scripts/check-proxy.sh` (pass 4) shows it on a real Docker host.
+
+*Moving a host.* After a portal update, bring the checkout to the same release and run the
+installer (`docs/install.md`, *Upgrading*); until then the proxy finds web by its name as before
+and says so in its log. The installer writes `IDP_UPSTREAM` with the address, renders the
+login, the directory and the database host again and replaces both client secrets
+(`KC_OPENPLANNER_CLIENT_SECRET`, `KC_DIRECTORY_CLIENT_SECRET`) unless the render script made them
+since this step (`KC_CLIENT_SECRETS_PINNED=true` in `secrets/keycloak.env`): whatever answered the
+name `idp` may hold the old ones. Running the render script by hand first does not change that. They change in `secrets/keycloak.env`,
+`secrets/keycloak-app.env` and the realm file and, once Keycloak runs, in Keycloak itself
+(`kcadm.sh` through `deploy/keycloak/kcadm-as-admin.sh`, logged in as `admin` with
+`KC_BOOTSTRAP_ADMIN_PASSWORD`, the values on standard input). Staff cannot log in between the start of web and that moment. When the installer stops
+with *did not take its new client secrets*, `KC_BOOTSTRAP_ADMIN_PASSWORD` is not the password
+of `admin` in realm `master` (the recovery below changes it): write the current one there with an
+editor and run the installer again, which sets the same new pair (it waits in
+`secrets/keycloak-secrets.pending` until Keycloak has it). A production host whose login still
+names `idp` runs the installer of the new release before its portal update instead: the new
+image refuses that address at start, and the updater would roll the update back.
+
+**After an unexplained outage of the bundled provider on a host that ran on the name (ADR 0125
+point 8).** Before ADR 0125 step 2, web, worker and the proxy reached Keycloak by the name `idp`,
+and the installer of that step moves a host to the fixed addresses above. This recovery is for an
+outage of the `idp` container from before the move: while it was down, this host's DNS may have
+answered that name, and whoever answered may hold staff passwords and one-time codes, the
+portal's session cookie, Keycloak's own session cookies (of the console too) and both client
+secrets, all of which work after the outage; it also served pages and script on the portal's own
+address. The new client secrets of the move do not replace step 2 below: an administrator planted
+in realm `master` during the outage can read them. Nothing logs whether Keycloak's console was
+used in that time (the proxy keeps no access log, Keycloak no event log here), so assume it was.
+Since the move an outage stops the login, the staff directory and `/idp`, and reaches nothing
+else. When the `idp` container was down before the
+move and the reason is not known (an update or a restart you did yourself is known), work through
+these steps in this order (Keycloak's admin console for them is on the host's loopback, *Opening
+the admin console*, ADR 0126; not under `https://<host>/idp`):
 
 1. **Realm `master` first, always**, before any new secret exists (a `master` administrator can
    read every client's secret):
    - give `admin` a new password, using only `A-Z a-z 0-9 _ . : / -`, and write it as
      `KC_BOOTSTRAP_ADMIN_PASSWORD` in `secrets/keycloak.env` with an editor (the installer logs
-     in with it to set the realm's mail server);
+     in with it to set the realm's mail server, the console's loopback address and the client
+     secrets of a move);
    - remove what nobody can explain among what gives administrator rights in `master`: users
      and groups with the realm role `admin` or with roles of the clients `master-realm` and
      `openplanner-realm`, clients with a service account, identity providers, and authentication
@@ -1819,7 +1951,7 @@ and no token; the audit log shows it.
 
 A merge to `main` is **not** a release. An installation only sees a new version after a tag
 `vX.Y.Z` on `main` has gone through `main.yml`. The product owner does two clicks in the
-workflow *release* (GitHub → *Actions* → *release* → *Run workflow*) and reads one section;
+workflow *release* (GitHub → *Actions* → *release* → *Run workflow*) and sets one label;
 everything else is automatic and visible in the Actions tab and in the release PR.
 
 ### What happens where
@@ -1828,7 +1960,7 @@ everything else is automatic and visible in the Actions tab and in the release P
 |---|---|---|---|
 | PR | `ci.yml` | checks only | no |
 | Merge to `main` | `main.yml`: ZAP, then build, sign, tag `vX.Y.Z-rc.N`, pre-release (ADR 0059); mutation runs alongside | application and proxy images `:X.Y.Z-rc.N`, `:main` and `:sha-<commit>` (the application with `APP_VERSION=X.Y.Z-rc.N` and `APP_COMMIT`); pre-release page with both SBOMs | only on the `rc` channel (below) |
-| Dispatch *release* with `step = release-pr` | `release.yml`: the release PR, and for `vX.Y.0` the audit job | PR `chore(release): vX.Y.Z` with auto-merge; `## Release audit` with `Verdict: open` | no |
+| Dispatch *release* with `step = release-pr` | `release.yml`: the release PR | PR `chore(release): vX.Y.Z` with auto-merge | no |
 | Dispatch *release* with `step = tag` | `release.yml`: the checks of ADR 0052 point 4, the annotated tag | tag `vX.Y.Z` on the merged release commit | not yet |
 | Tag `vX.Y.Z` pushed | `main.yml`: tag check, ZAP, mutation, build, sign, SBOM, GitHub release | application image `:X.Y.Z` with `APP_VERSION` and `APP_COMMIT`, proxy image `:X.Y.Z` (ADR 0064 step 2); release page with `sbom.cdx.json` and `sbom-proxy.cdx.json` | yes, within an hour |
 
@@ -1841,7 +1973,6 @@ repository:
 |---|---|---|---|
 | `RELEASE_APP_CLIENT_ID` | variable in the environment `release` | the client ID of the release app (ADR 0107) | the release jobs take a short-lived token from the app: a PR or tag made with the workflow's own `GITHUB_TOKEN` starts no workflow, and only the app may create a `v*` tag |
 | `RELEASE_APP_PRIVATE_KEY` | secret in the environment `release` | a private key of the release app (PEM) | as above; the environment `release` may only be used from `main` and the maintenance lines `release/[0-9]*` |
-| `OPENAI_API_KEY` | secret | an OpenAI API key | the audit job (`openai/codex-action`); the key stays in the action's proxy and never reaches the review process |
 | `RELEASE_RUNNER` | variable, optional | the label of a self-hosted runner | default `ubuntu-24.04`; see *Self-hosted runner* below |
 
 A real run stops at the app-token step without the release app; a dry run needs none of
@@ -1863,9 +1994,10 @@ gh secret set RELEASE_APP_PRIVATE_KEY --env release --repo 3Corners-Labs/OpenPla
 Delete the `.pem` afterwards. The key does not expire; to rotate it, add a new key under *Key pairs*,
 store it the same way and delete the old one there. The tag ruleset `release tags`
 lets only the app and repository administrators create, move or delete a `v*` tag; an
-administrator can still tag by hand when the app is broken. The Codex CLI is installed at its newest version on every audit run
-(`codex-version` empty), as on a laptop; it is a tool of the forge, not a dependency of the
-product.
+administrator can still tag by hand when the app is broken.
+
+The secret `OPENAI_API_KEY` of the former audit job is no longer used (ADR 0128); a repository
+admin deletes it under *Settings → Secrets and variables → Actions*.
 
 ### Step 1: the release PR (one click)
 
@@ -1887,21 +2019,17 @@ The job `release PR` then:
    in (the dispatcher's login is in it: that is the recorded instruction) and enables
    auto-merge.
 
-For a minor or major release (`vX.Y.0`) the job `release audit` runs next (ADR 0078): the
-Codex CLI, a second model, reviews everything since the last release in a read-only sandbox
-(`scripts/release-audit.sh`, the same command as `make release-audit`) and writes the
-findings into the PR under `## Release audit`, ending with `Verdict: open`. It takes some
-minutes and costs one API call (roughly 5 to 20 US dollars for a diff the size of `v0.4.0`).
-A patch release has no audit job.
+No release waits for an audit by a second model (ADR 0128). Now and then, when the product
+owner wants a second opinion, someone with the Codex CLI and their own account runs
+`make release-audit` in a checkout of the release branch: a review of everything since the
+last release in a read-only sandbox. The findings may go into the PR under `## Release audit`;
+nothing reads a verdict there.
 
-### Step 2: read, decide, label (the product owner)
+### Step 2: decide, label (the product owner)
 
-1. Open the release PR. Read `## Release audit`: P1 findings are fixed before the release
-   (in their own PRs; then re-run the *release audit* job from the Actions tab, it replaces the
-   section), P2 findings become issues.
-2. Edit the PR description and change the last line of the section from `Verdict: open` to
-   `Verdict: pass`. This is a human act on purpose; `main.yml` refuses the tag until it is done.
-3. Set the label `po:approved`. The PR is a decision (ADR 0078): with the label and green CI
+1. Open the release PR. When an occasional audit was run, its findings that block the release
+   are fixed first, in their own PRs; the rest become issues.
+2. Set the label `po:approved`. The PR is a decision (ADR 0078): with the label and green CI
    the merge queue squash-merges it. The gate checks the label again in the queue (ADR 0088),
    so removing the label before the merge sends the PR back. Only a label set by an
    administrator of the repository counts, and a push by anyone else takes it off (ADR 0104).
@@ -1912,9 +2040,7 @@ A patch release has no audit job.
 
 1. finds the merged `chore(release): vX.Y.Z (#NN)` on `main`, checks that `pyproject.toml` at
    that commit says `X.Y.Z` and that the tag does not exist yet;
-2. for `vX.Y.0`, checks that the release PR's `## Release audit` ends with `Verdict: pass`
-   (`scripts/check-release-audit.sh`, the same check `main.yml` repeats);
-3. sets the annotated tag `vX.Y.Z` on that commit with the message
+2. sets the annotated tag `vX.Y.Z` on that commit with the message
    `vX.Y.Z: tagged on the instruction of <your login> on <date>` and pushes it; `main.yml`
    takes over.
 
@@ -1931,21 +2057,14 @@ the image is signed, and a hand-made release would make that step fail.
 When the forge cannot run the workflow, the same scripts work in a checkout on `main`:
 `python -m scripts.release_pr plan`, `python -m scripts.release_pr prepare --version X.Y.Z
 --body body.md` (then branch, commit `chore(release): vX.Y.Z`, `gh pr create --body-file
-body.md`, `gh pr merge --auto --squash`), `make release-audit` with the findings pasted under
-`## Release audit`, and after the merge `python -m scripts.release_pr tag-check --version X.Y.Z`
+body.md`, `gh pr merge --auto --squash`), and after the merge `python -m scripts.release_pr tag-check --version X.Y.Z`
 followed by `git tag -a vX.Y.Z <commit> -m "<message it printed>"` and `git push origin vX.Y.Z`.
 
 ### Self-hosted runner
 
 Set the repository variable `RELEASE_RUNNER` to the runner's label. The runner needs git,
-Python 3.11 or newer, the `gh` CLI and network access to the forge. The audit job additionally
-needs what `openai/codex-action` needs on Linux: passwordless `sudo`, `/usr/bin/setpriv`,
-`/usr/bin/setfacl` (package `acl`) and unprivileged user namespaces (`kernel.unprivileged_userns_clone=1`,
-AppArmor not restricting them); the action drops `sudo` irreversibly and removes the runner's
-access to root-owned sockets under `/run`, so give the audit job an ephemeral runner that is
-replaced after every job. On an internal forge (Forgejo or Gitea Actions) the YAML runs as is
-with its `vars` and `secrets`; the four `gh` calls (list and open the PR, auto-merge, edit the
-body) are the places to swap for that forge's CLI.
+Python 3.11 or newer, the `gh` CLI and network access to the forge. On an internal forge (Forgejo or Gitea Actions) the YAML runs as is
+with its `vars` and `secrets`; the three `gh` calls (list and open the PR, auto-merge) are the places to swap for that forge's CLI.
 
 ### Step 4: watch it go out
 
@@ -2001,7 +2120,7 @@ migration, point 4).
 | Cut the line (once per minor, only when needed) | *Run workflow* on `main`, `step = cut-line`, `version = X.Y` (tick `dry_run` first) | `scripts/release_line.py cut` checks that a release of X.Y exists, the line does not, and `main` holds a `feat` since its newest release; the release app pushes `release/X.Y` and the label `backport:X.Y` is created |
 | Fix | the usual PR to `main`, merged through the queue, with the label `backport:X.Y` set before the merge; a label set after the merge needs `gh workflow run backport.yml -f pull_request=N` (ADR 0120) | `backport.yml` starts from the merge's push to `main` (or the dispatch); its job `find` fails, and is re-run, when a listed PR is not merged yet or is not the one the push merged; it cherry-picks the merge commit onto `backport/X.Y/pr-N` and opens the PR against `release/X.Y` with auto-merge; a pull request into a line runs the full lane itself (a line has no merge queue) and must be up to date with the line; when the cherry-pick does not apply it comments on the PR, and a Claude Code session makes the backport by hand (`git cherry-pick -x`) |
 | Candidate | the merge on the line | `main.yml` tags `vX.Y.Z-rc.N` from `scripts/release_plan.py --candidate --branch release/X.Y` and publishes it as on `main` (no mutation run: the fix ran it on `main`) |
-| Release | *Run workflow* on `release/X.Y`, `step = release-pr`, then `step = tag` on `release/X.Y` | the release PR goes to the line (a patch, no audit); the tag sits on the line's merge commit; `main.yml` accepts a tag on `main` or a patch tag on its own line (`scripts/release_line.py tag-allowed`); a line's release is never GitHub's *Latest* release and never moves `:latest` |
+| Release | *Run workflow* on `release/X.Y`, `step = release-pr`, then `step = tag` on `release/X.Y` | the release PR goes to the line (a patch); the tag sits on the line's merge commit; `main.yml` accepts a tag on `main` or a patch tag on its own line (`scripts/release_line.py tag-allowed`); a line's release is never GitHub's *Latest* release and never moves `:latest` |
 | Changelog | the next release PR on `main` | `release_pr.py prepare` takes over the released sections of every `origin/release/X.Y` that `main` lacks, in version order |
 
 Two rulesets cover `release/[0-9]*`, both in `.github/guardrails.json`, which the hourly
@@ -2273,6 +2392,18 @@ write lock only for a group that lacks something. On an error it prints one line
 `ensure-flows: failed (<ErrorType>)` to stderr; the exit code is 1 on an error and when `M` is
 above zero, and the log lines `flows.repair_failed` and `flows.repair_incomplete` say the same
 for the worker's own run.
+
+**Services that use the call page (ADR 0123 step 6a).** Look here before going back to an image
+from before step 6a. That image cannot read a group whose client is `embedded` (it builds
+`JoinClient(row.join_client)`, which fails on the value), so such a group breaks every page and job
+that loads it. Before going back, set every such group to `browser`: on the group's settings form
+(Group → Settings → Video, *How the participant gets into the call*), or with a configuration
+package that sets `join_client` of those groups (export one first and look for `"join_client":
+"embedded"` to find them). Switching `embedded_call_enabled` off is not enough: the stored value
+stays. Migration 0120's downgrade does this by itself (it sets every `embedded` group to `browser`),
+but only when the schema is downgraded with `alembic downgrade 0119`; starting the previous image
+on the current schema does not. The service's own option is lost by that downgrade; the
+organisation's value is never touched.
 
 **Services, flows and requests (ADR 0121, ADR 0122; proof in `docs/service-flows-compatibility.md`).**
 Migrations 0109 to 0115 (minor 0.6) only add: tables, nullable or defaulted columns on
@@ -2584,6 +2715,54 @@ again. Each sealed value carries the id of the key that sealed it. In this order
 A configuration package (ADR 0089) can be exported and imported during a rotation: the
 installation opens its secrets under either key.
 
+**Rotating a webhook secret (ADR 0124 point 8)** keeps the old secret verifying for
+`webhook_secret_overlap_minutes` (class C, default 60, 0 to 1440, *Advanced settings*), so no event
+is refused while the platform takes up the new one.
+
+*An organisation's secret*: on the organisation's *Kanalen* page press *Make a new webhook secret*.
+The server makes the secret and tells the platform (the card says what came of it). The card then
+says until when the previous secret still works. A rotation inside that time stops the previous
+secret at once, together with the one before it. In *Deliveries seen* the count *Verified with the
+previous secret* goes to zero once the platform has taken the new one up. **If the old secret
+leaked**, an organisation's administrator rotates twice in a row: the first rotation keeps the old
+secret valid until the time shown, the second ends it at once. The superuser can instead set the
+overlap to 0 first (*Advanced settings*) and rotate once. Either way events already on their way may be
+refused. **If the card says registering did not succeed** (a gap, no subscription, or the platform not
+told), nothing retries it by itself: check the Service App's rights and press *Save* on the card to
+register again; the card says until when the old secret is still accepted. Removal of the
+sealed previous secret is housekeeping (an hourly sweep, and any write of the record after 24 hours);
+what counts is the clock at each delivery.
+
+*The installation's own secrets* (`WEBEX_WEBHOOK_SECRET`, `WXCC_WEBHOOK_SECRET`) come from the
+environment, which the application cannot write:
+
+1. Make the new value (at least 32 random characters; WxCC wants 32 to 256).
+2. Set the **new** value as `WEBEX_WEBHOOK_SECRET` (or `WXCC_WEBHOOK_SECRET`) and the **old** value
+   as `WEBEX_WEBHOOK_SECRET_PREVIOUS` (or `WXCC_WEBHOOK_SECRET_PREVIOUS`). Like `WEBEX_WEBHOOK_SECRET`
+   and `WXCC_WEBHOOK_SECRET` they are class C and take no `_FILE`; set them in the environment.
+3. Restart `web` and `worker`. The previous value verifies for the overlap counted from the moment
+   the application first saw the new secret (it is kept in the database as a fingerprint, so a later
+   restart does not start it again).
+4. Tell the platform the new secret straight away, inside the overlap:
+   `docker compose exec web python -m app.cli register-webhooks --update-secret`. The video
+   platform's webhooks are updated in place; the WxCC subscription is made again before the old one is
+   removed (a report line says when the old one had to be removed first, with a gap, or when
+   there is no subscription now: run it again). The report never holds a secret.
+5. After the overlap, **remove the `_PREVIOUS` variable** and restart. System status (*Address and
+   proxy*) shows a finding for a previous value that is still set after its overlap, and for one that
+   equals the current secret. A restart with only the new secret set and no previous value refuses the old
+   secret at once.
+
+If the database cannot be read when the application first sees a secret, the previous value is not
+used until it can: an overlap that cannot be measured is never granted.
+
+**After a restore of the database, or on another host** (a new installation from a backup, a
+standby taking over): the first sightings are in the database table `webhook_secret_sightings`. A
+restore from before the rotation, or a host with an empty database, has no sighting of the current
+secret, so a `_PREVIOUS` value that is still in the environment gets a new overlap, counted from
+the first call at the new place. Remove the `_PREVIOUS` variables before such a move once their
+overlap has ended; a configuration package neither carries the table nor a previous secret.
+
 **Rotating `MANAGEMENT_TOKEN_KEY`** keeps every link working while the previous key is set
 (ADR 0094 point 4):
 
@@ -2886,14 +3065,33 @@ Refused origins are logged as `widget.origin_refused` with the origin and the gr
 personal data). Many refusals from one unknown origin mean a copied tag: nothing to do, it
 cannot book.
 
+## Upgrading: who the participant is told they talk to (ADR 0123 step 5c)
+
+The default of `embedded_call_staff_name` (class D, per organisation) changed on 2026-11-14 from
+`name` (the staff member's account name) to `screen_name`: the participant sees the screen name kept
+with the staff record, or the organisation's word for staff alone when there is none, and never the
+account name. An organisation that stored `name` or `term` keeps it. An organisation that stored
+nothing now shows the word alone until a manager fills in the screen names on the staff page (the
+staff list marks who has none); it is no loss while the call page is dark behind
+`embedded_call_enabled`. To keep showing the account name, set the setting to `name` under
+*Organisation settings*.
+
+*Rate limit of the poll.* The call page asks who the participant talks to at the interval of
+`embedded_call_chat_poll_seconds` (class C, platform: an organisation cannot change it). The route's
+limits follow it and are no setting of their own: a bound per booking of three times the poll rate
+(18 a minute at 10 seconds, 60 at the default 3, 90 at 2) and a bound per address of fifty times that
+(900, 3000, 4500: fifty calls at three times their normal rate behind one address). From step 7c the chat is asked for in the same poll and counts against the same
+per-booking bound.
+
 ## The call page's SDK does not work (ADR 0123 step 4c)
 
 The call page (`/b/m/{ref}/call`, only while `embedded_call_enabled` is on) joins a call with the
 video supplier's SDK file, vendored under `app/web/static/vendor/webex/` and never installed. The
 supplier supports only its latest version and says an older one may stop working after about
-eighteen months, so this entry is part of running the product. Until a service chooses
-`join_client = embedded` (step 6) no participant is sent to the page; it is reached by its address,
-on a test installation.
+eighteen months, so this entry is part of running the product. A service chooses the page with
+`join_client = embedded` (Group → Settings → Video, step 6a); only the participants of such a
+service are sent to it, and only while `embedded_call_enabled` is on. Every other service keeps the
+redirect.
 
 **What you see.**
 
@@ -2908,15 +3106,21 @@ on a test installation.
 
 **What to do.**
 
-1. **A participant cannot join in our page.** Tell them to use the link in the confirmation (the
-   redirect of ADR 0075, `/join/go`) or the organisation's contact details. The redirect is a
-   separate route: it does not use the SDK and keeps working.
+1. **A participant cannot join in our page.** For a service of the page the confirmation's link
+   and `/join/go` lead back to the page unless the service's option allows the other way, so with
+   the option `hidden` telling the participant to use the link does not help. Give the participant
+   the organisation's contact details, and use item 3 (the service's option) or item 2 (the platform
+   switch) so the other way works for them. The redirect itself does not use the SDK.
 2. **Switch the page off for everyone.** Set `embedded_call_enabled` off (Platform settings,
    `settings.platform.manage`). The page and the token endpoint then answer as an address that
-   does not exist, and every group is back on the redirect. Nothing else has to change.
-3. **Offer the other way meanwhile.** An organisation can set `embedded_call_webex_option` to
-   `on_failure` (the link "join another way" in the failure state and in the not-available state) or
-   `always`. With `hidden` the participant sees the organisation's contact details instead.
+   does not exist, and every group is back on the redirect (a group that holds `embedded` acts as
+   the default client meanwhile and keeps its choice). Nothing else has to change.
+3. **Offer the other way meanwhile.** Set the service's option *Way into Webex next to our page*
+   (Group → Settings → Video, `group.edit`) to `on_failure` (the link "join another way" in the
+   failure state and in the not-available state, and `/join/go` leads to the video platform) or
+   `always`. A service that has not set its own follows the organisation's value
+   (`embedded_call_webex_option`, Organisation settings). With `hidden` the participant sees the
+   organisation's contact details instead and `/join/go` leads back to the page.
 4. **The checksum finding.** Put the file back that the manifest names, or replace the file and its
    checksum together: take the file of the pinned version from the supplier's published package
    (`umd/meetings.min.js`), place it as `meetings.min.js`, run `shasum -a 256` on it and write

@@ -184,6 +184,7 @@ EVENT_LABELS: dict[str, str] = {
     staff.SUSPENDED_EVENT: "audit.event.staff_suspended",
     staff.REINSTATED_EVENT: "audit.event.staff_reinstated",
     staff.ERASED_EVENT: "audit.event.staff_erased",
+    staff.SCREEN_NAME_EVENT: "audit.event.staff_screen_name_changed",
     # Admin sessions (ADR 0098): the system ended one, a person ended theirs, an administrator
     # ended a person's, or all were ended at once.
     SESSION_ENDED_EVENT: "audit.event.session_ended",
@@ -260,6 +261,7 @@ DETAIL_LABELS: dict[str, str] = {
     "embedding_enabled": "admin.field.embedding_enabled",
     "trial_call_enabled": "admin.field.trial_call_enabled",
     "join_client": "admin.field.join_client",
+    "embedded_call_webex_option": "admin.field.embedded_call_webex_option",
     "trial_call_minutes": "admin.field.trial_call_minutes",
     "trial_calls_per_booking": "admin.field.trial_calls_per_booking",
     "not_picked_up_minutes": "admin.field.not_picked_up_minutes",

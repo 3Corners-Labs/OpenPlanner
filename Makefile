@@ -26,7 +26,8 @@ lint:
 	$(UV) ruff format --check .
 	$(UV) ruff check .
 
-# The host's shell scripts (the root-run updater among them), the git hooks and the shell
+# The host's shell scripts (the root-run updater among them, and the one run inside the bundled
+# identity provider's container, deploy/keycloak), the git hooks and the shell
 # scripts that repo skills ship (.claude/skills/<skill>/scripts/*.sh). The shell expands the
 # skill pattern, so a file name stays one argument and is never read as code (make's wildcard
 # would paste it into the command as text); `set --` drops the pattern only when nothing
@@ -37,7 +38,7 @@ lint:
 SHELLCHECK_VERSION := 0.11.0.1
 shellcheck:
 	set -- .claude/skills/*/scripts/*.sh; [ -e "$$1" ] || [ -L "$$1" ] || set --; \
-	uvx --from shellcheck-py==$(SHELLCHECK_VERSION) shellcheck scripts/*.sh scripts/updater/*.sh deploy/proxy/*.sh .githooks/* "$$@"
+	uvx --from shellcheck-py==$(SHELLCHECK_VERSION) shellcheck scripts/*.sh scripts/updater/*.sh deploy/proxy/*.sh deploy/keycloak/*.sh .githooks/* "$$@"
 
 type:
 	$(UV) mypy
@@ -113,10 +114,10 @@ release-plan:
 	@git fetch --quiet --tags origin
 	$(UV) python -m scripts.release_plan
 
-# ADR 0078: before the release PR of a minor or major version merges, a second model reviews
-# everything since the last release (the Codex CLI in a read-only sandbox, as /codex does).
-# Paste the findings into the release PR under "## Release audit", ending with "Verdict: pass".
-release-audit: ## Independent review of everything since the last release (needs codex)
+# ADR 0128: optional and occasional. A second model reviews everything since the last release
+# (the Codex CLI in a read-only sandbox, as /codex does), on the machine of whoever runs it.
+# No check waits for it; findings may be pasted into the release PR under "## Release audit".
+release-audit: ## Optional review of everything since the last release by a second model (needs codex)
 	scripts/release-audit.sh
 
 # TLS proxy (ADR 0030) against Let's Encrypt's test CA; needs docker.

@@ -121,23 +121,25 @@ flowchart TB
         mailpit["mailpit<br/>dev profile only"]
         keycloak["keycloak (profile idp)<br/>bundled identity provider,<br/>ADR 0090 and 0106"]
         idpdata[("idp-data volume")]
+        idpdb[("idp-db (profile idp-db)<br/>PostgreSQL, production")]
     end
 
     smtp[Mail provider]
     github[GitHub releases<br/>GHCR images]
     updater["host updater<br/>systemd timer, cosign"]
 
-    browser -- "https :443" --> proxy -- "http, edge network, one host (recorded exception)" --> web
+    browser -- "https :443" --> proxy -- "http, edge network, web's fixed address (recorded exception)" --> web
     browser -- https --> ownproxy -- "https when WEB_TLS_CERT_FILE is set (ADR 0091)" --> web
     proxy -. "ACME, renewal" .-> acme
     web <--> volume
     worker <--> volume
     worker -- "SMTP, STARTTLS or TLS" --> smtp
     web -- "OIDC, https" --> idp
-    web -- "OIDC and directory API (ADR 0095), http, one host (recorded exception, ADR 0125)" --> keycloak
-    worker -- "directory API, http, one host (ADR 0125)" --> keycloak
+    web -- "OIDC and directory API (ADR 0095), http, fixed address on edge (recorded exception, ADR 0125)" --> keycloak
+    worker -- "directory API, http, fixed address on edge (ADR 0125)" --> keycloak
     keycloak <--> idpdata
-    proxy -- "/idp route (ADR 0112), http, one host (ADR 0125)" --> keycloak
+    keycloak -- "PostgreSQL, internal network idp-store, fixed address (ADR 0125)" --> idpdb
+    proxy -- "/idp route: the login only (ADR 0112, 0126), http, fixed address on edge (ADR 0125)" --> keycloak
     web -- https --> cisco
     worker -- https --> cisco
     web -- "syslog+tls or https" --> logs
@@ -158,6 +160,9 @@ flowchart TB
   on its own, or serves an own certificate from `./certs`; port 80 only redirects. It runs as
   uid 10001 on a read-only filesystem, keeps certificates in the `proxy-data` volume and has a
   fixed address on the `edge` network, the only address `web` accepts `X-Forwarded-For` from.
+  It hands web one address, the visitor's: the peer, or behind an edge named in
+  `PROXY_TRUSTED_NETWORKS` the first untrusted address of its `X-Forwarded-For`, read right to
+  left (ADR 0129, the proxy as the security shell).
   `edge` is dual-stack, so Docker forwards visitors over IPv6 to the proxy with NAT and their
   own address reaches the rate limits; web listens on IPv4 only, so the proxy reaches it from
   that one trusted address.
@@ -175,13 +180,17 @@ flowchart TB
   Keycloak runs next to `web`; staff are managed in it from the portal (ADR 0095). In a lab
   without a public name the proxy can issue its certificates from its own certificate authority
   (`TLS_INTERNAL=true`, ADR 0112), publish the root for download on *System status*, and serve
-  Keycloak under `/idp` on the same https address.
+  Keycloak under `/idp` on the same https address; the installer writes `IDP_UPSTREAM` (ADR
+  0112 step 6). The route passes only the login of realm `openplanner` and its assets, keeps the
+  portal's cookies from Keycloak and drops what an answer could do to the whole origin; the
+  admin console is on the host's loopback (ADR 0126).
 - **Every hop with personal data is encrypted, or a recorded exception (ADR 0091).** The
   exceptions are all on one host: the bundled proxy to `web` on the `edge` network (ADR 0091),
-  and the hops to the bundled Keycloak as `idp:8080`, from `web` and `worker` and from the proxy,
-  and from Keycloak to its database `idp-db` (ADR 0125; the browser reaches the proxy over
-  https, and production accepts no other http login; until its step 2 these names, and `web`,
-  can leave the host while their container is not running). An own reverse proxy
+  and the hops to the bundled Keycloak from `web` and `worker` and from the proxy, and from
+  Keycloak to its database `idp-db` (ADR 0125; the browser reaches the proxy over https, and
+  production accepts no other http login). Each of them goes to a fixed address, on `edge` or on
+  the internal network `idp-store` that only Keycloak and its database join, never to a name
+  the host's resolver could answer while a container is down (ADR 0125 step 2). An own reverse proxy
   on another machine gets HTTPS from uvicorn (`WEB_TLS_CERT_FILE`, `WEB_TLS_KEY_FILE`, class B;
   the image's healthcheck follows), and *System status* warns while `FORWARDED_ALLOW_IPS` names
   another proxy and web serves no TLS. All outbound connections are listed in `docs/dataflow.md`

@@ -115,6 +115,7 @@ from app.domain.tasks import ActiveJob, ActiveJobs
 from app.domain.tls import CertificateCheck
 from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
 from app.domain.usage import StaffFact, UsageFact
+from app.domain.webhook_secrets import Sighting
 from app.domain.worker_check import WorkerHeartbeat
 from tests.fakes.service_request_store import ServiceRequestStore
 from tests.support.domain import NOW
@@ -183,6 +184,7 @@ class State:
     instance_id: str | None = None
     probe_nonce: tuple[str, datetime] | None = None
     address_checks: dict[AddressKind, AddressCheck] = field(default_factory=dict)
+    secret_sightings: dict[str, Sighting] = field(default_factory=dict)
     own_certificate: OwnCertificate | None = None
     maintenance: MaintenanceState = MAINTENANCE_OFF
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
@@ -339,6 +341,16 @@ class InMemoryTransaction(ServiceRequestStore):
             self.state.staff[subject] = replace(
                 self.state.staff[subject], status=status, status_at=at
             )
+
+    async def get_staff_by_id(self, staff_id: int) -> StaffMember | None:
+        return next((m for m in self.state.staff.values() if m.id == staff_id), None)
+
+    async def set_staff_screen_name(self, subject: str, screen_name: str | None) -> bool:
+        member = self.state.staff.get(subject)
+        if member is None or member.status is StaffStatus.ERASED:
+            return False
+        self.state.staff[subject] = replace(member, screen_name=screen_name)
+        return True
 
     async def get_overview_layout(self, subject: str) -> tuple[str, ...] | None:
         return self.state.overview_layouts.get(subject)
@@ -1833,6 +1845,12 @@ class InMemoryTransaction(ServiceRequestStore):
 
     async def save_address_check(self, check: AddressCheck) -> None:
         self.state.address_checks[check.kind] = check
+
+    async def get_secret_sighting(self, platform: str) -> Sighting | None:
+        return self.state.secret_sightings.get(platform)
+
+    async def save_secret_sighting(self, platform: str, sighting: Sighting) -> None:
+        self.state.secret_sightings[platform] = sighting
 
     async def delete_address_check(self, kind: AddressKind) -> None:
         self.state.address_checks.pop(kind, None)

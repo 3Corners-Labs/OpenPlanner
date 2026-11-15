@@ -1199,16 +1199,52 @@ msgid "admin.field.trial_call_enabled_hint"
 msgstr "Ja: de deelnemer kan vooraf in een echte Webex-meeting uitproberen of camera, microfoon en luidsprekers werken. De meeting is van de Webex-host van deze dienst; er komt niemand van het team in. Alleen met een Webex-host."
 
 msgid "admin.field.join_client"
-msgstr "Webex-pagina voor de deelnemer"
+msgstr "Hoe de deelnemer in het gesprek komt"
 
 msgid "admin.field.join_client_hint"
-msgstr "Welke pagina van Webex de deelnemer bij de afspraak en het proefgesprek te zien krijgt."
+msgstr "Hoe de deelnemer in het gesprek komt. 'Direct in de browser': de deelnemer gaat naar Webex en het gesprek opent in de webversie. 'Webex laat de deelnemer kiezen': de deelnemer gaat naar Webex en kiest daar zelf tussen de app en de browser. 'In de eigen pagina van de organisatie': het gesprek loopt in onze eigen pagina. Het proefgesprek opent altijd in Webex."
 
 msgid "admin.group.join_client_browser"
 msgstr "Direct in de browser"
 
 msgid "admin.group.join_client_choice"
 msgstr "Webex laat de deelnemer kiezen"
+
+msgid "admin.group.join_client_embedded"
+msgstr "In de eigen pagina van de organisatie"
+
+msgid "admin.field.join_client_embedded_off"
+msgstr "De gesprekspagina staat voor deze installatie uit (platforminstelling). Deelnemers van deze groep gaan voorlopig naar Webex."
+
+msgid "admin.field.join_client_embedded_unchecked"
+msgstr "De eigen pagina van de organisatie is te kiezen zodra de controle van de Service App op Koppelingen is geslaagd met de gastrechten."
+
+msgid "admin.field.join_client_embedded_held_unchecked"
+msgstr "De laatste controle van de Service App kon geen gast aanmaken. Deelnemers van deze groep krijgen onze pagina nog, maar komen er mogelijk niet in het gesprek. Herstel de gastrechten van de Service App en voer de controle op Koppelingen opnieuw uit; zet de groep anders voorlopig op 'Direct in de browser'."
+
+msgid "admin.field.embedded_call_webex_option"
+msgstr "Weg naar Webex naast onze pagina"
+
+msgid "admin.field.embedded_call_webex_option_hint"
+msgstr "Geldt alleen als hierboven 'In de eigen pagina van de organisatie' is gekozen. De deelnemer krijgt naast onze gesprekspagina een weg naar de webversie van Webex te zien: nooit, alleen als de pagina het gesprek niet kan geven, of altijd. De tekst van die link op de pagina van de deelnemer noemt Webex niet bij naam. 'Zoals de organisatie' volgt de instelling van de organisatie."
+
+msgid "admin.group.webex_option_hidden"
+msgstr "Nooit"
+
+msgid "admin.group.webex_option_on_failure"
+msgstr "Alleen als onze pagina het gesprek niet kan geven"
+
+msgid "admin.group.webex_option_always"
+msgstr "Altijd, ook voor het deelnemen"
+
+msgid "admin.group.webex_option_follow"
+msgstr "Zoals de organisatie (nu: {value})"
+
+msgid "admin.form.error.embedded_platform_switch"
+msgstr "Het gesprek in de eigen pagina van de organisatie staat voor deze installatie uit."
+
+msgid "admin.form.error.embedded_guest_check"
+msgstr "Nog niet: voer eerst de controle van de Service App op Koppelingen uit; die moet een gast bij het videoplatform hebben aangemaakt."
 
 msgid "admin.field.trial_call_minutes"
 msgstr "Proefgesprek blijft open (minuten)"
@@ -1636,6 +1672,9 @@ msgstr "Het gesprek opent in uw browser; op een computer hoeft u niets te instal
 msgid "message.join_choice"
 msgstr "Op een computer hoeft u niets te installeren: vraagt Webex om de app te openen, kies dan 'Deelnemen via deze browser'. Op een telefoon of tablet vraagt Webex om de Webex-app. De link werkt vanaf 15 minuten voor de start."
 
+msgid "message.join_embedded"
+msgstr "Het gesprek opent in uw browser; op een computer hoeft u niets te installeren. De link werkt vanaf 15 minuten voor de start."
+
 msgid "message.join_link"
 msgstr "Deelnemen aan het videogesprek"
 
@@ -1656,6 +1695,9 @@ msgstr "Het gesprek opent in uw browser; op een computer hoeft u niets te instal
 
 msgid "join.tips.choice"
 msgstr "Vraagt Webex of u de app wilt openen? Kies dan 'Deelnemen via deze browser'; op een computer hoeft u niets te installeren. Op een telefoon of tablet vraagt Webex om de Webex-app."
+
+msgid "join.tips.embedded"
+msgstr "Het gesprek opent in deze browser; u hoeft niets te installeren."
 
 msgid "join.tips.devices"
 msgstr "Geef uw browser toestemming voor camera en microfoon als daarom wordt gevraagd."
@@ -4783,7 +4825,7 @@ msgid "admin.check.webex.browser_link_ok"
 msgstr "De directe browserlink werkt: Webex houdt de browseroptie vast, dus de deelnemer krijgt op een computer meteen de webversie, zonder de vraag naar de app."
 
 msgid "admin.check.webex.browser_link_lost"
-msgstr "Webex neemt de browseroptie niet meer mee in de link (antwoord {status}). De deelnemer krijgt dan toch de keuze tussen app en browser. Er breekt niets; zet de Webex-pagina voor de deelnemer desnoods op 'Webex laat de deelnemer kiezen'."
+msgstr "Webex neemt de browseroptie niet meer mee in de link (antwoord {status}). De deelnemer krijgt dan toch de keuze tussen app en browser. Er breekt niets; zet 'Hoe de deelnemer in het gesprek komt' desnoods op 'Webex laat de deelnemer kiezen'."
 
 msgid "admin.check.webex.browser_link_unreachable"
 msgstr "De directe browserlink kon niet worden gecontroleerd: de Webex-site was niet bereikbaar ({error})."
@@ -4811,6 +4853,12 @@ msgstr "Webex weigerde een proefgesprek-meeting voor host {host} ({error}): {rea
 
 msgid "admin.check.webex.trial_lobby"
 msgstr "Webex nam een proefgesprek-meeting voor host {host} aan, maar bewaarde de instellingen niet ({stored}). De deelnemer komt dan in de wachtruimte terecht en niemand laat de deelnemer binnen. Laat de beheerder van de Webex-site toestaan dat deelnemers vóór de host binnenkomen en zonder wachtruimte; tot dan werkt het proefgesprek niet."
+
+msgid "admin.check.webex.guest_ok"
+msgstr "De gesprekspagina kan een gast aanmaken bij het videoplatform (de Service App heeft de gastrechten)."
+
+msgid "admin.check.webex.guest_refused"
+msgstr "Het videoplatform weigerde een gast aan te maken ({error}): de Service App heeft de gastrechten nodig, dus deelnemers kunnen niet in onze pagina meedoen."
 
 msgid "admin.check.webex.trial_left"
 msgstr "De proefgesprek-meeting {meeting} voor host {host} is gepland maar kon niet worden verwijderd ({error}); verwijder hem in Webex."
@@ -5865,6 +5913,9 @@ msgstr "Schorsing opgeheven"
 msgid "audit.event.staff_erased"
 msgstr "Gegevens van medewerker gewist"
 
+msgid "audit.event.staff_screen_name_changed"
+msgstr "Schermnaam ingesteld of gewist"
+
 msgid "admin.audit.detail.role_add"
 msgstr "rol erbij: {value}"
 
@@ -5948,6 +5999,39 @@ msgstr "Nog niet"
 
 msgid "admin.staff.dormant"
 msgstr "Lang niet ingelogd"
+
+msgid "admin.staff.screen_name.heading"
+msgstr "Schermnaam"
+
+msgid "admin.staff.screen_name.intro"
+msgstr "De deelnemer ziet deze naam in het gesprek bij het beeld van de medewerker, naast het woord van de organisatie voor medewerkers. Heeft de medewerker geen schermnaam, dan ziet de deelnemer alleen dat woord en nooit de accountnaam, tenzij de organisatie anders kiest."
+
+msgid "admin.staff.screen_name.label"
+msgstr "Schermnaam voor de deelnemer"
+
+msgid "admin.staff.screen_name.hint"
+msgstr "Wat de deelnemer in het gesprek ziet. Kies een voornaam of een verzonnen naam, niet de volledige naam. Laat leeg om geen schermnaam te hebben."
+
+msgid "admin.staff.screen_name.save"
+msgstr "Schermnaam opslaan"
+
+msgid "admin.staff.screen_name.none"
+msgstr "Geen schermnaam"
+
+msgid "admin.staff.screen_name.error.too_short"
+msgstr "Een schermnaam heeft minstens {min} tekens."
+
+msgid "admin.staff.screen_name.error.too_long"
+msgstr "Een schermnaam heeft hoogstens {max} tekens."
+
+msgid "admin.staff.screen_name.error.no_letter"
+msgstr "Een schermnaam heeft minstens één letter of cijfer."
+
+msgid "admin.staff.screen_name.error.bad_marks"
+msgstr "Een schermnaam gebruikt accenten alleen op een letter, en hoogstens {marks} achter elkaar."
+
+msgid "admin.staff.screen_name.error.bad_character"
+msgstr "Een schermnaam bevat alleen letters, cijfers, spaties, een koppelteken, een apostrof en een punt."
 
 msgid "admin.staff.no_role"
 msgstr "Geen rol"
@@ -6366,6 +6450,9 @@ msgstr "Binnenkomende webhooks per minuut, per koppeling en bronadres"
 msgid "settings.field.webhook_refusal_alert_count.label"
 msgstr "Geweigerde of onbekende webhookmeldingen op één adres, binnen het gebeurtenisvenster, waarboven een systeemgebeurtenis waarschuwt"
 
+msgid "settings.field.webhook_secret_overlap_minutes.label"
+msgstr "Hoe lang het vorige webhookgeheim blijft gelden na een vernieuwing (minuten, 0 is direct)"
+
 msgid "settings.field.rate_limit_agent_calls.label"
 msgstr "Aanroepen machine-API per client"
 
@@ -6443,6 +6530,12 @@ msgstr "API-adres Webex Contact Center"
 
 msgid "settings.field.wxcc_webhook_secret.label"
 msgstr "Webhookgeheim Webex Contact Center"
+
+msgid "settings.field.webex_webhook_secret_previous.label"
+msgstr "Webhookgeheim Webex vóór een vernieuwing"
+
+msgid "settings.field.wxcc_webhook_secret_previous.label"
+msgstr "Webhookgeheim Webex Contact Center vóór een vernieuwing"
 
 msgid "settings.field.update_repository.label"
 msgstr "Repository met releases"
@@ -8400,7 +8493,7 @@ msgid "admin.holidays.calendar_name"
 msgstr "Naam van de kalender"
 
 msgid "admin.tab.login"
-msgstr "Inloggen"
+msgstr "Authenticatie"
 
 msgid "authz.permission.identity_providers_view"
 msgstr "Identity providers van de organisatie bekijken"
@@ -8460,10 +8553,10 @@ msgid "admin.form.error.issuer_taken"
 msgstr "Deze issuer is al geregistreerd, bij deze organisatie, een andere organisatie of als platformprovider."
 
 msgid "admin.idp.title"
-msgstr "Inloggen"
+msgstr "Authenticatie"
 
 msgid "admin.idp.lead"
-msgstr "De identity providers waar medewerkers van deze organisatie inloggen. Een eigen provider geeft alleen rechten binnen deze organisatie; de e-maildomeinen die de provider kiest, volgen in een volgende stap."
+msgstr "De identity providers (IdP's) waarmee medewerkers van deze organisatie inloggen, en hoe het inlogscherm bepaalt welke provider een medewerker krijgt. Een eigen provider geeft alleen rechten binnen deze organisatie."
 
 msgid "admin.idp.providers"
 msgstr "Identity providers"
@@ -10967,7 +11060,31 @@ msgid "admin.channels.cc_secret_made"
 msgstr "Geheim gemaakt op {at}."
 
 msgid "admin.channels.cc_rotate_lead"
-msgstr "Maak een nieuw geheim als u vermoedt dat het oude is uitgelekt. Het oude geheim werkt daarna niet meer."
+msgstr "Maak een nieuw geheim als u vermoedt dat het oude is uitgelekt, of als vast onderdeel van uw eigen routine. Het contactcenter krijgt het nieuwe geheim direct te horen. Maakt u één keer een nieuw geheim, dan blijft het oude nog {minutes} minuten geldig (de kaart toont dan tot wanneer), zodat er geen melding verloren gaat terwijl het contactcenter het nieuwe overneemt. Maakt u daarna meteen nog een nieuw geheim, dan werkt het oude direct niet meer: zo beëindigt u een uitgelekt geheim zonder te wachten. De platformbeheerder kan die tijd ook op 0 zetten."
+
+msgid "admin.channels.cc_rotate_lead_now"
+msgstr "Maak een nieuw geheim als u vermoedt dat het oude is uitgelekt, of als vast onderdeel van uw eigen routine. Het contactcenter krijgt het nieuwe geheim direct te horen en het oude geheim werkt direct niet meer: meldingen die al onderweg zijn kunnen worden geweigerd."
+
+msgid "admin.channels.cc_rotate_again"
+msgstr "Maakt u nu nog een nieuw geheim, dan werkt het vorige geheim direct niet meer, samen met het geheim daarvoor."
+
+msgid "admin.channels.cc_registration_chip"
+msgstr "Aanmelding bij het contactcenter"
+
+msgid "admin.channels.cc_registration_replaced"
+msgstr "Het abonnement bij het contactcenter is vervangen toen het nieuwe geheim werd ingesteld, omdat het er één per adres toestaat. Bezorgingen in de tussentijd kunnen gemist zijn; de periodieke controle van open taken haalt achterstand in."
+
+msgid "admin.channels.cc_registration_gone"
+msgstr "Er is nu geen abonnement bij het contactcenter: het oude is verwijderd en het nieuwe is geweigerd. Er wordt niets bezorgd tot een aanmelding lukt. Controleer de rechten van de Service App en druk daarna op Opslaan op deze kaart om opnieuw aan te melden; er probeert niets vanzelf opnieuw."
+
+msgid "admin.channels.cc_registration_failed_until"
+msgstr "Het contactcenter heeft het nieuwe geheim niet gekregen (niet bereikbaar of geweigerd). Het tekent nog met het oude geheim, dat wordt geaccepteerd tot {at}; daarna worden zijn bezorgingen geweigerd. Er probeert niets vanzelf opnieuw: druk op Opslaan op deze kaart, of maak een nieuw geheim, om opnieuw aan te melden."
+
+msgid "admin.channels.cc_registration_failed"
+msgstr "Het contactcenter heeft het nieuwe geheim niet gekregen (niet bereikbaar of geweigerd) en het oude geheim wordt niet meer geaccepteerd: zijn bezorgingen worden geweigerd. Er probeert niets vanzelf opnieuw: druk op Opslaan op deze kaart, of maak een nieuw geheim, om opnieuw aan te melden."
+
+msgid "admin.channels.cc_previous_until"
+msgstr "Het vorige geheim werkt nog tot {at}."
 
 msgid "admin.channels.cc_rotate"
 msgstr "Nieuw webhookgeheim maken"
@@ -11027,6 +11144,12 @@ msgstr "Opgeslagen. Het contactcenter meldt de taken van deze organisatie nu op 
 
 msgid "admin.done.contact_center_saved_not_ready"
 msgstr "Opgeslagen. Het webhookadres wordt aangemeld zodra het clientgeheim en het refresh-token zijn ingevuld."
+
+msgid "admin.done.contact_center_replaced"
+msgstr "Opgeslagen. Het contactcenter staat één abonnement per adres toe, dus het oude is vervangen: bezorgingen in de tussentijd kunnen gemist zijn."
+
+msgid "admin.done.contact_center_gone"
+msgstr "Opgeslagen, maar er is nu geen abonnement bij het contactcenter: het oude is verwijderd en het nieuwe is geweigerd. Er wordt niets bezorgd tot u opnieuw aanmeldt; controleer de rechten van de Service App en druk op Opslaan op deze kaart."
 
 msgid "admin.done.contact_center_not_registered"
 msgstr "Opgeslagen, maar het contactcenter weigerde het webhookadres of was niet bereikbaar. Controleer de rechten van de Service App en maak daarna een nieuw webhookgeheim; dat meldt het adres opnieuw aan."
@@ -12714,6 +12837,15 @@ msgstr "De capaciteitspool is gearchiveerd."
 msgid "admin.done.staff_skills_saved"
 msgstr "De vaardigheden zijn opgeslagen. Ze gelden vanaf het volgende verzoek dat wordt opgepakt of gestart."
 
+msgid "admin.done.staff_screen_name_saved"
+msgstr "De schermnaam is opgeslagen."
+
+msgid "admin.done.staff_screen_name_cleared"
+msgstr "De schermnaam is verwijderd. Deelnemers zien nu alleen het woord van de organisatie voor medewerkers, tenzij de organisatie anders kiest."
+
+msgid "admin.done.staff_screen_name_unchanged"
+msgstr "De schermnaam is niet gewijzigd."
+
 msgid "admin.form.error.skill_code"
 msgstr "Gebruik alleen kleine letters, cijfers en streepjes, beginnend met een letter of cijfer (hoogstens 40 tekens)."
 
@@ -13725,8 +13857,11 @@ msgstr "Aantal keer per uur dat één afspraak toegang tot het gesprek mag vrage
 msgid "settings.field.embedded_call_display_name.label"
 msgstr "Naam van de deelnemer voor de medewerker in het gesprek (voornaam of eigen woord)"
 
+msgid "settings.field.embedded_call_chat_poll_seconds.label"
+msgstr "Seconden tussen twee keer kijken van de gesprekspagina wie er in het gesprek zit (en later naar nieuwe berichten)"
+
 msgid "settings.field.embedded_call_staff_name.label"
-msgstr "Naam van de medewerker voor de deelnemer in het gesprek (accountnaam of eigen woord)"
+msgstr "Naam van de medewerker voor de deelnemer in het gesprek (schermnaam van de medewerker, accountnaam of alleen het eigen woord)"
 
 msgid "settings.field.webhook_source_networks_video.label"
 msgstr "Netwerken waarvandaan de webhooks van het videoplatform mogen komen (CIDR, kommagescheiden of één per regel, hooguit 32; leeg: elke bron)"
@@ -13775,6 +13910,15 @@ msgstr "Bronnetwerken van webhooks"
 
 msgid "admin.settings.address.sources.intro"
 msgstr "Waarvandaan de webhookadressen van de hele installatie aanroepen accepteren. De eigen lijst van een organisatie staat op de kaart van haar koppeling. Een lijst is een extra laag; de handtekening houdt een vreemde buiten. Een adres met een lijst weigert ook een aanroep waarvan het adres niet te vertrouwen is: een aanroep met doorgestuurde headers die zijn peer niet mocht sturen, de proxy zelf, of een loopback- of privéadres terwijl het publieke adres publiek is. Dat wordt per aanroep beslist en staat als weigering in de gebeurtenissen, niet hier."
+
+msgid "admin.settings.address.secrets.title"
+msgstr "Vorige webhookgeheimen in de omgeving"
+
+msgid "admin.settings.address.secrets.ended"
+msgstr "Er staat nog een vorig webhookgeheim in de omgeving, en de overlap is voorbij: het controleert niets meer. Haal WEBEX_WEBHOOK_SECRET_PREVIOUS of WXCC_WEBHOOK_SECRET_PREVIOUS uit de omgeving."
+
+msgid "admin.settings.address.secrets.same"
+msgstr "Er staat een vorig webhookgeheim dat gelijk is aan het huidige: het doet niets. Haal het uit de omgeving."
 
 msgid "admin.settings.address.sources.video"
 msgstr "Videoplatform"
@@ -13890,6 +14034,9 @@ msgstr "Geaccepteerd en verwerkt"
 msgid "admin.delivery.outcome.duplicate"
 msgstr "Geaccepteerd, al eerder gezien (opnieuw bezorgd)"
 
+msgid "admin.delivery.by_previous"
+msgstr "Gecontroleerd met het vorige geheim"
+
 msgid "admin.delivery.outcome.paused"
 msgstr "Gecontroleerd, weggegooid tijdens de pauze"
 
@@ -13971,7 +14118,7 @@ msgstr "De bezorgingen zijn hervat."
 #. The participant's call page before the click that joins (ADR 0123 step 4b). No text names the video platform.
 
 msgid "settings.field.embedded_call_webex_option.label"
-msgstr "Weg naar de eigen app van het videoplatform naast het gesprek (nooit, alleen als de pagina het gesprek niet kan geven, of altijd)"
+msgstr "Weg naar de eigen app van het videoplatform naast het gesprek (nooit, alleen als de pagina het gesprek niet kan geven, of altijd). Geldt voor elk team dat er zelf geen koos; een team kiest het onder Groep, Instellingen, Video"
 
 msgid "callpage.start.body"
 msgstr "U voert het gesprek hier, in deze pagina. U hoeft niets te installeren."
@@ -14152,8 +14299,14 @@ msgstr "U hoeft niets te doen. Het gesprek begint vanzelf."
 msgid "callpage.call.heading"
 msgstr "U bent in gesprek"
 
-msgid "callpage.call.remote"
-msgstr "Beeld van uw {agent}"
+msgid "callpage.staff.term"
+msgstr "{agent}"
+
+msgid "callpage.staff.named"
+msgstr "{name} · {agent}"
+
+msgid "callpage.say.staff_name"
+msgstr "U spreekt met {name}."
 
 msgid "callpage.call.remote_off"
 msgstr "Uw {agent} heeft de camera uit"
@@ -14280,3 +14433,195 @@ msgstr "De wachtkamer verlaten"
 
 msgid "callpage.control.bar"
 msgstr "Bediening van het gesprek"
+
+msgid "callpage.control.captions"
+msgstr "Ondertitels"
+
+msgid "callpage.control.share"
+msgstr "Scherm delen"
+
+msgid "callpage.control.share_short"
+msgstr "Delen"
+
+msgid "callpage.notice.sharing.word"
+msgstr "Delen"
+
+msgid "callpage.notice.sharing.body"
+msgstr "U deelt uw scherm. Uw {agent} ziet wat u op dat scherm opent. De knop Scherm delen onderaan de pagina stopt het delen ook."
+
+msgid "callpage.notice.sharing.stop"
+msgstr "Stoppen met delen"
+
+msgid "callpage.notice.theirs.word"
+msgstr "Scherm gedeeld"
+
+msgid "callpage.notice.theirs.body"
+msgstr "Uw {agent} deelt een scherm."
+
+msgid "callpage.share.view"
+msgstr "Scherm gedeeld door uw {agent}"
+
+msgid "callpage.captions.you"
+msgstr "U"
+
+msgid "callpage.say.share_mine"
+msgstr "U deelt uw scherm."
+
+msgid "callpage.say.share_off"
+msgstr "U deelt uw scherm niet meer."
+
+msgid "callpage.say.share_theirs_off"
+msgstr "Uw {agent} deelt het scherm niet meer."
+
+msgid "callpage.say.share_replaced"
+msgstr "Uw {agent} is een scherm gaan delen. Uw eigen scherm wordt daarom niet meer gedeeld."
+
+msgid "callpage.say.share_failed"
+msgstr "Uw scherm kon niet worden gedeeld."
+
+msgid "callpage.say.captions_on"
+msgstr "Ondertitels staan aan."
+
+msgid "callpage.say.captions_off"
+msgstr "Ondertitels staan uit."
+
+msgid "callpage.say.captions_failed"
+msgstr "De ondertitels konden niet worden gestart. Dit gesprek biedt ze misschien niet aan."
+
+msgid "admin.idp.steps.title"
+msgstr "Stappenplan"
+
+msgid "admin.idp.steps.lead"
+msgstr "Zo komt een eigen identity provider in gebruik. Elke stap staat hier met zijn stand."
+
+msgid "admin.idp.steps.state.done"
+msgstr "Klaar"
+
+msgid "admin.idp.steps.state.todo"
+msgstr "Te doen"
+
+msgid "admin.idp.steps.state.blocked"
+msgstr "Wacht op een eerdere stap"
+
+msgid "admin.idp.steps.host_switch"
+msgstr "De host staat providers van organisaties toe"
+
+msgid "admin.idp.steps.host_switch.hint"
+msgstr "De serverbeheerder zet ORGANISATION_IDPS_ENABLED aan. Zolang die uit staat, loggen alle medewerkers in bij de platformprovider."
+
+msgid "admin.idp.steps.register"
+msgstr "Identity provider registreren"
+
+msgid "admin.idp.steps.register.hint"
+msgstr "Kies Identity provider toevoegen hieronder (superuser). Registreer OpenPlanner eerst bij de provider met de redirect-URI en het JWKS-adres van de providerpagina."
+
+msgid "admin.idp.steps.enable"
+msgstr "Proeflogin doen en de provider aanzetten"
+
+msgid "admin.idp.steps.enable.hint"
+msgstr "Open de provider, kies Proeflogin en zet hem daarna aan. Een nieuwe provider staat uit."
+
+msgid "admin.idp.steps.domain"
+msgstr "E-maildomein toevoegen"
+
+msgid "admin.idp.steps.domain.hint"
+msgstr "Onder Domeinen op de providerpagina. Het domein bepaalt welke medewerkers naar deze provider gaan."
+
+msgid "admin.idp.steps.verify"
+msgstr "Domein verifiëren met een TXT-record"
+
+msgid "admin.idp.steps.verify.hint"
+msgstr "Laat de organisatie het getoonde TXT-record in haar DNS zetten en kies Controleren. Pas dan routeert het domein."
+
+msgid "admin.idp.steps.platform"
+msgstr "Het platformaccount blijft altijd bruikbaar: wie een adres op een ander domein invult, of op het inlogscherm Inloggen met een platformaccount kiest, logt in bij de platformprovider."
+
+msgid "admin.idp.warnings"
+msgstr "Let op: dit wordt nog niet gekozen"
+
+msgid "admin.idp.warning.enabled_without_domain"
+msgstr "Provider {provider} staat aan, maar heeft geen geverifieerd domein. Geen enkele medewerker wordt naar deze provider gestuurd."
+
+msgid "admin.idp.warning.domain_provider_off"
+msgstr "Domein {domain} is geverifieerd, maar provider {provider} staat uit. Het domein routeert pas als de provider aan staat."
+
+msgid "admin.idp.warning.domain_pending"
+msgstr "Domein {domain} van provider {provider} wacht op verificatie. Zet het TXT-record in de DNS en kies Controleren."
+
+msgid "admin.idp.warning.domain_failing"
+msgstr "Het TXT-record van domein {domain} (provider {provider}) is verdwenen. Het domein routeert nog, maar stopt na de tolerantieperiode."
+
+msgid "admin.idp.warning.domain_lapsed"
+msgstr "Domein {domain} van provider {provider} is vervallen en routeert niet meer. Zet het TXT-record terug en controleer het opnieuw."
+
+msgid "admin.idp.check.title"
+msgstr "Probeer een adres"
+
+msgid "admin.idp.check.lead"
+msgstr "Vul een e-mailadres of inlognaam in om te zien welke provider het inlogscherm zou kiezen en waarom. Er wordt niets ingelogd en het adres wordt niet bewaard."
+
+msgid "admin.idp.check.label"
+msgstr "E-mailadres of inlognaam"
+
+msgid "admin.idp.check.hint"
+msgstr "Bijvoorbeeld naam@voorbeeld.nl. Alleen het domein telt."
+
+msgid "admin.idp.check.button"
+msgstr "Controleren"
+
+msgid "admin.idp.check.provider"
+msgstr "Dit adres (domein {domain}) logt in bij provider {provider}."
+
+msgid "admin.idp.check.foreign"
+msgstr "Dit adres (domein {domain}) logt in bij een identity provider van een andere organisatie."
+
+msgid "admin.idp.check.no_domain"
+msgstr "Dit is een inlognaam zonder domein. Die logt in bij de platformprovider."
+
+msgid "admin.idp.check.reserved_suffix"
+msgstr "Domein {domain} is gereserveerd voor de ingebouwde identiteitsprovider van het platform. Dit adres logt in bij de platformprovider."
+
+msgid "admin.idp.check.no_domain_match"
+msgstr "Geen enkele provider claimt domein {domain}. Dit adres logt in bij de platformprovider."
+
+msgid "admin.idp.check.domain_not_verified"
+msgstr "Provider {provider} claimt domein {domain}, maar het domein is nog niet geverifieerd of vervallen. Dit adres logt daarom in bij de platformprovider."
+
+msgid "admin.idp.check.provider_off"
+msgstr "Provider {provider} claimt domein {domain}, maar staat uit. Dit adres logt daarom in bij de platformprovider."
+
+msgid "admin.idp.check.host_switch_off"
+msgstr "Provider {provider} zou dit domein ({domain}) krijgen, maar de host staat providers van organisaties niet toe (ORGANISATION_IDPS_ENABLED). Dit adres logt daarom in bij de platformprovider."
+
+
+
+
+msgid "admin.idp.check.refused"
+msgstr "Vul een e-mailadres of inlognaam in (hoogstens 320 tekens)."
+
+msgid "admin.nav.my_profile"
+msgstr "Mijn profiel"
+
+msgid "admin.profile.my_profile"
+msgstr "Mijn profiel"
+
+msgid "admin.profile.title"
+msgstr "Mijn profiel"
+
+msgid "admin.profile.intro"
+msgstr "Hier stelt u in met welke naam een deelnemer u ziet in een gesprek."
+
+msgid "admin.profile.account.heading"
+msgstr "Accountnaam"
+
+msgid "admin.profile.account.note"
+msgstr "Deze naam komt uit de login van uw organisatie en kunt u hier niet wijzigen. Het is niet de naam die deelnemers zien."
+
+msgid "admin.profile.screen_name.where"
+msgstr "Deelnemers zien uw schermnaam in het gesprek, naast het woord van de organisatie voor medewerkers. Heeft u geen schermnaam, dan zien zij alleen dat woord. Een beheerder die medewerkers mag beheren, kan uw schermnaam ook wijzigen."
+
+msgid "admin.profile.screen_name.no_record"
+msgstr "U kunt een schermnaam instellen zodra uw login is vastgelegd. Log uit en log opnieuw in."
+
+msgid "admin.profile.screen_name.erased"
+msgstr "Uw gegevens zijn gewist. Een schermnaam kunt u weer instellen na uw volgende login."

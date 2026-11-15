@@ -18,6 +18,7 @@ from starlette.responses import HTMLResponse, RedirectResponse, Response
 from app.api.labels import slot_label
 from app.api.link_session import authorise
 from app.api.participant import participant_page
+from app.domain.call_client import redirect_client
 from app.domain.trial_call_service import TrialCallService, TrialView
 from app.i18n.dates import format_clock
 from app.web.locale import RequestLocale, request_locale
@@ -41,6 +42,7 @@ def _context(view: TrialView, public_ref: str, locale: RequestLocale) -> dict[st
     group, booking = view.group, view.booking
     return {
         "ref": public_ref,
+        "redirect": redirect_client(group).value,
         "state": view.state.value,
         "failed": view.failed,
         "calls_left": view.calls_left,

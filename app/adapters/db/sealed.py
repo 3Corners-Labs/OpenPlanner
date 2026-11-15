@@ -6,7 +6,9 @@ installation's key (import); ``rekey`` seals under the current ``SETTINGS_ENCRYP
 after a rotation. Raw SQL is allowed in this package only (CLAUDE.md). No value is logged.
 """
 
+import json
 import sqlite3
+from collections.abc import Callable
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
@@ -56,6 +58,37 @@ SEALED: tuple[tuple[str, str, str, str], ...] = (
 re-sealed value opens again on the other side under the same associated data."""
 
 
+ROTATION_FIELDS = ("previous_webhook_secret", "registration")
+"""The fields of an organisation's sealed contact-center record that say what a rotation left
+(ADR 0124 point 8): the secret on its way out and what the last registration came to."""
+CONTACT_CENTER_PREFIX = "contact-center:"
+"""The record name of an organisation's contact-center connection (``record_names``)."""
+
+
+def without_rotation_state(name: str, plaintext: bytes) -> bytes:
+    """Return a sealed record's plaintext without what a rotation left, for a package's copy.
+
+    A package never holds a secret that is on its way out: from an organisation's contact-center
+    record go the previous webhook secret and the registration outcome, and, when there was a
+    previous secret, the time of the rotation too (the overlap was counted from it; the current
+    secret's own time is kept when nothing was rotated). Any other record, and one that is not
+    a JSON object, is returned as it was.
+    """
+    if not name.startswith(CONTACT_CENTER_PREFIX):
+        return plaintext
+    try:
+        record = json.loads(plaintext)
+    except ValueError:
+        return plaintext
+    if not isinstance(record, dict):
+        return plaintext
+    if record.get("previous_webhook_secret"):
+        record.pop("webhook_secret_at", None)
+    for field_name in ROTATION_FIELDS:
+        record.pop(field_name, None)
+    return json.dumps(record).encode()
+
+
 @dataclass(frozen=True)
 class RekeyCounts:
     """What a re-sealing run did, counts only.
@@ -70,12 +103,20 @@ class RekeyCounts:
 
 
 def reseal(
-    db: sqlite3.Connection, opener: SecretBox, sealer: SecretBox, *, only_stale: bool = False
+    db: sqlite3.Connection,
+    opener: SecretBox,
+    sealer: SecretBox,
+    *,
+    only_stale: bool = False,
+    scrub: Callable[[str, bytes], bytes] | None = None,
 ) -> RekeyCounts:
     """Open every sealed value with ``opener`` and seal it again with ``sealer``; count them.
 
     With ``only_stale`` a value that already carries ``sealer``'s key id is left alone, which
-    makes a second run a no-op (``rekey``). The caller owns the transaction.
+    makes a second run a no-op (``rekey``). ``scrub`` changes each opened value before it is
+    sealed again (a package's copy leaves out what a rotation left, ``without_rotation_state``);
+    ``rekey`` never passes one, so the live database keeps every field. The caller owns the
+    transaction.
 
     Raises:
         InvalidTag: When a value does not open with ``opener``.
@@ -87,6 +128,8 @@ def reseal(
                 current += 1
                 continue
             plaintext = opener.open(name, nonce, ciphertext)
+            if scrub is not None:
+                plaintext = scrub(name, plaintext)
             new_nonce, new_ciphertext = sealer.seal(name, plaintext)
             db.execute(
                 f"UPDATE {table} SET {nonce_column} = ?, {cipher_column} = ? WHERE rowid = ?",  # noqa: S608  # nosec B608 - names from the fixed list above

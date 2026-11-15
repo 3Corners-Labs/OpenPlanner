@@ -55,6 +55,7 @@ from app.domain.ports import Clock
 from app.domain.roles import RoleService
 from app.domain.scheduling import GroupSummary
 from app.domain.skill_service import SkillService
+from app.domain.staff_screen_names import StaffScreenNames
 from app.web.locale import RequestLocale, request_locale
 from app.web.organisation_settings import follow
 
@@ -126,6 +127,12 @@ async def _scope_to_organisation(
 def admin_service(request: Request) -> AdminService:
     """Return the application's admin service."""
     service: AdminService = request.app.state.admin_service
+    return service
+
+
+def screen_names(request: Request) -> StaffScreenNames:
+    """Return the application's screen-name service (ADR 0123 step 5c)."""
+    service: StaffScreenNames = request.app.state.staff_names
     return service
 
 

@@ -15,7 +15,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MAKE = shutil.which("make") or "/usr/bin/make"
-HOST_SCRIPTS = ["scripts/a.sh", "scripts/updater/b.sh", "deploy/proxy/c.sh", ".githooks/pre-push"]
+HOST_SCRIPTS = [
+    "scripts/a.sh",
+    "scripts/updater/b.sh",
+    "deploy/proxy/c.sh",
+    "deploy/keycloak/d.sh",
+    ".githooks/pre-push",
+]
 """One file for each host pattern of the target, in the order the target lists them."""
 
 
