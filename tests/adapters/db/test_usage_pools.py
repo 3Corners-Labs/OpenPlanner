@@ -9,9 +9,9 @@ import pytest
 from app.domain.authorization import Scope
 from app.domain.booking import BookingStatus
 from app.domain.holidays import Holiday, HolidayCalendar
-from tests.adapters.db.test_pool_staffing import block, book_on, pool_slot, staffed_pool
 from tests.support.domain import SLOT_0900
-from tests.support.flow_world import EVERYTHING, World, open_world
+from tests.support.flow_world import EVERYTHING, World, add_pool, open_world
+from tests.support.pool_slots import block, book_on, pool_slot, staffed_pool
 
 DAY = SLOT_0900.date()
 
@@ -100,8 +100,6 @@ async def test_only_an_organisation_wide_scope_reads_a_pool(sql_world: World) ->
 
 
 async def test_an_archived_pool_and_one_without_a_time_zone_are_listed(sql_world: World) -> None:
-    from tests.support.flow_world import add_pool
-
     world = sql_world
     old = await staffed_pool(world, "Oud")
     await world.archive_pool_directly(old.id)

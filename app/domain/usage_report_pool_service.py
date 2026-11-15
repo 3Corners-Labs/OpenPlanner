@@ -18,7 +18,7 @@ from datetime import date, timedelta
 from app.domain.admin import AdminService, require
 from app.domain.authorization import Permission, Principal, scope_for
 from app.domain.errors import DomainError, ErrorCode
-from app.domain.ports import Clock, PoolReportUnitOfWork
+from app.domain.ports import Clock, UsageUnitOfWork
 from app.domain.usage_report import MAX_DAYS
 from app.domain.usage_report_pools import PoolReport, pool_report
 from app.domain.usage_report_service import require_organisation_scope
@@ -39,7 +39,7 @@ class PoolUsageService:
 
     def __init__(
         self,
-        uow: PoolReportUnitOfWork,
+        uow: UsageUnitOfWork,
         admin: AdminService,
         clock: Clock,
         platform_min: Callable[[], int],

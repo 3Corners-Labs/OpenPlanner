@@ -2856,6 +2856,18 @@ class UsageStore(Protocol):
         """Return the day counts from before reporting of ``group_ids`` in ``scope``."""
         ...
 
+    async def read_pool_report_inputs(
+        self, scope: Scope, organisation_slug: str, first_day: date, last_day: date
+    ) -> PoolInputs | None:
+        """Return the counted pools of the organisation inside ``scope`` for the range.
+
+        Each pool with its staffing, its closed days and the intervals of the appointments that
+        hold a unit (confirmed, completed, no show) over its own local days ``first_day`` to
+        ``last_day``; ``None`` for an organisation that is missing or outside ``scope``. Times
+        only (ADR 0122 step 5).
+        """
+        ...
+
     async def read_usage_events(self, after_id: int, limit: int) -> UsageBatch:
         """Return up to ``limit`` facts after ``after_id``, oldest first."""
         ...
@@ -2917,29 +2929,6 @@ class UsageUnitOfWork(Protocol):
         ...
 
     def read(self) -> AbstractAsyncContextManager[UsageStore]:
-        """Open a read transaction."""
-        ...
-
-
-class PoolReportStore(Protocol):
-    """What the utilisation of a counted pool reads (ADR 0122 step 5): times, no personal data."""
-
-    async def read_pool_report_inputs(
-        self, scope: Scope, organisation_slug: str, first_day: date, last_day: date
-    ) -> PoolInputs | None:
-        """Return the counted pools of the organisation inside ``scope`` for the range.
-
-        Each pool with its staffing, its closed days and the intervals of the appointments that
-        hold a unit (confirmed, completed, no show) over its own local days ``first_day`` to
-        ``last_day``; ``None`` for an organisation that is missing or outside ``scope``.
-        """
-        ...
-
-
-class PoolReportUnitOfWork(Protocol):
-    """Opens read transactions that carry the pool report's ``PoolReportStore``."""
-
-    def read(self) -> AbstractAsyncContextManager[PoolReportStore]:
         """Open a read transaction."""
         ...
 
