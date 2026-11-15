@@ -56,19 +56,22 @@ the chart of `docs/kubernetes.md`, with the storage and load balancer notes ther
    The root disk holds the system only.
 3. **Check the clock and the metadata path.** `timedatectl` must show the clock synchronised
    (the log sources need one clock, ASVS V16.2.2). Code in the instance can reach the cloud's
-   metadata service at `169.254.169.254`; nothing of OpenPlanner needs it, so block it in the
-   egress rules unless cloud-init still needs it.
+   metadata service at `169.254.169.254`; nothing of OpenPlanner needs it. A security group does
+   not filter that link-local address on every cloud, so block it from the containers with a rule
+   on the host (for example in the `DOCKER-USER` chain), and leave the VM itself alone while
+   cloud-init needs it.
 4. **Install** as `docs/install.md` says, as the operator account, never as root:
 
    ```sh
    git clone --branch vX.Y.Z https://github.com/3Corners-Labs/OpenPlanner.git ~/openplanner
    cd ~/openplanner
-   ./scripts/install.sh --mode test          # production for real participants
+   ./scripts/install.sh --mode test
    ```
 
    Use `--mode test` for a user test on its own public name: the same proxy and bundled login as
-   production, with candidates allowed (`docs/install.md`, *Modes*). Move to `production` with a
-   fresh installation or after the checks below pass; the modes trust different signatures.
+   production, with candidates allowed (`docs/install.md`, *Modes*). The modes trust different
+   signatures, so for real participants install `--mode production` on a fresh VM instead of
+   changing the mode of this one.
 5. **Behind a load balancer of the cloud** (Octavia or a hardware one) instead of a floating IP
    on the VM: add `--no-tls` if it ends TLS, or keep the bundled proxy and name the balancer
    with `--trusted-proxies '<its addresses>'` (ADR 0129). Without that, every visitor looks like
@@ -81,7 +84,8 @@ the chart of `docs/kubernetes.md`, with the storage and load balancer notes ther
 - `docker compose --env-file .env.update exec web python -m app.cli address-check`: the public
   name answers, the proxy is trusted, the application sees `https` (ADR 0086).
 - `docker compose --env-file .env.update exec web python -m app.cli tls-check`: a trusted
-  certificate with days left. First run with `--acme-staging` to stay clear of rate limits.
+  certificate with days left. To stay clear of Let's Encrypt's rate limits, install the first
+  time with the installer option `--acme-staging` (`docs/install.md`).
 - *System status* in the portal shows version, certificate, address and the log destination.
 - **MTU.** Overlay networks in OpenStack often carry less than 1500 bytes (1450 is common). A
   container network with a larger MTU then fails only for large packets: mail or the identity
@@ -111,7 +115,10 @@ openstack volume snapshot create --volume <volume> --force before-upgrade   # --
 
 `--force` snapshots an attached volume; the database file is consistent only because the
 application's copy was just made, so restore **that copy** (it sits in `data/backups` on the same
-volume) and not the live file. Delete the snapshot once the upgrade has proved itself: it holds
+volume) and not the live file. The same volume also holds the bundled identity provider's
+PostgreSQL and the proxy's certificate; a forced snapshot is only crash-consistent for those, so
+restoring the identity provider from it is a crash recovery (the runbook, *Bundled identity
+provider*, says what its own backup is). Delete the snapshot once the upgrade has proved itself: it holds
 personal data. A copy that leaves the cloud is the hosting party's under ADR 0102 point 8:
 encrypted, a fixed term, named access, a destruction record, a tested restore. **Test a restore
 on a second VM before go-live.**
