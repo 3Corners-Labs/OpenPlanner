@@ -7,7 +7,8 @@ the missing skills named and no *Claim* button (ADR 0121, choice S3); a row the 
 no longer qualifies for offers *Release* instead of *Open*. The list and the claimed booking
 refresh themselves through a fragment that ``static/live-region.js`` polls (ADR 0072); without
 the script the "Refresh" link reloads, and new and waiting rows are announced in a polite live
-region.
+region. Work the contact center holds (ADR 0121 step 28) stays on the list as *held by the
+contact center*, without a *Claim*, and is never next.
 
     GET  /admin/groups/{slug}/queue                         queue.work
     GET  /admin/groups/{slug}/queue/live?seen=KEY           queue.work  (fragment, 204 if same)
@@ -78,6 +79,7 @@ SHOWN_ON_THE_LIST = frozenset(
     {
         ErrorCode.QUEUE_EMPTY,
         ErrorCode.ALREADY_CLAIMED,
+        ErrorCode.HELD_BY_CONTACT_CENTER,
         ErrorCode.FREE_PICK_NOT_ALLOWED,
         ErrorCode.NOT_CLAIMED,
         ErrorCode.BOOKING_NOT_ACTIVE,
@@ -192,6 +194,8 @@ def _state(row: QueueRow, _: BoundGettext) -> tuple[str, str]:
         return _("admin.queue.state.mine"), "success"
     if row.claimed:
         return _("admin.queue.state.claimed"), ""
+    if row.held:  # ADR 0121 step 28: the contact center holds it; in words, not colour only
+        return _("admin.queue.state.held_by_contact_center"), ""
     if row.in_lobby:
         return _("admin.queue.state.in_lobby"), "warning"
     return _("admin.queue.state.upcoming"), ""
@@ -213,7 +217,11 @@ def _row(
         direct=row.direct,
         overdue=row.overdue,
         mine=row.mine,
-        can_claim=view.free_pick and not row.claimed and row.eligible and not row.awaiting_check_in,
+        can_claim=view.free_pick
+        and not row.claimed
+        and not row.held
+        and row.eligible
+        and not row.awaiting_check_in,
         can_release=row.claimed
         and ((view.can_release_any and not row.mine) or (row.mine and not row.eligible)),
         video=locale.gettext(video_key) if video_key and not row.without_video else None,
@@ -222,7 +230,7 @@ def _row(
         fallback=row.fallback,
         eligible=row.eligible,
         missing=", ".join(skill_name(skill, locale.code) for skill in row.missing),
-        can_check_in=row.awaiting_check_in and not row.claimed,
+        can_check_in=row.awaiting_check_in and not row.claimed and not row.held,
     )
 
 

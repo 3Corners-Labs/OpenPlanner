@@ -377,6 +377,9 @@ msgstr "There is no appointment left to pick up."
 msgid "error.already_claimed"
 msgstr "Already picked up by a colleague. Pick up the next one."
 
+msgid "error.held_by_contact_center"
+msgstr "The contact center holds this work. Pick up another one."
+
 msgid "error.free_pick_not_allowed"
 msgstr "In this service you always pick up the next appointment."
 
@@ -1995,6 +1998,9 @@ msgstr "Picked up by you"
 
 msgid "admin.queue.state.claimed"
 msgstr "Picked up by a colleague"
+
+msgid "admin.queue.state.held_by_contact_center"
+msgstr "Held by the contact center"
 
 msgid "admin.queue.state.in_lobby"
 msgstr "Participant waiting"

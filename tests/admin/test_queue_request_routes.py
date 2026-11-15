@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.db.models import BookingRow
 from app.domain.authorization import Scope
 from app.domain.request_watch import RequestWatch
+from app.domain.service_requests import WorkChannel, WorkItem, WorkItemState, appointment_request
 from tests.support.admin_site import AGENT, GROUP_ADMIN, SAME_ORIGIN, Site, site_uow
 from tests.support.queue import request_work
 
@@ -90,3 +91,86 @@ async def test_a_supervisor_lists_and_completes_work_in_recovery(site: Site) -> 
     assert f'action="{QUEUE}/{booking_id}/complete"' in page
     assert done.status_code == 303
     assert "Werk in herstel" not in after
+
+
+async def _hold(site: Site, booking_id: int) -> int:
+    """Hand the request of ``booking_id`` to the contact center, as a sent attempt; its id."""
+    async with site_uow(site).locked() as tx:
+        booking = await tx.get_booking(booking_id)
+        group = await tx.get_group_by_id(booking.group_id) if booking else None
+        assert booking is not None
+        assert group is not None
+        request = await tx.add_service_request(
+            appointment_request(
+                organisation_id=group.organisation_id,
+                group_id=booking.group_id,
+                flow=booking.flow,  # type: ignore[arg-type]
+                booking_id=booking_id,
+                booking_end=booking.end,
+                now=site.clock.now(),
+                unresolved_hours=24,
+            )
+        )
+        await tx.add_work_item(
+            WorkItem(
+                None,
+                request.id or 0,
+                WorkItemState.DISPATCHED,
+                None,
+                site.clock.now(),
+                None,
+                channel=WorkChannel.CONTACT_CENTER,
+            )
+        )
+    return request.id or 0
+
+
+async def _state(site: Site, booking_id: int, request_id: int) -> tuple[object, ...]:
+    """Return what a refused claim or check-in must leave alone."""
+    async with site_uow(site).read() as tx:
+        booking = await tx.get_booking(booking_id)
+        request = await tx.get_service_request(request_id)
+        items = await tx.work_items_of(request_id)
+    assert booking is not None
+    assert request is not None
+    return (
+        booking.claim,
+        request.handling,
+        request.arrived_at,
+        [(i.state, i.channel) for i in items],
+    )
+
+
+async def test_work_the_contact_center_holds_is_shown_as_held_without_a_claim(
+    site: Site,
+) -> None:
+    """ADR 0121 step 28: the chip says who holds it, in words; no *Claim* for anyone."""
+    booking_id = await request_work(site)
+    await _hold(site, booking_id)
+    await site.login_as(AGENT)
+
+    page = (await site.client.get(QUEUE)).text
+    english = (await site.client.get(f"{QUEUE}?lang=en")).text
+
+    assert "Bij het contactcenter" in page
+    assert "Held by the contact center" in english
+    assert f"{QUEUE}/{booking_id}/claim" not in page
+    assert f"{QUEUE}/next" not in page
+
+
+async def test_a_direct_claim_or_check_in_of_held_work_is_refused_and_changes_nothing(
+    site: Site,
+) -> None:
+    """The server decides, not the template: a hand-made POST is refused with the reason."""
+    booking_id = await request_work(site)
+    request_id = await _hold(site, booking_id)
+    before = await _state(site, booking_id, request_id)
+    await site.login_as(AGENT)
+
+    claimed = await site.client.post(f"{QUEUE}/{booking_id}/claim", headers=SAME_ORIGIN)
+    checked = await site.client.post(f"{QUEUE}/{booking_id}/check-in", headers=SAME_ORIGIN)
+
+    for refused in (claimed, checked):
+        assert refused.status_code == 409
+        assert "Dit werk ligt bij het contactcenter" in refused.text
+    assert await _state(site, booking_id, request_id) == before

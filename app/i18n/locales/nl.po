@@ -377,6 +377,9 @@ msgstr "Er is geen afspraak meer om op te pakken."
 msgid "error.already_claimed"
 msgstr "Al opgepakt door een collega. Pak de volgende op."
 
+msgid "error.held_by_contact_center"
+msgstr "Dit werk ligt bij het contactcenter. Pak een ander op."
+
 msgid "error.free_pick_not_allowed"
 msgstr "In deze dienst pakt u altijd de volgende afspraak op."
 
@@ -1995,6 +1998,9 @@ msgstr "Door u opgepakt"
 
 msgid "admin.queue.state.claimed"
 msgstr "Opgepakt door een collega"
+
+msgid "admin.queue.state.held_by_contact_center"
+msgstr "Bij het contactcenter"
 
 msgid "admin.queue.state.in_lobby"
 msgstr "Deelnemer wacht"
