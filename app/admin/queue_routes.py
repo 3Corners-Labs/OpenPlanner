@@ -79,6 +79,7 @@ SHOWN_ON_THE_LIST = frozenset(
     {
         ErrorCode.QUEUE_EMPTY,
         ErrorCode.ALREADY_CLAIMED,
+        ErrorCode.HELD_BY_CONTACT_CENTER,
         ErrorCode.FREE_PICK_NOT_ALLOWED,
         ErrorCode.NOT_CLAIMED,
         ErrorCode.BOOKING_NOT_ACTIVE,

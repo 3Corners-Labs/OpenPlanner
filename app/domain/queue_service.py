@@ -340,7 +340,8 @@ class QueueService:
 
         Raises:
             DomainError: ``free_pick_not_allowed``, ``booking_not_found``,
-                ``already_claimed``, ``booking_not_active``, ``not_eligible`` (a skill the
+                ``already_claimed``, ``held_by_contact_center`` (ADR 0121 step 28),
+                ``booking_not_active``, ``not_eligible`` (a skill the
                 booking requires is missing, judged inside the lock), or as ``view``.
         """
         summary = await self._group(principal, slug)
@@ -355,6 +356,8 @@ class QueueService:
                 raise DomainError(ErrorCode.BOOKING_NOT_FOUND)
             if booking.claim is not None:
                 raise DomainError(ErrorCode.ALREADY_CLAIMED)
+            if await _held(tx, booking):
+                raise DomainError(ErrorCode.HELD_BY_CONTACT_CENTER)
             await WorkEligibility(tx, principal, summary.organisation_slug).check(booking)
             return await self._claim(tx, principal, summary, booking, self._clock.now())
 
@@ -414,13 +417,16 @@ class QueueService:
 
         Raises:
             DomainError: ``booking_not_found``, ``booking_not_active`` (not request work, or
-                not confirmed), ``outside_booking_window``, or as ``view``.
+                not confirmed), ``held_by_contact_center`` (ADR 0121 step 28),
+                ``outside_booking_window``, or as ``view``.
         """
         summary = await self._group(principal, slug)
         async with self._uow.locked() as tx:
             booking = await _booking_of(tx, slug, booking_id)
             if self._work is None:
                 raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
+            if await _held(tx, booking):
+                raise DomainError(ErrorCode.HELD_BY_CONTACT_CENTER)
             before = await tx.get_request_of_booking(booking_id)
             arrived = await self._work.check_in(tx, summary.group, booking, self._clock.now())
             if before is None or before.arrived_at != arrived.arrived_at:

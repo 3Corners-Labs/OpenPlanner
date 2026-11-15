@@ -124,7 +124,7 @@ async def test_the_own_queue_and_the_contact_center_never_hold_one_request(
     assert await dispatch(the_desk, second) is None
     with pytest.raises(DomainError) as excinfo:
         await the_desk.queue.claim(AGENT, "demo", second)
-    assert excinfo.value.code is ErrorCode.ALREADY_CLAIMED
+    assert excinfo.value.code is ErrorCode.HELD_BY_CONTACT_CENTER
     assert len(the_desk.dispatcher.items) == 1
     for booking_id in (first, second):
         assert len([i for i in items_of(uow, booking_id) if i.active]) == 1
@@ -167,7 +167,7 @@ async def test_an_unknown_outcome_is_never_retried_and_blocks_the_own_queue(
     at(clock)
     with pytest.raises(DomainError) as excinfo:
         await the_desk.queue.claim(AGENT, "demo", booking_id)
-    assert excinfo.value.code is ErrorCode.ALREADY_CLAIMED
+    assert excinfo.value.code is ErrorCode.HELD_BY_CONTACT_CENTER
 
 
 async def test_a_late_task_of_an_attempt_in_doubt_is_adopted(

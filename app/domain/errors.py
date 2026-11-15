@@ -90,6 +90,8 @@ class ErrorCode(StrEnum):
     STAFF_VIEW_OFF = "staff_view_off"
     QUEUE_EMPTY = "queue_empty"
     ALREADY_CLAIMED = "already_claimed"
+    HELD_BY_CONTACT_CENTER = "held_by_contact_center"
+    """ADR 0121 step 28: the contact center holds the request (an active attempt): not ours."""
     FREE_PICK_NOT_ALLOWED = "free_pick_not_allowed"
     NOT_CLAIMED = "not_claimed"
     NOT_ELIGIBLE = "not_eligible"
