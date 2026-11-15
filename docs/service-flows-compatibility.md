@@ -175,7 +175,7 @@ gated paths.
   records. v0.6.0 is the first release with a fixture; `scripts/upgrade-matrix.sh
   rollback-release` started its public image on its fixture plus the gated records without a
   downgrade, booked on `/g/demo` and compared the database (2026-11-15). The claim half (checklist
-  G43, #893) runs the image's own `claim_booking` on the expanded database: once, refused twice,
+  G43, #896) runs the image's own `claim_booking` on the expanded database: once, refused twice,
   refused on work the current code holds, and read back; the route and a booking with an open
   contact-center attempt are G44. The tests above prove the same at the schema level with
   the current code. The image that may open the gate is the first minor after 0.6.0 (ADR 0122,
