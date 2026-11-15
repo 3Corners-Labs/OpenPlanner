@@ -37,6 +37,53 @@
   </form>
   {% endif %}
 </section>
+<section class="card" aria-labelledby="channel-heading">
+  <div class="card__header">
+    <h2 id="channel-heading">{{ _("admin.updates.channel_card.heading") }}</h2>
+    <p class="card__lead">{{ _("admin.updates.channel_card.lead") }}</p>
+  </div>
+  {% if channel_card.editable %}
+  <form method="post" action="/admin/updates/channel">
+    <div class="field">
+      {% if channel_card.channel.locked %}
+      <span class="field__label">{{ _("admin.updates.channel") }}</span>
+      <p>{{ _("admin.updates.channel." ~ channel_card.channel.value) }}</p>
+      <p class="hint">{{ _("admin.settings.locked") }}: <code>{{ channel_card.channel.variable }}</code></p>
+      {% else %}
+      <label for="value-update_channel">{{ _("admin.updates.channel") }}</label>
+      <select id="value-update_channel" name="update_channel" aria-describedby="hint-update_channel">
+        {% for choice in ("release", "rc") %}<option value="{{ choice }}"{% if choice == channel_card.channel.value %} selected{% endif %}>{{ _("admin.updates.channel." ~ choice) }}</option>{% endfor %}
+      </select>
+      <p class="hint" id="hint-update_channel">{{ _("admin.updates.channel_card.channel_hint") }}</p>
+      {% endif %}
+    </div>
+    <div class="field">
+      {% if channel_card.auto_apply.locked %}
+      <span class="field__label">{{ _("admin.updates.channel_card.auto_apply") }}</span>
+      <p>{% if channel_card.auto_apply.value == "true" %}{{ _("admin.settings.value.on") }}{% else %}{{ _("admin.settings.value.off") }}{% endif %}</p>
+      <p class="hint">{{ _("admin.settings.locked") }}: <code>{{ channel_card.auto_apply.variable }}</code></p>
+      {% else %}
+      <label for="value-update_auto_apply">{{ _("admin.updates.channel_card.auto_apply") }}</label>
+      <select id="value-update_auto_apply" name="update_auto_apply" aria-describedby="hint-update_auto_apply">
+        <option value="true"{% if channel_card.auto_apply.value == "true" %} selected{% endif %}>{{ _("admin.settings.value.on") }}</option>
+        <option value="false"{% if channel_card.auto_apply.value != "true" %} selected{% endif %}>{{ _("admin.settings.value.off") }}</option>
+      </select>
+      <p class="hint" id="hint-update_auto_apply">{{ _("admin.updates.channel_card.auto_apply_hint") }}</p>
+      {% endif %}
+    </div>
+    {% if not (channel_card.channel.locked and channel_card.auto_apply.locked) %}
+    <div class="form-actions">
+      <button type="submit" class="button">{{ _("admin.updates.channel_card.save") }}</button>
+    </div>
+    {% endif %}
+  </form>
+  {% else %}
+  <p>{{ _("admin.updates.channel_card.read_only") }}</p>
+  {% endif %}
+  {% if channel_card.settings_link %}
+  <p><a href="{{ channel_card.settings_link }}">{{ _("admin.updates.channel_card.settings_link") }}</a></p>
+  {% endif %}
+</section>
 {% if progress %}
 <section class="card" aria-labelledby="open-heading">
   <div class="card__header">
