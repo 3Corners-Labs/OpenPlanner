@@ -109,6 +109,15 @@ async def test_the_range_starts_no_earlier_than_the_rows_are_kept(
     assert store.asked[0][2] == report.first_day
 
 
+async def test_a_range_entirely_older_than_the_rows_reads_nothing(
+    service: PoolUsageService, store: PoolStore
+) -> None:
+    old = NOW.date() - timedelta(days=RETENTION + 30)
+
+    assert await service.report(ORG_ADMIN, "demo", old - timedelta(days=5), old) is None
+    assert store.asked == []
+
+
 async def test_a_backwards_or_too_wide_range_is_refused(service: PoolUsageService) -> None:
     today = NOW.date()
 

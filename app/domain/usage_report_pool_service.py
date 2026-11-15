@@ -57,7 +57,9 @@ class PoolUsageService:
     async def report(
         self, principal: Principal, organisation_slug: str, first_day: date, last_day: date
     ) -> PoolReport | None:
-        """Return the pools' utilisation over the days, or ``None`` when it has no counted pool.
+        """Return the pools' utilisation over the days, or ``None`` when there is nothing to show.
+
+        That is: no counted pool, or a range that ends before the appointment rows are kept.
 
         ``first_day`` moves forward to the oldest day the appointment rows are kept for.
 
@@ -75,7 +77,9 @@ class PoolUsageService:
             raise DomainError(ErrorCode.INVALID_RANGE)
         now = self._clock.now()
         kept = now.date() - timedelta(days=self._retention_days())
-        first = max(first_day, min(kept, last_day))
+        if last_day < kept:  # every day asked for is older than the rows: nothing to read
+            return None
+        first = max(first_day, kept)
         async with self._uow.read() as tx:
             found = await tx.read_pool_report_inputs(scope, organisation_slug, first, last_day)
         if found is None or not found.pools:

@@ -32,7 +32,7 @@ Pure Python, no I/O: ``usage_report_pool_service`` loads the inputs.
 from collections import Counter
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta, tzinfo
+from datetime import UTC, date, datetime, time, timedelta, tzinfo
 
 from app.domain.pool_staffing import Intake, PoolStaffing, supply_between
 from app.domain.slot_close import CLOSE_DELAY
@@ -109,11 +109,13 @@ class PoolInputs:
 def range_bounds(zone: tzinfo, first_day: date, last_day: date) -> tuple[datetime, datetime]:
     """Return the UTC instants where ``first_day`` begins and the day after ``last_day`` begins.
 
-    Days are the pool's own local days, so the store and the report cut the range alike.
+    Days are the pool's own local days, so the store and the report cut the range alike. Both
+    instants are UTC: two aware times of one zone subtract as wall-clock time, which is wrong
+    across a clock change.
     """
     return (
-        datetime.combine(first_day, time.min, zone),
-        datetime.combine(last_day + timedelta(days=1), time.min, zone),
+        datetime.combine(first_day, time.min, zone).astimezone(UTC),
+        datetime.combine(last_day + timedelta(days=1), time.min, zone).astimezone(UTC),
     )
 
 

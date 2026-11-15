@@ -172,3 +172,18 @@ def test_the_report_carries_times_only() -> None:
 
     assert result.counted_until == NOW - CLOSE_DELAY
     assert result.threshold == THRESHOLD
+
+
+def test_a_day_with_a_clock_change_is_cut_at_local_midnight_and_staffed_in_full() -> None:
+    from app.domain.usage_report_pools import range_bounds
+
+    spring = date(2026, 3, 29)  # Europe/Amsterdam: the clocks go forward at 02:00
+    lower, upper = range_bounds(AMSTERDAM, spring, spring)
+    sunday = ScheduleRule(6, TimeWindow(time(9), time(12), 2, None, Offer.BOTH))
+
+    result = pool_report(
+        [pool(rules=(sunday,))], spring, spring, now=NOW + timedelta(days=90), threshold=THRESHOLD
+    )
+
+    assert upper - lower == timedelta(hours=23)
+    assert result.pools[0].staffed_minutes == 2 * 180
