@@ -2,7 +2,7 @@
 
 > Kubernetes instead of a host? That is `docs/kubernetes.md` (trial, one replica, ADR 0114).
 > A virtual machine on OpenStack? That is this page plus `docs/openstack.md` (volume, network and
-> security group of the cloud).
+> security group of the cloud). On STACKIT: `docs/stackit.md`.
 
 One script installs, repairs and re-checks a host: `scripts/install.sh`. Run it after a fresh
 clone, after a manual change, or whenever something looks wrong; a second run changes nothing
