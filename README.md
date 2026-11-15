@@ -58,18 +58,24 @@ its own groups, branding, texts and administrators.
   maintenance mode shows a notice instead of the booking page.
 - A website can embed a group's calendar as a Web Component, styled through CSS tokens, on
   the origins its organisation allows (`docs/widget.md`, ADR 0035).
-- A machine API lets a contact-center bot (such as the Webex AI Agent) offer free times
+- A machine API lets a contact-center bot (such as the Webex AI Agent) offer free times and
+  pass on a participant's change request by phone number and appointment code
   (`docs/agent-api.md`).
+- Reports on use without personal data (volume, queue and calls, capacity, channels, team),
+  with CSV export, an API, an email digest and a live wallboard.
+- Subjects and routing attributes per group, contact-center health checks with alerts to
+  email and Webex spaces, and a rebooking assistant that proposes new times.
 
-On the roadmap: other contact-center platforms on the same adapter layer (ADR 0032),
-contact-center health checks with alerts to a Webex space and a fallback per group (ADR 0082),
-subjects and routing attributes per group (ADR 0081), the rebooking assistant (ADR 0057),
-changes through the bot API (ADR 0023) and staff provisioning through SCIM (ADR 0046). What is
-built of every decision is in `docs/adr-status.md`.
+On the roadmap: services, named flows, skills and shared capacity pools (ADR 0121, ADR 0122;
+built and shipped dark behind a rollback gate until the checks of
+`docs/service-flows-gate-checklist.md` are done), the participant's call in our own page
+(ADR 0123, switched off by default), other contact-center platforms on the same adapter layer
+(ADR 0032) and staff provisioning through SCIM (ADR 0046). What is built of every decision is
+in `docs/adr-status.md`.
 
 ## Status
 
-This README describes version 0.4.0. What is built of each decision is in `docs/adr-status.md`;
+This README describes version 0.6.0. What is built of each decision is in `docs/adr-status.md`;
 the release notes are in `CHANGELOG.md` and on the GitHub releases page.
 
 ## Quick start (demo)

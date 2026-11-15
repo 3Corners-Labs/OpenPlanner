@@ -1,8 +1,8 @@
-# Login: an organisation's identity providers
+# Authentication: an organisation's identity providers
 
 This screen shows which identity providers (login services) the staff of an organisation log
 in with, and lets the superuser register one. Open it through **Organisations → organisation
-→ Overview → Login**. Organisation admins and auditors see the status of their own
+→ Overview → Authentication**. Organisation admins and auditors see the status of their own
 organisation; registering, changing, switching on or off and removing is the superuser's and
 needs a recent login.
 
@@ -11,6 +11,22 @@ provider grants rights inside its own organisation only: a value naming another 
 or the superuser is refused (ADR 0083). An organisation may have at most two, so a move from
 one to the next leaves no gap; the superuser can change that maximum under **Advanced
 settings**.
+
+## Steps, warnings and trying an address
+
+The top of the page shows the **steps**: the five steps from the host switch to a verified
+domain, each with where it stands (*Done*, *To do* or *Waiting for an earlier step*). A
+**warning** appears above them as soon as a set-up will never route, for example a provider
+that is on without a verified domain, or a verified domain on a provider that is off.
+
+Under **Try an address** you enter an email address or user name. The page says which provider
+the login page would choose and why, with the same rules as the real login page. The address is
+not stored or logged and is never put in a URL; the answer names the domain only. If the domain
+belongs to a provider of another organisation, no name is shown.
+
+The platform account always keeps working: an address on another domain, a user name under the
+bundled provider's suffix, and the choice **Log in with a platform account** all go to the
+platform provider.
 
 ## Registering a provider
 

@@ -442,3 +442,33 @@ def test_a_view_holds_codes_counts_and_times_only() -> None:
     assert view is not None
     assert view.outcomes == {"accepted": 1, "source_unknown": 1}
     assert view.faults == {ChainFault.NO_ADDRESS: 1}
+
+
+def test_a_delivery_under_the_previous_secret_is_a_count_of_its_own() -> None:
+    """ADR 0124 point 8: accepted like any other; the count is for the card only, not an outcome."""
+    ledger, clock = _ledger(threshold=1)
+
+    assert ledger.delivered(ACME, Delivered.ACCEPTED) is None
+    ledger.verified_by_previous(ACME)
+    ledger.verified_by_previous(ACME)
+
+    view = ledger.view(ACME)
+    assert view is not None
+    assert view.outcomes == {"accepted": 1}  # the rows of outcomes still add up to the calls
+    assert view.by_previous == 2
+    assert view.last_accepted == clock.now()
+    assert view.counted == 0  # it never counts towards an alert
+
+
+def test_a_count_under_the_previous_secret_alone_is_no_delivery_and_ends_with_the_window() -> None:
+    ledger, clock = _ledger()
+
+    ledger.verified_by_previous(ACME)
+    first = ledger.view(ACME)
+    clock.advance(WINDOW)
+    after = ledger.view(ACME)
+
+    assert first is not None
+    assert (first.last_accepted, first.by_previous, first.outcomes) == (None, 1, {})
+    assert after is not None
+    assert after.by_previous == 0

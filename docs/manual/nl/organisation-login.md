@@ -1,8 +1,8 @@
-# Inloggen: identity providers van een organisatie
+# Authenticatie: identity providers van een organisatie
 
 Op dit scherm ziet u met welke identity providers (inlogdiensten) de medewerkers van een
 organisatie inloggen, en registreert de superuser er een. U opent het via **Organisaties →
-organisatie → Overzicht → Inloggen**. Organisatiebeheerders en auditors zien de status van
+organisatie → Overzicht → Authenticatie**. Organisatiebeheerders en auditors zien de status van
 hun eigen organisatie; registreren, wijzigen, aan- en uitzetten en verwijderen is aan de
 superuser en vraagt een recente login.
 
@@ -11,6 +11,23 @@ alleen rechten binnen de eigen organisatie: een waarde die een andere organisati
 superuser noemt, wordt geweigerd (ADR 0083). Een organisatie kan er maximaal twee hebben,
 zodat een overstap van de ene naar de andere zonder gat kan; de superuser kan dat maximum
 bij **Geavanceerde instellingen** aanpassen.
+
+## Stappenplan, waarschuwingen en een adres proberen
+
+Bovenaan de pagina staat het **stappenplan**: de vijf stappen van de hostschakelaar tot een
+geverifieerd domein, elk met zijn stand (*Klaar*, *Te doen* of *Wacht op een eerdere stap*).
+Een **waarschuwing** staat erboven zodra een opzet nooit zal routeren, bijvoorbeeld een
+provider die aan staat zonder geverifieerd domein, of een geverifieerd domein bij een provider
+die uit staat.
+
+Onder **Probeer een adres** vult u een e-mailadres of inlognaam in. De pagina zegt welke
+provider het inlogscherm zou kiezen en waarom, met dezelfde regels als het echte inlogscherm.
+Het adres wordt niet bewaard of gelogd en niet in een URL gezet; het antwoord noemt alleen het
+domein. Hoort het domein bij een provider van een andere organisatie, dan staat er geen naam.
+
+Het platformaccount blijft altijd bruikbaar: een adres op een ander domein, een inlognaam onder
+het achtervoegsel van de ingebouwde provider, en de keuze **Inloggen met een platformaccount**
+gaan naar de platformprovider.
 
 ## Een provider registreren
 

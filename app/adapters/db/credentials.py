@@ -6,7 +6,7 @@ lock (``BEGIN IMMEDIATE``) like every other writer.
 """
 
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import datetime
 from typing import Any, Protocol
 
@@ -35,6 +35,21 @@ class Secrets(Protocol):
 
     async def delete(self, name: str) -> None:
         """Remove the credential ``name``."""
+        ...
+
+    async def update(
+        self,
+        name: str,
+        change: Callable[[dict[str, object] | None], dict[str, object] | None],
+        now: datetime,
+    ) -> bool:
+        """Read ``name``, apply ``change`` to it and store the result, in one locked transaction.
+
+        ``change`` gets the stored value (``None`` when there is none) and returns the value to
+        store, or ``None`` to store nothing. Nothing can be written between the read and the
+        write, so two changes of different fields of one record never overwrite each other.
+        Returns whether something was stored.
+        """
         ...
 
 
@@ -81,6 +96,29 @@ class CredentialStore:
             await session.execute(
                 delete(IntegrationCredentialRow).where(IntegrationCredentialRow.name == name)
             )
+
+    async def update(
+        self,
+        name: str,
+        change: Callable[[dict[str, Any] | None], dict[str, Any] | None],
+        now: datetime,
+    ) -> bool:
+        """Read ``name``, apply ``change`` and store the result in one ``BEGIN IMMEDIATE``."""
+        async with locked_session(self._engine) as session:
+            row = await session.get(IntegrationCredentialRow, name)
+            current: dict[str, Any] | None = (
+                json.loads(self._box.open(name, row.nonce, row.ciphertext)) if row else None
+            )
+            value = change(current)
+            if value is None:
+                return False
+            nonce, ciphertext = self._box.seal(name, json.dumps(value).encode())
+            await session.merge(
+                IntegrationCredentialRow(
+                    name=name, nonce=nonce, ciphertext=ciphertext, updated_at=now
+                )
+            )
+            return True
 
     async def put(self, name: str, value: dict[str, Any], now: datetime) -> None:
         """Create or replace the credential ``name``."""

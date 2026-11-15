@@ -25,6 +25,7 @@ FAKE_CADDY = """#!/bin/sh
 echo "$1:${TLS_DIRECTIVE-unset}" >> "$CADDY_LOG"
 echo "$1:${IDP_DIRECTIVE-unset}" >> "$CADDY_LOG.idp"
 echo "$1:${WEB_UPSTREAM-unset}" >> "$CADDY_LOG.web"
+echo "$1:${TRUSTED_PROXIES_DIRECTIVE-unset}" >> "$CADDY_LOG.trusted"
 if [ "$1" = run ]; then sleep "${CADDY_RUN_SECONDS:-0}"; fi
 """
 
@@ -36,7 +37,7 @@ def bin_dir(tmp_path: Path) -> Path:
     directory.mkdir()
     (directory / "caddy").write_text(FAKE_CADDY)
     (directory / "caddy").chmod(0o755)
-    for tool in ("sh", "head", "sleep", "echo", "cp", "mv", "chmod"):
+    for tool in ("sh", "head", "sleep", "echo", "cp", "mv", "chmod", "tr", "sed"):
         real = shutil.which(tool)
         if real and not (directory / tool).exists():
             os.symlink(real, directory / tool)
@@ -53,6 +54,7 @@ class Outcome:
     logged: list[str]
     idp: list[str]
     web: list[str]
+    trusted: list[str]
 
 
 def run(bin_dir: Path, tmp_path: Path, run_seconds: int = 0, **env: str) -> Outcome:
@@ -82,11 +84,13 @@ def run(bin_dir: Path, tmp_path: Path, run_seconds: int = 0, **env: str) -> Outc
     time.sleep(1.5)  # let the watcher notice that caddy is gone and write its last line
     lines = log.read_text().splitlines() if log.exists() else []
     idp_log, web_log = Path(f"{log}.idp"), Path(f"{log}.web")
+    trusted_log = Path(f"{log}.trusted")
     idp = idp_log.read_text().splitlines() if idp_log.exists() else []
     web = web_log.read_text().splitlines() if web_log.exists() else []
-    for used in (idp_log, web_log):
+    trusted = trusted_log.read_text().splitlines() if trusted_log.exists() else []
+    for used in (idp_log, web_log, trusted_log):
         used.unlink(missing_ok=True)  # the next run in the same test starts its own
-    return Outcome(returncode, out.read_text(), err.read_text(), lines, idp, web)
+    return Outcome(returncode, out.read_text(), err.read_text(), lines, idp, web, trusted)
 
 
 def write_pair(portal: Path, serial: str) -> None:
@@ -324,3 +328,57 @@ def test_an_upstream_with_an_odd_character_is_refused(
     assert outcome.returncode == 1
     assert f"{name} must be host:port" in outcome.stderr
     assert outcome.logged == []
+
+
+def test_no_upstream_is_trusted_by_default(bin_dir: Path, tmp_path: Path) -> None:
+    """ADR 0129: without PROXY_TRUSTED_NETWORKS the peer is the visitor, as before."""
+    outcome = run(bin_dir, tmp_path, **COMPOSE)
+
+    assert outcome.trusted == ["run:"]
+    assert "X-Forwarded-For of" not in outcome.stdout
+
+
+def test_trusted_networks_are_read_right_to_left_and_announced(
+    bin_dir: Path, tmp_path: Path
+) -> None:
+    networks = "10.20.0.0/16, 192.0.2.10\n2001:db8::/48"
+
+    outcome = run(bin_dir, tmp_path, **COMPOSE, PROXY_TRUSTED_NETWORKS=networks)
+
+    directive = "\n".join(outcome.trusted)  # a multi-line directive: one log line per line of it
+    assert directive.startswith("run:trusted_proxies static 10.20.0.0/16 192.0.2.10 2001:db8::/48")
+    assert "trusted_proxies_strict" in directive
+    assert "10.20.0.0/16 192.0.2.10 2001:db8::/48 (right to left" in outcome.stdout
+
+
+@pytest.mark.parametrize("everything", ["0.0.0.0/0", "::/0", "10.0.0.0/00"])
+def test_a_range_that_trusts_every_address_is_refused(
+    bin_dir: Path, tmp_path: Path, everything: str
+) -> None:
+    outcome = run(bin_dir, tmp_path, **COMPOSE, PROXY_TRUSTED_NETWORKS=f"192.0.2.10 {everything}")
+
+    assert outcome.returncode == 1
+    assert "trusts every address" in outcome.stderr
+    assert outcome.logged == []
+
+
+@pytest.mark.parametrize(
+    "odd", ["10.0.0.0/8; respond 200", "edge.example.nl", "10.0.0.0/8/9", "/8", "10.0.0.0/"]
+)
+def test_anything_but_addresses_and_ranges_is_refused(
+    bin_dir: Path, tmp_path: Path, odd: str
+) -> None:
+    outcome = run(bin_dir, tmp_path, **COMPOSE, PROXY_TRUSTED_NETWORKS=odd)
+
+    assert outcome.returncode == 1
+    assert "is not an IP address or CIDR range" in outcome.stderr
+    assert outcome.logged == []
+
+
+def test_more_than_32_trusted_entries_are_refused(bin_dir: Path, tmp_path: Path) -> None:
+    networks = " ".join(f"192.0.2.{n}" for n in range(1, 34))
+
+    outcome = run(bin_dir, tmp_path, **COMPOSE, PROXY_TRUSTED_NETWORKS=networks)
+
+    assert outcome.returncode == 1
+    assert "at most 32 entries, 33 given" in outcome.stderr

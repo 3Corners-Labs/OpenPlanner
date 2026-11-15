@@ -160,6 +160,9 @@ flowchart TB
   on its own, or serves an own certificate from `./certs`; port 80 only redirects. It runs as
   uid 10001 on a read-only filesystem, keeps certificates in the `proxy-data` volume and has a
   fixed address on the `edge` network, the only address `web` accepts `X-Forwarded-For` from.
+  It hands web one address, the visitor's: the peer, or behind an edge named in
+  `PROXY_TRUSTED_NETWORKS` the first untrusted address of its `X-Forwarded-For`, read right to
+  left (ADR 0129, the proxy as the security shell).
   `edge` is dual-stack, so Docker forwards visitors over IPv6 to the proxy with NAT and their
   own address reaches the rate limits; web listens on IPv4 only, so the proxy reaches it from
   that one trusted address.
