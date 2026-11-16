@@ -6,16 +6,16 @@ import pytest
 
 from app.config import Settings
 from app.domain.staff_directory import DirectoryUser
-from tests.admin.conftest import (
+from tests.fakes.staff_directory import FakeStaffDirectory
+from tests.support.admin_site import (
     AUDITOR,
     GROUP_ADMIN,
     ORG_ADMIN,
     SAME_ORIGIN,
     SUPER,
     Site,
-    _running_site,
+    running_site,
 )
-from tests.fakes.staff_directory import FakeStaffDirectory
 
 P = "openplanner"
 INVITE = {
@@ -42,7 +42,7 @@ async def managed(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
             ),
         ]
     )
-    async with _running_site(settings, admin_db, directory=directory) as running:
+    async with running_site(settings, admin_db, directory=directory) as running:
         yield running
 
 
@@ -228,14 +228,14 @@ async def test_a_cross_site_post_is_refused(managed: Site) -> None:
     assert managed.directory.users["kc-mine"].enabled
 
 
-BUNDLED_ADMIN_URL = "http://idp:8080/admin/realms/openplanner"
+BUNDLED_ADMIN_URL = "http://172.31.240.4:8080/admin/realms/openplanner"
 
 
 @pytest.fixture
 async def half_connected(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
     """The bundled provider with its admin URL but without the directory secret (ADR 0106)."""
     half = settings.model_copy(update={"keycloak_admin_url": BUNDLED_ADMIN_URL})
-    async with _running_site(half, admin_db) as running:
+    async with running_site(half, admin_db) as running:
         yield running
 
 

@@ -32,7 +32,7 @@ from app.domain.contact_center import (
 )
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.interaction import InteractionKind
-from app.domain.scheduling import Group, JoinClient
+from app.domain.scheduling import Group
 
 BROWSER_LINK_PARAMS: tuple[tuple[str, str], ...] = (("launchApp", "true"),)
 """What Webex's own *join from this browser* button adds to the meeting link (ADR 0075).
@@ -90,18 +90,31 @@ class EventKind(StrEnum):
     INTEGRATION_ERROR = "integration_error"
 
 
-def join_link(link: str | None, client: JoinClient) -> str | None:
+class RedirectClient(StrEnum):
+    """How a redirect to the video platform is shaped (ADR 0075).
+
+    Only two shapes exist: ``embedded`` is not one of them, because our own page is never a
+    redirect. ``app.domain.call_client.redirect_client`` turns a service's client into one.
+    """
+
+    BROWSER = "browser"
+    """The platform's web app straight away (``BROWSER_LINK_PARAMS``)."""
+    CHOICE = "choice"
+    """The platform's own choice page: the link as it is."""
+
+
+def join_link(link: str | None, client: RedirectClient) -> str | None:
     """Return the link to send the participant to for ``client``, or ``None`` when there is none.
 
     The stored link comes from Webex and is personal data, so it is never altered in storage;
     this builds the redirect target. A link that is not ``https`` is refused, so a poisoned
-    value can never become a redirect. ``JoinClient.BROWSER`` sets the parameters of
+    value can never become a redirect. ``RedirectClient.BROWSER`` sets the parameters of
     ``BROWSER_LINK_PARAMS`` (replacing a value that says the opposite) and keeps every other
     part of the link; applying it twice gives the same link.
     """
     if not link or not link.startswith("https://"):
         return None
-    if client is JoinClient.CHOICE:
+    if client is RedirectClient.CHOICE:
         return link
     parts = urlsplit(link)
     names = {name for name, _ in BROWSER_LINK_PARAMS}
@@ -371,6 +384,14 @@ class MeetingRequest:
     host_email: str
     join_before_host: bool = False
     """A trial call (ADR 0071): the participant can enter alone, without the lobby."""
+    chat_enabled: bool = True
+    """Whether the platform's own chat is on in the meeting. Off for a service that uses the call
+    page (ADR 0123 point 8 and step 6b): the chat beside that page is our own, so staff must not
+    write into a panel the participant cannot see. Every other meeting keeps the chat as ADR 0017
+    has it."""
+    closed_captions: bool = False
+    """Ask the site to switch closed captions on (ADR 0123 point 17): only the group check's
+    captions probe sets it, to read back whether the site keeps it. No booking asks for it."""
 
 
 PROBE_KIND = "probe"
@@ -483,8 +504,12 @@ CONVERSATION_OPEN = "conversation_open"
 appointment's participant identifier and refused a second one (ADR 0123 point 8)."""
 
 
-def meeting_request(booking: Booking, group: Group) -> MeetingRequest:
+def meeting_request(booking: Booking, group: Group, *, call_page: bool = False) -> MeetingRequest:
     """Return the meeting to schedule for ``booking`` in ``group``.
+
+    ``call_page`` says that the booking's participant joins in the call page of our own
+    (``app.domain.call_client.uses_call_page``, asked by the caller): the meeting is then created
+    without the platform's own chat (ADR 0123 step 6b). Every other meeting is as before.
 
     Raises:
         DomainError: ``integration_not_ready`` (``video_host_email``) without a host.
@@ -497,6 +522,7 @@ def meeting_request(booking: Booking, group: Group) -> MeetingRequest:
         end=booking.end,
         timezone=group.timezone,
         host_email=group.video_host_email,
+        chat_enabled=not call_page,
     )
 
 
@@ -507,7 +533,7 @@ def contact_center_task(
     start_label: str,
     skills: tuple[str, ...] = (),
     interaction: InteractionKind = InteractionKind.VIDEO,
-    conversation_enabled: bool,
+    uses_call_page: bool,
 ) -> ContactCenterTask:
     """Return the contact-center task to dispatch for ``booking``.
 
@@ -521,12 +547,12 @@ def contact_center_task(
             ``meeting`` or ``contact``) or what the group's platform cannot carry
             (``interaction_kind``, ``skill_codes`` or ``task_kind``, ADR 0121 step 6, ADR 0123
             step 7a). The task is of the routing's kind in force (``task_kind_in_force``: a
-            conversation only while ``conversation_enabled``, the platform switch the caller
-            passes in); a conversation still lacks its ``first_message``, which the caller
-            composes.
+            conversation only while ``uses_call_page``: the one question "does this booking's
+            service use the call page", ADR 0123 step 6b); a conversation still lacks its
+            ``first_message``, which the caller composes.
     """
     routing = _complete_routing(group)
-    task_kind = task_kind_in_force(routing.task_kind, conversation_enabled)
+    task_kind = task_kind_in_force(routing.task_kind, uses_call_page)
     gap = uncarried(routing.descriptor.capabilities, interaction, bool(skills), task_kind)
     if gap is not None:
         raise DomainError(ErrorCode.INTEGRATION_NOT_READY, gap)

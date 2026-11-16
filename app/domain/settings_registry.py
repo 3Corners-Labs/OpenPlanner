@@ -1546,6 +1546,19 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=1000,
     ),
     S(
+        "webhook_secret_overlap_minutes",
+        K.INT,
+        60,
+        _C,
+        T.RATE_LIMITS,
+        "How long the previous webhook secret keeps verifying after a rotation, for an "
+        "organisation's secret and for the installation's own; 0 means at once. A secret that "
+        "was rotated away because it leaked still verifies for this long, so set it to 0 first "
+        "(ADR 0124 point 8).",
+        minimum=0,
+        maximum=1440,
+    ),
+    S(
         "rate_limit_agent_tokens",
         K.RATE,
         "10/minute",
@@ -1878,6 +1891,30 @@ REGISTRY: tuple[SettingSpec, ...] = (
         _C,
         T.WEBEX,
         "Webex webhook secret; to be generated and rotated by the server.",
+        optional=True,
+    ),
+    S(
+        "webex_webhook_secret_previous",
+        K.SECRET,
+        None,
+        _C,
+        T.WEBEX,
+        "The video platform's webhook secret before a rotation; set only during one, then removed. "
+        "It verifies for `webhook_secret_overlap_minutes` from the moment the application first "
+        "saw the current secret. Declared exactly like `webex_webhook_secret`: class C, set in "
+        "the environment, not editable in the portal and no `X_FILE` (that is for the bootstrap "
+        "secrets of classes A and B), so one rule holds for the four webhook secrets (ADR 0124 "
+        "point 8).",
+        optional=True,
+    ),
+    S(
+        "wxcc_webhook_secret_previous",
+        K.SECRET,
+        None,
+        _C,
+        T.WEBEX,
+        "The installation-wide contact-center webhook secret before a rotation; as "
+        "`webex_webhook_secret_previous`, set only during one (ADR 0124 point 8).",
         optional=True,
     ),
     S(
@@ -2411,6 +2448,39 @@ REGISTRY: tuple[SettingSpec, ...] = (
         maximum=30,
     ),
     S(
+        "embedded_call_chat_poll_seconds",
+        K.INT,
+        3,
+        _C,
+        T.WEBEX,
+        "Seconds between two looks of the call page at who is in the call and at the new "
+        "messages of the chat beside it: the one poll of the page, in the lobby and the call "
+        "for the name and in every state after the start for the chat (ADR 0123).",
+        minimum=2,
+        maximum=10,
+    ),
+    S(
+        "embedded_call_chat_per_minute",
+        K.INT,
+        20,
+        _C,
+        T.WEBEX,
+        "Chat messages one participant may send in a minute on the call page (ADR 0123 step 7b).",
+        minimum=5,
+        maximum=60,
+    ),
+    S(
+        "embedded_call_chat_max_chars",
+        K.INT,
+        1000,
+        _D,
+        T.DISPLAY,
+        "Longest chat message a participant may send on the call page, in characters "
+        "(ADR 0123 step 7b).",
+        minimum=200,
+        maximum=4000,
+    ),
+    S(
         "embedded_call_display_name",
         K.ENUM,
         "first_name",
@@ -2423,11 +2493,13 @@ REGISTRY: tuple[SettingSpec, ...] = (
     S(
         "embedded_call_staff_name",
         K.ENUM,
-        "name",
+        "screen_name",
         _D,
         T.DISPLAY,
-        "How the call page names the staff member to the participant: the name of their "
-        "account, or the organisation's word for staff (ADR 0123).",
+        "How the call page names the staff member to the participant: the screen name kept "
+        "with their staff record (the organisation's word for staff alone when they have "
+        "none), the name of their account, or the organisation's word for staff alone "
+        "(ADR 0123).",
         choices=tuple(m.value for m in StaffNameMode),
     ),
     S(
@@ -2436,9 +2508,23 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "hidden",
         _D,
         T.DISPLAY,
-        "Whether the call page shows the participant a way into the video platform's own app: "
-        "never, only when the page cannot give the call, or always (ADR 0123 point 11).",
+        "Whether the call page shows the participant a way into the video platform's own app "
+        "(never, only when the page cannot give the call, or always). It holds for every service "
+        "that has not chosen its own; a service may (Group > Settings > Video, ADR 0123 step 6a).",
         choices=tuple(m.value for m in OtherWayOffer),
+    ),
+    S(
+        "privacy_statement_url",
+        K.URL,
+        None,
+        _D,
+        T.DISPLAY,
+        "The address of the organisation's privacy statement: an https address with a host name "
+        "(not an IP address or localhost) of at most 2,048 characters, linked from the call page's "
+        "line about the external video service (ADR 0123 point 5). Empty: the page shows the "
+        "line without a link.",
+        optional=True,
+        https_only=True,
     ),
 )
 """Every setting of the service, in the order of ``docs/settings.md``."""

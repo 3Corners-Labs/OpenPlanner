@@ -114,7 +114,7 @@ actor, the group and the booking id, never the data (ADR 0044 §2, the product o
 | Email | `bookings.email` | booking form; shown, never changed, on the correction page (ADR 0056 point 10) | as above | mail provider (WP4). Shown to staff with `bookings.view` on the booking page on request, audited; its `mailto:` link hands it to the staff member's own mail program, to contact the participant (ADR 0044 §2) |
 | Phone (optional per group) | `bookings.phone` (E.164 since ADR 0055) | booking form; correction page (ADR 0056 point 10) | as above | the organisation's SMS provider, for SMS reminders (ADR 0022, 0028). Shown to staff with `bookings.view` on the booking page on request, audited; its `tel:` link hands it to the staff member's own phone, to call the participant (ADR 0044 §2) |
 | Answers to the group's custom fields | `bookings.form_answers` (JSON) | booking form, the group's own questions (ADR 0055); correction page, which shows the participant their own answers, all of them (`Purpose.PARTICIPANT_SELF`, ADR 0056 point 10) | as above: purged as a whole, whatever each field's tag | no. Shown on the booking page of the agenda (`bookings.view`); the queue, logs, audit and messages get only answers tagged *not personal data* |
-| An organisation's own contact-center connection (ADR 0032 point 9) | one sealed record `contact-center:{organisation id}` in `integration_credentials`: kind, API host, client id; client secret, refresh token and the generated webhook secret | the superuser on organisation → *Kanalen*; the webhook secret is made by the server | until removed, or the organisation is deleted (deleted in the same transaction) | no personal data; the secrets are write-only and never shown. Dispatch through it follows in CC-4b |
+| An organisation's own contact-center connection (ADR 0032 point 9) | one sealed record `contact-center:{organisation id}` in `integration_credentials`: kind, API host, client id; client secret, refresh token, the generated webhook secret and, after a rotation, the secret before it (`previous_webhook_secret`, ADR 0124 point 8, removed when its overlap has ended) and what the last registration at the platform left (`registration`: a code, shown on the card until one succeeds; neither goes into a configuration package, which also empties `webhook_secret_sightings`) | the superuser on organisation → *Kanalen*; the webhook secret is made by the server | until removed, or the organisation is deleted (deleted in the same transaction) | no personal data; the secrets are write-only and never shown. Dispatch through it follows in CC-4b |
 | A group's contact-center routing (ADR 0032) | `group_contact_center` (`kind`, `routing_value`, `attributes`: codes from the platform's descriptor); for WxCC also, and still read, `groups.wxcc_routing_value`, `wxcc_business_address`, `wxcc_channel` | the group's settings | as long as the group | no personal data; the values go to the contact center in each task |
 | Subject and routing attributes (ADR 0081) | `bookings.subject_code`, `bookings.routing_answers` (codes); the group's list and mapping in `groups.routing`; the codes a block offers in `schedule_rules.subjects`, `schedule_overrides.subjects` | booking form: the subject question and the switched-on routing questions, answered with one of a closed list of codes | not personal data, purged with the booking all the same (`privacy.ROUTING_FIELDS` in `PURGED_FIELDS`, ADR 0081); reporting by subject (ADR 0117) must copy the code into its fact before the purge | no. Shown in the agenda, on the booking page and in the own queue; the mapped codes leave the system only as routing variables in the contact-center task (`flowSettings`), next to the first name and the host join URL |
 | Channel consents | `bookings.consents` | booking form (WhatsApp, roadmap) | as above | no |
@@ -189,7 +189,7 @@ not personal data; no purge job; kept until changed. The audit event holds count
 ## Admin login and audit (WP7a)
 
 ```
-admin ──browser (https)──> proxy ──> web /admin/login ──redirect──> identity provider (the bundled one is served by the proxy under /idp on the same host, ADR 0112; PingFederate; Keycloak in dev; the bundled Keycloak, ADR 0090, on the host's loopback with its accounts in the volume idp-data, or in production in the PostgreSQL volume idp-db-data, ADR 0106 point 4)
+admin ──browser (https)──> proxy ──> web /admin/login ──redirect──> identity provider (the bundled one is served by the proxy under /idp on the same host, ADR 0112, its login only and without the portal's cookies, ADR 0126; PingFederate; Keycloak in dev; the bundled Keycloak, ADR 0090, on the host's loopback with its accounts in the volume idp-data, or in production in the PostgreSQL volume idp-db-data, ADR 0106 point 4)
 identity provider ──ID token (sub, name, roles, organisations, groups)──> web /admin/callback
 web ──signed session cookie op_admin (a random session reference and the admin's UI choices, no name or role; ADR 0098)──> admin browser
 web ──SQL──> admin_sessions (sha256 of the reference, sub, provider, claims, login, last seen, end and reason; ADR 0098)
@@ -215,6 +215,7 @@ organisation provider ──ID token (sub, name, email, email_verified, entitlem
 |---|---|---|---|---|
 | Admin subject identifier | `audit_events.actor`, `staff.subject`, `admin_sessions.subject`; `audit_events.detail` of the two volume warnings (`planner.changes_alert`, `booking.contact_reveals_alert`: `actor:<subject>,…`, ADR 0044) | identity provider | admin actions: `AUDIT_RETENTION_DAYS` (default 2 years, product owner 2026-10-29); system 90 days, security 1 year, debug 7 days (ADR 0040) | no |
 | Admin display name | `staff.display_name`, `admin_sessions.claims` | identity provider | replaced at every login; erased daily by the worker for people without a login for `staff_retention_days` (class C, 365 days, 90–1825; ADR 0046 step 2), or by the superuser for a suspended person; the session row follows the session clean-up | no |
+| Staff screen name (ADR 0123 step 5c) | `staff.screen_name` | typed by someone with `staff.manage` on the staff page, or by the staff member themselves on *My profile* (`rights.view`, step 5d; the staff member's own choice of name for the participant's side) | kept until cleared, replaced or the record is erased (manual, or `staff_retention_days`: erasure empties it); shown to `staff.manage` in the form, to the person on *My profile* and, through `GET /b/m/{ref}/call/staff`, to the participant of a booking this staff member accepted; never in a log, audit event (the event says that it changed, not to what), job payload or URL | no |
 | Admin email address (ADR 0117 step 10b) | `staff.email`, `staff.email_at` (not `admin_sessions.claims`) | identity provider claim `email`, kept only when `email_verified` is true | replaced or cleared at every login; removed with the display name at erasure (manual, or `staff_retention_days`); shown on the staff page to `staff.view`; read by the digest at send time, never in a log, audit event or job payload | no; mail to the person for the usage digest only |
 | Admin roles and memberships | `staff.roles`, `staff_memberships` (role key, organisation and group slugs: one row per grant, ADR 0049) | identity provider claims | replaced at every login; changes audited as `staff.membership_changed`; removed with the display name at erasure | no |
 | Staff skills (ADR 0121) | `staff_skills` (staff id, skill id, when and by whom granted; who granted a skill is kept as a staff id and is emptied when that person is erased; so is `published_by` on a flow revision, the staff id of whoever published it); the skill catalogue `skills` holds codes and labels only | granted by an administrator with `skills.manage` | data about staff, not about participants; replaced as a set on every grant; deleted with the staff record at erasure (`erase_staff`); a skill that is archived stays on the grants that held it | no |
@@ -222,6 +223,7 @@ organisation provider ──ID token (sub, name, email, email_verified, entitlem
 | Admin session (ADR 0098) | `admin_sessions` (`id_hash` = sha256 of 32 random bytes, subject, provider, login claims as JSON, `login_at`, `last_seen_at`, `ended_at`, `end_reason`); the cookie holds the reference only | the login; the requests | ends at logout, idle (`admin_idle_minutes`), absolute end (`admin_session_hours`), a newer login or the limit per person; rows are removed by the worker's clean-up (ADR 0098 step 2) | no; staff data, never the reference itself in a log, audit event or URL |
 | Organisation provider registration (ADR 0083 step 2) | `identity_providers` (key, name, discovery URL, issuer, client id, method, scopes, claim and prefix, on/off; client secret sealed AES-256-GCM), `identity_provider_keys` (public JWK; private key sealed) | the superuser's form; the provider's discovery document | until the superuser removes the provider; a retired key stays published 24 h | public keys at `/admin/jwks.json`; the client assertion to the provider's token endpoint; no personal data in any of it |
 | E-mail address typed on the login page (ADR 0083) | not stored; request body only | the admin | none: its domain chooses the provider, the address goes to that provider as `login_hint` | to the chosen identity provider only |
+| E-mail address typed in the route check of the authentication page (ADR 0083) | not stored; request body only, not echoed | the admin (`identity_providers.view`) | none: only its domain is read and shown | to the admin who asked; nothing leaves the web process |
 | `email` claim of an organisation provider | not stored; compared with the provider's verified domains at the callback | the organisation's identity provider | none | no |
 | Login domains | `identity_provider_domains` (domain, verification token, state, times) | superuser | as the provider; removed with it | the domain in DNS lookups (no personal data) |
 | IdP values of organisations and groups | `organisations.idp_key`, `groups.idp_key` | superuser and org admins in the portal | as the organisation or group; changes audited with old and new value | no (they are what PingFederate sends) |
@@ -264,7 +266,7 @@ worker/web ──HTTPS (Service App token)──> Webex Meetings API: title "Vid
 Webex ──meeting id, join link──> OpenPlanner (bookings.video_room_id, guest_join_url)
 worker/web ──HTTPS──> WxCC Create Task v2: booking reference, first name, start (text), group name, meeting link, kind
 WxCC ──task id──> OpenPlanner (bookings.contact_center_task_id, also wxcc_task_id until dropped)
-worker ──HTTPS──> WxCC Task Messages v2: booking reference, kind=cancelled; then End Task v1 (task id only)
+worker ──HTTPS──> WxCC Task Messages v2: booking reference, kind=cancelled; then End Task v1 (task id only); also for a contact-center attempt the request watchdog expired or cancelled (ADR 0121 step 27)
 operator CLI <──HTTPS── WxCC configuration (wxcc-config-check): channel, asset, entry point, queue names and ids, schema keys, flow export; nothing stored, no personal data
 operator CLI <──HTTPS── Webex webhooks (ownedBy=org), WxCC subscriptions (webhooks-list/-reset): ids, events, hostEmail filters, status, secret set or not, target without query → integration_reports
 operator CLI ──DELETE──> Webex webhooks, WxCC subscriptions (webhooks-reset --yes): ids of stale registrations only
@@ -292,6 +294,7 @@ web ──HTTPS GET /meetings/{id}, /meetingParticipants?meetingId=──> Webex
 | Fallback per group (ADR 0082 points 11 and 12): the choice, the team's Webex room id and since when the group is in fallback; per booking the flag `fallback` | `groups.dispatch_fallback`, `groups.fallback_space_room_id`, `groups.fallback_active_since`, `call_status.fallback` | the group's settings; the worker from the health state | the settings until changed; the state until the fallback ends; the flag with the call status | **the first name** of a booking that lands in the queue during a fallback, with its start time and a link to the queue, leaves to the Webex Messaging API, only for a group that chose the fallback and set its own space (the organisation chooses this by switching it on); never the host join link. **Retention:** those messages stay in the Webex space after OpenPlanner purges the booking (`slot.end + 24h`): OpenPlanner cannot delete Webex messages, so they fall under the organisation's own Webex retention. The manual topic *Contactcenter inrichten* (step 10) tells the administrator so |
 | Alert targets and deliveries (ADR 0082 point 9): an administrator's email address or a Webex room id, a minimum level; per target and alert the streak sent, when, counts and retry state; the bot token sealed in `integration_credentials` (`webex-bot:<organisation>`) | `alert_targets`, `alert_deliveries`, `integration_credentials` | the superuser on *Koppelingen* and an organisation's *Kanalen* | until the target is removed (its deliveries go with it); the token until replaced or removed | no participant data; an administrator's address is staff data. The alert message (codes, slugs, times, a count, the version, a portal link) leaves to the organisation's mail server or the Webex Messaging API |
 | Last inbound event per platform and connection health (ADR 0082): time, event type, outcome code; per organisation and platform the state, since when and the request counts | `integration_reports` (`inbound-webex`, `inbound-wxcc`, `integration-health`) | the webhooks; the worker from the `integration.request` events | replaced by the next event or evaluation | no; shown on **Koppelingen** and *System status* |
+| When the application first saw each installation webhook secret (ADR 0124 point 8): a keyed fingerprint (HMAC-SHA256 under a purpose key of `MANAGEMENT_TOKEN_KEY`, not reversible) and a time, one row per platform | `webhook_secret_sightings` (platform, fingerprint, first seen; migration 0119) | the web process, when it first sees a secret from the environment | replaced when the secret changes; emptied by a configuration package; dropped by the downgrade | no secret and no previous secret; read only by the gate and System status |
 | Service App tokens | `integration_credentials` (AES-256-GCM) | Webex | rotated automatically | sent only to Webex |
 | Last webhook listing and delivery test (registration ids, events, host account filters, target URLs without query, statuses, outcome codes) | `integration_reports` | Webex, WxCC, the self-test | replaced by the next check | no; shown read-only on **Koppelingen** |
 
@@ -302,7 +305,7 @@ A group whose routing has the task kind `conversation` (default `form`, the work
 ```
 worker/web ──HTTPS──> WxCC Create Task v2 (channelType customMessaging): booking reference (the participant's identifier, one conversation per appointment), first name, the same flow variables as a work item (route, routing variables, skill codes, interaction kind), and as the first text message: the booking reference, first name, start (text), group name and, for a video task, the meeting link, composed from a fixed catalogue text in the organisation's language
 WxCC ──task id──> OpenPlanner (bookings.contact_center_task_id, with the kind the task was made with in bookings.contact_center_task_kind)
-worker/web ──HTTPS──> WxCC Task Messages v2 (mediaType customMessaging), when a later step has a participant message to append: the message identifier (aliasId) and the text the participant wrote
+web ──HTTPS──> WxCC Task Messages v2 (mediaType customMessaging), for each message the participant sends in the call page's side bar: the message identifier (aliasId) and the text the participant wrote
 ```
 
 | Data item | Where | Source | Retention | Leaves the system |
@@ -310,15 +313,44 @@ worker/web ──HTTPS──> WxCC Task Messages v2 (mediaType customMessaging),
 | The routing's task kind | `group_contact_center.task_kind` | the group's settings | until changed; no personal data | no |
 | The kind a task was created with | `bookings.contact_center_task_kind` | the dispatch | with the booking row; a kind is no personal data and is not purged | no |
 | The first message | not stored: composed at dispatch from the catalogue and the allowed fields | the booking | not kept by OpenPlanner | to WxCC, as the conversation's first text (no other field of the booking: no surname, address, phone number, form answer or note) |
-| A participant's later message (from step 7b) | stored only from step 7b; nothing sends one in 7a | the participant | step 7b states it and puts it on the list of `app/domain/privacy.py` | to WxCC as the text of an appended message |
+| A participant's later message (step 7c) | `call_messages.message_text`, stored when the page sends it (`POST /b/m/{ref}/call/chat`), before it is handed to WxCC | the participant | with the booking's purge (see the chat below) | to WxCC as the text of an appended message |
 | The conversation's transcript | **at the contact center**: it keeps the transcript and the thread per participant identifier and business address, and masks card numbers | the contact center | the contact center's own; **OpenPlanner's purge does not reach it** (the follow-up ADR of step 7b states the retention; a question to the supplier, `docs/research/call-page-on-the-meetings-sdk.md`) | no |
+
+### The chat beside the call: what comes in and where it is kept (ADR 0123 point 8, step 7b)
+
+The contact center delivers the messages of a conversation task, and the platform's events about them, to two addresses of the organisation's own connection. Both pass the one gate of ADR 0124; neither is read by anything but the chat.
+
+```
+WxCC ──HTTPS POST, signed──> /webhooks/contact-center/webex_cc/{org}/messages   every message the flow or the staff member sends (a secret of its own, shown once in the portal)
+WxCC ──HTTPS POST, signed──> /webhooks/contact-center/webex_cc/{org}            task-message:appended (confirms what we appended), task-message:append-failed (it was refused after the end)
+web  ──verified, matched to the booking by the task id──> call_messages (message_text, author kind, time, state, the platform's message id)
+```
+
+| Data item | Where | Source | Retention | Leaves the system |
+|---|---|---|---|---|
+| A staff member's message | `call_messages.message_text` (author `staff`, state `delivered`, the platform's message id, the time) | the contact center's delivery | **deleted with the booking's purge** (`purge_personal_data`, 24 hours after the end of the appointment, or the booking's held moments); a row cannot outlive its booking | no |
+| A participant's message and its state | `call_messages` (author `participant`, state `sent`, `delivered` or `refused`) | the participant, from the call page's side bar (step 7c); the platform's confirmation or refusal only changes the state | as above | to WxCC as the text of an appended message (step 7c) |
+| The flow's own messages (the queue text) | not stored | the contact center | not kept by OpenPlanner | no |
+| Who wrote a staff message | not stored: the delivery's staff identifier and the participant's name are never read; the name a participant sees is worked out when the thread is read (`embedded_call_staff_name`, step 7c) | | | no |
+| The secret of the message address | the connection's sealed record (`message_secret`, the one before it for the overlap) | made on the server, shown once | until replaced or the connection is removed; never in a log, an event or a job | no |
+| The words in a log, an event, a job or an address | never | | | no |
+
+`message_text` is the one personal column of a third entity (`privacy.CHAT_FIELDS`, `CallMessage`) and is masked by the log processor wherever it is a key. The contact center keeps its own transcript of the same words, which our purge does not reach: the DPIA takes it (ADR 0123 point 18), and chat is not switched on for an organisation before the retention at the contact center is known.
 
 ### The guest of the call page (ADR 0123 points 6 and 7, step 4a)
 
 For a participant who joins in the organisation's own call page, our server asks the video
 platform for a guest token on the click that joins. Nothing is sent before the click, and the
-endpoint exists only while the platform switch `embedded_call_enabled` is on (until step 6 it is
-dark behind that switch alone).
+endpoint exists only while the platform switch `embedded_call_enabled` is on and only for a
+booking of a service that chose the page (`join_client = embedded`, step 6a). For every other
+service the participant's way to the video platform is the redirect `/join/go` of ADR 0075, and
+for an embedded service that redirect stays closed (it leads back to the call page) unless the
+service's `embedded_call_webex_option` is `on_failure` or `always` (its own value, else the
+organisation's); the choice itself is a setting of the group and holds no personal data. "Closed"
+hides the offer and the address; it is no barrier: the token's answer still carries the meeting's
+guest address, because the page needs it to join. The group check mints the one fixed guest of the
+checks (a constant subject, no participant) for a group that uses the page and only while the
+switch is on.
 
 ```
 participant ──POST /b/m/{public_ref}/call/token (cookie, same-origin)──> OpenPlanner
@@ -365,6 +397,122 @@ The SDK is told not to upload its logs after the call and to register the browse
 
 Nothing of this is stored by OpenPlanner: not the token, not the link beyond the booking's own
 field, not the picture or the sound.
+
+### In the call: devices, notices, the end (ADR 0123 points 10 and 13, step 5a)
+
+Inside the call the page sends nothing of its own anywhere: no request, no storage. What it
+does is told to the SDK and shown from the SDK's events.
+
+| What happens | What leaves the browser | What comes in | Stored by us |
+|---|---|---|---|
+| The participant chooses another camera or microphone in the panel of devices | the new stream goes to the supplier's call hosts through the SDK, as the first one did; the old stream is stopped | nothing | no: the choice lives in the page's memory until the call ends |
+| The participant chooses a speaker | nothing: the browser routes the other side's sound to that output | nothing | no |
+| The meeting is recorded | nothing; the recording is made at the supplier's side by the meeting, not by this page | one event (the recording started or stopped); the page shows its own sentence and reads nothing the event carries | no |
+| The connection is interrupted, restored or lost | the SDK's own reconnection traffic to the call hosts | events (restoring, back, lost); same | no |
+| The call ends (the meeting is removed, the participant leaves, the connection is lost for good) | the SDK leaves the meeting and unregisters the browser; every stream is stopped | nothing | no; the personal data of the booking is deleted by the purge 24 hours after the end of the appointment, and the ended state says so |
+
+The recording itself, its place and its retention belong to the supplier's site settings and the
+organisation's own rules; the page only tells the participant that it runs. That is input for the
+DPIA, not something this page controls.
+
+### Sharing a screen and closed captions (ADR 0123 points 10 and 12, step 5b)
+
+Still no request of its own, no storage. The page asks the browser for a screen only when the
+participant presses the share button; the browser's own picker is the second decision.
+
+| What happens | What leaves the browser | What comes in | Stored by us |
+|---|---|---|---|
+| The participant shares a screen | the screen's picture, encrypted in transit, to the supplier's call hosts through the SDK; never to us | nothing | no |
+| The participant stops sharing (the button, the browser's own control, the staff member, the end of the call) | the SDK takes the stream out of the meeting; the capture is stopped | one event at most | no |
+| The staff member shares a screen | nothing | their screen's picture, shown in place of their picture | no |
+| Captions are switched on | the SDK asks the meeting to start them and, at that press, for its real-time data link; the page's language is passed on; the call's sound reaches the platform as it did | text made by the platform from the sound of the call, with a speaker; the page shows the text and a word of its own for who spoke, and reads nothing else of the speaker | no: shown and not kept, not logged, not sent to us; gone when switched off or the call ends |
+
+The speaker of a caption is named by the page, not by the platform: the participant's own lines "You", the other side's the name described under *The staff member's name* below, or the team's word for staff.
+
+The real-time data link is asked for at the press, not at the join (`enableAutomaticLLM` stays off,
+see step 4c); a participant who never switches captions on never opens it, if the SDK allows that
+(a first real meeting shows it). The text of a caption is personal data of the call by nature; the
+platform makes it at its side, and what it keeps is for the DPIA, not for this page to control.
+
+| Open until a real meeting | What the page does | What is not known |
+|---|---|---|
+| Whose speech becomes text | The participant's press asks the meeting to start captions. It is probably meeting-wide: the platform turns the whole call's speech into text, the staff member's too, and a stop by the participant may end the captions for the staff member as well. | Who is affected, who sees the captions, and whether the platform keeps a transcript of the meeting (where, how long): asked of the supplier (`docs/research/call-page-on-the-meetings-sdk.md`, section 14, questions 10 and 11). The staff member is not told by this page. |
+| The real-time link and the transcription are closed | Switching captions off stops the transcription; leaving, the end of the call and a failure stop it too, then the meeting is left. The page knows no call that closes the link itself (the prototype has none): the link stays open until the meeting is left. | Whether the SDK has such a call, and whether leaving the meeting closes the link. |
+| A shared screen | The page asks the SDK for a display stream and gives no option for sound. Stopping it stops the track the browser gave; the stream is then taken out of the meeting. | That the SDK's display stream asks for no sound of the screen, and that stopping it ends the browser's capture on every browser. |
+
+
+### The staff member's name (ADR 0123 point 10, step 5c)
+
+Who the participant talks to is learnt from our own server and from nobody else. The video platform
+is asked nothing and told nothing for this; the name on the picture is never the name the platform
+reports for a member of the meeting.
+
+    staff.screen_name (typed by a manager)          booking claim (pseudonym of who accepted)
+                 │                                              │
+                 └────────► StaffScreenNames ◄───────────────────┘
+                                 │  by the organisation's embedded_call_staff_name:
+                                 │  screen_name (default) · name · term
+                                 ▼
+          GET /b/m/{ref}/call/staff  (the participant's link session, no-store)
+                                 ▼
+                 {"name": "..."} or {}  ─►  the page's state  ─►  text on the picture and in the captions
+
+| What happens | What leaves the browser | What comes in | Stored by us |
+|---|---|---|---|
+| The page asks who the participant talks to, on entering the lobby and the call and then every `embedded_call_chat_poll_seconds` while it is there | one `GET` to our own address, the participant's session cookie; no identifier of the staff member | a name (at most 40 characters) or nothing | no: the name lives in the page's state and is gone with the call; nothing in the browser's storage |
+| The server resolves the claim | nothing | nothing | the pseudonym-to-row-id map in the web process's memory, rebuilt at most once a minute and only on a miss; it holds pseudonyms and row ids, never a name |
+
+After the booking's purge the claim is gone and so is the name; erasing the staff record clears the
+screen name and the account name, and the endpoint answers `{}` for it. The account's name is shown
+only where the organisation chose `name`; with the default a staff member without a screen name is shown
+by the organisation's word for staff alone.
+
+### The chat beside the call: what the page sends and asks (ADR 0123 point 8, step 7c)
+
+A booking whose task is a conversation (`has_chat`) has a side bar on its call page. Nothing of it
+exists in the markup of any other booking, and the video platform is never involved: the chat runs
+through our own server and the contact center's task.
+
+```
+participant's browser ──POST /b/m/{ref}/call/chat {id, text}──> web ──store (sent)──> call_messages
+                                                                   └─HTTPS──> WxCC Task Messages v2 (aliasId = our id, text)
+participant's browser ──GET /b/m/{ref}/call/chat?since=&waiting=──> web ──> new messages, states, the staff member's name, closed
+```
+
+| What happens | What leaves the browser | What comes in | Stored by us |
+|---|---|---|---|
+| The participant sends a message | one `POST` to our own address with the participant's session cookie: a random identifier made in the browser and the text | the stored message (identifier, author kind, text as kept, state, time worded in the group's zone) | `call_messages.message_text` and its state, until the booking's purge |
+| The page asks what is new, in the turns of its one poll (`embedded_call_chat_poll_seconds`), in every state after the start until the chat is closed and read | one `GET` to our own address: the newest message id it holds and the ids of its own messages it still shows as waiting | only messages newer than that (at most 100 at a time, the page asks again at once), the new state of those waiting, the staff member's name for the participant (never an account name unless the organisation chose that) and whether the chat is closed | nothing new |
+| The server hands a message to the contact center | the text and our identifier, to WxCC Task Messages v2 | 202; the confirmation comes later as an event (step 7b) | a message the platform definitely did not take is taken back: nothing stays that never left; one whose answer was lost after the request may have arrived stays `sent` until the confirmation or a refusal settles it |
+
+The thread lives in the page only while it is open; nothing is written to the browser's storage.
+The staff member's name for the participant is the one of the staff-name flow above (the screen name
+by default). The contact center keeps its own transcript of the same words and our purge does not
+reach it (DPIA, ADR 0123 point 18). The participant is asked, above the first message, not to
+write identity numbers; there is no filter.
+
+### Meetings without chat, the trial call on the page, the privacy link (ADR 0123 points 5, 8, 9 and 17, step 6b)
+
+A meeting for a booking of a service that uses the call page is created with the platform's own
+chat off (`enabledChat` and the two chat privileges); the request still carries only the group's
+name and times. The trial call of such a service opens on the call page: the trial meeting (made
+as before, also without chat) is entered through `GET /b/m/{ref}/test/call`, and the guest token
+for it comes from `POST /b/m/{ref}/test/call/token`, the same guest per booking and the same
+budget as the appointment's (point 7). Nothing new about the participant leaves: the subject and
+the first name or the organisation's word, as for the appointment. The group check adds one probe
+meeting for such a group (title of the probe, no participant) that asks the site for closed
+captions and reads back whether it kept them; it is deleted at once. The organisation's privacy
+statement address (`privacy_statement_url`, class D) is an address the organisation chose; it is
+rendered as a link on the call page only when it is an https address, and nothing is sent to it
+by us (the participant's browser follows it in a new tab, without referrer).
+
+| Data item | Where | Source | Retention | Leaves the system |
+|---|---|---|---|---|
+| The trial meeting's guest link | `bookings.trial_join_url` (as before) | the video platform, when the trial call is opened | purged with the contact; the meeting is deleted minutes after it closes | to the participant's browser as the token endpoint's `link`; never in a log, event or job |
+| That the page was opened on a trial call | `booking_events` (`trial_joined`, detail `embedded`) | the page | with the timeline; no personal data | no |
+| The captions probe | nothing stored; the finding says ok, off, unknown or refused | the site's answer | replaced by the next check | probe meeting to the platform: the probe's title, the host, times |
+| The privacy statement address | organisation setting `privacy_statement_url` | the organisation admin | until changed; no personal data | to the participant's browser as a link |
+
 
 ## Own queue (ADR 0043)
 
@@ -524,8 +672,9 @@ web ──portal-certs volume──> proxy: privkey.pem, fullchain.pem, serial
 certificate is made on the host or imported straight into the `portal-certs` volume, which the
 database backup leaves out on purpose; it is never in a log, an audit event, an error message or
 a page. It concerns the organisation's server identity, not a participant. The CA learns the domain name and the operator's e-mail address; no participant data
-leaves through this flow. The proxy keeps no access log, so booking paths with management tokens are not
-written anywhere. Certificates are logged publicly in Certificate Transparency logs (domain
+leaves through this flow. The proxy keeps no access log and logs an answer it makes itself below its level, so booking
+paths with management tokens are not written in normal operation; an answer that breaks off
+after its headers is the exception (threat model, proxy logs; ADR 0126). Certificates are logged publicly in Certificate Transparency logs (domain
 name only).
 
 ## Outbound connections and the hop to web (ADR 0091)
@@ -546,7 +695,7 @@ and must be https (or the named secure transport) in production.
 | Webex Meetings | web, worker → `webexapis.com/v1` (OAuth token from the same host) | HTTPS | Required | B (`WEBEX_API_BASE_URL`, default Webex; changed only for test doubles); credentials A/B or sealed | no | Group name and times; host, never participants. For the call page's guest (ADR 0123): a pseudonymous subject and the first name or the organisation's word, nothing else |
 | Webex Messaging API | worker → `webexapis.com/v1/messages` with the bot token of the platform or the organisation (ADR 0082 points 9 and 12) | HTTPS | Required | The superuser on *Koppelingen* and per organisation on *Kanalen* (token sealed, write-only); the room id per alert target or per group (`fallback_space_room_id`, `group.edit`) | no | Alerts: codes, slugs, times, a count, the version, a portal link (no participant data). During a fallback: a booking's start time and first name and a link to the queue, never the host join link; kept in Webex after the purge |
 | Webex Contact Center | web, worker → the WxCC API of the region: the organisation's own host and Service App when it has a connection (ADR 0032 point 9), else the installation's | HTTPS | Required: https only; internal hosts refused for an organisation's connection | C (`WXCC_API_BASE_URL`, superuser) or the organisation's sealed connection (superuser); service app sealed | no | First name, host join URL, routing variables (ADR 0081), contact-center codes of the required skills (ADR 0121 step 4b; catalogue codes, no personal data) |
-| Identity provider, platform | web → `OIDC_DISCOVERY_URL`, token and key endpoints | HTTPS | Required: production refuses an http discovery URL | A (environment) | no | OIDC protocol: authorisation code, PKCE, client secret; no participant data |
+| Identity provider, platform | web → `OIDC_DISCOVERY_URL`, token and key endpoints | HTTPS | Required: production refuses an http discovery URL, except the bundled provider's internal address with an https `OIDC_ISSUER` (row *Bundled identity provider, internal*, ADR 0125) | A (environment) | no | OIDC protocol: authorisation code, PKCE, client secret; no participant data |
 | Identity providers, organisation | web → discovery, token and key endpoints of an organisation's IdP (ADR 0083) | HTTPS | Required | The superuser per organisation (`identity_providers.manage`; confined to its own domains) | yes | OIDC protocol only |
 | Log destinations | web, worker → syslog, Splunk, Elastic or an HTTP collector (ADR 0085) | `syslog+tls` or `https`; `syslog+tcp`, `syslog+udp` and `http` only outside production | Required: production refuses clear-text transports when saving | C (superuser, portal; credentials sealed) | no | Masked log lines and audit, system and security events: no PII fields (ADR 0034, 0040) |
 | ACME | proxy → the ACME CA (Let's Encrypt) and CA → proxy challenge on 80/443 | HTTPS (ACME); HTTP-01 on 80 | Required towards the CA | B (`ACME_CA`, `ACME_EMAIL` in `proxy.env`) | no | Domain name, operator email address, public key |
@@ -555,7 +704,10 @@ and must be https (or the named secure transport) in production.
 | Certificate probe | worker → the public address, port 443 | TLS handshake, no request | Is the TLS check itself | B (`PUBLIC_BASE_URL`) | no | Nothing; reads the public certificate (ADR 0064) |
 | Public address round trip | worker, and `address-check` → `PUBLIC_BASE_URL` and, when set, `WEBHOOK_BASE_URL`: `GET /api/v1/instance?probe={nonce}` | HTTPS | Required: the address must be https in production; the certificate is verified against the host's CA bundle | B (`PUBLIC_BASE_URL`, `WEBHOOK_BASE_URL`); kill switch `PUBLIC_ADDRESS_CHECK_ENABLED` (B) | no | Nothing about participants: a random nonce out, the instance id (a random UUID), the scheme seen and whether the forwarded headers were honoured back; no address in the answer (ADR 0086) |
 | DNS checks | worker → the host's resolver (`/etc/resolv.conf`): TXT lookups of the sender domain (SPF, DKIM, DMARC; ADR 0073) and, from ADR 0083 step 3, the organisation's domain claims | DNS (UDP/TCP 53) | Not encrypted by the application; the answers only fill a status, they gate nothing | Names: the superuser (sender domain, domain claims); resolver: the host | no | Domain names only, never personal data |
-| Proxy to web, bundled | proxy → `web:8000` on the `edge` network of one host | HTTP | **Recorded exception** (ADR 0091 point 2): the hop never leaves the host, and whoever reads the bridge already has the host and the TLS keys | B (`docker-compose.yml`, fixed addresses) | n/a | Everything the visitor sends |
+| Proxy to web, bundled | proxy → web at its fixed address `172.31.240.3:8000` on the `edge` network of one host (`WEB_UPSTREAM`) | HTTP | **Recorded exception** (ADR 0091 point 2): the hop is meant never to leave the host, and whoever reads the bridge already has the host and the TLS keys. The proxy reaches web at its address, never by the name `web`, so while web is not running (recreated on an update, stopped by the updater for a restore, restarting) the hop fails and nothing else receives it (ADR 0125 step 2), with `--idp own` too | B (`docker-compose.yml`, fixed addresses) | n/a | Everything the visitor sends |
+| Bundled identity provider, internal | web, worker → the provider at its fixed address `172.31.240.4:8080` on the `edge` network of one host: the login's discovery, token and key endpoints (`http://172.31.240.4:8080/idp/realms/openplanner/...`) and the staff directory's admin API (`KEYCLOAK_ADMIN_URL`, ADR 0095) | HTTP | **Recorded exception** (ADR 0125, next to ADR 0091 point 2): the hop is meant never to leave the host, and whoever reads that network already has the host, the secrets files and the provider's database. Browsers reach the provider through the proxy over https; production accepts an http discovery URL only when it is exactly this address and `OIDC_ISSUER` is https. No name is resolved, so while the container is down the hop fails and nothing else receives it (ADR 0125 step 2, threat model) | A and B, written by `scripts/render-keycloak-realm.sh` into `secrets/keycloak-app.env` (`OIDC_DISCOVERY_URL` and `KEYCLOAK_ADMIN_URL` A, `OIDC_ISSUER` B); the address is fixed | n/a | Client secret, authorisation code, ID token (a staff member's name, e-mail address and roles); the directory's client secret and staff accounts (names, user names, e-mail addresses, roles) |
+| Proxy to the bundled identity provider | proxy → the provider at `172.31.240.4:8080` on the `edge` network (`IDP_UPSTREAM`, the `/idp` route of ADR 0112, its login paths only, ADR 0126) | HTTP | **Recorded exception** (ADR 0125): the browser's leg to the proxy is https; the leg on one host is not. The route names the address, never `idp`, so while the container is down `/idp` answers 502 and nothing else receives it (ADR 0125 step 2, threat model) | B (`proxy.env`, written by the installer with `--idp bundled`, removed with `--idp own`) | n/a | What browsers send to `/idp/realms/openplanner/*` and `/idp/resources/*`: staff passwords, one-time codes and Keycloak's cookies. Not the portal's cookies: the proxy removes every `__Host-` cookie and `lang` before the request leaves it (ADR 0126 point 3) |
+| Bundled identity provider to its database | `idp` → the database at its fixed address `172.31.240.18:5432` on the internal network `idp-store`, which only these two containers join and which has no way out (production, ADR 0106 point 4) | PostgreSQL, no TLS | **Recorded exception** (ADR 0125): the hop is meant never to leave the host; Keycloak reaches the database at its address (`KC_DB_URL_HOST`), never by the name `idp-db`, so while the database is not running the hop fails and nothing else receives it (ADR 0125 step 2) | A (`secrets/keycloak.env`, `secrets/idp-db.env`, written by `scripts/render-keycloak-realm.sh`) | n/a | Staff accounts with their password hashes, sessions, the database login |
 | Proxy to web, own proxy | an own reverse proxy on another machine → `web:8000` | HTTP, or HTTPS when `WEB_TLS_CERT_FILE` and `WEB_TLS_KEY_FILE` are set | HTTPS expected: *System status* warns while `FORWARDED_ALLOW_IPS` names another address than the bundled proxy's and web serves no TLS (ADR 0091 point 3) | B | n/a | Everything the visitor sends |
 
 Not outbound but listed so the picture is complete: webhooks from Webex and WxCC reach `web`

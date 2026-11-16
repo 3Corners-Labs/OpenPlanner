@@ -20,9 +20,9 @@ from app.domain.usage import FactKind, UsageFact
 from app.domain.usage_report_service import UsageReportService
 from app.domain.usage_rollup_service import UsageRollup
 from app.domain.usage_staff import StaffCell
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.principals import principal
+from tests.support.seed_rows import seed_group
 
 NOW = datetime(2026, 11, 20, 12, 30, tzinfo=UTC)
 START = datetime(2026, 11, 18, 10, tzinfo=UTC)

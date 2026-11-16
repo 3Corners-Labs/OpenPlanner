@@ -11,8 +11,7 @@ from app.domain.contact_center import ContactCenterKind, Registration
 from app.domain.integration import EventOutcome
 from app.domain.networks import NetworkList
 from app.web.protection import RateLimits, configure_rate_limits
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
-from tests.support.admin_site import site_app
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site, set_settings
 from tests.support.contact_center_site import (
     FORM,
     PAGE,
@@ -26,13 +25,12 @@ from tests.support.contact_center_site import (
     _pause,
     _registrar,
     _save_networks,
-    _set_settings,
 )
 
 
 def _credentials(site: Site) -> CredentialStore:
     """The sealed store the connections live in, as the application builds it."""
-    state = site_app(site).state
+    state = site.app.state
     store = sealed_store(state.engine, state.settings)
     assert store is not None
     return store
@@ -153,7 +151,7 @@ async def test_a_refusal_at_an_organisations_address_names_the_organisation_and_
     )
     assert (refused.status_code, refused.content) == (415, b"")
 
-    log = await site_app(site).state.admin_service.audit_log(SUPER)
+    log = await site.app.state.admin_service.audit_log(SUPER)
     refusals = sorted(
         (
             e.event.reason,
@@ -207,7 +205,7 @@ async def test_forged_calls_to_an_organisation_never_lock_its_signed_calls_out(s
 
 
 async def _webhook_refusals(site: Site) -> list[tuple[str, str]]:
-    log = await site_app(site).state.admin_service.audit_log(SUPER)
+    log = await site.app.state.admin_service.audit_log(SUPER)
     return sorted(
         (
             e.event.reason,
@@ -246,7 +244,7 @@ async def test_changing_the_networks_alone_keeps_the_webhook_secret_and_register
     assert "done=contact_center_saved" in saved.headers["location"]
     assert registrar.registered == []
     assert await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC) == before
-    audit = await site_app(site).state.admin_service.audit_log(SUPER)
+    audit = await site.app.state.admin_service.audit_log(SUPER)
     saves = [
         e.event.detail for e in audit if e.event.detail.startswith("contact_center_connection.save")
     ]
@@ -276,9 +274,9 @@ async def test_a_refused_list_is_shown_at_its_input_and_stores_nothing(
 async def test_the_card_never_leaves_the_state_of_the_address_silent(site: Site) -> None:
     await _connect(site)
     open_card = (await site.client.get(PAGE)).text
-    _set_settings(site, webhook_source_networks_required=True)
+    set_settings(site, webhook_source_networks_required=True)
     required = (await site.client.get(PAGE)).text
-    _set_settings(site, webhook_source_networks_contact_center=SUPPLIER_RANGE)
+    set_settings(site, webhook_source_networks_contact_center=SUPPLIER_RANGE)
     default = (await site.client.get(PAGE)).text
     await _save_networks(site, "2001:4860:4860::/48")
     own = (await site.client.get(PAGE)).text
@@ -296,7 +294,7 @@ async def test_a_list_on_a_chain_that_cannot_be_trusted_is_shown_as_refused_with
 ) -> None:
     await _connect(site)
     await _save_networks(site, SUPPLIER_RANGE)
-    _set_settings(site, forwarded_allow_ips="*")
+    set_settings(site, forwarded_allow_ips="*")
 
     page = (await site.client.get(PAGE)).text
 
@@ -325,7 +323,7 @@ async def test_an_own_list_replaces_the_installations_default_and_without_one_th
     site: Site,
 ) -> None:
     await _connect(site)
-    _set_settings(site, webhook_source_networks_contact_center=SUPPLIER_RANGE)
+    set_settings(site, webhook_source_networks_contact_center=SUPPLIER_RANGE)
 
     default_in = await _call_from(site, SUPPLIER)
     default_out = await _call_from(site, STRANGER)
@@ -344,7 +342,7 @@ async def test_a_required_list_refuses_an_organisation_without_one_and_a_list_op
     site: Site,
 ) -> None:
     await _connect(site)
-    _set_settings(site, webhook_source_networks_required=True)
+    set_settings(site, webhook_source_networks_required=True)
 
     refused = await _call_from(site, SUPPLIER)
     await _save_networks(site, SUPPLIER_RANGE)
@@ -380,7 +378,7 @@ async def test_a_corrupted_stored_list_refuses_every_call_and_the_card_says_so(
     """Abuse case: a list that cannot be read is no empty list ("any source"): it is refused."""
     await _connect(site)
     await _damage_the_stored_list(site, damage)
-    _set_settings(site, webhook_source_networks_contact_center=SUPPLIER_RANGE)  # not a way round
+    set_settings(site, webhook_source_networks_contact_center=SUPPLIER_RANGE)  # not a way round
 
     inside = await _call_from(site, SUPPLIER)
     outside = await _call_from(site, STRANGER)
@@ -427,7 +425,7 @@ async def test_an_unreadable_default_tells_the_card_whom_to_ask_and_an_own_list_
 ) -> None:
     """The organisation cannot repair the installation's default: the card says so."""
     await _connect(site)
-    _set_settings(site, webhook_source_networks_contact_center="garbage")
+    set_settings(site, webhook_source_networks_contact_center="garbage")
 
     card = (await site.client.get(PAGE)).text
     refused = await _call_from(site, SUPPLIER)
@@ -457,7 +455,7 @@ class _Handler:
 
 def _handler(site: Site) -> _Handler:
     handler = _Handler()
-    site_app(site).state.integration_service = handler
+    site.app.state.integration_service = handler
     return handler
 
 
@@ -499,7 +497,7 @@ async def test_pausing_keeps_the_secret_registers_nothing_and_is_audited_by_name
     assert not stored.inbound_enabled
     assert registrar.registered == []
     assert await _connections(site).webhook_secret(1, ContactCenterKind.WEBEX_CC) == before
-    audit = await site_app(site).state.admin_service.audit_log(SUPER)
+    audit = await site.app.state.admin_service.audit_log(SUPER)
     details = [e.event.detail for e in audit if e.event.detail.startswith("contact_center")]
     assert details[:2] == [  # newest first
         "contact_center_connection.resume",

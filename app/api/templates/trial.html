@@ -11,15 +11,16 @@
 <div class="notice notice--warning" role="alert"><p>{{ _("trial.failed") }}</p></div>
 {% endif %}
 {% if state == "available" or state == "active" %}
-<p>{{ _("trial.intro") }}</p>
+{#- For a service that uses the call page (ADR 0123 point 9) the trial call opens on it, in words that never name the video platform. -#}
+<p>{{ _("trial.page.intro" if call_page else "trial.intro") }}</p>
 <ul>
   <li>{{ _("trial.check.camera") }}</li>
   <li>{{ _("trial.check.microphone") }}</li>
   <li>{{ _("trial.check.speakers") }}</li>
   <li>{{ _("trial.check.browser") }}</li>
 </ul>
-<p>{{ _("trial.alone") }}</p>
-<p>{{ _("trial.browser_choice" if group.join_client.value == "choice" else "trial.browser") }}</p>
+<p>{{ _("trial.page.alone" if call_page else "trial.alone") }}</p>
+<p>{{ _("trial.page.browser" if call_page else "trial.browser_choice" if redirect == "choice" else "trial.browser") }}</p>
 {% endif %}
 {% if state == "available" %}
 <form method="post" action="/b/m/{{ ref }}/test">
@@ -29,7 +30,7 @@
 <p>{{ _("trial.calls_left", count=calls_left) }}</p>
 {% elif state == "active" %}
 <div class="notice notice--success" role="status"><p>{{ _("trial.active", time=closes_at) }}</p></div>
-<p><a class="button button--large" href="/b/m/{{ ref }}/test/go">{{ _("trial.join") }}</a></p>
+<p><a class="button button--large" href="/b/m/{{ ref }}/test/{{ 'call' if call_page else 'go' }}">{{ _("trial.join") }}</a></p>
 <p>{{ _("trial.calls_left", count=calls_left) }}</p>
 {% elif state == "limit_reached" %}
 <div class="notice"><p>{{ _("trial.limit") }}</p></div>

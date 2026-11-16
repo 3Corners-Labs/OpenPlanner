@@ -127,7 +127,7 @@ async def seed_upgrade_fixture(
         bookings: Extra generated bookings for the duration budget (0 for the release fixture).
     """
     await seed_demo(engine)
-    await seed_closure_examples(engine, now, token_key)
+    await seed_closure_examples(engine, now, token_key, chat=False)
     await seed_flow_examples(engine)
     uow = SqlUnitOfWork(engine)
     async with uow.locked() as tx:

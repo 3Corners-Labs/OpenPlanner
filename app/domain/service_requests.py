@@ -113,9 +113,12 @@ IN_DOUBT: frozenset[WorkItemState] = frozenset(
 )
 """Contact-center attempts whose task may or may not exist at the platform."""
 
-ORPHANED: frozenset[WorkItemState] = frozenset({WorkItemState.FENCED, WorkItemState.CANCELLED})
+ORPHANED: frozenset[WorkItemState] = frozenset(
+    {WorkItemState.FENCED, WorkItemState.CANCELLED, WorkItemState.EXPIRED}
+)
 """Ended contact-center attempts whose task, if the platform made one after all, is nobody's:
-fenced, or cancelled with its booking while the create's outcome was unknown."""
+fenced, cancelled with its booking, or expired by the watchdog (ADR 0121 step 27) while the
+create's outcome was unknown."""
 
 
 class WorkChannel(StrEnum):
@@ -200,6 +203,14 @@ class WorkItem:
     def active(self) -> bool:
         """Whether it is the request's active work item."""
         return self.state in ACTIVE_ITEM
+
+    @property
+    def held_by_contact_center(self) -> bool:
+        """Whether the contact center holds the request through it: an active attempt.
+
+        Sent, in doubt or connected; the own queue shows such work as held (ADR 0121 step 28).
+        """
+        return self.active and self.channel is WorkChannel.CONTACT_CENTER
 
     @property
     def started(self) -> bool:

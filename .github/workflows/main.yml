@@ -48,7 +48,7 @@ jobs:
     # Not on a maintenance line: its fixes ran it on main first (ADR 0116 point 3).
     if: github.ref_name == 'main' || github.ref_type == 'tag'
     runs-on: ubuntu-26.04
-    timeout-minutes: 60   # took 22 to 30+ minutes at v0.5.1 (the first run hit the old limit of 30)
+    timeout-minutes: 90   # took 22 to 30+ minutes at v0.5.1; about 55 now, runs were cancelled at 60 (#590 raised 30 to 60)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
@@ -94,8 +94,12 @@ jobs:
       # installation on `rc` would go back (2026-11-03: rc.179 on #480 after rc.176 on #481).
       # On a line (ADR 0116 point 3) the candidate is the next patch of the line; a `feat` or a
       # migration on a line fails this step.
+      # A tag without a published release makes no candidate (ADR 0059): `release_plan` asks
+      # GitHub, so it needs the token for `gh release view`.
       - id: candidate
         name: next candidate number
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           version="$(python3 -m scripts.release_plan --candidate --branch "$GITHUB_REF_NAME")"
@@ -103,7 +107,7 @@ jobs:
           if [ -n "$version" ]; then
             echo "::notice::release candidate $version"
           else
-            echo "::notice::no release candidate: a later merge is already a candidate"
+            echo "::notice::no release candidate: a later merge is already a candidate, or the last release tag is not published yet"
           fi
       - id: publish
         if: steps.candidate.outputs.version != ''
@@ -169,7 +173,6 @@ jobs:
       contents: write   # attach the SBOM to a release
       packages: write   # push to ghcr.io
       id-token: write   # keyless cosign signature via GitHub OIDC
-      pull-requests: read   # the release audit check reads the release PR (ADR 0078)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -189,12 +192,6 @@ jobs:
           project="$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
           [ "v$project" = "$GITHUB_REF_NAME" ] \
             || { echo "::error::tag $GITHUB_REF_NAME but pyproject.toml says $project"; exit 1; }
-      # ADR 0078: a minor or major release (vX.Y.0) carries an independent audit of everything
-      # since the last release in its release PR; without it nothing is built or published.
-      - name: a minor or major release carries its audit
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: scripts/check-release-audit.sh
       - id: image
         run: |
           echo "name=${IMAGE,,}" >> "$GITHUB_OUTPUT"

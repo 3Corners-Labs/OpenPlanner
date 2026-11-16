@@ -18,9 +18,8 @@ import pytest
 from app.adapters.vendored_files import VendoredFile
 from app.config import Settings
 from app.web.static_assets import StaticAssets
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
-from tests.support.call_page import Page
+from tests.support.call_page import Page, embedded_app_client
 from tests.support.domain import NOW
 from tests.support.participant import booked, open_link
 
@@ -58,7 +57,7 @@ async def test_the_markup_carries_the_connection_values_and_no_sdk_while_none_is
     settings = call_settings.model_copy(
         update={"embedded_call_connect_seconds": 12, "embedded_call_connect_attempts": 4}
     )
-    async with app_client(settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(settings, FixedClock(NOW)) as client:
         app: Any = client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
         app.state.call_sdk = VendoredFile(tmp_path)  # an installation without the file
         base = await open_link(client, await booked(client))
@@ -78,7 +77,7 @@ async def test_a_whole_sdk_file_is_named_in_an_attribute_and_never_as_a_tag(
     call_settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr("app.api.call_pages.ASSETS", StaticAssets(tmp_path))
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         app: Any = client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
         app.state.call_sdk = _place(tmp_path)
         base = await open_link(client, await booked(client))
@@ -88,8 +87,8 @@ async def test_a_whole_sdk_file_is_named_in_an_attribute_and_never_as_a_tag(
     digest = base64.b64encode(hashlib.sha256(CONTENT).digest()).decode()
     assert str(root["data-call-sdk"]).startswith("/static/vendor/webex/meetings.min.js?v=")
     assert root["data-call-sdk-integrity"] == f"sha256-{digest}"
-    # Nothing the browser would fetch or run before the click: our four scripts, no SDK.
-    assert len(page.script_sources) == 4  # our own, never the SDK
+    # Nothing the browser would fetch or run before the click: our ten scripts, no SDK.
+    assert len(page.script_sources) == 11  # our own, never the SDK
     assert not any("vendor" in url for url in page.references)
 
 
@@ -105,7 +104,7 @@ async def test_an_sdk_file_that_cannot_be_trusted_is_not_named(
     )
     if what == "not_placed":
         (tmp_path / "vendor" / "webex" / "meetings.min.js").unlink()
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         app: Any = client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
         app.state.call_sdk = sdk
         base = await open_link(client, await booked(client))
@@ -119,15 +118,23 @@ async def test_every_failure_has_its_own_sentence_and_the_failed_state_its_ways_
     call_settings: Settings,
 ) -> None:
     settings = call_settings.model_copy(update={"embedded_call_webex_option": "on_failure"})
-    async with app_client(settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         page = Page((await client.get(f"{base}/call?lang=en")).text)
 
     failed = page.state("failed")
     reasons = re.findall(r'data-call-failure="(\w+)"', failed.raw)
     sentences = re.findall(r'data-call-failure="\w+" data-text="\w+" hidden>([^<]+)<', failed.raw)
-    assert reasons == ["attempts", "generic", "not_open", "rate_limited", "unavailable"]
-    assert len(set(sentences)) == 5
+    assert reasons == [
+        "attempts",
+        "generic",
+        "media",
+        "lost",
+        "not_open",
+        "rate_limited",
+        "unavailable",
+    ]
+    assert len(set(sentences)) == 7
     assert [b.text for b in failed.buttons()] == ["Try again"]
     # The link out is offered by `on_failure` in the failed state, with the contact details kept
     # for the script to show instead of it when the call is simply not open (a link out would
@@ -140,7 +147,7 @@ async def test_every_failure_has_its_own_sentence_and_the_failed_state_its_ways_
 async def test_the_failed_state_offers_contact_details_alone_while_the_other_way_is_hidden(
     call_settings: Settings,
 ) -> None:
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         page = Page((await client.get(f"{base}/call")).text)
 
@@ -153,7 +160,7 @@ async def test_the_failed_state_offers_contact_details_alone_while_the_other_way
 async def test_the_states_after_the_click_have_their_headings_and_name_no_supplier(
     call_settings: Settings,
 ) -> None:
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         english = Page((await client.get(f"{base}/call?lang=en")).text)
         dutch = Page((await client.get(f"{base}/call?lang=nl")).text)
@@ -180,7 +187,7 @@ async def test_the_states_after_the_click_have_their_headings_and_name_no_suppli
 async def test_an_organisation_without_contacts_gets_one_plain_sentence_in_the_failure_states(
     call_settings: Settings,
 ) -> None:
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         english = Page((await client.get(f"{base}/call?lang=en")).text)
         dutch = Page((await client.get(f"{base}/call?lang=nl")).text)
@@ -196,7 +203,7 @@ async def test_an_organisation_without_contacts_gets_one_plain_sentence_in_the_f
 async def test_each_own_picture_has_a_name_of_its_own_and_each_sentence_is_in_the_markup_once(
     call_settings: Settings,
 ) -> None:
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         page = Page((await client.get(f"{base}/call?lang=en")).text)
 
@@ -205,14 +212,20 @@ async def test_each_own_picture_has_a_name_of_its_own_and_each_sentence_is_in_th
     assert len(set(labels)) == 2
     # The check's, the lobby's and the call's picture are told apart by the state they are in.
     assert page.state("check").raw.count("Preview of your camera") == 1
-    for sentence in ("We tried 3 times", "The call is over.", "The last attempt did not work."):
+    for sentence in (
+        "We tried 3 times",
+        "Thank you for the call.",
+        "The last attempt did not work.",
+        "This call is being recorded. The picture",
+        "The connection was interrupted. It is being",
+    ):
         assert page.raw.count(sentence) == 1, sentence
 
 
 async def test_the_way_to_hear_the_other_side_is_in_the_call_state_and_hidden(
     call_settings: Settings,
 ) -> None:
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         base = await open_link(client, await booked(client))
         page = Page((await client.get(f"{base}/call?lang=en")).text)
 
@@ -228,7 +241,7 @@ async def test_a_file_that_goes_missing_between_the_check_and_the_address_is_no_
 ) -> None:
     # The verdict was "whole", the static folder no longer has it: the page, not a 500.
     monkeypatch.setattr("app.api.call_pages.ASSETS", StaticAssets(tmp_path / "elsewhere"))
-    async with app_client(call_settings, FixedClock(NOW)) as client:
+    async with embedded_app_client(call_settings, FixedClock(NOW)) as client:
         app: Any = client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
         app.state.call_sdk = _place(tmp_path)
         base = await open_link(client, await booked(client))

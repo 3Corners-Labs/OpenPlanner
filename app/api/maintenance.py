@@ -72,6 +72,12 @@ BOOKING_ROUTES = frozenset(
         "/b/m/{public_ref}/reschedule",
         "/b/m/{public_ref}/test",
         "/b/m/{public_ref}/test/go",
+        # ADR 0123 step 6b: the trial call on the call page closes with the rest of the trial
+        # call (ADR 0071 closes it because it schedules a meeting). Unlike the appointment's own
+        # call routes below, which stay open, the trial is no confirmed appointment taking place:
+        # entering it records an event and its token mints a guest at the video platform.
+        "/b/m/{public_ref}/test/call",
+        "/b/m/{public_ref}/test/call/token",
         "/b/m/{public_ref}/wait/leave",
         # ADR 0121 step 7: withdrawing an immediate request changes it, like stopping a
         # direct call.
@@ -118,6 +124,13 @@ OPEN_ROUTES = frozenset(
         # the video platform and marks the booking, as ``/join/go`` records the click; neither
         # changes what the installation holds about the appointment.
         "/b/m/{public_ref}/call/token",
+        # ADR 0123 step 5c: who the participant talks to. The call runs during maintenance, so the
+        # page's poll stays open like the token: a read of our own record that changes nothing.
+        "/b/m/{public_ref}/call/staff",
+        # ADR 0123 step 7c: the chat beside the call. It goes on during maintenance as the call
+        # does: the read is of our own record and the send appends to the contact center's task,
+        # stored beside the booking like the messages that come in (step 7b).
+        "/b/m/{public_ref}/call/chat",
         "/b/m/{public_ref}/wait",
         "/b/m/{public_ref}/wait/status",
         "/r/{ref}",
@@ -129,6 +142,8 @@ OPEN_ROUTES = frozenset(
         "/o/{slug}/font/{role}",
         "/webhooks/contact-center/{kind}",
         "/webhooks/contact-center/{kind}/{org}",
+        # ADR 0123 step 7b: the messages of a conversation; platform input like the events.
+        "/webhooks/contact-center/{kind}/{org}/messages",
         "/webhooks/webex",
         "/webhooks/wxcc",
     }

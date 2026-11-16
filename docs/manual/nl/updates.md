@@ -31,10 +31,18 @@ De eerste kaart toont:
   minorversie daarvoor), *Verlengde lijn* (met de einddatum) of *Niet meer ondersteund*: werk
   dan bij naar een ondersteunde lijn.
 
-Het kanaal, het automatisch bijwerken, het interval tussen twee controles, de lijn en het venster
-stelt u niet hier in, maar als superuser bij **Geavanceerde instellingen**, onderwerp Updates
-(`UPDATE_CHANNEL`, `UPDATE_AUTO_APPLY`, `UPDATE_CHECK_MINUTES`, `UPDATE_LINE`, `UPDATE_WINDOW`;
-zie [Geavanceerde instellingen](advanced-settings.md)). Het venster is maximaal zeven blokken
+De kaart **Updatekanaal** (onder deze kaart) laat de superuser het **kanaal** kiezen
+(*Releases* of *Releasekandidaten*) en **Zelf updaten** aan of uit zetten, met **Kanaal
+opslaan**. Het wijzigt dezelfde instellingen als Geavanceerde instellingen (`UPDATE_CHANNEL`,
+`UPDATE_AUTO_APPLY`), met dezelfde regels en hetzelfde auditbericht, en werkt zonder
+JavaScript. Releasekandidaten worden in een productie-installatie geweigerd en automatisch
+bijwerken werkt daar alleen met een ingesteld venster. Zet de beheerder van de server een
+waarde vast in `.env`, dan toont de kaart *Vastgezet door de beheerder van de server* met de
+naam van de variabele en zonder bediening voor die waarde. Anderen zien de waarden als tekst.
+
+Het interval tussen twee controles, de lijn en het venster stelt de superuser in bij
+**Geavanceerde instellingen**, onderwerp Updates (`UPDATE_CHECK_MINUTES`, `UPDATE_LINE`,
+`UPDATE_WINDOW`; de kaart verwijst er; zie [Geavanceerde instellingen](advanced-settings.md)). Het venster is maximaal zeven blokken
 zoals `mon 02:00-04:00, sat 01:00-05:00` in de tijdzone van het portaal, elk minstens 30
 minuten. Binnen een blok dient de server zelf een automatische update in en voert de updater
 hem uit; daarbuiten wacht hij op het volgende blok. Een verzoek dat u zelf indient, houdt het

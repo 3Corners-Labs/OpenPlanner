@@ -2,7 +2,7 @@
 
 import pytest
 
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AUDITOR,
     GROUP_ADMIN,
     ORG_ADMIN,
@@ -10,8 +10,8 @@ from tests.admin.conftest import (
     SAME_ORIGIN,
     SUPER,
     Site,
+    audit_events,
 )
-from tests.support.admin_site import audit_events
 
 TEXTS = "/admin/organisations/demo/texts"
 INTRO = "Kies een moment; een gesprek duurt {minutes} minuten."

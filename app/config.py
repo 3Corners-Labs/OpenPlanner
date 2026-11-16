@@ -29,6 +29,7 @@ from pydantic_settings import (
 from app.domain.connection_health import HealthPolicy
 from app.domain.event_schema import Envelope
 from app.domain.login_mapping import LOGIN_KEYS
+from app.domain.privacy_statement import valid_privacy_url
 from app.domain.settings_registry import PHONE_REGIONS, REGISTRY, SettingClass
 from app.domain.source_networks import MAX_WEBHOOK_NETWORKS, valid_source_networks
 from app.domain.staff_directory import ADMIN_URL_PATTERN
@@ -36,6 +37,7 @@ from app.domain.system_log import EventRetention
 from app.domain.update_policy import valid_line, valid_window
 from app.domain.updates import valid_release
 from app.domain.user_names import DEFAULT_SUFFIX, valid_suffix
+from app.domain.web_transport import bundled_idp_hop
 from app.i18n.dates import ClockStyle
 
 LogLevel = Literal["TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -316,14 +318,20 @@ class Settings(BaseSettings):
     # the queue, fixed into the work item at the claim. Class D organisation.
     assignment_start_lease_minutes: int = Field(default=5, ge=1, le=30)
     # ADR 0123 point 7 and the *Settings* table: what the participant is called to staff (the
-    # first name, or the organisation's word) and what staff are called to the participant (their
-    # account name, or the organisation's word). Class D organisation.
+    # first name, or the organisation's word) and what staff are called to the participant (the
+    # screen name kept with their record, their account name, or the organisation's word).
+    # Class D organisation.
     embedded_call_display_name: Literal["first_name", "term"] = "first_name"
-    embedded_call_staff_name: Literal["name", "term"] = "name"
+    embedded_call_staff_name: Literal["screen_name", "name", "term"] = "screen_name"
     # ADR 0123 point 11 and the *Settings* table: whether the participant of an embedded call is
-    # ever shown a way into the video platform's own app. Class D organisation (per service from
-    # step 6, which puts it on the service's form).
+    # ever shown a way into the video platform's own app. Class D organisation. Since step 6a a
+    # service may set its own (``groups.embedded_call_webex_option``); this value is the default
+    # of every service that has not (empty there means "as the organisation").
     embedded_call_webex_option: Literal["hidden", "on_failure", "always"] = "hidden"
+    # ADR 0123 point 5 and step 6b: the address of the organisation's privacy statement, linked
+    # from the call page. An https address of at most 2,048 characters (``app.domain.
+    # privacy_statement``); empty means no link. Class D organisation.
+    privacy_statement_url: str | None = None
     # ADR 0121 step 5: the watchdog: hours after the appointment's end before unstarted work
     # expires and started work is marked for recovery. Class D organisation.
     request_unresolved_hours: int = Field(default=24, ge=1, le=168)
@@ -447,6 +455,13 @@ class Settings(BaseSettings):
     embedded_call_connect_attempts: int = Field(default=3, ge=1, le=5)
     # ADR 0123 point 6: guest tokens one booking may ask for in an hour (step 4a). Class C.
     embedded_call_token_per_booking_per_hour: int = Field(default=10, ge=5, le=30)
+    # ADR 0123 step 5c: how often the call page asks who is in the call (and, from step 7c, for the
+    # chat's new messages), in seconds. One poll for the page. Class C.
+    embedded_call_chat_poll_seconds: int = Field(default=3, ge=2, le=10)
+    # ADR 0123 step 7b: how many chat messages one participant may send in a minute (class C,
+    # platform) and the longest one (class D, organisation).
+    embedded_call_chat_per_minute: int = Field(default=20, ge=5, le=60)
+    embedded_call_chat_max_chars: int = Field(default=1000, ge=200, le=4000)
     # ADR 0046, staff directory. An admin's "last seen" is written at most once per this many
     # seconds (class C, platform; ADR 0042 registry).
     staff_last_seen_interval_seconds: int = Field(default=300, ge=60, le=3600)
@@ -523,9 +538,17 @@ class Settings(BaseSettings):
     webex_refresh_token: SecretStr | None = None
     webex_api_base_url: str = "https://webexapis.com/v1"
     webex_webhook_secret: SecretStr | None = None
+    # ADR 0124 point 8: the webhook secret before a rotation of the installation's own secret,
+    # set only during one. It verifies for ``webhook_secret_overlap_minutes`` counted from the
+    # moment the application first saw the current secret; remove it afterwards (System status
+    # says when). Class C like its sibling and declared exactly like it: not editable in the
+    # portal (``GENERATED_SECRETS``) and no ``X_FILE``, which is for the bootstrap secrets of
+    # classes A and B (ADR 0042 section 9): one rule for the four webhook secrets.
+    webex_webhook_secret_previous: SecretStr | None = None
     # WxCC API host of the organisation's region, e.g. https://api.wxcc-eu1.cisco.com.
     wxcc_api_base_url: str | None = None
     wxcc_webhook_secret: SecretStr | None = None
+    wxcc_webhook_secret_previous: SecretStr | None = None
 
     # Rate limits on public endpoints (CLAUDE.md security baseline).
     rate_limit_enabled: bool = True
@@ -556,6 +579,9 @@ class Settings(BaseSettings):
     # the network after a delivery, unknown work) one address may have inside the event window
     # before one system event says so. Class C platform.
     webhook_refusal_alert_count: int = Field(default=20, ge=5, le=1000)
+    # ADR 0124 point 8: how long the previous webhook secret keeps verifying after a rotation, for
+    # an organisation's secret and for the installation's own; 0 is at once. Class C platform.
+    webhook_secret_overlap_minutes: int = Field(default=60, ge=0, le=1440)
 
     # ADR 0035: how many host websites one organisation may allow for the widget. Class C.
     embedding_max_origins: int = Field(default=20, ge=1, le=100)
@@ -745,6 +771,22 @@ class Settings(BaseSettings):
             raise ValueError("UPDATE_LINE must be empty or a minor such as 1.4")
         return value
 
+    @field_validator("privacy_statement_url")
+    @classmethod
+    def _valid_privacy_url(cls, value: str | None) -> str | None:
+        """Refuse a ``PRIVACY_STATEMENT_URL`` that is no https address (ADR 0123 step 6b).
+
+        Empty means no link and is kept as ``None``; the rule is ``app.domain.privacy_statement``.
+        """
+        if not value:
+            return None
+        if not valid_privacy_url(value):
+            raise ValueError(
+                "PRIVACY_STATEMENT_URL must be empty or an https address of a host name, at "
+                "most 2,048 characters"
+            )
+        return value
+
     @field_validator("min_upgrade_from")
     @classmethod
     def _valid_stop(cls, value: str) -> str:
@@ -839,12 +881,17 @@ class Settings(BaseSettings):
         check(
             self.oidc_discovery_url is not None
             and (
-                not self.oidc_discovery_url.startswith("https://")
+                not (
+                    self.oidc_discovery_url.startswith("https://")
+                    # ADR 0125: the bundled provider's internal hop, a recorded exception.
+                    or bundled_idp_hop(self.oidc_discovery_url, self.oidc_issuer)
+                )
                 or self.oidc_client_secret is None
             ),
             "oidc_incomplete",
             "OIDC_DISCOVERY_URL",
-            "OIDC needs an https discovery URL and a client secret",
+            "OIDC needs an https discovery URL, or the bundled provider's internal one with an "
+            "https OIDC_ISSUER, and a client secret",
         )
         return found
 

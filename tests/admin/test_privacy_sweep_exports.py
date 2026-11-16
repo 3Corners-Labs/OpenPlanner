@@ -19,8 +19,15 @@ from datetime import timedelta
 import pytest
 
 from app.domain.audit import AuditEvent, Outcome
-from tests.admin.conftest import AUDITOR, ORG_ADMIN, OUTSIDER, SAME_ORIGIN, SUPER, Site
-from tests.support.admin_site import site_uow
+from tests.support.admin_site import (
+    AUDITOR,
+    ORG_ADMIN,
+    OUTSIDER,
+    SAME_ORIGIN,
+    SUPER,
+    Site,
+    site_uow,
+)
 from tests.support.configuration_package import PACKAGE_PASSPHRASE
 from tests.support.downloads import DOWNLOAD_MODULES
 from tests.support.privacy_sweep import LOG_DESTINATION, Fixture, marker_leaks

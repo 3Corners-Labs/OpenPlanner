@@ -20,8 +20,14 @@ matrix in ``docs/service-flows-compatibility.md``:
 """
 
 import asyncio
+import io
+import json
+import os
 import shutil
 import sqlite3
+import subprocess
+import sys
+import tarfile
 from contextlib import closing
 from datetime import timedelta
 from pathlib import Path
@@ -31,12 +37,15 @@ from alembic import command
 from alembic.config import Config
 
 from app.adapters.db.engine import create_engine
+from app.adapters.db.gated_records import GatedRecords, write_gated_records
+from app.adapters.db.seed import seed_demo
 from app.adapters.db.upgrade_fixture import (
     FixtureState,
     compare_states,
     inspect_fixture,
     seed_upgrade_fixture,
 )
+from scripts.rollback_claim import claimed_by
 from tests.support.database import ROOT
 from tests.support.domain import NOW
 
@@ -44,12 +53,29 @@ PRE_TRAIN = "0108"
 """The revision before ADR 0121's first migration (0109): the schema of a pre-train image."""
 TRAIN_TOUCHED = {"bookings", "slots"}
 """The only pre-train tables the train adds columns to; every other one is left as it was."""
-AFTER_TRAIN_TOUCHED = {"group_contact_center"}
+AFTER_TRAIN_TOUCHED = {"group_contact_center", "groups", "staff"}
 """Pre-train tables that a migration after the train adds a column to, by the same additive rule:
-0116 (ADR 0123 step 7a) gives the group's contact-center routing its task kind."""
-AFTER_TRAIN_COLUMNS = {"group_contact_center": "task_kind VARCHAR(16) DEFAULT 'form' NOT NULL"}
-"""The one part each of those tables' definitions gains. The table is rebuilt to add it, which
-may reorder its keys and checks, so the definitions are compared part by part."""
+0116 (ADR 0123 step 7a) gives the group's contact-center routing its task kind, 0118
+(ADR 0123 step 5c) gives the staff record its screen name, and 0120 (ADR 0123 step 6a) gives the
+group the service's option next to the call page and widens one check (``AFTER_TRAIN_WIDENED``)."""
+AFTER_TRAIN_WIDENED = {"groups": ("join_client", ("browser", "choice"), "embedded")}
+"""The one check each of those tables has widened (never narrowed), as ``(column, the values it
+allowed, the one value added)``: ``groups.join_client`` may now be ``embedded`` (0120). Every value
+the previous image writes still meets it. The test builds both forms of the check from this, so
+the exemption is exactly "the same constraint with one more allowed value" and nothing else."""
+AFTER_TRAIN_COLUMNS = {
+    "group_contact_center": "task_kind VARCHAR(16) DEFAULT 'form' NOT NULL",
+    "staff": "screen_name VARCHAR(40)",
+    "groups": (
+        "embedded_call_webex_option VARCHAR(16)"
+        " | CONSTRAINT ck_groups_embedded_call_webex_option CHECK"
+        " (embedded_call_webex_option IS NULL"
+        " OR embedded_call_webex_option IN ('hidden', 'on_failure', 'always'))"
+    ),
+}
+"""The parts each of those tables' definitions gains (``|`` separates two parts). The table is
+rebuilt to add it, which may reorder its keys and checks, so the definitions are compared part
+by part."""
 LATER = NOW + timedelta(days=3650)
 """A moment after every pending job's ``run_at``, as the upgrade check claims."""
 Rows = dict[str, list[tuple[object, ...]]]
@@ -245,9 +271,35 @@ def test_the_train_changes_only_bookings_and_slots_of_the_pre_train_tables_and_o
             assert not notnull or default is not None, f"{table}.{name} needs a value"
 
 
+def _split(line: str) -> list[str]:
+    """Split ``line`` at the ``", "`` outside brackets, so an ``IN (...)`` list stays whole."""
+    parts, depth, start = [], 0, 0
+    for at, char in enumerate(line):
+        depth += (char == "(") - (char == ")")
+        if depth == 0 and line.startswith(", ", at):
+            parts.append(line[start:at])
+            start = at + 2
+    return [*parts, line[start:]]
+
+
 def _parts(definition: str) -> list[str]:
-    """Return the lines of a table's definition (columns, keys, checks), sorted, without commas."""
-    return sorted(line.strip().rstrip(",").strip() for line in definition.splitlines())
+    """Return the parts of a table's definition (columns, keys, checks), sorted, without commas.
+
+    A column that SQLite appends in place (``ALTER TABLE ... ADD COLUMN``) lands on the line of the
+    column before it, so a line is split at ``", "`` too, outside brackets; both sides are split
+    the same way.
+    """
+    return sorted(
+        part.strip().rstrip(",").strip()
+        for line in definition.splitlines()
+        for part in _split(line)
+        if part.strip().rstrip(",").strip()
+    )
+
+
+def _in_check(column: str, values: tuple[str, ...]) -> str:
+    """Return the text of the check ``column IN (...)`` for ``values``."""
+    return f"{column} IN ({', '.join(repr(value) for value in values)})"
 
 
 def _indexes(path: Path, tables: set[str]) -> dict[str, str]:
@@ -292,8 +344,14 @@ def test_no_index_or_constraint_of_a_pre_train_table_becomes_stricter(
     for table in tables - {"bookings", "slots"} - AFTER_TRAIN_TOUCHED:
         assert now[table] == definitions[table], table  # checks and keys untouched
     for table, added in AFTER_TRAIN_COLUMNS.items():
-        # every column, key and check as it was, plus the one defaulted column
-        assert _parts(now[table]) == sorted([*_parts(definitions[table]), added]), table
+        text = definitions[table]
+        if table in AFTER_TRAIN_WIDENED:
+            column, allowed, added_value = AFTER_TRAIN_WIDENED[table]
+            narrow = _in_check(column, allowed)
+            assert narrow in text, table
+            text = text.replace(narrow, _in_check(column, (*allowed, added_value)))
+        # every column, key and check as it was (a widened one as widened), plus what was added
+        assert _parts(now[table]) == sorted([*_parts(text), *_parts(added.replace(" | ", ", "))])
 
 
 def test_the_previous_image_writes_and_the_current_code_reads_and_claims_it(
@@ -329,6 +387,117 @@ def test_the_previous_image_writes_and_the_current_code_reads_and_claims_it(
     assert after.live_with_data == before.live_with_data + 1
     assert after.pending_jobs == after.claimable_jobs == before.pending_jobs + 1
     assert after.live_without_data == after.purged_with_data == 0
+
+
+PREVIOUS_RELEASE = "v0.6.0"
+"""The previous supported release: the first with an upgrade fixture (ADR 0116 point 7)."""
+
+
+def _previous_release_code(target: Path) -> Path:
+    """Extract the previous release's ``app`` package into ``target``; skip without its tag."""
+    found = subprocess.run(  # noqa: S603
+        ["git", "archive", PREVIOUS_RELEASE, "app"],  # noqa: S607
+        cwd=ROOT,
+        capture_output=True,
+        check=False,
+    )
+    if found.returncode:
+        pytest.skip(f"the tag {PREVIOUS_RELEASE} is not in this checkout")
+    with tarfile.open(fileobj=io.BytesIO(found.stdout)) as archive:
+        archive.extractall(target, filter="data")
+    return target
+
+
+def _run_previous_release(code: Path, *arguments: str) -> object:
+    """Run ``scripts/rollback_claim.py`` with the previous release's code first on the path."""
+    found = subprocess.run(  # noqa: S603
+        [sys.executable, str(ROOT / "scripts" / "rollback_claim.py"), *arguments],
+        cwd=code,
+        env={**os.environ, "PYTHONPATH": str(code)},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return json.loads(found.stdout)
+
+
+def test_the_previous_releases_own_claim_is_safe_on_the_expanded_schema(
+    alembic_config: Config, pre_train: Path, tmp_path: Path
+) -> None:
+    """G43, the claim half of A30, at the database: the old code's own claim, the new code reads.
+
+    The previous release's ``claim_booking`` (the one conditional update of its own queue) runs
+    on the database the current code expanded and wrote the gated records on. It claims a
+    booking it wrote itself once, refuses a second claim of it, and refuses the booking whose
+    work the current code already holds; the current code then reads the claim back and no
+    other row changes.
+    """
+    code = _previous_release_code(tmp_path / "previous")
+    command.upgrade(alembic_config, "head")
+    url = f"sqlite+aiosqlite:///{pre_train}"
+    records = asyncio.run(_gated_records(url))
+    with closing(sqlite3.connect(pre_train)) as database:
+        group = database.execute("SELECT id FROM groups ORDER BY id LIMIT 1").fetchone()[0]
+        written = _previous_image_booking(database, group, "n2")
+    before_rows = snapshot(pre_train, schema(pre_train))
+    held_by = _holders(pre_train, [records.pool_booking])
+
+    found = _run_previous_release(
+        code, "claim", url, "previous-image", str(written), str(written), str(records.pool_booking)
+    )
+
+    assert isinstance(found, dict)
+    assert str(code) in found["code"]  # the release's own app package ran, not this checkout's
+    assert found["claimed"] == [True, False, False]  # once; not twice; not work already held
+    assert _holders(pre_train, [written, records.pool_booking]) == {
+        written: "previous-image",
+        records.pool_booking: held_by[records.pool_booking],
+    }
+    after_rows = snapshot(pre_train, schema(pre_train))
+    changed = {t for t in after_rows if after_rows[t] != before_rows[t]}
+    assert changed == {"bookings"}  # nothing else moved: no work item, request or pool slot
+    assert len(after_rows["work_items"]) == len(before_rows["work_items"])
+    # The current code reads the previous release's claim back (and the work it held is intact).
+    assert asyncio.run(claimed_by(url, [written])) == {written: "previous-image"}
+
+
+async def _gated_records(url: str) -> GatedRecords:
+    """Write the gated records with the current code on the database at ``url``."""
+    engine = create_engine(url)
+    try:
+        await seed_demo(engine)
+        return await write_gated_records(engine, NOW, b"k" * 32)
+    finally:
+        await engine.dispose()
+
+
+def _previous_image_booking(database: sqlite3.Connection, group: int, name: str) -> int:
+    """Insert a confirmed booking with the pre-train columns only; return its id."""
+    slot = database.execute(
+        'INSERT INTO slots (group_id, start, "end", capacity_snapshot, kind)'
+        " VALUES (?, '2030-01-09 08:07:00.000000', '2030-01-09 08:37:00.000000', 1, 'scheduled')",
+        (group,),
+    ).lastrowid
+    booking = database.execute(
+        "INSERT INTO bookings (slot_id, group_id, status, locale, management_token_hash,"
+        " management_token_salt, public_ref, created_at, consents, first_name, last_name, email)"
+        " VALUES (?, ?, 'confirmed', 'nl', ?, ?, ?, '2030-01-01 08:00:00.000000', '',"
+        " 'Voorbeeld', 'Deelnemer', 'n2@example.org')",
+        (slot, group, f"h-{name}", f"s-{name}", f"{name}-ref"),
+    ).lastrowid
+    database.commit()
+    return int(booking or 0)
+
+
+def _holders(path: Path, bookings: list[int]) -> dict[int, str | None]:
+    """Return ``claimed_by`` of each booking, read straight from the table."""
+    with closing(sqlite3.connect(path)) as database:
+        return {
+            booking: database.execute(
+                "SELECT claimed_by FROM bookings WHERE id = ?", (booking,)
+            ).fetchone()[0]
+            for booking in bookings
+        }
 
 
 @pytest.fixture

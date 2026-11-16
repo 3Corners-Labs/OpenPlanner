@@ -12,7 +12,7 @@ The attributes are stored as one JSON object of strings (``group_contact_center.
 import json
 from collections.abc import Mapping
 
-from app.adapters.webhooks import WXCC_INBOUND, ContactCenterWebhook
+from app.adapters.webhooks import WXCC_INBOUND, WXCC_MESSAGES, ContactCenterWebhook
 from app.adapters.wxcc import DESCRIPTOR as WEBEX_CC
 from app.domain.contact_center import (
     ContactCenterKind,
@@ -26,6 +26,22 @@ DESCRIPTORS: Mapping[ContactCenterKind, ProviderDescriptor] = {WEBEX_CC.kind: WE
 
 INBOUND: Mapping[ContactCenterKind, ContactCenterWebhook] = {WXCC_INBOUND.kind: WXCC_INBOUND}
 """How each platform's webhooks are checked and read (ADR 0032 point 6), by kind."""
+
+
+MESSAGES: Mapping[ContactCenterKind, ContactCenterWebhook] = {WXCC_MESSAGES.kind: WXCC_MESSAGES}
+"""How each platform's deliveries of a conversation's messages are checked (ADR 0124 point 15),
+by kind; a platform without a conversation task is not here."""
+
+
+def messages(kind: str) -> ContactCenterWebhook | None:
+    """Return the handling of the message deliveries of the platform named ``kind``, or ``None``.
+
+    ``kind`` comes from the URL, so an unknown or malformed value is an answer, not an error.
+    """
+    try:
+        return MESSAGES.get(ContactCenterKind(kind))
+    except ValueError:
+        return None
 
 
 def inbound(kind: str) -> ContactCenterWebhook | None:

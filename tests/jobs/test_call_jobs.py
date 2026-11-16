@@ -9,7 +9,7 @@ from app.domain.calls import CallState, EventKind, TaskState
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef, TaskKind
 from app.domain.job_plan import JobType
 from app.domain.ports import IntegrationError
-from app.domain.scheduling import DispatchKind
+from app.domain.scheduling import DispatchKind, JoinClient
 from app.i18n import Translator, load_catalogues
 from app.jobs.messages import MessageComposer
 from app.jobs.runner import JobRunner
@@ -363,13 +363,14 @@ async def test_a_bad_opening_text_fails_the_dispatch_once_with_its_code() -> Non
         group_uow(
             video_host_email="host@example.nl",
             contact_center=webex_routing(task_kind=TaskKind.CONVERSATION),
+            join_client=JoinClient.EMBEDDED,
         )
     )
     bid = await setup.booking()
     await setup.runner(FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])).run_due()
     queue = FakeQueue([job(bid, JobType.DISPATCH_CONTACT_CENTER_TASK)])
 
-    await setup.runner(queue, translator=broken, conversation_enabled=lambda: True).run_due()
+    await setup.runner(queue, translator=broken, uses_page=lambda group: True).run_due()
 
     assert queue.failed == [(1, "integration_not_ready")]
     assert queue.retried == []

@@ -106,6 +106,7 @@ SETTING_LABELS: dict[str, str] = {
         "settings.field.webhook_source_networks_contact_center.label"
     ),
     "webhook_refusal_alert_count": "settings.field.webhook_refusal_alert_count.label",
+    "webhook_secret_overlap_minutes": "settings.field.webhook_secret_overlap_minutes.label",
     "rate_limit_agent_calls": "settings.field.rate_limit_agent_calls.label",
     "admin_session_hours": "settings.field.admin_session_hours.label",
     "admin_reauth_minutes": "settings.field.admin_reauth_minutes.label",
@@ -139,6 +140,12 @@ SETTING_LABELS: dict[str, str] = {
     "webex_webhook_secret": "settings.field.webex_webhook_secret.label",  # nosec B105 - an i18n key
     "wxcc_api_base_url": "settings.field.wxcc_api_base_url.label",
     "wxcc_webhook_secret": "settings.field.wxcc_webhook_secret.label",  # nosec B105 - an i18n key
+    "webex_webhook_secret_previous": (  # nosec B105 - an i18n key
+        "settings.field.webex_webhook_secret_previous.label"
+    ),
+    "wxcc_webhook_secret_previous": (  # nosec B105 - an i18n key
+        "settings.field.wxcc_webhook_secret_previous.label"
+    ),
     "update_repository": "settings.field.update_repository.label",
     "update_channel": "settings.field.update_channel.label",
     "update_auto_apply": "settings.field.update_auto_apply.label",
@@ -196,9 +203,13 @@ SETTING_LABELS: dict[str, str] = {
     "embedded_call_token_per_booking_per_hour": (
         "settings.field.embedded_call_token_per_booking_per_hour.label"
     ),
+    "embedded_call_chat_poll_seconds": "settings.field.embedded_call_chat_poll_seconds.label",
+    "embedded_call_chat_per_minute": "settings.field.embedded_call_chat_per_minute.label",
+    "embedded_call_chat_max_chars": "settings.field.embedded_call_chat_max_chars.label",
     "embedded_call_display_name": "settings.field.embedded_call_display_name.label",
     "embedded_call_staff_name": "settings.field.embedded_call_staff_name.label",
     "embedded_call_webex_option": "settings.field.embedded_call_webex_option.label",
+    "privacy_statement_url": "settings.field.privacy_statement_url.label",
 }
 """The label of every class C and D setting, by key."""
 

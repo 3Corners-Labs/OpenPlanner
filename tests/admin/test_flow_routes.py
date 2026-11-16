@@ -4,8 +4,7 @@ import re
 
 import pytest
 
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, Site
-from tests.support.admin_site import audit_log
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, Site, audit_log
 from tests.support.flow_pages import BASE, act, create, form_data, save
 from tests.support.pool_flows import shut_gate
 from tests.support.skill_seed import add_pool

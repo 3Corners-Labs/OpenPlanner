@@ -69,7 +69,7 @@ BOOKING = Booking(
 
 def _body() -> dict[str, object]:
     item = contact_center_task(
-        BOOKING, GROUP, start_label="5 jan 2026, 09:00", conversation_enabled=False
+        BOOKING, GROUP, start_label="5 jan 2026, 09:00", uses_call_page=False
     )
     return task_body(item, "alias-1", 1767600000000)
 
@@ -120,7 +120,7 @@ def test_no_other_booking_field_or_label_reaches_the_payload() -> None:
 
 def test_the_routing_key_of_openplanner_cannot_be_overwritten() -> None:
     # The mapping refuses the reserved name, and the body puts the group's value last anyway.
-    item = contact_center_task(BOOKING, GROUP, start_label="x", conversation_enabled=False)
+    item = contact_center_task(BOOKING, GROUP, start_label="x", uses_call_page=False)
     forced = type(item)(**{**item.__dict__, "variables": ((ROUTING_KEY, "other"),)})
     assert task_body(forced, "a", 1)["flowSettings"] == {ROUTING_KEY: "demo"}
 
@@ -129,7 +129,7 @@ def test_a_booking_without_a_choice_sends_only_the_group() -> None:
     from dataclasses import replace
 
     item = contact_center_task(
-        replace(BOOKING, routing=None), GROUP, start_label="x", conversation_enabled=False
+        replace(BOOKING, routing=None), GROUP, start_label="x", uses_call_page=False
     )
     assert task_body(item, "a", 1)["flowSettings"] == {ROUTING_KEY: "demo"}
 

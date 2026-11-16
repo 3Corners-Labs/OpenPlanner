@@ -1,6 +1,6 @@
 """The usage reports as an admin sees them: scope, small cells, ranges, words (ADR 0117 step 5)."""
 
-from tests.admin.conftest import AGENT, AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
+from tests.support.admin_site import AGENT, AUDITOR, GROUP_ADMIN, ORG_ADMIN, OUTSIDER, SUPER, Site
 from tests.support.usage_data import DAY
 from tests.support.usage_data import fill as _fill
 

@@ -53,16 +53,18 @@ from app.domain.log_events import (
     lookup,
     trace_points,
 )
-from app.domain.privacy import ALIASES
+from app.domain.privacy import ALIASES, CHAT_FIELDS
 from app.domain.privacy import PII_FIELDS as PII_COLUMNS
 
-STAFF_FIELDS = frozenset({"username"})
+STAFF_FIELDS = frozenset({"username", "screen_name"})
 """Personal data of staff that a log line could carry: the user name of the bundled provider
-holds the person's name (ADR 0106 point 11). Their e-mail address is masked as ``email``."""
-PII_FIELDS = PII_COLUMNS | ALIASES | STAFF_FIELDS
+holds the person's name (ADR 0106 point 11), and so does the screen name the participant of a
+call sees (ADR 0123 step 5c). Their e-mail address is masked as ``email``."""
+PII_FIELDS = PII_COLUMNS | ALIASES | STAFF_FIELDS | frozenset(CHAT_FIELDS)
 """Every personal-data field of ``Booking`` (``app.domain.privacy``, the one home of the
-list, ADR 0063), the other names the same data travels by (``name``, ``answers``), and the
-staff user name."""
+list, ADR 0063), the other names the same data travels by (``name``, ``answers``), the
+staff user name and screen name, and the text of a chat message (``CHAT_FIELDS``, ADR 0123
+step 7b)."""
 MASK = "***"
 
 TRACE = 5

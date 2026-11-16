@@ -77,6 +77,9 @@ FAILURE_HINTS: dict[tuple[EventKind, str], str] = {
     (EventKind.TASK_FAILED, "meeting_missing"): "call.hint.task.meeting_missing",
     (EventKind.TASK_FAILED, MESSAGING_NOT_CONFIGURED): "call.hint.task.messaging_not_configured",
     (EventKind.TASK_FAILED, CONVERSATION_OPEN): "call.hint.task.conversation_open",
+    (EventKind.INTEGRATION_ERROR, "chat_options_refused"): (
+        "call.hint.integration.chat_options_refused"
+    ),
 }
 """What to check after a failure with a known meaning for that kind of event."""
 

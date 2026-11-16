@@ -12,8 +12,8 @@ from app.domain.booking import MeetingRef
 from app.domain.calls import EventKind
 from app.domain.scheduling import JoinClient
 from app.domain.tokens import hash_token
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import app_client
 from tests.support.domain import NOW
 from tests.support.participant import FRIDAY_0900, open_link
 from tests.support.participant import booked as book_and_confirm
@@ -198,6 +198,7 @@ async def test_the_click_says_which_page_the_participant_was_sent_to(
         base = await open_link(http, token)
         await http.get(f"{base}/join/go")
 
-    assert await _details(settings.database_url, booking_id, EventKind.JOIN_CLICKED) == [
-        client.value
-    ]
+    # An embedded group acts as the default while the platform switch is off (ADR 0123 step 6a):
+    # the click was a redirect to the web app, and the event says so.
+    sent = JoinClient.BROWSER if client is JoinClient.EMBEDDED else client
+    assert await _details(settings.database_url, booking_id, EventKind.JOIN_CLICKED) == [sent.value]

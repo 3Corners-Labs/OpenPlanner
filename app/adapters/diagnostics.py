@@ -27,7 +27,7 @@ import httpx
 
 from app.adapters.webex_auth import WebexTokens
 from app.adapters.webex_meetings import guest_token_request
-from app.domain.guest_access import CHECK_SUBJECT, NEUTRAL_TERM
+from app.domain.guest_access import CHECK_SUBJECT, GUEST_PROBE, NEUTRAL_TERM
 from app.domain.ports import Clock, IntegrationError
 
 NIL_TASK_ID = "00000000-0000-0000-0000-000000000000"
@@ -96,7 +96,7 @@ def probes(webex_base_url: str, wxcc_base_url: str | None, *, guest: bool = Fals
     if guest:
         found.append(
             Probe(
-                "POST /guests/token",
+                GUEST_PROBE,
                 "POST",
                 f"{webex}/guests/token",
                 "guest-issuer:read and guest-issuer:write (guest tokens for the call page, "

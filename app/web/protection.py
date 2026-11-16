@@ -13,6 +13,7 @@ buckets per request path, so links that match no booking get a bound of their ow
 per address whatever the path (``count_unknown_link``).
 """
 
+import math
 from dataclasses import dataclass, fields
 from urllib.parse import urlsplit
 
@@ -125,6 +126,11 @@ def is_action(request: Request) -> bool:
     return require_same_origin in dependency_calls(request.scope.get("route"))
 
 
+def _polls_a_minute(settings: Settings) -> int:
+    """How many times a minute the call page asks for who the participant talks to."""
+    return math.ceil(60 / settings.embedded_call_chat_poll_seconds)
+
+
 @dataclass
 class RateLimits:
     """Current limit strings; set once per application in ``configure_rate_limits``.
@@ -143,10 +149,14 @@ class RateLimits:
     change_requests: str = "20/hour"
     webhooks: str = "600/minute"
     call_tokens: str = "10/hour"
+    call_staff: str = "60/minute"
+    call_staff_addresses: str = "600/minute"
+    call_chat_sends: str = "40/minute"
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "RateLimits":
         """Return the limits the settings ask for; the one place that reads them."""
+        polls = CALL_POLL_HEADROOM * _polls_a_minute(settings)  # one booking's asks a minute
         return cls(
             bookings=settings.rate_limit_bookings,
             reads=settings.rate_limit_reads,
@@ -157,8 +167,37 @@ class RateLimits:
             change_requests=f"{settings.agent_change_requests_per_hour}/hour",
             webhooks=f"{settings.rate_limit_webhook_per_minute}/minute",
             call_tokens=f"{settings.embedded_call_token_per_booking_per_hour}/hour",
+            call_staff=f"{polls}/minute",
+            call_staff_addresses=f"{CALL_POLL_ADDRESS_HEADROOM * polls}/minute",
+            call_chat_sends=(
+                f"{CALL_CHAT_SEND_HEADROOM * settings.embedded_call_chat_per_minute}/minute"
+            ),
         )
 
+
+CALL_POLL_HEADROOM = 3
+"""How many times the call page's own poll rate (``embedded_call_chat_poll_seconds``) one booking
+may ask for who the participant talks to: room for reloads and a second browser, not for a flood.
+Derived from that setting, so it is no setting of its own (ADR 0042). It counts only a request that
+holds the booking's session (``within_call_staff_limit``), so knowing the reference is not enough to
+use it up."""
+
+CALL_CHAT_SEND_HEADROOM = 2
+"""How many attempts to send a chat message one booking may make in a minute, as a multiple of
+``embedded_call_chat_per_minute`` (the messages that count: a message that was taken back after the
+platform refused it leaves no row, so this bound counts the attempts, and a platform that is down is
+not called without end). Derived from that setting, so it is no setting of its own (ADR 0042)."""
+
+CALL_POLL_ADDRESS_HEADROOM = 50
+"""How many bookings' worth of that bound one address may ask for: fifty times the per-booking rate,
+3000 a minute at the default interval of 3 seconds, 4500 at the setting's lowest (2 seconds) and 900
+at its highest (10 seconds). That is fifty calls at three times their normal rate, or 150 at their
+normal rate, so thirty participants behind one office, carrier or IPv6 /64 address do not
+starve each other. A flood without a session is already refused by the bound on links that match no
+booking (``count_unknown_link``); this is the last bound for an address that holds sessions, and it
+bounds the limiter's memory, because its key is the address and never the path. Derived from
+``embedded_call_chat_poll_seconds``, so it is no setting of its own: it follows the interval the
+page asks at, and a value of its own could only be set wrong against it (ADR 0042)."""
 
 LIMITS = RateLimits()
 limiter = Limiter(key_func=caller_of)
@@ -193,6 +232,11 @@ def booking_limit() -> str:
 def read_limit() -> str:
     """Limit for availability pages."""
     return LIMITS.reads
+
+
+def call_staff_address_limit() -> str:
+    """Limit per address for the call page's poll, counted before the session is checked."""
+    return LIMITS.call_staff_addresses
 
 
 def unknown_link_limit() -> str:
@@ -326,6 +370,58 @@ def within_unknown_address_limit(source: str) -> bool:
         ``False`` when the caller is over the bucket; always ``True`` while rate limits are off.
     """
     return _within(webhook_limit(), "webhook-unknown", source)
+
+
+def within_call_staff_limit(public_ref: str) -> bool:
+    """Count one poll for who the participant talks to against its booking's own bucket.
+
+    As the guest token's (``within_call_token_limit``): the key is the booking's public reference,
+    so a participant's reloads and several browsers share one budget whatever the address, and only
+    a request that holds the participant's session is counted, so a caller who knows the (not
+    secret) reference but has no session can never use the budget up; the bound on callers without
+    a session is the per-address limit of the route (``call_staff_address_limit``).
+
+    Args:
+        public_ref: The booking's public reference, after the session check.
+
+    Returns:
+        ``False`` when the booking is over its limit; always ``True`` while rate limits are off.
+    """
+    return _within(LIMITS.call_staff, "call-staff", public_ref)
+
+
+def within_call_chat_limit(public_ref: str) -> bool:
+    """Count one read of the call page's chat against its booking's own bucket (ADR 0123 step 7c).
+
+    As ``within_call_staff_limit``: the key is the booking's public reference, the budget is the
+    same one derived from the page's poll rate (the chat is asked in the same turns as the staff
+    member's name), and only a request that holds the participant's session is counted. The
+    messages a participant sends are bounded by ``embedded_call_chat_per_minute`` in the domain
+    (``app.domain.call_chat.within_rate``), not here.
+
+    Args:
+        public_ref: The booking's public reference, after the session check.
+
+    Returns:
+        ``False`` when the booking is over its limit; always ``True`` while rate limits are off.
+    """
+    return _within(LIMITS.call_staff, "call-chat", public_ref)
+
+
+def within_call_chat_send_limit(public_ref: str) -> bool:
+    """Count one attempt to send a chat message against its booking's own bucket (ADR 0123 step 7c).
+
+    The key is the booking's public reference, counted only for a request that holds the
+    participant's session. It bounds the attempts, which the domain's rate (the stored messages
+    of the last minute) does not see when the platform refuses and the message is taken back.
+
+    Args:
+        public_ref: The booking's public reference, after the session check.
+
+    Returns:
+        ``False`` when the booking is over its limit; always ``True`` while rate limits are off.
+    """
+    return _within(LIMITS.call_chat_sends, "call-chat-send", public_ref)
 
 
 def within_call_token_limit(public_ref: str) -> bool:

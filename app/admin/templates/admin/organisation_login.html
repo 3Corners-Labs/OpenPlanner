@@ -1,4 +1,5 @@
 {% extends "admin/layout.html" %}
+{% from "admin/_fields.html" import form_body with context %}
 {% block title %}{{ _("admin.idp.title") }} · {{ organisation.name }} – {{ _("admin.title") }}{% endblock %}
 {% block content %}
 {% include "admin/_organisation_header.html" %}
@@ -6,6 +7,38 @@
 <p>{{ _("admin.idp.lead") }}</p>
 {% if routing_off %}<div class="alert alert--info" role="status"><p>{{ _("admin.idp.routing_off") }}</p></div>{% endif %}
 {% if done %}<div class="alert alert--success" role="status"><p>{{ done }}</p></div>{% endif %}
+{% if warnings %}
+<div class="alert alert--warning" role="alert">
+  <h2>{{ _("admin.idp.warnings") }}</h2>
+  <ul>{% for text in warnings %}<li>{{ text }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+<section class="card" aria-labelledby="steps-heading">
+  <h2 id="steps-heading">{{ _("admin.idp.steps.title") }}</h2>
+  <p>{{ _("admin.idp.steps.lead") }}</p>
+  <ol>
+    {% for step in steps %}
+    <li>
+      <strong>{{ step.title }}</strong>
+      <span class="chip{{ step.chip }}">{{ step.state }}</span>
+      {% if not step.done %}<br><span class="muted">{{ step.hint }}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  <p class="hint">{{ _("admin.idp.steps.platform") }}</p>
+</section>
+<section class="card" aria-labelledby="check-heading">
+  <h2 id="check-heading">{{ _("admin.idp.check.title") }}</h2>
+  <p>{{ _("admin.idp.check.lead") }}</p>
+  <form method="post" action="/admin/organisations/{{ organisation.slug }}/login/_check" novalidate>
+    {{ form_body(check_fields, _("admin.idp.check.button"), None) }}
+  </form>
+  {% if check %}
+  <div class="alert {% if check.error %}alert--error{% elif check.platform %}alert--info{% else %}alert--success{% endif %}" role="{% if check.error %}alert{% else %}status{% endif %}">
+    <p>{{ check.message }}</p>
+  </div>
+  {% endif %}
+</section>
 <section class="card" aria-labelledby="providers-heading">
   <h2 id="providers-heading">{{ _("admin.idp.providers") }}</h2>
   {% if providers %}

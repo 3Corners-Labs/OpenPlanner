@@ -87,7 +87,15 @@ getoond; een leeg veld laat het bewaarde geheim staan.
 Na het opslaan ziet u het **Webhookadres** van deze organisatie. Het contactcenter meldt daar de
 status van taken. OpenPlanner controleert elke melding met een geheim dat de server zelf maakt;
 niemand typt of ziet het. Met **Nieuw webhookgeheim maken** vervangt u het, bijvoorbeeld als u
-denkt dat het is uitgelekt; het oude werkt dan meteen niet meer. **Eigen koppeling verwijderen**
+denkt dat het is uitgelekt. Het contactcenter krijgt het nieuwe geheim direct te horen. Het oude
+geheim blijft nog even werken (de platformbeheerder stelt in hoe lang, standaard 60 minuten), zodat
+er geen melding verloren gaat terwijl het contactcenter het nieuwe overneemt; de kaart zegt tot
+wanneer. Maakt u meteen daarna nog een nieuw geheim, dan werken de oude direct niet meer: zo beëindigt u een
+uitgelekt geheim zonder te wachten (de platformbeheerder kan die tijd ook op 0 zetten). *Geziene
+bezorgingen* telt hoeveel meldingen nog met het oude geheim zijn gecontroleerd: blijft dat op nul, dan
+gebruikt het contactcenter het nieuwe. Zegt de kaart dat het contactcenter het nieuwe geheim niet
+heeft gekregen, of dat er nu geen abonnement is, dan probeert er niets vanzelf opnieuw: controleer de
+rechten van de Service App en druk op **Opslaan** op de kaart om opnieuw aan te melden. **Eigen koppeling verwijderen**
 wist de koppeling en haar geheimen.
 
 Zolang een organisatie geen eigen koppeling heeft, gebruikt zij de koppeling van de installatie.
@@ -184,6 +192,30 @@ geaccepteerd, wat betekent dat uw lijst verouderd kan zijn. Een vreemde die het 
 de *list*-melding ook veroorzaken terwijl echte bezorgingen binnenkomen: het kost één
 gebeurtenis per venster en verbergt niets. Andere mislukte aanroepen van vreemden staan op de
 kaart en geven geen melding.
+
+### Chatberichten
+
+Voor een dienst waarvan de deelnemer een chat naast het gesprek krijgt, bezorgt het contactcenter de
+berichten van het gesprek op een tweede adres op de kaart, **Chatberichten**, dat eindigt op
+`/messages`. Dat adres heeft een eigen geheim, los van het webhookgeheim.
+
+1. Kies **Geheim voor dit adres maken**. De volgende pagina toont het adres en het geheim
+   **één keer**; OpenPlanner bewaart het geheim versleuteld en kan het niet opnieuw tonen.
+2. Zet in de console van het contactcenter het adres als webhookadres van het berichtenkanaal en het
+   geheim als geheim ervan.
+3. Kwijt? Maak een nieuw geheim. Het geheim dat tot dan werkte, blijft nog werken tijdens de overlap
+   die de platformbeheerder instelde (standaard 60 minuten), zodat er geen bericht verloren gaat terwijl u het
+   nieuwe plakt; de kaart zegt tot wanneer.
+
+Zolang er geen geheim is gemaakt bestaat het adres niet en wordt elke aanroep beantwoord als een
+onbekend adres. De pauze en de toegestane bronnetwerken van de kaart gelden ook voor dit adres. Is het
+adres niet bereikbaar, dan mislukt de flow van het contactcenter bij de eerste berichtstap en eindigt de
+taak voordat een medewerker hem ziet.
+
+De berichten van de medewerker worden bij de afspraak bewaard en samen met die afspraak verwijderd, 24
+uur na de afspraak, net als de gegevens van de deelnemer. Het contactcenter bewaart een eigen
+gespreksverslag; de verwijdering door OpenPlanner bereikt dat niet. De chat van de vergadering zelf staat
+voor deze diensten uit, dus medewerkers antwoorden alleen in het bureaublad van het contactcenter.
 
 ## Wat wordt vastgelegd
 

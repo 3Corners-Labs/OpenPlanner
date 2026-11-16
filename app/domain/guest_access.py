@@ -19,7 +19,7 @@ it out of its ``repr``.
 import hashlib
 import hmac
 import unicodedata
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -40,6 +40,26 @@ is ``SUBJECT_PREFIX`` and a digest, and it names no one."""
 NEUTRAL_TERM = "Participant"
 """The word the checks send as the guest's name: no participant, so no personal data."""
 
+GUEST_PROBE = "POST /guests/token"
+"""The name of the service-app check's line that mints the checks' guest."""
+
+GUEST_FACT = "guest_minted"
+"""The key in the stored service-app report that holds the typed fact: did the check mint the
+guest token. The check writes it next to its results (``app.adapters.service_app_check``), and
+``guest_check_passed`` is the one reader."""
+
+
+def guest_check_passed(report: Mapping[str, object] | None) -> bool:
+    """Return whether the latest stored service-app check minted a guest token (ADR 0123 point 17).
+
+    A group may be saved as ``embedded`` only after that: it proves the Service App has the guest
+    scopes. ``report`` is the body of the stored report (``None`` before any check ran). Each
+    stored check replaces the last, so a later check that failed to mint a guest (a revoked scope,
+    or a run while the platform switch was off) takes the fact away; a report written before the
+    fact existed holds none and does not count until the next check.
+    """
+    return report is not None and report.get(GUEST_FACT) is True
+
 
 GuestKeys = Callable[[], Sequence[bytes]]
 """The keys of the guest subjects now in force, the current one first, then the previous one
@@ -59,8 +79,15 @@ class DisplayNameMode(StrEnum):
 
 
 class StaffNameMode(StrEnum):
-    """How the staff member is named to the participant (``embedded_call_staff_name``)."""
+    """How the staff member is named to the participant (``embedded_call_staff_name``).
 
+    ``SCREEN_NAME`` is the default (ADR 0123 point 10, decided 2026-11-14): the name kept with the
+    staff record for the participant's side. ``NAME`` is the account's display name and ``TERM``
+    the organisation's word for staff alone. A value stored before ``SCREEN_NAME`` existed keeps
+    working.
+    """
+
+    SCREEN_NAME = "screen_name"
     NAME = "name"
     TERM = "term"
 

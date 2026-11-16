@@ -232,16 +232,21 @@ def plate_overview() -> Page:
     # runs straight; more than seven get lower boxes and a smaller step.
     ext_height = 74 if len(EXTERNALS) <= 7 else 66
     ext_step = min(110.0, (890 - 160 - ext_height) / max(len(EXTERNALS) - 1, 1))
-    for i, (name, sub) in enumerate(EXTERNALS):
+    for i, external in enumerate(EXTERNALS):
         ext = page.box(
             1370,
             160 + i * ext_step,
             200,
             ext_height,
-            label(Family.EXTERNAL, "", name, sub),
-            block_style(Family.EXTERNAL),
+            label(Family.EXTERNAL, "", external.name, external.note),
+            block_style(Family.EXTERNAL, dashed=external.explored),
         )
-        page.edge(system, ext, style="exitX=1;entryX=0;entryY=0.5;startArrow=block;startFill=1;")
+        page.edge(
+            system,
+            ext,
+            style="exitX=1;entryX=0;entryY=0.5;startArrow=block;startFill=1;"
+            + ("dashed=1;" if external.explored else ""),
+        )
     return page
 
 
@@ -377,7 +382,7 @@ def plate_integrations() -> Page:
             250,
             80,
             label(lane.family, lane.tags, lane.adapter, lane.modules),
-            block_style(lane.family, size=11),
+            block_style(lane.family, dashed=lane.planned, size=11),
         )
         system = page.box(
             790,
@@ -385,15 +390,20 @@ def plate_integrations() -> Page:
             220,
             80,
             label(Family.EXTERNAL, "", lane.system, lane.system_note),
-            block_style(Family.EXTERNAL, size=11),
+            block_style(Family.EXTERNAL, dashed=lane.planned, size=11),
         )
         if has_port:
             page.edge(adapter, port, style="dashed=1;endFill=0;")
+        wire_dash = "dashed=1;" if lane.planned else ""
         if lane.incoming:
-            page.edge(system, adapter, lane.wire, "exitX=0;exitY=0.5;entryX=1;entryY=0.5;")
+            page.edge(
+                system, adapter, lane.wire, "exitX=0;exitY=0.5;entryX=1;entryY=0.5;" + wire_dash
+            )
             facts = f"← {lane.inbound}<br>→ {lane.outbound}"
         else:
-            page.edge(adapter, system, lane.wire, "exitX=1;exitY=0.5;entryX=0;entryY=0.5;")
+            page.edge(
+                adapter, system, lane.wire, "exitX=1;exitY=0.5;entryX=0;entryY=0.5;" + wire_dash
+            )
             facts = f"→ {lane.outbound}<br>← {lane.inbound}"
         page.text(1040, y + 8, 530, 72, facts, size=11, colour=MUTED)
         y += 95

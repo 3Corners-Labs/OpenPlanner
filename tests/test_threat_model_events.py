@@ -214,11 +214,33 @@ FLOWS: dict[str, Flow] = {
         "file, the policy and the test double are defects of the build or the installation, found "
         "by tests and the service-app check; there is no request of its own to attribute"
     ),
+    "## Flow: in the call (ADR 0123 step 5a)": Flow(
+        no_event="everything in it happens in the browser: the page makes no request in the call, "
+        "so an attack on it (a device, a notice, an event of a call that is over) reaches no "
+        "server, and there is nothing to attribute"
+    ),
+    "## Flow: the call page chosen by a service (ADR 0123 step 6a)": Flow((PUBLIC, DENIED, CHANGE)),
+    "## Flow: the rest of the call page's step 6 (ADR 0123 step 6b)": Flow(
+        (PUBLIC, DENIED, CHANGE)
+    ),
+    "## Flow: the staff member's name on the participant's call page (ADR 0123 step 5c)": Flow(
+        (PUBLIC, DENIED, CHANGE)
+    ),
+    "## Flow: sharing a screen and closed captions in the call (ADR 0123 step 5b)": Flow(
+        no_event="everything in it happens in the browser: the screen goes to the video platform "
+        "and the captions come from it, the page makes no request of its own, so an attack on it "
+        "(a screen without a press, a share that outlives the call, a caption shown as markup) "
+        "reaches no server, and there is nothing to attribute"
+    ),
     "## Flow: allowed origins for embedding (ADR 0035, EM-1)": Flow(ADMIN),
     "## Flow: video meetings, work items and direct calls (WP5/WP6)": Flow(
         (PUBLIC, WEBHOOK, JOB, DENIED, CHANGE)
     ),
     "## Flow: the conversation task at the contact center (ADR 0123 point 8, step 7a)": Flow(ADMIN),
+    "## Flow: the chat's inbound deliveries and their storage (ADR 0123 point 8, step 7b)": Flow(
+        (WEBHOOK, CHANGE, DENIED)
+    ),
+    "## Flow: the participant's side of the chat (ADR 0123 point 8, step 7c)": Flow((PUBLIC,)),
     "## Flow: own queue (ADR 0043)": Flow(ADMIN),
     "## Flow: requests and work items (ADR 0121 step 5)": Flow(ADMIN),
     "## Flow: immediate intake and check-in (ADR 0121 step 7)": Flow((PUBLIC, DENIED, CHANGE)),

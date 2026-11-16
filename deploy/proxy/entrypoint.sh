@@ -16,7 +16,11 @@
 # The Caddyfile cannot branch, so the `tls` line of the https site comes from TLS_DIRECTIVE,
 # which this script sets for `caddy run` and again for every `caddy reload`. Without a domain
 # Caddy would serve plain HTTP on 8443, so a missing or incomplete setting stops the container.
-# IDP_UPSTREAM (host:port) adds the route /idp/* to the bundled identity provider (ADR 0112).
+# WEB_UPSTREAM (address:port) is where everything else goes: web's fixed address on edge, set in
+# docker-compose.yml. IDP_UPSTREAM (address:port) adds the route /idp to the bundled identity
+# provider (ADR 0112) at its fixed address, written by the installer; what the route lets through
+# and keeps out is in idp.caddy (ADR 0126). A name works but is named in the log: this host's DNS
+# may answer it while its container is down (ADR 0125).
 set -eu
 
 PORTAL_DIR=${TLS_PORTAL_DIR:-/portal-certs} # the volume's mount point (tests point it elsewhere)
@@ -24,6 +28,7 @@ INTERNAL_CA_DIR=${TLS_INTERNAL_CA_DIR:-/internal-ca}
 CA_ROOT=${TLS_CA_ROOT:-/data/caddy/pki/authorities/local/root.crt}
 POLL=${TLS_PORTAL_POLL_SECONDS:-10}
 CADDYFILE=/etc/caddy/Caddyfile
+IDP_CADDYFILE=/etc/caddy/idp.caddy
 
 fail() { echo "$1" >&2; exit 1; }
 
@@ -87,17 +92,66 @@ publish_root() {
   done
 }
 
-if [ -n "${IDP_UPSTREAM:-}" ]; then
-  case $IDP_UPSTREAM in
-    *[!A-Za-z0-9.:_-]*) fail "IDP_UPSTREAM must be host:port" ;;
+# upstream NAME VALUE: refuse anything but host:port, since the value goes into the Caddyfile,
+# and say so when it is a name rather than an address (ADR 0125 step 2).
+upstream() {
+  case $2 in
+    '' | *[!A-Za-z0-9.:_-]*) fail "$1 must be host:port" ;;
+    *[!0-9.:]*) echo "warning: $1=$2 is a name, which this host's DNS may answer while its container is down; docker-compose.yml and scripts/install.sh give its fixed address (ADR 0125)" >&2 ;;
   esac
-  IDP_DIRECTIVE="handle /idp/* {
-		reverse_proxy $IDP_UPSTREAM
-	}"
+}
+
+# A docker-compose.yml from before ADR 0125 step 2 sets no WEB_UPSTREAM: this image then finds
+# web by its name as the earlier one did, until the checkout of this release is in place (a
+# portal update replaces the image before the operator updates the checkout; docs/install.md,
+# Upgrading). The fallback goes a minor later (ADR 0116: expand, then contract).
+WEB_UPSTREAM=${WEB_UPSTREAM:-web:8000}
+upstream WEB_UPSTREAM "$WEB_UPSTREAM"
+export WEB_UPSTREAM
+
+if [ -n "${IDP_UPSTREAM:-}" ]; then
+  upstream IDP_UPSTREAM "$IDP_UPSTREAM"
+  # The route and what it lets through live in idp.caddy (ADR 0126), which reads IDP_UPSTREAM
+  # and hands the provider the visitor's address alone, as web gets it (ADR 0129).
+  IDP_DIRECTIVE="import $IDP_CADDYFILE"
 else
   IDP_DIRECTIVE=""
 fi
 export IDP_DIRECTIVE
+
+# trusted_networks VALUE: the reverse proxies, WAFs and load balancers in front of this proxy
+# (PROXY_TRUSTED_NETWORKS, ADR 0129), comma or space separated, as one space-separated line.
+# Only addresses and CIDR ranges, at most 32, and never a range of length 0: trusting every
+# address would let any visitor choose theirs. Caddy itself refuses a malformed address.
+trusted_networks() {
+  ranges=$(printf '%s' "$1" | tr ',\t\n' '   ')
+  count=0
+  for range in $ranges; do
+    case $range in
+      *[!0-9A-Fa-f.:/]* | /* | */*/* | */) fail "PROXY_TRUSTED_NETWORKS: $range is not an IP address or CIDR range" ;;
+    esac
+    case $range in
+      */*)
+        prefix=${range##*/}
+        [ "$prefix" -gt 0 ] 2>/dev/null \
+          || fail "PROXY_TRUSTED_NETWORKS: $range trusts every address; name the edge's own addresses"
+        ;;
+    esac
+    count=$((count + 1))
+  done
+  [ "$count" -le 32 ] || fail "PROXY_TRUSTED_NETWORKS: at most 32 entries, $count given"
+  printf '%s' "$ranges" | tr -s ' ' | sed 's/^ //; s/ $//'
+}
+
+trusted=$(trusted_networks "${PROXY_TRUSTED_NETWORKS:-}")
+if [ -n "$trusted" ]; then
+  TRUSTED_PROXIES_DIRECTIVE="trusted_proxies static $trusted
+		trusted_proxies_strict"
+  echo "visitor's address taken from X-Forwarded-For of: $trusted (right to left, ADR 0129)"
+else
+  TRUSTED_PROXIES_DIRECTIVE=""
+fi
+export TRUSTED_PROXIES_DIRECTIVE
 
 if [ -n "${TLS_CERT_FILE:-}" ] || [ -n "${TLS_KEY_FILE:-}" ]; then
   [ -n "${TLS_CERT_FILE:-}" ] && [ -n "${TLS_KEY_FILE:-}" ] \

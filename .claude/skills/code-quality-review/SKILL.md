@@ -41,6 +41,10 @@ judge only whether the change uses them the way the rest of the code does.
 
 ## Checks
 
+To find an existing home or a near-copy, ask the Graphify MCP first (`graphify_find`,
+`query_graph`, `graphify_callers`); it describes the indexed commit, so read the file for
+anything changed in this scope.
+
 1. **Missed simplification.** Is there a restructuring, inside the rules above, that removes
    whole branches, flags, helpers or layers? Name it and say what it deletes. A refactor that
    only rearranges code, while a reader still has to keep as much in mind as before, is not a

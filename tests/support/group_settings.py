@@ -1,5 +1,12 @@
 """The settings form of the demo group in the admin portal, for the HTTP tests."""
 
+import httpx
+
+from tests.support.admin_site import Site, post_form
+
+SETTINGS = "/admin/groups/demo/settings"
+"""The demo group's settings page, where the form is posted."""
+
 SETTINGS_FORM = {
     "name": "Demo-team",
     "timezone": "Europe/Amsterdam",
@@ -31,3 +38,8 @@ SETTINGS_FORM = {
     "fallback_space_room_id": "",
 }
 """A complete, valid settings form for the demo group."""
+
+
+async def save_settings(site: Site, data: dict[str, str]) -> httpx.Response:
+    """Post ``data`` as the demo group's settings form."""
+    return await post_form(site, SETTINGS, data)

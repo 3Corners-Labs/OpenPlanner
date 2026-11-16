@@ -8,7 +8,7 @@ everyone else is refused by the matrix (403) before the id is looked at.
 
 import pytest
 
-from tests.admin.conftest import SAME_ORIGIN, Site
+from tests.support.admin_site import SAME_ORIGIN, Site
 from tests.support.authorization_matrix import ROLES
 from tests.support.skill_seed import add_pool, add_skill, staff_id
 

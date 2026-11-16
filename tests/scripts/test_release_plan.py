@@ -4,7 +4,9 @@ from pathlib import Path
 
 import pytest
 
+from scripts import release_plan
 from scripts.release_plan import (
+    ReleaseLookupError,
     candidate_base,
     candidate_version,
     main,
@@ -13,7 +15,8 @@ from scripts.release_plan import (
     project_version,
     superseded_by,
 )
-from tests.scripts.conftest import Git, commit_all
+from scripts.release_plan import release_published as real_release_published
+from tests.support.git_repository import Git, commit_all
 
 
 @pytest.mark.parametrize(
@@ -158,3 +161,109 @@ def test_the_release_plan_proposes_minor_when_a_fix_brought_a_migration(
     assert main([]) == 0
 
     assert "next version   0.5.0" in capsys.readouterr().out
+
+
+# A tag whose release is not published yet makes no candidates (ADR 0059 fix, 2026-11-15).
+
+
+def test_no_candidate_while_the_last_release_tag_is_not_published(
+    git: Git, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    Path("pyproject.toml").write_text('[project]\nname = "x"\nversion = "0.3.0"\n')
+    commit_all(git, "chore: start")
+    git("tag", "-a", "v0.3.0", "-m", "v0.3.0")
+    Path("a").write_text("a")
+    commit_all(git, "feat: after the tag (#1)")
+    monkeypatch.setattr(release_plan, "release_published", lambda _tag: False)
+
+    assert main(["--candidate"]) == 0
+    out = capsys.readouterr()
+    assert out.out == ""
+    assert "v0.3.0" in out.err
+    assert "not published" in out.err
+
+    # The release finishes: the next candidate is the next minor, numbered from 1.
+    monkeypatch.setattr(release_plan, "release_published", lambda _tag: True)
+    assert main(["--candidate"]) == 0
+    assert capsys.readouterr().out == "0.4.0-rc.1\n"
+
+
+def test_the_publication_is_not_looked_up_when_nothing_was_merged_since_the_tag(
+    git: Git, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    Path("pyproject.toml").write_text('[project]\nname = "x"\nversion = "0.3.0"\n')
+    commit_all(git, "chore: start")
+    git("tag", "-a", "v0.3.0", "-m", "v0.3.0")
+
+    def refuse(_tag: str) -> bool:
+        raise AssertionError("no lookup expected")
+
+    monkeypatch.setattr(release_plan, "release_published", refuse)
+    assert main(["--candidate"]) == 0
+
+
+def test_a_failed_lookup_fails_the_candidate_instead_of_guessing(
+    git: Git, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    Path("pyproject.toml").write_text('[project]\nname = "x"\nversion = "0.3.0"\n')
+    commit_all(git, "chore: start")
+    git("tag", "-a", "v0.3.0", "-m", "v0.3.0")
+    Path("a").write_text("a")
+    commit_all(git, "fix: after the tag")
+
+    def broken(_tag: str) -> bool:
+        raise ReleaseLookupError("gh: HTTP 502")
+
+    monkeypatch.setattr(release_plan, "release_published", broken)
+    assert main(["--candidate"]) == 1
+    assert "HTTP 502" in capsys.readouterr().err
+
+
+def test_release_published_reads_the_github_release(monkeypatch: pytest.MonkeyPatch) -> None:
+
+    class Result:
+        def __init__(self, code: int, out: str, err: str) -> None:
+            self.returncode, self.stdout, self.stderr = code, out, err
+
+    answers = iter(
+        [Result(0, "false\n", ""), Result(0, "true\n", ""), Result(1, "", "release not found\n")]
+    )
+
+    def fake_run(_argv: list[str], **_kwargs: object) -> Result:
+        return next(answers)
+
+    monkeypatch.setattr(release_plan.subprocess, "run", fake_run)
+    assert real_release_published("v0.3.0") is True  # published
+    assert real_release_published("v0.3.1") is False  # still a draft
+    assert real_release_published("v0.3.2") is False  # no release at all
+
+
+def test_release_published_raises_on_any_other_gh_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Result:
+        returncode, stdout, stderr = 1, "", "HTTP 502:\nBad Gateway"
+
+    monkeypatch.setattr(release_plan.subprocess, "run", lambda *_a, **_k: Result())
+    with pytest.raises(ReleaseLookupError, match=r"HTTP 502: Bad Gateway"):  # on one line
+        real_release_published("v0.3.0")
+
+
+def test_release_published_raises_when_github_does_not_answer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def hang(argv: list[str], **kwargs: object) -> None:
+        raise release_plan.subprocess.TimeoutExpired(argv, 60)
+
+    monkeypatch.setattr(release_plan.subprocess, "run", hang)
+    with pytest.raises(ReleaseLookupError, match="no answer"):
+        real_release_published("v0.3.0")
+
+
+def test_release_published_raises_when_gh_is_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    def missing(*_args: object, **_kwargs: object) -> None:
+        raise FileNotFoundError(2, "No such file or directory")
+
+    monkeypatch.setattr(release_plan.subprocess, "run", missing)
+    with pytest.raises(ReleaseLookupError, match="cannot run gh"):
+        real_release_published("v0.3.0")

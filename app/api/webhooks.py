@@ -18,6 +18,8 @@ unknown work, points 10 and 12) and noted as its platform's latest inbound event
 
     POST /webhooks/webex                   meetings started/ended, participants joined/left
     POST /webhooks/contact-center/{kind}/{org}  an organisation's own connection (ADR 0032)
+    POST /webhooks/contact-center/{kind}/{org}/messages  the deliveries of a conversation's
+                                           messages, with a secret of their own (ADR 0124 point 15)
     POST /webhooks/contact-center/{kind}   task created/connected/ended/failed
     POST /webhooks/wxcc                    alias of /webhooks/contact-center/webex_cc
 """
@@ -30,11 +32,15 @@ from starlette.responses import Response
 
 from app.adapters.webhooks import (
     CONTACT_CENTER_PATH,
+    MESSAGES_SUFFIX,
     WEBEX_PATH,
     WXCC_INBOUND,
     ContactCenterWebhook,
     InboundWebhook,
 )
+from app.adapters.wxcc_chat import chat_key
+from app.domain.call_chat import ChatEvent
+from app.domain.call_chat_service import CallChatService
 from app.domain.connection_health import InboundEvent, Platform
 from app.domain.integration import EventOutcome, IntegrationService
 from app.domain.integration_health import IntegrationHealthService
@@ -45,6 +51,7 @@ from app.web.webhook_gate import (
     alias_address,
     installation_address,
     key_of,
+    messages_address,
     organisation_address,
     webex_address,
     webhook_gate,
@@ -61,6 +68,9 @@ InstallationDelivery = Annotated[
 AliasDelivery = Annotated[Delivery[ContactCenterWebhook], Depends(webhook_gate(alias_address))]
 OrganisationDelivery = Annotated[
     Delivery[ContactCenterWebhook], Depends(webhook_gate(organisation_address))
+]
+MessagesDelivery = Annotated[
+    Delivery[ContactCenterWebhook], Depends(webhook_gate(messages_address))
 ]
 
 
@@ -123,6 +133,52 @@ async def organisation_contact_center(request: Request, delivery: OrganisationDe
     return await _record_task_event(request, delivery)
 
 
+@router.post(CONTACT_CENTER_PATH + "/{kind}/{org}" + MESSAGES_SUFFIX)
+async def organisation_messages(request: Request, delivery: MessagesDelivery) -> Response:
+    """Record the deliveries of a conversation's messages of an organisation's own connection.
+
+    The platform delivers every message the flow or a staff member sends here (ADR 0123 point 8,
+    ADR 0124 point 15), signed with the secret of this address. The body is a participant's words
+    or a staff member's: it is stored for the booking whose task it names and never logged.
+    """
+    inbound = delivery.address.inbound
+    event = inbound.chat(delivery.payload, assume_appended=True) if inbound.chat else None
+    return await _record_chat(request, delivery, event)
+
+
+async def _record_chat(
+    request: Request, delivery: Delivery[ContactCenterWebhook], event: ChatEvent | None
+) -> Response:
+    """Read one verified body as a chat event and store it; anything else is acknowledged.
+
+    Only an organisation's address gets here (the installation's has no booking of its own to
+    match). The log line carries codes and an outcome, never the text.
+    """
+    inbound = delivery.address.inbound
+    organisation_id = delivery.address.organisation_id
+    outcome = EventOutcome.IGNORED
+    if event is not None and organisation_id is not None:
+        chat: CallChatService = request.app.state.call_chat_service
+        outcome = await chat.record(
+            event,
+            delivery.now,
+            provider=inbound.kind,
+            source=inbound.source,
+            organisation_id=organisation_id,
+            event_key=chat_key(event, delivery.payload),
+            scope=scope_of(organisation_id),
+            body_identity=delivery.body_identity,
+        )
+        log.info(
+            "webhook.chat",
+            platform=inbound.kind.value,
+            kind=event.kind.value,
+            outcome=outcome.value,
+        )
+    await _note(request, delivery, outcome)
+    return Response(status_code=204)
+
+
 async def _record_task_event(
     request: Request, delivery: Delivery[ContactCenterWebhook]
 ) -> Response:
@@ -133,6 +189,11 @@ async def _record_task_event(
     """
     inbound = delivery.address.inbound
     event = inbound.parse(delivery.payload)
+    if event is None and inbound.chat is not None and delivery.address.organisation_id is not None:
+        # A message event of a conversation (ADR 0123 step 7b): the subscription reports them too.
+        message = inbound.chat(delivery.payload)
+        if message is not None:
+            return await _record_chat(request, delivery, message)
     outcome = EventOutcome.IGNORED
     if event is not None:
         outcome = await _service(request).record_task_event(
@@ -153,6 +214,9 @@ async def _record_task_event(
             platform=inbound.kind.value,
             kind=event.kind.value,
             outcome=outcome.value,
+            # Whether the event carried a booking reference as its origin, never the value: the
+            # operator check G15 of ADR 0121 step 29 reads it (docs/runbook.md).
+            origin="reference" if event.origin else "none",
         )
     await _note(request, delivery, outcome)
     return Response(status_code=204)

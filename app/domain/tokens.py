@@ -11,7 +11,7 @@ import base64
 import hashlib
 import hmac
 import secrets
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 
 SALT_BYTES = 32
 MIN_KEY_BYTES = 32
@@ -76,6 +76,24 @@ def token_matches(token: str, token_hash: str) -> bool:
 def agent_pseudonyms(keys: Sequence[bytes], subject: str) -> tuple[str, ...]:
     """Return the pseudonyms of ``subject`` under the current key and the previous one, if any."""
     return tuple(agent_pseudonym(key, subject) for key in keys)
+
+
+def staff_ids_by_pseudonym(
+    keys: Sequence[bytes], members: Iterable[tuple[int | None, str]]
+) -> dict[str, int]:
+    """Return the row id of every staff member under each of their pseudonyms.
+
+    The one place a pseudonym is matched to staff (a claim names its agent only by a pseudonym,
+    ADR 0043): the usage facts (``StaffUsage``) and the name of who accepted a booking
+    (``StaffScreenNames``) both look a pseudonym up in this map. ``members`` are ``(id,
+    subject)`` pairs; one without an id (not stored yet) is left out.
+    """
+    return {
+        pseudonym: member_id
+        for member_id, subject in members
+        if member_id is not None
+        for pseudonym in agent_pseudonyms(keys, subject)
+    }
 
 
 def agent_pseudonym(key: bytes, subject: str) -> str:

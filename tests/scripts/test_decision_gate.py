@@ -26,7 +26,7 @@ from scripts.decision_gate import (
     reasons,
     unbuilt,
 )
-from tests.scripts.conftest import Git, commit_all
+from tests.support.git_repository import Git, commit_all
 
 
 def with_first_step(text: str) -> str:
@@ -115,7 +115,7 @@ def test_every_decision_path_and_the_release_title_are_named() -> None:
         ".semgrep/no-print.yml",
         "Makefile",
         "app/domain/authorization.py",
-        "scripts/check-release-audit.sh",
+        "scripts/release-audit.sh",
         "scripts/vendor.py",
         "scripts/vendor_sbom.py",
         "docs/adr/0099-example.md",
@@ -134,7 +134,6 @@ def test_every_decision_path_and_the_release_title_are_named() -> None:
         "Makefile changed",
         "app/domain/authorization.py changed",
         "docs/adr/0099-example.md changed outside its Status line and Build status table",
-        "scripts/check-release-audit.sh changed",
         "scripts/vendor.py changed",
         "scripts/vendor_sbom.py changed",
     ]

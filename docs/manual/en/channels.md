@@ -86,7 +86,15 @@ stored secret.
 After saving you see this organisation's **Webhook address**. The contact center reports the
 status of tasks there. OpenPlanner checks every report with a secret the server makes itself;
 nobody types or sees it. **Make a new webhook secret** replaces it, for example when you suspect
-it leaked; the old one stops working at once. **Remove the own connection** erases the connection
+it leaked. The contact center is told the new secret at once. The old secret keeps working for a
+short time (the platform administrator sets how long, 60 minutes by default), so that no event is
+lost while the contact center takes the new one up; the card says until when. Making yet another
+new secret straight after stops the old ones at once: that is how you end a secret that leaked
+without waiting (the platform administrator can also set that time to 0). *Deliveries seen* counts
+how many deliveries were still verified with the old secret: when that stays at zero the contact
+center uses the new one. If the card says the contact center was not told the new secret, or that
+there is no subscription now, nothing retries by itself: check the Service App's rights and press
+**Save** on the card to register again. **Remove the own connection** erases the connection
 and its secrets.
 
 As long as an organisation has no connection of its own, it uses the installation's. That
@@ -177,6 +185,30 @@ cause these alone (when your list is a range the supplier shares with others, a 
 means your list may be out of date. A stranger who knows the address can also cause the *list*
 alert while real deliveries arrive: it costs one event per window and hides nothing. Other calls
 from strangers that fail are counted on the card and raise nothing.
+
+### Chat messages
+
+For a service whose participant gets a chat beside the call, the contact center delivers the
+messages of the conversation to a second address on the card, **Chat messages**, which ends in
+`/messages`. It has a secret of its own, separate from the webhook secret.
+
+1. Choose **Make a secret for this address**. The next page shows the address and the secret
+   **once**; OpenPlanner keeps the secret sealed and cannot show it again.
+2. In the contact center's console, set the address as the webhook address of the messaging
+   asset and the secret as its secret.
+3. Lost it? Make a new one. The secret that worked until then keeps working for the overlap the
+   platform administrator set (60 minutes by default), so no message is lost while you paste the
+   new one; the card says until when.
+
+Until a secret is made the address does not exist and every call to it is answered as an unknown
+address. The pause and the allowed source networks of the card apply to this address too. If the
+address cannot be reached, the contact center's flow fails at its first message step and the task
+ends before a staff member sees it.
+
+The staff member's messages are kept with the appointment and deleted with it, 24 hours after the
+appointment, like the participant's details. The contact center keeps its own transcript of the
+conversation; OpenPlanner's deletion does not reach it. The meeting's own chat is switched off for
+these services, so staff answer in the contact center's desktop only.
 
 ## What is recorded
 

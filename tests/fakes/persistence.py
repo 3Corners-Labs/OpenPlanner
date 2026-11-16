@@ -4,7 +4,7 @@ import asyncio
 import copy
 from collections import Counter
 from collections.abc import AsyncIterator, Collection, Sequence
-from contextlib import asynccontextmanager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 
@@ -32,6 +32,7 @@ from app.domain.booking import (
 )
 from app.domain.booking_rollup import DayCount, RollableBooking
 from app.domain.branding import Branding, FontFile, FontRole, Logo
+from app.domain.call_chat import CallMessage, ChatAuthor, ChatState
 from app.domain.calls import BookingEvent, BookingOverview, CallStatus, new_status
 from app.domain.capacity import CapacityPool
 from app.domain.change_requests import ChangeRequest
@@ -115,6 +116,7 @@ from app.domain.tasks import ActiveJob, ActiveJobs
 from app.domain.tls import CertificateCheck
 from app.domain.updates import ListedRelease, ReleaseCheck, RunningVersion, UpdateRequest
 from app.domain.usage import StaffFact, UsageFact
+from app.domain.webhook_secrets import Sighting
 from app.domain.worker_check import WorkerHeartbeat
 from tests.fakes.service_request_store import ServiceRequestStore
 from tests.support.domain import NOW
@@ -138,6 +140,7 @@ class State:
     organisation_slugs: dict[int, str] = field(default_factory=dict)
     organisations: dict[int, Organisation] = field(default_factory=dict)
     booking_events: dict[int, list[BookingEvent]] = field(default_factory=dict)
+    call_messages: dict[int, list[CallMessage]] = field(default_factory=dict)
     call_status: dict[int, CallStatus] = field(default_factory=dict)
     webhook_events: dict[tuple[str, str], datetime] = field(default_factory=dict)
     audit: list[AuditEvent] = field(default_factory=list)
@@ -183,6 +186,7 @@ class State:
     instance_id: str | None = None
     probe_nonce: tuple[str, datetime] | None = None
     address_checks: dict[AddressKind, AddressCheck] = field(default_factory=dict)
+    secret_sightings: dict[str, Sighting] = field(default_factory=dict)
     own_certificate: OwnCertificate | None = None
     maintenance: MaintenanceState = MAINTENANCE_OFF
     update_requests: dict[int, UpdateRequest] = field(default_factory=dict)
@@ -339,6 +343,16 @@ class InMemoryTransaction(ServiceRequestStore):
             self.state.staff[subject] = replace(
                 self.state.staff[subject], status=status, status_at=at
             )
+
+    async def get_staff_by_id(self, staff_id: int) -> StaffMember | None:
+        return next((m for m in self.state.staff.values() if m.id == staff_id), None)
+
+    async def set_staff_screen_name(self, subject: str, screen_name: str | None) -> bool:
+        member = self.state.staff.get(subject)
+        if member is None or member.status is StaffStatus.ERASED:
+            return False
+        self.state.staff[subject] = replace(member, screen_name=screen_name)
+        return True
 
     async def get_overview_layout(self, subject: str) -> tuple[str, ...] | None:
         return self.state.overview_layouts.get(subject)
@@ -895,6 +909,88 @@ class InMemoryTransaction(ServiceRequestStore):
     async def get_booking_events(self, booking_id: int) -> list[BookingEvent]:
         return list(self.state.booking_events.get(booking_id, []))
 
+    async def add_call_message(self, message: CallMessage) -> bool:
+        stored = self.state.call_messages.setdefault(message.booking_id, [])
+        if any(m.provider_message_id == message.provider_message_id for m in stored):
+            return False
+        self.state.next_id += 1
+        stored.append(replace(message, id=self.state.next_id))
+        return True
+
+    async def messages_of_call(
+        self, booking_id: int, since: int = 0, limit: int | None = None
+    ) -> list[CallMessage]:
+        found = sorted(
+            (m for m in self.state.call_messages.get(booking_id, []) if (m.id or 0) > since),
+            key=lambda m: m.id or 0,
+        )
+        return found if limit is None else found[:limit]
+
+    async def call_message_by_provider_id(
+        self, booking_id: int, provider_message_id: str
+    ) -> CallMessage | None:
+        for m in self.state.call_messages.get(booking_id, []):
+            if m.provider_message_id == provider_message_id:
+                return m
+        return None
+
+    async def participant_message_times(self, booking_id: int, after: datetime) -> list[datetime]:
+        return [
+            m.at
+            for m in self.state.call_messages.get(booking_id, [])
+            if m.author is ChatAuthor.PARTICIPANT and m.at > after
+        ]
+
+    async def call_message_states(self, booking_id: int, ids: list[int]) -> dict[int, ChatState]:
+        return {
+            m.id: m.state
+            for m in self.state.call_messages.get(booking_id, [])
+            if m.id in ids and m.author is ChatAuthor.PARTICIPANT and m.id is not None
+        }
+
+    async def has_refused_call_message(self, booking_id: int) -> bool:
+        return any(
+            m.state is ChatState.REFUSED for m in self.state.call_messages.get(booking_id, [])
+        )
+
+    async def confirm_call_message(self, booking_id: int, provider_message_id: str) -> bool:
+        stored = self.state.call_messages.get(booking_id, [])
+        for i, m in enumerate(stored):
+            if m.provider_message_id == provider_message_id and m.state is ChatState.SENT:
+                stored[i] = replace(m, state=ChatState.DELIVERED)
+                return True
+        return False
+
+    async def refuse_sent_call_messages(self, booking_id: int) -> int:
+        stored = self.state.call_messages.get(booking_id, [])
+        count = 0
+        for i, m in enumerate(stored):
+            if m.state is ChatState.SENT:
+                stored[i] = replace(m, state=ChatState.REFUSED)
+                count += 1
+        return count
+
+    async def count_call_messages(self, booking_id: int) -> int:
+        return len(self.state.call_messages.get(booking_id, []))
+
+    async def sent_call_message_ids(self, booking_id: int) -> list[str]:
+        return [
+            m.provider_message_id
+            for m in self.state.call_messages.get(booking_id, [])
+            if m.state is ChatState.SENT
+        ]
+
+    async def withdraw_call_message(self, booking_id: int, provider_message_id: str) -> bool:
+        stored = self.state.call_messages.get(booking_id, [])
+        for m in stored:
+            if m.provider_message_id == provider_message_id and m.state is ChatState.SENT:
+                stored.remove(m)
+                return True
+        return False
+
+    async def delete_call_messages(self, booking_id: int) -> None:
+        self.state.call_messages.pop(booking_id, None)
+
     async def list_bookings(
         self, scope: Scope, group_id: int, lower: datetime, upper: datetime
     ) -> list[BookingOverview]:
@@ -1238,6 +1334,7 @@ class InMemoryTransaction(ServiceRequestStore):
         self.state.booking_events[booking_id] = [
             replace(e, message="") for e in self.state.booking_events.get(booking_id, [])
         ]
+        self.state.call_messages.pop(booking_id, None)
         self.state.purged_at[booking_id] = now
         self._forget_agents_of_booking(booking_id)
 
@@ -1834,6 +1931,12 @@ class InMemoryTransaction(ServiceRequestStore):
     async def save_address_check(self, check: AddressCheck) -> None:
         self.state.address_checks[check.kind] = check
 
+    async def get_secret_sighting(self, platform: str) -> Sighting | None:
+        return self.state.secret_sightings.get(platform)
+
+    async def save_secret_sighting(self, platform: str, sighting: Sighting) -> None:
+        self.state.secret_sightings[platform] = sighting
+
     async def delete_address_check(self, kind: AddressKind) -> None:
         self.state.address_checks.pop(kind, None)
 
@@ -1987,3 +2090,23 @@ class InMemoryUnitOfWork:
             yield InMemoryTransaction(working)
             await asyncio.sleep(0)  # let a competing transaction queue up on the lock
             self.state = working
+
+
+class CommitFailingUnitOfWork:
+    """Wraps a store so that every locked transaction fails at its commit: nothing is kept.
+
+    Reads see the store; a locked block works on a copy that is thrown away, then raises, as a
+    commit that fails would. For counts that must reflect only what was committed.
+    """
+
+    def __init__(self, uow: InMemoryUnitOfWork) -> None:
+        self._uow = uow
+
+    def read(self) -> AbstractAsyncContextManager[InMemoryTransaction]:
+        return self._uow.read()
+
+    @asynccontextmanager
+    async def locked(self) -> AsyncIterator[InMemoryTransaction]:
+        async with self._uow.read() as tx:
+            yield tx
+        raise RuntimeError("commit failed")

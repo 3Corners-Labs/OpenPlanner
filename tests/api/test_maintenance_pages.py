@@ -29,6 +29,7 @@ from app.domain.maintenance import MaintenanceReason
 from app.domain.maintenance_service import MaintenanceService
 from app.main import create_app
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import served
 from tests.support.domain import NOW
 
 SAME_ORIGIN = {"sec-fetch-site": "same-origin"}
@@ -58,12 +59,7 @@ class Site:
 @pytest.fixture
 async def site(demo_settings: Settings) -> AsyncIterator[Site]:
     app = create_app(demo_settings, FixedClock(NOW))
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
-        ) as client,
-    ):
+    async with served(app) as client:
         yield Site(client, app)
 
 
@@ -150,6 +146,7 @@ async def test_a_management_link_page_never_tells_whether_the_token_exists(site:
         ("GET", f"/b/{TOKEN}/wait/status"),
         ("POST", "/webhooks/webex"),
         ("POST", "/webhooks/wxcc"),
+        ("POST", "/webhooks/contact-center/webex_cc/demo/messages"),
         ("GET", "/o/demo/theme.css"),
     ],
 )
@@ -173,6 +170,17 @@ async def test_purge_jobs_are_not_touched() -> None:
     sources = [p.read_text() for p in Path(jobs_package.__file__).parent.glob("*.py")]
     assert not any("MaintenanceService" in source for source in sources)
     assert not any(".refuse(" in source or ".status()" in source for source in sources)
+
+
+def test_the_trial_call_on_the_call_page_closes_with_the_trial_call() -> None:
+    """ADR 0038 and ADR 0123 step 6b: unlike the appointment's call routes (a confirmed
+    appointment takes place during maintenance), the trial call is no appointment: entering it
+    writes an event and its token mints a guest at the video platform, so it closes like
+    ``/test`` and ``/test/go``."""
+    trial = {"/b/m/{public_ref}/test/call", "/b/m/{public_ref}/test/call/token"}
+
+    assert trial <= BOOKING_ROUTES
+    assert not trial & OPEN_ROUTES
 
 
 def test_every_public_route_is_closed_or_explicitly_open(demo_settings: Settings) -> None:
@@ -212,12 +220,7 @@ async def machine(settings: Settings, database_url: str) -> AsyncIterator[Site]:
     """A machine API with one write route besides the real ones (none write today)."""
     on = settings.model_copy(update={"database_url": database_url, "agent_api_enabled": True})
     app = create_app(on, FixedClock(NOW))
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
-        ) as client,
-    ):
+    async with served(app) as client:
         yield Site(client, app)
 
 

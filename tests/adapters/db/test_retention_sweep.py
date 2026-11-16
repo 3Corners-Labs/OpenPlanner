@@ -10,7 +10,6 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.booking import BookingStatus
 from app.domain.retention_sweep import RetentionSweep
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import (
     ADA,
@@ -21,6 +20,7 @@ from tests.support.domain import (
     book,
     book_pending,
 )
+from tests.support.seed_rows import seed_group
 
 DAY = timedelta(hours=24)
 

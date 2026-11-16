@@ -11,8 +11,7 @@ from app.admin.overview_charts import (
     page_href,
 )
 from app.web.widgets import WIDGETS, View, widget
-from tests.admin.conftest import AGENT, GROUP_ADMIN, ORG_ADMIN, SUPER, Site
-from tests.support.admin_site import site_uow
+from tests.support.admin_site import AGENT, GROUP_ADMIN, ORG_ADMIN, SUPER, Site, site_uow
 from tests.support.queue import own_queue
 
 SVG = re.compile(r"<svg [^>]*>")

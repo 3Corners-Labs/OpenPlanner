@@ -10,7 +10,7 @@ live meeting status per ADR 0010), ``ContactCenterDispatcher`` (WP6, ADR 0007; o
 from collections.abc import Collection, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Protocol
 
 from app.domain.admin_sessions import AdminSession, EndReason
@@ -32,6 +32,7 @@ from app.domain.booking import (
 )
 from app.domain.booking_rollup import DayCount, RollableBooking
 from app.domain.branding import Branding, FontFile, FontRole, Logo
+from app.domain.call_chat import CallMessage, ChatState
 from app.domain.calls import (
     BookingEvent,
     BookingOverview,
@@ -132,6 +133,7 @@ from app.domain.usage_report import DayStatusCount, ReportGroup
 from app.domain.usage_rollup import UsageBatch, UsagePruned, UsageState
 from app.domain.usage_staff import StaffCell
 from app.domain.wallboard_link import WallboardLink
+from app.domain.webhook_secrets import Sighting, WebhookSecrets
 from app.domain.worker_check import WorkerHeartbeat
 
 
@@ -580,11 +582,30 @@ class ContactCenterConnections(Protocol):
         ...
 
     async def rotate_webhook_secret(self, organisation_id: int, now: datetime) -> None:
-        """Generate a new webhook secret for an existing connection, replacing the old one."""
+        """Generate a new webhook secret for an existing connection.
+
+        The secret that was current is kept, sealed, as the previous one and the one before it is
+        removed (ADR 0124 point 8; ``app.domain.webhook_secrets.rotated`` is the rule).
+        """
+        ...
+
+    async def drop_expired_previous(
+        self, organisation_ids: Sequence[int], now: datetime, overlap: timedelta
+    ) -> int:
+        """Remove the previous secrets whose overlap has ended at ``now``; return how many went."""
         ...
 
     async def set_inbound_enabled(self, organisation_id: int, enabled: bool, now: datetime) -> None:
         """Pause or resume the address of an existing connection; nothing else of it changes."""
+        ...
+
+    async def set_registration(
+        self, organisation_id: int, state: Registration | None, now: datetime
+    ) -> None:
+        """Remember what the last registration came to, or ``None`` once it succeeded.
+
+        Only that field of an existing connection changes (ADR 0124 point 8).
+        """
         ...
 
     async def delete(self, organisation_id: int) -> None:
@@ -602,6 +623,32 @@ class ContactCenterConnections(Protocol):
         """Return the webhook secret when the organisation is connected to ``kind``; else ``None``.
 
         For the webhook gate and the dispatcher only (ADR 0032 point 10); never shown.
+        """
+        ...
+
+    async def webhook_secrets(
+        self, organisation_id: int, kind: ContactCenterKind
+    ) -> WebhookSecrets | None:
+        """Return the current and previous webhook secret with the time of the rotation.
+
+        As ``webhook_secret``, for the webhook gate (ADR 0124 point 8); never shown.
+        """
+        ...
+
+    async def make_message_secret(self, organisation_id: int, now: datetime) -> str | None:
+        """Make the secret of the message address and return it, the one time it is shown.
+
+        ``None`` without a connection. The secret that was current becomes the previous one for
+        the overlap (ADR 0124 points 8 and 15).
+        """
+        ...
+
+    async def message_secrets(
+        self, organisation_id: int, kind: ContactCenterKind
+    ) -> WebhookSecrets | None:
+        """Return the current and previous secret of the message address; ``None`` without one.
+
+        For the webhook gate (ADR 0124 point 15); never shown again.
         """
         ...
 
@@ -993,6 +1040,21 @@ class Transaction(Protocol):
 
     async def set_staff_status(self, subject: str, status: StaffStatus, at: datetime) -> None:
         """Set the status of ``subject`` (suspended or active again); unknown ones are ignored."""
+        ...
+
+    async def get_staff_by_id(self, staff_id: int) -> StaffMember | None:
+        """Return the staff record with this row id, or ``None``.
+
+        One read by the primary key; the call page's name lookup uses it (ADR 0123 step 5c).
+        """
+        ...
+
+    async def set_staff_screen_name(self, subject: str, screen_name: str | None) -> bool:
+        """Set or clear (``None``) the screen name of ``subject`` (ADR 0123 step 5c).
+
+        Returns ``False`` when ``subject`` has no staff record or the record is erased (an erased
+        record keeps no name); nothing is written then.
+        """
         ...
 
     async def get_overview_layout(self, subject: str) -> tuple[str, ...] | None:
@@ -2560,6 +2622,79 @@ class Transaction(Protocol):
 
     async def save_address_check(self, check: AddressCheck) -> None:
         """Replace the latest round trip of ``check.kind``."""
+        ...
+
+    async def add_call_message(self, message: CallMessage) -> bool:
+        """Store a message of a booking's chat; ``False`` when its provider id is stored already.
+
+        Locked transactions only (ADR 0123 step 7b); the text is personal data.
+        """
+        ...
+
+    async def messages_of_call(
+        self, booking_id: int, since: int = 0, limit: int | None = None
+    ) -> list[CallMessage]:
+        """Return a booking's chat in arrival order (by id), only what is newer than ``since``.
+
+        The caller checks the participant's session; ``limit`` cuts the answer (``None``: all).
+        """
+        ...
+
+    async def call_message_by_provider_id(
+        self, booking_id: int, provider_message_id: str
+    ) -> CallMessage | None:
+        """Return the booking's message with that provider id, or ``None``."""
+        ...
+
+    async def participant_message_times(self, booking_id: int, after: datetime) -> list[datetime]:
+        """Return the times of the participant's messages later than ``after`` (the rate window)."""
+        ...
+
+    async def call_message_states(self, booking_id: int, ids: list[int]) -> dict[int, ChatState]:
+        """Return the state of the participant's messages among ``ids``."""
+        ...
+
+    async def has_refused_call_message(self, booking_id: int) -> bool:
+        """Return whether the platform refused a message of the booking's chat."""
+        ...
+
+    async def confirm_call_message(self, booking_id: int, provider_message_id: str) -> bool:
+        """Mark the booking's ``sent`` message ``delivered``; ``False`` when there is none."""
+        ...
+
+    async def refuse_sent_call_messages(self, booking_id: int) -> int:
+        """Mark every ``sent`` message of the booking ``refused``; return how many."""
+        ...
+
+    async def count_call_messages(self, booking_id: int) -> int:
+        """Return how many messages a booking's chat holds (the bound of the chat, step 7b)."""
+        ...
+
+    async def sent_call_message_ids(self, booking_id: int) -> list[str]:
+        """Return the provider ids of the booking's messages that wait for their confirmation."""
+        ...
+
+    async def withdraw_call_message(self, booking_id: int, provider_message_id: str) -> bool:
+        """Delete one ``sent`` message that never reached the platform; ``False`` if none.
+
+        The call page's sending (ADR 0123 step 7c) stores a message before it hands it to the
+        platform and takes it back when the platform could not be reached.
+        """
+        ...
+
+    async def delete_call_messages(self, booking_id: int) -> None:
+        """Delete a booking's chat (its purge, ADR 0123 step 7b)."""
+        ...
+
+    async def get_secret_sighting(self, platform: str) -> Sighting | None:
+        """Return when the installation's webhook secret of ``platform`` was first seen.
+
+        A keyed fingerprint and a time, never the secret (ADR 0124 point 8); ``None`` before.
+        """
+        ...
+
+    async def save_secret_sighting(self, platform: str, sighting: Sighting) -> None:
+        """Store the first sighting of the installation's webhook secret of ``platform``."""
         ...
 
     async def delete_address_check(self, kind: AddressKind) -> None:

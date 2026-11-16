@@ -5,6 +5,9 @@ Helm chart. Meant for hosting OpenPlanner externally without a server of your ow
 **trial**: written against the Kubernetes API and TransIP's published facts, and tested by
 rendering the chart; the first real cluster run is step 3 of the ADR.
 
+> On OpenStack without a cluster? One virtual machine with the host installation is the simpler
+> route: `docs/openstack.md`.
+
 ## What you get, and what you do not
 
 - One pod with `web` and `worker` on one volume. **One replica, never more**: the database is a
@@ -21,7 +24,8 @@ rendering the chart; the first real cluster run is step 3 of the ADR.
   an ingress controller and, for HTTPS, cert-manager or a certificate of your own. Use a
   maintained controller, for example Traefik: the Kubernetes project retired ingress-nginx in
   March 2026, and it gets no security fixes any more. TransIP includes no controller (*TransIP
-  notes* below).
+  notes* below). The ingress keeps no access log and writes no request line to its error log:
+  paths carry management tokens (as the runbook asks of every reverse proxy of your own).
 - `kubectl` and Helm 3, and the chart from this repository (`deploy/helm/openplanner`).
 - A public name for the installation, DNS pointing at the ingress, and the settings of
   `.env.example` for production: the login, the mail server, `PUBLIC_BASE_URL`.

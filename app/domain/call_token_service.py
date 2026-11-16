@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from app.domain.booking import Booking
-from app.domain.calls import EventKind, JoinState, join_link, join_state
+from app.domain.calls import EventKind, JoinState, RedirectClient, join_link, join_state
 from app.domain.guest_access import (
     DisplayNameMode,
     GuestAccess,
@@ -33,7 +33,8 @@ from app.domain.guest_access import (
 )
 from app.domain.integration import IntegrationService
 from app.domain.ports import Clock, IntegrationError, UnitOfWork, VideoProvider
-from app.domain.scheduling import JoinClient
+from app.domain.scheduling import Group
+from app.domain.trial_call import TrialState, trial_state
 
 
 class TokenRefusal(StrEnum):
@@ -117,13 +118,55 @@ class CallTokenService:
         Returns:
             The token and the guest link, or the refusal.
         """
-        if booking.id is None:  # pragma: no cover - stored bookings always have an id
-            raise ValueError("booking has no id")
         # The one rule of the join page (``join_state``). The link is not shaped by the group's
         # join client as ``/join/go`` does (``launchApp`` sends the browser to the Webex app):
         # the SDK takes the stored guest link as it is, so the unaltered form is asked for here.
-        link = join_link(booking.meeting.link if booking.meeting else None, JoinClient.CHOICE)
-        if join_state(booking, self._clock.now()) is not JoinState.OPEN or link is None:
+        link = join_link(booking.meeting.link if booking.meeting else None, RedirectClient.CHOICE)
+        is_open = join_state(booking, self._clock.now()) is JoinState.OPEN
+        return await self._mint(booking, link if is_open else None, display, term, admit)
+
+    async def issue_trial(
+        self,
+        booking: Booking,
+        group: Group,
+        display: DisplayNameMode,
+        term: str,
+        admit: Callable[[], bool],
+    ) -> CallToken | TokenRefusal:
+        """Mint a guest token for the open trial call of ``booking`` (ADR 0123 point 9).
+
+        The same guest as the appointment's (one per booking, point 7), the same budget and the
+        same rules about the token; only the meeting differs: the booking's trial meeting, while
+        its trial call is open (``trial_state``). Without an open trial call the answer is
+        ``NOT_OPEN``.
+
+        Args:
+            booking: The booking, read by the caller after it checked the participant's session.
+            group: The booking's group (the trial call's rules are the group's).
+            display: As for ``issue``.
+            term: As for ``issue``.
+            admit: As for ``issue``.
+        """
+        trial = booking.trial
+        link = join_link(trial.meeting.link if trial else None, RedirectClient.CHOICE)
+        active = trial_state(booking, group, self._clock.now()) is TrialState.ACTIVE
+        return await self._mint(booking, link if active else None, display, term, admit)
+
+    async def _mint(
+        self,
+        booking: Booking,
+        link: str | None,
+        display: DisplayNameMode,
+        term: str,
+        admit: Callable[[], bool],
+    ) -> CallToken | TokenRefusal:
+        """Mint for ``booking`` when ``link`` (the meeting's, or ``None`` when not open) allows.
+
+        Only an attempt that is open now counts against the booking's budget.
+        """
+        if booking.id is None:  # pragma: no cover - stored bookings always have an id
+            raise ValueError("booking has no id")
+        if link is None:
             return TokenRefusal.NOT_OPEN
         if self._video is None:
             return TokenRefusal.UNAVAILABLE

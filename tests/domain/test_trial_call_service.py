@@ -7,6 +7,7 @@ import pytest
 
 from app.domain.admin import AdminService
 from app.domain.booking import BookingStatus, MeetingRef
+from app.domain.call_client import call_page_rule
 from app.domain.calls import EventKind
 from app.domain.errors import DomainError
 from app.domain.integration import IntegrationService
@@ -230,7 +231,9 @@ async def test_following_the_trial_link_says_which_page_the_participant_was_sent
         for e in setup.uow.state.booking_events[setup.booking_id]
         if e.kind is EventKind.TRIAL_JOINED
     ]
-    assert [e.detail for e in joined] == [client.value]
+    # the page the participant really got: an embedded service's trial call opens the web app
+    shape = "browser" if client is JoinClient.EMBEDDED else client.value
+    assert [e.detail for e in joined] == [shape]
 
 
 @pytest.mark.parametrize(
@@ -267,3 +270,66 @@ async def test_a_second_trial_removes_the_expired_one_and_binds_its_own_cleanup(
         j for j in setup.uow.state.jobs[setup.booking_id] if j.type is JobType.DELETE_TRIAL_CALL
     ]
     assert [j.pinned_start for j in cleanup] == [first.expires_at, second.expires_at]
+
+
+# --- the trial call on the call page (ADR 0123 point 9, step 6b) -------------------------------
+
+
+def _with_page(setup: Setup, *, enabled: bool = True) -> Setup:
+    """Return ``setup`` with a trial service that knows the platform switch."""
+    integration = IntegrationService(setup.uow, setup.clock, AdminService(setup.uow, setup.clock))
+    setup.service = TrialCallService(
+        setup.uow, setup.video, integration, setup.clock, call_page_rule(lambda: enabled)
+    )
+    return setup
+
+
+async def test_a_trial_meeting_of_a_service_that_uses_the_page_has_no_chat() -> None:
+    setup = _with_page(await Setup(join_client=JoinClient.EMBEDDED).booked())
+
+    view = await setup.service.open(setup.token)
+
+    assert view.call_page is True
+    assert [r.chat_enabled for r in setup.video.created] == [False]
+    assert setup.video.created[0].join_before_host is True  # the rest of the trial is unchanged
+
+
+@pytest.mark.parametrize(
+    ("client", "enabled"),
+    [
+        (JoinClient.BROWSER, True),
+        (JoinClient.CHOICE, True),
+        (JoinClient.EMBEDDED, False),  # held, while the platform switch is off
+    ],
+)
+async def test_any_other_trial_meeting_keeps_the_chat_and_the_old_ways(
+    client: JoinClient, enabled: bool
+) -> None:
+    setup = _with_page(await Setup(join_client=client).booked(), enabled=enabled)
+
+    view = await setup.service.open(setup.token)
+
+    assert view.call_page is False
+    assert [r.chat_enabled for r in setup.video.created] == [True]
+    assert await setup.service.enter_page(setup.token) is None
+    assert EventKind.TRIAL_JOINED not in setup.events()
+
+
+async def test_entering_the_page_is_recorded_only_while_the_trial_call_is_open() -> None:
+    setup = _with_page(await Setup(join_client=JoinClient.EMBEDDED).booked())
+    assert await setup.service.enter_page(setup.token) is None  # nothing opened yet
+    await setup.service.open(setup.token)
+
+    view = await setup.service.enter_page(setup.token)
+    setup.clock.advance(timedelta(minutes=31))
+    after = await setup.service.enter_page(setup.token)
+
+    assert view is not None
+    assert view.state is TrialState.ACTIVE
+    assert after is None
+    joined = [
+        e
+        for e in setup.uow.state.booking_events[setup.booking_id]
+        if e.kind is EventKind.TRIAL_JOINED
+    ]
+    assert [e.detail for e in joined] == ["embedded"]

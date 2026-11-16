@@ -25,6 +25,7 @@ from app.adapters.webex_auth import AuthorizedClient, ServiceAppConfig, WebexTok
 from app.adapters.webex_meetings import WebexMeetings
 from app.adapters.wxcc import wxcc_tasks
 from app.config import Settings
+from app.domain.call_client import UsesCallPage, call_page_rule
 from app.domain.contact_center import ContactCenterKind
 from app.domain.ports import (
     Clock,
@@ -73,6 +74,8 @@ def webex_fingerprint(settings: Settings) -> str:
         settings.webex_refresh_token.get_secret_value() if settings.webex_refresh_token else "",
         settings.wxcc_api_base_url or "",
         settings.webex_api_base_url,
+        # The group check's guest finding follows the platform switch (ADR 0123 point 17).
+        str(settings.embedded_call_enabled),
     )
     return hashlib.sha256("\x00".join(parts).encode()).hexdigest()
 
@@ -129,12 +132,15 @@ def build_integrations(
     security: SecurityLog | None = None,
     request_log: RequestLog | None = None,
     probe_timeout: Callable[[], timedelta] | None = None,
+    uses_page: UsesCallPage | None = None,
 ) -> Integrations:
     """Return the adapters the settings allow.
 
     ``security`` records failing token refreshes; ``request_log`` receives every request the
     adapters make (ADR 0068); ``probe_timeout`` is how long the group check waits for its
-    probe work item's events (ADR 0082; the settings' value when not given).
+    probe work item's events (ADR 0082; the settings' value when not given); ``uses_page`` is the
+    call-page rule of ADR 0123, built once by the caller (``call_page_rule``; for a command-line
+    run, the settings' switch as it is now).
     """
     client_id, secret, refresh = (
         settings.webex_client_id,
@@ -180,6 +186,7 @@ def build_integrations(
         probes=ProbeReports(ReportStore(engine)) if dispatcher else None,
         probe_timeout=probe_timeout
         or (lambda: timedelta(seconds=settings.integration_probe_timeout_seconds)),
+        uses_page=uses_page or call_page_rule(lambda: settings.embedded_call_enabled),
     )
     dispatchers: ContactCenterDispatchers = (
         {ContactCenterKind.WEBEX_CC: dispatcher} if dispatcher else {}

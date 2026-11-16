@@ -76,6 +76,8 @@ settings only, and no train module imports it.
 | C | Unchanged: no other booking field or label reaches the payload | `tests/adapters/test_wxcc_routing_payload.py::test_no_other_booking_field_or_label_reaches_the_payload` |
 | C | Unchanged: the meeting first, then the work item, idempotent | `tests/jobs/test_call_jobs.py::test_meeting_then_work_item` |
 | C | Gated: a flow on the own queue is never dispatched to the contact center | `tests/domain/test_request_dispatch.py::test_a_flow_on_the_own_queue_is_never_dispatched` |
+| C | Gated: the watchdog ends the platform task of a contact-center attempt it expires, through the existing end-task job (ADR 0121 step 27); a legacy booking never has an attempt | `tests/domain/test_request_watch.py::test_the_watchdog_ends_at_the_platform_the_task_of_an_attempt_it_expires` |
+| C | Gated: the own queue shows work the contact center holds as held, never next nor "not picked up" (ADR 0121 step 28); a legacy booking is never held | `tests/domain/test_request_dispatch.py::test_the_own_queue_shows_work_the_contact_center_holds_as_held` |
 
 ### Emergency closure (ADR 0024)
 
@@ -112,6 +114,7 @@ settings only, and no train module imports it.
 | B | Unchanged: a document without the new sections leaves skills, pools and flows alone | `tests/domain/test_configuration_v1_flows.py::test_a_document_without_the_sections_leaves_skills_pools_and_flows_alone` |
 | B | Unchanged: the same, through the database adapter | `tests/adapters/db/test_config_flows.py::test_a_document_without_the_sections_leaves_what_the_installation_has` |
 | B | Intended: export, import, export gives the same document | `tests/adapters/db/test_config_flows.py::test_export_import_export_gives_the_same_document` |
+| B | Gated: a document cannot activate a flow on the own queue on a service without one (ADR 0121 row 40) | `tests/domain/test_own_queue_flows_gate.py::test_a_document_cannot_activate_an_own_queue_flow_on_a_service_without_one` |
 | R | Unchanged: every table is configuration or state, so requests never travel in a package | `tests/adapters/db/test_configuration_package.py::test_every_table_of_the_model_is_configuration_or_state` |
 
 ### Public API `/api/v1` (widget)
@@ -162,7 +165,9 @@ client, audit events), taken back to 0108.
 **What the train adds that the previous image does not know, and why that is safe while the
 gate is shut.** No job kind, booking status, event kind or settings key that the previous image
 reads changes meaning; the train adds no job kind at all (the watchdog, the reconciliation and
-the deletion of request-level records run in the worker's rounds and the nightly sweep). New
+the deletion of request-level records run in the worker's rounds and the nightly sweep; the
+watchdog's end of a contact-center task, step 27, plans the end-task job the previous image
+already runs). New
 settings keys are stored values the previous image never looks up (the upgrade check lists them
 as unknown, not as unusable). The records the previous image would miscount (a pool slot carries
 its service's `group_id`; an immediate request occupies a unit of a pool) are written only by
@@ -170,13 +175,15 @@ gated paths.
 
 **Findings of step 8** (the open ones are rows of the gate checklist):
 
-- *The released-image proof cannot run yet.* ADR 0121 point 9 asks for the previous supported
-  image on the expanded database after the new image has written new records, including booking
-  and claiming. The upgrade matrix of ADR 0116 (`scripts/upgrade-matrix.sh`) does this with
-  released images and their fixtures, but no release carries a fixture yet (v0.5.1 has none;
-  the first is v0.6.0), so the CI job has nothing to run. The tests above prove the same at the
-  schema level with the current code. The proof with real images is possible from the first
-  minor after 0.6.0, which is also the earliest image that may open the gate (ADR 0122,
+- *The released-image proof runs against v0.6.0* (checklist G07, done). ADR 0121 point 9 asks
+  for the previous supported image on the expanded database after the new image has written new
+  records. v0.6.0 is the first release with a fixture; `scripts/upgrade-matrix.sh
+  rollback-release` started its public image on its fixture plus the gated records without a
+  downgrade, booked on `/g/demo` and compared the database (2026-11-15). The claim half (checklist
+  G43, #896) runs the image's own `claim_booking` on the expanded database: once, refused twice,
+  refused on work the current code holds, and read back; the route and a booking with an open
+  contact-center attempt are G44. The tests above prove the same at the schema level with
+  the current code. The image that may open the gate is the first minor after 0.6.0 (ADR 0122,
   consequences).
 - *A refused downgrade was not atomic* (fixed in this step). Alembic's SQLite default commits
   after every migration, so a refusal at 0111 left the database at 0111 with 0115 to 0112 already
@@ -229,7 +236,7 @@ legacy paths). A row whose proof needs a released image or a browser names its c
 | A27 | Completion and no-show reports from explicit evidence only | n/a | `tests/domain/test_request_work.py::test_start_and_complete_release_the_unit_once_and_complete_the_booking`; the reports: `tests/domain/test_slot_close.py::test_a_pool_booking_is_completed_only_by_the_operators_explicit_evidence` |
 | A28 | Archiving a referenced flow, skill or pool blocks new use, keeps history | n/a | skill keeps binding accepted work: `tests/domain/test_queue_skills.py::test_an_archived_skill_still_binds_accepted_work`; skill not newly chosen: `tests/domain/test_configuration_v1_skills.py::test_a_pool_may_keep_an_archived_skill_but_never_newly_choose_one`; pool not newly chosen: `tests/domain/test_service_flows.py::test_an_archived_pool_may_stay_but_is_not_newly_chosen`; flow never the default: `tests/domain/test_flow_resolution.py::test_an_archived_flow_is_never_the_default` (partly: that a booking made under a flow keeps its revision after the flow is archived is asserted only for a newer revision, A23) |
 | A29 | Configuration export and import keep identities, mappings, revisions | n/a | `tests/adapters/db/test_config_flows.py::test_export_import_export_gives_the_same_document` |
-| A30 | The previous image on the expanded schema: book and claim stay safe | n/a | `tests/test_upgrade_train.py::test_the_previous_image_writes_and_the_current_code_reads_and_claims_it`, `tests/adapters/db/test_gated_records.py::test_with_the_gate_shut_demo_books_at_the_time_the_pool_bookings_hold`; with an image: `scripts/upgrade-matrix.sh rollback IMAGE`; with the released v0.6.0 image: checklist G07 |
+| A30 | The previous image on the expanded schema: book and claim stay safe | n/a | `tests/test_upgrade_train.py::test_the_previous_image_writes_and_the_current_code_reads_and_claims_it`, `tests/adapters/db/test_gated_records.py::test_with_the_gate_shut_demo_books_at_the_time_the_pool_bookings_hold`; with an image: `scripts/upgrade-matrix.sh rollback IMAGE`; with the released v0.6.0 image and its fixture, run on 2026-11-15: checklist G07; the claim in the previous image's own code, `scripts/upgrade-matrix.sh rollback` (`scripts/rollback_claim.py`) and `tests/test_upgrade_train.py::test_the_previous_releases_own_claim_is_safe_on_the_expanded_schema`: checklist G43; through its route and on an open contact-center attempt: not proven, G44 |
 | A31 | A ticket number does not enumerate requests | open | `tests/api/test_immediate_pages.py::test_a_request_is_taken_in_and_shown_by_its_cookie` (partly: a random reference and a cookie, refused the same for a stranger and an unknown reference; no public display exists, follow-up row 20) |
 | A32 | Dutch and English, keyboard, scripts off, narrow screen | open | `tests/api/test_immediate_pages.py::test_a_retried_post_and_a_second_visit_give_the_same_request` (partly: the pages work as plain forms without script; English, keyboard, narrow screen and axe in the browser are checklist G06) |
 | A33 | Never checked in and never claimed requests expire and are deleted | open | `tests/domain/test_immediate_requests.py::test_an_immediate_record_is_deleted_end_to_end` |

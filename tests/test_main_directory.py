@@ -5,8 +5,8 @@ from pydantic import SecretStr
 from app.config import Settings
 from app.main import _directory_missing
 
-URL = "http://idp:8080/admin/realms/openplanner"
-BUNDLED = "http://idp:8080/realms/openplanner/.well-known/openid-configuration"
+URL = "http://172.31.240.4:8080/admin/realms/openplanner"
+BUNDLED = "http://172.31.240.4:8080/realms/openplanner/.well-known/openid-configuration"
 
 
 def test_another_provider_lacks_nothing(settings: Settings) -> None:

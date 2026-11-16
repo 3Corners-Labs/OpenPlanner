@@ -20,7 +20,7 @@ from app.domain.updates import (
     Version,
 )
 from app.web.static_assets import ASSETS
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.support.domain import NOW
 
 RELEASE = Release(Version(1, 4, 0), "https://github.com/acme/openplanner/releases/tag/v1.4.0")
@@ -75,7 +75,7 @@ async def listed(admin_db: str) -> None:
 
 
 def updates(site: Site) -> UpdateService:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     found: UpdateService = app.state.update_service
     return found
 
@@ -463,3 +463,95 @@ async def test_a_moment_no_clock_can_hold_is_refused_not_a_server_error(site: Si
     )
 
     assert refused.status_code == 422
+
+
+# The channel card (ADR 0059, 0065): the same settings and rules as Advanced settings.
+
+CHANNEL_FIELD = 'name="update_channel"'
+CHANNEL_POST = "/admin/updates/channel"
+
+
+async def test_the_superuser_chooses_the_channel_on_the_page(site: Site) -> None:
+    await site.login_as(SUPER)
+    page = (await site.client.get("/admin/updates")).text
+    assert f'action="{CHANNEL_POST}"' in page
+    assert CHANNEL_FIELD in page
+    assert 'name="update_auto_apply"' in page
+    assert "/admin/settings/values#topic-updates" in page  # line and window live there
+
+
+async def test_choosing_the_channel_stores_the_setting_and_audits_it(site: Site) -> None:
+    await site.login_as(SUPER)
+    saved = await site.client.post(
+        CHANNEL_POST,
+        data={"update_channel": "rc", "update_auto_apply": "true"},
+        headers=SAME_ORIGIN,
+    )
+    assert saved.status_code == 303
+    page = (await site.client.get("/admin/updates")).text
+    assert '<option value="rc" selected>' in page
+    assert '<option value="true" selected>' in page
+    audit = (await site.client.get("/admin/audit?subject=settings")).text
+    assert "update_channel" in audit
+
+
+async def test_an_unchanged_value_is_not_written_again(site: Site) -> None:
+    await site.login_as(SUPER)
+    saved = await site.client.post(
+        CHANNEL_POST,
+        data={"update_channel": "release", "update_auto_apply": "false"},
+        headers=SAME_ORIGIN,
+    )
+    assert saved.status_code == 303
+    assert "update_channel" not in (await site.client.get("/admin/audit?subject=settings")).text
+
+
+async def test_an_unknown_channel_is_refused_with_a_message(site: Site) -> None:
+    await site.login_as(SUPER)
+    refused = await site.client.post(
+        CHANNEL_POST, data={"update_channel": "beta"}, headers=SAME_ORIGIN
+    )
+    assert refused.status_code == 409
+    assert '<option value="beta"' not in refused.text
+
+
+@pytest.mark.parametrize("settings", [{"environment": "prod"}], indirect=True)
+async def test_rc_stays_refused_in_production(site: Site) -> None:
+    await site.login_as(SUPER)
+    refused = await site.client.post(
+        CHANNEL_POST, data={"update_channel": "rc"}, headers=SAME_ORIGIN
+    )
+    assert refused.status_code == 409
+    assert 'id="error-update_channel"' in refused.text  # the refusal sits at the field
+    assert '<option value="rc" selected>' not in (await site.client.get("/admin/updates")).text
+
+
+async def test_an_organisation_admin_may_not_change_the_channel(site: Site) -> None:
+    await site.login_as(ORG_ADMIN)
+    refused = await site.client.post(
+        CHANNEL_POST, data={"update_channel": "rc"}, headers=SAME_ORIGIN
+    )
+    assert refused.status_code == 403
+
+
+@pytest.fixture
+def lock_channel(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("UPDATE_CHANNEL", "release")
+
+
+@pytest.mark.usefixtures("lock_channel")
+async def test_a_locked_channel_shows_its_variable_and_no_control(site: Site) -> None:
+    await site.login_as(SUPER)
+    page = (await site.client.get("/admin/updates")).text
+    assert CHANNEL_FIELD not in page
+    assert "<code>UPDATE_CHANNEL</code>" in page
+    assert 'name="update_auto_apply"' in page  # only the locked value loses its control
+
+
+@pytest.mark.usefixtures("lock_channel")
+async def test_posting_a_locked_channel_is_refused(site: Site) -> None:
+    await site.login_as(SUPER)
+    refused = await site.client.post(
+        CHANNEL_POST, data={"update_channel": "rc"}, headers=SAME_ORIGIN
+    )
+    assert refused.status_code == 409

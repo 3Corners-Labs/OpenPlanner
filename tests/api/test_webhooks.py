@@ -20,11 +20,11 @@ from app.domain.calls import CallState, TaskState
 from app.domain.contact_center import ContactCenterKind, ContactCenterTaskRef
 from app.domain.services import BookingService
 from app.domain.webhook_replay import body_identity, replay_key, scope_of
-from tests.adapters.db.conftest import seed_group
-from tests.conftest import app_client
 from tests.fakes.clock import FixedClock
+from tests.support.app_client import app_client
 from tests.support.database import migrated_database
 from tests.support.domain import NOW, TEST_TOKEN_KEY, book
+from tests.support.seed_rows import seed_group
 from tests.support.webhooks import SECRET, sign, timestamp, wxcc_body
 
 
@@ -101,13 +101,29 @@ async def test_the_neutral_route_records_a_wxcc_event_like_the_alias(
     _, task, events = await _status(database_url, booking_id)
     assert task is TaskState.CONNECTED
     logged = [e for e in logs if e["event"] == "webhook.contact_center"]
-    assert [(e["platform"], e["kind"], e["outcome"]) for e in logged] == [
-        ("webex_cc", "task_connected", "recorded")
+    assert [(e["platform"], e["kind"], e["outcome"], e["origin"]) for e in logged] == [
+        ("webex_cc", "task_connected", "recorded", "none")
     ]
     # The alias shares the event keys: the same event delivered there is a duplicate.
     again = await client.post("/webhooks/wxcc", content=body, headers=headers)
     assert again.status_code == 204
     assert (await _status(database_url, booking_id))[2] == events
+
+
+async def test_the_log_says_whether_an_event_carried_the_origin_never_which(
+    client: httpx.AsyncClient, booking_id: int
+) -> None:
+    """Checklist G15 (ADR 0121 step 29): the operator reads ``origin`` on the test host."""
+    body = wxcc_body("task:connected", at=NOW, origin={"id": "OP-000123", "name": "Ada"})
+    headers = {"x-webexcc-signature": sign(body), "x-webexcc-timestamp": timestamp(body)}
+
+    with structlog.testing.capture_logs() as logs:
+        await client.post("/webhooks/contact-center/webex_cc", content=body, headers=headers)
+
+    [logged] = [e for e in logs if e["event"] == "webhook.contact_center"]
+    assert logged["origin"] == "reference"
+    assert "OP-000123" not in str(logs)
+    assert "Ada" not in str(logs)
 
 
 async def test_a_platform_without_an_adapter_does_not_exist(client: httpx.AsyncClient) -> None:

@@ -22,7 +22,7 @@ from app.admin.authz import AdminContext, RequirePermission
 from app.admin.forms import CODE_MESSAGES, done_message, raise_refusal, read_form, redirect_done
 from app.admin.pages import Locale, SameOrigin, organisation_header, organisation_redirect
 from app.admin.pages import page as _page
-from app.admin.settings_routes import SettingRow, _input, _value, topic_sections
+from app.admin.settings_routes import SettingRow, _value, input_value, topic_sections
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError
 from app.domain.settings_registry import BY_KEY, Kind, Topic
@@ -87,7 +87,7 @@ async def change_organisation_settings(
     changed = 0
     for state in live.organisation_states(organisation.id):
         key = state.spec.key
-        if key not in form.values or form.text(key) == _input(state):
+        if key not in form.values or form.text(key) == input_value(state):
             continue
         try:
             await service.change_organisation(context.principal, org, key, form.text(key))
@@ -159,7 +159,7 @@ async def _overview(
                 state.portal_ignored,
                 key=state.spec.key,
                 editable=True,
-                input=_input(state),
+                input=input_value(state),
                 choices=state.spec.choices,
                 from_portal=state.source.value == "organisation",
                 error=errors.get(state.spec.key),

@@ -2,8 +2,10 @@
 
 import json
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
@@ -86,6 +88,88 @@ async def test_meeting_is_created_with_the_agreed_defaults() -> None:
         "2026-01-05T09:30:00+01:00",
     )
     assert body["timezone"] == "Europe/Amsterdam"
+
+
+async def test_a_meeting_for_the_call_page_is_created_without_the_platforms_chat() -> None:
+    """ADR 0123 point 8: our own chat sits beside the page, so the platform's is off for all."""
+    seen: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json=CREATED)
+
+    await _meetings(handler).create_meeting(replace(REQUEST, chat_enabled=False))
+    await _meetings(handler).create_meeting(REQUEST)
+
+    quiet, as_before = seen
+    assert quiet["meetingOptions"] == {
+        "enabledChat": False,
+        "enabledVideo": True,
+        "enabledFileTransfer": False,
+    }
+    assert quiet["attendeePrivileges"] == {
+        "enabledChatHost": False,
+        "enabledChatOtherParticipants": False,
+    }
+    # Everything else is the booking's meeting: lobby, cohost, host.
+    kept = {k: v for k, v in quiet.items() if k not in ("meetingOptions", "attendeePrivileges")}
+    assert kept == {
+        k: v for k, v in as_before.items() if k not in ("meetingOptions", "attendeePrivileges")
+    }
+    # A meeting for any other service is created exactly as before.
+    assert as_before["meetingOptions"]["enabledChat"] is True
+    assert as_before["attendeePrivileges"] == {
+        "enabledChatHost": True,
+        "enabledChatOtherParticipants": True,
+    }
+
+
+async def test_a_trial_meeting_without_chat_keeps_its_entry_before_the_host() -> None:
+    seen: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json=CREATED)
+
+    await _meetings(handler).create_meeting(
+        replace(REQUEST, join_before_host=True, chat_enabled=False)
+    )
+
+    assert seen[0]["enabledJoinBeforeHost"] is True
+    assert seen[0]["unlockedMeetingJoinSecurity"] == "allowJoin"
+    assert seen[0]["meetingOptions"]["enabledChat"] is False
+
+
+@pytest.mark.parametrize(("answer", "expected"), [(True, True), (False, False), (None, None)])
+async def test_the_captions_probe_reads_back_what_the_site_kept(
+    answer: bool | None, expected: bool | None
+) -> None:
+    seen: list[dict[str, Any]] = []
+    options = {} if answer is None else {"enabledClosedCaptions": answer}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json={**CREATED, "meetingOptions": options})
+
+    probe = await _meetings(handler).probe_meeting(replace(REQUEST, closed_captions=True))
+
+    assert seen[0]["meetingOptions"]["enabledClosedCaptions"] is True  # asked for
+    assert probe.captions is expected
+
+
+async def test_a_booking_never_asks_for_captions_and_an_odd_answer_is_not_an_answer() -> None:
+    seen: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(
+            200, json={**CREATED, "meetingOptions": {"enabledClosedCaptions": "yes"}}
+        )
+
+    probe = await _meetings(handler).probe_meeting(REQUEST)
+
+    assert "enabledClosedCaptions" not in seen[0]["meetingOptions"]
+    assert probe.captions is None  # a string is no verdict
 
 
 async def test_deleting_a_meeting_that_is_gone_is_fine() -> None:

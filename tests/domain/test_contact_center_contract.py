@@ -44,12 +44,14 @@ from tests.support.flow_documents import (
     acme,
     advies,
     document_json,
+    empty_flows,
     full,
     plan,
     published,
     refusals,
 )
 from tests.support.integration import GROUP, make_booking
+from tests.support.pool_flows import open_gate
 from tests.support.service_flows import legacy, pool, revision
 
 FLOW = "organisations[acme].groups[balie].flows[advies]"
@@ -71,6 +73,7 @@ def _reason(
         made,
         pool(guaranteed=frozenset({10})),
         offered_subjects=(),
+        own_queue=True,
         coded_skills=frozenset({10}),
         carrier=carrier,
     )
@@ -160,7 +163,7 @@ def test_the_own_queue_and_a_legacy_flow_are_not_judged_by_a_platform() -> None:
         legacy(dispatch=CONTACT_CENTER),
     ):
         for carrier in (None, ContactCenterCapabilities()):
-            items = readiness(made, pool(), offered_subjects=(), carrier=carrier)
+            items = readiness(made, pool(), offered_subjects=(), own_queue=True, carrier=carrier)
             reasons = {item.reason for item in items}
             assert not reasons & {
                 ReadinessReason.CONTACT_CENTER_MISSING,
@@ -174,7 +177,7 @@ MEETING = MeetingRef("m-1", "https://site.webex.com/meet/abc")
 
 def test_a_task_names_its_interaction_and_a_booking_without_a_flow_is_video() -> None:
     task = contact_center_task(
-        make_booking(meeting=MEETING), GROUP, start_label="x", conversation_enabled=False
+        make_booking(meeting=MEETING), GROUP, start_label="x", uses_call_page=False
     )
 
     assert task.interaction is InteractionKind.VIDEO
@@ -189,7 +192,7 @@ def test_a_task_the_platform_cannot_carry_is_refused_before_it_is_built() -> Non
             GROUP,
             start_label="x",
             interaction=InteractionKind.TELEPHONE,
-            conversation_enabled=False,
+            uses_call_page=False,
         )
 
     assert (excinfo.value.code, excinfo.value.field) == (
@@ -257,6 +260,21 @@ def test_a_configuration_document_judges_with_the_routing_of_the_service() -> No
     assert refused in refusals(without)
     assert refused in refusals(half)
     assert refused not in refusals(routed)
+
+
+def test_a_document_cannot_bring_a_contact_center_flow_live_until_g13_to_g15(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The one rule behind the portal also refuses the import (product owner, 2026-11-14)."""
+    open_gate(monkeypatch)
+    data = _contact_center_document(WEBEX_ROUTING)
+    advies(data)["state"] = "active"
+    reason = (FLOW, ErrorCode.INVALID_CONFIGURATION, "readiness_rollback")
+
+    assert reason in refusals(plan(data, empty_flows(), contact_centers=PLATFORMS))
+
+    monkeypatch.setattr("app.domain.service_flows.CONTACT_CENTER_FLOWS_READY", True)
+    assert reason not in refusals(plan(data, empty_flows(), contact_centers=PLATFORMS))
 
 
 def test_a_recorded_flow_gives_its_own_interaction_and_never_a_guess() -> None:

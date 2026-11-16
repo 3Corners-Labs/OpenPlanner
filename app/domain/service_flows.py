@@ -126,6 +126,20 @@ Read when called, never copied (tests flip it with a monkeypatch): ``readiness``
 ``flow_resolution.pool_flows_bookable`` keeps every flow on a counted pool out of the booking
 paths.
 """
+CONTACT_CENTER_FLOWS_READY: Final = False
+"""May a non-legacy flow that dispatches to the contact center be activated once the rollback
+gate ``ROLLBACK_SAFE`` is open? Not until checklist items G13 to G15 are done
+(``docs/service-flows-gate-checklist.md``, product owner 2026-11-14): the watchdog ends the task
+at the platform when it expires or cancels an attempt (G13), the own queue shows work the
+contact center holds as held (G14), and the test host showed that the platform's task events
+carry the origin (G15).
+
+A fixed rule, never a setting: it is a protection. The PR that closes G13 to G15 flips it to
+true. Read when called, never copied (tests flip it with a monkeypatch): ``readiness`` reports
+``contact_center_not_ready`` for a non-legacy contact-center flow while it is false and the
+gate is open. A legacy flow (the wrapper of an existing service, ADR 0121 step 2e) and a flow on
+the own queue are never refused by it.
+"""
 
 
 @dataclass(frozen=True)

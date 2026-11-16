@@ -20,7 +20,7 @@ from app.web.security_policy import (
     PageKind,
     permissions_policy,
 )
-from tests.web.conftest import RenderSource
+from tests.support.template_source import RenderSource
 
 APP = Path("app")
 CALL_NAMES = frozenset(

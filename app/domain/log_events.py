@@ -350,12 +350,15 @@ _OPERATIONS = (
         "requests.watched",
         _OPS,
         "info",
-        "changed expired_unclaimed deleted failed errors",
+        "changed expired_unclaimed deleted failed tasks_ended errors",
         "The watchdog round of requests changed {changed}, expired {expired_unclaimed} "
-        "unclaimed, deleted {deleted} records; {failed} failed ({errors}).",
+        "unclaimed, deleted {deleted} records, ended {tasks_ended} contact-center tasks; "
+        "{failed} failed ({errors}).",
         "The worker's round of ADR 0121 step 5 (lease expiry, cancellation, expiry, recovery, "
         "deletion of request-level records); counts only, and the type names of what failed "
-        "(never a message). A failed request is tried again in the next round.",
+        "(never a message). A failed request is tried again in the next round. "
+        "`tasks_ended` counts the end-task jobs planned for contact-center attempts the round "
+        "expired or cancelled (step 27); each job's outcome is on the booking's timeline.",
     ),
     _e(
         "requests.watch_failed",
@@ -1288,9 +1291,21 @@ _OPERATIONS = (
         "webhook.contact_center",
         _OPS,
         "info",
+        "platform kind outcome origin",
+        "Contact center {platform} reported {kind}: {outcome} (origin: {origin}).",
+        "A verified webhook of a contact-center platform was processed (ADR 0032). `origin` "
+        "says whether the event carried a booking reference as the task's origin "
+        "(`reference`) or not (`none`), never the value: the operator check of ADR 0121 "
+        "step 29 (checklist G15) reads it.",
+    ),
+    _e(
+        "webhook.chat",
+        _OPS,
+        "info",
         "platform kind outcome",
-        "Contact center {platform} reported {kind}: {outcome}.",
-        "A verified webhook of a contact-center platform was processed (ADR 0032).",
+        "Contact center {platform} reported a chat event ({kind}): {outcome}.",
+        "A verified message event of a conversation task was processed (ADR 0123 step 7b); "
+        "codes only, never the text of a message.",
     ),
     _e(
         "webhook.alert_failed",
@@ -1310,6 +1325,67 @@ _OPERATIONS = (
         "The delivery ledger could not note a webhook call: {error}.",
         "The in-memory ledger behind the connection card (ADR 0124 point 10) failed on a call; "
         "the webhook was answered as usual.",
+        _CHECK_HOST,
+    ),
+    _e(
+        "webhook.subscription_gap",
+        _SYS,
+        "outcome",
+        "",
+        "A contact-center subscription left a gap or none for the organisation.",
+        "Setting a new webhook secret at the contact center left a gap in the deliveries "
+        "(reason `replaced`: the old subscription had to be removed before the new one could be "
+        "made, so events in between may have been missed) or no subscription at all (reason "
+        "`gone`: the new one was refused after the old one was removed) (ADR 0124 point 8). "
+        "Nothing is delivered in the second case until a registration succeeds. No text from "
+        "the platform is kept.",
+        "`gone`: check the Service App's rights, then save the connection's card again to "
+        "register. `replaced`: the periodic check of open tasks catches up on states.",
+    ),
+    _e(
+        "webhook.renewal_interrupted",
+        _OPS,
+        "warning",
+        "stage error",
+        "Renewing the contact-center subscription was interrupted at {stage}: {error}.",
+        "While a new webhook secret was being given to the contact center (ADR 0124 point 8) the "
+        "platform failed after an old subscription had been removed (stage `delete` or `create`), "
+        "or while the old ones were being cleaned up after the new one was made (stage "
+        "`cleanup`). The first two leave the connection card on `gone`, with its system event; "
+        "the third leaves a duplicate subscription. Only the platform's status code is logged.",
+        "`create` or `delete`: save the connection's card again to register. `cleanup`: remove "
+        "the old subscription at the platform.",
+    ),
+    _e(
+        "webhook.sighting_failed",
+        _OPS,
+        "warning",
+        "source error",
+        "The first sighting of the {source} webhook secret could not be read or kept: {error}.",
+        "The moment the application first saw the installation's webhook secret is kept in the "
+        "database (ADR 0124 point 8) and could not be read or written. A previous value of the "
+        "secret in the environment is not used while that is so: an overlap that cannot be "
+        "measured is never granted. The current secret is unaffected.",
+        _CHECK_HOST,
+    ),
+    _e(
+        "webhook.previous_secrets_removed",
+        _SYS,
+        "info",
+        "connections",
+        "The previous webhook secret of {connections} connections was removed.",
+        "Housekeeping removed sealed previous webhook secrets whose overlap had ended (ADR 0124 "
+        "point 8). They no longer verified anything: the clock decides that at each delivery.",
+    ),
+    _e(
+        "webhook.previous_secrets_failed",
+        _SYS,
+        "warning",
+        "error",
+        "Removing previous webhook secrets failed: {error}.",
+        "The hourly sweep of previous webhook secrets whose overlap had ended did not finish "
+        "(ADR 0124 point 8). Nothing is refused or accepted differently: the clock decides, and "
+        "the next round tries again.",
         _CHECK_HOST,
     ),
     _e(
@@ -2030,6 +2106,17 @@ _AUDIT = (
         "Repeated `origin_mismatch` from your own site: check the proxy's `Host` header.",
     ),
     _e(
+        "chat.limit_reached",
+        _SYS,
+        "outcome",
+        "",
+        "A booking's chat reached its fixed ceiling of messages.",
+        "The contact center delivered as many messages for one appointment as a chat may hold "
+        "(`MAX_MESSAGES_PER_BOOKING`, ADR 0123 step 7b); later deliveries are ignored and "
+        "answered as usual. Written once per booking, with no text.",
+        "Check that the messaging asset's flow does not loop; a real conversation never gets here.",
+    ),
+    _e(
         "retention.sweep",
         _SYS,
         "warning outcome",
@@ -2138,6 +2225,16 @@ _AUDIT = (
         "",
         "A staff member was reinstated.",
         "A suspended person can sign in again.",
+        _ADMIN_SEEN,
+    ),
+    _e(
+        "staff.screen_name_changed",
+        _AUD,
+        "outcome",
+        "",
+        "A staff member's screen name was set or cleared.",
+        "The name the participant of a call sees for the staff member (ADR 0123 step 5c); the "
+        "event says that it changed and never to what.",
         _ADMIN_SEEN,
     ),
     _e(

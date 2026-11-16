@@ -3,7 +3,7 @@
 import re
 
 from app.domain.authorization import Role
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AGENT,
     GROUP_ADMIN,
     ORG_ADMIN,

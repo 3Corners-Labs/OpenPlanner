@@ -12,10 +12,13 @@ one, which shows the open request's steps itself.
     POST /admin/updates/update                  request the latest release
     POST /admin/updates/restore                 request the version the last update replaced
     POST /admin/updates/requests/{id}/cancel    withdraw a request not yet claimed
+    POST /admin/updates/channel                 settings.platform.manage (recent login): choose the
+                                                channel and automatic updates, the same settings
+                                                and rules as Advanced settings (ADR 0042, 0065)
     POST /admin/updates/snooze                  hide the banner for 60 minutes (this session)
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo
@@ -23,8 +26,10 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Query, Request
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
-from app.admin.authz import AdminContext, RequirePermission, session_principal
+from app.adapters.live_settings import LiveSettings
+from app.admin.authz import AdminContext, RequirePermission, can_function, session_principal
 from app.admin.forms import (
+    CODE_MESSAGES,
     Field,
     FormData,
     done_message,
@@ -35,9 +40,12 @@ from app.admin.forms import (
 from app.admin.pages import Locale, SameOrigin, admin_moment, templates
 from app.admin.pages import page as _page
 from app.admin.return_to import safe_next
+from app.admin.settings_routes import SettingRow, input_value, setting_row_for
 from app.domain.audit import AuditEntry
 from app.domain.authorization import Permission
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.settings_registry import Topic
+from app.domain.settings_service import SettingsService
 from app.domain.update_service import UpdateNotice, UpdateOverview, UpdateService
 from app.domain.updates import (
     SNOOZE,
@@ -53,6 +61,7 @@ from app.i18n import BoundGettext
 from app.i18n.dates import format_time_of_day, weekday_abbreviations
 from app.web.errors import form_errors, status_for
 from app.web.locale import RequestLocale, resolve_locale
+from app.web.navigation import topic_anchor
 from app.web.organisation_settings import settings_for
 from app.web.security_policy import PageKind
 from app.web.templates import render
@@ -79,6 +88,15 @@ SNOOZE_KEY = "update_snoozed_until"
 
 URL = "/admin/updates"
 PROGRESS_URL = "/admin/updates/progress"
+CHANNEL_KEY = "update_channel"
+AUTO_APPLY_KEY = "update_auto_apply"
+SETTINGS_LINK = "/admin/settings/values" + topic_anchor(Topic.UPDATES)
+"""Where the line and the window are changed: Advanced settings, topic Updates."""
+
+ChangeSettings = Annotated[
+    AdminContext, Depends(RequirePermission(Permission.SETTINGS_PLATFORM_MANAGE, fresh=True))
+]
+"""Choosing the channel: the platform settings right, with a fresh login (ADR 0015)."""
 
 
 def update_service(request: Request) -> UpdateService:
@@ -102,6 +120,58 @@ class Banner:
     text: str
     snooze: bool
     next_path: str
+
+
+@dataclass(frozen=True)
+class ChannelCard:
+    """The channel card: the two settings as Advanced settings shows them, in one form.
+
+    Attributes:
+        rows: The channel and the automatic-updates setting; a locked one has no control.
+        editable: Whether the viewer holds ``settings.platform.manage`` (superuser).
+        settings_link: A link to Advanced settings, topic Updates; empty when the viewer may
+            not see it.
+    """
+
+    rows: list[SettingRow]
+    editable: bool
+    settings_link: str
+
+
+async def _channel_card(
+    request: Request,
+    locale: RequestLocale,
+    context: AdminContext,
+    refusal: tuple[str, DomainError] | None = None,
+) -> ChannelCard:
+    """Read the two settings through the same states Advanced settings shows.
+
+    The stored values are read again first, so the card shows what the processes now apply.
+    """
+    live: LiveSettings = request.app.state.live_settings
+    await live.refresh()
+    can = can_function(context.principal)
+    manage = can(Permission.SETTINGS_PLATFORM_MANAGE)
+    states = {s.spec.key: s for s in live.states()}
+    rows = [
+        replace(
+            setting_row_for(
+                states[key],
+                locale,
+                manage=manage,
+                error=(
+                    locale.gettext(CODE_MESSAGES.get(refusal[1].code, "error.invalid_request"))
+                    if refusal and refusal[0] == key
+                    else None
+                ),
+            ),
+            from_portal=False,  # the card has no reset: Advanced settings has
+            adoptable=False,
+        )
+        for key in (CHANNEL_KEY, AUTO_APPLY_KEY)
+    ]
+    link = SETTINGS_LINK if can(Permission.SETTINGS_PLATFORM_VIEW) else ""
+    return ChannelCard(rows, manage, link)
 
 
 @dataclass(frozen=True)
@@ -354,13 +424,18 @@ async def _overview(
     context: AdminContext,
     error: DomainError | None = None,
     form: FormData | None = None,
+    refused_setting: tuple[str, DomainError] | None = None,
 ) -> HTMLResponse:
-    """Render the updates page, with the refusal of a request or the form's errors."""
+    """Render the updates page, with the refusal of a request or the form's errors.
+
+    ``refused_setting`` is the setting of the channel card a change was refused for.
+    """
     service = update_service(request)
     found = await service.overview(context.principal)
     entries = await service.history(context.principal)
     check = found.check
     live = _progress(request, locale, found) if found.open else None
+    channel_card = await _channel_card(request, locale, context, refused_setting)
     response = _page(
         request,
         locale,
@@ -368,6 +443,7 @@ async def _overview(
         context.principal,
         {
             "overview": found,
+            "channel_card": channel_card,
             "commit": _commit(request),
             "checked_at": admin_moment(request, locale, check.checked_at) if check else None,
             "check_error": check.error if check else "",
@@ -534,3 +610,30 @@ async def snooze(request: Request, locale: Locale, _: SameOrigin, context: View)
     until = request.app.state.clock.now() + SNOOZE
     request.session[SNOOZE_KEY] = until.isoformat()
     return RedirectResponse(safe_next(form.text("next")), status_code=303)
+
+
+@router.post("/updates/channel", response_class=HTMLResponse)
+async def change_channel(
+    request: Request, locale: Locale, _: SameOrigin, context: ChangeSettings
+) -> Response:
+    """Choose the channel and automatic updates through the settings service.
+
+    The same service, validation, environment lock and audit as Advanced settings: only the
+    fields that were submitted and differ from the effective value are written, and the first
+    refusal stops the change and is shown on this page.
+    """
+    form = await read_form(request, locale)
+    service: SettingsService = request.app.state.settings_service
+    live: LiveSettings = request.app.state.live_settings
+    await live.refresh()
+    states = {s.spec.key: s for s in live.states()}
+    key = CHANNEL_KEY
+    try:
+        for key in (CHANNEL_KEY, AUTO_APPLY_KEY):
+            raw = form.text(key)
+            if raw and raw != input_value(states[key]):
+                await service.change(context.principal, key, raw)
+    except DomainError as error:
+        raise_refusal(error)
+        return await _overview(request, locale, context, error, refused_setting=(key, error))
+    return redirect_done(URL, "channel_saved")

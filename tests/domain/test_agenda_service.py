@@ -31,11 +31,6 @@ def uow() -> InMemoryUnitOfWork:
 
 
 @pytest.fixture
-def clock() -> FixedClock:
-    return FixedClock(NOW)
-
-
-@pytest.fixture
 def agenda(uow: InMemoryUnitOfWork, clock: FixedClock) -> AgendaService:
     return AgendaService(uow, clock, AdminService(uow, clock), horizon_days=14)
 

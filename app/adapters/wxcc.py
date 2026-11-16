@@ -78,6 +78,7 @@ from app.domain.contact_center import (
     ContactCenterTaskRef,
     ProviderDescriptor,
     TaskKind,
+    WebhookSecretUpdate,
     uncarried,
 )
 from app.domain.interaction import InteractionKind
@@ -117,6 +118,7 @@ DESCRIPTOR = ProviderDescriptor(
         interaction_kinds=frozenset({InteractionKind.VIDEO, InteractionKind.NONE}),
         skills=True,
         task_kinds=frozenset({TaskKind.FORM, TaskKind.CONVERSATION}),
+        webhook_secret_update=WebhookSecretUpdate.RENEW,
     ),
 )
 """What a group needs for WxCC (ADR 0032 point 4) and what WxCC carries (ADR 0121 step 6); the
@@ -124,8 +126,9 @@ limits are WxCC's (``flowSettings`` values up to 512 bytes), fixed by the platfo
 constants, not settings. Video and ``none`` are carried (``none`` since ADR 0121 step 6b: a work
 item with an empty ``meetingLink``); a telephone interaction would need the participant's number,
 which never leaves OpenPlanner. The conversation (a ``customMessaging`` task) is carried since
-ADR 0123 step 7a; whether an organisation's tenant has the messaging feature is not known here:
-WxCC answers 403 when it has not."""
+ADR 0123 step 7a. A subscription keeps its secret, so a rotation makes a new one and removes the
+old (``renew_wxcc``, ADR 0124 point 8; not proven against a tenant). Whether an organisation's
+tenant has the messaging feature is not known here: WxCC answers 403 when it has not."""
 
 PROBE_KIND = calls.PROBE_KIND
 """``kind`` of the group check's probe work item (ADR 0082 point 2), defined in the domain."""

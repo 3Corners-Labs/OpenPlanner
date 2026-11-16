@@ -5,7 +5,7 @@ implementation. ``tests/admin/test_authorization_matrix.py`` sweeps it, role by 
 other admin tests read it to find the routes they cover.
 """
 
-from tests.admin.conftest import (
+from tests.support.admin_site import (
     AGENT,
     AUDITOR,
     GROUP_ADMIN,
@@ -324,6 +324,15 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/rights/sessions/end-others": {
         "/admin/rights/sessions/end-others": statuses(303, 303, 303, 303, 303, 303, 403)
     },
+    # ADR 0123 step 5d: every admin sets their own screen name (rights.view); the empty form
+    # clears an empty name, which is "unchanged" and goes back to the page. No number is in the
+    # path.
+    "GET /admin/rights/profile": {
+        "/admin/rights/profile": statuses(200, 200, 200, 200, 200, 200, 403)
+    },
+    "POST /admin/rights/profile/screen-name": {
+        "/admin/rights/profile/screen-name": statuses(303, 303, 303, 303, 303, 303, 403)
+    },
     # ADR 0098 point 9b: an organisation admin (and the superuser) ends a person's sessions.
     # Outside the scope the answer is 403, an unknown number too; only the superuser, who sees
     # everyone, gets a 404. The group admin, auditor and agent do not hold the permission.
@@ -333,6 +342,11 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     # ADR 0046 step 2: suspend and reinstate under staff.manage (organisation level, like
     # ending sessions); erasing is the superuser's alone (staff.erase, locked). An unknown
     # number is a 404 for the superuser only.
+    # ADR 0123 step 5c: the screen name of a person, staff.manage like suspending (organisation
+    # level); a person outside the scope, or an unknown number, is a 404 for the superuser only.
+    "POST /admin/staff/{member_id}/screen-name": {
+        "/admin/staff/999/screen-name": statuses(404, 403, 403, 403, 403, 403, 403)
+    },
     "POST /admin/staff/{member_id}/suspend": {
         "/admin/staff/999/suspend": statuses(404, 403, 403, 403, 403, 403, 403)
     },
@@ -536,6 +550,9 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     "POST /admin/updates/update": {
         "/admin/updates/update": statuses(409, 403, 403, 403, 403, 403, 403)
     },
+    "POST /admin/updates/channel": {
+        "/admin/updates/channel": statuses(303, 403, 403, 403, 403, 403, 403),
+    },
     "POST /admin/updates/restore": {
         "/admin/updates/restore": statuses(409, 403, 403, 403, 403, 403, 403),
     },
@@ -585,6 +602,13 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
     },
     "POST /admin/organisations/{org}/channels/contact-center/webhook-secret": {
         "/admin/organisations/demo/channels/contact-center/webhook-secret": statuses(
+            303, 403, 403, 403, 403, 403, 403
+        ),
+    },
+    # ADR 0124 point 15: the secret of the address for message deliveries, shown once; without a
+    # connection the superuser is sent back to the card with a refusal.
+    "POST /admin/organisations/{org}/channels/contact-center/message-secret": {
+        "/admin/organisations/demo/channels/contact-center/message-secret": statuses(
             303, 403, 403, 403, 403, 403, 403
         ),
     },
@@ -1444,6 +1468,12 @@ EXPECTED: dict[str, dict[str, dict[str, int]]] = {
         "/admin/organisations/demo/login": statuses(200, 200, 403, 403, 200, 403, 403),
         "/admin/organisations/andere/login": statuses(200, 403, 403, 200, 403, 403, 403),
         "/admin/organisations/nope/login": statuses(404, 403, 403, 403, 403, 403, 403),
+    },
+    # The route check reads the same as the page: the same people may ask it.
+    "POST /admin/organisations/{org}/login/_check": {
+        "/admin/organisations/demo/login/_check": statuses(200, 200, 403, 403, 200, 403, 403),
+        "/admin/organisations/andere/login/_check": statuses(200, 403, 403, 200, 403, 403, 403),
+        "/admin/organisations/nope/login/_check": statuses(404, 403, 403, 403, 403, 403, 403),
     },
     "GET /admin/organisations/{org}/login/new": {
         "/admin/organisations/demo/login/new": statuses(200, 403, 403, 403, 403, 403, 403),

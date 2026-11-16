@@ -13,9 +13,9 @@ import pytest
 
 from app.config import Settings
 from app.domain.entitlements import LoginClaims
-from tests.admin.conftest import SAME_ORIGIN, SUPER, Site, _running_site
 from tests.fakes.identity import FakeIdentityProvider
-from tests.support.organisation_login import register
+from tests.support.admin_site import SAME_ORIGIN, SUPER, Site, running_site
+from tests.support.organisation_login import route_domain
 
 P = "openplanner"
 ADDRESS = "jan@acme-a.nl"
@@ -23,20 +23,7 @@ ADDRESS = "jan@acme-a.nl"
 
 async def _route_domain(site: Site) -> str:
     """Register org-a, switch it on and verify acme-a.nl for it; return its page."""
-    await site.login_as(SUPER)
-    page_url = await register(site)
-    await site.client.post(f"{page_url}/enable", data={"enabled": "on"}, headers=SAME_ORIGIN)
-    await site.client.post(f"{page_url}/domains", data={"domain": "acme-a.nl"}, headers=SAME_ORIGIN)
-    page = (await site.client.get(page_url)).text
-    token = page.split("openplanner-domain-verification=", 1)[1].split("<", 1)[0]
-    claim_id = page.split("/domains/", 1)[1].split("/", 1)[0]
-    site.dns.records["_openplanner-challenge.acme-a.nl"] = (
-        f"openplanner-domain-verification={token}",
-    )
-    verified = await site.client.post(f"{page_url}/domains/{claim_id}/verify", headers=SAME_ORIGIN)
-    assert verified.headers["location"].endswith("idp_domain_verified")
-    site.client.cookies.clear()
-    return page_url
+    return await route_domain(site, "acme-a.nl")
 
 
 def _organisation_adapter(site: Site, email: str = ADDRESS) -> FakeIdentityProvider:
@@ -54,7 +41,7 @@ def _organisation_adapter(site: Site, email: str = ADDRESS) -> FakeIdentityProvi
 @pytest.fixture
 async def routed(settings: Settings, admin_db: str) -> AsyncIterator[Site]:
     switched_on = settings.model_copy(update={"organisation_idps_enabled": True})
-    async with _running_site(switched_on, admin_db) as running:
+    async with running_site(switched_on, admin_db) as running:
         running.page_url = await _route_domain(running)  # type: ignore[attr-defined]
         yield running
 

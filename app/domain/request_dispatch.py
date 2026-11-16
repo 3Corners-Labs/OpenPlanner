@@ -196,7 +196,8 @@ class AttemptEvents:
 
         * a confirmed booking whose attempt is ``reconciliation_required`` (the create returned
           with an unknown outcome): the task is adopted as the attempt's own, no second task;
-        * an attempt fenced, or ended because the booking was cancelled, within the window: the
+        * an attempt fenced, ended because the booking was cancelled, or expired by the
+          watchdog (step 27), within the window: the
           task is an orphan, kept on the booking and ended at the platform by the end-task job
           (ADR 0021), so it never stays with an agent.
 

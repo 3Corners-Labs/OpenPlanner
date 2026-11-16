@@ -8,7 +8,7 @@ import pytest
 from app.admin.frozen_forms import BAR_ID, LEFT_ALONE, freeze_forms, requirement_for
 from app.domain.maintenance import MaintenanceReason
 from app.domain.maintenance_service import MaintenanceService
-from tests.admin.conftest import ORG_ADMIN, SUPER, Site
+from tests.support.admin_site import ORG_ADMIN, SUPER, Site
 from tests.support.authorization_matrix import EXPECTED, ROLES
 
 FROZEN = f'disabled aria-describedby="{BAR_ID}"'
@@ -38,7 +38,7 @@ def test_only_the_refused_post_forms_are_frozen() -> None:
 
 
 def maintenance(site: Site) -> MaintenanceService:
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
     found: MaintenanceService = app.state.maintenance_service
     return found
 
@@ -108,7 +108,7 @@ async def test_every_post_form_on_every_page_resolves_to_its_route(
     # A form whose action matches no route would be frozen by default; none may rely on that.
     await maintenance(site).switch_on_host("host-cli", MaintenanceReason.OTHER)
     await site.login_as(ROLES[role])
-    app = site.client._transport.app  # type: ignore[attr-defined]  # noqa: SLF001
+    app = site.app
 
     page = (await site.client.get(path)).text
 

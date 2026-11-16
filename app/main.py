@@ -14,6 +14,7 @@ import structlog
 from fastapi import Depends, FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
+from app import service_wiring as wiring
 from app.adapters import internal_ca
 from app.adapters.alert_senders import BotSpacePoster, ConfiguredAlertSenders, alert_bots
 from app.adapters.certificate_pem import CryptographyPemReader
@@ -61,6 +62,7 @@ from app.admin.session import session_cookie_for
 from app.api import (
     booking_pages,
     brand_assets,
+    call_chat_pages,
     call_pages,
     direct_pages,
     health,
@@ -87,6 +89,8 @@ from app.domain.alert_delivery import AlertTargetService
 from app.domain.alerts import AlertService
 from app.domain.api_access import ApiAccessService
 from app.domain.branding_service import BrandingService
+from app.domain.call_chat_service import CallChatService
+from app.domain.call_client import call_page_rule
 from app.domain.call_retry import CallRetryService
 from app.domain.call_service import CallService
 from app.domain.call_token_service import CallTokenService
@@ -97,6 +101,7 @@ from app.domain.client_pseudonym import ClientPseudonyms
 from app.domain.closure_service import ClosureService
 from app.domain.configuration_service import ConfigurationPackageService
 from app.domain.contact_center_connection import ContactCenterConnectionService
+from app.domain.contact_center_dispatch import DispatcherChoice
 from app.domain.contact_service import ContactService
 from app.domain.csv_export import ExportLimits
 from app.domain.diagnostics import DiagnosticsService
@@ -162,11 +167,13 @@ from app.domain.usage_report_service import UsageReportService
 from app.domain.wallboard_link import parse_networks
 from app.domain.wallboard_link_service import WallboardLinkService
 from app.domain.wallboard_service import WallboardService
+from app.domain.web_transport import BUNDLED_REALM_PATH
 from app.i18n import Translator, load_catalogues
 from app.i18n.dates import configure_clock
 from app.keys import (
     agent_pseudonym_key,
     agent_pseudonym_key_previous,
+    agent_pseudonym_keys,
     client_pseudonym_key,
     guest_pseudonym_keys,
     management_token_key,
@@ -242,10 +249,6 @@ def _change_policy(settings: Settings) -> ChangePolicy:
 def _keycloak_directory(settings: Settings) -> StaffDirectory | None:
     """Return the staff directory of the bundled Keycloak, or ``None`` without its settings."""
     return directory_from_settings(settings)
-
-
-BUNDLED_REALM_PATH = "/realms/openplanner/"
-"""Where the bundled provider's realm sits in its discovery URL (ADR 0090, the realm template)."""
 
 
 def _directory_missing(settings: Settings) -> tuple[str, ...]:
@@ -350,6 +353,10 @@ def create_app(
             if wired_with is not None and wired_with != webex_fingerprint(current):
                 wire_integrations(current)
 
+        # ADR 0123 step 6b: the one question "does this service's participant get the call page",
+        # built once; the platform switch is read at every call, so a portal change applies.
+        uses_page = call_page_rule(lambda: app.state.settings.embedded_call_enabled)
+
         def wire_integrations(current: Settings) -> None:
             wired = integrations or build_integrations(
                 current,
@@ -359,6 +366,7 @@ def create_app(
                 app.state.security_log,
                 request_log,
                 probe_timeout=lambda: timedelta(seconds=live().integration_probe_timeout_seconds),
+                uses_page=uses_page,
             )
             app.state.integrations = wired
             app.state.call_service = CallService(
@@ -370,10 +378,14 @@ def create_app(
                 app.state.fallback_service,
                 wired.organisations,
                 partial(conversation_opening, app.state.translator),
-                lambda: app.state.settings.embedded_call_enabled,
+                uses_page,
             )
             app.state.trial_call_service = TrialCallService(
-                uow, wired.video, app.state.integration_service, clock
+                uow,
+                wired.video,
+                app.state.integration_service,
+                clock,
+                uses_page,
             )
             # ADR 0123 point 6: the call page's guest token; rebuilt with the video provider.
             app.state.call_token_service = CallTokenService(
@@ -513,6 +525,7 @@ def create_app(
         )
         app.state.admin_session_service = AdminSessionService(uow, clock)
         app.state.staff_lifecycle_service = StaffLifecycleService(uow, clock)
+        app.state.staff_names = wiring.staff_screen_names(uow, clock, settings)
         # ADR 0049: claims become grants per request; the mode is class B, the prefix C.
         app.state.login_service = LoginService(
             uow,
@@ -657,11 +670,7 @@ def create_app(
         app.state.planning_service = PlanningService(uow, clock, app.state.admin_service)
         # ADR 0117 point 9: a team member's usage facts, only while the organisation has them on.
         staff_usage = StaffUsage(
-            [
-                k
-                for k in (agent_pseudonym_key(settings), agent_pseudonym_key_previous(settings))
-                if k is not None
-            ],
+            agent_pseudonym_keys(settings),
             lambda organisation: per_organisation(organisation).reporting_staff_view_enabled,
         )
         app.state.queue_service = QueueService(
@@ -697,6 +706,15 @@ def create_app(
                 lambda: live().contact_center_reconcile_minutes,
                 own_connection,
             ),
+        )
+        # ADR 0123 step 7b: the messages of a conversation task, stored with their booking.
+        app.state.call_chat_service = CallChatService(
+            uow,
+            uses_page,
+            lambda: DispatcherChoice(
+                app.state.integrations.dispatchers, app.state.integrations.organisations
+            ),
+            clock,
         )
         # ADR 0082 points 5 and 7: the last inbound webhooks and the health of the connections.
         app.state.health_service = IntegrationHealthService(
@@ -987,6 +1005,7 @@ def create_app(
         booking_pages.router,
         join_pages.router,
         call_pages.router,
+        call_chat_pages.router,
         trial_pages.router,
         direct_pages.router,
         immediate_pages.router,

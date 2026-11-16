@@ -225,6 +225,8 @@ class GroupRow(Base):
     trial_calls_per_booking: Mapped[int] = mapped_column(Integer, server_default=text("3"))
     # ADR 0075: which Webex page the participant's join link opens.
     join_client: Mapped[str] = mapped_column(String(16), server_default=text("'browser'"))
+    # ADR 0123 point 11, a service's setting from step 6a; NULL follows the organisation's value.
+    embedded_call_webex_option: Mapped[str | None] = mapped_column(String(16))
     embedding_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
     queue_visible_from_minutes: Mapped[int] = mapped_column(Integer, server_default=text("15"))
     queue_free_pick_allowed: Mapped[bool] = mapped_column(Boolean, server_default=text("0"))
@@ -261,7 +263,12 @@ class GroupRow(Base):
         CheckConstraint("planner_change_min_lead_minutes BETWEEN 0 AND 1440", name="planner_lead"),
         CheckConstraint("trial_call_minutes BETWEEN 10 AND 60", name="trial_call_minutes"),
         CheckConstraint("trial_calls_per_booking BETWEEN 1 AND 5", name="trial_calls_per_booking"),
-        CheckConstraint("join_client IN ('browser', 'choice')", name="join_client"),
+        CheckConstraint("join_client IN ('browser', 'choice', 'embedded')", name="join_client"),
+        CheckConstraint(
+            "embedded_call_webex_option IS NULL"
+            " OR embedded_call_webex_option IN ('hidden', 'on_failure', 'always')",
+            name="embedded_call_webex_option",
+        ),
         CheckConstraint("queue_visible_from_minutes BETWEEN 0 AND 120", name="queue_visible_from"),
         CheckConstraint("holiday_source IN ('inherit', 'own')", name="holiday_source"),
         CheckConstraint("max_bookings_per_email BETWEEN 1 AND 10", name="max_bookings_per_email"),
@@ -931,6 +938,8 @@ class StaffRow(Base):
     # ADR 0117 step 10b: the verified ``email`` claim of the last login; personal data.
     email: Mapped[str | None] = mapped_column(String(320))
     email_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # ADR 0123 step 5c: the name the participant of a call sees; personal data, cleared on erasure.
+    screen_name: Mapped[str | None] = mapped_column(String(40))
 
 
 class OverviewLayoutRow(Base):
@@ -1547,6 +1556,46 @@ class PublicAddressCheckRow(Base):
     scheme: Mapped[str | None] = mapped_column(String(8))
     forwarded: Mapped[str | None] = mapped_column(String(12))
     error: Mapped[str] = mapped_column(String(40), server_default=text("''"))
+
+
+class WebhookSecretSightingRow(Base):
+    """When the application first saw an installation webhook secret (ADR 0124 point 8).
+
+    One row per platform: its code, a keyed fingerprint of the secret (not reversible) and the
+    first time it was seen. Never a secret.
+    """
+
+    __tablename__ = "webhook_secret_sightings"
+
+    platform: Mapped[str] = mapped_column(String(16), primary_key=True)
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    first_seen: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
+class CallMessageRow(Base):
+    """One message of the chat beside a booking's call (ADR 0123 point 8, step 7b).
+
+    ``message_text`` is the one personal column (``privacy.CHAT_FIELDS``); the booking's purge
+    deletes the rows. ``author`` is a kind, never a name; ``provider_message_id`` is unique per
+    booking, so a delivery that comes twice is one row.
+    """
+
+    __tablename__ = "call_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    booking_id: Mapped[int] = mapped_column(ForeignKey("bookings.id", ondelete="CASCADE"))
+    author: Mapped[str] = mapped_column(String(16))
+    message_text: Mapped[str] = mapped_column(Text)
+    at: Mapped[datetime] = mapped_column(UTCDateTime())
+    state: Mapped[str] = mapped_column(String(16))
+    provider_message_id: Mapped[str] = mapped_column(String(128))
+
+    __table_args__ = (
+        CheckConstraint("author IN ('participant', 'staff')", name="author"),
+        CheckConstraint("state IN ('sent', 'delivered', 'refused')", name="state"),
+        UniqueConstraint("booking_id", "provider_message_id"),
+        Index("ix_call_messages_booking_id_at", "booking_id", "at"),
+    )
 
 
 class PlatformSettingRow(Base):

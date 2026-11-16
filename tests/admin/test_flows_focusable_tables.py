@@ -1,6 +1,6 @@
 """The scrollable tables of the flow screens take focus (axe: scrollable-region-focusable)."""
 
-from tests.admin.conftest import ORG_ADMIN, Site
+from tests.support.admin_site import ORG_ADMIN, Site
 from tests.support.flow_seed import add_flow, add_subjects
 from tests.support.skill_seed import add_pool
 

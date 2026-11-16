@@ -1,10 +1,55 @@
 /*
  * The participant's call page: the device check (ADR 0123 step 4b), connecting, the lobby and the
- * first moment of the call (step 4c). It builds on
+ * first moment of the call (step 4c), the notices and the panel of devices (step 5a). It builds on
  * site.css: colours, radius, spacing, font and the 44 px target all come from the --booking-*
  * tokens of the organisation's theme (ADR 0020, ADR 0041). Only the picture's own dark ground
  * is a constant of this page. No inline styles and no forced declarations; the page works from 320 px.
  */
+/* The bar is fixed at the foot of the window, so a page needs room at its end for it, and a focused
+   control is scrolled to rest above it (WCAG 2.4.11); both exist only while the bar shows. From 48 rem
+   wide the row of buttons is one line, about 4.5 rem with its frame; the captions and sharing buttons of
+   step 5b make the row longer, so below 72 rem it wraps to two rows (8.5 rem; 127 px measured at 1024 wide), below 46 rem to three
+   (11.5 rem) and below 40 rem to as many as five (17.5 rem), each the lesser of that and half the window;
+   the three are estimates from the buttons' widths, to be measured. `body` is a plain block, so a
+   bottom padding is the room after the footer. A browser without `:has()` only loses the room at the end. */
+html:has([data-call-controls]:not([hidden])) {
+  scroll-padding-bottom: 4.5rem;
+}
+
+html:has([data-call-controls]:not([hidden])) body {
+  padding-bottom: 4.5rem;
+}
+
+@media (max-width: 72rem) {
+  html:has([data-call-controls]:not([hidden])) {
+    scroll-padding-bottom: min(50vh, 8.5rem);
+  }
+
+  html:has([data-call-controls]:not([hidden])) body {
+    padding-bottom: min(50vh, 8.5rem);
+  }
+}
+
+@media (max-width: 46rem) {
+  html:has([data-call-controls]:not([hidden])) {
+    scroll-padding-bottom: min(50vh, 11.5rem);
+  }
+
+  html:has([data-call-controls]:not([hidden])) body {
+    padding-bottom: min(50vh, 11.5rem);
+  }
+}
+
+@media (max-width: 40rem) {
+  html:has([data-call-controls]:not([hidden])) {
+    scroll-padding-bottom: min(50vh, 17.5rem);
+  }
+
+  html:has([data-call-controls]:not([hidden])) body {
+    padding-bottom: min(50vh, 17.5rem);
+  }
+}
+
 .call {
   --call-stage: #101214;
   --call-on-stage: #ffffff;
@@ -79,15 +124,18 @@
   display: none;
 }
 
-.call-toggles {
+.call-toggles,
+.call-extras {
   display: flex;
   flex-wrap: wrap;
   gap: var(--booking-space-s);
   margin-bottom: var(--booking-space-m);
 }
 
-/* On is a filled, solid button; off is plain with a dashed edge: the word says it too. */
-.call-toggle {
+/* On is a filled, solid button; off is plain with a dashed edge: the word says it too. The button
+   that opens the panel of devices looks the same and is solid, filled while its panel is open. */
+.call-toggle,
+.call-more {
   display: inline-flex;
   align-items: center;
   gap: var(--booking-space-s);
@@ -107,16 +155,29 @@
   background: var(--booking-color-background);
 }
 
-.call-toggle:hover {
+.call-more {
+  border-color: var(--booking-color-border-strong);
+  background: var(--booking-color-background);
+}
+
+.call-more[aria-expanded="true"] {
+  border-color: var(--booking-color-accent);
+  background: var(--booking-color-accent-subtle);
+}
+
+.call-toggle:hover,
+.call-more:hover {
   border-color: var(--booking-color-text);
 }
 
-.call-toggle:focus-visible {
+.call-toggle:focus-visible,
+.call-more:focus-visible {
   background: var(--booking-color-focus-background);
   color: var(--booking-color-text);
 }
 
-.call-toggle svg {
+.call-toggle svg,
+.call-more svg {
   width: 1.25rem;
   height: 1.25rem;
   fill: currentcolor;
@@ -237,10 +298,6 @@
   margin: 0 auto var(--booking-space-m);
 }
 
-.call-card .call-toggles {
-  justify-content: center;
-}
-
 .call-spinner {
   display: block;
   box-sizing: border-box;
@@ -267,9 +324,85 @@
   font-weight: 400;
 }
 
+/* The picture gives way, never the bar, and it gives way to what is really shown above and below it,
+   with no estimate per notice. While the call shows, the page is a column of grids as high as the
+   window at least (the well-known sticky-footer pattern): the body is `auto 1fr auto` (header, main,
+   footer; the bar's room is its own bottom padding, inside the window's height), main holds the call,
+   the call is `auto 1fr` (the notices, then the call's section), the section is `auto 1fr` (its
+   heading, then the media). A `1fr` row of a grid with a `min-height` is exactly what is left, and
+   the column grows by itself when the minimums do not fit, so the page then scrolls and the bar
+   holds, as before. The media is a column of its own, the picture and under it the captions.
+   The picture GROWS into the room that is left: a small base (8 rem) with `flex-grow`, capped at the
+   16 by 9 height of the column's width, which the container unit `cqw` of the media gives without any
+   estimate. It cannot be done the other way round, as a 16 by 9 box that shrinks: a grid under a
+   `min-height` only hands out room that is left over and never makes an item smaller than its content
+   size, and the content size of a 16 by 9 box is its 16 by 9 height, so the `1fr` rows would have
+   nothing to give and the page would just grow. Where the room is more than the cap, the captions
+   follow the picture and the rest is empty below them, so no gap opens. A browser without `:has()` or
+   container units keeps the 16 by 9 box of the rule below and a page that scrolls. */
+body:has([data-call-state="call"]:not([hidden])) {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  grid-template-columns: minmax(0, 1fr);
+  box-sizing: border-box;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* A grid item with automatic side margins would be as wide as its content: the width is asked for. */
+body:has([data-call-state="call"]:not([hidden])) main,
+body:has([data-call-state="call"]:not([hidden])) .site-footer {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+body:has([data-call-state="call"]:not([hidden])) main {
+  display: grid;
+  grid-template-rows: 1fr;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body:has([data-call-state="call"]:not([hidden])) .call {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.call-state[data-call-state="call"]:not([hidden]) {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.call-media {
+  --call-captions-max: 6.5rem;
+  --call-media-min: 8rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: var(--call-media-min);
+}
+
+.call-media:has([data-call-captions]:not([hidden])) {
+  --call-media-min: calc(8rem + var(--call-captions-max) + var(--booking-space-s));
+}
+
+body:has([data-call-state="call"]:not([hidden])) .call-media {
+  container-type: inline-size;
+}
+
+body:has([data-call-state="call"]:not([hidden])) .call-stage {
+  flex: 1 1 8rem;
+  aspect-ratio: auto;
+  max-height: calc(100cqw * 9 / 16);
+}
+
 .call-stage {
   position: relative;
+  flex: 0 1 auto;
+  width: 100%;
   aspect-ratio: 16 / 9;
+  min-height: 8rem;
   overflow: hidden;
   border-radius: var(--booking-radius);
   background: var(--call-stage);
@@ -283,6 +416,71 @@
   object-fit: contain;
 }
 
+/* The staff member's screen takes the place of their picture, which moves to a small tile at the
+   foot on the left (the participant's own tile is on the right). It is the same element, so the
+   other side's sound and its tracks go on as they were. */
+.call-remote-share {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.call-stage[data-call-share="theirs"] .call-remote {
+  position: absolute;
+  bottom: var(--booking-space-s);
+  left: var(--booking-space-s);
+  z-index: 1;
+  width: auto;
+  height: var(--call-tile);
+  max-width: 30%;
+  aspect-ratio: 16 / 9;
+  border: 2px solid var(--call-on-stage);
+  border-radius: var(--booking-radius);
+  background: var(--call-stage);
+  object-fit: cover;
+}
+
+.call-stage[data-call-share="theirs"] .call-remote__off {
+  inset: auto auto var(--booking-space-s) var(--booking-space-s);
+  z-index: 1;
+  width: auto;
+  height: var(--call-tile);
+  max-width: 30%;
+  aspect-ratio: 16 / 9;
+  padding: var(--booking-space-xs);
+  font-size: 0.875rem;
+}
+
+/* The captions are ordinary text under the picture, their size the page's own (rem). The box has a
+   height of its own and scrolls inside itself (the script scrolls it to the start of the newest line
+   and gives it focus only when it can scroll), so a long line is read to its start and the box can
+   never take the picture's place. */
+.call-captions {
+  position: relative;
+  flex: none;
+  max-height: var(--call-captions-max);
+  margin: var(--booking-space-s) 0 0;
+  padding: var(--booking-space-xs) var(--booking-space-m);
+  overflow-y: auto;
+  border-radius: var(--booking-radius);
+  background: var(--call-stage);
+  color: var(--call-on-stage);
+  font-size: 1.125rem;
+}
+
+.call-caption {
+  margin: 0;
+}
+
+.call-caption__who::after {
+  content: ":";
+}
+
+.call-caption--interim .call-caption__text {
+  font-style: italic;
+}
+
 .call-remote__off {
   position: absolute;
   inset: 0;
@@ -294,11 +492,38 @@
   text-align: center;
 }
 
+/* Who the participant talks to: a pill on the picture's top left, text in the page (its words are
+   also the picture's accessible name). It stays above the staff member's tile and screen. */
+.call-remote__label {
+  position: absolute;
+  top: var(--booking-space-s);
+  left: var(--booking-space-s);
+  z-index: 2;
+  max-width: calc(100% - 2 * var(--booking-space-s));
+  margin: 0;
+  padding: var(--booking-space-xs) var(--booking-space-m);
+  border-radius: 999px;
+  background: var(--call-stage);
+  color: var(--call-on-stage);
+  font-size: 1rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* The small tiles in the stage (the participant's own, and the staff member's camera while their screen
+   is shared) are as high as the stage allows, 55 % of it and 6.75 rem at most, 16 by 9, and no wider
+   than 30 % of it: a low picture still shows them whole and side by side. */
+.call-stage {
+  --call-tile: min(55%, 6.75rem);
+}
+
 .call-self {
   position: absolute;
   right: var(--booking-space-s);
   bottom: var(--booking-space-s);
-  width: min(30%, 12rem);
+  width: auto;
+  height: var(--call-tile);
+  max-width: 30%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
   border: 2px solid var(--call-on-stage);
@@ -315,17 +540,156 @@
   transform: scaleX(-1);
 }
 
+/* Notices last while they hold: an icon and a word, a bar on the edge, never colour alone. */
+.call-notice {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--booking-space-xs) var(--booking-space-s);
+  margin: 0 0 var(--booking-space-s);
+  padding: var(--booking-space-s) var(--booking-space-m);
+  border: 1px solid var(--booking-color-border-strong);
+  border-left-width: 6px;
+  border-radius: var(--booking-radius);
+  background: var(--booking-color-surface);
+}
+
+.call-notice svg {
+  align-self: center;
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: currentcolor;
+}
+
+/* The words take the row's room and the stop button stays on their right (as in the mock-up); on a
+   narrow window the button goes to a row of its own. */
+.call-notice > span {
+  flex: 1 1 20rem;
+  min-width: 0;
+}
+
+.call-notice__stop {
+  margin-left: auto;
+}
+
+.call-notice[data-call-notice="sharing"],
+.call-notice[data-call-notice="theirs"] {
+  border-left-color: var(--booking-color-accent);
+}
+
+.call-notice[data-call-notice="recording"] {
+  border-left-color: var(--booking-color-error);
+}
+
+/* The one bar of the lobby and the call is fixed at the foot of the window: a sticky bar leaves the
+   foot at the end of the page, and the panel above it would leave the window. The page keeps room for
+   it at its end (above). It is the positioning context of the panel of devices. */
+.call-controls {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  margin: 0;
+  padding: var(--booking-space-s) var(--booking-space-m);
+  border-top: 1px solid var(--booking-color-border-strong);
+  background: var(--booking-color-background);
+}
+
 .call-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: var(--booking-space-m);
-  margin-top: var(--booking-space-m);
 }
 
-.call-bar .call-toggles {
+/* The panel of devices overlays what is above the bar and pushes nothing: it is out of flow, anchored to
+   the bar's box (`.call-controls` is fixed, so it is the positioning context; nothing between them is
+   positioned), and adds nothing to the sticky box, so the row of buttons cannot be pushed out of the
+   window. The row is at most half the window and sits at the window's foot; the panel is at most half
+   the window less 1.5 rem and has a margin of 0.5 rem (`--booking-space-s`), so its top stays at least
+   1 rem below the window's top. It stays after its button in the markup and there is no `order`: one
+   engine lets `order` change the keyboard order. A panel that does not fit scrolls inside itself. */
+.call-devices {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  left: 0;
+  box-sizing: border-box;
+  max-width: 28rem;
+  max-height: calc(50vh - 1.5rem);
+  max-height: calc(50dvh - 1.5rem);
+  margin: 0 auto var(--booking-space-s);
+  padding: var(--booking-space-m);
+  overflow: auto;
+  border: 1px solid var(--booking-color-border-strong);
+  border-radius: var(--booking-radius);
+  background: var(--booking-color-surface);
+  text-align: left;
+}
+
+/* On a window at least 640 px high the row is at most about 190 px, so the panel may take what is
+   left and need not scroll. */
+@media (min-height: 40rem) {
+  .call-devices {
+    max-height: calc(100vh - 14rem);
+    max-height: calc(100dvh - 14rem);
+  }
+}
+
+.call-devices h2 {
+  margin-top: 0;
+}
+
+.call-devices > :last-child {
   margin-bottom: 0;
+}
+
+.call-bar .call-toggles,
+.call-bar .call-extras {
+  margin-bottom: 0;
+}
+
+/* The long name of sharing goes where room is short; assistive technology keeps it either way. */
+.call-label-short {
+  display: none;
+}
+
+.call-toggle[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+@media (max-width: 40rem) {
+  .call-bar .call-extras {
+    gap: var(--booking-space-s);
+  }
+
+  .call-bar .call-toggle {
+    position: relative;
+  }
+
+  .call-bar .call-label-long {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .call-bar .call-label-short {
+    display: inline;
+  }
+
+  .call-bar .call-toggle,
+  .call-bar .call-more,
+  .call-bar .call-leave {
+    padding-right: var(--booking-space-s);
+    padding-left: var(--booking-space-s);
+  }
 }
 
 .call-leave {
@@ -338,9 +702,74 @@
   padding-left: calc(var(--booking-space-l) * 2);
 }
 
+/* On a narrow window the bar is as low as it can be: close rows, the way out in the row's middle. */
+@media (max-width: 40rem) {
+  .call-bar {
+    gap: var(--booking-space-s);
+  }
+
+  .call-bar__leave {
+    margin-left: 0;
+    padding-left: 0;
+  }
+}
+
 .call-hear {
-  display: block;
-  margin: var(--booking-space-s) auto 0;
+  position: absolute;
+  top: var(--booking-space-s);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* On a low window the bar takes at most about half of it (WCAG 1.4.4, 1.4.10): smaller buttons
+   (still above 24 by 24 pixels), closer rows, a leaner frame. The picture gives way. */
+@media (max-height: 32rem) {
+  .call-controls {
+    padding: 2px var(--booking-space-m);
+  }
+
+  .call-bar,
+  .call-bar .call-toggles,
+  .call-bar .call-extras {
+    gap: 4px;
+  }
+
+  .call-media {
+    --call-captions-max: 3.5rem;
+  }
+
+  .call-captions {
+    font-size: 1rem;
+  }
+
+  .call-bar .call-toggle,
+  .call-bar .call-more,
+  .call-bar .call-leave {
+    min-height: 2rem;
+    padding: 2px var(--booking-space-s);
+  }
+
+  .call-notice {
+    margin-bottom: 4px;
+    padding: 2px var(--booking-space-s);
+  }
+}
+
+/* On a very low window the toggles keep their words ("on", "off") for assistive technology only,
+   so the row stays on two lines; the pressed edge (solid or dashed) and the icon still show it. */
+@media (max-height: 20rem) {
+  .call-bar .call-toggle {
+    position: relative;
+  }
+
+  .call-bar .call-toggle__state {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 /* --- Preferences ------------------------------------------------------------------------ */
@@ -354,8 +783,41 @@
 @media (forced-colors: active) {
   .call-card,
   .call-stage,
-  .call-self {
+  .call-self,
+  .call-captions,
+  .call-devices {
     border: 1px solid CanvasText;
+  }
+
+  .call-stage[data-call-share="theirs"] .call-remote {
+    border-color: CanvasText;
+  }
+
+  .call-remote__label {
+    border: 1px solid CanvasText;
+  }
+
+  .call-toggle[aria-disabled="true"] {
+    border-color: GrayText;
+    color: GrayText;
+  }
+
+  .call-notice {
+    border: 1px solid CanvasText;
+    border-left-width: 6px;
+  }
+
+  .call-more {
+    border-color: ButtonText;
+  }
+
+  .call-more[aria-expanded="true"] {
+    border-color: Highlight;
+    border-width: 3px;
+  }
+
+  .call-more:focus-visible {
+    outline: 3px solid Highlight;
   }
 
   .call-spinner {
@@ -406,7 +868,182 @@
 
 @media (prefers-contrast: more) {
   .call-toggle,
-  .call-toggle[aria-pressed="false"] {
+  .call-toggle[aria-pressed="false"],
+  .call-more {
     border-color: var(--booking-color-text);
+  }
+}
+
+/* --- The chat beside the call (step 7c) ------------------------------------------------------- */
+/* The side bar sits after the call's content in the page and below it on a narrow window, so a
+   reading order and a keyboard order follow the page; from 64 rem it takes a column of its own to
+   the right of everything else. It is shown in every state after the start. */
+.call-chat {
+  box-sizing: border-box;
+  margin-top: var(--booking-space-m);
+  padding: var(--booking-space-m);
+  border: 1px solid var(--booking-color-border-strong);
+  border-radius: var(--booking-radius);
+  background: var(--booking-color-surface);
+}
+
+.call-chat h2 {
+  margin-top: 0;
+}
+
+.call-chat__warning {
+  margin-bottom: var(--booking-space-s);
+}
+
+/* The log scrolls inside itself and can be focused for that; its place is kept when a message is
+   added (the script appends, it never draws a line again that did not change). */
+.call-chat__log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--booking-space-s);
+  max-height: 20rem;
+  margin-bottom: var(--booking-space-s);
+  overflow-y: auto;
+}
+
+.call-chat__message {
+  box-sizing: border-box;
+  max-width: 90%;
+  padding: var(--booking-space-s);
+  border: 1px solid var(--booking-color-border);
+  border-radius: var(--booking-radius);
+  background: var(--booking-color-background);
+  overflow-wrap: anywhere;
+}
+
+.call-chat__message--participant {
+  align-self: flex-end;
+  border-color: var(--booking-color-accent);
+  background: var(--booking-color-accent-subtle);
+}
+
+.call-chat__message p {
+  margin: 0;
+}
+
+.call-chat__who {
+  font-weight: 700;
+}
+
+.call-chat__time,
+.call-chat__state {
+  color: var(--booking-color-text-muted);
+  font-size: 0.875rem;
+}
+
+/* Line breaks of a message are kept as the writer made them. */
+.call-chat__text {
+  white-space: pre-wrap;
+}
+
+.call-chat__state:empty {
+  display: none;
+}
+
+.call-chat__closed {
+  margin-bottom: var(--booking-space-s);
+  padding: var(--booking-space-s) var(--booking-space-m);
+  border: 1px solid var(--booking-color-border-strong);
+  border-left-width: 6px;
+  border-radius: var(--booking-radius);
+  background: var(--booking-color-background);
+}
+
+.call-chat__closed p {
+  margin: 0;
+}
+
+.call-chat__closed:focus-visible,
+.call-chat__log:focus-visible {
+  outline: 3px solid var(--booking-color-accent);
+  outline-offset: 2px;
+}
+
+/* The way to send is said for the pointer in use: a touch keyboard has no Shift and Enter, so there
+   Enter starts a new line and the button sends (call-chat.js). The sentence that is not true here is
+   not in the box and so not read. */
+.call-chat__keys-touch {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .call-chat__keys-fine {
+    display: none;
+  }
+
+  .call-chat__keys-touch {
+    display: inline;
+  }
+}
+
+.call-chat__form .field {
+  margin-bottom: var(--booking-space-s);
+}
+
+.call-chat__form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+}
+
+.call-chat__problem {
+  margin: var(--booking-space-xs) 0 0;
+  padding-left: var(--booking-space-s);
+  border-left: 4px solid var(--booking-color-error);
+  font-weight: 700;
+}
+
+.call-chat__form > :last-child {
+  margin-bottom: 0;
+}
+
+@media (min-width: 64rem) {
+  body:has([data-call-state]:not([hidden])) .call:has(> .call-chat:not([hidden])) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    column-gap: var(--booking-space-l);
+    align-items: start;
+  }
+
+  body:has([data-call-state]:not([hidden])) .call:has(> .call-chat:not([hidden])) > * {
+    grid-column: 1;
+  }
+
+  body:has([data-call-state]:not([hidden])) .call:has(> .call-chat:not([hidden])) > .call-chat {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    margin-top: 0;
+  }
+
+  /* The bar is fixed at the foot of the window: a side bar taller than the window less the bar would
+     leave Send under it (WCAG 2.4.11), so it is cut to the room there is and scrolls inside itself. */
+  .call-chat {
+    position: sticky;
+    top: var(--booking-space-m);
+    max-height: calc(100vh - 8rem);
+    max-height: calc(100dvh - 8rem);
+    overflow-y: auto;
+  }
+}
+
+@media (forced-colors: active) {
+  .call-chat,
+  .call-chat__message,
+  .call-chat__closed {
+    border: 1px solid CanvasText;
+  }
+
+  .call-chat__message--participant {
+    border-width: 3px;
+  }
+
+  .call-chat__closed:focus-visible,
+  .call-chat__log:focus-visible {
+    outline: 3px solid Highlight;
   }
 }

@@ -35,6 +35,7 @@ from app.adapters.crypto import SecretBox
 from app.adapters.db.admin_sessions import AdminSessionQueries
 from app.adapters.db.alert_targets import AlertTargetQueries
 from app.adapters.db.api_clients import ApiClientQueries
+from app.adapters.db.call_messages import CallMessageQueries
 from app.adapters.db.call_status_rows import call_status_of
 from app.adapters.db.capacity_pools import CapacityPoolQueries
 from app.adapters.db.certificate import CertificateQueries
@@ -125,6 +126,7 @@ from app.adapters.db.routing_json import (
 from app.adapters.db.scenarios import ScenarioQueries
 from app.adapters.db.schedule_rules import rule_from_row
 from app.adapters.db.scope import scope_filter
+from app.adapters.db.secret_sightings import SecretSightingQueries
 from app.adapters.db.service_flows import ServiceFlowQueries
 from app.adapters.db.service_requests import ServiceRequestQueries
 from app.adapters.db.skills import SkillQueries
@@ -167,6 +169,7 @@ from app.domain.booking import (
     TrialCall,
 )
 from app.domain.branding import Branding, FontFile, FontRef, FontRole, HeaderStyle, Logo, LogoRef
+from app.domain.call_page import OtherWayOffer
 from app.domain.calls import (
     BookingEvent,
     BookingOverview,
@@ -292,6 +295,11 @@ def _group(row: GroupRow, center: GroupContactCenterRow | None) -> Group:
         trial_call_minutes=row.trial_call_minutes,
         trial_calls_per_booking=row.trial_calls_per_booking,
         join_client=JoinClient(row.join_client),
+        embedded_call_webex_option=(
+            OtherWayOffer(row.embedded_call_webex_option)
+            if row.embedded_call_webex_option
+            else None
+        ),
         embedding_enabled=row.embedding_enabled,
         queue_visible_from_minutes=row.queue_visible_from_minutes,
         queue_free_pick_allowed=row.queue_free_pick_allowed,
@@ -387,6 +395,9 @@ def _group_columns(group: Group) -> dict[str, Any]:
         "trial_call_minutes": group.trial_call_minutes,
         "trial_calls_per_booking": group.trial_calls_per_booking,
         "join_client": group.join_client.value,
+        "embedded_call_webex_option": (
+            group.embedded_call_webex_option.value if group.embedded_call_webex_option else None
+        ),
         "embedding_enabled": group.embedding_enabled,
         "queue_visible_from_minutes": group.queue_visible_from_minutes,
         "queue_free_pick_allowed": group.queue_free_pick_allowed,
@@ -522,6 +533,8 @@ class SqlTransaction(
     FormFieldQueries,
     CertificateQueries,
     PublicAddressQueries,
+    SecretSightingQueries,
+    CallMessageQueries,
     OwnCertificateQueries,
 ):
     """``Transaction`` on an ``AsyncSession`` whose transaction is already open.
@@ -1946,7 +1959,8 @@ class SqlTransaction(
         """Delete the personal fields and provider links of a booking (ADR 0102 point 11).
 
         Sets every column of ``privacy.PURGED_FIELDS`` to NULL, empties the message of the
-        booking's timeline events, replaces the management token hash by a random value (the
+        booking's timeline events, deletes the booking's chat messages (``privacy.CHAT_FIELDS``),
+        replaces the management token hash by a random value (the
         column is unique and not null; the old hash can no longer find the booking) and records
         ``pii_purged_at``. The salt stays: without the token it identifies nothing.
 
@@ -1979,6 +1993,8 @@ class SqlTransaction(
             )
             .values({name: None for name in REQUEST_DERIVED_FIELDS})
         )
+        # ADR 0123 step 7b: the text of the booking's chat is personal data (``CHAT_FIELDS``).
+        await self.delete_call_messages(booking_id)
         # ADR 0093 point 5: a purged booking leaves every participant link session.
         await self._session.execute(
             delete(ParticipantLinkBookingRow).where(

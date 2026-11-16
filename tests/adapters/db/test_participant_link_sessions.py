@@ -15,9 +15,9 @@ from app.adapters.db.uow import SqlUnitOfWork
 from app.domain.participant_link_service import ParticipantLinkService
 from app.domain.participant_links import MAX_BOOKINGS, hash_value
 from app.domain.services import BookingService
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.clock import FixedClock
 from tests.support.domain import NOW, SLOT_0900, SLOT_0930, TEST_TOKEN_KEY, book
+from tests.support.seed_rows import seed_group
 
 DAY = timedelta(hours=24)
 

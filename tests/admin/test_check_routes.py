@@ -12,15 +12,14 @@ from app.adapters.integrations import Integrations
 from app.config import Settings
 from app.domain.checks import CheckArea, CheckStatus, Finding
 from app.main import create_app
-from tests.admin.conftest import ORG_ADMIN, SAME_ORIGIN, SUPER, Site
 from tests.fakes.clock import FixedClock
 from tests.fakes.identity import FakeIdentityProvider
 from tests.fakes.integrations import FakeChecker
-from tests.support.admin_site import audit_events
+from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site, audit_events
+from tests.support.app_client import served
 from tests.support.domain import NOW
-from tests.support.group_settings import SETTINGS_FORM
+from tests.support.group_settings import SETTINGS, SETTINGS_FORM, save_settings
 
-SETTINGS = "/admin/groups/demo/settings"
 FINDINGS = [
     Finding(CheckArea.WEBEX, "webex.host_ok", CheckStatus.OK, (("host", "host@example.nl"),)),
     Finding(
@@ -53,13 +52,8 @@ async def _site(settings: Settings, admin_db: str, checker: FakeChecker) -> Asyn
         idp,
         Integrations(checker=checker),
     )
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
-        ) as client,
-    ):
-        yield Site(client, idp, FixedClock(NOW))
+    async with served(app) as client:
+        yield Site(app, client, idp, FixedClock(NOW))
 
 
 @pytest.fixture
@@ -146,8 +140,7 @@ async def test_cross_site_check_is_refused(checked: tuple[Site, FakeChecker]) ->
 
 
 async def _save(site: Site, host: str) -> httpx.Response:
-    form = {**SETTINGS_FORM, "video_host_email": host}
-    return await site.client.post(SETTINGS, data=form, headers=SAME_ORIGIN)
+    return await save_settings(site, {**SETTINGS_FORM, "video_host_email": host})
 
 
 async def test_saving_a_new_host_checks_the_group_and_reports_the_failure(
@@ -167,11 +160,7 @@ async def test_saving_a_new_host_checks_the_group_and_reports_the_failure(
     assert ("system", "integration.check", "failure", "wxcc.schema.refused") in events
     # Saving the same host again, or other settings, checks nothing.
     await _save(site, "host@example.nl")
-    await site.client.post(
-        SETTINGS,
-        data={**SETTINGS_FORM, "video_host_email": "host@example.nl", "name": "X"},
-        headers=SAME_ORIGIN,
-    )
+    await save_settings(site, {**SETTINGS_FORM, "video_host_email": "host@example.nl", "name": "X"})
     assert len(checker.calls) == 1
 
 

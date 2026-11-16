@@ -51,6 +51,15 @@ bewaart alle onderwerpen samen.
 - **Rustperiode na een wijzigingsverzoek** (1 tot 1440 minuten, standaard 10): nadat een
   verzoek een afspraak heeft bereikt, krijgt de deelnemer in deze periode geen nieuw bericht voor
   diezelfde afspraak, ook niet als de bot opnieuw vraagt. Kan niet worden uitgezet.
+- **Privacyverklaring (adres)**: het https-adres van de privacyverklaring van de organisatie, hoogstens
+  2.048 tekens, met een hostnaam (geen IP-adres en niet `localhost`). De gesprekspagina linkt ernaar bij de regel dat een externe videodienst het gesprek
+  verzorgt (de link opent in een nieuw tabblad). In die verklaring staat welke dienst dat is: de
+  pagina zelf noemt hem niet. Leeg: de pagina toont de regel zonder link.
+- **Langste chatbericht dat een deelnemer op de gesprekspagina mag sturen, in tekens** (200 tot
+  4.000, standaard 1.000): het aantal tekens van één bericht dat een deelnemer in de chat naast het
+  gesprek mag sturen. De chat bestaat alleen voor een dienst die de gesprekspagina gebruikt en
+  waarvan de taak bij het contactcenter een gesprek is. Een bericht van de medewerker wordt niet door dit
+  aantal ingekort. De platformbeheerder stelt in hoeveel berichten een deelnemer per minuut mag sturen.
 
 ## Een instelling wijzigen
 

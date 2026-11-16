@@ -15,10 +15,10 @@ from app.cli import _idp_check, _idp_disable, main
 from app.config import Settings
 from app.domain.identity_providers import ClientAuth, OrganisationProvider
 from app.domain.login_domains import DomainClaim, DomainState
-from tests.adapters.db.conftest import seed_group
 from tests.fakes.oidc_provider import DISCOVERY, oidc_provider
 from tests.fakes.outbound import resolver
 from tests.support.database import migrated_database
+from tests.support.seed_rows import seed_group
 
 NOW = datetime(2026, 11, 2, 12, 0, tzinfo=UTC)
 

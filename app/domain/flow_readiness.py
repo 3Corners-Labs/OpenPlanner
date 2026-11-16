@@ -89,10 +89,20 @@ class ReadinessReason(StrEnum):
     ROLLBACK_NOT_SAFE = "rollback_not_safe"
     """The rollback gate ``ROLLBACK_SAFE`` is shut: the previous supported version could not
     yet account for the pool slots a new flow writes (ADR 0122 decision 12)."""
+    CONTACT_CENTER_NOT_READY = "contact_center_not_ready"
+    """The flow dispatches to the contact center, which waits for the go-live items G13 to G15
+    (``CONTACT_CENTER_FLOWS_READY``, product owner 2026-11-14)."""
+    OWN_QUEUE_MISSING = "own_queue_missing"
+    """The flow dispatches to the own queue, but its service has none (``Group.has_own_queue``):
+    nobody could claim its work and the watchdog would expire it (product owner, 2026-11-15)."""
 
 
 FOLLOWING: frozenset[ReadinessReason] = frozenset(
-    {ReadinessReason.NOT_BUILT_YET, ReadinessReason.ROLLBACK_NOT_SAFE}
+    {
+        ReadinessReason.NOT_BUILT_YET,
+        ReadinessReason.ROLLBACK_NOT_SAFE,
+        ReadinessReason.CONTACT_CENTER_NOT_READY,
+    }
 )
 """The reasons an administrator cannot fix: a part of OpenPlanner that follows in a later
 version. They keep a checklist from being complete, never make it incomplete."""
@@ -278,15 +288,27 @@ def _retention_reason(revision: FlowRevision) -> ReadinessReason | None:
     return ReadinessReason.NOT_BUILT_YET
 
 
-def _rollback_reason(revision: FlowRevision) -> ReadinessReason | None:
+def _rollback_reason(revision: FlowRevision, own_queue: bool) -> ReadinessReason | None:
     """Return why the rollback check fails, if it does.
 
     Whether the previous supported version could still account for the flow's records after a
-    rollback (``ROLLBACK_SAFE``, ADR 0121 point 9, ADR 0122 decision 12), read when called.
+    rollback (``ROLLBACK_SAFE``, ADR 0121 point 9, ADR 0122 decision 12), and, once it can,
+    whether the flow may go live where its work is dispatched: a flow that dispatches to the
+    contact center waits for ``CONTACT_CENTER_FLOWS_READY`` (checklist G13 to G15), and a flow
+    on the own queue needs a service with an own queue (``own_queue``, product owner
+    2026-11-15); the constant read when called. This is the one place both rules are applied,
+    so the portal and the configuration import both meet them, and a shut gate still names
+    only ``rollback_not_safe``. A legacy revision is never refused.
     """
-    if revision.legacy or flows.ROLLBACK_SAFE:
+    if revision.legacy:
         return None
-    return ReadinessReason.ROLLBACK_NOT_SAFE
+    if not flows.ROLLBACK_SAFE:
+        return ReadinessReason.ROLLBACK_NOT_SAFE
+    if revision.dispatch is DispatchKind.CONTACT_CENTER and not flows.CONTACT_CENTER_FLOWS_READY:
+        return ReadinessReason.CONTACT_CENTER_NOT_READY
+    if revision.dispatch is DispatchKind.OWN_QUEUE and not own_queue:
+        return ReadinessReason.OWN_QUEUE_MISSING
+    return None
 
 
 def readiness(
@@ -296,6 +318,7 @@ def readiness(
     offered_subjects: Collection[str],
     coded_skills: Collection[int] = (),
     carrier: ContactCenterCapabilities | None = None,
+    own_queue: bool,
 ) -> tuple[ReadinessItem, ...]:
     """Return the seven checklist items, in order, for activating ``revision``.
 
@@ -303,8 +326,11 @@ def readiness(
     subjects, ``coded_skills`` the ids of the organisation's skills that have a contact-center
     code (only a contact-center revision with skills reads it), ``carrier`` what the platform of
     the service's complete contact-center routing carries (``capabilities_of``; ``None``
-    without one; only a non-legacy contact-center revision reads it, ADR 0121 step 6). Values
-    outside the ``BUILT_*`` constants fail for a non-legacy revision.
+    without one; only a non-legacy contact-center revision reads it, ADR 0121 step 6),
+    ``own_queue`` whether the service has an own queue (``Group.has_own_queue``; only a
+    non-legacy own-queue revision reads it, once the rollback gate is open). It has no default,
+    so no caller can forget it. Values outside the ``BUILT_*`` constants fail for a non-legacy
+    revision.
     """
     return (
         _item(ReadinessCheck.DATA, _data_reason(revision)),
@@ -316,7 +342,7 @@ def readiness(
         _item(ReadinessCheck.DISPATCH, _dispatch_reason(revision, carrier)),
         _item(ReadinessCheck.COMPLETION, _completion_reason(revision)),
         _item(ReadinessCheck.RETENTION, _retention_reason(revision)),
-        _item(ReadinessCheck.ROLLBACK, _rollback_reason(revision)),
+        _item(ReadinessCheck.ROLLBACK, _rollback_reason(revision, own_queue)),
     )
 
 
