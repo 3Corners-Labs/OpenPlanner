@@ -11,6 +11,9 @@ attempt is active.
                └─outcome unknown─► reconciliation_required ─late task─► dispatched
                                          └─window over─► fenced (request queued, own queue)
 
+    watchdog (``app.domain.request_watch``): an attempt not started by its deadline ─► expired,
+    its booking ended ─► cancelled; a task the platform holds is then ended there (step 27)
+
 Pure Python, no I/O; the use cases are in ``app.domain.request_dispatch``. The build brief is
 ``docs/service-flows-contact-center-contract-design.md`` section 11.
 """
@@ -18,6 +21,7 @@ Pure Python, no I/O; the use cases are in ``app.domain.request_dispatch``. The b
 from dataclasses import replace
 from datetime import datetime, timedelta
 
+from app.domain.booking import BookingStatus
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.service_requests import (
     IN_DOUBT,
@@ -27,6 +31,11 @@ from app.domain.service_requests import (
     WorkItem,
     WorkItemState,
 )
+
+WATCHDOG_ENDED: frozenset[WorkItemState] = frozenset(
+    {WorkItemState.EXPIRED, WorkItemState.CANCELLED}
+)
+"""The states the watchdog ends an unstarted attempt in (``service_requests.watchdog_outcome``)."""
 
 
 def _handled(request: ServiceRequest, handling: HandlingState, now: datetime) -> ServiceRequest:
@@ -185,3 +194,25 @@ def ended(
     attempt = _attempt(item)
     done = replace(attempt, state=WorkItemState.COMPLETED, ended_at=now)
     return _handled(request, HandlingState.COMPLETED, now), done
+
+
+def watchdog_ends_task(
+    before: WorkItem | None, after: WorkItem | None, *, has_task: bool, booking: BookingStatus
+) -> bool:
+    """Return whether the watchdog, ending ``before`` as ``after``, must end its platform task.
+
+    Step 27 of ADR 0121 (brief section 11, choice E9): a contact-center attempt the watchdog
+    expires or cancels would otherwise leave its task with an agent, for work that is over.
+    ``has_task`` says the booking holds the task's id; an attempt still in doubt has none, and a
+    task that shows up for it later is an orphan that ``request_dispatch`` ends. A booking that
+    was cancelled has its task ended by the cancellation's own job (ADR 0021), so the watchdog
+    plans no second one. Started work becomes ``recovery_required`` and keeps its task (A34).
+    """
+    return (
+        before is not None
+        and after is not None
+        and before.channel is WorkChannel.CONTACT_CENTER
+        and after.state in WATCHDOG_ENDED
+        and has_task
+        and booking is not BookingStatus.CANCELLED
+    )

@@ -308,6 +308,9 @@ class CallService:
     async def end_task(self, booking: Booking, group: Group) -> None:
         """Mark a cancelled booking's task cancelled, then try to end it.
 
+        Also the end of a contact-center attempt the request watchdog expired or cancelled
+        (ADR 0121 step 27): the work is over, so no agent may keep the task.
+
         Nothing happens without a task, without a dispatcher for the platform that holds it, or
         once the platform reported it ended or failed. A retry after a successful mark does not
         mark again. A conversation task (ADR 0123 step 7a) is never marked: the mark is the work

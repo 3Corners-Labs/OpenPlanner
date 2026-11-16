@@ -577,24 +577,33 @@ test('a long caption can be read to its start and to its end with the keyboard, 
   expect(await visible('first')).toBe(true); // the newest line begins inside the box
   expect(await visible('last')).toBe(false); // and does not end there
 
-  await box.focus();
-  await page.keyboard.press('End');
-  await expect.poll(() => visible('last')).toBe(true); // the keyboard reaches its end
-  await page.keyboard.press('Home');
-  await expect.poll(() => box.evaluate((el) => el.scrollTop)).toBe(0); // a key scrolls over a few frames
-  // A key's scroll takes a few frames: look only once the box has come to rest, or the next key is
-  // pressed while the newest line's start is still on its way in, and carries it past the box.
-  const atRest = async (): Promise<void> => {
+  // A key's scroll is animated in WebKit and takes a few frames. Look, and press the next key, only
+  // once the box has come to rest: a key pressed while the one before is still on its way retargets
+  // the running animation, and WebKit then settles a pixel or two short of the new target (scrollTop
+  // 1 or 2 instead of 0, for good). That is the browser's own scroll animator, not the page: no script
+  // of ours handles a key on the box (call-render.js only sets scrollTop when lines are drawn), and a reader who waits
+  // for the text to stop moving, as this test does, always arrives.
+  const top = () => box.evaluate((el) => el.scrollTop);
+  const atRest = async (leaving = -1): Promise<void> => {
     let before = -1;
     await expect
       .poll(async () => {
-        const now = await box.evaluate((el) => el.scrollTop);
-        const same = now === before;
+        const now = await top();
+        const same = now === before && now !== leaving; // not still where the key found it
         before = now;
         return same;
       })
       .toBe(true);
   };
+  await box.focus();
+  const first = await top();
+  await page.keyboard.press('End');
+  await atRest(first);
+  expect(await visible('last')).toBe(true); // the keyboard reaches its end
+  const last = await top();
+  await page.keyboard.press('Home');
+  await atRest(last);
+  expect(await top()).toBe(0); // and its start, the box's top
   for (let i = 0; i < 30 && !(await visible('first')); i++) {
     await page.keyboard.press('PageDown'); // and back to its start
     await atRest();

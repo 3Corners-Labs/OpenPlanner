@@ -113,9 +113,12 @@ IN_DOUBT: frozenset[WorkItemState] = frozenset(
 )
 """Contact-center attempts whose task may or may not exist at the platform."""
 
-ORPHANED: frozenset[WorkItemState] = frozenset({WorkItemState.FENCED, WorkItemState.CANCELLED})
+ORPHANED: frozenset[WorkItemState] = frozenset(
+    {WorkItemState.FENCED, WorkItemState.CANCELLED, WorkItemState.EXPIRED}
+)
 """Ended contact-center attempts whose task, if the platform made one after all, is nobody's:
-fenced, or cancelled with its booking while the create's outcome was unknown."""
+fenced, cancelled with its booking, or expired by the watchdog (ADR 0121 step 27) while the
+create's outcome was unknown."""
 
 
 class WorkChannel(StrEnum):

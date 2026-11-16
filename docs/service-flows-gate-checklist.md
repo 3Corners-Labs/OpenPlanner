@@ -17,7 +17,10 @@ is `False`, the readiness checklist refuses to activate a non-legacy flow that d
 contact center, with the reason `contact_center_not_ready`, in the portal and in the
 configuration import alike (one rule, in the rollback point of `app/domain/flow_readiness.py`).
 Flows on the own queue and the legacy flows of existing services are not affected. The constant
-is a protection, never a setting; the PR that closes G13 to G15 flips it to `True`.
+is a protection, never a setting; the PR that closes G13 to G15 flips it to `True`. G13 and G14
+are build work; G15 is an operator check that a person does on the test host with a real Webex
+Contact Center tenant (`docs/runbook.md`, *Checklist G15*), and it is the last thing before the
+constant flips.
 
 The same point holds a second rule, which is not an item because it never lifts (product owner,
 2026-11-15; ADR 0121 row 40, #895): once the gate is open, a non-legacy flow that dispatches to
@@ -52,9 +55,9 @@ the PR that did it.
 | G10 | The product owner's decision to open the gate, after G01 to G09 | step 8 | yes | po | open |
 | G11 | A downgrade refused part way stopped between revisions (Alembic committed every SQLite migration on its own); the migration run is now one transaction (`transactional_ddl=True` in `migrations/env.py`) | step 8 | no | build | done (#786) |
 | G12 | Diff the generated OpenAPI document against a stored copy (CLAUDE.md asks for it); today one test holds that `/api/v1` requires no `flow` | 0121/35 | no | build | open |
-| G13 | The watchdog ends the task at the platform when it expires or cancels a contact-center attempt | 0121/27 | cc | build | follow-up (enforced by code until done) |
+| G13 | The watchdog ends the task at the platform when it expires or cancels a contact-center attempt. Built: the round plans the existing end-task job (ADR 0021) for an attempt it ends that holds a task, never beside a cancellation's own; a late task of an attempt it expired in doubt is ended as an orphan; the job's outcome is on the booking's timeline | 0121/27 | cc | build | done (#893) |
 | G14 | The own queue shows work the contact center holds as held, not as open. Built: the row says *held by the contact center*, offers no claim, is never next and never "not picked up" | 0121/28 | cc | build | done (#894) |
-| G15 | See on the test host that Webex Contact Center's task events carry the origin, so a late task is matched | 0121/29 | cc | operator | follow-up (enforced by code until done) |
+| G15 | See on the test host that Webex Contact Center's task events carry the origin, so a late task is matched. The last item before `CONTACT_CENTER_FLOWS_READY` flips: a person does it on the test host with a real tenant, by the procedure in `docs/runbook.md` (*Checklist G15: does a task event carry the origin?*), and records the result here | 0121/29 | cc | operator | follow-up (enforced by code until done) |
 | G16 | Immediate work dispatched to the contact center: a reference for work without a booking and the matching of its late events | 0121/30 | no | build | follow-up |
 | G17 | The staff detail's table "what this person may pick up, and why" | 0121/4c | no | build | planned |
 | G18 | The participant's choice between several flows of a service (one default per path and an explicit `flow` work without it) | 0121/5c | no | build | follow-up |
