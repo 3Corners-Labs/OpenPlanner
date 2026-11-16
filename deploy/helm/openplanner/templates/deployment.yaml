@@ -28,9 +28,11 @@ spec:
       {{- end }}
       automountServiceAccountToken: false
       securityContext:
+        {{- if not .Values.openshift.enabled }}
         runAsUser: 10001
         runAsGroup: 10001
         fsGroup: 10001
+        {{- end }}
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault

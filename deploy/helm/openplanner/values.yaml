@@ -53,6 +53,16 @@ persistence:
 service:
   port: 8000
 
+# OpenShift under SCC restricted-v2 (ADR 0130): the platform assigns the user and the fsGroup from
+# the namespace's range, so the pod names none, and a Route replaces the Ingress. The image's
+# writable paths are writable for group 0, which every assigned user belongs to.
+openshift:
+  enabled: false
+  route:
+    # Required with webTls.enabled: the Route then re-encrypts to the pod and must trust the
+    # certificate of webTls.secretName (PEM of its issuing CA).
+    destinationCACertificate: ""
+
 ingress:
   enabled: true
   className: ""

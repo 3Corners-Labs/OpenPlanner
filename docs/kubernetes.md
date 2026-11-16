@@ -321,6 +321,18 @@ confirms or corrects them.
 
   Note the answers here after the trial.
 
+## OpenShift (restricted-v2, ADR 0130)
+
+The platform's default constraint `restricted-v2` assigns the user id and `fsGroup` itself and
+refuses a pod that names its own. Install with `--set openshift.enabled=true`: the pod then names
+no user or group, and a `Route` (edge termination, redirect from http) replaces the `Ingress`
+(`ingress.host` is the route's host). With `webTls.enabled` the route re-encrypts and
+`openshift.route.destinationCACertificate` must hold the PEM of the CA that issued the pod's
+certificate. `forwardedAllowIps` still names the router pods. The image's `/srv/data` is writable
+for group 0, which the assigned user belongs to. Still one replica: a platform upgrade restarts
+the pod and the site is down for the minutes the volume needs to detach. Not yet run on a real
+cluster (ADR 0130 step 2).
+
 ## Webhook source networks and the ingress
 
 An address for webhooks can carry a list of allowed source networks (the connection card, and the

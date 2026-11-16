@@ -1,0 +1,29 @@
+{{- if .Values.openshift.enabled }}
+{{- $host := required "ingress.host is required" .Values.ingress.host }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "openplanner.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  host: {{ $host | quote }}
+  to:
+    kind: Service
+    name: {{ .Release.Name }}
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    {{- if .Values.webTls.enabled }}
+    termination: reencrypt
+    destinationCACertificate: {{ required "openshift.route.destinationCACertificate is required with webTls.enabled" .Values.openshift.route.destinationCACertificate | quote }}
+    {{- else }}
+    termination: edge
+    {{- end }}
+    insecureEdgeTerminationPolicy: Redirect
+{{- end }}
