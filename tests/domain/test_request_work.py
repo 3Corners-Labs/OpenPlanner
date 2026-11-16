@@ -14,6 +14,8 @@ from app.domain.booking import BookingStatus
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.queue_service import COMPLETED, STARTED, STARTED_IN_CONFLICT, QueueService
 from app.domain.service_requests import HandlingState, WorkItemState
+from app.domain.slot_close import CLOSE_DELAY
+from app.domain.usage import FactKind, UsageFact, UsageOutcome
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryTransaction, InMemoryUnitOfWork
 from tests.support.domain import SLOT_0900
@@ -295,3 +297,61 @@ async def test_a_view_reads_each_slot_and_revision_once(
     assert all(row.without_video for row in view.rows)
     assert reads["slots"] == 3  # each booking has its own pool slot in this world
     assert reads["revisions"] <= 2  # once for the skills' cache, once for the judge
+
+
+def outcomes(uow: InMemoryUnitOfWork) -> list[UsageFact]:
+    """Return the ``booking.outcome`` facts written so far."""
+    return [
+        f
+        for f in uow.state.usage_facts
+        if isinstance(f, UsageFact) and f.kind is FactKind.BOOKING_OUTCOME
+    ]
+
+
+async def test_work_completed_after_its_slot_was_closed_writes_its_outcome_then(
+    queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """G41: the closing wrote no outcome for work still running; completing it does."""
+    booking_id = await book(uow, clock)
+    at(clock)
+    await queue.claim(AGENT, "demo", booking_id)
+    await queue.start(AGENT, "demo", booking_id)
+    slot_end = SLOT_0900 + LENGTH
+    uow.state.slots_closed_until = slot_end + CLOSE_DELAY  # the closing has passed the slot
+    clock.advance(timedelta(hours=3))
+
+    await queue.complete(AGENT, "demo", booking_id)
+
+    (fact,) = outcomes(uow)
+    assert fact.outcome is UsageOutcome.COMPLETED
+    assert fact.bucket_hour == SLOT_0900  # the cohort of the slot, not of the completion
+
+
+async def test_work_in_recovery_completed_by_a_supervisor_after_the_closing_counts_too(
+    queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    booking_id = await book(uow, clock)
+    at(clock)
+    await queue.claim(AGENT, "demo", booking_id)
+    await queue.start(AGENT, "demo", booking_id)
+    request = next(iter(uow.state.requests.values()))
+    uow.state.requests[request.id or 0] = replace(request, handling=HandlingState.RECOVERY_REQUIRED)
+    uow.state.slots_closed_until = SLOT_0900 + LENGTH + CLOSE_DELAY
+
+    await queue.complete(ADMIN, "demo", booking_id)
+
+    assert [f.outcome for f in outcomes(uow)] == [UsageOutcome.COMPLETED]
+
+
+async def test_work_completed_before_the_closing_leaves_the_outcome_to_the_closing(
+    queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """No double count: the closing reads the completed status when it reaches the slot."""
+    booking_id = await book(uow, clock)
+    at(clock)
+    await queue.claim(AGENT, "demo", booking_id)
+    await queue.start(AGENT, "demo", booking_id)
+
+    await queue.complete(AGENT, "demo", booking_id)
+
+    assert outcomes(uow) == []

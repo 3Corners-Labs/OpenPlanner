@@ -45,6 +45,34 @@ _MARGIN = timedelta(days=1)
 14 hours away from the UTC day, and the report keeps only the days of its range."""
 
 
+async def require_organisation_scope(
+    admin: AdminService,
+    principal: Principal,
+    scope: Scope,
+    organisation_slug: str,
+    permission: Permission,
+) -> None:
+    """Refuse an organisation page to a reader whose scope is not the whole organisation.
+
+    A group admin reads the groups they hold, one page each; the organisation's page adds
+    up its groups and is for who holds ``reports.view`` on the organisation (or on all). The
+    refusal is audited like the matrix's own.
+
+    Raises:
+        DomainError: ``not_permitted``.
+    """
+    if scope.everything or organisation_slug in scope.organisations:
+        return
+    await admin.record(
+        principal.subject,
+        permission.value,
+        Outcome.DENIED,
+        Reason.OUT_OF_SCOPE.value,
+        organisation=organisation_slug,
+    )
+    raise DomainError(ErrorCode.NOT_PERMITTED)
+
+
 @dataclass(frozen=True)
 class UsageScreen[R]:
     """A report and what it is about.
@@ -411,25 +439,10 @@ class UsageReportService:
     async def _require_organisation(
         self, principal: Principal, scope: Scope, organisation_slug: str, permission: Permission
     ) -> None:
-        """Refuse an organisation page to a reader whose scope is not the whole organisation.
-
-        A group admin reads the groups they hold, one page each; the organisation's page adds
-        up its groups and is for who holds ``reports.view`` on the organisation (or on all). The
-        refusal is audited like the matrix's own.
-
-        Raises:
-            DomainError: ``not_permitted``.
-        """
-        if scope.everything or organisation_slug in scope.organisations:
-            return
-        await self._admin.record(
-            principal.subject,
-            permission.value,
-            Outcome.DENIED,
-            Reason.OUT_OF_SCOPE.value,
-            organisation=organisation_slug,
+        """Refuse an organisation page to a reader whose scope is not the whole organisation."""
+        await require_organisation_scope(
+            self._admin, principal, scope, organisation_slug, permission
         )
-        raise DomainError(ErrorCode.NOT_PERMITTED)
 
     def _range(
         self, group: ReportGroup, first_day: date | None, last_day: date | None

@@ -42,6 +42,7 @@ from app.domain.service_requests import (
     start,
 )
 from app.domain.tunable import value_for
+from app.domain.usage_recording import record_late_completion
 
 
 @dataclass(frozen=True)
@@ -213,7 +214,19 @@ class RequestWork:
         await self._write(tx, work, request, item)
         if booking.status is BookingStatus.CONFIRMED:
             await tx.save_booking(replace(booking, status=BookingStatus.COMPLETED))
+            await self.completed(tx, booking)
         return Work(request, item)
+
+    async def completed(self, tx: Transaction, booking: Booking) -> None:
+        """Write the outcome of ``booking`` just completed, if its slot was closed already.
+
+        Work completed after the closing (the lease, a long treatment, work in recovery) was
+        closed without an outcome; this is where it is counted (``slot_close.late_completion``).
+        """
+        slot = await self.pool_slot(tx, booking)
+        group = await tx.get_group_by_id(booking.group_id)
+        if slot is not None and group is not None:
+            await record_late_completion(tx, booking, group, slot)
 
     async def released(self, tx: Transaction, booking: Booking, now: datetime) -> None:
         """End the unstarted work item of ``booking``'s request; nothing for other bookings.

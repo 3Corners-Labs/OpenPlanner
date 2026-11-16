@@ -14,6 +14,7 @@ from app.domain.authorization import Scope
 from app.domain.usage import StaffFact, UsageCell, UsageFact
 from app.domain.usage_backfill import BackfillBooking
 from app.domain.usage_report import DayStatusCount, ReportGroup
+from app.domain.usage_report_pools import PoolInputs
 from app.domain.usage_rollup import UsageBatch, UsagePruned, UsageState, merge
 from app.domain.usage_staff import StaffCell, merge_staff
 
@@ -32,6 +33,8 @@ class UsageData:
     cutoff: datetime | None = None
     bookings: list[BackfillBooking] = field(default_factory=list)
     groups: list[ReportGroup] = field(default_factory=list)
+    pools: PoolInputs | None = None
+    pool_reads: list[tuple[Scope, str, date, date]] = field(default_factory=list)
     day_counts: list[DayStatusCount] = field(default_factory=list)
     done: set[int] = field(default_factory=set)
     next_id: int = 1
@@ -95,6 +98,12 @@ class InMemoryUsageStore:
             for c in self.data.cells
             if c.group_id in allowed and first_hour <= c.bucket_hour < last_hour
         ]
+
+    async def read_pool_report_inputs(
+        self, scope: Scope, organisation_slug: str, first_day: date, last_day: date
+    ) -> PoolInputs | None:
+        self.data.pool_reads.append((scope, organisation_slug, first_day, last_day))
+        return self.data.pools
 
     async def read_day_status_counts(
         self, scope: Scope, group_ids: Sequence[int], first_day: date, last_day: date

@@ -27,6 +27,8 @@ from app.domain.service_requests import (
     WorkItem,
     WorkItemState,
 )
+from app.domain.slot_close import CLOSE_DELAY
+from app.domain.usage import FactKind, UsageFact, UsageOutcome
 from app.domain.webhook_replay import INSTALLATION_SCOPE
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
@@ -602,3 +604,28 @@ async def test_a_failed_task_tells_the_team_and_an_early_end_completes(
     [item] = items_of(uow, ending)
     assert (item.state, item.started_at, item.pool_id) == (WorkItemState.COMPLETED, None, None)
     assert request_of(uow, ending).handling is HandlingState.COMPLETED
+
+
+async def test_a_task_that_ends_after_the_slot_was_closed_writes_the_outcome_then(
+    the_desk: Desk, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """G41: the closing found the booking still confirmed; the end of the task counts it."""
+    booking_id = await book(uow, clock, CC_FLOW)
+    await dispatch(the_desk, booking_id)
+    task = uow.state.bookings[booking_id].contact_center_task
+    assert task is not None
+    at(clock)
+    await event(the_desk, task.id, EventKind.TASK_CONNECTED)
+    slot = uow.state.slots[uow.state.bookings[booking_id].slot_id]
+    uow.state.slots_closed_until = slot.end + CLOSE_DELAY
+    clock.advance(timedelta(hours=3))
+
+    await event(the_desk, task.id, EventKind.TASK_ENDED)
+
+    [fact] = [
+        f
+        for f in uow.state.usage_facts
+        if isinstance(f, UsageFact) and f.kind is FactKind.BOOKING_OUTCOME
+    ]
+    assert fact.outcome is UsageOutcome.COMPLETED
+    assert fact.bucket_hour == slot.start

@@ -130,6 +130,7 @@ from app.domain.updates import (
 from app.domain.usage import StaffFact, UsageCell, UsageFact
 from app.domain.usage_backfill import BackfillBooking
 from app.domain.usage_report import DayStatusCount, ReportGroup
+from app.domain.usage_report_pools import PoolInputs
 from app.domain.usage_rollup import UsageBatch, UsagePruned, UsageState
 from app.domain.usage_staff import StaffCell
 from app.domain.wallboard_link import WallboardLink
@@ -2853,6 +2854,18 @@ class UsageStore(Protocol):
         self, scope: Scope, group_ids: Sequence[int], first_day: date, last_day: date
     ) -> list[DayStatusCount]:
         """Return the day counts from before reporting of ``group_ids`` in ``scope``."""
+        ...
+
+    async def read_pool_report_inputs(
+        self, scope: Scope, organisation_slug: str, first_day: date, last_day: date
+    ) -> PoolInputs | None:
+        """Return the counted pools of the organisation inside ``scope`` for the range.
+
+        Each pool with its staffing, its closed days and the intervals of the appointments that
+        hold a unit (confirmed, completed, no show) over its own local days ``first_day`` to
+        ``last_day``; ``None`` for an organisation that is missing or outside ``scope``. Times
+        only (ADR 0122 step 5).
+        """
         ...
 
     async def read_usage_events(self, after_id: int, limit: int) -> UsageBatch:

@@ -54,6 +54,7 @@ ALL_SLOTS = {
     "db/rollup.py:find_rollable": "rolls up purged bookings, any slot",
     "db/usage_rollup.py:find_unbackfilled": "facts of every booking, a pool booking among them",
     "db/usage_slots.py:ended_slots": "closes every ended slot; a pool slot by the pool rule",
+    "db/usage_pools.py:_held_intervals": "the pool report reads one counted pool's slots by id",
     "db/usage_slots.py:_bookings_of": "bookings of the slots ended_slots chose",
     # Erasing and seeding.
     "db/config_group.py:write_group": "a configuration import replaces the group's slots",
