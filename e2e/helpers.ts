@@ -38,12 +38,27 @@ export function participantEmail(testInfo: TestInfo): string {
 
 /** Press Tab until `locator` has focus; fails if it is not reachable with the keyboard. */
 export async function tabTo(page: Page, locator: Locator): Promise<void> {
+  await pressUntilFocused(page, locator, 'Tab');
+}
+
+/**
+ * Press Shift+Tab until `locator` has focus: for a target that comes before the focused element.
+ *
+ * Tab never wraps round to the top of the page reliably: past the last element Firefox moves
+ * focus into the browser itself and the page gets it back only after a variable number of
+ * presses. A target earlier in the page is therefore reached backwards, never by wrapping.
+ */
+export async function shiftTabTo(page: Page, locator: Locator): Promise<void> {
+  await pressUntilFocused(page, locator, 'Shift+Tab');
+}
+
+async function pressUntilFocused(page: Page, locator: Locator, key: string): Promise<void> {
   for (let i = 0; i < 200; i++) {
     // Inside a shadow root (the widget) the root, not the document, knows the focused element.
     if (await locator.evaluate((el) => el === (el.getRootNode() as Document | ShadowRoot).activeElement)) return;
-    await page.keyboard.press('Tab');
+    await page.keyboard.press(key);
   }
-  throw new Error('element not reachable with Tab');
+  throw new Error(`element not reachable with ${key}`);
 }
 
 /** The minimum notice of the demo group (`seed-demo`, `min_notice_minutes`). */
@@ -73,25 +88,50 @@ export async function timeClearOfNotice(page: Page): Promise<Locator | null> {
 /**
  * Return a time clear of the minimum notice, moving through the calendar grid with the arrow
  * keys and Enter to the next free day while the shown day has none (late on a day, its last
- * times can all lie inside the margin). Keyboard only, as the tests that call it.
+ * times can all lie inside the margin), and with PageDown to the next month when the shown
+ * month has no later free day. Keyboard only, as the tests that call it.
+ *
+ * The grid comes before the times in the page, so it is reached with Shift+Tab from the times
+ * (`shiftTabTo`); after PageDown the page is new, focus is at its top and Tab reaches it.
  */
 export async function chooseTimeByKeyboard(page: Page): Promise<Locator> {
-  for (let day = 0; day < 31; day++) {
+  const stop = page.getByRole('grid').locator('.calendar__day[tabindex="0"]');
+  for (let attempt = 0; attempt < 62; attempt++) {
     const time = await timeClearOfNotice(page);
     if (time !== null) return time;
-    const grid = page.getByRole('grid');
-    const current = await grid.locator('.calendar__day[tabindex="0"]').getAttribute('data-day');
-    await tabTo(page, grid.locator('.calendar__day[tabindex="0"]'));
-    // Move right until a later day that has times (a link) holds the tab stop.
-    for (let step = 0; step < 31; step++) {
-      await page.keyboard.press('ArrowRight');
-      const focused = page.locator('.calendar__day[tabindex="0"]');
-      const next = await focused.getAttribute('data-day');
-      const isLink = await focused.evaluate((el) => el.tagName === 'A');
-      if (next !== null && current !== null && next > current && isLink) break;
+    const current = (await stop.getAttribute('data-day')) ?? '';
+    const later = await page
+      .getByRole('grid')
+      .locator('a.calendar__day')
+      .evaluateAll(
+        (links, day) =>
+          links.map((link) => link.getAttribute('data-day') ?? '').filter((d) => d > day),
+        current,
+      );
+    if (later.length === 0) {
+      // No later free day this month: the next month is a new page.
+      await shiftTabTo(page, stop);
+      await page.keyboard.press('PageDown');
+      await page.waitForLoadState('load');
+      await expect(stop).not.toHaveAttribute('data-day', current);
+      await tabTo(page, stop);
+      await page.keyboard.press('Enter');
+      await expect(page.locator('#times-heading')).toBeFocused();
+      continue;
     }
+    await shiftTabTo(page, stop);
+    // The roving tab stop moves one day per ArrowRight; stop on the next free day.
+    for (let step = 0; (await stop.getAttribute('data-day')) !== later[0]; step++) {
+      if (step > 42) throw new Error(`the arrow keys did not reach ${later[0]}`);
+      await page.keyboard.press('ArrowRight');
+    }
+    await expect(stop).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.locator('#times-heading')).toBeFocused();
+    await expect(page.locator(`a.calendar__day[data-day="${later[0]}"]`)).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
   }
-  throw new Error('no time clear of the minimum notice in the coming month');
+  throw new Error('no time clear of the minimum notice in the coming two months');
 }
