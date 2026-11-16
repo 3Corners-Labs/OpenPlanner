@@ -450,7 +450,7 @@ async def test_seed_closures_prints_the_example_pages_as_json(migrated: Settings
             flows = await tx.list_service_flows(Scope(everything=True), demo.id)
     finally:
         await engine.dispose()
-    assert {"documentcontrole", "persoonlijk-gesprek"} <= {f.code for f in flows}
+    assert {"documentcontrole", "persoonlijk-gesprek", "samen-bespreken"} <= {f.code for f in flows}
 
 
 async def test_seed_closures_refuses_production(settings: Settings) -> None:

@@ -1,7 +1,7 @@
 """An own queue with one booking at its start, for the queue and overview tests (ADR 0043).
 
 ``request_work`` puts that booking on a staffed counted pool under a flow without video
-(ADR 0121 steps 5 and 7).
+(ADR 0121 steps 5 and 7), or under a video flow with its meeting (row 36).
 """
 
 from dataclasses import replace
@@ -10,7 +10,7 @@ from datetime import time, timedelta
 from sqlalchemy import insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.db.models import BookingRow, SlotRow
+from app.adapters.db.models import BookingRow, FlowRevisionRow, SlotRow
 from app.domain.authorization import Scope
 from app.domain.booking import MeetingRef
 from app.domain.scheduling import DispatchKind, Offer, ScheduleRule, TimeWindow
@@ -68,9 +68,13 @@ async def staffed_pool_flow(site: Site) -> tuple[int, int]:
     return pool, (await flow_ids(site.app.state.engine))["advies"]
 
 
-async def request_work(site: Site) -> int:
-    """Book in the own queue and put the booking on a staffed pool under a flow without video."""
-    booking_id = await own_queue(site, meeting=False, queue_free_pick_allowed=True)
+async def request_work(site: Site, *, video: bool = False) -> int:
+    """Book in the own queue and put the booking on a staffed pool under a flow without video.
+
+    ``video=True`` makes the flow a video flow and gives the booking its meeting (ADR 0121
+    row 36).
+    """
+    booking_id = await own_queue(site, meeting=video, queue_free_pick_allowed=True)
     pool, flow_id = await staffed_pool_flow(site)
     engine = site.app.state.engine
     async with AsyncSession(engine) as session, session.begin():
@@ -97,4 +101,10 @@ async def request_work(site: Site) -> int:
             .where(BookingRow.id == booking_id)
             .values(slot_id=slot_id, flow_id=flow_id, flow_revision=1)
         )
+        if video:
+            await session.execute(
+                update(FlowRevisionRow)
+                .where(FlowRevisionRow.flow_id == flow_id)
+                .values(interaction_kind="video", handling_action="open_video")
+            )
     return booking_id

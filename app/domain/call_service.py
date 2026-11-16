@@ -18,6 +18,7 @@ from datetime import datetime
 
 from app.domain.authorization import Scope
 from app.domain.booking import Booking
+from app.domain.booking_video import flow_has_video
 from app.domain.call_client import UsesCallPage
 from app.domain.calls import (
     ContactCenterTask,
@@ -120,9 +121,20 @@ class CallService:
         """Whether tasks can be created (needs video for the meeting link)."""
         return self._video is not None and self._dispatchers.configured
 
+    async def flow_has_video(self, booking: Booking) -> bool:
+        """Return whether ``booking`` is a video call by its flow (ADR 0121 row 36)."""
+        async with self._uow.read() as tx:
+            return await flow_has_video(tx, booking)
+
     async def ensure_meeting(self, booking: Booking, group: Group) -> Booking:
-        """Create the booking's meeting if the group has video and it has none yet."""
+        """Create the booking's meeting if it gets one and has none yet.
+
+        It gets one when the group has video and the booking's flow is a video flow (no flow, a
+        legacy flow or a new video flow: ``app.domain.booking_video``, ADR 0121 row 36).
+        """
         if self._video is None or not group.video_enabled or booking.meeting is not None:
+            return booking
+        if not await self.flow_has_video(booking):
             return booking
         request = meeting_request(booking, group, call_page=self._uses_page(group))
         booking_id = _id(booking)

@@ -15,7 +15,7 @@
   <dt>{{ _("manage.appointment_code") }}</dt><dd>{{ appointment_code }}</dd>
   {% endif %}
 </dl>
-{% if active and group.video_enabled %}
+{% if active and video %}
 <p><a class="button button--large" href="/b/m/{{ ref }}/join">{{ _("join.from_manage") }}</a></p>
 {% endif %}
 {% if active and trial_offered %}

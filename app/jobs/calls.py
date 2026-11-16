@@ -41,6 +41,9 @@ ALREADY_DONE = "already_done"
 """Skip reason: the meeting or work item exists already (a retry after a partial run)."""
 NO_VIDEO = "no_video"
 """Skip reason: the group has no Webex host, so no meeting is made (ADR 0068)."""
+FLOW_WITHOUT_VIDEO = "flow_without_video"
+"""Skip reason: the booking's flow has no video call, so no meeting is made (ADR 0121 row 36,
+A19)."""
 OWN_QUEUE = "own_queue"
 """Skip reason: the group's agents pick bookings up in OpenPlanner (ADR 0043): no work item."""
 NO_DISPATCH = "no_dispatch"
@@ -157,7 +160,15 @@ class CallJobs:
             # ADR 0082 point 11: the contact center is down; the booking went to the own queue.
             log.info("job.skipped", job_id=job.id, reason=FALLBACK)
             return FALLBACK
-        elif (reason := nothing_to_do(job.type, booking, group)) is not None:
+        elif (
+            reason := nothing_to_do(
+                job.type,
+                booking,
+                group,
+                video=job.type is not JobType.CREATE_VIDEO_ROOM
+                or await self._calls.flow_has_video(booking),
+            )
+        ) is not None:
             log.info("job.skipped", job_id=job.id, reason=reason)
             return reason
         elif job.type is JobType.CREATE_VIDEO_ROOM:
@@ -174,16 +185,22 @@ class CallJobs:
             await self._calls.dispatch_failed(job.booking_id)
 
 
-def nothing_to_do(job_type: JobType, booking: Booking, group: Group) -> str | None:
+def nothing_to_do(
+    job_type: JobType, booking: Booking, group: Group, *, video: bool = True
+) -> str | None:
     """Return why a meeting or work item job has nothing to do, or ``None`` when it has.
 
     A job that does nothing is recorded as skipped with this reason (ADR 0068), so the audit
-    log never says "succeeded" about a work item that was never created.
+    log never says "succeeded" about a work item that was never created. ``video`` says whether
+    the booking is a video call by its flow (``app.domain.booking_video``); a meeting job of a
+    flow without video has nothing to do (ADR 0121 row 36).
     """
     if job_type is JobType.CREATE_VIDEO_ROOM:
         if booking.meeting is not None:
             return ALREADY_DONE
-        return None if group.video_enabled else NO_VIDEO
+        if not group.video_enabled:
+            return NO_VIDEO
+        return None if video else FLOW_WITHOUT_VIDEO
     if booking.contact_center_task:
         return ALREADY_DONE
     if group.dispatch_enabled:

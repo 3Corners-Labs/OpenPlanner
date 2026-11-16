@@ -7343,6 +7343,9 @@ msgstr "Already done: the meeting or task exists."
 msgid "admin.audit.reason.no_video"
 msgstr "Not needed: this service has no Webex host."
 
+msgid "admin.audit.reason.flow_without_video"
+msgstr "Not needed: the flow of this appointment has no video call."
+
 msgid "admin.audit.reason.own_queue"
 msgstr "Not needed: this service uses OpenPlanner's own queue, so no contact center task is made."
 
@@ -13495,6 +13498,9 @@ msgstr "Activating a flow that dispatches to the contact center waits until the 
 
 msgid "admin.flows.reason.own_queue_missing"
 msgstr "This flow sends work to the own queue, but this service has no own queue. Without it nobody can pick the work up. Choose OpenPlanner's own queue in the service's settings."
+
+msgid "admin.flows.reason.video_host_missing"
+msgstr "This flow is a video call, but this service has no Webex host, so no meeting can be made for its appointments. Enter the Webex host in the service's settings."
 
 msgid "admin.flows.summary.none"
 msgstr "Not set"

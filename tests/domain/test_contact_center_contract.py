@@ -76,6 +76,7 @@ def _reason(
         own_queue=True,
         coded_skills=frozenset({10}),
         carrier=carrier,
+        video_host=True,
     )
     return next(i for i in items if i.code is check).reason
 
@@ -143,8 +144,12 @@ def test_a_flow_whose_interaction_the_platform_cannot_carry_is_not_ready(
 
 
 def test_a_carried_flow_waits_only_for_what_follows() -> None:
-    """Video on Webex is carried; contact-center dispatch of a new flow follows in step 6b."""
-    assert _reason(ReadinessCheck.DISPATCH, WEBEX, **VIDEO) is ReadinessReason.NOT_BUILT_YET
+    """Video on Webex is carried and built (ADR 0121 row 36); a contact-center flow still waits
+    for its go-live items (``CONTACT_CENTER_FLOWS_READY``, row 37)."""
+    assert _reason(ReadinessCheck.DISPATCH, WEBEX, **VIDEO) is None
+    assert _reason(ReadinessCheck.ROLLBACK, WEBEX, **VIDEO) is (
+        ReadinessReason.CONTACT_CENTER_NOT_READY
+    )
 
 
 def test_skills_need_a_platform_that_routes_on_them() -> None:
@@ -163,7 +168,9 @@ def test_the_own_queue_and_a_legacy_flow_are_not_judged_by_a_platform() -> None:
         legacy(dispatch=CONTACT_CENTER),
     ):
         for carrier in (None, ContactCenterCapabilities()):
-            items = readiness(made, pool(), offered_subjects=(), own_queue=True, carrier=carrier)
+            items = readiness(
+                made, pool(), offered_subjects=(), own_queue=True, carrier=carrier, video_host=True
+            )
             reasons = {item.reason for item in items}
             assert not reasons & {
                 ReadinessReason.CONTACT_CENTER_MISSING,

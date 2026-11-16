@@ -7356,6 +7356,9 @@ msgstr "Al gedaan: de meeting of taak bestaat al."
 msgid "admin.audit.reason.no_video"
 msgstr "Niet nodig: deze dienst heeft geen Webex-host."
 
+msgid "admin.audit.reason.flow_without_video"
+msgstr "Niet nodig: de flow van deze afspraak heeft geen videogesprek."
+
 msgid "admin.audit.reason.own_queue"
 msgstr "Niet nodig: deze dienst gebruikt de eigen wachtrij van OpenPlanner, er komt geen contactcentertaak."
 
@@ -13508,6 +13511,9 @@ msgstr "Activeren van een flow die naar het contactcenter stuurt wacht tot het c
 
 msgid "admin.flows.reason.own_queue_missing"
 msgstr "Deze flow verdeelt naar de eigen wachtrij, maar deze dienst heeft geen eigen wachtrij. Zonder die wachtrij kan niemand het werk oppakken. Kies in de instellingen van de dienst de eigen wachtrij van OpenPlanner."
+
+msgid "admin.flows.reason.video_host_missing"
+msgstr "Deze flow is een videogesprek, maar deze dienst heeft geen Webex-host, dus voor de afspraken kan geen meeting worden gemaakt. Vul de Webex-host in bij de instellingen van de dienst."
 
 msgid "admin.flows.summary.none"
 msgstr "Niet ingesteld"

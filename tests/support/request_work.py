@@ -2,8 +2,8 @@
 
 ADR 0121 step 5b: a flow without video on a counted pool of one unit (Mondays 09:00–12:00
 Amsterdam), an appointment of 30 minutes plus 5 minutes wrap-up at 09:00, the queue with request
-work wired as the application does, and a flow with video on the same pool that is not request
-work.
+work wired as the application does, and a flow with video on the same pool, which is request
+work with a meeting since ADR 0121 row 36.
 """
 
 from dataclasses import replace

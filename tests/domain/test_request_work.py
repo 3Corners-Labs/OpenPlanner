@@ -10,7 +10,7 @@ from datetime import timedelta
 
 import pytest
 
-from app.domain.booking import BookingStatus
+from app.domain.booking import BookingStatus, MeetingRef
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.queue_service import COMPLETED, STARTED, STARTED_IN_CONFLICT, QueueService
 from app.domain.service_requests import HandlingState, WorkItemState
@@ -103,16 +103,42 @@ async def test_a_legacy_booking_makes_no_request_and_keeps_its_meeting(
     assert await refused(queue.start(AGENT, "demo", booking_id)) is ErrorCode.NOT_CLAIMED
 
 
-async def test_a_video_flow_on_a_pool_is_not_request_work(
+async def test_a_video_flow_on_a_pool_is_request_work_with_its_meeting(
     queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
 ) -> None:
+    """ADR 0121 row 36: claimed, started and completed like any request, with its join link."""
     booking_id = await book(uow, clock, VIDEO_FLOW)
+    uow.state.bookings[booking_id] = replace(
+        uow.state.bookings[booking_id], meeting=MeetingRef("m", "https://v/j")
+    )
     at(clock)
 
+    view = await queue.view(AGENT, "demo")
+    [row] = [r for r in view.rows if r.booking_id == booking_id]
     claimed = await queue.claim(AGENT, "demo", booking_id)
+    shown = await queue.claimed(AGENT, "demo", booking_id)
+    started = await queue.start(AGENT, "demo", booking_id)
+    await queue.complete(AGENT, "demo", booking_id)
 
-    assert claimed.work is None
-    assert uow.state.requests == {}
+    assert not row.without_video
+    assert not row.awaiting_check_in  # media presence: no check-in before the claim
+    assert claimed.work is not None
+    assert claimed.work.request.flow == VIDEO_FLOW
+    assert (shown.join_url, shown.video_call) == ("https://v/j", True)
+    assert started.video_call
+    assert uow.state.bookings[booking_id].status is BookingStatus.COMPLETED
+
+
+async def test_request_work_without_video_shows_no_meeting(
+    queue: QueueService, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    booking_id = await book(uow, clock)
+    at(clock)
+    await queue.claim(AGENT, "demo", booking_id)
+
+    shown = await queue.claimed(AGENT, "demo", booking_id)
+
+    assert (shown.join_url, shown.video_call) == (None, False)
 
 
 async def test_start_and_complete_release_the_unit_once_and_complete_the_booking(

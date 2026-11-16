@@ -6,9 +6,11 @@ from typing import Any
 import pytest
 
 from app.domain import configuration_v1_flow_rules as rules
+from app.domain import service_flows
 from app.domain.configuration_changes import ChangeAction, Usage
 from app.domain.configuration_tree import Entity
 from app.domain.errors import DomainError, ErrorCode
+from app.domain.interaction import InteractionKind
 from tests.support.flow_documents import (
     acme,
     advies,
@@ -273,7 +275,16 @@ UNBUILT = [
     ({"interaction_kind": "video", "handling_action": "open_video"}, "interaction_kind"),
     ({"interaction_kind": "in_person", "handling_action": "assign_workstation"}, "handling_action"),
 ]
-"""A choice ADR 0121 has not built, with the field the screens' own rule blames."""
+"""A choice ADR 0121 has not built, with the field the screens' own rule blames. Every interaction
+kind is built since row 36 (video): the tests take video out of ``BUILT_KINDS`` themselves
+(``_unbuild_video``), so the refusal of an unbuilt kind stays proven."""
+
+
+def _unbuild_video(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Take video out of the built interaction kinds, as before ADR 0121 row 36."""
+    monkeypatch.setattr(
+        service_flows, "BUILT_KINDS", service_flows.BUILT_KINDS - {InteractionKind.VIDEO}
+    )
 
 
 def _legacy_pool(found: dict[str, Any]) -> None:
@@ -284,8 +295,9 @@ def _legacy_pool(found: dict[str, Any]) -> None:
 
 @pytest.mark.parametrize(("choice", "field"), UNBUILT)
 def test_a_draft_of_a_document_chooses_only_what_is_built_and_is_refused_once(
-    choice: dict[str, Any], field: str
+    choice: dict[str, Any], field: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    _unbuild_video(monkeypatch)
     for current in (empty_flows(), full()):
         data = document_json()
         draft(data).update(choice)
@@ -297,8 +309,9 @@ def test_a_draft_of_a_document_chooses_only_what_is_built_and_is_refused_once(
 
 @pytest.mark.parametrize(("choice", "field"), UNBUILT)
 def test_a_published_revision_that_is_restored_may_hold_what_is_not_built(
-    choice: dict[str, Any], field: str
+    choice: dict[str, Any], field: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    _unbuild_video(monkeypatch)
     data = document_json()
     advies(data)["revisions"][0].update(choice)  # published, as recorded
 

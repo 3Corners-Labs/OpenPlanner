@@ -364,27 +364,31 @@ async def or_done(
 
 def _claimed_view(booking: ClaimedBooking, locale: RequestLocale, tz: tzinfo) -> ClaimedView:
     """Write the claimed booking out; polling stops once nothing can change any more."""
+    participant_key, participant_tone = PARTICIPANT_LABELS[booking.participant]
+    video_key, _tone = VIDEO_LABELS[booking.video]
+    call = key(booking.video, booking.participant, booking.join_url is not None)
     if booking.work is not None:
+        # Request work (ADR 0121 step 5): Start and Complete; a video flow's work also shows
+        # where the participant is and its meeting link (row 36).
         work = work_view(booking.work.item, booking.work.request.handling, locale, tz)
+        video = booking.video_call
         return ClaimedView(
             booking=booking,
             time=format_clock(booking.start, tz, locale.code),
-            participant="",
-            participant_tone="",
-            video=None,
-            key=key(work.state, work.can_start, work.can_complete),
+            participant=locale.gettext(participant_key) if video else "",
+            participant_tone=participant_tone if video else "",
+            video=locale.gettext(video_key) if video and video_key else None,
+            key=key(work.state, work.can_start, work.can_complete, *([call] if video else [])),
             polling=True,
             work=work,
         )
-    participant_key, participant_tone = PARTICIPANT_LABELS[booking.participant]
-    video_key, _tone = VIDEO_LABELS[booking.video]
     return ClaimedView(
         booking=booking,
         time=format_clock(booking.start, tz, locale.code),
         participant=locale.gettext(participant_key),
         participant_tone=participant_tone,
         video=locale.gettext(video_key) if video_key else None,
-        key=key(booking.video, booking.participant, booking.join_url is not None),
+        key=call,
         polling=booking.video is not VideoState.FAILED
         and booking.participant is not ParticipantState.ENDED,
     )

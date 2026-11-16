@@ -154,6 +154,7 @@ REASON_TEXTS: Mapping[ReadinessReason, str] = {
     ReadinessReason.ROLLBACK_NOT_SAFE: "admin.flows.reason.rollback_not_safe",
     ReadinessReason.CONTACT_CENTER_NOT_READY: "admin.flows.reason.contact_center_not_ready",
     ReadinessReason.OWN_QUEUE_MISSING: "admin.flows.reason.own_queue_missing",
+    ReadinessReason.VIDEO_HOST_MISSING: "admin.flows.reason.video_host_missing",
 }
 """One sentence per reason a check fails."""
 

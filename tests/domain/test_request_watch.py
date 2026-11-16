@@ -232,16 +232,17 @@ async def test_a_booking_on_hold_keeps_its_request_open_and_the_deadline_follows
     assert uow.state.requests[request.id or 0].handling is HandlingState.EXPIRED
 
 
-async def test_a_video_booking_on_a_pool_never_gets_an_expired_request() -> None:
-    """Review finding 3: the watchdog uses the queue's rule of request work."""
+async def test_a_video_booking_on_a_pool_nobody_claimed_expires_like_any_request_work() -> None:
+    """Review finding 3: the watchdog uses the queue's rule of request work, which takes a video
+    flow since ADR 0121 row 36."""
     uow, clock = world(), FixedClock(NOW)
     await book(uow, clock, VIDEO_FLOW)
     clock.advance(DEADLINE + timedelta(days=1) - clock.now())
 
     result = await watch(uow, clock).run()
 
-    assert result.expired_unclaimed == 0
-    assert uow.state.requests == {}
+    assert result.expired_unclaimed == 1
+    assert len(uow.state.requests) == 1
 
 
 async def test_the_pseudonym_goes_on_time_also_without_a_record() -> None:

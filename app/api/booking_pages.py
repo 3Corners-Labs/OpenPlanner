@@ -400,7 +400,9 @@ def _manage_context(
         "active": booking.is_active,
         "changeable": details.changeable,
         "correctable": details.correctable,
-        "trial_offered": group.trial_call_enabled and group.video_enabled,
+        # ADR 0121 row 36: joining and the trial call only for a booking that gets a meeting.
+        "video": details.video,
+        "trial_offered": group.trial_call_enabled and details.video,
         "deadline": _moment(deadline, group, locale),
         "notice": locale.gettext(STATUS_NOTICES[status]) if status in STATUS_NOTICES else None,
         # ADR 0060 §7: the footer mark settles once when the booking has just been confirmed.

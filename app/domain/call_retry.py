@@ -18,6 +18,7 @@ from datetime import datetime
 from app.domain.admin import AdminService, require
 from app.domain.authorization import Permission, Principal
 from app.domain.booking import Booking
+from app.domain.booking_video import flow_has_video
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.job_plan import RETRYABLE_JOBS, JobType, PlannedJob
 from app.domain.lookups import group_booking
@@ -59,7 +60,7 @@ class CallRetryService:
             booking, group = await group_booking(tx, slug, booking_id)
             if not booking.is_active:
                 raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
-            if not _missing(booking, group, job):
+            if not _missing(booking, group, job, await flow_has_video(tx, booking)):
                 raise DomainError(ErrorCode.NOTHING_TO_RETRY, job.value)
             await tx.delete_pending_jobs(booking_id, {job})
             await tx.add_jobs(
@@ -77,8 +78,11 @@ class CallRetryService:
             )
 
 
-def _missing(booking: Booking, group: Group, job: JobType) -> bool:
+def _missing(booking: Booking, group: Group, job: JobType, video: bool) -> bool:
     """Whether the job's result is still missing while the group expects it.
+
+    ``video`` says whether the booking is a video call by its flow: a booking of a flow without
+    video never misses a meeting (ADR 0121 row 36).
 
     A purged booking (no contact left) never is: the purge empties the ids of the meeting and
     the work item, and a retry must not create new ones for a deleted appointment (ADR 0102).
@@ -86,7 +90,7 @@ def _missing(booking: Booking, group: Group, job: JobType) -> bool:
     if booking.contact is None:
         return False
     if job is JobType.CREATE_VIDEO_ROOM:
-        return group.video_enabled and booking.meeting is None
+        return video and group.video_enabled and booking.meeting is None
     return group.dispatch_enabled and not booking.contact_center_task
 
 

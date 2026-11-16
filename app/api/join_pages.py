@@ -67,7 +67,7 @@ async def join_page(request: Request, public_ref: str) -> HTMLResponse:
         "state": state.value,
         "client": client.value,
         "refresh": state in REFRESHING,
-        "trial_offered": group.trial_call_enabled and group.video_enabled,
+        "trial_offered": group.trial_call_enabled and details.video,
         "slot_label": slot_label(booking.start, booking.end, group, locale),
         "opens_at": format_clock(booking.start - JOIN_OPENS_BEFORE, group.tz, locale.code),
     }

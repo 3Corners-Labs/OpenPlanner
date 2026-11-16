@@ -103,7 +103,8 @@ class QueueRow:
         eligible: The viewer holds every skill the booking requires (ADR 0121 point 5).
         missing: The skills the booking requires that the viewer does not hold, to name them
             (choice S3); empty when the viewer may take it.
-        without_video: Request work of a flow without video (ADR 0121 step 5).
+        without_video: Request work of a flow without video (ADR 0121 step 5); request work
+            of a video flow has its video state like any booking (row 36).
         awaiting_check_in: Request work of a flow with an explicit check-in that is not checked
             in yet: it cannot be claimed until it is (ADR 0121 step 7, choice I2).
         held: The contact center holds the work (an active contact-center attempt, ADR 0121
@@ -182,6 +183,10 @@ class ClaimedBooking:
     """Where the participant is: not yet joined, in the lobby, in the call, or gone."""
     work: Work | None = None
     """The request and its work item for request work (ADR 0121 step 5), else ``None``."""
+    video_call: bool = True
+    """Whether the booking is a video call: false only for request work of a flow without
+    video (A19); request work of a video flow shows its meeting beside Start and Complete
+    (ADR 0121 row 36)."""
 
 
 class QueueService:
@@ -234,10 +239,10 @@ class QueueService:
             lacking = await _lacking(judge, entries)
             named = {i: await judge.skills(ids) for i, ids in lacking.items() if ids}
             judge_work = WorkJudge(tx)
-            requests = {
+            no_video = {
                 _id(e.booking)
                 for e in entries
-                if self._work is not None and await judge_work.handles(e.booking)
+                if self._work is not None and await judge_work.without_video(e.booking)
             }
             unready = {
                 _id(e.booking) for e in entries if not await _ready(judge_work, self._work, e)
@@ -254,7 +259,7 @@ class QueueService:
                 _row(e, me, e.not_picked_up(now, limit)),
                 eligible=not lacking[_id(e.booking)],
                 missing=named.get(_id(e.booking), ()),
-                without_video=_id(e.booking) in requests,
+                without_video=_id(e.booking) in no_video,
                 awaiting_check_in=_id(e.booking) in unready,
             )
             for e in entries
@@ -385,7 +390,8 @@ class QueueService:
             form = await tx.get_form(summary.group.id)
             status = await tx.get_call_status(booking_id)
             work = await self._work.of(tx, booking) if self._work else None
-        return replace(_claimed(booking, form, locale, status), work=work)
+            video = not (self._work is not None and await WorkJudge(tx).without_video(booking))
+        return replace(_claimed(booking, form, locale, status), work=work, video_call=video)
 
     async def release(self, principal: Principal, slug: str, booking_id: int) -> None:
         """Put a claimed booking back at the top of the queue.
@@ -452,7 +458,8 @@ class QueueService:
             work = await self._work.start(tx, summary.group, booking, self._clock.now())
             detail = STARTED_IN_CONFLICT if work.item and work.item.start_conflict else STARTED
             await self._audit(tx, principal, summary, booking_id, detail)
-        return replace(_claimed(booking), work=work)
+            video = not await WorkJudge(tx).without_video(booking)
+        return replace(_claimed(booking), work=work, video_call=video)
 
     async def complete(self, principal: Principal, slug: str, booking_id: int) -> None:
         """Complete request work: its pool unit is released once and the booking completed.

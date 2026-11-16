@@ -55,6 +55,7 @@ from app.domain.booking import (
     Slot,
 )
 from app.domain.booking_changes import ProposalTiming, lapse_unconfirmed
+from app.domain.booking_video import gets_meeting
 from app.domain.call_usage import record_call_event
 from app.domain.calls import apply_event, new_status
 from app.domain.channels import ChannelKind
@@ -164,6 +165,10 @@ class BookingDetails:
     """Whether the participant may still correct name, phone and answers (ADR 0056 point 10)."""
     proposal: HeldProposal | None = None
     """The proposed new time that still holds its place, before its deadline (ADR 0057)."""
+    video: bool = False
+    """Whether the booking gets a meeting: its service has a video host and its flow is a video
+    call (``app.domain.booking_video``, ADR 0121 row 36); the page offers joining and the trial
+    call only then."""
 
 
 @dataclass(frozen=True)
@@ -615,6 +620,7 @@ class BookingService:
                 else None
             )
             proposal = await tx.get_open_proposal(_id(booking))
+            video = await gets_meeting(tx, booking, group)
         now = self._clock.now()
         deadline = group.change_deadline(booking.start)
         changeable = booking.on_hold or (booking.is_active and now < deadline)
@@ -638,6 +644,7 @@ class BookingService:
             delete_by,
             correctable,
             proposal if proposal is not None and not proposal.is_due(now) else None,
+            video,
         )
 
     async def confirm(self, management_token: str | PublicRef) -> Booking:

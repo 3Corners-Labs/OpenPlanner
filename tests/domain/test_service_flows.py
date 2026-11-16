@@ -72,7 +72,7 @@ def reasons(
     rev: FlowRevision, the_pool: CapacityPool | None = None, subjects: tuple[str, ...] = ()
 ) -> Mapping[ReadinessCheck, ReadinessReason | None]:
     """Return ``{check: reason}`` of the checklist, asserting its order and consistency."""
-    items = readiness(rev, the_pool, offered_subjects=subjects, own_queue=True)
+    items = readiness(rev, the_pool, offered_subjects=subjects, own_queue=True, video_host=True)
     assert tuple(i.code for i in items) == ORDER
     assert all(i.ok == (i.reason is None) for i in items)
     return {i.code: i.reason for i in items}
@@ -101,12 +101,8 @@ def test_the_combination_table_is_closed() -> None:
     assert set(COMBINATIONS) == set(InteractionKind)
 
 
-def test_what_is_built_is_exactly_what_the_steps_up_to_6b_allow() -> None:
-    assert BUILT_KINDS == {
-        InteractionKind.TELEPHONE,
-        InteractionKind.IN_PERSON,
-        InteractionKind.NONE,
-    }
+def test_what_is_built_is_exactly_what_the_steps_up_to_row_36_allow() -> None:
+    assert BUILT_KINDS == set(InteractionKind)  # video since ADR 0121 row 36
     assert BUILT_DISPATCH == {DispatchKind.OWN_QUEUE, DispatchKind.CONTACT_CENTER}
     assert BUILT_COMPLETION == {CompletionPolicy.OPERATOR, CompletionPolicy.PROVIDER_EVENT}
     assert BUILT_ACTIONS == {
@@ -209,7 +205,9 @@ def test_a_stored_flow_has_a_published_current_and_an_unpublished_draft() -> Non
 
 def test_the_legacy_wrapper_is_ready_everywhere() -> None:
     assert reasons(legacy(), pool()) == dict.fromkeys(ORDER)
-    assert can_activate(readiness(legacy(), pool(), offered_subjects=(), own_queue=True))
+    assert can_activate(
+        readiness(legacy(), pool(), offered_subjects=(), own_queue=True, video_host=True)
+    )
 
 
 def test_a_new_flow_cannot_be_activated_while_the_rollback_gate_is_shut(
@@ -220,13 +218,17 @@ def test_a_new_flow_cannot_be_activated_while_the_rollback_gate_is_shut(
         **dict.fromkeys(ORDER),
         ReadinessCheck.ROLLBACK: R.ROLLBACK_NOT_SAFE,
     }
-    assert not can_activate(readiness(revision(), pool(), offered_subjects=(), own_queue=True))
+    assert not can_activate(
+        readiness(revision(), pool(), offered_subjects=(), own_queue=True, video_host=True)
+    )
 
 
 def test_a_flow_is_ready_once_the_gate_opens(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("app.domain.service_flows.ROLLBACK_SAFE", True)  # ADR 0122: the gate
     assert reasons(revision(), pool()) == dict.fromkeys(ORDER)
-    assert can_activate(readiness(revision(), pool(), offered_subjects=(), own_queue=True))
+    assert can_activate(
+        readiness(revision(), pool(), offered_subjects=(), own_queue=True, video_host=True)
+    )
 
 
 def test_the_legacy_factory_builds_revision_one_of_a_video_wrapper() -> None:
@@ -351,12 +353,12 @@ def test_assigning_a_workstation_is_not_built_yet() -> None:
     )
 
 
-def test_video_and_contact_center_wait_for_their_steps_unless_legacy() -> None:
+def test_video_is_built_and_contact_center_names_what_is_missing_unless_legacy() -> None:
     dp = ReadinessCheck.DISPATCH
     video = revision(
         interaction_kind=InteractionKind.VIDEO, handling_action=HandlingAction.OPEN_VIDEO
     )
-    assert reasons(video, pool())[dp] is R.NOT_BUILT_YET
+    assert reasons(video, pool())[dp] is None  # ADR 0121 row 36
     cc = revision(dispatch=DispatchKind.CONTACT_CENTER)
     # A service without a routing is something the administrator can fix, so it is named before
     # what follows (ADR 0121 step 6); with a carrier it waits for step 6b.
@@ -877,7 +879,11 @@ def test_activation_needs_the_checklist_of_the_published_revision_in_order() -> 
     assert flow_actions(published, ready_items()).activate is True
 
 
-def test_a_draft_that_is_wrong_in_itself_is_refused_and_one_that_is_incomplete_passes() -> None:
+def test_a_draft_that_is_wrong_in_itself_is_refused_and_one_that_is_incomplete_passes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Every kind is built since ADR 0121 row 36; the refusal of an unbuilt one stays proven.
+    monkeypatch.setattr(service_flows, "BUILT_KINDS", BUILT_KINDS - {InteractionKind.VIDEO})
     check_draft_content(
         revision(
             interaction_kind=None,
@@ -940,6 +946,9 @@ def test_a_draft_that_is_wrong_in_itself_is_refused_and_one_that_is_incomplete_p
 def test_each_built_constant_alone_decides_what_a_draft_may_choose(
     monkeypatch: pytest.MonkeyPatch, constant: str, member: StrEnum, changes: dict[str, Any]
 ) -> None:
+    monkeypatch.setattr(
+        service_flows, constant, frozenset(getattr(service_flows, constant)) - {member}
+    )
     assert refusal(lambda: check_draft_content(revision(**changes)))[0] is (
         ErrorCode.INVALID_CONFIGURATION
     )
@@ -1021,7 +1030,10 @@ def test_restoring_still_refuses_a_pool_of_another_organisation() -> None:
     ) == (ErrorCode.CONFIGURATION_OUT_OF_SCOPE, "capacity_pool_id")
 
 
-def test_a_draft_is_checked_for_identity_and_for_what_is_built_apart() -> None:
+def test_a_draft_is_checked_for_identity_and_for_what_is_built_apart(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service_flows, "BUILT_KINDS", BUILT_KINDS - {InteractionKind.VIDEO})
     unbuilt = flow(
         state=FlowState.DRAFT,
         current=None,

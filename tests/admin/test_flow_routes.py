@@ -80,21 +80,20 @@ async def test_the_read_outs_follow_the_saved_contact_channel(site: Site, kind: 
         assert "Kies de eerste actie" in page
 
 
-async def test_video_is_listed_to_follow_and_refused_like_every_other_unbuilt_option(
+async def test_a_video_flow_is_saved_and_its_checklist_asks_for_the_services_webex_host(
     site: Site,
 ) -> None:
+    """ADR 0121 row 36: video is built; the demo service has no Webex host yet."""
     await site.login_as(ORG_ADMIN)
     created = await create(site, interaction_kind="video")
-    await create(site, interaction_kind="none")
 
-    saved = await save(site, interaction_kind="video")
     page = (await site.client.get(f"{BASE}/advies")).text
 
-    assert created.status_code == saved.status_code == 422
-    assert 'href="#interaction_kind"' in created.text
+    assert created.status_code == 303
     radio = page.split('id="kind-video"')[1].split(">")[0]
-    assert "disabled" in radio
-    assert "Videogesprek (volgt)" in page
+    assert "disabled" not in radio
+    assert "Videogesprek (volgt)" not in page
+    assert "deze dienst heeft geen Webex-host" in page
 
 
 async def test_an_action_that_does_not_fit_the_posted_channel_is_replaced_and_the_page_says_so(

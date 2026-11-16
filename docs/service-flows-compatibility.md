@@ -26,8 +26,9 @@ written next to the proof. *Gated* means a path that only a non-legacy flow reac
 The columns are the train's changes: **B** the backfill and the flow resolver (steps 2b, 2e, 3a),
 **S** skill enforcement and skill codes (4a, 4b), **P** pool accounting (ADR 0122), **R**
 requests, work items and the request-level record (5a, 5b), **C** the contact-center contract
-and dispatch (6a, 6b), **I** immediate intake and check-in (7a, 7b). A behaviour a change does not
-reach has no row for it.
+and dispatch (6a, 6b), **I** immediate intake and check-in (7a, 7b), **V** video for a new flow
+(row 36: one meeting per pool booking of a video flow, none for a flow without video). A behaviour
+a change does not reach has no row for it.
 
 ### Group booking (standalone page and widget)
 
@@ -47,6 +48,8 @@ reach has no row for it.
 | P | Gated: a pool flow made the default is ignored while the gate is shut | `tests/domain/test_pool_booking_gate.py::test_a_pool_flow_made_the_default_is_ignored_while_the_gate_is_shut` |
 | P | Intended (gated): a pool slot is closed for the reports by the pool rule (explicit outcome only, no capacity of the service), the legacy slot beside it as before | `tests/adapters/db/test_legacy_slot.py::test_the_closing_of_ended_slots_closes_the_pool_slot_as_a_pool_slot` |
 | R | Unchanged: a legacy booking gets no request and is never watched | `tests/domain/test_request_watch.py::test_a_legacy_booking_is_never_watched` |
+| V | Unchanged: a booking without a flow, or of a legacy flow, gets its meeting from the service's host as before; intended: a pool booking of a video flow gets one meeting, a booking of a flow without video none | `tests/jobs/test_flow_video_jobs.py::test_a_video_flows_pool_booking_gets_one_meeting_and_a_flow_without_video_none` |
+| V | Intended: only a booking that gets a meeting carries the join link in its message | `tests/jobs/test_flow_video_jobs.py::test_only_a_video_flows_booking_gets_the_join_link_in_its_message` |
 
 ### Direct call (start now, ADR 0072)
 
@@ -61,13 +64,15 @@ reach has no row for it.
 
 ### Trial call (ADR 0072)
 
-No change of the train reaches the trial call: it reads the booking and the service's video
-settings only, and no train module imports it.
+The trial call itself reads the booking and the service's video settings only, and no train
+module imports it. Since row 36 the pages offer it (and joining) only for a booking that gets a
+meeting: unchanged for a booking without a flow or of a legacy flow.
 
 | Change | Result | Proof |
 |---|---|---|
 | none | Unchanged: opening schedules a meeting the participant can enter alone | `tests/domain/test_trial_call_service.py::test_opening_schedules_a_meeting_the_participant_can_enter_alone` |
 | none | Unchanged: the booking and join pages link to the trial call | `tests/api/test_trial_pages.py::test_the_booking_and_join_pages_link_to_the_trial_call` |
+| V | Intended: a booking of a flow without video is offered neither joining nor the trial call | `tests/domain/test_booking_video.py::test_a_booking_gets_a_meeting_when_its_flow_is_a_video_call_and_a_host_exists` |
 
 ### Contact-center dispatch (ADR 0018)
 
@@ -227,7 +232,7 @@ legacy paths). A row whose proof needs a released image or a browser names its c
 | A16 | A ticket retried after response loss: the same ticket | open | `tests/domain/test_immediate_requests.py::test_a_retried_intake_returns_the_same_request` |
 | A17 | An immediate request before a fully reserved interval may wait, not start | open | `tests/domain/test_request_queue.py::test_immediate_work_never_takes_a_reserved_unit` |
 | A18 | An overrun stays visible with an explicit conflict | n/a | `tests/domain/test_request_work.py::test_a_due_appointment_starts_when_a_colleague_holds_the_last_unit_and_it_is_recorded` |
-| A19 | A flow without video needs no host, provider, meeting job or video state | n/a | `tests/domain/test_request_work.py::test_a_flow_without_video_needs_no_meeting_and_shows_no_video_state` |
+| A19 | A flow without video needs no host, provider, meeting job or video state | n/a | `tests/domain/test_request_work.py::test_a_flow_without_video_needs_no_meeting_and_shows_no_video_state`; its meeting job is skipped (row 36): `tests/jobs/test_flow_video_jobs.py::test_the_meeting_job_of_a_flow_without_video_is_skipped_with_its_reason` |
 | A20 | A request without collected email or name is valid, invents nothing, expires and is deleted | open | `tests/domain/test_immediate_requests.py::test_a_flow_that_does_not_collect_email_stores_none`; expiry and deletion: `tests/domain/test_immediate_requests.py::test_an_immediate_record_is_deleted_end_to_end` |
 | A21 | A task without video: a valid payload without a meeting link, organisation credentials | n/a | `tests/domain/test_request_dispatch.py::test_a_task_without_a_meeting_reaches_the_contact_center_once` |
 | A22 | Provider timeout, fallback, late callback: reconciled, one fenced authority | n/a | `tests/domain/test_request_dispatch.py::test_an_attempt_in_doubt_is_fenced_and_a_later_task_is_ended` |

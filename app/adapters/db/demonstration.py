@@ -4,12 +4,13 @@ The fixture of ``docs/service-flows-handover.md``: a service with the subjects *
 *Aanvraag / Request*, a counted pool of two units that guarantees ``general-advice`` and a
 pool of one unit of its own:
 
+    samen-bespreken      video       shared pool   30 min   active, media presence
     persoonlijk-gesprek  in person   shared pool   30 min   active, explicit check-in
     documentcontrole     none        own pool      20 min   active
 
-The fixture of the brief also has a video flow, *Samen bespreken / Discuss together*, on the
-shared pool. A new flow cannot use video yet (``BUILT_KINDS``; even its draft is refused), so it
-joins the fixture with the step that builds video for a new flow (ADR 0121 follow-up row 36).
+The video flow *Samen bespreken / Discuss together* joined with ADR 0121 row 36 (video for a new
+flow): each of its bookings gets one meeting from the service's video host, so on a service
+without a host its readiness names ``video_host_missing`` and its bookings get no meeting.
 
 Both pools are staffed on weekdays: the shared one 09:00 to 12:00, the own one 13:00 to 16:00,
 Amsterdam time, for appointments and work without one.
@@ -56,6 +57,7 @@ SKILLS = ((GENERAL, "Algemeen advies", "General advice"), (ENGLISH, "Engels", "E
 SUBJECTS = (("contract", "Contract", "Contract"), ("aanvraag", "Aanvraag", "Request"))
 SHARED_POOL = "personal-advice"
 OWN_POOL = "document-review"
+VIDEO_FLOW = "samen-bespreken"
 IN_PERSON_FLOW = "persoonlijk-gesprek"
 REVIEW_FLOW = "documentcontrole"
 
@@ -92,8 +94,18 @@ FLOWS = (
         False,
         20,
     ),
+    _Flow(
+        VIDEO_FLOW,
+        "Samen bespreken",
+        "Discuss together",
+        InteractionKind.VIDEO,
+        HandlingAction.OPEN_VIDEO,
+        True,
+        30,
+    ),
 )
-"""The flows of the fixture, both active."""
+"""The flows of the fixture, all active; the video flow last, so the ids of the two flows of
+step 10 stay what they were on a database seeded before row 36."""
 
 
 @dataclass(frozen=True)
@@ -102,8 +114,7 @@ class Demonstration:
 
     Attributes:
         group_id: The service.
-        shared_pool: The pool of two units the in-person flow draws on (and later the video
-            flow).
+        shared_pool: The pool of two units the video and the in-person flow draw on.
         own_pool: The pool of one unit of the document review.
         flows: The flow ids by code.
     """

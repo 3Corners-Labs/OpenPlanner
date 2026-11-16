@@ -411,6 +411,7 @@ REASON_LABELS: dict[str, str] = {
     # ADR 0068: a meeting or work item job with nothing to do.
     "already_done": "admin.audit.reason.already_done",
     "no_video": "admin.audit.reason.no_video",
+    "flow_without_video": "admin.audit.reason.flow_without_video",
     "own_queue": "admin.audit.reason.own_queue",
     "no_dispatch": "admin.audit.reason.no_dispatch",
     "channel_not_configured": "admin.audit.reason.channel_not_configured",
