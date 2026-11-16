@@ -8,7 +8,13 @@
  */
 import { expect, test } from '@playwright/test';
 
-import { participantEmail, expectNoAxeViolations, tabTo } from '../helpers';
+import {
+  chooseTimeByKeyboard,
+  expectNoAxeViolations,
+  participantEmail,
+  tabTo,
+  timeClearOfNotice,
+} from '../helpers';
 import { fixture } from '../pages';
 
 test('book, confirm, move and cancel with the keyboard only', async ({ page }, testInfo) => {
@@ -31,8 +37,9 @@ test('book, confirm, move and cancel with the keyboard only', async ({ page }, t
   await expect(page.locator('[data-announce]')).toContainText('vrij');
   await expectNoAxeViolations(page);
 
-  // A time button takes the participant to the form.
-  await tabTo(page, page.locator('#times .time-button').first());
+  // A time button takes the participant to the form; one clear of the minimum notice, so it is
+  // still offered when the form posts (helpers.ts).
+  await tabTo(page, await chooseTimeByKeyboard(page));
   await page.keyboard.press('Enter');
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Uw gegevens');
@@ -86,7 +93,7 @@ test('book, confirm, move and cancel with the keyboard only', async ({ page }, t
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Afspraak verplaatsen');
   await expectNoAxeViolations(page);
-  await tabTo(page, page.locator('#times .time-button').first());
+  await tabTo(page, await chooseTimeByKeyboard(page));
   await page.keyboard.press('Enter');
   // A new time is confirmed first: from → to.
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Nieuw moment bevestigen');
@@ -122,7 +129,10 @@ test('the calendar works without JavaScript', async ({ browser }) => {
   await expect(page.locator(`a[data-day="${label}"]`)).toHaveAttribute('aria-current', 'true');
   // No axe here: axe runs as a script. The same markup is scanned in the other tests.
 
-  await page.locator('#times .time-button').first().click();
+  // The last free day is today only on the last days of a month; its times then lie past the
+  // notice as well, or the first one is taken as before.
+  const time = (await timeClearOfNotice(page)) ?? page.locator('#times .time-button').first();
+  await time.click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Uw gegevens');
   await context.close();
 });
