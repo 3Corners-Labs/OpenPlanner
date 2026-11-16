@@ -12,6 +12,12 @@ as the last release here. A candidate's number follows main's commit order: when
 candidate already contains ``HEAD`` (a run that started late, on an older merge than one already
 tagged), it prints nothing and says on stderr which candidate superseded it, so ``main.yml``
 tags nothing and an installation on the ``rc`` channel never goes back.
+
+A candidate is also refused while the last release tag has no published GitHub release (a tag
+whose ``main.yml`` run is still queued, failed or being retried): the candidates of the next
+version would otherwise reach the ``rc`` channel before the release they follow (ADR 0059, fix
+of 2026-11-15). The script prints nothing and says so on stderr; the next merge after the
+release is published becomes the first candidate.
 """
 
 import argparse
@@ -28,10 +34,15 @@ _FEATURE = re.compile(r"^feat(\([^)]*\))?:")
 _CANDIDATE_TAG = re.compile(r"^v(\d+\.\d+\.\d+)-rc\.(\d+)$")
 _VERSION = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 _LINE_BRANCH = re.compile(r"^release/(\d+)\.(\d+)$")
+_GH_TIMEOUT_SECONDS = 60  # a hung GitHub call must not hold the one-at-a-time candidate job
 
 
 class LineError(ValueError):
     """A maintenance line's rule refuses what was asked; the message says which rule."""
+
+
+class ReleaseLookupError(RuntimeError):
+    """GitHub could not say whether a release is published; the candidate is not guessed."""
 
 
 def parse_version(version: str) -> tuple[int, int, int]:
@@ -240,6 +251,41 @@ def last_release() -> str:
     ).strip()
 
 
+def release_published(tag: str) -> bool:
+    """Return whether ``tag`` has a published (not draft) GitHub release.
+
+    Args:
+        tag: A release tag, for example ``v0.6.0``. It needs ``GH_TOKEN`` in the environment.
+
+    Raises:
+        ReleaseLookupError: ``gh`` failed for any reason other than "release not found", so
+            the caller neither assumes the release exists nor that it does not.
+    """
+    try:
+        result = subprocess.run(  # noqa: S603 - fixed argument list, no shell
+            ["gh", "release", "view", tag, "--json", "isDraft", "--jq", ".isDraft"],  # noqa: S607
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=_GH_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise ReleaseLookupError(
+            f"gh release view {tag}: no answer in {_GH_TIMEOUT_SECONDS} s"
+        ) from error
+    except OSError as error:  # `gh` is not installed or not executable
+        raise ReleaseLookupError(
+            f"gh release view {tag}: cannot run gh ({error.strerror})"
+        ) from error
+    if result.returncode == 0:
+        return result.stdout.strip() == "false"
+    if "release not found" in result.stderr:
+        return False
+    # One line: the text goes into a workflow annotation, where a newline starts a new command.
+    reason = " ".join(result.stderr.split())[:200]
+    raise ReleaseLookupError(f"gh release view {tag}: {reason}")
+
+
 def messages_since(ref: str, head: str = "HEAD") -> list[str]:
     """Return the full commit messages on the first-parent line from ``ref`` to ``head``."""
     log = git("log", f"{ref}..{head}", "--format=%B%x00", "--first-parent")
@@ -275,6 +321,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         if base is None:
             # Pushing a freshly cut line is such a case: nothing to tag, nothing failed.
             sys.stderr.write(f"nothing merged on {target.branch} since {last}; no candidate\n")
+            return 0
+        try:
+            published = release_published(last)
+        except ReleaseLookupError as error:
+            sys.stderr.write(f"::error::{error}\n")
+            return 1
+        if not published:
+            sys.stderr.write(
+                f"{last} is tagged but not published yet; no candidate until it is (ADR 0059)\n"
+            )
             return 0
         later = superseded_by(git("tag", "--list", "v*-rc.*", "--contains", "HEAD").split())
         if later is not None:

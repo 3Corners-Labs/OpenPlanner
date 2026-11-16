@@ -94,8 +94,12 @@ jobs:
       # installation on `rc` would go back (2026-11-03: rc.179 on #480 after rc.176 on #481).
       # On a line (ADR 0116 point 3) the candidate is the next patch of the line; a `feat` or a
       # migration on a line fails this step.
+      # A tag without a published release makes no candidate (ADR 0059): `release_plan` asks
+      # GitHub, so it needs the token for `gh release view`.
       - id: candidate
         name: next candidate number
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           version="$(python3 -m scripts.release_plan --candidate --branch "$GITHUB_REF_NAME")"
@@ -103,7 +107,7 @@ jobs:
           if [ -n "$version" ]; then
             echo "::notice::release candidate $version"
           else
-            echo "::notice::no release candidate: a later merge is already a candidate"
+            echo "::notice::no release candidate: a later merge is already a candidate, or the last release tag is not published yet"
           fi
       - id: publish
         if: steps.candidate.outputs.version != ''
