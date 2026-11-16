@@ -2539,9 +2539,14 @@ organisation's Settings tab (`privacy_statement_url`); empty means no link.
 **Services, flows and requests (ADR 0121, ADR 0122; proof in `docs/service-flows-compatibility.md`).**
 Migrations 0109 to 0115 (minor 0.6) only add: tables, nullable or defaulted columns on
 `bookings` and `slots`, and a backfill of one legacy pool and the default flows per service.
-While the rollback gate `ROLLBACK_SAFE` is shut (it is, in every image so far) nothing in
-production writes a pool slot, a request-level record, a contact-center attempt or an immediate
-request, so:
+Up to 0.6.0 the rollback gate `ROLLBACK_SAFE` was shut, so nothing in production wrote a pool
+slot, a request-level record, a contact-center attempt or an immediate request. Since #826 it
+is open (checklist G10): such records are written once an administrator activates a non-legacy
+flow on the own queue of a service with an own queue; an update activates nothing, and
+contact-center flows stay refused. Before activating an on-demand flow, set its pool's waiting
+limit (*Skills and capacity*, the pool's staffing page): a new pool has none. Going back to 0.6.0 on a database holding them is proven by
+the upgrade matrix (`scripts/upgrade-matrix.sh rollback-release`: 0.6.0 books and claims next to
+them, checklist G07 and G43). So:
 
 1. *Going forward* is `alembic upgrade head` as for any release; every booking, slot, job and
    setting keeps its values, every old booking reads as its service's default flow.

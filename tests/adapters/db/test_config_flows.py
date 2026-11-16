@@ -45,6 +45,7 @@ from tests.support.flow_documents import (
     organisation_document,
     revision_json,
 )
+from tests.support.pool_flows import shut_gate
 
 LABELS = json.dumps({"nl": "Balie", "en": "Desk"})
 STAFF_NAME, STAFF_MAIL = "Jan Jansen", "jan@voorbeeld.nl"
@@ -693,7 +694,10 @@ async def test_the_writer_refuses_a_published_revision_a_second_time(source: Asy
     assert refused.value.code is ErrorCode.CONFIGURATION_REVISION_PUBLISHED
 
 
-async def test_a_draft_is_published_and_the_next_one_added_in_order(source: AsyncEngine) -> None:
+async def test_a_draft_is_published_and_the_next_one_added_in_order(
+    source: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    shut_gate(monkeypatch)  # publishing here waits on the rollback point
     exported = await export(source)
     helpdesk = exported["organisations"][0]["groups"][0]
     advies = next(f for f in helpdesk["flows"] if f["code"] == "advies")

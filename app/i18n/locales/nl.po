@@ -1417,6 +1417,9 @@ msgstr "Vul een aantal minuten in van 0 tot 120."
 msgid "admin.form.error.phone_mode"
 msgstr "Kies of het telefoonnummer verborgen, optioneel of verplicht is."
 
+msgid "admin.form.error.own_queue_in_use"
+msgstr "Deze dienst houdt zijn eigen wachtrij zolang een actieve flow daarheen verdeelt. Archiveer die flow eerst, of laat hem naar het contactcenter verdelen."
+
 msgid "admin.form.error.future_bookings"
 msgstr "Dit kan niet zolang er afspraken in de toekomst staan. Wijzig het nadat die zijn geweest of geannuleerd."
 

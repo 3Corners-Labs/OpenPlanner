@@ -108,18 +108,21 @@ RETENTION_BUILT = True
 Each later step of ADR 0121 widens exactly these five constants and nothing else here. A
 legacy revision skips all five tests.
 """
-ROLLBACK_SAFE: Final = False
+ROLLBACK_SAFE: Final = True
 """The rollback gate of ADR 0122 (design section 5.2): may a non-legacy flow be activated?
 
 A non-legacy flow writes pool slots (and later occupations and requests) that the previous
 supported minor does not know; it would count their bookings in a service's legacy slot and
 never respect the pool across services. So a flow may be activated only in an image whose
 previous supported minor already holds the readers and the accounting of every record it writes.
-This stays false until the release after the last reader-adding step, and until the upgrade
-matrix has proven it: activate a flow, book on the pool, roll back to the previous minor, book
-and claim there, and check that no unit was sold twice (A30). Setting it true is a decision,
-and needs ADR 0121 step 7b too: with the gate open, a service whose on-demand default is a pool
-flow is refused by the legacy direct call and is served only by the immediate intake pages.
+It stayed false until the release after the last reader-adding step (0.6.0) and until the
+upgrade matrix proved it: book and claim in the previous minor on a database holding every
+gated record, with no unit sold twice (A30, checklist G07 and G43). The product owner set it
+true on 2026-11-15 (checklist G10, #826). With the gate open, a service whose on-demand
+default is a pool flow is refused by the legacy direct call and is served only by the
+immediate intake pages (ADR 0121 step 7b); a flow that dispatches to the contact center stays
+refused by ``CONTACT_CENTER_FLOWS_READY``, and one on the own queue needs a service with an own
+queue. A fixed protection, never a setting.
 
 Read when called, never copied (tests flip it with a monkeypatch): ``readiness`` reports
 ``rollback_not_safe`` while it is false (ADR 0122 step 5), and

@@ -115,7 +115,7 @@ def test_what_is_built_is_exactly_what_the_steps_up_to_6b_allow() -> None:
         HandlingAction.CALL,
     }
     assert RETENTION_BUILT is True  # the watchdog and the deletion of step 5b
-    assert ROLLBACK_SAFE is False  # the gate of ADR 0122 stays shut until the upgrade proof
+    assert ROLLBACK_SAFE is True  # G10: the product owner opened the gate of ADR 0122
 
 
 def test_a_flow_code_follows_the_subject_grammar() -> None:

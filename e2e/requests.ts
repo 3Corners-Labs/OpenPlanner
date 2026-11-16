@@ -64,6 +64,7 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     const waiting = await ask(browser, baseURL, 'Bea');
     const setUp: SetUp = {
       immediate_request: waiting.path,
+      immediate_request_leave: `${waiting.path}/leave`,
       immediate_request_cookie: waiting.cookie,
       claimed_request: await claimOldest(browser, baseURL),
     };

@@ -10,7 +10,15 @@ from app.domain.authorization import Principal
 from app.domain.booking import Booking, BookingStatus, Slot
 from app.domain.errors import DomainError
 from app.domain.planning import NewGroup, PlanningService, settings_of
-from app.domain.scheduling import Offer, PhoneMode, ScheduleOverride, ScheduleRule, TimeWindow
+from app.domain.scheduling import (
+    DispatchKind,
+    Offer,
+    PhoneMode,
+    ScheduleOverride,
+    ScheduleRule,
+    TimeWindow,
+)
+from app.domain.service_flows import FlowState
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import (
@@ -22,6 +30,7 @@ from tests.support.admin import (
     two_organisations,
 )
 from tests.support.domain import NOW, SLOT_0900, window
+from tests.support.pool_flows import add_counted_pool, add_pool_flow, block, open_gate
 
 TODAY = date(2026, 1, 1)
 
@@ -614,3 +623,28 @@ async def test_an_exception_of_another_group_is_out_of_reach(
         await planning.update_override(
             GROUP_ADMIN, "andere-team", other, ScheduleOverride(date(2026, 1, 8), None)
         )
+
+
+# --- the own queue of a service with an active flow on it (G10 security review) ------------
+
+
+async def test_the_own_queue_stays_while_an_active_flow_dispatches_to_it(
+    planning: PlanningService, uow: InMemoryUnitOfWork, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The own-queue rule held at activation only: a service that then left its own queue kept
+    taking work nobody could claim. Leaving it is refused while such a flow is active."""
+    open_gate(monkeypatch)
+    uow.state.groups[1] = replace(uow.state.groups[1], dispatch_kind=DispatchKind.OPENPLANNER_QUEUE)
+    pool_id = await add_counted_pool(uow, uow.state.groups[1].organisation_id, [block()])
+    await add_pool_flow(uow, 1, pool_id, on_demand=True)
+    current = settings_of(uow.state.groups[1])
+    away = replace(current, dispatch_kind=DispatchKind.CONTACT_CENTER)
+
+    with pytest.raises(DomainError, match="own_queue_in_use: dispatch_kind"):
+        await planning.update_settings(SUPER, "demo", away)
+    # Other settings stay editable, and a service without such a flow may leave its queue.
+    assert await planning.update_settings(SUPER, "demo", replace(current, horizon_days=10))
+    for flow_id, stored in list(uow.state.flows.items()):
+        if stored.current is not None and not stored.current.legacy:
+            uow.state.flows[flow_id] = replace(stored, state=FlowState.ARCHIVED)
+    assert await planning.update_settings(SUPER, "demo", replace(away, horizon_days=10))
