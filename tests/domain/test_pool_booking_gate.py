@@ -236,7 +236,7 @@ def test_the_gate_lets_a_pool_flow_through_on_both_paths(
 
 def test_a_new_flow_waits_for_the_gate_on_its_own_point(monkeypatch: pytest.MonkeyPatch) -> None:
     shut_gate(monkeypatch)  # explicitly: the default opens with G10
-    items = readiness(revision(), pool(), offered_subjects=(), own_queue=True)
+    items = readiness(revision(), pool(), offered_subjects=(), own_queue=True, video_host=True)
 
     retention = next(i for i in items if i.code is ReadinessCheck.RETENTION)
     rollback = next(i for i in items if i.code is ReadinessCheck.ROLLBACK)
@@ -250,13 +250,15 @@ def test_a_new_flow_waits_for_the_gate_on_its_own_point(monkeypatch: pytest.Monk
 def test_an_open_gate_makes_a_new_flow_ready(monkeypatch: pytest.MonkeyPatch) -> None:
     open_gate(monkeypatch)
 
-    items = readiness(revision(), pool(), offered_subjects=(), own_queue=True)
+    items = readiness(revision(), pool(), offered_subjects=(), own_queue=True, video_host=True)
 
     assert can_activate(items)
 
 
 def test_the_legacy_wrapper_never_waits_for_the_gate() -> None:
-    assert can_activate(readiness(legacy(), pool(), offered_subjects=(), own_queue=True))
+    assert can_activate(
+        readiness(legacy(), pool(), offered_subjects=(), own_queue=True, video_host=True)
+    )
 
 
 def test_the_following_reasons_are_exactly_the_three_an_administrator_cannot_fix() -> None:

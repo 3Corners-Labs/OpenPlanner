@@ -64,6 +64,15 @@
       "island": true
     },
     {
+      "name": "calendar of a video flow on a shared pool",
+      "path": "/g/demo?flow=samen-bespreken",
+      "locales": [
+        "nl",
+        "en"
+      ],
+      "island": true
+    },
+    {
       "name": "call page",
       "path": "{call_page}",
       "locales": [

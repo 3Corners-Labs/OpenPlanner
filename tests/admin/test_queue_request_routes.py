@@ -55,6 +55,27 @@ async def test_request_work_is_started_and_completed_without_a_meeting(site: Sit
     assert status == "completed"
 
 
+async def test_video_request_work_shows_its_meeting_beside_start_and_complete(
+    site: Site,
+) -> None:
+    """ADR 0121 row 36: a video flow's request work has its join link and the participant."""
+    booking_id = await request_work(site, video=True)
+    await site.login_as(AGENT)
+
+    await site.client.post(f"{QUEUE}/{booking_id}/claim", headers=SAME_ORIGIN)
+    opened = (await site.client.get(f"{QUEUE}/{booking_id}")).text
+    site.clock.advance(timedelta(minutes=4))
+    await site.client.post(f"{QUEUE}/{booking_id}/start", headers=SAME_ORIGIN)
+    running = (await site.client.get(f"{QUEUE}/{booking_id}/live")).text
+
+    assert "Dit verzoek heeft geen videogesprek." not in opened
+    assert 'href="https://webex.example/j/1"' in opened
+    assert f"{QUEUE}/{booking_id}/start" in opened
+    assert "data-live-status" in opened
+    assert 'href="https://webex.example/j/1"' in running
+    assert f"{QUEUE}/{booking_id}/complete" in running
+
+
 async def test_a_late_start_is_refused_with_a_message_on_the_list(site: Site) -> None:
     booking_id = await request_work(site)
     await site.login_as(AGENT)

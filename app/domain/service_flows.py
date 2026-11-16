@@ -82,10 +82,9 @@ class DispatchKind(StrEnum):
     CONTACT_CENTER = "contact_center"
 
 
-BUILT_KINDS: frozenset[InteractionKind] = frozenset(
-    {InteractionKind.TELEPHONE, InteractionKind.IN_PERSON, InteractionKind.NONE}
-)
-"""Interaction kinds a new (non-legacy) flow may use; step 5 of ADR 0121 adds video."""
+BUILT_KINDS: frozenset[InteractionKind] = frozenset(InteractionKind)
+"""Interaction kinds a new (non-legacy) flow may use: every kind since ADR 0121 row 36 built
+video for a new flow (one meeting per pool booking, ``has_video``)."""
 COMPLETION_OF: Mapping[DispatchKind, CompletionPolicy] = {
     DispatchKind.OWN_QUEUE: CompletionPolicy.OPERATOR,
     DispatchKind.CONTACT_CENTER: CompletionPolicy.PROVIDER_EVENT,
@@ -353,6 +352,22 @@ def interaction_of(revision: FlowRevision | None, recorded: bool) -> Interaction
     if revision is None or revision.interaction_kind is None:
         raise DomainError(ErrorCode.INTEGRATION_NOT_READY, "interaction_kind")
     return revision.interaction_kind
+
+
+def has_video(revision: FlowRevision | None, recorded: bool) -> bool:
+    """Return whether a booking made under ``revision`` is a video call (ADR 0121 row 36).
+
+    The one rule of which booking gets a meeting from its service's host, its join link in a
+    message, the join and trial call on its pages and the video state in the queue: a booking
+    without a flow (``recorded`` false) and one of a legacy flow are video bookings, as they
+    always were; a booking of a new flow is one exactly when the flow's interaction kind is
+    ``video``. A recorded revision that cannot be read keeps the old answer, video, so a missing
+    row never takes a participant's link away. Whether the service has a host is the caller's
+    second question (``Group.video_enabled``).
+    """
+    if not recorded or revision is None or revision.legacy:
+        return True
+    return revision.interaction_kind is InteractionKind.VIDEO
 
 
 def check_code_kept(

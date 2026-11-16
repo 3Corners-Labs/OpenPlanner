@@ -1,13 +1,38 @@
 {#- The claimed booking's status (ADR 0043, 0072): where the participant is, whether the video
-    link is ready, and the actions. Request work of a flow without video (ADR 0121 step 5) has
-    no meeting: it shows where the work stands and *Start* or *Complete* instead. Rendered inside
-    queue_claimed.html and on its own for static/live-region.js, which swaps it in while
-    ``poll`` is set. -#}
+    link is ready, and the actions. Request work (ADR 0121 step 5) shows where the work stands
+    and *Start* or *Complete*; request work of a flow without video has no meeting, request work
+    of a video flow (row 36) shows the participant, the video state and the link as well.
+    Rendered inside queue_claimed.html and on its own for static/live-region.js, which swaps it in
+    while ``poll`` is set. -#}
+{% macro video_notes() %}
+  {% if claimed.booking.video == "failed" %}
+  <div class="alert alert--error">
+    <p>{{ _("admin.queue.video_failed_explained") }}</p>
+    {% if can("bookings.view", summary) %}<p><a href="/admin/groups/{{ summary.group.slug }}/bookings/{{ claimed.booking.booking_id }}">{{ _("admin.queue.timeline") }}</a></p>{% endif %}
+  </div>
+  {% elif claimed.booking.video == "pending" %}
+  <p>{{ _("admin.queue.video_pending_explained") }}</p>
+  {% endif %}
+{% endmacro %}
+{% macro join_link() %}
+  {% if claimed.booking.join_url %}
+  <a class="button" href="{{ claimed.booking.join_url }}" target="_blank" rel="noopener noreferrer">{{ _("admin.queue.join") }}<span class="visually-hidden"> {{ _("admin.queue.new_window") }}</span></a>
+  {% endif %}
+{% endmacro %}
+{% macro participant_chip() -%}
+<span class="chip{% if claimed.participant_tone %} chip--{{ claimed.participant_tone }}{% endif %}" data-live-status>{{ claimed.participant }}</span>
+{%- endmacro %}
 <div data-live-fragment{% if poll %} data-poll="{{ poll }}" data-poll-seconds="{{ poll_seconds }}"{% endif %}>
   {% if claimed.work %}
+  {% if claimed.booking.video_call %}
+  <p>{{ participant_chip() }}{% if claimed.work.sentence %} {{ claimed.work.sentence }}{% endif %}</p>
+  {{ video_notes() }}
+  {% else %}
   <p data-live-status>{{ _("admin.queue.work.no_video") }}{% if claimed.work.sentence %} {{ claimed.work.sentence }}{% endif %}</p>
+  {% endif %}
   {% if claimed.work.conflict %}<div class="alert alert--warning"><p>{{ _("admin.queue.work.conflict") }}</p></div>{% endif %}
   <div class="form-actions">
+    {% if claimed.booking.video_call %}{{ join_link() }}{% endif %}
     {% if claimed.work.can_start %}
     <form method="post" action="/admin/groups/{{ summary.group.slug }}/queue/{{ claimed.booking.booking_id }}/start">
       <button type="submit" class="button">{{ _("admin.queue.work.start") }}</button>
@@ -26,19 +51,10 @@
     {% if poll %}<a class="button button--ghost" href="/admin/groups/{{ summary.group.slug }}/queue/{{ claimed.booking.booking_id }}">{{ _("admin.queue.refresh") }}</a>{% endif %}
   </div>
   {% else %}
-  <p><span class="chip{% if claimed.participant_tone %} chip--{{ claimed.participant_tone }}{% endif %}" data-live-status>{{ claimed.participant }}</span></p>
-  {% if claimed.booking.video == "failed" %}
-  <div class="alert alert--error">
-    <p>{{ _("admin.queue.video_failed_explained") }}</p>
-    {% if can("bookings.view", summary) %}<p><a href="/admin/groups/{{ summary.group.slug }}/bookings/{{ claimed.booking.booking_id }}">{{ _("admin.queue.timeline") }}</a></p>{% endif %}
-  </div>
-  {% elif claimed.booking.video == "pending" %}
-  <p>{{ _("admin.queue.video_pending_explained") }}</p>
-  {% endif %}
+  <p>{{ participant_chip() }}</p>
+  {{ video_notes() }}
   <div class="form-actions">
-    {% if claimed.booking.join_url %}
-    <a class="button" href="{{ claimed.booking.join_url }}" target="_blank" rel="noopener noreferrer">{{ _("admin.queue.join") }}<span class="visually-hidden"> {{ _("admin.queue.new_window") }}</span></a>
-    {% endif %}
+    {{ join_link() }}
     <form method="post" action="/admin/groups/{{ summary.group.slug }}/queue/{{ claimed.booking.booking_id }}/release">
       <button type="submit" class="button button--secondary">{{ _("admin.queue.release") }}</button>
     </form>

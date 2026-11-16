@@ -183,6 +183,8 @@ class _World:
         own_queues: The slugs of the groups with an own queue (``dispatch_kind`` is
             ``openplanner_queue``, ``Group.has_own_queue``); a group whose field is absent has
             the dataclass default, the contact center, and is not in it.
+        video_hosts: The slugs of the groups with a video host (``video_host_email`` set,
+            ``Group.video_enabled``, ADR 0121 row 36).
     """
 
     organisations: Mapping[str, int]
@@ -195,6 +197,7 @@ class _World:
     subjects: Mapping[str, frozenset[str]]
     carriers: Mapping[str, ContactCenterCapabilities] = field(default_factory=dict)
     own_queues: frozenset[str] = frozenset()
+    video_hosts: frozenset[str] = frozenset()
 
     @property
     def skills_by_id(self) -> dict[int, Skill]:
@@ -260,6 +263,7 @@ def _read_world(root: Entity, descriptors: Mapping[str, ProviderDescriptor]) -> 
     subjects: dict[str, frozenset[str]] = {}
     carriers: dict[str, ContactCenterCapabilities] = {}
     own_queues: set[str] = set()
+    video_hosts: set[str] = set()
     for address, group in walk(root, GROUP_KIND):
         groups[address[1]] = next(ids)
         group_organisation[address[1]] = address[0]
@@ -273,6 +277,8 @@ def _read_world(root: Entity, descriptors: Mapping[str, ProviderDescriptor]) -> 
             carriers[address[1]] = carrier
         if group.fields.get("dispatch_kind") == GroupDispatchKind.OPENPLANNER_QUEUE.value:
             own_queues.add(address[1])
+        if group.fields.get("video_host_email"):
+            video_hosts.add(address[1])
     world = _World(
         organisations,
         groups,
@@ -284,6 +290,7 @@ def _read_world(root: Entity, descriptors: Mapping[str, ProviderDescriptor]) -> 
         subjects,
         carriers,
         frozenset(own_queues),
+        frozenset(video_hosts),
     )
     pools: dict[tuple[str, str], CapacityPool] = {}
     legacy: dict[str, CapacityPool] = {}
@@ -799,6 +806,7 @@ def _check_publication(run: _Run, address: Address, number: int, built: FlowRevi
                 coded_skills=run.world.coded_skills,
                 carrier=run.world.carriers.get(address[1]),
                 own_queue=address[1] in run.world.own_queues,
+                video_host=address[1] in run.world.video_hosts,
             )
         )
 
@@ -829,6 +837,7 @@ def _check_state(run: _Run, address: Address, built: ServiceFlow) -> Iterator[Re
             coded_skills=run.world.coded_skills,
             carrier=run.world.carriers.get(address[1]),
             own_queue=address[1] in run.world.own_queues,
+            video_host=address[1] in run.world.video_hosts,
         )
         if not can_activate(items):
             for item in items:

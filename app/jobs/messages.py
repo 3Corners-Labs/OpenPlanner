@@ -417,6 +417,7 @@ class MessageComposer:
         proposal: HeldProposal | None = None,
         change: ChangeRequest | None = None,
         show_code: bool = False,
+        video: bool = True,
     ) -> OutboundMessage:
         """Return the message for ``job_type`` on ``channel``.
 
@@ -436,6 +437,9 @@ class MessageComposer:
             show_code: Whether the message shows the appointment code (the
                 organisation's ``agent_change_requests_enabled``); only a message that links to
                 the booking itself shows it.
+            video: Whether the booking is a video call by its flow
+                (``app.domain.booking_video``): a booking of a flow without video gets no join
+                link, even when its service has a video host (ADR 0121 row 36).
 
         Raises:
             KeyError: If ``job_type`` is not a message job.
@@ -483,6 +487,7 @@ class MessageComposer:
             f"{manage_url}/join"
             if manage_url
             and group.video_enabled
+            and video
             and not on_hold
             and not kind.rebook
             and kind.link is ManageLink.MANAGE

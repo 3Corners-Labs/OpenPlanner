@@ -92,6 +92,10 @@ class ReadinessReason(StrEnum):
     CONTACT_CENTER_NOT_READY = "contact_center_not_ready"
     """The flow dispatches to the contact center, which waits for the go-live items G13 to G15
     (``CONTACT_CENTER_FLOWS_READY``, product owner 2026-11-14)."""
+    VIDEO_HOST_MISSING = "video_host_missing"
+    """A new video flow, but its service has no video host (``Group.video_enabled``): no meeting
+    could be made for its bookings and the participant could never become ready by joining
+    (media presence, ADR 0121 row 36)."""
     OWN_QUEUE_MISSING = "own_queue_missing"
     """The flow dispatches to the own queue, but its service has none (``Group.has_own_queue``):
     nobody could claim its work and the watchdog would expire it (product owner, 2026-11-15)."""
@@ -219,12 +223,13 @@ def _carrier_reason(
 
 
 def _dispatch_reason(
-    revision: FlowRevision, carrier: ContactCenterCapabilities | None
+    revision: FlowRevision, carrier: ContactCenterCapabilities | None, video_host: bool
 ) -> ReadinessReason | None:
     """Return why the dispatch check fails, if it does.
 
     What the administrator can fix comes before what follows in a later version: a contact
-    center that cannot take the work is named before ``not_built_yet``.
+    center that cannot take the work, or a video flow on a service without a video host
+    (``video_host``, ADR 0121 row 36), is named before ``not_built_yet``.
     """
     kind = revision.interaction_kind
     if kind is None:
@@ -236,6 +241,8 @@ def _dispatch_reason(
         return ReadinessReason.ACTION_NOT_ALLOWED
     if (reason := _carrier_reason(revision, kind, carrier)) is not None:
         return reason
+    if not revision.legacy and kind is InteractionKind.VIDEO and not video_host:
+        return ReadinessReason.VIDEO_HOST_MISSING
     if not revision.legacy and (
         kind not in flows.BUILT_KINDS
         or revision.dispatch not in flows.BUILT_DISPATCH
@@ -319,6 +326,7 @@ def readiness(
     coded_skills: Collection[int] = (),
     carrier: ContactCenterCapabilities | None = None,
     own_queue: bool,
+    video_host: bool,
 ) -> tuple[ReadinessItem, ...]:
     """Return the seven checklist items, in order, for activating ``revision``.
 
@@ -328,9 +336,10 @@ def readiness(
     the service's complete contact-center routing carries (``capabilities_of``; ``None``
     without one; only a non-legacy contact-center revision reads it, ADR 0121 step 6),
     ``own_queue`` whether the service has an own queue (``Group.has_own_queue``; only a
-    non-legacy own-queue revision reads it, once the rollback gate is open). It has no default,
-    so no caller can forget it. Values outside the ``BUILT_*`` constants fail for a non-legacy
-    revision.
+    non-legacy own-queue revision reads it, once the rollback gate is open), ``video_host``
+    whether the service has a video host (``Group.video_enabled``; only a non-legacy video
+    revision reads it, ADR 0121 row 36). Neither has a default, so no caller can forget them.
+    Values outside the ``BUILT_*`` constants fail for a non-legacy revision.
     """
     return (
         _item(ReadinessCheck.DATA, _data_reason(revision)),
@@ -339,7 +348,7 @@ def readiness(
             ReadinessCheck.SKILLS,
             _skills_reason(revision, pool, offered_subjects, coded_skills, carrier),
         ),
-        _item(ReadinessCheck.DISPATCH, _dispatch_reason(revision, carrier)),
+        _item(ReadinessCheck.DISPATCH, _dispatch_reason(revision, carrier, video_host)),
         _item(ReadinessCheck.COMPLETION, _completion_reason(revision)),
         _item(ReadinessCheck.RETENTION, _retention_reason(revision)),
         _item(ReadinessCheck.ROLLBACK, _rollback_reason(revision, own_queue)),

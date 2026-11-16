@@ -261,7 +261,9 @@ def test_immediate_work_is_not_sent_to_the_contact_center() -> None:
             handling_action=HandlingAction.VIEW_REQUEST,
             **changes,
         )
-        items = readiness(made, pool(), offered_subjects=(), own_queue=True, carrier=carrier)
+        items = readiness(
+            made, pool(), offered_subjects=(), own_queue=True, carrier=carrier, video_host=True
+        )
         return next(i for i in items if i.code is ReadinessCheck.DISPATCH).reason
 
     assert dispatch(intake_modes=both, dispatch=DispatchKind.CONTACT_CENTER) is (

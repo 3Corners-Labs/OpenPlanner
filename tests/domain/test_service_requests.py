@@ -506,8 +506,8 @@ def test_the_booking_phase_of_each_status() -> None:
         assert booking_phase(ended) is BookingPhase.ENDED
 
 
-def test_only_a_flow_without_video_that_is_not_legacy_is_request_work() -> None:
+def test_every_flow_that_is_not_legacy_is_request_work() -> None:
     assert is_request_work(revision(interaction_kind=InteractionKind.NONE))
-    assert not is_request_work(revision(interaction_kind=InteractionKind.VIDEO))
+    assert is_request_work(revision(interaction_kind=InteractionKind.VIDEO))  # row 36
     assert not is_request_work(legacy())
     assert not is_request_work(None)

@@ -44,8 +44,8 @@ from app.domain.service_flows import (
     COMBINATIONS,
     FlowRevision,
     IntakeMode,
-    InteractionKind,
     ReadinessPolicy,
+    has_video,
 )
 
 
@@ -644,16 +644,23 @@ def booking_phase(status: BookingStatus | None) -> BookingPhase:
 
 
 def is_request_work(revision: FlowRevision | None) -> bool:
-    """Return whether bookings of ``revision`` are request work: not legacy and without video.
+    """Return whether bookings of ``revision`` are request work: a flow that is not legacy.
 
     The one rule of the queue (``RequestWork.handles``) and of the watchdog's unclaimed
-    bookings, so a video flow never gets a request (or a false ``expired`` one).
+    bookings. A video flow is request work since ADR 0121 row 36: claimed, started and completed
+    like any other, with the booking's meeting beside it (``without_video`` tells them apart).
+    A legacy flow keeps the queue it always had.
     """
-    return (
-        revision is not None
-        and not revision.legacy
-        and revision.interaction_kind is not InteractionKind.VIDEO
-    )
+    return revision is not None and not revision.legacy
+
+
+def without_video(revision: FlowRevision | None) -> bool:
+    """Return whether bookings of ``revision`` are request work without a video call (A19).
+
+    Such work has no meeting, no join link and no video state in the queue; request work of a
+    video flow shows them as a legacy booking does.
+    """
+    return is_request_work(revision) and revision is not None and not has_video(revision, True)
 
 
 def needs_check_in(revision: FlowRevision | None) -> bool:

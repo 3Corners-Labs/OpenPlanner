@@ -40,6 +40,7 @@ from app.domain.service_requests import (
     needs_check_in,
     release,
     start,
+    without_video,
 )
 from app.domain.tunable import value_for
 from app.domain.usage_recording import record_late_completion
@@ -80,10 +81,11 @@ class RequestWork:
         return slot if slot is not None and slot.capacity_pool_id is not None else None
 
     async def handles(self, tx: Transaction, booking: Booking) -> bool:
-        """Return whether ``booking`` is request work: a flow without video on a counted pool.
+        """Return whether ``booking`` is request work: a new flow on a counted pool.
 
-        Every other booking (no flow, a legacy flow, a service's own slot, a video flow) is the
-        queue's work as before: no request, a meeting link, no start or complete.
+        Every other booking (no flow, a legacy flow, a service's own slot) is the queue's work as
+        before: no request, a meeting link, no start or complete. Request work of a video flow
+        has its meeting link as well (ADR 0121 row 36).
         """
         return await WorkJudge(tx).handles(booking)
 
@@ -296,6 +298,12 @@ class WorkJudge:
         if not self._pooled[booking.slot_id]:
             return False
         return is_request_work(await self._revision(booking.flow))
+
+    async def without_video(self, booking: Booking) -> bool:
+        """Return whether ``booking`` is request work without a video call (``without_video``)."""
+        return await self.handles(booking) and without_video(
+            await self._revision(cast(FlowRef, booking.flow))
+        )
 
     async def needs_check_in(self, booking: Booking) -> bool:
         """Return whether ``booking`` is claimed only after a check-in (``needs_check_in``)."""

@@ -11,14 +11,17 @@ from app.domain.authorization import Permission
 from app.domain.booking import BookingStatus, MeetingRef
 from app.domain.call_retry import CallRetryService
 from app.domain.errors import DomainError
+from app.domain.flow_resolution import FlowRef
 from app.domain.job_plan import JobType, PlannedJob
 from app.domain.scheduling import ScheduleRule
+from app.domain.service_flows import InteractionKind
 from app.domain.services import BookingService
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
 from tests.support.admin import AUDITOR, GROUP_ADMIN, OTHER_TEAM, OUTSIDER, two_organisations
 from tests.support.call_jobs import WIRED
 from tests.support.domain import NOW, TEST_TOKEN_KEY, book, window
+from tests.support.service_flows import revision
 
 
 async def _setup(alert_per_hour: int = 50) -> tuple[InMemoryUnitOfWork, CallRetryService, int]:
@@ -125,3 +128,13 @@ async def test_a_purged_booking_is_never_given_a_new_meeting() -> None:
     with pytest.raises(DomainError, match="nothing_to_retry"):
         await service.retry(GROUP_ADMIN, "demo", booking_id, JobType.DISPATCH_CONTACT_CENTER_TASK)
     assert uow.state.jobs[booking_id] == []
+
+
+async def test_a_booking_of_a_flow_without_video_has_no_meeting_to_retry() -> None:
+    """ADR 0121 row 36: only a video call misses its meeting."""
+    uow, service, booking_id = await _setup()
+    uow.state.flow_revisions[(60, 1)] = revision(flow_id=60, interaction_kind=InteractionKind.NONE)
+    uow.state.bookings[booking_id] = replace(uow.state.bookings[booking_id], flow=FlowRef(60, 1))
+
+    with pytest.raises(DomainError):
+        await service.retry(GROUP_ADMIN, "demo", booking_id, JobType.CREATE_VIDEO_ROOM)

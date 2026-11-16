@@ -168,6 +168,7 @@ def test_an_option_becomes_available_when_its_built_constant_holds_it_and_for_no
     monkeypatch: pytest.MonkeyPatch, constant: str, member: StrEnum, show: Any
 ) -> None:
     locale = nl_locale()
+    monkeypatch.setattr(flows, constant, frozenset(getattr(flows, constant)) - {member})
     before = {o.value: o.disabled for o in show(locale)}
 
     assert before[member.value] is True
@@ -178,12 +179,13 @@ def test_an_option_becomes_available_when_its_built_constant_holds_it_and_for_no
     assert available(show(locale), member.value)
 
 
-def test_video_is_marked_to_follow_like_every_other_unbuilt_option() -> None:
+def test_video_is_offered_like_every_other_built_kind() -> None:
+    """ADR 0121 row 36: every interaction kind is built."""
     kinds = {k.value: k for k in views.kind_views(empty_draft(), locale_of("en"))}
 
-    assert kinds["video"].disabled is True
-    assert kinds["video"].label == "Video call (to follow)"
-    assert kinds["telephone"].disabled is False
+    assert kinds["video"].disabled is False
+    assert kinds["video"].label == "Video call"
+    assert all(not kind.disabled for kind in kinds.values())
 
 
 def test_the_read_out_shows_one_action_never_the_list_of_the_allowed_ones() -> None:

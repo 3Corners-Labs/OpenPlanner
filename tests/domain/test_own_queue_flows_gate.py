@@ -35,7 +35,9 @@ CARRIER = ContactCenterCapabilities(frozenset({InteractionKind.TELEPHONE}), skil
 
 def rollback_reason(rev: FlowRevision, *, own_queue: bool) -> ReadinessReason | None:
     """Return the reason of the rollback point of ``rev``'s checklist."""
-    items = readiness(rev, pool(), offered_subjects=(), carrier=CARRIER, own_queue=own_queue)
+    items = readiness(
+        rev, pool(), offered_subjects=(), carrier=CARRIER, own_queue=own_queue, video_host=True
+    )
     return next(i for i in items if i.code is ReadinessCheck.ROLLBACK).reason
 
 
@@ -43,7 +45,7 @@ def test_an_open_gate_refuses_an_own_queue_flow_on_a_service_without_one(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     open_gate(monkeypatch)
-    items = readiness(revision(), pool(), offered_subjects=(), own_queue=False)
+    items = readiness(revision(), pool(), offered_subjects=(), own_queue=False, video_host=True)
 
     assert not can_activate(items)
     assert rollback_reason(revision(), own_queue=False) is ReadinessReason.OWN_QUEUE_MISSING
@@ -54,7 +56,7 @@ def test_the_administrator_can_fix_it_so_the_checklist_is_incomplete(
 ) -> None:
     """Not a part that follows: choosing the own queue for the service fixes it."""
     open_gate(monkeypatch)
-    items = readiness(revision(), pool(), offered_subjects=(), own_queue=False)
+    items = readiness(revision(), pool(), offered_subjects=(), own_queue=False, video_host=True)
 
     assert ReadinessReason.OWN_QUEUE_MISSING not in FOLLOWING
     assert readiness_state(items) is ReadinessState.INCOMPLETE
@@ -66,14 +68,18 @@ def test_an_own_queue_flow_on_a_service_with_one_is_allowed(
 ) -> None:
     open_gate(monkeypatch)
     assert rollback_reason(revision(), own_queue=True) is None
-    assert can_activate(readiness(revision(), pool(), offered_subjects=(), own_queue=True))
+    assert can_activate(
+        readiness(revision(), pool(), offered_subjects=(), own_queue=True, video_host=True)
+    )
 
 
 def test_a_shut_gate_names_only_rollback_not_safe(monkeypatch: pytest.MonkeyPatch) -> None:
     """The gate-shut behaviour is unchanged: the rollback gate is named, and only it."""
     shut_gate(monkeypatch)
     for own_queue in (False, True):
-        items = readiness(revision(), pool(), offered_subjects=(), own_queue=own_queue)
+        items = readiness(
+            revision(), pool(), offered_subjects=(), own_queue=own_queue, video_host=True
+        )
         assert [i.reason for i in items if not i.ok] == [ReadinessReason.ROLLBACK_NOT_SAFE]
         assert readiness_state(items) is ReadinessState.COMPLETE_EXCEPT_FOLLOWING
 

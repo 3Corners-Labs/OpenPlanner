@@ -37,6 +37,7 @@ from app.adapters.db.jobs import ClaimedJob
 from app.domain import booking_changes
 from app.domain.audit import Outcome
 from app.domain.booking import Booking
+from app.domain.booking_video import flow_has_video
 from app.domain.call_client import UsesCallPage
 from app.domain.call_service import CallService
 from app.domain.change_request_service import request_still_open
@@ -376,6 +377,7 @@ class JobRunner:
                 if group and job.type in TEAM_INVITES
                 else None
             )
+            video = booking is None or await flow_has_video(tx, booking)
         step = self._step(job, "load", step)
         contact = booking.contact if booking else None
         if (
@@ -418,6 +420,7 @@ class JobRunner:
                     proposal=proposal,
                     change=change,
                     show_code=self._takes_change_requests(group.organisation_id),
+                    video=video,
                 )
         step = self._step(job, "compose", step)
         await sender.send(message)
