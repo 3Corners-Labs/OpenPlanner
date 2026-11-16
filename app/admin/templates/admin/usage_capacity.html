@@ -1,6 +1,7 @@
 {% extends "admin/usage_base.html" %}
 {% from "admin/_usage_tables.html" import cell, count_table, figure, nothing_yet, tiles with context %}
 {% from "admin/_report_chart.html" import report_chart with context %}
+{% macro unit_hours(minutes) -%}{{ (minutes / 60) | round(1) }}{%- endmacro %}
 {% block report %}
 {% if report.empty %}
 {{ nothing_yet() }}
@@ -59,5 +60,38 @@
   <p class="muted">{{ _("reports.capacity.heat.rule", n=5 * report.threshold) }}</p>
 </section>
 {{ count_table("shortfall", _("reports.capacity.shortfall.title"), _("reports.capacity.shortfall.state"), report.shortfall, "shortfall", report.threshold, _("reports.total")) }}
+{% endif %}
+{% if pools %}
+<section class="card" aria-labelledby="pools-heading">
+  <h2 id="pools-heading">{{ _("reports.capacity.pools.title") }}</h2>
+  <p>{{ _("reports.capacity.pools.intro") }}</p>
+  <div class="table-scroll" role="region" aria-labelledby="pools-heading" tabindex="0">
+  <table class="data-table">
+    <caption class="visually-hidden">{{ _("reports.capacity.pools.title") }}</caption>
+    <thead><tr>
+      <th scope="col">{{ _("reports.capacity.pools.pool") }}</th>
+      <th scope="col">{{ _("reports.capacity.pools.staffed") }}</th>
+      <th scope="col">{{ _("reports.capacity.pools.appointments") }}</th>
+      <th scope="col">{{ _("reports.capacity.pools.utilisation") }}</th>
+      <th scope="col">{{ _("reports.capacity.pools.idle") }}</th>
+      {% for code in ("empty", "under_half", "under_full", "full") %}<th scope="col">{{ label("fill", code) }}</th>{% endfor %}
+    </tr></thead>
+    <tbody>
+      {% for row in pools.pools %}
+      <tr>
+        <th scope="row">{{ row.name }}{% if row.archived %} <span class="muted">{{ _("reports.capacity.pools.archived") }}</span>{% endif %}</th>
+        <td>{{ unit_hours(row.staffed_minutes) }}</td>
+        <td>{{ cell(row.appointments, pools.threshold) }}</td>
+        <td>{{ figure(row.utilisation_percent, "%") }}</td>
+        <td>{% if row.idle_minutes is none %}{{ figure(none) }}{% else %}{{ unit_hours(row.idle_minutes) }}{% endif %}</td>
+        {% for fill in row.fill.rows %}<td>{{ cell(fill.count, pools.threshold) }}</td>{% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if pools.first_day != report.first_day %}<p class="muted">{{ _("reports.capacity.pools.reach", day=pools.first_day.isoformat()) }}</p>{% endif %}
+  <p class="muted">{{ _("reports.capacity.pools.rule", n=pools.threshold) }}</p>
+</section>
 {% endif %}
 {% endblock %}

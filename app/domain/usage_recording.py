@@ -24,10 +24,11 @@ call after the slot has ended (ADR 0117 step 3).
 from datetime import datetime, timedelta
 
 from app.domain import booking_facts
-from app.domain.booking import Booking, ChangeReason
+from app.domain.booking import Booking, ChangeReason, Slot
 from app.domain.booking_facts import BookingFacts
 from app.domain.ports import Transaction
 from app.domain.scheduling import Group
+from app.domain.slot_close import late_completion
 from app.domain.usage import ActorClass, FactKind
 
 
@@ -157,3 +158,17 @@ async def record_queue_released(
 ) -> None:
     """Record a claimed booking put back in the queue (metric Q7)."""
     await tx.record_usage(booking_facts.queue_released(facts_of_booking(booking, group), now))
+
+
+async def record_late_completion(
+    tx: Transaction, booking: Booking, group: Group, slot: Slot
+) -> None:
+    """Record the outcome of a pool booking completed after its slot was closed (metric U2).
+
+    Nothing is written while the closing has not reached the slot: it writes the outcome itself.
+    """
+    fact = late_completion(
+        facts_of_booking(booking, group), slot.start, slot.end, await tx.slots_closed_until()
+    )
+    if fact is not None:
+        await tx.record_usage(fact)

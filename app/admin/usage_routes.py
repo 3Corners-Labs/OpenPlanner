@@ -52,6 +52,7 @@ from app.domain.report_digest import MAX_MONTH_DAY, DigestPeriod
 from app.domain.report_digest_service import DigestAdmin
 from app.domain.usage_export_service import TIDY, UsageExportService, UsageFile
 from app.domain.usage_report import SPLITS, RangedReport
+from app.domain.usage_report_pool_service import PoolUsageService
 from app.domain.usage_report_service import UsageReportService, UsageScreen
 from app.web.security_policy import PageKind
 from app.web.usage_charts import capacity_charts, channels_charts, queue_charts, volume_charts
@@ -100,6 +101,12 @@ ExportGroup = Annotated[
 def report_service(request: Request) -> UsageReportService:
     """Return the application's usage report service."""
     service: UsageReportService = request.app.state.usage_report_service
+    return service
+
+
+def pool_service(request: Request) -> PoolUsageService:
+    """Return the application's pool utilisation service."""
+    service: PoolUsageService = request.app.state.pool_usage_service
     return service
 
 
@@ -266,6 +273,11 @@ async def _report(
         result = await service.capacity(principal, **scope)
         extra["charts"] = capacity_charts(result.report, _, drill)
         extra["tiles_"] = capacity_tiles(result.report, _)
+        extra["pools"] = None  # a pool serves several services: the organisation's page only
+        if organisation is not None:
+            extra["pools"] = await pool_service(request).report(
+                principal, organisation, result.report.first_day, result.report.last_day
+            )
     elif view == "channels":
         result = await service.channels(principal, **scope)
         extra["charts"] = channels_charts(result.report, _)

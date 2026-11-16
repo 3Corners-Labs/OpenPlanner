@@ -163,9 +163,33 @@ An appointment of a flow on a counted pool (ADR 0122) has no meeting to observe:
 the operator's explicit *Complete* (`completed`), or `no_show` where the booking was marked so;
 work that expired unstarted has no outcome. It counts as not picked up when, at closing, nobody
 had claimed it or started it. Its places belong to a pool that several services share, so it adds
-nothing to utilisation, fill or idle capacity (C1 to C3) and no shortfall (C5): a pool's shortage
-is on the pool's own page. Work completed more than two hours after the appointment's end (work
-in recovery, among others) is closed without its outcome.
+nothing to the service's utilisation, fill or idle capacity (C1 to C3) and no shortfall (C5): the
+pool's own utilisation is read per pool (below), and its shortage is on the pool's own page. Work
+that is still running when the slot is closed, work in recovery among it, is closed without an
+outcome; when it is completed afterwards its outcome (`completed`) is written at that moment, in
+the hour of the slot, so outcomes (U2, U3) count it all the same.
+
+## Utilisation of a counted pool
+
+A counted pool (ADR 0122) has no capacity snapshot: its supply is its live staffing and several
+services draw on it. The *Capacity* screen of the organisation therefore reads C1 to C3 per pool,
+from the pool's own staffing instead of from `slot.closed` facts, with a *unit-hour* (one person
+for one hour) in place of a slot:
+
+| Metric | Per pool |
+|---|---|
+| C1 | booked unit-time over staffed unit-time in the hours that count, in whole percent |
+| C2 | pool-hours by fill: empty, under half, under full, full |
+| C3 | staffed unit-time nobody booked |
+
+Staffed is what the pool's blocks and exceptions staff for appointments (blocks for work without
+appointment add nothing; holidays close the day). Booked is the time confirmed, completed and no
+show appointments hold a unit, wrap-up included; an hour never holds more than it is staffed for,
+so a shortage reads as a full hour. Only hours that ended more than two hours ago count, and only
+hours the pool is staffed for appointments. The staffing is today's and the appointments are those
+the rows still hold (`booking_row_retention_days`): the range starts no earlier than that. A pool
+with fewer appointments than the small-cell threshold shows its staffing only. Only a reader of
+the whole organisation sees the pools; they are not exported.
 
 ## Duration buckets
 

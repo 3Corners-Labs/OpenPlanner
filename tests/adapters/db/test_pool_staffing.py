@@ -17,32 +17,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db.models import CapacityPoolRow
 from app.domain.authorization import Scope
-from app.domain.booking import Booking, BookingKind, BookingStatus, Slot
+from app.domain.booking import BookingStatus, Slot
 from app.domain.capacity import CapacityPool, PoolMode
 from app.domain.errors import ErrorCode
 from app.domain.pool_accounting import Commitment
 from app.domain.reschedule_proposal import HeldProposal, ProposalOutcome
 from app.domain.scheduling import Offer, ScheduleOverride, ScheduleRule, TimeWindow
-from tests.support.closures import confirmed_booking
 from tests.support.domain import SLOT_0900
 from tests.support.flow_world import EVERYTHING, World, add_pool, refused
+from tests.support.pool_slots import AMSTERDAM, block, book_on, pool_slot, staffed_pool
 
-AMSTERDAM = "Europe/Amsterdam"
 BETA = Scope(organisations=frozenset({"beta"}))
 OTHER_DAY = date(2026, 3, 2)
-
-
-def block(opens: int = 9, closes: int = 12, units: int = 2, offer: Offer = Offer.SCHEDULED) -> Any:
-    """Return a Monday block ``opens`` to ``closes`` o'clock with ``units`` people."""
-    return ScheduleRule(0, TimeWindow(time(opens), time(closes), units, "Balie", offer))
-
-
-async def staffed_pool(world: World, name: str = "Loket") -> CapacityPool:
-    """Store a counted pool of Acme with a time zone."""
-    pool = await add_pool(world, name)
-    async with world.uow.locked() as tx:
-        assert await tx.set_pool_timezone(EVERYTHING, pool.id, AMSTERDAM)
-    return pool
 
 
 async def staffing(world: World, pool: CapacityPool, from_day: date | None = None) -> Any:
@@ -188,39 +174,6 @@ async def test_a_legacy_pool_has_no_staffing(world: World) -> None:
         )
 
     assert await staffing(world, legacy) is None
-
-
-def pool_slot(world: World, pool: CapacityPool, minutes: int = 30, buffer: int = 5) -> Slot:
-    """Return a pool slot of Acme's group at Monday 09:00 CET: ``minutes`` plus a wrap-up."""
-    end = SLOT_0900 + timedelta(minutes=minutes)
-    return Slot(
-        None,
-        world.acme_group,
-        SLOT_0900,
-        end,
-        2,
-        BookingKind.SCHEDULED,
-        pool.id,
-        end + timedelta(minutes=buffer),
-    )
-
-
-async def book_on(world: World, slot: Slot, number: int, **changes: Any) -> Booking:
-    """Store a booking in ``slot`` with its own token hash and reference."""
-    booking = confirmed_booking(
-        **{
-            "id": None,
-            "group_id": slot.group_id,
-            "slot_id": slot.id,
-            "start": slot.start,
-            "end": slot.end,
-            "token_hash": f"{number:064d}",
-            "public_ref": f"ref{number:020d}",
-            **changes,
-        }
-    )
-    async with world.uow.locked() as tx:
-        return await tx.add_booking(booking)
 
 
 async def test_a_pool_slot_keeps_its_pool_and_its_occupied_end(world: World) -> None:

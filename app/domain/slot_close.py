@@ -21,9 +21,11 @@ outcome is therefore *derived from the call*, and only where the call was observ
     direct, guest seen and host joined         ``completed``; any other direct call: no outcome
 
 A slot of a counted pool (ADR 0122) is closed too, with its own rule: its outcome is the
-operator's explicit evidence (A27), never an observation of a meeting. Its capacity belongs to a
-pool that several services share, not to the service, so it writes no ``slot.closed`` and no
-``slot.shortfall`` (a pool's shortage is listed on the pool's own page):
+operator's explicit evidence (A27), never an observation of a meeting. Work completed after the
+slot was closed is written at its completion (``late_completion``), not at the closing. Its
+capacity belongs to a pool that several services share, not to the service, so it writes no
+``slot.closed`` and no ``slot.shortfall``; the pool's utilisation is read from its own staffing
+(``usage_report_pools``) and its shortage is listed on the pool's own page:
 
     pool booking completed by an operator        ``completed``
     pool booking marked as a no show             ``no_show``
@@ -81,9 +83,11 @@ An appointment of a flow on a counted pool (ADR 0122) has no meeting to observe:
 the operator's explicit *Complete* (`completed`), or `no_show` where the booking was marked so;
 work that expired unstarted has no outcome. It counts as not picked up when, at closing, nobody
 had claimed it or started it. Its places belong to a pool that several services share, so it adds
-nothing to utilisation, fill or idle capacity (C1 to C3) and no shortfall (C5): a pool's shortage
-is on the pool's own page. Work completed more than two hours after the appointment's end (work
-in recovery, among others) is closed without its outcome.
+nothing to the service's utilisation, fill or idle capacity (C1 to C3) and no shortfall (C5): the
+pool's own utilisation is read per pool (below), and its shortage is on the pool's own page. Work
+that is still running when the slot is closed, work in recovery among it, is closed without an
+outcome; when it is completed afterwards its outcome (`completed`) is written at that moment, in
+the hour of the slot, so outcomes (U2, U3) count it all the same.
 """
 """The rule of ``outcome_of`` in words, as published in ``docs/reporting.md``."""
 
@@ -254,6 +258,34 @@ def pool_not_picked_up(booking: ClosedBooking) -> bool:
     """
     picked_up = booking.claimed or booking.work_started
     return booking.status is BookingStatus.CONFIRMED and not picked_up
+
+
+def late_completion(
+    facts: BookingFacts, slot_start: datetime, slot_end: datetime, closed_until: datetime | None
+) -> UsageFact | None:
+    """Return the ``booking.outcome`` of a pool booking completed after its slot was closed.
+
+    The closing writes an outcome only from the status it finds. Work that was still running
+    then (or in recovery) is completed later, so its outcome is written at that moment, keyed on
+    the slot's start like every outcome of the slot (metric U2). ``None`` while the slot is not
+    closed yet: the closing will find the completed status and write it itself, once.
+
+    Args:
+        facts: The booking as the fact builders need it.
+        slot_start: The slot's start, the instant the fact is keyed on.
+        slot_end: The slot's end.
+        closed_until: The end of the last slot the closing has handled, ``None`` before the
+            first pass.
+    """
+    if closed_until is None or slot_end > closed_until:
+        return None
+    return keyed(
+        FactKind.BOOKING_OUTCOME,
+        facts,
+        slot_start,
+        actor_class=ActorClass.SYSTEM,
+        outcome=UsageOutcome.COMPLETED,
+    )
 
 
 def not_picked_up(booking: ClosedBooking, dispatch: DispatchKind, limit: timedelta) -> bool:
