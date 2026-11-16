@@ -370,7 +370,7 @@ async def test_storing_a_task_clears_the_attempt_and_clearing_it_leaves_the_task
         booking = await tx.get_booking(booking_id)
 
     assert booking is not None
-    assert booking.attempted_task_kind is TaskKind.FORM  # NULL is a form
+    assert booking.attempted_task_kind is None  # no create pending
     assert booking.contact_center_task == ContactCenterTaskRef(
         "task-2", WEBEX_CC, TaskKind.CONVERSATION
     )

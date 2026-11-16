@@ -109,6 +109,21 @@ async def test_transient_failures_are_retried(setup: Setup) -> None:
     assert queue.failed == []
 
 
+async def test_an_unknown_outcome_of_a_create_is_skipped_never_retried(setup: Setup) -> None:
+    """ADR 0123 point 8: the platform may have made the task; a retry would offer it twice."""
+    bid = await setup.booking()
+    await setup.runner(FakeQueue([job(bid, JobType.CREATE_VIDEO_ROOM)])).run_due()
+    setup.dispatcher.error = IntegrationError("server_error", retryable=True, ambiguous=True)
+    queue = FakeQueue([job(bid, JobType.DISPATCH_CONTACT_CENTER_TASK)])
+
+    await setup.runner(queue).run_due()
+    setup.dispatcher.error = None
+    await setup.runner(FakeQueue([job(bid, JobType.DISPATCH_CONTACT_CENTER_TASK)])).run_due()
+
+    assert (queue.retried, queue.failed, setup.dispatcher.items) == ([], [], [])
+    assert _skips(setup) == [("job.dispatch_wxcc_task", "outcome_unknown")] * 2
+
+
 async def test_final_failure_is_recorded(setup: Setup) -> None:
     bid = await setup.booking()
     setup.video.error = IntegrationError("server_error", retryable=True)

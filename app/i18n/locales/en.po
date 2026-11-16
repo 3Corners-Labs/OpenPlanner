@@ -9837,6 +9837,12 @@ msgstr "A log destination no longer accepts lines."
 msgid "admin.alerts.text.retention"
 msgstr "Not all personal data past its retention period could be deleted."
 
+msgid "admin.alerts.source.held_twice"
+msgstr "Contact center: held twice"
+
+msgid "admin.alerts.text.held_twice"
+msgstr "A contact-center task is still live for work the own queue holds too. One side must keep it."
+
 msgid "admin.alerts.text.other"
 msgstr "A problem was reported ({code})."
 

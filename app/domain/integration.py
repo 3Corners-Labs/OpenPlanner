@@ -31,7 +31,7 @@ from app.domain.calls import (
     apply_event,
     new_status,
 )
-from app.domain.contact_center import ContactCenterKind
+from app.domain.contact_center import ContactCenterKind, TaskKind
 from app.domain.job_plan import JobSummary
 from app.domain.lookups import group_booking
 from app.domain.ports import REASON_LIMIT, Clock, ProbeRegistry, Transaction, UnitOfWork
@@ -59,6 +59,7 @@ class TaskWork(Protocol):
         provider: ContactCenterKind,
         at: datetime,
         organisation_id: int | None = None,
+        task_kind: TaskKind | None = None,
     ) -> Booking | None:
         """Match an unknown task to an attempt by its origin; ``None`` when it is not ours."""
         ...
@@ -218,6 +219,7 @@ class IntegrationService:
         scope: str,
         body_identity: str,
         origin: str = "",
+        task_kind: TaskKind | None = None,
         provider: ContactCenterKind,
         source: str,
         organisation_id: int | None = None,
@@ -237,14 +239,17 @@ class IntegrationService:
 
         With request work (ADR 0121 step 6b) the event also moves the booking's contact-center
         attempt, and an unknown task whose ``origin`` names an attempt in doubt or a fenced one
-        is matched to it (adopted, or ended at the platform).
+        is matched to it (adopted, or ended at the platform); ``task_kind`` is the task's kind as
+        the event names it, and a task of the other kind is never adopted (ADR 0123 point 8).
         """
         recorded: int | None = None
         requeued = False
         async with self._uow.locked() as tx:
             booking = await tx.get_booking_by_task(task_id, provider)
             if booking is None and self._work is not None and origin:
-                booking = await self._work.adopt(tx, origin, task_id, provider, at, organisation_id)
+                booking = await self._work.adopt(
+                    tx, origin, task_id, provider, at, organisation_id, task_kind
+                )
             if booking is not None and organisation_id is not None:
                 group = await tx.get_group_by_id(booking.group_id)
                 if group is None or group.organisation_id != organisation_id:

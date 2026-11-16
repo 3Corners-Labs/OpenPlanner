@@ -704,7 +704,11 @@ Verification (before reading anything else):
 2. `X-WebExCC-Timestamp` equals the body's `comciscotimestamp`.
 3. |now − timestamp| ≤ 300 s.
 
-Correlation is on `data.taskId`. A booking's `task:new` is acknowledged and ignored (the
+Correlation is on `data.taskId`. A task OpenPlanner does not know is matched by its `origin`
+(a booking reference) only to a booking without a task whose create had an unknown outcome, and
+only when `data.channelType` (`workItem` or `customMessaging`, read as the task's kind; anything
+else counts as not given) is the kind that create was tried as: one task, of one kind, per
+appointment (ADR 0123 point 8). A booking's `task:new` is acknowledged and ignored (the
 dispatch job recorded the creation); the `task:new` and `task:ended` of the group check's probe
 work item are noted for the check (`integration_reports`, row `wxcc_probe`) and never touch a
 booking. `task:connected` carries no agent identity, which is why the

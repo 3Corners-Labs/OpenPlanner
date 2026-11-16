@@ -12,6 +12,8 @@ from dataclasses import replace
 from datetime import datetime
 
 from app.domain.booking import BookingStatus
+from app.domain.calls import TaskState
+from app.domain.contact_center_attempts import held_twice
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.pool_accounting import Commitment
 from app.domain.service_requests import (
@@ -97,6 +99,19 @@ class ServiceRequestStore(PoolStaffingStore):
             and (r.personal_data is PersonalDataState.PRESENT or key in named)
             and (group_ids is None or r.group_id in group_ids)
         ]
+
+    async def count_contact_moments_held_twice(self) -> int:
+        held = 0
+        for booking_id, booking in self.state.bookings.items():
+            request = next(
+                (r for r in self.state.requests.values() if r.booking_id == booking_id), None
+            )
+            if booking.contact_center_task is None or request is None:
+                continue
+            status = self.state.call_status.get(booking_id)
+            task = status.task if status is not None else TaskState.NONE
+            held += held_twice(task, await self.get_active_work_item(request.id or 0))
+        return held
 
     async def get_active_work_item(self, request_id: int) -> WorkItem | None:
         return next(

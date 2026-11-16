@@ -1983,6 +1983,14 @@ class Transaction(Protocol):
         """Return the request's one active work item, or ``None``."""
         ...
 
+    async def count_contact_moments_held_twice(self) -> int:
+        """Count the bookings held twice (``contact_center_attempts.held_twice``).
+
+        A booking that holds a task the platform has not reported over, while an active work
+        item of its request is in the own queue (ADR 0123 point 8). A count only.
+        """
+        ...
+
     async def work_items_of(self, request_id: int) -> list[WorkItem]:
         """Return every work item of a request, oldest first (ADR 0121 step 6b)."""
         ...

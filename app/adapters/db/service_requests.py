@@ -21,9 +21,11 @@ from sqlalchemy import and_, delete, func, or_, select, true, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import ColumnElement
 
+from app.adapters.db.contact_center_rows import has_any_task
 from app.adapters.db.form_fields import answers_from_json, answers_json
 from app.adapters.db.models import (
     BookingRow,
+    CallStatusRow,
     GroupRow,
     RequestPersonalDataRow,
     ServiceRequestRow,
@@ -31,6 +33,7 @@ from app.adapters.db.models import (
     WorkItemRow,
 )
 from app.domain.booking import BookingStatus
+from app.domain.contact_center_attempts import TASK_OVER
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.flow_resolution import FlowRef
 from app.domain.pool_accounting import Commitment, CommitmentKey
@@ -57,6 +60,9 @@ _WAITING = sorted(state.value for state in (HandlingState.QUEUED, HandlingState.
 """The handling states of the line ``max_waiting`` bounds (ADR 0121 step 7)."""
 
 _TERMINAL = sorted(state.value for state in TERMINAL)
+
+_TASK_OVER = sorted(state.value for state in TASK_OVER)
+"""The stored call states of a task the platform reported over (``held_twice``)."""
 
 _WATCHED = sorted(
     state.value
@@ -265,6 +271,28 @@ class ServiceRequestQueries:
             .order_by(ServiceRequestRow.id)
         )
         return [request_of(row) for row in found]
+
+    async def count_contact_moments_held_twice(self) -> int:
+        """Count bookings with a live task whose request the own queue holds (``held_twice``)."""
+        own_queue = (
+            select(WorkItemRow.id)
+            .join(ServiceRequestRow, WorkItemRow.request_id == ServiceRequestRow.id)
+            .where(
+                ServiceRequestRow.booking_id == BookingRow.id,
+                WorkItemRow.state.in_(_ACTIVE),
+                WorkItemRow.channel == WorkChannel.OWN_QUEUE.value,
+            )
+            .exists()
+        )
+        over = (
+            select(CallStatusRow.booking_id)
+            .where(CallStatusRow.booking_id == BookingRow.id, CallStatusRow.task.in_(_TASK_OVER))
+            .exists()
+        )
+        found = await self._session.scalar(
+            select(func.count()).select_from(BookingRow).where(has_any_task(), own_queue, ~over)
+        )
+        return found or 0
 
     async def get_active_work_item(self, request_id: int) -> WorkItem | None:
         """Return the request's one active work item, or ``None``."""

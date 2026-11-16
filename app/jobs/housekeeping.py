@@ -404,6 +404,9 @@ class Housekeeping:
             )
         if result.backlog or result.failed:
             log.error("retention.backlog", bookings=result.backlog, failed=result.failed)
+        if result.held_twice:
+            # ADR 0123 point 8: a contact moment offered twice. A count, never a booking.
+            log.error("contact_center.held_twice", bookings=result.held_twice)
 
     async def _checkpoint(self) -> None:
         """Empty the WAL after a sweep that purged, so no older copy of the data stays (WP-A3)."""

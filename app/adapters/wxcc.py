@@ -88,6 +88,22 @@ from app.domain.security_log import SecurityLog
 CONVERSATION_CHANNEL_TYPE = "customMessaging"
 """WxCC's name of a conversation task: the ``channelType`` of Create Task v2 and the
 ``mediaType`` of Task Messages v2."""
+WORK_ITEM_CHANNEL_TYPE = "workItem"
+"""WxCC's name of a work item: the ``channelType`` of Create Task v2."""
+
+
+def task_kind_of(channel_type: object) -> TaskKind | None:
+    """Return the task kind a WxCC event names by its ``channelType``; ``None`` for another.
+
+    ADR 0123 point 8: a late task is attached only when it is of the kind its create was tried
+    as, so the event's own word is read where it is given. Anything else (absent, unknown) is
+    ``None``, and the kind stored with the attempt decides.
+    """
+    return {
+        WORK_ITEM_CHANNEL_TYPE: TaskKind.FORM,
+        CONVERSATION_CHANNEL_TYPE: TaskKind.CONVERSATION,
+    }.get(channel_type if isinstance(channel_type, str) else "")
+
 
 ROUTING_KEY = "openplannerGroup"
 SKILLS_KEY = "openplannerSkills"
@@ -239,7 +255,7 @@ def task_body(item: ContactCenterTask, alias_id: str, timestamp_ms: int) -> dict
     return {
         "origin": {"id": item.reference, "name": item.first_name},
         "destination": {"id": address, "type": "businessAddress"},
-        "channelType": "workItem",
+        "channelType": WORK_ITEM_CHANNEL_TYPE,
         "channel": channel,
         "flowSettings": _flow_settings(item),
         "channelParams": {

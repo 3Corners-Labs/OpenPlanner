@@ -15,6 +15,11 @@ the same way: one past ``data_deletion_at`` plus the grace is deleted and counte
 bookings (overdue, purged, backlog), so the alert covers both. The watchdog round deletes them on
 time; the sweep is the net under it.
 
+The same nightly round checks the rule of ADR 0123 point 8, one task of one kind per contact
+moment: it counts the bookings held twice (a live contact-center task while the own queue holds
+the request, ``contact_center_attempts.held_twice``) and records the count as the system event
+``contact_center.held_twice``. It changes nothing: which side keeps the work is a person's call.
+
 It is idempotent: a purged booking is no candidate any more. A booking under an open-ended
 closure is purged at the maximum after its original slot (``closure_max_retention_days``,
 ADR 0102), the same moment the job plan and the overview use. Before that moment the sweep tells
@@ -54,6 +59,10 @@ _CHANGED = "changed"
 SWEPT = "retention.sweep"
 """The system event written when the sweep found something overdue."""
 
+HELD_TWICE = "contact_center.held_twice"
+"""The system event written when bookings are held by a contact-center task and the own queue
+at once (ADR 0123 point 8): a count, never a booking or a participant."""
+
 CLOSURE_NOTICE = "closure.retention_notice"
 """The system event, at the group, that a closure still holds data until a date (ADR 0102)."""
 
@@ -69,6 +78,8 @@ class SweepResult:
         backlog: Of those, how many were past ``BACKLOG_AGE``: the alert condition.
         per_group: Overdue bookings per group slug.
         notices: Closures the administrators were told about (ADR 0102).
+        held_twice: Bookings held by a live contact-center task and the own queue at once (ADR
+            0123 point 8): the alert condition of the one-task rule.
     """
 
     overdue: int = 0
@@ -77,6 +88,7 @@ class SweepResult:
     backlog: int = 0
     per_group: dict[str, int] = field(default_factory=dict)
     notices: int = 0
+    held_twice: int = 0
 
 
 @dataclass(frozen=True)
@@ -142,6 +154,7 @@ class RetentionSweep:
         self._retention_of = retention_of
         self._events = SystemLog(uow, clock)
         self._announced: set[tuple[int, int, date]] = set()
+        self._held_twice_open = False
 
     async def run(self, *, dry_run: bool = False) -> SweepResult:
         """Purge every overdue booking and record; with ``dry_run`` only count them per group."""
@@ -154,6 +167,7 @@ class RetentionSweep:
                 if is_overdue(d.candidate, now, self._retention_of(d.candidate.organisation_id))
             ]
             records = [r for r in await tx.requests_holding_data() if is_record_overdue(r, now)]
+            held_twice = await tx.count_contact_moments_held_twice()
             per_group: dict[str, int] = {}
             for group_id in [d.candidate.group_id for d in overdue] + [r.group_id for r in records]:
                 group = await tx.get_group_by_id(group_id)
@@ -166,16 +180,17 @@ class RetentionSweep:
         ) + sum(1 for r in records if _record_backlog(r, now))
         total = len(overdue) + len(records)
         if dry_run:
-            return SweepResult(total, 0, 0, backlog, per_group)
+            return SweepResult(total, 0, 0, backlog, per_group, held_twice=held_twice)
         notices = await self._announce(closure_notices(found, now, self._retention_of))
+        await self._report_held_twice(held_twice)
         if not total:
-            return SweepResult(0, 0, 0, backlog, per_group, notices)
+            return SweepResult(0, 0, 0, backlog, per_group, notices, held_twice)
         outcomes = [await self._purge(due) for due in overdue]
         outcomes += [await self._delete_record(r.id or 0) for r in records]
         purged = outcomes.count(_PURGED)
         errors = sorted({o for o in outcomes if o not in (_PURGED, _CHANGED)})
         failed = sum(1 for o in outcomes if o in errors)
-        result = SweepResult(total, purged, failed, backlog, per_group, notices)
+        result = SweepResult(total, purged, failed, backlog, per_group, notices, held_twice)
         await self._events.record(
             SWEPT,
             Outcome.FAILURE if failed else Outcome.SUCCESS,
@@ -183,6 +198,18 @@ class RetentionSweep:
             detail=f"overdue:{result.overdue},purged:{purged},failed:{failed},backlog:{backlog}",
         )
         return result
+
+    async def _report_held_twice(self, held: int) -> None:
+        """Record ``held`` bookings held twice as a failure; a success once none is left.
+
+        The success is written only after a failure this process recorded, so a quiet night
+        writes nothing; it closes the alert of ``HELD_TWICE``.
+        """
+        if held:
+            await self._events.record(HELD_TWICE, Outcome.FAILURE, detail=f"bookings:{held}")
+        elif self._held_twice_open:
+            await self._events.record(HELD_TWICE, Outcome.SUCCESS, detail="bookings:0")
+        self._held_twice_open = bool(held)
 
     async def _announce(self, notices: list[ClosureNotice]) -> int:
         """Tell the group's administrators about each closure once per day; return how many.

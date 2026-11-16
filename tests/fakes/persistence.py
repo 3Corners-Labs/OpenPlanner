@@ -842,14 +842,12 @@ class InMemoryTransaction(ServiceRequestStore):
     async def save_task(self, booking_id: int, task: ContactCenterTaskRef) -> None:
         booking = self.state.bookings[booking_id]
         self.state.bookings[booking_id] = replace(
-            booking, contact_center_task=task, attempted_task_kind=TaskKind.FORM
+            booking, contact_center_task=task, attempted_task_kind=None
         )
 
     async def save_task_attempt(self, booking_id: int, task_kind: TaskKind | None) -> None:
         booking = self.state.bookings[booking_id]
-        self.state.bookings[booking_id] = replace(
-            booking, attempted_task_kind=task_kind or TaskKind.FORM
-        )
+        self.state.bookings[booking_id] = replace(booking, attempted_task_kind=task_kind)
 
     async def get_booking_by_meeting(self, meeting_id: str) -> Booking | None:
         return next(

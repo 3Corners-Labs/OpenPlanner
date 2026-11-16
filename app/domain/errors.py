@@ -94,6 +94,9 @@ class ErrorCode(StrEnum):
     ALREADY_CLAIMED = "already_claimed"
     HELD_BY_CONTACT_CENTER = "held_by_contact_center"
     """ADR 0121 step 28: the contact center holds the request (an active attempt): not ours."""
+    CONTACT_CENTER_TASK_HELD = "contact_center_task_held"
+    """ADR 0123 point 8: the contact moment holds a task, or an earlier create may still make
+    one, so no second task is created (of either kind) until that one is ended or forgotten."""
     FREE_PICK_NOT_ALLOWED = "free_pick_not_allowed"
     NOT_CLAIMED = "not_claimed"
     NOT_ELIGIBLE = "not_eligible"

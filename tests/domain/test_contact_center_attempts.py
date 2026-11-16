@@ -6,12 +6,14 @@ the platform's event and an own-queue flow by the operator.
 """
 
 from dataclasses import replace
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 
 from app.domain import contact_center_attempts as attempts
 from app.domain.booking import BookingStatus
+from app.domain.calls import TaskState
+from app.domain.contact_center import TaskKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.flow_readiness import ReadinessCheck, ReadinessReason, readiness
 from app.domain.service_flows import (
@@ -51,9 +53,23 @@ def queued() -> ServiceRequest:
     return replace(made, id=3)
 
 
+def open_attempt(
+    request: ServiceRequest,
+    active: WorkItem | None,
+    *,
+    holds_task: bool = False,
+    earlier: tuple[WorkItem, ...] = (),
+    now: datetime = NOW,
+) -> tuple[ServiceRequest, WorkItem]:
+    """Open an attempt with the window of ten minutes."""
+    return attempts.open_attempt(
+        request, active, now=now, holds_task=holds_task, earlier=earlier, window_minutes=10
+    )
+
+
 def opened() -> tuple[ServiceRequest, WorkItem]:
     """Return a request with an open attempt, stored."""
-    request, item = attempts.open_attempt(queued(), None, now=NOW)
+    request, item = open_attempt(queued(), None)
     return request, replace(item, id=9)
 
 
@@ -72,11 +88,11 @@ def test_an_attempt_opens_only_when_nobody_holds_the_request() -> None:
     )
     assert item.assigned_to is None
     assert item.lease_until is None
-    assert code(lambda: attempts.open_attempt(request, item, now=NOW)) is ErrorCode.ALREADY_CLAIMED
+    assert code(lambda: open_attempt(request, item)) is ErrorCode.ALREADY_CLAIMED
     _, own = claim(queued(), None, now=NOW, agent="a", lease_minutes=5)
-    assert code(lambda: attempts.open_attempt(queued(), own, now=NOW)) is ErrorCode.ALREADY_CLAIMED
+    assert code(lambda: open_attempt(queued(), own)) is ErrorCode.ALREADY_CLAIMED
     done = replace(queued(), handling=HandlingState.COMPLETED, resolved_at=NOW)
-    assert code(lambda: attempts.open_attempt(done, None, now=NOW)) is ErrorCode.BOOKING_NOT_ACTIVE
+    assert code(lambda: open_attempt(done, None)) is ErrorCode.BOOKING_NOT_ACTIVE
 
 
 def test_only_an_attempt_in_doubt_is_adopted_or_fenced() -> None:
@@ -216,3 +232,45 @@ def test_a_contact_center_flow_without_a_meeting_waits_only_for_the_rollback_gat
     assert [(i.code, i.reason) for i in items if not i.ok] == [
         (ReadinessCheck.ROLLBACK, ReadinessReason.ROLLBACK_NOT_SAFE)
     ]
+
+
+def test_no_attempt_opens_while_the_booking_holds_a_task_of_either_kind() -> None:
+    """ADR 0123 point 8: one task per contact moment; the booking's task, live or ended."""
+    assert code(lambda: open_attempt(queued(), None, holds_task=True)) is (
+        ErrorCode.CONTACT_CENTER_TASK_HELD
+    )
+
+
+def test_no_attempt_opens_while_an_earlier_one_may_still_make_a_task() -> None:
+    """A fenced, cancelled or expired attempt may still have made a task until its window
+    closes: a second create would be a second offer of one contact moment."""
+    _, item = opened()
+    for state in (WorkItemState.FENCED, WorkItemState.CANCELLED, WorkItemState.EXPIRED):
+        ended = replace(item, state=state, ended_at=NOW)
+        assert code(lambda e=ended: open_attempt(queued(), None, earlier=(e,))) is (
+            ErrorCode.CONTACT_CENTER_TASK_HELD
+        )
+        later = NOW + timedelta(minutes=10, seconds=1)
+        assert open_attempt(queued(), None, earlier=(ended,), now=later)[1].state is (
+            WorkItemState.DISPATCHING
+        )
+    failed = replace(item, state=WorkItemState.FAILED, ended_at=NOW)  # made no task
+    assert open_attempt(queued(), None, earlier=(failed,))[1].state is WorkItemState.DISPATCHING
+
+
+def test_a_late_task_is_adopted_only_when_it_is_of_the_kind_that_was_tried() -> None:
+    assert attempts.adoptable(None, TaskKind.FORM)
+    assert attempts.adoptable(TaskKind.CONVERSATION, TaskKind.CONVERSATION)
+    assert not attempts.adoptable(TaskKind.CONVERSATION, TaskKind.FORM)
+    assert not attempts.adoptable(TaskKind.FORM, TaskKind.CONVERSATION)
+
+
+def test_a_contact_moment_is_held_twice_by_a_live_task_and_an_own_queue_claim() -> None:
+    _, own = claim(queued(), None, now=NOW, agent="a", lease_minutes=5)
+    _, attempt = opened()
+    assert attempts.held_twice(TaskState.QUEUED, own)
+    assert attempts.held_twice(TaskState.CANCELLED, own)  # marked, not yet ended
+    assert not attempts.held_twice(TaskState.ENDED, own)
+    assert not attempts.held_twice(TaskState.FAILED, own)
+    assert not attempts.held_twice(TaskState.CONNECTED, attempt)  # the contact center alone
+    assert not attempts.held_twice(TaskState.CONNECTED, None)

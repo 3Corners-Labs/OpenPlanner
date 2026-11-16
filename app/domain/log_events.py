@@ -2117,6 +2117,18 @@ _AUDIT = (
         "Check that the messaging asset's flow does not loop; a real conversation never gets here.",
     ),
     _e(
+        "contact_center.held_twice",
+        _SYS,
+        "error outcome",
+        "bookings",
+        "{bookings} bookings held by a contact-center task and the own queue at once.",
+        "The nightly sweep found appointments whose task at the contact center is still live "
+        "while the own queue holds the same work (ADR 0123 point 8: one task, of one kind, per "
+        "appointment). Counts only.",
+        "Look at the bookings with a task on the queue: end the task at the contact center or "
+        "the claim in the own queue, so one side keeps the work.",
+    ),
+    _e(
         "retention.sweep",
         _SYS,
         "warning outcome",

@@ -449,7 +449,9 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         else None,
         trial_count=row.trial_count,
         contact_center_task=task_of(row),
-        attempted_task_kind=TaskKind(row.contact_center_attempt_kind or TaskKind.FORM),
+        attempted_task_kind=(
+            TaskKind(row.contact_center_attempt_kind) if row.contact_center_attempt_kind else None
+        ),
         kind=BookingKind(slot.kind),
         closure_id=row.closure_id,
         change_reason=ChangeReason(row.change_reason) if row.change_reason else None,

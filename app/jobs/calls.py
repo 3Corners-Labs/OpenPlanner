@@ -7,7 +7,8 @@ skipped with a reason, ADR 0068) and logging. Failures are classified by the run
 
     create_video_room  ─► CallService.ensure_meeting
     dispatch_wxcc_task ─► CallService.ensure_task   (waits for the meeting; member
-                          DISPATCH_CONTACT_CENTER_TASK, ADR 0032)
+                          DISPATCH_CONTACT_CENTER_TASK, ADR 0032; an unknown outcome is
+                          never retried, ADR 0123 point 8)
     delete_video_room  ─► CallService.delete_meeting
     delete_trial_call  ─► CallService.delete_trial_call   (ADR 0071)
     rename_guest       ─► CallService.rename_guest        (ADR 0123 point 7; added by the purge)
@@ -21,6 +22,7 @@ center, and an attempt in doubt is never retried.
 import structlog
 
 from app.adapters.db.jobs import ClaimedJob
+from app.domain import contact_center_attempts as attempts
 from app.domain.booking import Booking
 from app.domain.call_service import CallService
 from app.domain.calls import EventKind
@@ -45,6 +47,8 @@ OWN_QUEUE = "own_queue"
 """Skip reason: the group's agents pick bookings up in OpenPlanner (ADR 0043): no work item."""
 NO_DISPATCH = "no_dispatch"
 """Skip reason: the group's contact-center routing is missing or incomplete: no task."""
+OUTCOME_UNKNOWN = attempts.OUTCOME_UNKNOWN
+"""Skip reason: a create's outcome is unknown, so no second task is tried (ADR 0123 point 8)."""
 NO_GUEST_KEY = "no_guest_key"
 """Skip reason: this worker has no video provider or no key to work out the guest's subject."""
 
@@ -163,7 +167,12 @@ class CallJobs:
         elif job.type is JobType.CREATE_VIDEO_ROOM:
             await self._calls.ensure_meeting(booking, group)
         else:
-            await self._calls.ensure_task(booking, group)
+            done = await self._calls.ensure_task(booking, group)
+            if done.contact_center_task is None and done.attempted_task_kind is not None:
+                # ADR 0123 point 8: the create's outcome is unknown; never a second task. The
+                # task that shows up later is adopted by its origin.
+                log.info("job.skipped", job_id=job.id, reason=OUTCOME_UNKNOWN)
+                return OUTCOME_UNKNOWN
         return None
 
     async def record_failure(self, job: ClaimedJob, code: str, message: str = "") -> None:

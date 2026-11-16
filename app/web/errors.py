@@ -106,6 +106,7 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.QUEUE_EMPTY: "error.queue_empty",
     ErrorCode.ALREADY_CLAIMED: "error.already_claimed",
     ErrorCode.HELD_BY_CONTACT_CENTER: "error.held_by_contact_center",
+    ErrorCode.CONTACT_CENTER_TASK_HELD: "error.held_by_contact_center",  # a job's, never shown
     ErrorCode.FREE_PICK_NOT_ALLOWED: "error.free_pick_not_allowed",
     ErrorCode.NOT_CLAIMED: "error.not_claimed",
     ErrorCode.NOT_ELIGIBLE: "error.not_eligible",

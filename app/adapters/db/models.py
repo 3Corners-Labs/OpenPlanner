@@ -698,6 +698,13 @@ class BookingRow(Base):
             "'awaiting_rebook', 'pending_confirmation', 'refused')",
             name="status",
         ),
+        # ADR 0123 point 8, migration 0122: a stored task always carries its kind. One way only:
+        # the purge deletes the id and keeps the kind (``privacy.PURGED_FIELDS``).
+        CheckConstraint(
+            "(contact_center_task_id IS NULL AND wxcc_task_id IS NULL) "
+            "OR contact_center_task_kind IS NOT NULL",
+            name="task_kind",
+        ),
         CheckConstraint(
             "change_reason IS NULL OR change_reason IN ('staffing', 'technical', 'unforeseen')",
             name="change_reason",
