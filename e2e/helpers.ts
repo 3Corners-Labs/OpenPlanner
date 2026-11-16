@@ -85,53 +85,83 @@ export async function timeClearOfNotice(page: Page): Promise<Locator | null> {
   return index < 0 ? null : buttons.nth(index);
 }
 
+/** How many months `chooseTimeByKeyboard` looks ahead before it gives up. */
+const MONTHS_AHEAD = 3;
+
 /**
- * Return a time clear of the minimum notice, moving through the calendar grid with the arrow
- * keys and Enter to the next free day while the shown day has none (late on a day, its last
- * times can all lie inside the margin), and with PageDown to the next month when the shown
- * month has no later free day. Keyboard only, as the tests that call it.
+ * Return a time clear of the minimum notice, moving through the calendar grid with the keyboard
+ * to the next free day while the shown day has none (late on a day, its last times can all lie
+ * inside the margin). Keyboard only, as the tests that call it.
  *
- * The grid comes before the times in the page, so it is reached with Shift+Tab from the times
- * (`shiftTabTo`); after PageDown the page is new, focus is at its top and Tab reaches it.
+ * The next free day is read from the grid's links (a day with times is a link, a closed or full
+ * day is not) and reached with ArrowRight; when the shown month has no later free day, PageDown
+ * opens the next month and the same rule picks its first free day, never the day that merely
+ * holds the tab stop. The grid comes before the times in the page, so it is reached with
+ * Shift+Tab from the times (`shiftTabTo`, never by wrapping round the page); after PageDown the
+ * page is new, focus is at its top and Tab reaches it.
  */
 export async function chooseTimeByKeyboard(page: Page): Promise<Locator> {
-  const stop = page.getByRole('grid').locator('.calendar__day[tabindex="0"]');
-  for (let attempt = 0; attempt < 62; attempt++) {
+  for (let attempt = 0; attempt < 31 * MONTHS_AHEAD; attempt++) {
     const time = await timeClearOfNotice(page);
     if (time !== null) return time;
-    const current = (await stop.getAttribute('data-day')) ?? '';
-    const later = await page
-      .getByRole('grid')
-      .locator('a.calendar__day')
-      .evaluateAll(
-        (links, day) =>
-          links.map((link) => link.getAttribute('data-day') ?? '').filter((d) => d > day),
-        current,
-      );
-    if (later.length === 0) {
-      // No later free day this month: the next month is a new page.
-      await shiftTabTo(page, stop);
-      await page.keyboard.press('PageDown');
-      await page.waitForLoadState('load');
-      await expect(stop).not.toHaveAttribute('data-day', current);
-      await tabTo(page, stop);
+    await openNextFreeDay(page);
+  }
+  throw new Error(`no time clear of the minimum notice in the coming ${MONTHS_AHEAD} months`);
+}
+
+/** The grid's tab stop: the one day of the calendar that Tab reaches. */
+function tabStop(page: Page): Locator {
+  return page.getByRole('grid').locator('.calendar__day[tabindex="0"]');
+}
+
+/** Return the days of the shown month that have times (links) and come after `after`. */
+async function freeDaysAfter(page: Page, after: string): Promise<string[]> {
+  return page
+    .getByRole('grid')
+    .locator('a.calendar__day')
+    .evaluateAll(
+      (links, day) =>
+        links.map((link) => link.getAttribute('data-day') ?? '').filter((d) => d > day),
+      after,
+    );
+}
+
+/**
+ * Open the next free day after the shown one with the keyboard: in this month if it has one,
+ * else in the first following month that has one (at most `MONTHS_AHEAD`).
+ */
+async function openNextFreeDay(page: Page): Promise<void> {
+  const stop = tabStop(page);
+  let after = (await stop.getAttribute('data-day')) ?? '';
+  await shiftTabTo(page, stop);
+  for (let month = 0; month <= MONTHS_AHEAD; month++) {
+    const [target] = await freeDaysAfter(page, after);
+    if (target !== undefined) {
+      await arrowTo(page, target);
       await page.keyboard.press('Enter');
       await expect(page.locator('#times-heading')).toBeFocused();
-      continue;
+      await expect(page.locator(`a.calendar__day[data-day="${target}"]`)).toHaveAttribute(
+        'aria-current',
+        'true',
+      );
+      return;
     }
-    await shiftTabTo(page, stop);
-    // The roving tab stop moves one day per ArrowRight; stop on the next free day.
-    for (let step = 0; (await stop.getAttribute('data-day')) !== later[0]; step++) {
-      if (step > 42) throw new Error(`the arrow keys did not reach ${later[0]}`);
-      await page.keyboard.press('ArrowRight');
-    }
-    await expect(stop).toBeFocused();
-    await page.keyboard.press('Enter');
-    await expect(page.locator('#times-heading')).toBeFocused();
-    await expect(page.locator(`a.calendar__day[data-day="${later[0]}"]`)).toHaveAttribute(
-      'aria-current',
-      'true',
-    );
+    // No later free day this month: the next month is a new page; every day of it is later.
+    const shown = (await stop.getAttribute('data-day')) ?? '';
+    await page.keyboard.press('PageDown');
+    await expect(stop).not.toHaveAttribute('data-day', shown);
+    await tabTo(page, stop);
+    after = '';
   }
-  throw new Error('no time clear of the minimum notice in the coming two months');
+  throw new Error(`no free day in the coming ${MONTHS_AHEAD} months`);
+}
+
+/** Move the focused grid's roving tab stop with ArrowRight to the day `target` of this month. */
+async function arrowTo(page: Page, target: string): Promise<void> {
+  const stop = tabStop(page);
+  for (let step = 0; (await stop.getAttribute('data-day')) !== target; step++) {
+    if (step > 42) throw new Error(`the arrow keys did not reach ${target}`);
+    await page.keyboard.press('ArrowRight');
+  }
+  await expect(stop).toBeFocused();
 }
