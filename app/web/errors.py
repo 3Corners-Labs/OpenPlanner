@@ -37,6 +37,7 @@ ERROR_KEYS: dict[ErrorCode, str] = {
     ErrorCode.NOT_PERMITTED: "admin.forbidden.text",
     ErrorCode.SLUG_TAKEN: "admin.form.error.slug_taken",
     ErrorCode.GROUP_HAS_FUTURE_BOOKINGS: "admin.form.error.future_bookings",
+    ErrorCode.OWN_QUEUE_IN_USE: "admin.form.error.own_queue_in_use",
     ErrorCode.GROUP_ARCHIVED: "admin.form.error.group_archived",
     ErrorCode.CONFIRMATION_MISMATCH: "admin.form.error.confirmation_mismatch",
     ErrorCode.API_CLIENT_ENABLED: "admin.form.error.api_client_enabled",

@@ -1417,6 +1417,9 @@ msgstr "Enter a number of minutes from 0 to 120."
 msgid "admin.form.error.phone_mode"
 msgstr "Choose whether the phone number is hidden, optional or required."
 
+msgid "admin.form.error.own_queue_in_use"
+msgstr "This service keeps its own queue while an active flow sends work there. Archive that flow first, or let it send its work to the contact center."
+
 msgid "admin.form.error.future_bookings"
 msgstr "This is not possible while appointments lie ahead. Change it after they have taken place or were cancelled."
 

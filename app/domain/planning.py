@@ -19,7 +19,7 @@ from dataclasses import dataclass, fields, replace
 from datetime import date, time, timedelta
 
 from app.domain.admin import AdminService, Authorization, record_change, require
-from app.domain.authorization import Permission, Principal, scope_for
+from app.domain.authorization import Permission, Principal, Scope, scope_for
 from app.domain.availability import SlotTime, slots_on
 from app.domain.call_page import OtherWayOffer
 from app.domain.contact_center import ContactCenterRouting
@@ -43,6 +43,8 @@ from app.domain.scheduling import (
     validate_schedule,
     windows_on,
 )
+from app.domain.service_flows import DispatchKind as FlowDispatch
+from app.domain.service_flows import FlowState
 
 TIME_GRID_FIELDS = ("slot_minutes", "timezone")
 """Settings that move existing slots; frozen while confirmed bookings lie ahead."""
@@ -115,6 +117,27 @@ class PreviewDay:
 
     day: date
     slots: list[SlotTime]
+
+
+async def _check_own_queue_unused(tx: Transaction, group_id: int) -> None:
+    """Refuse leaving the own queue while an active flow of the service dispatches to it.
+
+    The readiness checklist keeps such a flow from being activated on a service without an own
+    queue (``own_queue_missing``, ADR 0121 row 40); this is the other half: without the queue
+    nobody can claim the flow's work, and the watchdog would expire it (security review of G10).
+
+    Raises:
+        DomainError: ``own_queue_in_use`` with the field ``dispatch_kind``.
+    """
+    for flow in await tx.list_service_flows(Scope(everything=True), group_id):
+        current = flow.current
+        if (
+            flow.state is FlowState.ACTIVE
+            and current is not None
+            and not current.legacy
+            and current.dispatch is FlowDispatch.OWN_QUEUE
+        ):
+            raise DomainError(ErrorCode.OWN_QUEUE_IN_USE, "dispatch_kind")
 
 
 class PlanningService:
@@ -193,6 +216,8 @@ class PlanningService:
             frozen = [name for name in TIME_GRID_FIELDS if name in changed]
             if frozen and await tx.count_future_bookings(group.id, self._clock.now()):
                 raise DomainError(ErrorCode.GROUP_HAS_FUTURE_BOOKINGS, frozen[0])
+            if group.has_own_queue and not updated.has_own_queue:
+                await _check_own_queue_unused(tx, group.id)
             await tx.save_group(updated)
             await self._audit(
                 tx, principal, permission, _organisation(authorization), slug, ",".join(changed)

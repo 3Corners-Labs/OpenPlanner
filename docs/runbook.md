@@ -2543,7 +2543,8 @@ Up to 0.6.0 the rollback gate `ROLLBACK_SAFE` was shut, so nothing in production
 slot, a request-level record, a contact-center attempt or an immediate request. Since #826 it
 is open (checklist G10): such records are written once an administrator activates a non-legacy
 flow on the own queue of a service with an own queue; an update activates nothing, and
-contact-center flows stay refused. Going back to 0.6.0 on a database holding them is proven by
+contact-center flows stay refused. Before activating an on-demand flow, set its pool's waiting
+limit (*Skills and capacity*, the pool's staffing page): a new pool has none. Going back to 0.6.0 on a database holding them is proven by
 the upgrade matrix (`scripts/upgrade-matrix.sh rollback-release`: 0.6.0 books and claims next to
 them, checklist G07 and G43). So:
 

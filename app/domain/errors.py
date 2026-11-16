@@ -32,6 +32,8 @@ class ErrorCode(StrEnum):
     ORGANISATION_NOT_FOUND = "organisation_not_found"
     SLUG_TAKEN = "slug_taken"
     GROUP_HAS_FUTURE_BOOKINGS = "group_has_future_bookings"
+    OWN_QUEUE_IN_USE = "own_queue_in_use"
+    """The service would leave its own queue while an active flow dispatches to it (ADR 0121)."""
     GROUP_ARCHIVED = "group_archived"
     """ADR 0084: the group is archived; only reading is left."""
     CONFIRMATION_MISMATCH = "confirmation_mismatch"

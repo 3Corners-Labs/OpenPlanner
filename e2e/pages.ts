@@ -41,9 +41,9 @@ export const REQUEST_COOKIE = 'op_req';
 export interface SetUp {
   /** The page of the request that keeps waiting. */
   immediate_request: string;
-  /** The value of its cookie, `<reference>.<random value>`. */
   /** Its "withdraw?" page, which says what withdrawing does (nothing is withdrawn by opening it). */
   immediate_request_leave: string;
+  /** The value of its cookie, `<reference>.<random value>`. */
   immediate_request_cookie: string;
   /** The page of the request the e2e agent claimed. */
   claimed_request: string;
