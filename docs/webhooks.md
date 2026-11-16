@@ -153,7 +153,9 @@ Contact Center's task events carry the origin is still to be seen on the test ho
 **Ending a cancelled booking's task** (ADR 0021), v2 first. **Primary:** a Task Messages v2
 snapshot, `POST /v2/tasks/{taskId}/messages` (`cjp:task_write`, beta, `202`), marks the task
 cancelled. **Secondary:** End Task, `POST /v1/tasks/{taskId}/end` without a body (v1 only;
-`cjp:user`; `202`); a refusal is recorded as `end_not_possible` with the code.
+`cjp:user`; `202`); a refusal is recorded as `end_not_possible` with the code. The same job
+ends the task of a contact-center attempt that the request watchdog expired or cancelled (ADR
+0121 step 27): the work is over, so no agent keeps it; nothing else is sent.
 
 ```json
 {

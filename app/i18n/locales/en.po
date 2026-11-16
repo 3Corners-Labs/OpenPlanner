@@ -13490,6 +13490,9 @@ msgstr "Activation waits until the previous version of OpenPlanner can also keep
 msgid "admin.flows.reason.contact_center_not_ready"
 msgstr "Activating a flow that dispatches to the contact center waits until the contact center is released for go-live. This follows in a later version."
 
+msgid "admin.flows.reason.own_queue_missing"
+msgstr "This flow sends work to the own queue, but this service has no own queue. Without it nobody can pick the work up. Choose OpenPlanner's own queue in the service's settings."
+
 msgid "admin.flows.summary.none"
 msgstr "Not set"
 

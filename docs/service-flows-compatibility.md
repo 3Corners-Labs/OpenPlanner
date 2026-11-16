@@ -76,6 +76,7 @@ settings only, and no train module imports it.
 | C | Unchanged: no other booking field or label reaches the payload | `tests/adapters/test_wxcc_routing_payload.py::test_no_other_booking_field_or_label_reaches_the_payload` |
 | C | Unchanged: the meeting first, then the work item, idempotent | `tests/jobs/test_call_jobs.py::test_meeting_then_work_item` |
 | C | Gated: a flow on the own queue is never dispatched to the contact center | `tests/domain/test_request_dispatch.py::test_a_flow_on_the_own_queue_is_never_dispatched` |
+| C | Gated: the watchdog ends the platform task of a contact-center attempt it expires, through the existing end-task job (ADR 0121 step 27); a legacy booking never has an attempt | `tests/domain/test_request_watch.py::test_the_watchdog_ends_at_the_platform_the_task_of_an_attempt_it_expires` |
 | C | Gated: the own queue shows work the contact center holds as held, never next nor "not picked up" (ADR 0121 step 28); a legacy booking is never held | `tests/domain/test_request_dispatch.py::test_the_own_queue_shows_work_the_contact_center_holds_as_held` |
 
 ### Emergency closure (ADR 0024)
@@ -113,6 +114,7 @@ settings only, and no train module imports it.
 | B | Unchanged: a document without the new sections leaves skills, pools and flows alone | `tests/domain/test_configuration_v1_flows.py::test_a_document_without_the_sections_leaves_skills_pools_and_flows_alone` |
 | B | Unchanged: the same, through the database adapter | `tests/adapters/db/test_config_flows.py::test_a_document_without_the_sections_leaves_what_the_installation_has` |
 | B | Intended: export, import, export gives the same document | `tests/adapters/db/test_config_flows.py::test_export_import_export_gives_the_same_document` |
+| B | Gated: a document cannot activate a flow on the own queue on a service without one (ADR 0121 row 40) | `tests/domain/test_own_queue_flows_gate.py::test_a_document_cannot_activate_an_own_queue_flow_on_a_service_without_one` |
 | R | Unchanged: every table is configuration or state, so requests never travel in a package | `tests/adapters/db/test_configuration_package.py::test_every_table_of_the_model_is_configuration_or_state` |
 
 ### Public API `/api/v1` (widget)
@@ -163,7 +165,9 @@ client, audit events), taken back to 0108.
 **What the train adds that the previous image does not know, and why that is safe while the
 gate is shut.** No job kind, booking status, event kind or settings key that the previous image
 reads changes meaning; the train adds no job kind at all (the watchdog, the reconciliation and
-the deletion of request-level records run in the worker's rounds and the nightly sweep). New
+the deletion of request-level records run in the worker's rounds and the nightly sweep; the
+watchdog's end of a contact-center task, step 27, plans the end-task job the previous image
+already runs). New
 settings keys are stored values the previous image never looks up (the upgrade check lists them
 as unknown, not as unusable). The records the previous image would miscount (a pool slot carries
 its service's `group_id`; an immediate request occupies a unit of a pool) are written only by

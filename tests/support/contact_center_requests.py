@@ -66,6 +66,8 @@ class Desk:
     queue: QueueService
     requeued: list[int]
     """Bookings whose contact-center work went back to the own queue (the fallback's notice)."""
+    calls: CallService
+    """Runs the call jobs' use cases, the end-task job among them (ADR 0021)."""
 
 
 def desk(
@@ -117,4 +119,4 @@ def desk(
         window_minutes=lambda: WINDOW,
     )
     queue = QueueService(uow, clock, AdminService(uow, clock), b"k" * 32, work=work)
-    return Desk(uow, clock, dispatcher, work, integration, dispatch, queue, requeued)
+    return Desk(uow, clock, dispatcher, work, integration, dispatch, queue, requeued, calls)

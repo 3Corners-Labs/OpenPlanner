@@ -72,7 +72,7 @@ def reasons(
     rev: FlowRevision, the_pool: CapacityPool | None = None, subjects: tuple[str, ...] = ()
 ) -> Mapping[ReadinessCheck, ReadinessReason | None]:
     """Return ``{check: reason}`` of the checklist, asserting its order and consistency."""
-    items = readiness(rev, the_pool, offered_subjects=subjects)
+    items = readiness(rev, the_pool, offered_subjects=subjects, own_queue=True)
     assert tuple(i.code for i in items) == ORDER
     assert all(i.ok == (i.reason is None) for i in items)
     return {i.code: i.reason for i in items}
@@ -209,7 +209,7 @@ def test_a_stored_flow_has_a_published_current_and_an_unpublished_draft() -> Non
 
 def test_the_legacy_wrapper_is_ready_everywhere() -> None:
     assert reasons(legacy(), pool()) == dict.fromkeys(ORDER)
-    assert can_activate(readiness(legacy(), pool(), offered_subjects=()))
+    assert can_activate(readiness(legacy(), pool(), offered_subjects=(), own_queue=True))
 
 
 def test_a_new_flow_cannot_be_activated_while_the_rollback_gate_is_shut(
@@ -220,13 +220,13 @@ def test_a_new_flow_cannot_be_activated_while_the_rollback_gate_is_shut(
         **dict.fromkeys(ORDER),
         ReadinessCheck.ROLLBACK: R.ROLLBACK_NOT_SAFE,
     }
-    assert not can_activate(readiness(revision(), pool(), offered_subjects=()))
+    assert not can_activate(readiness(revision(), pool(), offered_subjects=(), own_queue=True))
 
 
 def test_a_flow_is_ready_once_the_gate_opens(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("app.domain.service_flows.ROLLBACK_SAFE", True)  # ADR 0122: the gate
     assert reasons(revision(), pool()) == dict.fromkeys(ORDER)
-    assert can_activate(readiness(revision(), pool(), offered_subjects=()))
+    assert can_activate(readiness(revision(), pool(), offered_subjects=(), own_queue=True))
 
 
 def test_the_legacy_factory_builds_revision_one_of_a_video_wrapper() -> None:

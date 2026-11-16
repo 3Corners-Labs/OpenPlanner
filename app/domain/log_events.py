@@ -350,12 +350,15 @@ _OPERATIONS = (
         "requests.watched",
         _OPS,
         "info",
-        "changed expired_unclaimed deleted failed errors",
+        "changed expired_unclaimed deleted failed tasks_ended errors",
         "The watchdog round of requests changed {changed}, expired {expired_unclaimed} "
-        "unclaimed, deleted {deleted} records; {failed} failed ({errors}).",
+        "unclaimed, deleted {deleted} records, ended {tasks_ended} contact-center tasks; "
+        "{failed} failed ({errors}).",
         "The worker's round of ADR 0121 step 5 (lease expiry, cancellation, expiry, recovery, "
         "deletion of request-level records); counts only, and the type names of what failed "
-        "(never a message). A failed request is tried again in the next round.",
+        "(never a message). A failed request is tried again in the next round. "
+        "`tasks_ended` counts the end-task jobs planned for contact-center attempts the round "
+        "expired or cancelled (step 27); each job's outcome is on the booking's timeline.",
     ),
     _e(
         "requests.watch_failed",
@@ -1288,9 +1291,12 @@ _OPERATIONS = (
         "webhook.contact_center",
         _OPS,
         "info",
-        "platform kind outcome",
-        "Contact center {platform} reported {kind}: {outcome}.",
-        "A verified webhook of a contact-center platform was processed (ADR 0032).",
+        "platform kind outcome origin",
+        "Contact center {platform} reported {kind}: {outcome} (origin: {origin}).",
+        "A verified webhook of a contact-center platform was processed (ADR 0032). `origin` "
+        "says whether the event carried a booking reference as the task's origin "
+        "(`reference`) or not (`none`), never the value: the operator check of ADR 0121 "
+        "step 29 (checklist G15) reads it.",
     ),
     _e(
         "webhook.chat",

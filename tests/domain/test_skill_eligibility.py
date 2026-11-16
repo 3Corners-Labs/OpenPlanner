@@ -52,9 +52,13 @@ def test_two_people_with_one_skill_each_are_no_unit_with_both() -> None:
     needs_both = revision(required_skill_ids=frozenset({X, Y}))
 
     for guaranteed in ({X}, {Y}):
-        skills = readiness(needs_both, pool(guaranteed=frozenset(guaranteed)), offered_subjects=())
+        skills = readiness(
+            needs_both, pool(guaranteed=frozenset(guaranteed)), offered_subjects=(), own_queue=True
+        )
         item = next(i for i in skills if i.code is ReadinessCheck.SKILLS)
         assert item.reason is ReadinessReason.POOL_DOES_NOT_GUARANTEE
 
-    ready = readiness(needs_both, pool(guaranteed=frozenset({X, Y})), offered_subjects=())
+    ready = readiness(
+        needs_both, pool(guaranteed=frozenset({X, Y})), offered_subjects=(), own_queue=True
+    )
     assert next(i for i in ready if i.code is ReadinessCheck.SKILLS).ok

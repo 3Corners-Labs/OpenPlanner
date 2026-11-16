@@ -737,8 +737,8 @@ async def _readiness_of(
     """Return the readiness checklist of ``revision`` against what the organisation has now.
 
     That is its pool, the service's subjects, what the platform of the service's contact-center
-    routing carries (ADR 0121 step 6) and, only for a contact-center revision that requires
-    skills, which skills have a contact-center code.
+    routing carries (ADR 0121 step 6), whether the service has an own queue and, only for a
+    contact-center revision that requires skills, which skills have a contact-center code.
     """
     coded: frozenset[int] = frozenset()
     if revision.dispatch is flows.DispatchKind.CONTACT_CENTER and revision.all_skill_ids:
@@ -753,6 +753,7 @@ async def _readiness_of(
         offered_subjects=[s.code for s in group.routing.subjects],
         coded_skills=coded,
         carrier=capabilities_of(group.contact_center),
+        own_queue=group.has_own_queue,
     )
 
 
