@@ -7,21 +7,31 @@ events and the queue as the worker and the web process do, on a fake dispatcher.
 """
 
 from dataclasses import dataclass, replace
+from datetime import timedelta
 
 from app.domain.admin import AdminService
 from app.domain.call_service import CallService
+from app.domain.calls import EventKind
+from app.domain.contact_center import ContactCenterKind, TaskKind
 from app.domain.flow_resolution import FlowRef
-from app.domain.integration import IntegrationService
+from app.domain.integration import EventOutcome, IntegrationService
+from app.domain.job_plan import JobType
 from app.domain.pool_booking import PoolBookings
+from app.domain.ports import IntegrationError
 from app.domain.queue_service import QueueService
 from app.domain.request_dispatch import AttemptEvents, RequestDispatch
 from app.domain.request_work import RequestWork
+from app.domain.scheduling import DispatchKind as GroupDispatch
+from app.domain.scheduling import JoinClient
 from app.domain.service_flows import (
     CompletionPolicy,
     DispatchKind,
+    FlowRevision,
     HandlingAction,
     InteractionKind,
 )
+from app.domain.service_requests import ServiceRequest, WorkItem
+from app.domain.webhook_replay import INSTALLATION_SCOPE
 from tests.fakes.clock import FixedClock
 from tests.fakes.integrations import FakeDispatcher, FakeVideo, webex_cc
 from tests.fakes.persistence import InMemoryUnitOfWork
@@ -33,6 +43,8 @@ CC_FLOW = FlowRef(53, 1)
 """A flow without a meeting, dispatched to the contact center, completed by the platform."""
 WINDOW = 10
 """``contact_center_reconcile_minutes`` of the tests."""
+SOURCE = "webex_cc"
+"""The platform's code under which its event keys are remembered."""
 
 
 def cc_world() -> InMemoryUnitOfWork:
@@ -120,3 +132,87 @@ def desk(
     )
     queue = QueueService(uow, clock, AdminService(uow, clock), b"k" * 32, work=work)
     return Desk(uow, clock, dispatcher, work, integration, dispatch, queue, requeued, calls)
+
+
+def request_of(uow: InMemoryUnitOfWork, booking_id: int) -> ServiceRequest:
+    """Return the one request of ``booking_id``."""
+    return next(r for r in uow.state.requests.values() if r.booking_id == booking_id)
+
+
+def items_of(uow: InMemoryUnitOfWork, booking_id: int) -> list[WorkItem]:
+    """Return the work items of the request of ``booking_id``, oldest first."""
+    request = request_of(uow, booking_id)
+    found = [i for i in uow.state.work_items.values() if i.request_id == request.id]
+    return sorted(found, key=lambda i: i.id or 0)
+
+
+async def dispatch(the_desk: Desk, booking_id: int) -> str | None:
+    """Run the dispatch of ``booking_id`` as the dispatch job does."""
+    booking = the_desk.uow.state.bookings[booking_id]
+    group = the_desk.uow.state.groups[booking.group_id]
+    revision = await the_desk.dispatch.handles(booking)
+    assert isinstance(revision, FlowRevision)
+    return await the_desk.dispatch.dispatch(booking, group, revision)
+
+
+async def event(
+    the_desk: Desk,
+    task_id: str,
+    kind: EventKind,
+    origin: str = "",
+    task_kind: TaskKind | None = None,
+) -> EventOutcome:
+    """Deliver one platform event of ``task_id``; ``task_kind`` as the event names it."""
+    return await the_desk.integration.record_task_event(
+        task_id,
+        kind,
+        the_desk.clock.now(),
+        origin=origin,
+        task_kind=task_kind,
+        provider=ContactCenterKind.WEBEX_CC,
+        source=SOURCE,
+        scope=INSTALLATION_SCOPE,
+        body_identity="",
+    )
+
+
+AMBIGUOUS = IntegrationError("unreachable", retryable=True, ambiguous=True)
+"""A create whose outcome is unknown: the platform may have made the task."""
+
+
+def routed(
+    uow: InMemoryUnitOfWork, kind: TaskKind, *, dispatch_kind: GroupDispatch | None = None
+) -> None:
+    """Route the demo service to tasks of ``kind``, on the call page (ADR 0123 step 6b).
+
+    ``dispatch_kind`` ``contact_center`` makes the service dispatch its own (legacy) bookings.
+    """
+    group = uow.state.groups[1]
+    uow.state.groups[1] = replace(
+        group,
+        contact_center=webex_routing(task_kind=kind),
+        join_client=JoinClient.EMBEDDED,
+        dispatch_kind=dispatch_kind or group.dispatch_kind,
+    )
+
+
+async def fenced(the_desk: Desk, booking_id: int) -> None:
+    """Dispatch ``booking_id`` with an unknown outcome and fence it after the window."""
+    the_desk.dispatcher.error = AMBIGUOUS
+    await dispatch(the_desk, booking_id)
+    the_desk.dispatcher.error = None
+    the_desk.clock.advance(timedelta(minutes=WINDOW))
+    assert await the_desk.dispatch.fence_round() == 1
+
+
+async def ensure(the_desk: Desk, booking_id: int) -> None:
+    """Run the dispatch job's use case for a booking without a request (ADR 0018)."""
+    booking = the_desk.uow.state.bookings[booking_id]
+    await the_desk.calls.ensure_task(booking, the_desk.uow.state.groups[booking.group_id])
+
+
+async def end_jobs(the_desk: Desk, booking_id: int) -> None:
+    """Run the end-task job of ``booking_id`` as the worker does (ADR 0021)."""
+    assert any(j.type is JobType.END_WXCC_TASK for j in the_desk.uow.state.jobs[booking_id])
+    booking = the_desk.uow.state.bookings[booking_id]
+    await the_desk.calls.end_task(booking, the_desk.uow.state.groups[booking.group_id])

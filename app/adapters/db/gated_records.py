@@ -257,7 +257,9 @@ async def _attempt(
 ) -> int:
     """Open a contact-center attempt on the booking's request."""
     request = await _request(tx, group, ids, booking, now)
-    assigned, item = attempts.open_attempt(request, None, now=now)
+    assigned, item = attempts.open_attempt(
+        request, None, now=now, holds_task=False, earlier=(), window_minutes=0
+    )
     await write_work(tx, request, None, assigned, None)
     await tx.add_work_item(item)
     return request.id or 0

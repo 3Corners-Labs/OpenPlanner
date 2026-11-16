@@ -205,6 +205,7 @@ async def _record_task_event(
             scope=scope_of(delivery.address.organisation_id),
             body_identity=delivery.body_identity,
             origin=event.origin,
+            task_kind=event.task_kind,
             provider=inbound.kind,
             source=inbound.source,
             organisation_id=delivery.address.organisation_id,

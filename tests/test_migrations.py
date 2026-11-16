@@ -670,3 +670,56 @@ def test_refused_bookings_become_cancelled_with_a_purge_due_on_downgrade(
         jobs = database.execute("SELECT type, status FROM jobs").fetchall()
     assert status == ("cancelled", "2026-01-01 08:00:00")
     assert jobs == [("purge_pii", "pending")]
+
+
+def test_a_stored_task_gets_its_kind_and_cannot_lose_it(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    # ADR 0123 point 8, migration 0122: a task made before the kind existed is a form; from then
+    # on an id is never stored without a kind, while a purged kind without an id stays allowed.
+    import sqlite3
+    from contextlib import closing
+
+    command.upgrade(alembic_config, "0121")
+    rows = [  # (id, wxcc_task_id, contact_center_task_id, kind)
+        (1, "t-old", "t-old", None),
+        (2, None, None, "conversation"),  # purged: the id gone, the kind kept
+        (3, None, None, None),
+    ]
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        database.executescript(
+            """
+            INSERT INTO organisations (id, name, slug) VALUES (1, 'Acme', 'acme');
+            INSERT INTO groups (id, organisation_id, name, slug, timezone, slot_minutes,
+                min_notice_minutes, horizon_days, phone_mode)
+                VALUES (1, 1, 'Balie', 'balie', 'Europe/Amsterdam', 30, 60, 60, 'hidden');
+            INSERT INTO slots (id, group_id, start, "end", capacity_snapshot)
+                VALUES (1, 1, '2026-02-02 08:00:00', '2026-02-02 08:30:00', 3);
+            """
+        )
+        database.executemany(
+            "INSERT INTO bookings (id, slot_id, group_id, status, locale, management_token_hash,"
+            " management_token_salt, created_at, consents, public_ref, wxcc_task_id,"
+            " contact_center_task_id, contact_center_task_kind) VALUES"
+            " (?, 1, 1, 'confirmed', 'nl', ?, 's', '2026-01-01 08:00:00', '', ?, ?, ?, ?)",
+            [(i, f"h{i}", f"ref{i:09d}", w, c, k) for i, w, c, k in rows],
+        )
+        database.commit()
+
+    command.upgrade(alembic_config, "0122")
+
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        kinds = database.execute(
+            "SELECT contact_center_task_kind FROM bookings ORDER BY id"
+        ).fetchall()
+        with pytest.raises(sqlite3.IntegrityError, match="ck_bookings_task_kind"):
+            database.execute(
+                "UPDATE bookings SET contact_center_task_id = 't-2', wxcc_task_id = 't-2', "
+                "contact_center_task_kind = NULL WHERE id = 3"
+            )
+    assert kinds == [("form",), ("conversation",), (None,)]
+
+    command.downgrade(alembic_config, "0121")
+    with closing(sqlite3.connect(tmp_path / "migrate.db")) as database:
+        database.execute("UPDATE bookings SET wxcc_task_id = 't-3' WHERE id = 3")  # no check
+        database.commit()

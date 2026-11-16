@@ -1451,6 +1451,14 @@ class Transaction(Protocol):
         """Store the booking's contact-center task: its id and the platform that holds it."""
         ...
 
+    async def attach_task(self, booking_id: int, task: ContactCenterTaskRef) -> bool:
+        """Store ``task`` on the booking only while it holds none; whether it was stored.
+
+        The conditional write of a late task (ADR 0123 point 8), as a claim is conditional:
+        a stale read never replaces a task the booking holds.
+        """
+        ...
+
     async def save_task_attempt(self, booking_id: int, task_kind: TaskKind | None) -> None:
         """Store the kind the latest create is about to be tried as (step 7a); ``None`` clears.
 
@@ -1981,6 +1989,14 @@ class Transaction(Protocol):
 
     async def get_active_work_item(self, request_id: int) -> WorkItem | None:
         """Return the request's one active work item, or ``None``."""
+        ...
+
+    async def count_contact_moments_held_twice(self) -> int:
+        """Count the bookings held twice (``contact_center_attempts.held_twice``).
+
+        A booking that holds a task the platform has not reported over, while an active work
+        item of its request is in the own queue (ADR 0123 point 8). A count only.
+        """
         ...
 
     async def work_items_of(self, request_id: int) -> list[WorkItem]:

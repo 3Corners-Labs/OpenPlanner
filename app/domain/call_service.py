@@ -29,6 +29,7 @@ from app.domain.calls import (
     meeting_request,
 )
 from app.domain.contact_center import TaskKind
+from app.domain.contact_center_attempts import OUTCOME_UNKNOWN, refuse_second_task
 from app.domain.contact_center_dispatch import DispatcherChoice
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.fallback import FallbackService
@@ -165,9 +166,17 @@ class CallService:
         The interaction kind is read before the meeting is waited for: only a video task waits
         for one (ADR 0121 step 6b).
 
+        One task, of one kind, per booking (ADR 0123 point 8): the kind the create is tried as
+        is stored first, under the lock and only while the booking has no task and no create
+        pending (``refuse_second_task``). A create whose outcome is unknown (the platform may
+        have made the task) is never tried again: the booking keeps that kind, the job ends
+        (``app.jobs.calls``) and the task that shows up later is adopted by its origin
+        (``AttemptEvents.adopt``). A create that failed for good forgets the kind.
+
         Raises:
             IntegrationError: ``meeting_missing`` (retryable) while a video task's meeting is
-                not there.
+                not there; the platform's refusal or unreachability, unless the outcome is
+                unknown.
         """
         routing = group.contact_center
         if routing is None or not group.dispatch_enabled or booking.contact_center_task:
@@ -178,12 +187,34 @@ class CallService:
         if await self.diverts(booking, group):
             return booking
         built = await self.task_for(booking, group)
-        task_id = await dispatcher.create_task(built)
-        booking_id, task = _id(booking), built.ref(task_id)
+        booking_id = _id(booking)
+        async with self._uow.locked() as tx:
+            current = await tx.get_booking(booking_id)
+            try:
+                refuse_second_task(
+                    holds_task=current is None or current.contact_center_task is not None,
+                    pending=current is not None and current.attempted_task_kind is not None,
+                )
+            except DomainError:
+                return current or booking
+            await tx.save_task_attempt(booking_id, built.task_kind)
+        try:
+            task_id = await dispatcher.create_task(built)
+        except Exception as error:
+            if isinstance(error, IntegrationError) and error.ambiguous:
+                await self._integration.record(
+                    booking_id, EventKind.INTEGRATION_ERROR, detail=OUTCOME_UNKNOWN
+                )
+                return _with(booking, attempted_task_kind=built.task_kind)
+            # Any other failure made no task: forget the mark before it propagates.
+            async with self._uow.locked() as tx:
+                await tx.save_task_attempt(booking_id, None)
+            raise
+        task = built.ref(task_id)
         async with self._uow.locked() as tx:
             await tx.save_task(booking_id, task)
         await self._integration.record(booking_id, EventKind.TASK_CREATED)
-        return _with(booking, contact_center_task=task)
+        return _with(booking, contact_center_task=task, attempted_task_kind=None)
 
     async def task_for(self, booking: Booking, group: Group) -> ContactCenterTask:
         """Return the neutral task of ``booking``: its flow's interaction kind and skill codes.

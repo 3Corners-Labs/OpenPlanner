@@ -42,7 +42,7 @@ from app.domain.integration_check import CHECK_EVENT
 from app.domain.log_destinations import HEALTH_EVENT
 from app.domain.ports import Clock, Transaction, UnitOfWork
 from app.domain.public_address import EVENT as ADDRESS_EVENT
-from app.domain.retention_sweep import SWEPT
+from app.domain.retention_sweep import HELD_TWICE, SWEPT
 from app.domain.storage import FREE_SPACE_CRITICAL, STORAGE_EVENT
 from app.domain.tls import EVENT as CERTIFICATE_EVENT
 from app.domain.tls import Finding
@@ -164,6 +164,8 @@ ALERT_RULES: tuple[AlertRule, ...] = (
     AlertRule(HEALTH_EVENT, Permission.SETTINGS_PLATFORM_VIEW, subject="destination"),
     # ADR 0102: personal data past its retention could not be deleted.
     AlertRule(SWEPT, Permission.SETTINGS_PLATFORM_VIEW),
+    # ADR 0123 point 8: a booking held by a contact-center task and the own queue at once.
+    AlertRule(HELD_TWICE, Permission.SETTINGS_PLATFORM_VIEW),
     # ADR 0065: the automatic check of a group's integration chain fails.
     AlertRule(CHECK_EVENT, Permission.AUDIT_VIEW),
     # ADR 0061 OV-7: participants wait longer than the organisation's warning threshold.

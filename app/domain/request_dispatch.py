@@ -12,8 +12,13 @@ request is the fence: the own queue and the contact center never hold the same r
         outcome unknown ─► attempt reconciliation_required; never retried
     platform event of the booking's task ─► connected = start, ended = complete, failed = queue
     platform event of an unknown task, origin = a booking reference
-        ─► attempt in doubt: the task is adopted (no second task)
+        ─► attempt in doubt: the task is adopted (no second task), unless its kind is not
+           the kind the create was tried as: never attached (ADR 0123 point 8)
         ─► attempt fenced: the late task is ended by the end-task job (ADR 0021)
+        ─► a booking without a request whose create had an unknown outcome
+           (``CallService.ensure_task``): adopted as above, ended when the booking is over
+    a new attempt while the booking holds a task, or an earlier one may still make one
+        ─► refused (``contact_center_task_held``): one task per contact moment
     fence round ─► attempts in doubt past ``contact_center_reconcile_minutes``: fenced; the
         request goes to the own queue and the fallback tells the team (ADR 0082)
 
@@ -23,7 +28,7 @@ the contact center, so the timeline, the end-task job and the purge work unchang
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from app.domain import contact_center_attempts as attempts
 from app.domain.booking import Booking, BookingStatus, booking_id_of, stored_id
@@ -47,7 +52,6 @@ from app.domain.scheduling import Group
 from app.domain.service_flows import DispatchKind, FlowRevision
 from app.domain.service_requests import (
     IN_DOUBT,
-    ORPHANED,
     ServiceRequest,
     WorkChannel,
     WorkItem,
@@ -61,8 +65,11 @@ HELD = "already_done"
 """Skip reason: the request already has an active work item (the job's ``ALREADY_DONE``)."""
 NO_DISPATCH = "no_dispatch"
 """Skip reason: the service has no complete routing, or no dispatcher for its platform."""
-IN_DOUBT_SKIP = "outcome_unknown"
+IN_DOUBT_SKIP = attempts.OUTCOME_UNKNOWN
 """The create's outcome is unknown: the attempt waits for reconciliation, the job ends."""
+TASK_HELD = "task_held"
+"""Skip reason: the booking holds a task, or an earlier create may still make one (ADR 0123
+point 8, ``contact_center_attempts.refuse_second_task``): no second task."""
 
 
 @dataclass(frozen=True)
@@ -187,8 +194,15 @@ class AttemptEvents:
         provider: ContactCenterKind,
         at: datetime,
         organisation_id: int | None = None,
+        *,
+        task_kind: TaskKind | None = None,
     ) -> Booking | None:
         """Match a task OpenPlanner did not know to an attempt by its ``origin`` (a reference).
+
+        ``task_kind`` is the task's kind as the platform's event names it, ``None`` when the
+        event does not say. A task whose kind is not the kind the create was tried as is never
+        adopted as the attempt's own (ADR 0123 point 8); an orphan is stored with its own kind,
+        so that it is ended the way its kind is ended.
 
         Only a booking without a task, of a service routed to ``provider``, inside the
         organisation of the webhook address (``organisation_id``; at the installation's address
@@ -204,45 +218,90 @@ class AttemptEvents:
 
         An attempt still ``dispatching`` is never adopted: its create is still running and gives
         the task itself.
+
+        A booking without a request (not request work) whose create had an unknown outcome
+        (``CallService.ensure_task`` kept the kind it was tried as) is matched the same way:
+        adopted while it is confirmed, an orphan ended once it is not.
         """
         booking_id = booking_id_of(origin)
         booking = await tx.get_booking(booking_id) if booking_id is not None else None
-        request = await tx.get_request_of_booking(stored_id(booking)) if booking else None
-        if booking is None or request is None or booking.contact_center_task is not None:
+        if booking is None or booking.contact_center_task is not None:
             return None
-        if not await self._ours(tx, booking, request, provider, organisation_id):
+        request = await tx.get_request_of_booking(stored_id(booking))
+        if request is None:
+            return await self._adopt_unknown_outcome(
+                tx, booking, task_id, provider, at, organisation_id, task_kind
+            )
+        if not await self._ours(tx, booking, request.organisation_id, provider, organisation_id):
             return None
         # The kind of the latest attempt, stored before it was tried. The platform's task carries
         # only the booking's reference, no attempt id, so which attempt an orphan belongs to
         # cannot be told; the latest attempt is the safest reading (a form when none is stored,
         # as before the step), and it is the only attempt that can still be in doubt.
-        task = ContactCenterTaskRef(task_id, provider, booking.attempted_task_kind)
+        tried = booking.attempted_task_kind or TaskKind.FORM
         items = [
             i
             for i in await tx.work_items_of(request.id or 0)
             if i.channel is WorkChannel.CONTACT_CENTER
         ]
         doubt = next((i for i in items if i.state is WorkItemState.RECONCILIATION_REQUIRED), None)
+        if doubt is not None and not attempts.adoptable(task_kind, tried):
+            # Not the create in doubt: its own task may still come, and must find the booking
+            # without a task. This one is never attached (ADR 0123 point 8).
+            return None
+        task = ContactCenterTaskRef(task_id, provider, task_kind or tried)
         if doubt is not None and booking.status is BookingStatus.CONFIRMED:
             if not await tx.update_work_item(attempts.dispatched(doubt), doubt.state):
                 return None
-            await tx.save_task(stored_id(booking), task)
+            if not await tx.attach_task(stored_id(booking), task):
+                # Read without a task under this lock: the invariant is already broken. Refuse
+                # the whole transaction rather than leave the attempt dispatched without one.
+                raise DomainError(ErrorCode.CONTACT_CENTER_TASK_HELD)
             return replace(booking, contact_center_task=task)
-        horizon = at - timedelta(minutes=self._window())
         orphaned = doubt is not None or any(
-            i.state in ORPHANED and i.ended_at is not None and i.ended_at >= horizon for i in items
+            attempts.late_task_is_orphan(i, at, self._window()) for i in items
         )
         if not orphaned:
             return None
-        await tx.save_task(stored_id(booking), task)
-        await tx.add_jobs(stored_id(booking), [PlannedJob(JobType.END_WXCC_TASK, at, None)])
+        return await _keep_to_end(tx, booking, task, at)
+
+    async def _adopt_unknown_outcome(
+        self,
+        tx: Transaction,
+        booking: Booking,
+        task_id: str,
+        provider: ContactCenterKind,
+        at: datetime,
+        organisation_id: int | None,
+        task_kind: TaskKind | None,
+    ) -> Booking | None:
+        """Match a late task to a booking without a request whose create had an unknown outcome.
+
+        ``CallService.ensure_task`` keeps the kind it tried (``attempted_task_kind``) when the
+        platform's answer was lost, and never tries again: the task that shows up is the one.
+        A confirmed booking adopts it; a booking that is over (cancelled, moved) keeps it only to
+        end it. A task of the other kind is never the one that was tried.
+        """
+        tried = booking.attempted_task_kind
+        if tried is None or not attempts.adoptable(task_kind, tried):
+            return None
+        group = await tx.get_group_by_id(booking.group_id)
+        if group is None or not await self._ours(
+            tx, booking, group.organisation_id, provider, organisation_id
+        ):
+            return None
+        task = ContactCenterTaskRef(task_id, provider, tried)
+        if booking.status is not BookingStatus.CONFIRMED:
+            return await _keep_to_end(tx, booking, task, at)
+        if not await tx.attach_task(stored_id(booking), task):
+            return None
         return replace(booking, contact_center_task=task)
 
     async def _ours(
         self,
         tx: Transaction,
         booking: Booking,
-        request: ServiceRequest,
+        organisation: int,
         provider: ContactCenterKind,
         organisation_id: int | None,
     ) -> bool:
@@ -260,10 +319,23 @@ class AttemptEvents:
         ):
             return False
         if organisation_id is not None:
-            return request.organisation_id == organisation_id
+            return organisation == organisation_id
         if self._own_connection is None:
             return True
-        return not await self._own_connection(request.organisation_id)
+        return not await self._own_connection(organisation)
+
+
+async def _keep_to_end(
+    tx: Transaction, booking: Booking, task: ContactCenterTaskRef, at: datetime
+) -> Booking | None:
+    """Keep an orphan ``task`` on ``booking`` only so that the end-task job ends it (ADR 0021).
+
+    ``None`` when the booking holds a task already (``attach_task`` is conditional).
+    """
+    if not await tx.attach_task(stored_id(booking), task):
+        return None
+    await tx.add_jobs(stored_id(booking), [PlannedJob(JobType.END_WXCC_TASK, at, None)])
+    return replace(booking, contact_center_task=task)
 
 
 def own_connection_of(
@@ -356,8 +428,8 @@ class RequestDispatch:
             return FALLBACK
         built = await self._task_of(booking, group)  # before the attempt: a refusal opens none
         opened = await self._open(booking, group, built.task_kind)
-        if opened is None:
-            return HELD
+        if isinstance(opened, str):
+            return opened
         try:
             task_id = await dispatcher.create_task(built)
         except IntegrationError as error:
@@ -382,22 +454,32 @@ class RequestDispatch:
         await self._integration.record(stored_id(booking), EventKind.TASK_CREATED)
         return None
 
-    async def _open(self, booking: Booking, group: Group, task_kind: TaskKind) -> _Write | None:
-        """Open the attempt under the lock; ``None`` when someone holds the request.
+    async def _open(self, booking: Booking, group: Group, task_kind: TaskKind) -> _Write | str:
+        """Open the attempt under the lock; the skip reason when none may be opened.
 
-        The kind the create is tried as is stored with the attempt, before the platform
-        answers, so that adoption of a task found later reads it back (ADR 0123 step 7a).
+        ``HELD`` when someone holds the request, ``TASK_HELD`` when the booking holds a task or
+        an earlier attempt may still make one (ADR 0123 point 8), both read under the lock. The
+        kind the create is tried as is stored with the attempt, before the platform answers, so
+        that adoption of a task found later reads it back (ADR 0123 step 7a).
         """
         now = self._clock.now()
         async with self._uow.locked() as tx:
             request = await self._work.request_of(tx, group, booking, now)
             active = await tx.get_active_work_item(request.id or 0)
+            current = await tx.get_booking(stored_id(booking))
             try:
-                new_request, item = attempts.open_attempt(request, active, now=now)
-            except DomainError:
-                return None
+                new_request, item = attempts.open_attempt(
+                    request,
+                    active,
+                    now=now,
+                    holds_task=current is None or current.contact_center_task is not None,
+                    earlier=await tx.work_items_of(request.id or 0),
+                    window_minutes=self._window(),
+                )
+            except DomainError as error:
+                return TASK_HELD if error.code is ErrorCode.CONTACT_CENTER_TASK_HELD else HELD
             if not await tx.update_service_request(new_request, request.handling):
-                return None
+                return HELD
             stored = await tx.add_work_item(item)
             await tx.save_task_attempt(stored_id(booking), task_kind)
         return _Write(new_request, new_request, stored, stored.state)

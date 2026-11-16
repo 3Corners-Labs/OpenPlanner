@@ -14,23 +14,38 @@ attempt is active.
     watchdog (``app.domain.request_watch``): an attempt not started by its deadline ─► expired,
     its booking ended ─► cancelled; a task the platform holds is then ended there (step 27)
 
+One task, of one kind, per contact moment (ADR 0123 point 8): ``refuse_second_task`` is the one
+rule that keeps a create from being tried while the booking holds a task or an earlier create
+may still make one. ``open_attempt`` applies it to request work, ``CallService.ensure_task`` to a
+booking without a request; a late task is matched by ``late_task_is_orphan`` and by its kind.
+
 Pure Python, no I/O; the use cases are in ``app.domain.request_dispatch``. The build brief is
 ``docs/service-flows-contact-center-contract-design.md`` section 11.
 """
 
+from collections.abc import Sequence
 from dataclasses import replace
 from datetime import datetime, timedelta
 
 from app.domain.booking import BookingStatus
+from app.domain.calls import TaskState
+from app.domain.contact_center import TaskKind
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.service_requests import (
     IN_DOUBT,
+    ORPHANED,
     HandlingState,
     ServiceRequest,
     WorkChannel,
     WorkItem,
     WorkItemState,
 )
+
+OUTCOME_UNKNOWN = "outcome_unknown"
+"""A create whose outcome is unknown: the timeline's detail and the dispatch job's skip reason."""
+
+TASK_OVER: frozenset[TaskState] = frozenset({TaskState.ENDED, TaskState.FAILED})
+"""The states in which the platform reported a task over; in any other a stored task is live."""
 
 WATCHDOG_ENDED: frozenset[WorkItemState] = frozenset(
     {WorkItemState.EXPIRED, WorkItemState.CANCELLED}
@@ -55,19 +70,75 @@ def _attempt(item: WorkItem | None) -> WorkItem:
     return item
 
 
+def refuse_second_task(*, holds_task: bool, pending: bool) -> None:
+    """Refuse a create for a contact moment that has, or may still get, a task.
+
+    ADR 0123 point 8: one contact moment (a booking) has at most one task at the contact
+    center, of one kind, and never a second offer. ``holds_task`` says the booking holds a
+    task's id, of either kind, live or ended: its one column holds one task, so a second create
+    would leave the first without a way to end it. ``pending`` says an earlier create may still
+    make a task the platform has not reported (its outcome unknown, or an orphan still inside
+    the window): that task is ended or adopted when it shows up, never joined by a second.
+
+    Raises:
+        DomainError: ``contact_center_task_held`` in either case.
+    """
+    if holds_task or pending:
+        raise DomainError(ErrorCode.CONTACT_CENTER_TASK_HELD)
+
+
+def late_task_is_orphan(item: WorkItem, now: datetime, window_minutes: int) -> bool:
+    """Return whether a task the platform reports late for ``item`` is an orphan to end.
+
+    An attempt ended fenced, cancelled or expired (``ORPHANED``) whose create may still have
+    made a task: within ``window_minutes`` after it ended, such a task is recognised as ours
+    and ended (ADR 0121 step 6b, step 27); after that it is not ours.
+    """
+    return (
+        item.channel is WorkChannel.CONTACT_CENTER
+        and item.state in ORPHANED
+        and item.ended_at is not None
+        and item.ended_at + timedelta(minutes=window_minutes) >= now
+    )
+
+
+def adoptable(reported: TaskKind | None, tried: TaskKind) -> bool:
+    """Return whether a late task of kind ``reported`` can be the create tried as ``tried``.
+
+    The platform's event names the task's kind when it carries it (``None`` when it does not):
+    a task of the other kind is never the attempt's own, so it is never attached to the
+    contact moment (ADR 0123 point 8). Without a reported kind the stored one is all there is.
+    """
+    return reported is None or reported is tried
+
+
 def open_attempt(
-    request: ServiceRequest, active: WorkItem | None, *, now: datetime
+    request: ServiceRequest,
+    active: WorkItem | None,
+    *,
+    now: datetime,
+    holds_task: bool,
+    earlier: Sequence[WorkItem],
+    window_minutes: int,
 ) -> tuple[ServiceRequest, WorkItem]:
     """Return the request assigned to the contact center and its new attempt, ``dispatching``.
 
+    ``holds_task`` says the booking holds a task already; ``earlier`` are the request's work
+    items, whose orphans may still make one within ``window_minutes`` (``refuse_second_task``).
+
     Raises:
         DomainError: ``booking_not_active`` for a finished request or one in recovery,
-            ``already_claimed`` when someone holds it (the fence).
+            ``already_claimed`` when someone holds it (the fence), ``contact_center_task_held``
+            when the booking holds a task or an earlier attempt may still make one.
     """
     if request.terminal or request.handling is HandlingState.RECOVERY_REQUIRED:
         raise DomainError(ErrorCode.BOOKING_NOT_ACTIVE)
     if active is not None or request.handling is not HandlingState.QUEUED:
         raise DomainError(ErrorCode.ALREADY_CLAIMED)
+    refuse_second_task(
+        holds_task=holds_task,
+        pending=any(late_task_is_orphan(i, now, window_minutes) for i in earlier),
+    )
     item = WorkItem(
         id=None,
         request_id=request.id or 0,
@@ -216,3 +287,14 @@ def watchdog_ends_task(
         and has_task
         and booking is not BookingStatus.CANCELLED
     )
+
+
+def held_twice(task: TaskState, active: WorkItem | None) -> bool:
+    """Return whether a contact moment that holds a task in state ``task`` is held twice.
+
+    ADR 0123 point 8, the nightly check: a live task at the contact center while the own queue
+    holds the request (``active`` is an own-queue work item) is a second offer of one contact
+    moment. A second live task cannot be stored (one column), so this is the form a breach of
+    the rule takes in OpenPlanner's own records. ``count_contact_moments_held_twice`` counts it.
+    """
+    return task not in TASK_OVER and active is not None and active.channel is WorkChannel.OWN_QUEUE

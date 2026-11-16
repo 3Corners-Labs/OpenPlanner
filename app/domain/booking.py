@@ -273,11 +273,13 @@ class Booking:
     trial_count: int = 0
     contact_center_task: ContactCenterTaskRef | None = None
     """The task at the contact center and its platform (ADR 0032); purged with the contact."""
-    attempted_task_kind: TaskKind = TaskKind.FORM
+    attempted_task_kind: TaskKind | None = None
     """The kind the latest create of a task was tried as (ADR 0123 step 7a), stored before the
-    platform answers and cleared with a stored task or a failed attempt; a form when none is
-    pending. Adoption gives an orphan this kind: the platform's task carries no attempt id, so
-    the latest attempt is all there is to go by."""
+    platform answers and cleared with a stored task or a failed attempt; ``None`` when no create
+    is pending (request work reads that as a form, as before the step). Adoption gives an orphan
+    this kind: the platform's task carries no attempt id, so the latest attempt is all there is
+    to go by. For a booking without a request it is also the mark of a create whose outcome is
+    unknown: no second create is tried while it is set (ADR 0123 point 8)."""
     kind: BookingKind = BookingKind.SCHEDULED
     closure_id: int | None = None
     change_reason: ChangeReason | None = None

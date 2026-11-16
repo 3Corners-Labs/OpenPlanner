@@ -449,7 +449,9 @@ def _booking(row: BookingRow, slot: SlotRow) -> Booking:
         else None,
         trial_count=row.trial_count,
         contact_center_task=task_of(row),
-        attempted_task_kind=TaskKind(row.contact_center_attempt_kind or TaskKind.FORM),
+        attempted_task_kind=(
+            TaskKind(row.contact_center_attempt_kind) if row.contact_center_attempt_kind else None
+        ),
         kind=BookingKind(slot.kind),
         closure_id=row.closure_id,
         change_reason=ChangeReason(row.change_reason) if row.change_reason else None,
@@ -1436,6 +1438,15 @@ class SqlTransaction(
         await self._session.execute(
             update(BookingRow).where(BookingRow.id == booking_id).values(**task_columns(task))
         )
+
+    async def attach_task(self, booking_id: int, task: ContactCenterTaskRef) -> bool:
+        """Store ``task`` only on a booking without one (``without_task``); whether it was."""
+        result = await self._session.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id, without_task())
+            .values(**task_columns(task))
+        )
+        return bool(getattr(result, "rowcount", 0) == 1)
 
     async def save_task_attempt(self, booking_id: int, task_kind: TaskKind | None) -> None:
         """Store the kind a create is tried as, before the answer; ``None`` clears it.

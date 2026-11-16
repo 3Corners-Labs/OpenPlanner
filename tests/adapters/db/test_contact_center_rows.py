@@ -3,7 +3,9 @@
 from dataclasses import replace
 from datetime import timedelta
 
+import pytest
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.db.models import BookingRow, GroupContactCenterRow, GroupRow, JobRow
@@ -313,10 +315,13 @@ async def test_a_task_keeps_the_kind_it_was_created_with(engine: AsyncEngine) ->
     assert column == "conversation"
 
 
-async def test_a_task_stored_before_the_step_reads_as_a_form(engine: AsyncEngine) -> None:
+async def test_a_stored_task_cannot_lose_its_kind(engine: AsyncEngine) -> None:
+    """ADR 0123 point 8, migration 0122: a task made before the kind existed was given ``form``;
+    from then on the database refuses a task id without its kind (one task, of one kind)."""
     uow, booking_id = await _booking_with_task(engine)
-    async with engine.begin() as connection:
-        await connection.execute(update(BookingRow).values(contact_center_task_kind=None))
+    with pytest.raises(IntegrityError, match="ck_bookings_task_kind"):
+        async with engine.begin() as connection:
+            await connection.execute(update(BookingRow).values(contact_center_task_kind=None))
 
     async with uow.read() as tx:
         booking = await tx.get_booking(booking_id)
@@ -370,7 +375,35 @@ async def test_storing_a_task_clears_the_attempt_and_clearing_it_leaves_the_task
         booking = await tx.get_booking(booking_id)
 
     assert booking is not None
-    assert booking.attempted_task_kind is TaskKind.FORM  # NULL is a form
+    assert booking.attempted_task_kind is None  # no create pending
     assert booking.contact_center_task == ContactCenterTaskRef(
         "task-2", WEBEX_CC, TaskKind.CONVERSATION
     )
+
+
+async def test_a_late_task_is_attached_only_to_a_booking_that_holds_none(
+    engine: AsyncEngine,
+) -> None:
+    """ADR 0123 point 8: two connections that both read the booking without a task each try to
+    attach a late task; the conditional write lets the first win and refuses the second, so a
+    stale read never replaces a task the booking already holds."""
+    await seed_group(engine, slug="balie")
+    first, second = SqlUnitOfWork(engine), SqlUnitOfWork(engine)
+    receipt = await book(BookingService(first, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0))
+    booking_id = receipt.booking.id or 0
+    async with first.read() as tx, second.read() as other:  # both see no task
+        seen = await tx.get_booking(booking_id), await other.get_booking(booking_id)
+    assert all(b is not None and b.contact_center_task is None for b in seen)
+
+    async with first.locked() as tx:
+        won = await tx.attach_task(booking_id, ContactCenterTaskRef("late-1", WEBEX_CC))
+    async with second.locked() as tx:
+        lost = await tx.attach_task(
+            booking_id, ContactCenterTaskRef("late-2", WEBEX_CC, TaskKind.CONVERSATION)
+        )
+
+    async with first.read() as tx:
+        booking = await tx.get_booking(booking_id)
+    assert (won, lost) == (True, False)
+    assert booking is not None
+    assert booking.contact_center_task == ContactCenterTaskRef("late-1", WEBEX_CC)

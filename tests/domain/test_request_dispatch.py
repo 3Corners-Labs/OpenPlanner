@@ -19,12 +19,10 @@ from app.domain.job_plan import JobType
 from app.domain.ports import IntegrationError
 from app.domain.request_dispatch import IN_DOUBT_SKIP, OWN_QUEUE
 from app.domain.scheduling import JoinClient
-from app.domain.service_flows import FlowRevision, InteractionKind
+from app.domain.service_flows import InteractionKind
 from app.domain.service_requests import (
     HandlingState,
-    ServiceRequest,
     WorkChannel,
-    WorkItem,
     WorkItemState,
 )
 from app.domain.slot_close import CLOSE_DELAY
@@ -32,11 +30,20 @@ from app.domain.usage import FactKind, UsageFact, UsageOutcome
 from app.domain.webhook_replay import INSTALLATION_SCOPE
 from tests.fakes.clock import FixedClock
 from tests.fakes.persistence import InMemoryUnitOfWork
-from tests.support.contact_center_requests import CC_FLOW, WINDOW, Desk, cc_world, desk
+from tests.support.contact_center_requests import (
+    CC_FLOW,
+    SOURCE,
+    WINDOW,
+    Desk,
+    cc_world,
+    desk,
+    dispatch,
+    event,
+    items_of,
+    request_of,
+)
 from tests.support.domain import webex_routing
 from tests.support.request_work import AGENT, FLOW, at, book
-
-SOURCE = "webex_cc"
 
 
 @pytest.fixture
@@ -47,41 +54,6 @@ def uow() -> InMemoryUnitOfWork:
 @pytest.fixture
 def the_desk(uow: InMemoryUnitOfWork, clock: FixedClock) -> Desk:
     return desk(uow, clock)
-
-
-def request_of(uow: InMemoryUnitOfWork, booking_id: int) -> ServiceRequest:
-    """Return the one request of ``booking_id``."""
-    return next(r for r in uow.state.requests.values() if r.booking_id == booking_id)
-
-
-def items_of(uow: InMemoryUnitOfWork, booking_id: int) -> list[WorkItem]:
-    """Return the work items of the request of ``booking_id``, oldest first."""
-    request = request_of(uow, booking_id)
-    found = [i for i in uow.state.work_items.values() if i.request_id == request.id]
-    return sorted(found, key=lambda i: i.id or 0)
-
-
-async def dispatch(the_desk: Desk, booking_id: int) -> str | None:
-    """Run the dispatch of ``booking_id`` as the dispatch job does."""
-    booking = the_desk.uow.state.bookings[booking_id]
-    group = the_desk.uow.state.groups[booking.group_id]
-    revision = await the_desk.dispatch.handles(booking)
-    assert isinstance(revision, FlowRevision)
-    return await the_desk.dispatch.dispatch(booking, group, revision)
-
-
-async def event(the_desk: Desk, task_id: str, kind: EventKind, origin: str = "") -> EventOutcome:
-    """Deliver one platform event of ``task_id``."""
-    return await the_desk.integration.record_task_event(
-        task_id,
-        kind,
-        the_desk.clock.now(),
-        origin=origin,
-        provider=ContactCenterKind.WEBEX_CC,
-        source=SOURCE,
-        scope=INSTALLATION_SCOPE,
-        body_identity="",
-    )
 
 
 async def test_a_task_without_a_meeting_reaches_the_contact_center_once(
@@ -242,7 +214,7 @@ async def test_a_failed_attempt_leaves_no_kind_and_the_next_attempt_is_labelled_
 
     booking = uow.state.bookings[booking_id]
     assert booking.contact_center_task is None
-    assert booking.attempted_task_kind is TaskKind.FORM  # cleared by the final failure
+    assert booking.attempted_task_kind is None  # cleared by the final failure
     uow.state.groups[1] = replace(uow.state.groups[1], contact_center=webex_routing())  # a form now
     the_desk = desk(uow, clock, uses_call_page=True)
     the_desk.dispatcher.error = IntegrationError("unreachable", retryable=True, ambiguous=True)
@@ -276,7 +248,7 @@ async def test_an_attempt_keeps_its_kind_while_it_is_in_doubt_and_loses_it_with_
     await event(the_desk, "late-5", EventKind.TASK_CONNECTED, reference)
 
     booking = uow.state.bookings[booking_id]
-    assert booking.attempted_task_kind is TaskKind.FORM  # stored task: nothing left to adopt
+    assert booking.attempted_task_kind is None  # stored task: nothing left to adopt
     assert booking.contact_center_task is not None
     assert booking.contact_center_task.task_kind is TaskKind.CONVERSATION
 

@@ -9853,6 +9853,12 @@ msgstr "Een logbestemming neemt geen regels meer aan."
 msgid "admin.alerts.text.retention"
 msgstr "Persoonsgegevens over hun bewaartermijn konden niet allemaal worden verwijderd."
 
+msgid "admin.alerts.source.held_twice"
+msgstr "Contactcenter: dubbel in behandeling"
+
+msgid "admin.alerts.text.held_twice"
+msgstr "Een taak bij het contactcenter loopt nog voor werk dat ook in de eigen wachtrij zit. Eén kant moet het houden."
+
 msgid "admin.alerts.text.other"
 msgstr "Er is een probleem gemeld ({code})."
 

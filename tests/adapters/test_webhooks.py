@@ -11,6 +11,7 @@ from app.adapters.webhooks import (
     parse_wxcc,
 )
 from app.domain.calls import EventKind
+from app.domain.contact_center import TaskKind
 from app.domain.inbound_gate import Refusal
 from tests.support.webhooks import NOW, SECRET, sign, timestamp, wxcc_body
 
@@ -95,6 +96,23 @@ def test_wxcc_events_map_to_call_events() -> None:
     assert created is not None
     assert created.kind is EventKind.TASK_CREATED  # ADR 0082: the probe work item needs it
     assert parse_wxcc({"type": "task:ended", "data": {}}) is None
+
+
+def test_a_wxcc_event_names_the_task_kind_only_when_it_carries_a_known_one() -> None:
+    """ADR 0123 point 8: a late task of the other kind is never attached, so its kind is read."""
+    kinds = {
+        channel: parse_wxcc(json.loads(wxcc_body("task:new", channelType=channel)))
+        for channel in ("workItem", "customMessaging", "telephony", 7)
+    }
+    assert {c: e.task_kind if e else None for c, e in kinds.items()} == {
+        "workItem": TaskKind.FORM,
+        "customMessaging": TaskKind.CONVERSATION,
+        "telephony": None,
+        7: None,
+    }
+    plain = parse_wxcc(json.loads(wxcc_body("task:new")))
+    assert plain is not None
+    assert plain.task_kind is None
 
 
 def test_webex_events_map_to_call_events_without_names() -> None:

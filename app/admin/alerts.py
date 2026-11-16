@@ -48,7 +48,7 @@ from app.domain.connection_health import WEBHOOKS_MISSING
 from app.domain.integration_check import CHECK_EVENT
 from app.domain.log_destinations import HEALTH_EVENT
 from app.domain.public_address import EVENT as ADDRESS_EVENT
-from app.domain.retention_sweep import SWEPT
+from app.domain.retention_sweep import HELD_TWICE, SWEPT
 from app.domain.storage import STORAGE_EVENT
 from app.domain.tls import EVENT as CERTIFICATE_EVENT
 from app.web.alert_text import alert_path
@@ -73,6 +73,7 @@ SOURCE_LABELS: dict[str, str] = {
     ADDRESS_EVENT: "admin.alerts.source.address",
     HEALTH_EVENT: "admin.alerts.source.log_destination",
     SWEPT: "admin.alerts.source.retention",
+    HELD_TWICE: "admin.alerts.source.held_twice",
     CHECK_EVENT: "admin.alerts.source.integration",
     QUEUE_WAIT_EVENT: "admin.alerts.source.queue_wait",
     WORKER_ALERT: "admin.alerts.source.worker",
@@ -95,6 +96,7 @@ OWN_TEXTS: dict[str, str] = {
     WORKER_ALERT: "admin.alerts.text.worker",
     HEALTH_EVENT: "admin.alerts.text.log_destination",
     SWEPT: "admin.alerts.text.retention",
+    HELD_TWICE: "admin.alerts.text.held_twice",
     CHECK_EVENT: "admin.alerts.text.check",
     CONNECTION_HEALTH: "admin.alerts.text.connection",
     WEBHOOKS_MISSING: "admin.alerts.text.webhooks_missing",
