@@ -49,8 +49,8 @@ and uid 10001 as the image's own user outside OpenShift.
 
 | Step | What | PR | State |
 |---|---|---|---|
-| 0 | ADR | #TBD | merged |
-| 1 | `openshift.enabled`, the Route, group-0 writable paths, rendering tests, `docs/kubernetes.md` section | #TBD | merged |
+| 0 | ADR | #911 | merged |
+| 1 | `openshift.enabled`, the Route, group-0 writable paths, rendering tests, `docs/kubernetes.md` section | #911 | merged |
 | 2 | A run on a real OpenShift cluster under `restricted-v2` (a person with a cluster) | | planned |
 | 3 | An ArgoCD example (`Application` for the chart), once the chart is an OCI artifact (ADR 0114 step 5) | | planned |
 
