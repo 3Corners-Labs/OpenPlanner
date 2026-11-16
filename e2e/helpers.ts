@@ -38,12 +38,27 @@ export function participantEmail(testInfo: TestInfo): string {
 
 /** Press Tab until `locator` has focus; fails if it is not reachable with the keyboard. */
 export async function tabTo(page: Page, locator: Locator): Promise<void> {
+  await pressUntilFocused(page, locator, 'Tab');
+}
+
+/**
+ * Press Shift+Tab until `locator` has focus: for a target that comes before the focused element.
+ *
+ * Tab never wraps round to the top of the page reliably: past the last element Firefox moves
+ * focus into the browser itself and the page gets it back only after a variable number of
+ * presses. A target earlier in the page is therefore reached backwards, never by wrapping.
+ */
+export async function shiftTabTo(page: Page, locator: Locator): Promise<void> {
+  await pressUntilFocused(page, locator, 'Shift+Tab');
+}
+
+async function pressUntilFocused(page: Page, locator: Locator, key: string): Promise<void> {
   for (let i = 0; i < 200; i++) {
     // Inside a shadow root (the widget) the root, not the document, knows the focused element.
     if (await locator.evaluate((el) => el === (el.getRootNode() as Document | ShadowRoot).activeElement)) return;
-    await page.keyboard.press('Tab');
+    await page.keyboard.press(key);
   }
-  throw new Error('element not reachable with Tab');
+  throw new Error(`element not reachable with ${key}`);
 }
 
 /** The minimum notice of the demo group (`seed-demo`, `min_notice_minutes`). */
@@ -70,28 +85,83 @@ export async function timeClearOfNotice(page: Page): Promise<Locator | null> {
   return index < 0 ? null : buttons.nth(index);
 }
 
+/** How many months `chooseTimeByKeyboard` looks ahead before it gives up. */
+const MONTHS_AHEAD = 3;
+
 /**
- * Return a time clear of the minimum notice, moving through the calendar grid with the arrow
- * keys and Enter to the next free day while the shown day has none (late on a day, its last
- * times can all lie inside the margin). Keyboard only, as the tests that call it.
+ * Return a time clear of the minimum notice, moving through the calendar grid with the keyboard
+ * to the next free day while the shown day has none (late on a day, its last times can all lie
+ * inside the margin). Keyboard only, as the tests that call it.
+ *
+ * The next free day is read from the grid's links (a day with times is a link, a closed or full
+ * day is not) and reached with ArrowRight; when the shown month has no later free day, PageDown
+ * opens the next month and the same rule picks its first free day, never the day that merely
+ * holds the tab stop. The grid comes before the times in the page, so it is reached with
+ * Shift+Tab from the times (`shiftTabTo`, never by wrapping round the page); after PageDown the
+ * page is new, focus is at its top and Tab reaches it.
  */
 export async function chooseTimeByKeyboard(page: Page): Promise<Locator> {
-  for (let day = 0; day < 31; day++) {
+  for (let attempt = 0; attempt < 31 * MONTHS_AHEAD; attempt++) {
     const time = await timeClearOfNotice(page);
     if (time !== null) return time;
-    const grid = page.getByRole('grid');
-    const current = await grid.locator('.calendar__day[tabindex="0"]').getAttribute('data-day');
-    await tabTo(page, grid.locator('.calendar__day[tabindex="0"]'));
-    // Move right until a later day that has times (a link) holds the tab stop.
-    for (let step = 0; step < 31; step++) {
-      await page.keyboard.press('ArrowRight');
-      const focused = page.locator('.calendar__day[tabindex="0"]');
-      const next = await focused.getAttribute('data-day');
-      const isLink = await focused.evaluate((el) => el.tagName === 'A');
-      if (next !== null && current !== null && next > current && isLink) break;
-    }
-    await page.keyboard.press('Enter');
-    await expect(page.locator('#times-heading')).toBeFocused();
+    await openNextFreeDay(page);
   }
-  throw new Error('no time clear of the minimum notice in the coming month');
+  throw new Error(`no time clear of the minimum notice in the coming ${MONTHS_AHEAD} months`);
+}
+
+/** The grid's tab stop: the one day of the calendar that Tab reaches. */
+function tabStop(page: Page): Locator {
+  return page.getByRole('grid').locator('.calendar__day[tabindex="0"]');
+}
+
+/** Return the days of the shown month that have times (links) and come after `after`. */
+async function freeDaysAfter(page: Page, after: string): Promise<string[]> {
+  return page
+    .getByRole('grid')
+    .locator('a.calendar__day')
+    .evaluateAll(
+      (links, day) =>
+        links.map((link) => link.getAttribute('data-day') ?? '').filter((d) => d > day),
+      after,
+    );
+}
+
+/**
+ * Open the next free day after the shown one with the keyboard: in this month if it has one,
+ * else in the first following month that has one (at most `MONTHS_AHEAD`).
+ */
+async function openNextFreeDay(page: Page): Promise<void> {
+  const stop = tabStop(page);
+  let after = (await stop.getAttribute('data-day')) ?? '';
+  await shiftTabTo(page, stop);
+  for (let month = 0; month <= MONTHS_AHEAD; month++) {
+    const [target] = await freeDaysAfter(page, after);
+    if (target !== undefined) {
+      await arrowTo(page, target);
+      await page.keyboard.press('Enter');
+      await expect(page.locator('#times-heading')).toBeFocused();
+      await expect(page.locator(`a.calendar__day[data-day="${target}"]`)).toHaveAttribute(
+        'aria-current',
+        'true',
+      );
+      return;
+    }
+    // No later free day this month: the next month is a new page; every day of it is later.
+    const shown = (await stop.getAttribute('data-day')) ?? '';
+    await page.keyboard.press('PageDown');
+    await expect(stop).not.toHaveAttribute('data-day', shown);
+    await tabTo(page, stop);
+    after = '';
+  }
+  throw new Error(`no free day in the coming ${MONTHS_AHEAD} months`);
+}
+
+/** Move the focused grid's roving tab stop with ArrowRight to the day `target` of this month. */
+async function arrowTo(page: Page, target: string): Promise<void> {
+  const stop = tabStop(page);
+  for (let step = 0; (await stop.getAttribute('data-day')) !== target; step++) {
+    if (step > 42) throw new Error(`the arrow keys did not reach ${target}`);
+    await page.keyboard.press('ArrowRight');
+  }
+  await expect(stop).toBeFocused();
 }
