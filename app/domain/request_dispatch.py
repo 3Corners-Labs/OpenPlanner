@@ -194,6 +194,7 @@ class AttemptEvents:
         provider: ContactCenterKind,
         at: datetime,
         organisation_id: int | None = None,
+        *,
         task_kind: TaskKind | None = None,
     ) -> Booking | None:
         """Match a task OpenPlanner did not know to an attempt by its ``origin`` (a reference).
@@ -252,7 +253,10 @@ class AttemptEvents:
         if doubt is not None and booking.status is BookingStatus.CONFIRMED:
             if not await tx.update_work_item(attempts.dispatched(doubt), doubt.state):
                 return None
-            await tx.save_task(stored_id(booking), task)
+            if not await tx.attach_task(stored_id(booking), task):
+                # Read without a task under this lock: the invariant is already broken. Refuse
+                # the whole transaction rather than leave the attempt dispatched without one.
+                raise DomainError(ErrorCode.CONTACT_CENTER_TASK_HELD)
             return replace(booking, contact_center_task=task)
         orphaned = doubt is not None or any(
             attempts.late_task_is_orphan(i, at, self._window()) for i in items
@@ -289,7 +293,8 @@ class AttemptEvents:
         task = ContactCenterTaskRef(task_id, provider, tried)
         if booking.status is not BookingStatus.CONFIRMED:
             return await _keep_to_end(tx, booking, task, at)
-        await tx.save_task(stored_id(booking), task)
+        if not await tx.attach_task(stored_id(booking), task):
+            return None
         return replace(booking, contact_center_task=task)
 
     async def _ours(
@@ -322,9 +327,13 @@ class AttemptEvents:
 
 async def _keep_to_end(
     tx: Transaction, booking: Booking, task: ContactCenterTaskRef, at: datetime
-) -> Booking:
-    """Keep an orphan ``task`` on ``booking`` only so that the end-task job ends it (ADR 0021)."""
-    await tx.save_task(stored_id(booking), task)
+) -> Booking | None:
+    """Keep an orphan ``task`` on ``booking`` only so that the end-task job ends it (ADR 0021).
+
+    ``None`` when the booking holds a task already (``attach_task`` is conditional).
+    """
+    if not await tx.attach_task(stored_id(booking), task):
+        return None
     await tx.add_jobs(stored_id(booking), [PlannedJob(JobType.END_WXCC_TASK, at, None)])
     return replace(booking, contact_center_task=task)
 

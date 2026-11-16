@@ -239,3 +239,17 @@ async def test_a_create_that_failed_for_good_forgets_its_kind(
     the_desk.dispatcher.error = None
     await ensure(the_desk, booking_id)
     assert len(the_desk.dispatcher.items) == 1
+
+
+async def test_an_unexpected_failure_of_the_create_forgets_its_kind(
+    the_desk: Desk, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """Any failure other than an unknown outcome clears the pending mark before it propagates,
+    so the booking is never left marked as waiting for a task that no create is making."""
+    booking_id = await legacy_booking(uow, clock, TaskKind.FORM)
+    the_desk.dispatcher.error = RuntimeError("boom")  # type: ignore[assignment]
+
+    with pytest.raises(RuntimeError):
+        await ensure(the_desk, booking_id)
+
+    assert uow.state.bookings[booking_id].attempted_task_kind is None

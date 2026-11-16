@@ -845,6 +845,12 @@ class InMemoryTransaction(ServiceRequestStore):
             booking, contact_center_task=task, attempted_task_kind=None
         )
 
+    async def attach_task(self, booking_id: int, task: ContactCenterTaskRef) -> bool:
+        if self.state.bookings[booking_id].contact_center_task is not None:
+            return False
+        await self.save_task(booking_id, task)
+        return True
+
     async def save_task_attempt(self, booking_id: int, task_kind: TaskKind | None) -> None:
         booking = self.state.bookings[booking_id]
         self.state.bookings[booking_id] = replace(booking, attempted_task_kind=task_kind)

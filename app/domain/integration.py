@@ -59,6 +59,7 @@ class TaskWork(Protocol):
         provider: ContactCenterKind,
         at: datetime,
         organisation_id: int | None = None,
+        *,
         task_kind: TaskKind | None = None,
     ) -> Booking | None:
         """Match an unknown task to an attempt by its origin; ``None`` when it is not ours."""
@@ -248,7 +249,7 @@ class IntegrationService:
             booking = await tx.get_booking_by_task(task_id, provider)
             if booking is None and self._work is not None and origin:
                 booking = await self._work.adopt(
-                    tx, origin, task_id, provider, at, organisation_id, task_kind
+                    tx, origin, task_id, provider, at, organisation_id, task_kind=task_kind
                 )
             if booking is not None and organisation_id is not None:
                 group = await tx.get_group_by_id(booking.group_id)

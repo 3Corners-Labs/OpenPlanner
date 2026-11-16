@@ -379,3 +379,31 @@ async def test_storing_a_task_clears_the_attempt_and_clearing_it_leaves_the_task
     assert booking.contact_center_task == ContactCenterTaskRef(
         "task-2", WEBEX_CC, TaskKind.CONVERSATION
     )
+
+
+async def test_a_late_task_is_attached_only_to_a_booking_that_holds_none(
+    engine: AsyncEngine,
+) -> None:
+    """ADR 0123 point 8: two connections that both read the booking without a task each try to
+    attach a late task; the conditional write lets the first win and refuses the second, so a
+    stale read never replaces a task the booking already holds."""
+    await seed_group(engine, slug="balie")
+    first, second = SqlUnitOfWork(engine), SqlUnitOfWork(engine)
+    receipt = await book(BookingService(first, FixedClock(NOW), TEST_TOKEN_KEY, treatment_buffer=0))
+    booking_id = receipt.booking.id or 0
+    async with first.read() as tx, second.read() as other:  # both see no task
+        seen = await tx.get_booking(booking_id), await other.get_booking(booking_id)
+    assert all(b is not None and b.contact_center_task is None for b in seen)
+
+    async with first.locked() as tx:
+        won = await tx.attach_task(booking_id, ContactCenterTaskRef("late-1", WEBEX_CC))
+    async with second.locked() as tx:
+        lost = await tx.attach_task(
+            booking_id, ContactCenterTaskRef("late-2", WEBEX_CC, TaskKind.CONVERSATION)
+        )
+
+    async with first.read() as tx:
+        booking = await tx.get_booking(booking_id)
+    assert (won, lost) == (True, False)
+    assert booking is not None
+    assert booking.contact_center_task == ContactCenterTaskRef("late-1", WEBEX_CC)

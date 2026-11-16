@@ -1439,6 +1439,15 @@ class SqlTransaction(
             update(BookingRow).where(BookingRow.id == booking_id).values(**task_columns(task))
         )
 
+    async def attach_task(self, booking_id: int, task: ContactCenterTaskRef) -> bool:
+        """Store ``task`` only on a booking without one (``without_task``); whether it was."""
+        result = await self._session.execute(
+            update(BookingRow)
+            .where(BookingRow.id == booking_id, without_task())
+            .values(**task_columns(task))
+        )
+        return bool(getattr(result, "rowcount", 0) == 1)
+
     async def save_task_attempt(self, booking_id: int, task_kind: TaskKind | None) -> None:
         """Store the kind a create is tried as, before the answer; ``None`` clears it.
 

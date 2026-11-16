@@ -188,12 +188,13 @@ class CallService:
             await tx.save_task_attempt(booking_id, built.task_kind)
         try:
             task_id = await dispatcher.create_task(built)
-        except IntegrationError as error:
-            if error.ambiguous:
+        except Exception as error:
+            if isinstance(error, IntegrationError) and error.ambiguous:
                 await self._integration.record(
                     booking_id, EventKind.INTEGRATION_ERROR, detail=OUTCOME_UNKNOWN
                 )
                 return _with(booking, attempted_task_kind=built.task_kind)
+            # Any other failure made no task: forget the mark before it propagates.
             async with self._uow.locked() as tx:
                 await tx.save_task_attempt(booking_id, None)
             raise

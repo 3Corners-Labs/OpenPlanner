@@ -1451,6 +1451,14 @@ class Transaction(Protocol):
         """Store the booking's contact-center task: its id and the platform that holds it."""
         ...
 
+    async def attach_task(self, booking_id: int, task: ContactCenterTaskRef) -> bool:
+        """Store ``task`` on the booking only while it holds none; whether it was stored.
+
+        The conditional write of a late task (ADR 0123 point 8), as a claim is conditional:
+        a stale read never replaces a task the booking holds.
+        """
+        ...
+
     async def save_task_attempt(self, booking_id: int, task_kind: TaskKind | None) -> None:
         """Store the kind the latest create is about to be tried as (step 7a); ``None`` clears.
 
