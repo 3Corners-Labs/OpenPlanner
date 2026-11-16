@@ -14,7 +14,7 @@ green CI and a decision with the product owner's label (ADR 0078), never through
 | Before coding, and before changing a shared symbol | Graphify MCP (`graphify_find`, `graphify_impact` with `include_risk=true`, `graphify_tests_for`) | Find the definition, the callers, the blast radius and the linked tests from the code graph instead of grepping; CLAUDE.md, *How to work in this repo*, says when to read the file instead |
 | While coding | `/freeze app/<module>` (optional) | Keep edits inside the module being built |
 | Bug or failing test | `/investigate` | Find the root cause before fixing |
-| Before the PR | `pre-pr-review` (repo) | The review CLAUDE.md asks for before every PR, in one command; see *Repo skills* |
+| Before the PR | `make deadcode`, then `pre-pr-review` (repo) | The review CLAUDE.md asks for before every PR, in one command; see *Repo skills* |
 | End | `/context-save` | Hand over to the next session |
 | Now and then, before a release (optional) | `/codex review` via `make release-audit` | Review of everything since the last release by a second model, on the machine of whoever runs it; findings may be pasted into the release PR. Optional and gating nothing since ADR 0128 (it was a required step under ADR 0078); no workflow runs it |
 
