@@ -231,3 +231,21 @@ def test_works_queue_follows_the_matrix_for_the_members_memberships() -> None:
     assert not works_queue(elsewhere, "team", "demo")
     assert works_queue(org_admin, "team", "demo")
     assert not works_queue(auditor, "team", "demo")
+
+
+def test_work_the_contact_center_holds_is_taken_not_waiting_nor_next() -> None:
+    """ADR 0121 step 28 (E10): held by the contact center, the work is nobody's to pick up here.
+
+    It is not next, not waiting and never "not picked up"; the row stays on the list.
+    """
+    limit = timedelta(minutes=10)
+    held = replace(entry(1, -11, lobby=True), held=True)
+    open_one = entry(2, 5)
+
+    assert held.taken
+    assert not held.waiting
+    assert not held.not_picked_up(NOW, limit)
+    assert (nxt := next_up([held, open_one])) is not None
+    assert nxt.booking.id == 2
+    assert next_up([held]) is None
+    assert ids(visible([held], GROUP, NOW)) == [1]
