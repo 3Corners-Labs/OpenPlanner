@@ -39,14 +39,17 @@ from tests.support.admin import (
 )
 from tests.support.domain import NOW
 from tests.support.flow_seed import draft
-from tests.support.pool_flows import shut_gate
+from tests.support.pool_flows import open_gate, set_own_queue, shut_gate
 
 EVERYTHING = Scope(everything=True)
 
 
 @pytest.fixture
-def uow() -> InMemoryUnitOfWork:
-    return InMemoryUnitOfWork(two_organisations())
+async def uow() -> InMemoryUnitOfWork:
+    """The two organisations; ``demo`` works on the own queue, where the flows here dispatch."""
+    made = InMemoryUnitOfWork(two_organisations())
+    await set_own_queue(made)
+    return made
 
 
 def make(uow: InMemoryUnitOfWork, limit: int = 3) -> FlowService:
@@ -313,6 +316,36 @@ async def test_activation_is_refused_with_the_checklist_while_the_gate_is_shut(
     (flow,) = uow.state.flows.values()
     assert flow.state is FlowState.DRAFT
     assert not any(d.startswith("flow.activated") for d in details(uow))
+
+
+async def test_activation_on_a_service_without_an_own_queue_is_refused_with_its_reason(
+    service: FlowService, uow: InMemoryUnitOfWork, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Product owner, 2026-11-15: nobody could claim the work, so the checklist refuses it."""
+    monkeypatch.setattr(flows, "RETENTION_BUILT", True)
+    open_gate(monkeypatch)
+    await person(uow, ORG_ADMIN.subject)
+    _, pool = await seed(uow)
+    await service.create(ORG_ADMIN, "demo", "advies", draft(pool))
+    await set_own_queue(uow, own=False)
+
+    with pytest.raises(DomainError) as publishing:
+        await service.publish(ORG_ADMIN, "demo", "advies")
+    assert publishing.value.field == "readiness"
+
+    await set_own_queue(uow)
+    await service.publish(ORG_ADMIN, "demo", "advies")
+    await set_own_queue(uow, own=False)
+    outcome = await service.activate(ORG_ADMIN, "demo", "advies")
+
+    assert outcome.activated is False
+    assert [(i.code, i.reason) for i in outcome.items if not i.ok] == [
+        (readiness_rules.ReadinessCheck.ROLLBACK, readiness_rules.ReadinessReason.OWN_QUEUE_MISSING)
+    ]
+    assert not any(d.startswith("flow.activated") for d in details(uow))
+
+    await set_own_queue(uow)
+    assert (await service.activate(ORG_ADMIN, "demo", "advies")).activated
 
 
 async def test_activation_needs_a_published_revision(

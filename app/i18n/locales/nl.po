@@ -13473,6 +13473,9 @@ msgstr "Activeren wacht tot ook de vorige versie van OpenPlanner afspraken op ee
 msgid "admin.flows.reason.contact_center_not_ready"
 msgstr "Activeren van een flow die naar het contactcenter stuurt wacht tot het contactcenter is vrijgegeven voor livegang. Dat volgt in een latere versie."
 
+msgid "admin.flows.reason.own_queue_missing"
+msgstr "Deze flow verdeelt naar de eigen wachtrij, maar deze dienst heeft geen eigen wachtrij. Zonder die wachtrij kan niemand het werk oppakken. Kies in de instellingen van de dienst de eigen wachtrij van OpenPlanner."
+
 msgid "admin.flows.summary.none"
 msgstr "Niet ingesteld"
 

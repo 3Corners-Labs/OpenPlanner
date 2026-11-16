@@ -22,6 +22,14 @@ are build work; G15 is an operator check that a person does on the test host wit
 Contact Center tenant (`docs/runbook.md`, *Checklist G15*), and it is the last thing before the
 constant flips.
 
+The same point holds a second rule, which is not an item because it never lifts (product owner,
+2026-11-15; ADR 0121 row 40, #895): once the gate is open, a non-legacy flow that dispatches to
+the own queue is not activated on a service without an own queue (`Group.has_own_queue`, the
+service's `dispatch_kind` is `openplanner_queue`), with the reason `own_queue_missing`, in the
+portal and in the configuration import alike. Without that queue nobody can claim the flow's
+work and the watchdog expires it. While the gate is shut the checklist still names only
+`rollback_not_safe`.
+
 `tests/test_service_flows_compatibility.py` reads this table: every open row of either ADR has an
 item here, and `ROLLBACK_SAFE` must be `False` while any item with *Blocks* `yes` is not `done`.
 

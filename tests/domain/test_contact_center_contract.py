@@ -73,6 +73,7 @@ def _reason(
         made,
         pool(guaranteed=frozenset({10})),
         offered_subjects=(),
+        own_queue=True,
         coded_skills=frozenset({10}),
         carrier=carrier,
     )
@@ -162,7 +163,7 @@ def test_the_own_queue_and_a_legacy_flow_are_not_judged_by_a_platform() -> None:
         legacy(dispatch=CONTACT_CENTER),
     ):
         for carrier in (None, ContactCenterCapabilities()):
-            items = readiness(made, pool(), offered_subjects=(), carrier=carrier)
+            items = readiness(made, pool(), offered_subjects=(), own_queue=True, carrier=carrier)
             reasons = {item.reason for item in items}
             assert not reasons & {
                 ReadinessReason.CONTACT_CENTER_MISSING,

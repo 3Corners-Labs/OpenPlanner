@@ -80,6 +80,7 @@ def _skills_item(dispatch: DispatchKind, coded: frozenset[int], **changes: objec
         made,
         pool(guaranteed=frozenset({10, 11})),
         offered_subjects=("renewal",),
+        own_queue=True,
         coded_skills=coded,
     )
     return next(i for i in items if i.code is ReadinessCheck.SKILLS).reason
@@ -100,7 +101,9 @@ def test_a_contact_center_flow_with_an_unmapped_skill_is_not_ready() -> None:
 
 
 def test_a_legacy_flow_never_needs_a_code() -> None:
-    items = readiness(legacy(dispatch=DispatchKind.CONTACT_CENTER), pool(), offered_subjects=())
+    items = readiness(
+        legacy(dispatch=DispatchKind.CONTACT_CENTER), pool(), offered_subjects=(), own_queue=True
+    )
     assert next(i for i in items if i.code is ReadinessCheck.SKILLS).ok
 
 

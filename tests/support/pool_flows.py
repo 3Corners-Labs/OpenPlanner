@@ -16,7 +16,7 @@ import pytest
 
 from app.domain.authorization import Scope
 from app.domain.capacity import CapacityPool, PoolMode
-from app.domain.scheduling import Offer, ScheduleRule, TimeWindow
+from app.domain.scheduling import DispatchKind, Offer, ScheduleRule, TimeWindow
 from app.domain.service_flows import FlowState, HandlingAction, IntakeMode, InteractionKind
 from app.domain.staff import StaffMember
 from tests.support.domain import NOW
@@ -48,6 +48,22 @@ def shut_gate(monkeypatch: pytest.MonkeyPatch) -> None:
     owner opens the gate (checklist item G10) and a rollback image runs with it shut.
     """
     monkeypatch.setattr("app.domain.service_flows.ROLLBACK_SAFE", False)
+
+
+async def set_own_queue(uow: Any, slug: str = "demo", *, own: bool = True) -> None:
+    """Give the service ``slug`` OpenPlanner's own queue, or the contact center (``own=False``).
+
+    The one helper for tests that activate a flow on the own queue through the readiness
+    checklist (portal or import): the checklist refuses it on a service without an own queue
+    (``own_queue_missing``, product owner 2026-11-15), and the shared group fixtures default to
+    the contact center. Written through the ``Transaction`` port, so it serves the fake and the
+    SQL adapter alike.
+    """
+    kind = DispatchKind.OPENPLANNER_QUEUE if own else DispatchKind.CONTACT_CENTER
+    async with uow.locked() as tx:
+        group = await tx.get_group(slug)
+        assert group is not None, slug
+        await tx.save_group(replace(group, dispatch_kind=kind))
 
 
 def block(
