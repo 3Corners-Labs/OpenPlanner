@@ -15,6 +15,8 @@ het afspraaknummer en de status:
 - **Nog niet begonnen**: de deelnemer is nog niet in het gesprek.
 - **Deelnemer wacht**: de deelnemer zit in het gesprek en wacht op een medewerker.
 - **Opgepakt door een collega** of **Door u opgepakt**.
+- **Bij het contactcenter**: het contactcenter heeft dit werk en een medewerker daar handelt het
+  af. U kunt het hier niet oppakken. Geeft het contactcenter het terug, dan staat het weer open.
 - **Niet opgepakt**: niemand heeft de afspraak opgepakt binnen de tijd die bij de groep is
   ingesteld. OpenPlanner legt dat per afspraak één keer vast als systeemgebeurtenis
   `queue.not_picked_up` in het auditlog, en het overzicht telt deze afspraken per groep.

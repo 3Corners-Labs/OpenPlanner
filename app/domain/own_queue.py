@@ -99,6 +99,9 @@ class QueueEntry:
 
     booking: Booking
     status: CallStatus
+    held: bool = False
+    """The contact center holds the work: its request has an active contact-center attempt
+    (ADR 0121 step 28, choice E10). Taken like a claim, but by the platform: shown as held."""
 
     @property
     def in_lobby(self) -> bool:
@@ -109,6 +112,11 @@ class QueueEntry:
     def claimed(self) -> bool:
         """Whether an agent picked the booking up."""
         return self.booking.claim is not None
+
+    @property
+    def taken(self) -> bool:
+        """Whether someone holds the work: an agent's claim, or the contact center."""
+        return self.claimed or self.held
 
     @property
     def is_direct(self) -> bool:
@@ -127,17 +135,18 @@ class QueueEntry:
         A scheduled participant waits once in the lobby; a direct caller from the request itself,
         until an agent claims the call or joins the meeting.
         """
-        if self.claimed or self.status.host_joined:
+        if self.taken or self.status.host_joined:
             return False
         return self.in_lobby or (self.is_direct and self.status.call is not CallState.ENDED)
 
     def not_picked_up(self, now: datetime, limit: timedelta) -> bool:
         """Whether nobody took the booking within ``limit`` after its start (ADR 0043 point 8).
 
-        Taken means claimed, or an agent joined the meeting without claiming it. The one rule
-        behind the queue's chip, the overview's count and the ``queue.not_picked_up`` event.
+        Taken means claimed, held by the contact center, or an agent joined the meeting without
+        claiming it. The one rule behind the queue's chip, the overview's count and the
+        ``queue.not_picked_up`` event.
         """
-        if self.claimed or self.status.host_joined:
+        if self.taken or self.status.host_joined:
             return False
         return now - self.booking.start > limit
 
@@ -201,8 +210,8 @@ def visible(entries: Iterable[QueueEntry], group: Group, now: datetime) -> list[
 
 
 def next_up(entries: Iterable[QueueEntry]) -> QueueEntry | None:
-    """Return the unclaimed entry "pick up next" takes, or ``None`` when none is left."""
-    open_entries = [e for e in entries if not e.claimed and e.booking.is_active]
+    """Return the entry nobody holds that "pick up next" takes, or ``None`` when none is left."""
+    open_entries = [e for e in entries if not e.taken and e.booking.is_active]
     if not open_entries:
         return None
     return min(open_entries, key=_pick_order)
