@@ -124,7 +124,7 @@ async def test_the_own_queue_and_the_contact_center_never_hold_one_request(
     assert await dispatch(the_desk, second) is None
     with pytest.raises(DomainError) as excinfo:
         await the_desk.queue.claim(AGENT, "demo", second)
-    assert excinfo.value.code is ErrorCode.ALREADY_CLAIMED
+    assert excinfo.value.code is ErrorCode.HELD_BY_CONTACT_CENTER
     assert len(the_desk.dispatcher.items) == 1
     for booking_id in (first, second):
         assert len([i for i in items_of(uow, booking_id) if i.active]) == 1
@@ -167,7 +167,7 @@ async def test_an_unknown_outcome_is_never_retried_and_blocks_the_own_queue(
     at(clock)
     with pytest.raises(DomainError) as excinfo:
         await the_desk.queue.claim(AGENT, "demo", booking_id)
-    assert excinfo.value.code is ErrorCode.ALREADY_CLAIMED
+    assert excinfo.value.code is ErrorCode.HELD_BY_CONTACT_CENTER
 
 
 async def test_a_late_task_of_an_attempt_in_doubt_is_adopted(
@@ -378,6 +378,50 @@ async def test_a_failed_task_goes_back_to_the_own_queue(
     [item] = items_of(uow, booking_id)
     assert item.state is WorkItemState.FAILED
     assert request_of(uow, booking_id).handling is HandlingState.QUEUED
+
+
+async def test_the_own_queue_shows_work_the_contact_center_holds_as_held(
+    the_desk: Desk, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """Step 28 (E10): held, not open; no claim offered, not next, never "not picked up".
+
+    Once the platform gives the work back (``task:failed``) the row is open again.
+    """
+    booking_id = await book(uow, clock, CC_FLOW)
+    await dispatch(the_desk, booking_id)
+    at(clock, 20)  # well past ``not_picked_up_minutes``
+
+    view = await the_desk.queue.view(AGENT, "demo")
+
+    [row] = [r for r in view.rows if r.booking_id == booking_id]
+    assert (row.held, row.claimed, row.overdue) == (True, False, False)
+    assert view.next_booking_id is None
+    with pytest.raises(DomainError) as excinfo:
+        await the_desk.queue.claim_next(AGENT, "demo")
+    assert excinfo.value.code is ErrorCode.QUEUE_EMPTY
+
+    task = uow.state.bookings[booking_id].contact_center_task
+    assert task is not None
+    await event(the_desk, task.id, EventKind.TASK_FAILED)
+    back = await the_desk.queue.view(AGENT, "demo")
+
+    [row] = [r for r in back.rows if r.booking_id == booking_id]
+    assert not row.held
+    assert back.next_booking_id == booking_id
+
+
+async def test_an_attempt_in_doubt_is_held_too(
+    the_desk: Desk, uow: InMemoryUnitOfWork, clock: FixedClock
+) -> None:
+    """Outcome unknown: the contact center may hold it, so the own queue does not offer it."""
+    booking_id = await book(uow, clock, CC_FLOW)
+    the_desk.dispatcher.error = IntegrationError("unreachable", retryable=True, ambiguous=True)
+    await dispatch(the_desk, booking_id)
+    at(clock)
+
+    view = await the_desk.queue.view(AGENT, "demo")
+
+    assert [r.held for r in view.rows if r.booking_id == booking_id] == [True]
 
 
 async def test_an_event_during_the_create_never_ends_the_task_it_creates(

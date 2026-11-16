@@ -15,7 +15,9 @@
 #       without it), seeds demo and the demonstration and writes one record of each kind the
 #       rollback gate holds back (seed-gated-records); the previous IMAGE then starts on it
 #       without a downgrade and books on /g/demo on the day the pool bookings hold; this checkout
-#       compares the database per table again
+#       claims there with the image's own code (scripts/rollback_claim.py: once, not twice, not
+#       the work this checkout holds); this checkout reads the claim back and compares the
+#       database per table again
 #   scripts/upgrade-matrix.sh rollback-release IMAGE_REPO  the same against the newest release
 #       that carries an upgrade fixture (ROLLBACK_VERSION=X.Y.Z picks another one): downloads
 #       and checks its fixture, runs `rollback IMAGE_REPO:X.Y.Z FIXTURE`; skips with a notice
@@ -167,6 +169,35 @@ book_on_demo() {
     --data-urlencode "phone=" --data-urlencode "website="
 }
 
+# The claim half of A30 (G43). The previous image's claim is a signed-in agent's POST, which this
+# matrix cannot make (no identity provider, and a login is never forged); what the POST writes is
+# one conditional update of the booking, so the image's own code runs it (scripts/rollback_claim.py,
+# piped into the running container) on two bookings: the one in the previous image's own shape that
+# this checkout wrote with the pre-train columns only (the booking the image makes over HTTP is
+# pending until its confirmation link is followed, ADR 0056, and cannot be claimed yet), and the
+# booking whose work this checkout holds. Expected: claimed once, not twice, the held work refused;
+# this checkout then reads the previous image's claim back and the held work is still its own.
+previous_image_claim() {
+  local name="$1" gated="$2" made held url results holders
+  made="$("${PY[@]}" -c 'import json,sys; print(json.load(open(sys.argv[1]))["legacy_booking"])' "$gated")"
+  held="$("${PY[@]}" -c 'import json,sys; print(json.load(open(sys.argv[1]))["pool_booking"])' "$gated")"
+  url="sqlite+aiosqlite:////srv/data/$name"
+  results="$(docker exec -i upgrade-app python - claim "$url" previous-image "$made" "$made" "$held" <scripts/rollback_claim.py)" || return 1
+  echo "the previous image's own code claimed: $results"
+  if [ "$("${PY[@]}" -c 'import json,sys; print(json.dumps(json.loads(sys.argv[1])["claimed"]))' "$results")" != "[true, false, false]" ]; then
+    echo "::error::the previous image's claim was not once on its booking, refused twice and refused on held work" >&2
+    return 1
+  fi
+  export DATABASE_URL="sqlite+aiosqlite:///$work/$name"
+  holders="$("${PY[@]}" -m scripts.rollback_claim claimed "$DATABASE_URL" "$made" "$held")"
+  unset DATABASE_URL
+  echo "this checkout reads the claims back: $holders"
+  if ! "${PY[@]}" -c 'import json,sys; h=json.loads(sys.argv[1]); sys.exit(not (h[sys.argv[2]]=="previous-image" and h[sys.argv[3]] not in (None,"previous-image")))' "$holders" "$made" "$held"; then
+    echo "::error::this checkout does not read back the previous image's claim, or the held work lost its holder" >&2
+    return 1
+  fi
+}
+
 # Make sure IMAGE is here: pulled when it is not. Fails with what to do when it cannot be had.
 require_image() {
   local image="$1"
@@ -216,6 +247,10 @@ rollback() {
     return 1
   fi
   if ! status="$(book_on_demo "$day")"; then
+    docker logs upgrade-app >&2
+    return 1
+  fi
+  if ! previous_image_claim "$name" "$work/gated.json"; then
     docker logs upgrade-app >&2
     return 1
   fi

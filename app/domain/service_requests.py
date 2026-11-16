@@ -205,6 +205,14 @@ class WorkItem:
         return self.state in ACTIVE_ITEM
 
     @property
+    def held_by_contact_center(self) -> bool:
+        """Whether the contact center holds the request through it: an active attempt.
+
+        Sent, in doubt or connected; the own queue shows such work as held (ADR 0121 step 28).
+        """
+        return self.active and self.channel is WorkChannel.CONTACT_CENTER
+
+    @property
     def started(self) -> bool:
         """Whether treatment started (it may have ended since)."""
         return self.started_at is not None
