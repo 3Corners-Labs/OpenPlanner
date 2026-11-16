@@ -537,8 +537,8 @@ web ──> audit_events: queue.claimed / queue.released (actor subject, group, 
 A request of a flow on a counted pool (`service_requests`) and the attempts of staff to handle it
 (`work_items`). The personal data of a request with an appointment stays on its booking; a
 request without one keeps it in `request_personal_data` (decision D1), written by step 7
-(on-demand intake) on. Nothing in production makes a request while the rollback gate
-`ROLLBACK_SAFE` is shut. A rollback never drops this data outside its retention: the
+(on-demand intake) on. Since #826 the rollback gate
+`ROLLBACK_SAFE` is open: a request is made only once an administrator activates an on-demand flow on the own queue of a service with an own queue (no flow activates by itself; contact-center flows stay refused). A rollback never drops this data outside its retention: the
 previous image leaves the tables alone, and a downgrade past migration 0113 refuses while a
 request-level record holds personal data (`docs/service-flows-compatibility.md`, section 2).
 

@@ -1,6 +1,6 @@
 # 0122. Capacity of a shared pool: staffing and interval accounting
 
-Status: accepted, partly built (2026-11-11), requested by the product owner. Extends ADR 0121 (step 3b); builds on ADR 0027 (staffing blocks), ADR 0072 (what a block offers), ADR 0116 (expand/contract) and ADR 0042 (settings).
+Status: accepted, partly built; the rollback gate is open since #826 (2026-11-16), requested by the product owner. Extends ADR 0121 (step 3b); builds on ADR 0027 (staffing blocks), ADR 0072 (what a block offers), ADR 0116 (expand/contract) and ADR 0042 (settings).
 
 The full design, with the algorithms, the worked examples and the plan of five pull requests, is [`docs/service-flows-capacity-design.md`](../service-flows-capacity-design.md); it is the build brief of this ADR, and [`docs/service-flows-handover.md`](../service-flows-handover.md) is the condensed brief of ADR 0121. The decisions below are the testable summary.
 
@@ -57,6 +57,7 @@ Configuration of one object, not a setting (like a service's `direct_call_max_co
 | 5 | Utilisation of a counted pool in the reports (C1 to C3 per pool rather than per service), and the outcome of work completed after its slot was closed | | follow-up |
 | 5 | Must be done before `ROLLBACK_SAFE` opens: the change-request check of the agent API (`ChangeRequestService._free`) judges a requested time on the service's own times, before any booking is matched; a time on the pool of a matched pool booking must be judged on that pool without telling the caller whether anything matched. Built: the time is judged first on every placement of the service (`Placements.every_placement`), then the matched booking on its own slot (`BookingService.may_move_to`); a booking that cannot move there is recorded as no match | #808 | merged |
 | 5 | Must be done before `ROLLBACK_SAFE` opens: `rollback_not_safe` becomes its own readiness check (title and text), split from the retention check, when ADR 0121 step 5 sets `RETENTION_BUILT` true | #767 | merged |
+| 5 | The rollback gate `ROLLBACK_SAFE` set to `True` (ADR 0121 checklist G10, product owner 2026-11-15), in an image whose previous minor (0.6.0) holds the readers and the accounting of every pool record, proven by the upgrade matrix's rollback mode (G07, G43) | #826 | merged |
 
 ## Decisions of the product owner (2026-11-11)
 

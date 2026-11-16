@@ -19,6 +19,8 @@ migration 0109) behaves byte for byte as before. *Intended* means a change the A
 written next to the proof. *Gated* means a path that only a non-legacy flow reaches, and
 `ROLLBACK_SAFE` (`app/domain/service_flows.py`) keeps every non-legacy flow shut.
 
+**The gate is open since #826** (checklist G10, product owner 2026-11-15) for flows on the own queue. The rows marked *Gated* below describe the behaviour with the gate shut, which a rollback to the previous image restores; their tests shut the gate themselves (`tests.support.pool_flows.shut_gate`), so they keep proving it. With the gate open nothing changes for a service until an administrator activates a non-legacy flow on it.
+
 ## 1. Compatibility matrix
 
 The columns are the train's changes: **B** the backfill and the flow resolver (steps 2b, 2e, 3a),
