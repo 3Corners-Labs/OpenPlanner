@@ -42,12 +42,19 @@ export interface SetUp {
   /** The page of the request that keeps waiting. */
   immediate_request: string;
   /** The value of its cookie, `<reference>.<random value>`. */
+  /** Its "withdraw?" page, which says what withdrawing does (nothing is withdrawn by opening it). */
+  immediate_request_leave: string;
   immediate_request_cookie: string;
   /** The page of the request the e2e agent claimed. */
   claimed_request: string;
 }
 
-const SETUP_KEYS: ReadonlySet<string> = new Set(['immediate_request', 'immediate_request_cookie', 'claimed_request']);
+const SETUP_KEYS: ReadonlySet<string> = new Set([
+  'immediate_request',
+  'immediate_request_leave',
+  'immediate_request_cookie',
+  'claimed_request',
+]);
 
 /** The participant's journey of one browser (ADR 0071, 0075, 0076): two seeded bookings. */
 export interface JourneyExample {

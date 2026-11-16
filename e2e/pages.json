@@ -46,6 +46,24 @@
       "cookie": "immediate_request_cookie"
     },
     {
+      "name": "withdraw an immediate request",
+      "path": "{immediate_request_leave}",
+      "locales": [
+        "nl",
+        "en"
+      ],
+      "cookie": "immediate_request_cookie"
+    },
+    {
+      "name": "calendar of a flow on a shared pool",
+      "path": "/g/demo?flow=persoonlijk-gesprek",
+      "locales": [
+        "nl",
+        "en"
+      ],
+      "island": true
+    },
+    {
       "name": "call page",
       "path": "{call_page}",
       "locales": [
@@ -566,6 +584,16 @@
         "nl",
         "en"
       ]
+    },
+    {
+      "name": "own queue with work without an appointment",
+      "path": "/admin/groups/demo/queue",
+      "user": "agent",
+      "locales": [
+        "nl",
+        "en"
+      ],
+      "island": true
     }
   ]
 }
