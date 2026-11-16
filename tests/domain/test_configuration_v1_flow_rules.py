@@ -699,7 +699,10 @@ def next_revision(data: dict[str, Any], **changes: Any) -> dict[str, Any]:
     return fresh
 
 
-def test_a_stored_draft_may_gain_a_publication_time_and_become_the_current_revision() -> None:
+def test_a_stored_draft_may_gain_a_publication_time_and_become_the_current_revision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shut_gate(monkeypatch)  # publishing here waits on the rollback point
     data = document_json()
     advies(data)["revisions"][2]["published_at"] = published(3)
     advies(data)["current_revision"], advies(data)["draft_revision"] = 3, None
@@ -750,7 +753,8 @@ def test_a_revision_is_published_later_than_every_revision_before_it() -> None:
     ]
 
 
-def test_revisions_follow_each_other_without_a_gap() -> None:
+def test_revisions_follow_each_other_without_a_gap(monkeypatch: pytest.MonkeyPatch) -> None:
+    shut_gate(monkeypatch)  # publishing here waits on the rollback point
     data = document_json()
     advies(data)["revisions"][2]["published_at"] = published(3)
     advies(data)["current_revision"], advies(data)["draft_revision"] = 3, None
@@ -776,7 +780,10 @@ def test_a_published_revision_cannot_newly_name_what_the_one_before_it_did_not_h
     ) in refusals(plan(data, full()))
 
 
-def test_a_published_revision_may_keep_what_the_one_before_it_has() -> None:
+def test_a_published_revision_may_keep_what_the_one_before_it_has(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shut_gate(monkeypatch)  # publishing here waits on the rollback point
     data = document_json()
     next_revision(data, required_skills=["passport"], subjects={"paspoort": ["passport"]})
     advies(data)["revisions"][2]["required_skills"] = ["passport"]
@@ -971,9 +978,10 @@ def test_the_world_of_a_resolution_is_read_once_whatever_the_number_of_rules(
     assert reads == [1]
 
 
-def test_every_revision_a_document_newly_publishes_in_an_existing_flow_needs_its_checklist() -> (
-    None
-):
+def test_every_revision_a_document_newly_publishes_in_an_existing_flow_needs_its_checklist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shut_gate(monkeypatch)  # publishing here waits on the rollback point
     data = document_json()
     next_revision(data)
     advies(data)["revisions"][2]["capacity_pool"] = None  # revision 3: published, not ready
@@ -983,7 +991,8 @@ def test_every_revision_a_document_newly_publishes_in_an_existing_flow_needs_its
     ]
 
 
-def test_two_new_publications_in_order_are_accepted() -> None:
+def test_two_new_publications_in_order_are_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
+    shut_gate(monkeypatch)  # publishing here waits on the rollback point
     data = document_json()
     next_revision(data)
 

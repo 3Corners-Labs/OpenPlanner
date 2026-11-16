@@ -1,5 +1,7 @@
 """What a walkthrough of the flow screens found (ADR 0121 step 2d): wording, notices and rights."""
 
+import pytest
+
 from app.admin.skill_inputs import skill_name
 from app.domain.authorization import CustomRole, Permission, Role
 from app.domain.entitlements import LoginClaims
@@ -8,6 +10,7 @@ from tests.support.admin_site import ORG_ADMIN, SAME_ORIGIN, SUPER, Site, site_u
 from tests.support.domain import make_group
 from tests.support.flow_pages import BASE, act, create, create_ready, form_data
 from tests.support.flow_seed import add_flow, add_subjects, publish_flow
+from tests.support.pool_flows import shut_gate
 from tests.support.skill_seed import add_pool, add_skill
 
 
@@ -58,7 +61,10 @@ async def test_a_draft_that_is_not_in_order_has_no_publish_button_but_the_reason
     assert '<p class="hint" id="publish-hint">Publishing is possible once' in english
 
 
-async def test_a_draft_with_only_the_point_that_follows_open_offers_publish(site: Site) -> None:
+async def test_a_draft_with_only_the_point_that_follows_open_offers_publish(
+    site: Site, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    shut_gate(monkeypatch)  # publishing here waits on the rollback point
     await site.login_as(ORG_ADMIN)
     await create_ready(site)
 
@@ -119,7 +125,10 @@ async def test_an_unknown_skill_or_pool_answers_with_the_house_not_found_page(si
         assert "Er ging iets mis" not in response.text
 
 
-async def test_the_service_admin_of_the_service_manages_its_flows_and_no_other(site: Site) -> None:
+async def test_the_service_admin_of_the_service_manages_its_flows_and_no_other(
+    site: Site, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    shut_gate(monkeypatch)  # publishing here waits on the rollback point
     await site.login_as(SUPER)
     await add_subjects(site, {"contract": "Contract"})
     pool = await add_pool(site, "Loket")
