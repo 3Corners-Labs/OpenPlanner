@@ -86,7 +86,7 @@ semgrep:
 	uvx semgrep scan --error --config p/python --config p/owasp-top-ten --config p/secrets --metrics=off --config .semgrep/rules.yml app/
 
 # renovate: datasource=npm depName=jscpd
-JSCPD_VERSION := 5.4.2
+JSCPD_VERSION := 5.4.3
 duplication:
 	npx --yes jscpd@$(JSCPD_VERSION)
 
