@@ -4,7 +4,7 @@ import asyncio
 import copy
 from collections import Counter
 from collections.abc import AsyncIterator, Collection, Sequence
-from contextlib import asynccontextmanager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 
@@ -2090,3 +2090,23 @@ class InMemoryUnitOfWork:
             yield InMemoryTransaction(working)
             await asyncio.sleep(0)  # let a competing transaction queue up on the lock
             self.state = working
+
+
+class CommitFailingUnitOfWork:
+    """Wraps a store so that every locked transaction fails at its commit: nothing is kept.
+
+    Reads see the store; a locked block works on a copy that is thrown away, then raises, as a
+    commit that fails would. For counts that must reflect only what was committed.
+    """
+
+    def __init__(self, uow: InMemoryUnitOfWork) -> None:
+        self._uow = uow
+
+    def read(self) -> AbstractAsyncContextManager[InMemoryTransaction]:
+        return self._uow.read()
+
+    @asynccontextmanager
+    async def locked(self) -> AsyncIterator[InMemoryTransaction]:
+        async with self._uow.read() as tx:
+            yield tx
+        raise RuntimeError("commit failed")

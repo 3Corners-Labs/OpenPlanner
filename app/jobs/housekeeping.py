@@ -324,13 +324,20 @@ class Housekeeping:
         except Exception as exc:  # never stop the loop; the next round tries again
             log.warning("requests.watch_failed", error=type(exc).__name__)
             return
-        if result.changed or result.expired_unclaimed or result.deleted or result.failed:
+        if (
+            result.changed
+            or result.expired_unclaimed
+            or result.deleted
+            or result.failed
+            or result.tasks_ended
+        ):
             log.info(
                 "requests.watched",
                 changed=result.changed,
                 expired_unclaimed=result.expired_unclaimed,
                 deleted=result.deleted,
                 failed=result.failed,
+                tasks_ended=result.tasks_ended,
                 errors=",".join(result.errors),
             )
 

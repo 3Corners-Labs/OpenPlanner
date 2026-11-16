@@ -266,7 +266,7 @@ worker/web ──HTTPS (Service App token)──> Webex Meetings API: title "Vid
 Webex ──meeting id, join link──> OpenPlanner (bookings.video_room_id, guest_join_url)
 worker/web ──HTTPS──> WxCC Create Task v2: booking reference, first name, start (text), group name, meeting link, kind
 WxCC ──task id──> OpenPlanner (bookings.contact_center_task_id, also wxcc_task_id until dropped)
-worker ──HTTPS──> WxCC Task Messages v2: booking reference, kind=cancelled; then End Task v1 (task id only)
+worker ──HTTPS──> WxCC Task Messages v2: booking reference, kind=cancelled; then End Task v1 (task id only); also for a contact-center attempt the request watchdog expired or cancelled (ADR 0121 step 27)
 operator CLI <──HTTPS── WxCC configuration (wxcc-config-check): channel, asset, entry point, queue names and ids, schema keys, flow export; nothing stored, no personal data
 operator CLI <──HTTPS── Webex webhooks (ownedBy=org), WxCC subscriptions (webhooks-list/-reset): ids, events, hostEmail filters, status, secret set or not, target without query → integration_reports
 operator CLI ──DELETE──> Webex webhooks, WxCC subscriptions (webhooks-reset --yes): ids of stale registrations only
