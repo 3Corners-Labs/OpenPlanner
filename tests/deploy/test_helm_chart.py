@@ -190,3 +190,64 @@ def test_egress_refuses_to_guess_where_the_pod_may_go(
     )
     assert result.returncode != 0
     assert message in result.stderr
+
+
+OPENSHIFT = {"openshift.enabled": "true"}
+FIXED_IDS = ("runAsUser", "runAsGroup", "fsGroup")
+
+
+def test_openshift_leaves_the_user_and_group_to_the_platform() -> None:
+    # SCC restricted-v2 (ADR 0130) assigns a uid and an fsGroup from the namespace range and
+    # rejects a pod that names one outside it.
+    pod = _docs(**OPENSHIFT)["Deployment"]["spec"]["template"]["spec"]
+    for field in FIXED_IDS:
+        assert field not in pod["securityContext"]
+    assert pod["securityContext"]["runAsNonRoot"] is True
+    assert pod["securityContext"]["seccompProfile"] == {"type": "RuntimeDefault"}
+    for container in pod["containers"]:
+        for field in FIXED_IDS:
+            assert field not in container["securityContext"]
+        assert container["securityContext"]["allowPrivilegeEscalation"] is False
+        assert container["securityContext"]["capabilities"] == {"drop": ["ALL"]}
+        assert container["securityContext"]["readOnlyRootFilesystem"] is True
+
+
+def test_openshift_serves_through_a_route_not_an_ingress() -> None:
+    docs = _docs(**OPENSHIFT)
+    assert "Ingress" not in docs
+    route = docs["Route"]
+    assert route["apiVersion"] == "route.openshift.io/v1"
+    assert route["spec"]["host"] == "planner.example.nl"
+    assert route["spec"]["to"] == {"kind": "Service", "name": "t", "weight": 100}
+    assert route["spec"]["port"] == {"targetPort": "http"}
+    assert route["spec"]["tls"] == {
+        "termination": "edge",
+        "insecureEdgeTerminationPolicy": "Redirect",
+    }
+
+
+def test_without_openshift_nothing_changes() -> None:
+    docs = _docs()
+    assert "Route" not in docs
+    assert "Ingress" in docs
+    assert docs["Deployment"]["spec"]["template"]["spec"]["securityContext"]["fsGroup"] == 10001
+
+
+def test_openshift_with_web_tls_re_encrypts_and_names_the_ca() -> None:
+    tls = {"webTls.enabled": "true", "webTls.secretName": "w", **OPENSHIFT}
+    result = _template(**tls)
+    assert result.returncode != 0
+    assert "openshift.route.destinationCACertificate is required" in result.stderr
+    route = _docs(
+        {"openshift.route.destinationCACertificate": "-----BEGIN CERTIFICATE-----"}, **tls
+    )["Route"]
+    assert route["spec"]["tls"]["termination"] == "reencrypt"
+    assert route["spec"]["tls"]["destinationCACertificate"] == "-----BEGIN CERTIFICATE-----"
+
+
+def test_the_images_writable_paths_are_group_zero_writable() -> None:
+    # A random uid has group 0 (restricted-v2), so the volume paths of the image must be
+    # writable by that group (ADR 0130).
+    dockerfile = (Path(__file__).parents[2] / "Dockerfile").read_text()
+    assert "chgrp 0 /srv/data /srv/portal-certs" in dockerfile
+    assert "chmod g=u /srv/data /srv/portal-certs" in dockerfile

@@ -1,4 +1,4 @@
-{{- if .Values.ingress.enabled }}
+{{- if and .Values.ingress.enabled (not .Values.openshift.enabled) }}
 {{- $host := required "ingress.host is required" .Values.ingress.host }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress

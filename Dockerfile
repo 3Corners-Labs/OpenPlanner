@@ -46,8 +46,13 @@ COPY --from=widget /widget/dist/openplanner-booking.js ./widget/dist/openplanner
 # The manual is rendered in the portal (ADR 0033).
 COPY docs/manual ./docs/manual
 # The data volume (SQLite database, worker heartbeat) and the portal-certs volume (the own
-# certificate handed to the proxy, ADR 0070) are the only writable paths.
-RUN mkdir /srv/data /srv/portal-certs && chown app:app /srv/data /srv/portal-certs
+# certificate handed to the proxy, ADR 0070) are the only writable paths. They are also writable
+# for group 0: OpenShift's SCC restricted-v2 runs the image under a random uid that is a member
+# of group 0 only (ADR 0130).
+RUN mkdir /srv/data /srv/portal-certs \
+ && chown app:app /srv/data /srv/portal-certs \
+ && chgrp 0 /srv/data /srv/portal-certs \
+ && chmod g=u /srv/data /srv/portal-certs
 # Summer and winter time come from the pinned `tzdata` package (uv.lock, Renovate), not from
 # whatever the base image happens to ship: an empty PYTHONTZPATH makes zoneinfo use only it.
 ENV APP_VERSION=${APP_VERSION} \
