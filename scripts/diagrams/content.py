@@ -8,7 +8,7 @@ the HTML that draw.io renders (``<b>``, ``<br>``, ``&amp;``); the document build
 from dataclasses import dataclass
 from enum import StrEnum
 
-AS_OF = "5 november 2026, aangevuld op 14 november 2026"
+AS_OF = "5 november 2026, aangevuld op 14 en 19 november 2026"
 TITLE = "Bouwblokken van OpenPlanner"
 SUBTITLE = (
     "Architectuur van de groepsafsprakenservice voor het contactcenter, zoals gebouwd. "
@@ -59,7 +59,7 @@ PLATES = (
         "Hoofdlijn: bouwblokken en omgeving",
         "Zeventien bouwblokken in vier families. Links wie de dienst gebruikt, rechts de systemen "
         "waar OpenPlanner mee praat. Deelnemers loggen nooit in; alleen beheerders via de identity "
-        "provider. Persoonsgegevens staan alleen op Booking.",
+        "provider. Persoonsgegevens staan alleen op de afspraak, het verzoek en de chat.",
     ),
     Plate(
         "Softwarecomponenten per laag",
@@ -166,10 +166,11 @@ BLOCKS = (
         "ondertekende webhooks terug, tijdlijn en gespreksstatus per boeking met de reden van de "
         "provider; groepscontrole met een proef-work item. De embedded call laat de deelnemer in "
         "een eigen pagina bellen: het videoplatform blijft afgeschermd en de huisstijl blijft die "
-        "van de organisatie. Als huls gebouwd op de Webex Meetings SDK; een on-premises platform "
-        "zoals Cisco Meeting Server is verkend.",
+        "van de organisatie, met een chat naast het gesprek. Als huls gebouwd op de Webex Meetings "
+        "SDK; een on-premises platform zoals Cisco Meeting Server is verkend.",
         "domain/calls · call_service · call_page · guest_access · integration · jobs/calls · "
-        "api/call_pages · adapters/webex_meetings · wxcc · webhooks · group_check",
+        "api/call_pages · call_chat_pages · adapters/webex_meetings · wxcc · webhooks · "
+        "group_check",
         "0017 · 0018 · 0021 · 0065 · 0068 · 0082 · 0123",
     ),
     Block(
@@ -270,10 +271,11 @@ BLOCKS = (
         "TLS-proxy, certificaten, headers, rate limits",
         "Caddy als TLS-proxy; certificaatbron in het portaal (ACME, eigen certificaat via CSR, "
         "interne CA voor labs); certificaat en publiek adres gecontroleerd op Systeemstatus; "
-        "strikte CSP en HSTS, CSRF via Fetch Metadata, rate limits en honeypot.",
-        "deploy/proxy · web/protection · api/security_headers · adapters/tls_probe · "
+        "strikte CSP en HSTS, CSRF via Fetch Metadata, rate limits en honeypot. Achter een eigen "
+        "rand vertrouwt de proxy alleen de opgegeven adressen; /idp dient alleen het inloggen.",
+        "deploy/proxy · idp.caddy · web/protection · api/security_headers · adapters/tls_probe · "
         "instance_probe · certificate_volume",
-        "0030 · 0064 · 0070 · 0086 · 0112",
+        "0030 · 0064 · 0070 · 0086 · 0112 · 0126 · 0129",
     ),
     Block(
         "B16",
@@ -327,7 +329,7 @@ EXTERNALS = (
 
 PLATE1_FOOTNOTE = (
     "Deelnemers loggen nooit in; alleen beheerders via de IdP. Persoonsgegevens staan alleen op "
-    "<b>Booking</b>; naar WxCC gaan alleen voornaam en host-link."
+    "<b>Booking</b>, het verzoek en de chat; naar WxCC gaan alleen voornaam en host-link."
 )
 
 
@@ -765,7 +767,9 @@ SHARED_PARTS = (
         "Webhooks in",
         "webhooks.py · api/webhooks",
         "handtekening over de ruwe body vóór het parsen; replay-sleutel per event; "
-        "contactcenter op /webhooks/contact-center/{kind} (alias /webhooks/wxcc)",
+        "contactcenter op /webhooks/contact-center/{kind}[/{org}], chatberichten op "
+        "…/{org}/messages (alias /webhooks/wxcc); na een rotatie geldt het vorige secret binnen "
+        "de overlap",
     ),
     SharedPart(
         Family.PLATFORM,
