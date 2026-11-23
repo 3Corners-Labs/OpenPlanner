@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "docx": "9.15.3",
+    "docx": "9.16.0",
     "marked": "15.0.12"
   }
 }
