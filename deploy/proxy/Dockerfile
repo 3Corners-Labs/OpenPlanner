@@ -10,7 +10,7 @@
 # up to 3 times (waits of 10 s and 30 s); the module cache is a BuildKit cache mount, so a retry
 # only fetches what is still missing. Checksum verification stays on: never set GOSUMDB=off,
 # GONOSUMDB, GONOSUMCHECK or GOFLAGS=-insecure here.
-FROM caddy:2.11.7-builder-alpine AS build
+FROM caddy:2.11.9-builder-alpine@sha256:86e132d1d6db8850352b2dbc15f82a4cb25363ac305ee41e11405873e5931f37 AS build
 RUN --mount=type=cache,target=/go/pkg/mod \
     attempt=1; \
     until xcaddy build v2.11.7 \
@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       sleep "$delay"; attempt=$((attempt + 1)); \
     done
 
-FROM caddy:2.11.7-alpine
+FROM caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
 # curl is not used (the health check uses busybox wget) and carries its own CVEs.
 # /internal-ca receives the public root of the internal authority (ADR 0112).
 # Caddy runs as uid 10001 on unprivileged ports (8080/8443, published as 80/443). The file
