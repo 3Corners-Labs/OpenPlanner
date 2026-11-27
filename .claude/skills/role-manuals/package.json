@@ -9,6 +9,6 @@
   },
   "dependencies": {
     "docx": "9.15.3",
-    "marked": "15.0.12"
+    "marked": "18.3.0"
   }
 }
